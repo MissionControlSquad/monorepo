@@ -1,0 +1,20 @@
+// Import all query resolvers (side-effect: registers on builder)
+import "./agents";
+import "./me";
+import "./tasks";
+import "./messages";
+import "./activities";
+import "./documents";
+import "./notifications";
+import "./deliverables";
+import "./agent-actions";
+import "./agent-queue";
+import "./projects";
+import "./project-docs";
+import "./channels";
+import "./task-templates";
+import "./recurring-tasks";
+import "./reviews";
+import "./analytics";
+import "./search";
+import "./feature-flags";

@@ -1,0 +1,21 @@
+// Import all type definitions (side-effect: registers types on builder)
+import "./agent";
+import "./task";
+import "./task-assignee";
+import "./message";
+import "./message-reaction";
+import "./activity";
+import "./document";
+import "./notification";
+import "./subscription-model";
+import "./work-session";
+import "./status-history";
+import "./agent-action";
+import "./deliverable";
+import "./task-template";
+import "./recurring-task";
+import "./project";
+import "./project-doc";
+import "./agent-queue";
+import "./channel";
+import "./cloud-vm";

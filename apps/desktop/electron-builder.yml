@@ -1,0 +1,46 @@
+appId: cloud.agentcenter.desktop
+productName: AgentCenter
+copyright: Copyright © 2026 AgentCenter
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist-electron/**/*
+  - "!node_modules"
+  - "!src"
+  - "!electron"
+  - "!.next"
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - universal
+  icon: build/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+
+dmg:
+  sign: false
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+protocols:
+  - name: AgentCenter
+    schemes:
+      - agentcenter
+
+publish:
+  provider: github
+  owner: agentcenter
+  repo: agentcenter-desktop

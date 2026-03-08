@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "channel_messages" ADD COLUMN "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

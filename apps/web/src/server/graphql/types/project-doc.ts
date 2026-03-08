@@ -1,0 +1,34 @@
+import { builder } from "../builder";
+
+builder.prismaObject("ProjectDoc", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    projectId: t.exposeString("projectId"),
+    title: t.exposeString("title"),
+    summary: t.exposeString("summary", { nullable: true }),
+    content: t.exposeString("content"),
+    addedById: t.exposeString("addedById", { nullable: true }),
+    createdAt: t.expose("createdAt", { type: "DateTime" }),
+    updatedAt: t.expose("updatedAt", { type: "DateTime" }),
+
+    project: t.relation("project"),
+    addedBy: t.relation("addedBy", { nullable: true }),
+    revisions: t.relation("revisions"),
+  }),
+});
+
+builder.prismaObject("ProjectDocRevision", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    docId: t.exposeString("docId"),
+    title: t.exposeString("title"),
+    summary: t.exposeString("summary", { nullable: true }),
+    content: t.exposeString("content"),
+    editedById: t.exposeString("editedById", { nullable: true }),
+    editAction: t.exposeString("editAction"),
+    createdAt: t.expose("createdAt", { type: "DateTime" }),
+
+    doc: t.relation("doc"),
+    editedBy: t.relation("editedBy", { nullable: true }),
+  }),
+});

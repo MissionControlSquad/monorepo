@@ -1,0 +1,53 @@
+import { prisma } from "@/server/prisma";
+import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { getVMSSHConfig } from "@/server/services/cloud-vm-utils";
+import { sshExec } from "@/server/services/ssh";
+
+/**
+ * GET /api/cloud-vms/[id]/containers
+ * List Docker containers on the VM via SSH.
+ */
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+
+    const vm = await prisma.cloudVM.findUnique({
+      where: { id },
+      select: { ipv4: true, sshPrivateKey: true, status: true },
+    });
+
+    if (!vm) return errorResponse("VM not found", 404);
+    if (vm.status !== "running" || !vm.ipv4 || !vm.sshPrivateKey) {
+      return errorResponse("VM is not running", 400);
+    }
+
+    const sshConfig = getVMSSHConfig(vm);
+
+    const result = await sshExec(
+      sshConfig,
+      `docker ps -a --format '{"id":"{{.ID}}","name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","state":"{{.State}}"}'`,
+      { timeoutMs: 15_000 },
+    );
+
+    if (result.code !== 0) {
+      return errorResponse(`Failed to list containers: ${result.stderr.slice(0, 300)}`, 500);
+    }
+
+    const containers = result.stdout
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    return successResponse({ containers });
+  } catch (err) {
+    return handleError(err);
+  }
+}

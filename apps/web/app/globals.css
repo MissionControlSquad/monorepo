@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* AgentCenter design alignment (agentcenter.cloud): slate/neutral surfaces, indigo accent */
+@theme {
+  /* Project brand colors */
+  --color-brand: #4f46e5;
+  --color-brand-hover: #4338ca;
+  --color-brand-muted: #eef2ff;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  /* shadcn/ui theme - radius */
+  --radius: 0.625rem;
+
+  /* shadcn/ui theme - color tokens */
+  --color-background: oklch(1 0 0);
+  --color-foreground: oklch(0.145 0.004 285.82);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.145 0.004 285.82);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.145 0.004 285.82);
+  --color-primary: oklch(0.432 0.187 264.05);
+  --color-primary-foreground: oklch(0.985 0.002 247.86);
+  --color-secondary: oklch(0.967 0.001 286.38);
+  --color-secondary-foreground: oklch(0.21 0.006 285.88);
+  --color-muted: oklch(0.967 0.001 286.38);
+  --color-muted-foreground: oklch(0.553 0.013 285.94);
+  --color-accent: oklch(0.967 0.001 286.38);
+  --color-accent-foreground: oklch(0.21 0.006 285.88);
+  --color-destructive: oklch(0.577 0.245 27.33);
+  --color-destructive-foreground: oklch(0.577 0.245 27.33);
+  --color-border: oklch(0.922 0.004 286.32);
+  --color-input: oklch(0.922 0.004 286.32);
+  --color-ring: oklch(0.432 0.187 264.05);
+  --color-chart-1: oklch(0.646 0.222 41.12);
+  --color-chart-2: oklch(0.6 0.118 184.71);
+  --color-chart-3: oklch(0.398 0.07 227.39);
+  --color-chart-4: oklch(0.828 0.189 84.43);
+  --color-chart-5: oklch(0.769 0.188 70.08);
+  --color-sidebar: oklch(0.985 0.002 247.86);
+  --color-sidebar-foreground: oklch(0.145 0.004 285.82);
+  --color-sidebar-primary: oklch(0.432 0.187 264.05);
+  --color-sidebar-primary-foreground: oklch(0.985 0.002 247.86);
+  --color-sidebar-accent: oklch(0.967 0.001 286.38);
+  --color-sidebar-accent-foreground: oklch(0.21 0.006 285.88);
+  --color-sidebar-border: oklch(0.922 0.004 286.32);
+  --color-sidebar-ring: oklch(0.432 0.187 264.05);
+
+  /* Success */
+  --color-success: oklch(0.627 0.194 149.57);
+  --color-success-foreground: oklch(1 0 0);
+  --color-success-muted: oklch(0.982 0.018 155.83);
+
+  /* Warning */
+  --color-warning: oklch(0.769 0.188 70.08);
+  --color-warning-foreground: oklch(1 0 0);
+  --color-warning-muted: oklch(0.987 0.022 95.28);
+
+  /* Destructive muted */
+  --color-destructive-muted: oklch(0.971 0.013 17.38);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 120px;
+}

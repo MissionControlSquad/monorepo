@@ -1,0 +1,70 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-no-db:
+    name: Unit (no DB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: cd apps/web && npx prisma generate
+
+      - name: Run unit tests (no DB)
+        run: cd apps/web && npm run test:unit:no-db
+
+  test:
+    name: Test (with DB)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      POSTGRES_PRISMA_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
+      POSTGRES_URL_NON_POOLING: "postgresql://postgres:postgres@localhost:5432/postgres"
+      AUTH_SECRET: "ci-test-secret"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: cd apps/web && npx prisma generate
+
+      - name: Run tests
+        run: npx turbo run test

@@ -1,0 +1,26 @@
+import type { Document } from "@prisma/client";
+import { prisma } from "../prisma";
+import { emit } from "../events";
+import { EventTypes } from "../constants";
+import { Model } from "./base";
+
+class DocumentModel extends Model<Document> {
+  constructor() {
+    super(() => prisma.document);
+  }
+
+  async emitCreated(
+    doc: Pick<Document, "id" | "title">,
+    ctx: {
+      docType: string;
+      taskId?: string;
+      taskTitle?: string;
+      createdBy: string;
+      creatorName: string;
+    },
+  ) {
+    await emit({ type: EventTypes.DOCUMENT_CREATED, documentId: doc.id, title: doc.title, ...ctx });
+  }
+}
+
+export const documentModel = new DocumentModel();

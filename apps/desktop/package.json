@@ -1,0 +1,18 @@
+{
+  "name": "@agentcenter/desktop",
+  "private": true,
+  "version": "0.0.0",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "tsc -p tsconfig.json && electron .",
+    "build": "tsc -p tsconfig.json && electron-builder --mac",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "electron": "^35.1.2",
+    "electron-builder": "^26.0.12",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.6.2",
+    "typescript": "~5.9.3"
+  }
+}

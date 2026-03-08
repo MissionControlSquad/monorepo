@@ -1,0 +1,1158 @@
+generator client {
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+generator pothos {
+  provider     = "prisma-pothos-types"
+  clientOutput = "@prisma/client"
+  output       = "../src/server/graphql/generated/pothos-types.ts"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────
+
+enum AgentStatus {
+  idle
+  active
+  blocked
+}
+
+enum DetailedStatus {
+  thinking
+  coding
+  reviewing
+  researching
+  deploying
+  testing
+  writing
+  waiting_review
+  waiting_input
+  waiting_dependency
+}
+
+enum AgentLevel {
+  intern
+  specialist
+  lead
+}
+
+enum SetupStatus {
+  pending_setup
+  active
+  deactivated
+}
+
+enum TaskStatus {
+  inbox
+  assigned
+  in_progress
+  review
+  done
+  blocked
+}
+
+enum Priority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum ActivityType {
+  task_created
+  task_updated
+  message_sent
+  document_created
+  agent_status_changed
+  task_assigned
+  task_completed
+  agent_woke_up
+  agent_went_to_sleep
+  deliverable_submitted
+}
+
+enum DocumentType {
+  deliverable
+  research
+  protocol
+  note
+  file
+}
+
+enum WorkSessionEventType {
+  started
+  continued
+  paused
+  completed
+}
+
+enum AgentActionType {
+  file_opened
+  file_edited
+  command_executed
+  code_written
+  research_done
+  comment_posted
+  status_update
+  thinking
+  waiting
+  reviewing
+  deploying
+  testing
+  writing_docs
+}
+
+enum DeliverableKind {
+  markdown
+  code
+  file
+  link
+}
+
+enum ProjectStatus {
+  active
+  archived
+}
+
+enum ProjectDocEditAction {
+  created
+  updated
+  deleted
+  archived
+}
+
+enum QueueItemStatus {
+  pending
+  in_progress
+  completed
+  blocked
+  skipped
+}
+
+enum QueueItemPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum QueueItemType {
+  task_breakdown
+  personal_note
+  reminder
+  follow_up
+  research
+  action
+}
+
+enum ProjectMemberStatus {
+  active
+  deactivated
+}
+
+enum ChannelVisibility {
+  public
+  private
+  dm
+}
+
+enum ChannelMemberRole {
+  member
+  creator
+}
+
+enum ProfileKind {
+  human
+  agent
+}
+
+enum DeploymentStatus {
+  provisioning
+  waiting_for_ssh
+  installing_deps
+  installing_openclaw
+  configuring
+  starting_service
+  running
+  stopped
+  error
+  destroying
+  destroyed
+}
+
+enum DeploymentProvider {
+  hetzner
+}
+
+enum HostingType {
+  selfHosted
+  cloudVM
+}
+
+enum UserNotificationType {
+  task_done
+  task_needs_review
+  task_clarification_requested
+  task_approved
+  task_rejected
+  new_comment
+  mention
+  deliverable_submitted
+  task_assigned
+  team_update
+  document_added
+}
+
+enum NotificationChannel {
+  in_app
+  push
+  email
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+  read
+}
+
+// ─── Admin Auth ─────────────────────────────────────────────────────
+
+model AdminUser {
+  id                String    @id @default(cuid())
+  username          String    @unique
+  passwordHash      String
+  userId            String?   @unique
+  sessionsRevokedAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user               User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  resetTokensReceived PasswordResetToken[] @relation("ResetTokenTarget")
+  resetTokensCreated  PasswordResetToken[] @relation("ResetTokenCreator")
+
+  @@map("admin_users")
+}
+
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  tokenHash   String    @unique
+  adminUserId String
+  createdById String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  adminUser AdminUser @relation("ResetTokenTarget", fields: [adminUserId], references: [id], onDelete: Cascade)
+  createdBy AdminUser @relation("ResetTokenCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+// ─── User (human account; public identity on Profile) ───────────────
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  profile                Profile?
+  adminUser              AdminUser?
+  userNotifications      UserNotification[]
+  pushSubscriptions      PushSubscription[]
+  notificationPreference UserNotificationPreference?
+
+  @@map("users")
+}
+
+// ─── Models ──────────────────────────────────────────────────────────
+
+model Agent {
+  id              String          @id @default(cuid())
+  name            String
+  role            String
+  status          AgentStatus     @default(idle)
+  detailedStatus  DetailedStatus?
+  statusMessage   String?
+  currentTaskId   String?
+  currentTask     String?
+  avatar          String?
+  personality     String?
+  workspacePath   String?
+  identityEmoji   String?
+  level           AgentLevel?
+  username        String?         @unique
+  lastHeartbeat   DateTime?
+  setupStatus     SetupStatus     @default(active)
+  apiKeyHash      String?         @unique
+  apiKeyPrefix    String?
+  apiKeyCreatedAt DateTime?
+  isOnVacation    Boolean         @default(false)
+  templateId      String?
+  configVersion   String?         // Reported by agent on sync_identity; used for "upgrade available"
+  hostingType     HostingType     @default(selfHosted)
+  cloudVmId       String?
+  llmModel        String?         // Per-agent LLM model override (e.g. "anthropic/claude-haiku-4-5-20251001"); null = use VM default
+  createdBy       String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  currentTaskRef      Task?               @relation("AgentCurrentTask", fields: [currentTaskId], references: [id], onDelete: SetNull)
+  documents           Document[]
+  notifications       Notification[]
+  subscriptions       Subscription[]
+  workSessions        WorkSession[]
+  statusHistory       StatusHistory[]
+  agentActions        AgentAction[]
+  queueItems          AgentQueueItem[]
+  projectDocsAdded    ProjectDoc[]          @relation("ProjectDocAddedBy")
+  projectDocRevisions ProjectDocRevision[]  @relation("ProjectDocRevisionEditedBy")
+  profile             Profile?
+  cloudVm             CloudVM?              @relation(fields: [cloudVmId], references: [id], onDelete: SetNull)
+
+  @@index([username])
+  @@index([cloudVmId])
+  @@map("agents")
+}
+
+// ─── Profile (public identity for humans and agents; one collection) ─
+
+model Profile {
+  id          String      @id @default(cuid())
+  kind        ProfileKind
+  displayName String
+  username    String?      @unique
+  avatarUrl   String?
+  bio         String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  userId  String?  @unique
+  agentId String?  @unique
+  user    User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent   Agent?   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  channelMemberships       ChannelMember[]
+  channelMessagesFrom      ChannelMessage[]       @relation("ChannelMessageFrom")
+  channelMessagesPinned    ChannelMessage[]       @relation("ChannelMessagePinnedBy")
+  channelMessageMentions   ChannelMessageMention[]
+  channelMessageReactions ChannelMessageReaction[]
+  channelsCreated          Channel[]              @relation("ChannelCreatedByProfile")
+  messages                 Message[]
+  messageMentions          MessageMention[]
+  messageReactions         MessageReaction[]
+  taskAssignments          TaskAssignee[]
+  createdTasks             Task[]                 @relation("TaskCreatedByProfile")
+  deliverables             Deliverable[]
+  deliverableVersions      DeliverableVersion[]   @relation("DeliverableVersionEditedByProfile")
+  projectMemberships       ProjectMember[]
+  activities               Activity[]
+  createdRecurringTasks    RecurringTask[]           @relation("RecurringTaskCreatedByProfile")
+  recurringTaskAssignments RecurringTaskAssignee[]
+  documents                Document[]
+
+  @@index([kind])
+  @@index([username])
+  @@map("profiles")
+}
+
+model Task {
+  id                 String      @id @default(cuid())
+  title              String
+  description        String
+  status             TaskStatus  @default(inbox)
+  priority           Priority?
+  createdByProfileId String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  dueDate            DateTime?
+  deletedAt          DateTime?
+  tags               String[]    @default([])
+  taskNumber         Int         @default(autoincrement())
+  parentTaskId       String?
+  projectId          String?
+  blockedByTaskId    String?
+  recurringTaskId    String?
+
+  // Relations
+  createdByProfile   Profile?            @relation("TaskCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: SetNull)
+  recurringTask      RecurringTask?      @relation("TaskFromRecurring", fields: [recurringTaskId], references: [id], onDelete: SetNull)
+  parentTask       Task?               @relation("TaskParentChild", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  childTasks       Task[]              @relation("TaskParentChild")
+  blockedByTask    Task?               @relation("TaskBlockedBy", fields: [blockedByTaskId], references: [id], onDelete: SetNull)
+  blockingTasks    Task[]              @relation("TaskBlockedBy")
+  project          Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  assignees        TaskAssignee[]
+  agentsWorkingOn  Agent[]             @relation("AgentCurrentTask")
+  messages         Message[]
+  activities       Activity[]
+  subscriptions    Subscription[]
+  workSessions     WorkSession[]
+  agentActions     AgentAction[]
+  deliverables     Deliverable[]
+  queueItems       AgentQueueItem[]
+  documents        Document[]
+  notifications      Notification[]
+  userNotifications  UserNotification[]
+
+  @@unique([taskNumber])
+  @@index([status])
+  @@index([createdAt])
+  @@index([parentTaskId])
+  @@index([blockedByTaskId])
+  @@index([projectId])
+  @@index([projectId, status])
+  @@index([deletedAt])
+  @@index([status, deletedAt])
+  @@map("tasks")
+}
+
+model TaskAssignee {
+  id        String   @id @default(cuid())
+  taskId    String
+  profileId String
+  assignedAt DateTime @default(now())
+
+  task    Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, profileId])
+  @@index([profileId])
+  @@map("task_assignees")
+}
+
+model Message {
+  id            String   @id @default(cuid())
+  taskId        String
+  fromProfileId String
+  content       String
+  projectId     String?
+  createdAt     DateTime @default(now())
+
+  // Relations
+  task        Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fromProfile Profile            @relation(fields: [fromProfileId], references: [id], onDelete: Cascade)
+  project     Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  attachments MessageAttachment[]
+  mentions    MessageMention[]
+  reactions         MessageReaction[]
+  notifications     Notification[]
+  userNotifications UserNotification[]
+
+  @@index([taskId])
+  @@index([fromProfileId])
+  @@index([createdAt])
+  @@index([projectId])
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id         String @id @default(cuid())
+  messageId  String
+  documentId String
+
+  message  Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, documentId])
+  @@map("message_attachments")
+}
+
+model MessageMention {
+  id        String @id @default(cuid())
+  messageId String
+  profileId String
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, profileId])
+  @@map("message_mentions")
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  profileId String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, profileId, emoji])
+  @@index([messageId])
+  @@index([profileId])
+  @@map("message_reactions")
+}
+
+// ─── Channels (Slack-like; separate from Task/Message) ────────────────
+
+model Channel {
+  id                  String           @id @default(cuid())
+  name                String
+  slug                String           @unique // e.g. "general", "frontend-sync"
+  visibility          ChannelVisibility @default(public)
+  description         String?
+  projectId           String?          // optional: scope channel to project later
+  createdByProfileId  String           // creator is always a Profile (human or agent)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  createdByProfile Profile  @relation("ChannelCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: Cascade)
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  members         ChannelMember[]
+  messages        ChannelMessage[]
+
+  @@index([visibility])
+  @@index([createdByProfileId])
+  @@index([projectId])
+  @@map("channels")
+}
+
+model ChannelMember {
+  id         String    @id @default(cuid())
+  channelId  String
+  profileId  String
+  role       ChannelMemberRole @default(member)
+  joinedAt   DateTime  @default(now())
+  lastReadAt DateTime? // when this user last read the channel (for unread count)
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, profileId])
+  @@index([profileId])
+  @@map("channel_members")
+}
+
+model ChannelMessage {
+  id                String    @id @default(cuid())
+  channelId         String
+  fromProfileId     String
+  content           String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  pinnedAt          DateTime?
+  pinnedByProfileId String?
+
+  channel     Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  fromProfile Profile   @relation("ChannelMessageFrom", fields: [fromProfileId], references: [id], onDelete: Cascade)
+  pinnedByProfile Profile? @relation("ChannelMessagePinnedBy", fields: [pinnedByProfileId], references: [id], onDelete: SetNull)
+  attachments ChannelMessageAttachment[]
+  mentions    ChannelMessageMention[]
+  reactions   ChannelMessageReaction[]
+
+  @@index([channelId])
+  @@index([fromProfileId])
+  @@index([createdAt])
+  @@index([channelId, pinnedAt])
+  @@map("channel_messages")
+}
+
+model ChannelMessageAttachment {
+  id         String @id @default(cuid())
+  messageId  String
+  documentId String
+
+  message  ChannelMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  document Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, documentId])
+  @@map("channel_message_attachments")
+}
+
+model ChannelMessageMention {
+  id        String  @id @default(cuid())
+  messageId String
+  profileId String
+
+  message ChannelMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  profile Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, profileId])
+  @@map("channel_message_mentions")
+}
+
+model ChannelMessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  profileId String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message ChannelMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  profile Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, profileId, emoji])
+  @@index([messageId])
+  @@index([profileId])
+  @@map("channel_message_reactions")
+}
+
+model Activity {
+  id        String       @id @default(cuid())
+  type      ActivityType
+  profileId String?
+  taskId    String?
+  projectId String?
+  message   String
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
+  // Relations
+  profile Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([profileId])
+  @@index([taskId])
+  @@index([projectId])
+  @@map("activities")
+}
+
+model Document {
+  id        String       @id @default(cuid())
+  title     String
+  content   String
+  type      DocumentType
+  taskId    String?
+  projectId String?
+  createdById String?
+  createdByProfileId String?
+  storageKey String?
+  fileName   String?
+  mimeType   String?
+  fileSize   Int?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  // Relations
+  createdBy          Agent?              @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdByProfile   Profile?            @relation(fields: [createdByProfileId], references: [id], onDelete: SetNull)
+  task               Task?               @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project            Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  messageAttachments        MessageAttachment[]
+  channelMessageAttachments ChannelMessageAttachment[]
+
+  @@index([taskId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([projectId])
+  @@map("documents")
+}
+
+model Notification {
+  id               String   @id @default(cuid())
+  mentionedAgentId String
+  content          String
+  taskId           String?
+  messageId        String?
+  delivered        Boolean  @default(false)
+  deliveredAt      DateTime?
+  createdAt        DateTime @default(now())
+
+  // Relations
+  mentionedAgent Agent    @relation(fields: [mentionedAgentId], references: [id], onDelete: Cascade)
+  task           Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  message        Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([mentionedAgentId])
+  @@index([delivered])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model Subscription {
+  id           String   @id @default(cuid())
+  agentId      String
+  taskId       String
+  subscribedAt DateTime @default(now())
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  task  Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, taskId])
+  @@index([agentId])
+  @@index([taskId])
+  @@map("subscriptions")
+}
+
+model WorkSession {
+  id        String               @id @default(cuid())
+  taskId    String
+  agentId   String
+  projectId String?
+  startedAt DateTime             @default(now())
+  endedAt   DateTime?
+  duration  Int?                 // milliseconds
+  eventType WorkSessionEventType
+
+  // Relations
+  task    Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  agent   Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([agentId])
+  @@index([taskId, agentId])
+  @@index([startedAt])
+  @@index([projectId])
+  @@map("work_sessions")
+}
+
+model StatusHistory {
+  id                 String          @id @default(cuid())
+  agentId            String
+  fromStatus         AgentStatus
+  toStatus           AgentStatus
+  fromDetailedStatus DetailedStatus?
+  toDetailedStatus   DetailedStatus?
+  statusMessage      String?
+  timestamp          DateTime        @default(now())
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([agentId, timestamp])
+  @@index([timestamp])
+  @@map("status_history")
+}
+
+model AgentAction {
+  id          String          @id @default(cuid())
+  agentId     String
+  taskId      String?
+  projectId   String?
+  actionType  AgentActionType
+  description String
+  metadata    Json?
+  timestamp   DateTime        @default(now())
+
+  // Relations
+  agent   Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([agentId])
+  @@index([taskId])
+  @@index([timestamp])
+  @@index([agentId, timestamp])
+  @@index([projectId])
+  @@map("agent_actions")
+}
+
+model Deliverable {
+  id         String          @id @default(cuid())
+  taskId     String
+  profileId  String
+  projectId  String?
+  title      String
+  kind       DeliverableKind
+  content    String?
+  language   String?
+  storageKey String?         // R2 object key
+  fileName   String?
+  mimeType   String?
+  fileSize   Int?
+  url        String?
+  version    Int             @default(1)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  // Relations
+  task     Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  profile  Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  project  Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  versions DeliverableVersion[]
+
+  @@index([taskId])
+  @@index([profileId])
+  @@index([taskId, profileId])
+  @@index([projectId])
+  @@map("deliverables")
+}
+
+model DeliverableVersion {
+  id               String          @id @default(cuid())
+  deliverableId    String
+  version          Int
+  title            String
+  kind             DeliverableKind
+  content          String?
+  language         String?
+  storageKey       String?
+  fileName         String?
+  mimeType         String?
+  fileSize         Int?
+  url              String?
+  editedByProfileId String?
+  createdAt        DateTime        @default(now())
+
+  deliverable    Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  editedByProfile Profile?   @relation("DeliverableVersionEditedByProfile", fields: [editedByProfileId], references: [id], onDelete: SetNull)
+
+  @@index([deliverableId])
+  @@index([deliverableId, version])
+  @@map("deliverable_versions")
+}
+
+model TaskTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  subtasks    Json     // Array of {title, description, priority?, tags?}
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("task_templates")
+}
+
+model RecurringTask {
+  id                 String     @id @default(cuid())
+  title              String
+  description        String
+  status             TaskStatus @default(inbox)
+  priority           Priority?
+  tags               String[]   @default([])
+  recurrenceConfig   Json       // { type, interval, daysOfWeek?, dayOfMonth?, time? }
+  isActive           Boolean    @default(true)
+  timezone           String     @default("UTC")
+  nextDueAt          DateTime?
+  lastGeneratedAt    DateTime?
+  createdByProfileId String?
+  projectId          String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  createdByProfile Profile?              @relation("RecurringTaskCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: SetNull)
+  project          Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  assignees        RecurringTaskAssignee[]
+  generatedTasks   Task[]                @relation("TaskFromRecurring")
+
+  @@index([isActive, nextDueAt])
+  @@index([projectId])
+  @@map("recurring_tasks")
+}
+
+model RecurringTaskAssignee {
+  id              String   @id @default(cuid())
+  recurringTaskId String
+  profileId       String
+  assignedAt      DateTime @default(now())
+
+  recurringTask RecurringTask @relation(fields: [recurringTaskId], references: [id], onDelete: Cascade)
+  profile       Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([recurringTaskId, profileId])
+  @@map("recurring_task_assignees")
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  status         ProjectStatus @default(active)
+  shutdownActive Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relations
+  members      ProjectMember[]
+  tasks        Task[]
+  projectDocs  ProjectDoc[]
+  activities   Activity[]
+  messages     Message[]
+  documents    Document[]
+  workSessions WorkSession[]
+  agentActions AgentAction[]
+  deliverables    Deliverable[]
+  queueItems      AgentQueueItem[]
+  channels        Channel[]
+  recurringTasks  RecurringTask[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String              @id @default(cuid())
+  projectId String
+  profileId String
+  status    ProjectMemberStatus @default(active)
+  joinedAt  DateTime            @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, profileId])
+  @@index([profileId])
+  @@map("project_members")
+}
+
+model ProjectDoc {
+  id        String   @id @default(cuid())
+  projectId String
+  title     String
+  summary   String?
+  content   String
+  addedById  String?
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relations
+  project   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  addedBy   Agent?               @relation("ProjectDocAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  revisions ProjectDocRevision[]
+
+  @@index([projectId])
+  @@map("project_docs")
+}
+
+model ProjectDocRevision {
+  id         String              @id @default(cuid())
+  docId      String
+  title      String
+  summary    String?
+  content    String
+  editedById String?
+  editAction ProjectDocEditAction
+  createdAt  DateTime            @default(now())
+
+  // Relations
+  doc      ProjectDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  editedBy Agent?     @relation("ProjectDocRevisionEditedBy", fields: [editedById], references: [id], onDelete: SetNull)
+
+  @@index([docId])
+  @@index([docId, createdAt])
+  @@map("project_doc_revisions")
+}
+
+model AgentQueueItem {
+  id                String           @id @default(cuid())
+  agentId           String
+  title             String
+  description       String?
+  notes             String?
+  status            QueueItemStatus  @default(pending)
+  priority          QueueItemPriority @default(medium)
+  relatedTaskId     String?
+  projectId         String?
+  parentQueueItemId String?
+  itemType          QueueItemType    @default(action)
+  autoGenerated     Boolean          @default(false)
+  generatedFrom     String?
+  createdAt         DateTime         @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  dueDate           DateTime?
+  order             Int              @default(0)
+
+  // Relations
+  agent           Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  relatedTask     Task?           @relation(fields: [relatedTaskId], references: [id], onDelete: SetNull)
+  project         Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parentQueueItem AgentQueueItem? @relation("QueueItemParent", fields: [parentQueueItemId], references: [id], onDelete: SetNull)
+  childQueueItems AgentQueueItem[] @relation("QueueItemParent")
+
+  @@index([agentId])
+  @@index([agentId, status])
+  @@index([relatedTaskId])
+  @@index([agentId, priority])
+  @@index([createdAt])
+  @@index([agentId, order])
+  @@index([projectId])
+  @@map("agent_queue_items")
+}
+
+// ─── System Settings (singleton) ──────────────────────────────────
+
+model SystemSettings {
+  id             String   @id @default("global")
+  shutdownActive Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+// ─── Cloud VMs ────────────────────────────────────────────────────
+
+model CloudVM {
+  id                 String             @id @default(cuid())
+  name               String?
+  provider           DeploymentProvider @default(hetzner)
+  status             DeploymentStatus   @default(provisioning)
+  externalServerId   String?
+  serverName         String?
+  ipv4               String?
+  region             String             @default("fsn1")
+  serverType         String             @default("cx22")
+  webhookSecret      String?
+  sshPrivateKey      String?
+  sshPublicKey       String?
+  hetznerSshKeyId    String?
+  setupStep          String?
+  setupProgress      Int                @default(0)
+  errorMessage       String?
+  errorAt            DateTime?
+  provisionedAt      DateTime?
+  installedAt        DateTime?
+  stoppedAt          DateTime?
+  destroyedAt        DateTime?
+  totalUptimeSeconds Int                @default(0)
+  estimatedCostCents Int                @default(0)
+  llmConfigured      Boolean            @default(false)
+  llmProvider        String?
+  llmModel           String?
+  gatewayToken       String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  agents       Agent[]
+  logs         CloudVMLog[]
+  usageRecords CloudVMUsage[]
+
+  @@index([status])
+  @@map("cloud_vms")
+}
+
+model CloudVMLog {
+  id        String   @id @default(cuid())
+  vmId      String
+  message   String
+  level     String   @default("info")
+  createdAt DateTime @default(now())
+
+  vm CloudVM @relation(fields: [vmId], references: [id], onDelete: Cascade)
+
+  @@index([vmId, createdAt])
+  @@map("cloud_vm_logs")
+}
+
+model CloudVMUsage {
+  id            String   @id @default(cuid())
+  vmId          String
+  periodStart   DateTime
+  periodEnd     DateTime
+  uptimeSeconds Int
+  costCents     Int
+
+  vm CloudVM @relation(fields: [vmId], references: [id], onDelete: Cascade)
+
+  @@index([vmId])
+  @@map("cloud_vm_usage")
+}
+
+// ─── User Notifications ────────────────────────────────────────────
+
+model UserNotification {
+  id        String               @id @default(cuid())
+  userId    String
+  type      UserNotificationType
+  channel   NotificationChannel
+  status    NotificationStatus   @default(pending)
+  title     String
+  body      String
+  taskId    String?
+  messageId String?
+  url       String?
+  metadata  Json?
+  readAt    DateTime?
+  sentAt    DateTime?
+  errorMsg    String?
+  retryCount  Int                  @default(0)
+  nextRetryAt DateTime?
+  dedupKey    String?
+  createdAt   DateTime             @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  message Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@unique([dedupKey, channel])
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([status, nextRetryAt])
+  @@map("user_notifications")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@map("push_subscriptions")
+}
+
+model UserNotificationPreference {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  // Per-type toggles
+  taskDone                   Boolean @default(true)
+  taskNeedsReview            Boolean @default(true)
+  taskClarificationRequested Boolean @default(true)
+  taskApproved               Boolean @default(true)
+  taskRejected               Boolean @default(true)
+  newComment                 Boolean @default(false)
+  mention                    Boolean @default(true)
+  deliverableSubmitted       Boolean @default(true)
+  taskAssigned               Boolean @default(true)
+  teamUpdate                 Boolean @default(true)
+  documentAdded              Boolean @default(true)
+
+  // Per-channel toggles
+  pushEnabled  Boolean @default(true)
+  emailEnabled Boolean @default(false)
+  inAppEnabled Boolean @default(true)
+
+  // Quiet hours
+  quietStart String?
+  quietEnd   String?
+  timezone   String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_preferences")
+}
+
+enum FlagManagedBy {
+  system
+  user
+}
+
+model FeatureFlag {
+  id          String        @id @default(cuid())
+  key         String        @unique
+  enabled     Boolean       @default(false)
+  managedBy   FlagManagedBy @default(system)
+  description String?
+  updatedAt   DateTime      @updatedAt
+
+  @@map("feature_flags")
+}

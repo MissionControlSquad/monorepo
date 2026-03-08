@@ -1,0 +1,20 @@
+// Import all mutation resolvers (side-effect: registers on builder)
+import "./agents";
+import "./tasks";
+import "./messages";
+import "./message-reactions";
+import "./documents";
+import "./notifications";
+import "./deliverables";
+import "./agent-actions";
+import "./agent-queue";
+import "./projects";
+import "./project-docs";
+import "./channels";
+import "./task-templates";
+import "./recurring-tasks";
+import "./reviews";
+import "./events";
+import "./system";
+import "./profile";
+import "./feature-flags";
