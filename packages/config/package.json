@@ -1,0 +1,11 @@
+{
+  "name": "@agentcenter/config",
+  "version": "0.1.0",
+  "private": true,
+  "files": ["ts", "eslint", "prettier"],
+  "exports": {
+    "./ts": "./ts/tsconfig.base.json",
+    "./eslint": "./eslint/index.mjs",
+    "./prettier": "./prettier/index.mjs"
+  }
+}
