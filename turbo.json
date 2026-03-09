@@ -18,5 +18,10 @@
     "typecheck": {
       "dependsOn": ["^build"]
     }
-  }
+  },
+  "globalDependencies": [
+    "tsconfig.json",
+    ".prettierrc",
+    ".eslintignore"
+  ]
 }
