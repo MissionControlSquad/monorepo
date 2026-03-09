@@ -1,50 +1,41 @@
 import { Stack } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
-import { useRouter } from "expo-router";
 
 export default function RootLayout() {
-  const router = useRouter();
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is authenticated on app start
+    const checkAuth = async () => {
+      try {
+        const token = await SecureStore.getItemAsync("authToken");
+        setIsSignedIn(!!token);
+      } catch (error) {
+        console.error("Auth check failed:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     checkAuth();
   }, []);
 
-  const checkAuth = async () => {
-    try {
-      const token = await SecureStore.getItemAsync("auth_token");
-      if (!token) {
-        router.replace("/auth/login");
-      }
-    } catch (error) {
-      console.error("Auth check failed:", error);
-      router.replace("/auth/login");
-    }
-  };
+  if (isLoading) {
+    return null;
+  }
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: true,
-        headerTintColor: "#000",
-        headerTitleStyle: {
-          fontWeight: "600",
-        },
-      }}
-    >
-      <Stack.Screen
-        name="auth"
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="(tabs)"
-        options={{
-          headerShown: false,
-        }}
-      />
+    <Stack>
+      {!isSignedIn ? (
+        <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+      ) : (
+        <>
+          <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />
+          <Stack.Screen name="task/[id]" options={{ title: "Task Details" }} />
+          <Stack.Screen name="channels/[id]" options={{ title: "Channel" }} />
+        </>
+      )}
     </Stack>
   );
 }

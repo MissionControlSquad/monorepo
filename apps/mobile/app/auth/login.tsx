@@ -1,21 +1,7 @@
+import { StyleSheet, View, TextInput, TouchableOpacity, Text } from "react-native";
 import { useState } from "react";
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  Text,
-  ActivityIndicator,
-  Alert,
-  SafeAreaView,
-} from "react-native";
-import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import { styled } from "nativewind";
-
-const StyledView = styled(View);
-const StyledTextInput = styled(TextInput);
-const StyledText = styled(Text);
-const StyledTouchableOpacity = styled(TouchableOpacity);
+import { useRouter } from "expo-router";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -24,80 +10,81 @@ export default function LoginScreen() {
   const router = useRouter();
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Error", "Please fill in all fields");
-      return;
-    }
-
     setLoading(true);
     try {
-      // TODO: Call GraphQL mutation to authenticate
-      // For now, store a mock token
-      const mockToken =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock.token";
-      await SecureStore.setItemAsync("auth_token", mockToken);
-
-      router.replace("/(tabs)/dashboard");
+      // TODO: Call API endpoint /api/auth/token with email/password
+      // For now, mock the token
+      const mockToken = "mock-jwt-token-" + Date.now();
+      await SecureStore.setItemAsync("authToken", mockToken);
+      router.replace("/(dashboard)");
     } catch (error) {
-      Alert.alert("Login Failed", "Please check your credentials and try again");
-      console.error(error);
+      console.error("Login failed:", error);
+      alert("Login failed");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <StyledView className="flex-1 justify-center px-6 py-8">
-        <StyledText className="text-3xl font-bold text-center mb-8 text-black">
-          AgentCenter
-        </StyledText>
-
-        <StyledTextInput
-          className="border border-gray-300 rounded-lg px-4 py-3 mb-4 text-base"
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          editable={!loading}
-          placeholderTextColor="#999"
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-
-        <StyledTextInput
-          className="border border-gray-300 rounded-lg px-4 py-3 mb-6 text-base"
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          editable={!loading}
-          placeholderTextColor="#999"
-        />
-
-        <StyledTouchableOpacity
-          className="bg-blue-600 rounded-lg py-3 mb-4 flex-row justify-center items-center"
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <StyledText className="text-white font-semibold text-lg">
-              Login
-            </StyledText>
-          )}
-        </StyledTouchableOpacity>
-
-        <StyledText className="text-center text-gray-600 mb-4">
-          Don't have an account?{" "}
-          <Text
-            className="text-blue-600 font-semibold"
-            onPress={() => router.push("/auth/register")}
-          >
-            Register
-          </Text>
-        </StyledText>
-      </StyledView>
-    </SafeAreaView>
+    <View style={styles.container}>
+      <Text style={styles.title}>AgentCenter</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        editable={!loading}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+        editable={!loading}
+      />
+      <TouchableOpacity
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleLogin}
+        disabled={loading}
+      >
+        <Text style={styles.buttonText}>{loading ? "Signing in..." : "Sign In"}</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+    backgroundColor: "#fff",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 8,
+  },
+  button: {
+    backgroundColor: "#007AFF",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+});

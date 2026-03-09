@@ -1,19 +1,22 @@
 {
-  "extends": "expo/tsconfig",
+  "extends": "../../packages/config/ts/tsconfig.base.json",
   "compilerOptions": {
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "jsx": "react-jsx",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
       "@agentcenter/types": ["../../packages/types/src"],
       "@agentcenter/utils": ["../../packages/utils/src"],
-      "@agentcenter/config": ["../../packages/config/src"]
+      "@agentcenter/config": ["../../packages/config"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", ".expo"]
 }

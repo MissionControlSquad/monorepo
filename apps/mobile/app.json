@@ -1,41 +1,25 @@
 {
   "expo": {
-    "name": "AgentCenter Mobile",
-    "slug": "agentcenter-mobile",
-    "version": "0.0.1",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
+    "name": "AgentCenter",
+    "slug": "agentcenter",
+    "version": "1.0.0",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTabletMode": true,
-      "bundleIdentifier": "com.agentcenter.mobile"
+      "supportsTabletMode": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      },
-      "package": "com.agentcenter.mobile"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      [
-        "expo-secure-store",
-        {
-          "faceIDPermission": "Allow $(PRODUCT_NAME) to access your Face ID"
-        }
-      ]
+      "expo-router"
     ]
   }
 }
