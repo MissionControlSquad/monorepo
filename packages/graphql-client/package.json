@@ -1,0 +1,33 @@
+{
+  "name": "@agentcenter/graphql-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./queries": "./src/queries/index.ts",
+    "./queries/recurring-tasks": "./src/queries/recurring-tasks.ts",
+    "./mutations": "./src/mutations/index.ts",
+    "./mutations/agents": "./src/mutations/agents.ts",
+    "./mutations/profile": "./src/mutations/profile.ts",
+    "./mutations/recurring-tasks": "./src/mutations/recurring-tasks.ts",
+    "./mutations/system": "./src/mutations/system.ts",
+    "./mutations/tasks": "./src/mutations/tasks.ts"
+  },
+  "files": ["src"],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "graphql": "^16.12.0",
+    "urql": "^5.0.1"
+  },
+  "devDependencies": {
+    "@agentcenter/config": "*",
+    "typescript": "~5.9.3"
+  },
+  "peerDependencies": {
+    "graphql": "^16.0.0",
+    "urql": ">=4.0.0"
+  }
+}

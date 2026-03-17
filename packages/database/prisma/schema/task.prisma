@@ -1,0 +1,133 @@
+// ─── Tasks ────────────────────────────────────────────────────────
+
+enum TaskStatus {
+  inbox
+  assigned
+  in_progress
+  review
+  done
+  blocked
+}
+
+enum Priority {
+  low
+  medium
+  high
+  urgent
+}
+
+model Task {
+  id                 String     @id @default(cuid())
+  title              String
+  description        String
+  status             TaskStatus @default(inbox)
+  priority           Priority?
+  createdByProfileId String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  dueDate            DateTime?
+  deletedAt          DateTime?
+  tags               String[]   @default([])
+  taskNumber         Int        @default(autoincrement())
+  parentTaskId       String?
+  projectId          String?
+  blockedByTaskId    String?
+  recurringTaskId    String?
+
+  createdByProfile  Profile?      @relation("TaskCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: SetNull)
+  recurringTask     RecurringTask? @relation("TaskFromRecurring", fields: [recurringTaskId], references: [id], onDelete: SetNull)
+  parentTask        Task?          @relation("TaskParentChild", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  childTasks        Task[]         @relation("TaskParentChild")
+  blockedByTask     Task?          @relation("TaskBlockedBy", fields: [blockedByTaskId], references: [id], onDelete: SetNull)
+  blockingTasks     Task[]         @relation("TaskBlockedBy")
+  project           Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  assignees         TaskAssignee[]
+  agentsWorkingOn   Agent[]        @relation("AgentCurrentTask")
+  messages          Message[]
+  activities        Activity[]
+  subscriptions     Subscription[]
+  workSessions      WorkSession[]
+  agentActions      AgentAction[]
+  deliverables      Deliverable[]
+  queueItems        AgentQueueItem[]
+  documents         Document[]
+  notifications     Notification[]
+  userNotifications UserNotification[]
+
+  @@unique([taskNumber])
+  @@index([status])
+  @@index([createdAt])
+  @@index([parentTaskId])
+  @@index([blockedByTaskId])
+  @@index([projectId])
+  @@index([projectId, status])
+  @@index([deletedAt])
+  @@index([status, deletedAt])
+  @@map("tasks")
+}
+
+model TaskAssignee {
+  id         String   @id @default(cuid())
+  taskId     String
+  profileId  String
+  assignedAt DateTime @default(now())
+
+  task    Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, profileId])
+  @@index([profileId])
+  @@map("task_assignees")
+}
+
+model TaskTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  subtasks    Json     // Array of {title, description, priority?, tags?}
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("task_templates")
+}
+
+model RecurringTask {
+  id                 String     @id @default(cuid())
+  title              String
+  description        String
+  status             TaskStatus @default(inbox)
+  priority           Priority?
+  tags               String[]   @default([])
+  recurrenceConfig   Json       // { type, interval, daysOfWeek?, dayOfMonth?, time? }
+  isActive           Boolean    @default(true)
+  timezone           String     @default("UTC")
+  nextDueAt          DateTime?
+  lastGeneratedAt    DateTime?
+  createdByProfileId String?
+  projectId          String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  createdByProfile Profile?                @relation("RecurringTaskCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: SetNull)
+  project          Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  assignees        RecurringTaskAssignee[]
+  generatedTasks   Task[]                  @relation("TaskFromRecurring")
+
+  @@index([isActive, nextDueAt])
+  @@index([projectId])
+  @@map("recurring_tasks")
+}
+
+model RecurringTaskAssignee {
+  id              String   @id @default(cuid())
+  recurringTaskId String
+  profileId       String
+  assignedAt      DateTime @default(now())
+
+  recurringTask RecurringTask @relation(fields: [recurringTaskId], references: [id], onDelete: Cascade)
+  profile       Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([recurringTaskId, profileId])
+  @@map("recurring_task_assignees")
+}

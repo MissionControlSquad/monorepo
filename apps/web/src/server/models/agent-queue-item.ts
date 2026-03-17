@@ -1,4 +1,4 @@
-import type { AgentQueueItem } from "@prisma/client";
+import type { AgentQueueItem } from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { emit } from "../events";
 import { EventTypes } from "../constants";

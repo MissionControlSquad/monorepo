@@ -1,4 +1,4 @@
-import type { TaskTemplate } from "@prisma/client";
+import type { TaskTemplate } from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { Model } from "./base";
 

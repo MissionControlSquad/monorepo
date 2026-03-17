@@ -1,4 +1,4 @@
-import type { Subscription } from "@prisma/client";
+import type { Subscription } from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { Model } from "./base";
 

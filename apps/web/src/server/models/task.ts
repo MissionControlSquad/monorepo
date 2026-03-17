@@ -1,4 +1,4 @@
-import type { Task, Prisma, TaskAssignee } from "@prisma/client";
+import type { Task, Prisma, TaskAssignee } from "@agentcenter/database";
 import { prisma, notDeleted } from "../prisma";
 import { emit } from "../events";
 import { EventTypes } from "../constants";

@@ -1,0 +1,144 @@
+// ─── Notifications ────────────────────────────────────────────────
+
+enum UserNotificationType {
+  task_done
+  task_needs_review
+  task_clarification_requested
+  task_approved
+  task_rejected
+  new_comment
+  mention
+  deliverable_submitted
+  task_assigned
+  team_update
+  document_added
+}
+
+enum NotificationChannel {
+  in_app
+  push
+  email
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+  read
+}
+
+/// Agent-targeted mention notifications (delivered via GraphQL subscription)
+model Notification {
+  id               String    @id @default(cuid())
+  mentionedAgentId String
+  content          String
+  taskId           String?
+  messageId        String?
+  delivered        Boolean   @default(false)
+  deliveredAt      DateTime?
+  createdAt        DateTime  @default(now())
+
+  mentionedAgent Agent    @relation(fields: [mentionedAgentId], references: [id], onDelete: Cascade)
+  task           Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  message        Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([mentionedAgentId])
+  @@index([delivered])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+/// Agent task subscriptions (for real-time updates)
+model Subscription {
+  id           String   @id @default(cuid())
+  agentId      String
+  taskId       String
+  subscribedAt DateTime @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  task  Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, taskId])
+  @@index([agentId])
+  @@index([taskId])
+  @@map("subscriptions")
+}
+
+/// User-facing notifications (push, email, in-app)
+model UserNotification {
+  id          String               @id @default(cuid())
+  userId      String
+  type        UserNotificationType
+  channel     NotificationChannel
+  status      NotificationStatus   @default(pending)
+  title       String
+  body        String
+  taskId      String?
+  messageId   String?
+  url         String?
+  metadata    Json?
+  readAt      DateTime?
+  sentAt      DateTime?
+  errorMsg    String?
+  retryCount  Int                  @default(0)
+  nextRetryAt DateTime?
+  dedupKey    String?
+  createdAt   DateTime             @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  message Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@unique([dedupKey, channel])
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([status, nextRetryAt])
+  @@map("user_notifications")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@map("push_subscriptions")
+}
+
+model UserNotificationPreference {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  // Per-type toggles
+  taskDone                   Boolean @default(true)
+  taskNeedsReview            Boolean @default(true)
+  taskClarificationRequested Boolean @default(true)
+  taskApproved               Boolean @default(true)
+  taskRejected               Boolean @default(true)
+  newComment                 Boolean @default(false)
+  mention                    Boolean @default(true)
+  deliverableSubmitted       Boolean @default(true)
+  taskAssigned               Boolean @default(true)
+  teamUpdate                 Boolean @default(true)
+  documentAdded              Boolean @default(true)
+
+  // Per-channel toggles
+  pushEnabled  Boolean @default(true)
+  emailEnabled Boolean @default(false)
+  inAppEnabled Boolean @default(true)
+
+  // Quiet hours
+  quietStart String?
+  quietEnd   String?
+  timezone   String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_preferences")
+}

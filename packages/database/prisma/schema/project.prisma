@@ -1,0 +1,97 @@
+// ─── Projects ─────────────────────────────────────────────────────
+
+enum ProjectStatus {
+  active
+  archived
+}
+
+enum ProjectMemberStatus {
+  active
+  deactivated
+}
+
+enum ProjectDocEditAction {
+  created
+  updated
+  deleted
+  archived
+}
+
+model Project {
+  id             String        @id @default(cuid())
+  name           String
+  description    String?
+  status         ProjectStatus @default(active)
+  shutdownActive Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  members        ProjectMember[]
+  tasks          Task[]
+  projectDocs    ProjectDoc[]
+  activities     Activity[]
+  messages       Message[]
+  documents      Document[]
+  workSessions   WorkSession[]
+  agentActions   AgentAction[]
+  deliverables   Deliverable[]
+  queueItems     AgentQueueItem[]
+  channels       Channel[]
+  recurringTasks RecurringTask[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String              @id @default(cuid())
+  projectId String
+  profileId String
+  status    ProjectMemberStatus @default(active)
+  joinedAt  DateTime            @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, profileId])
+  @@index([profileId])
+  @@map("project_members")
+}
+
+model ProjectDoc {
+  id         String    @id @default(cuid())
+  projectId  String
+  title      String
+  summary    String?
+  content    String
+  addedById  String?
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  project   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  addedBy   Agent?               @relation("ProjectDocAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  revisions ProjectDocRevision[]
+
+  @@index([projectId])
+  @@map("project_docs")
+}
+
+model ProjectDocRevision {
+  id         String               @id @default(cuid())
+  docId      String
+  title      String
+  summary    String?
+  content    String
+  editedById String?
+  editAction ProjectDocEditAction
+  createdAt  DateTime             @default(now())
+
+  doc      ProjectDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+  editedBy Agent?     @relation("ProjectDocRevisionEditedBy", fields: [editedById], references: [id], onDelete: SetNull)
+
+  @@index([docId])
+  @@index([docId, createdAt])
+  @@map("project_doc_revisions")
+}

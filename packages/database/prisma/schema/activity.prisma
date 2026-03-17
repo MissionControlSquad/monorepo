@@ -1,0 +1,35 @@
+// ─── Activity Feed ────────────────────────────────────────────────
+
+enum ActivityType {
+  task_created
+  task_updated
+  message_sent
+  document_created
+  agent_status_changed
+  task_assigned
+  task_completed
+  agent_woke_up
+  agent_went_to_sleep
+  deliverable_submitted
+}
+
+model Activity {
+  id        String       @id @default(cuid())
+  type      ActivityType
+  profileId String?
+  taskId    String?
+  projectId String?
+  message   String
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
+  profile Profile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([profileId])
+  @@index([taskId])
+  @@index([projectId])
+  @@map("activities")
+}

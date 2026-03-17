@@ -1,7 +1,6 @@
+// Import from package — this registers all Pothos type definitions on the builder
+import "@agentcenter/graphql-server";
 import { builder } from "./builder";
-
-// Import all type definitions (side-effect registrations)
-import "./types";
 
 // Import all query resolvers
 import "./queries";

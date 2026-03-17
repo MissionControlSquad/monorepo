@@ -1,0 +1,114 @@
+// ─── Channels (Slack-like) ────────────────────────────────────────
+
+enum ChannelVisibility {
+  public
+  private
+  dm
+}
+
+enum ChannelMemberRole {
+  member
+  creator
+}
+
+model Channel {
+  id                 String            @id @default(cuid())
+  name               String
+  slug               String            @unique
+  visibility         ChannelVisibility @default(public)
+  description        String?
+  projectId          String?
+  createdByProfileId String
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  createdByProfile Profile  @relation("ChannelCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: Cascade)
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  members         ChannelMember[]
+  messages        ChannelMessage[]
+
+  @@index([visibility])
+  @@index([createdByProfileId])
+  @@index([projectId])
+  @@map("channels")
+}
+
+model ChannelMember {
+  id         String            @id @default(cuid())
+  channelId  String
+  profileId  String
+  role       ChannelMemberRole @default(member)
+  joinedAt   DateTime          @default(now())
+  lastReadAt DateTime?
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, profileId])
+  @@index([profileId])
+  @@map("channel_members")
+}
+
+model ChannelMessage {
+  id                String    @id @default(cuid())
+  channelId         String
+  fromProfileId     String
+  content           String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  pinnedAt          DateTime?
+  pinnedByProfileId String?
+
+  channel         Channel                   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  fromProfile     Profile                   @relation("ChannelMessageFrom", fields: [fromProfileId], references: [id], onDelete: Cascade)
+  pinnedByProfile Profile?                  @relation("ChannelMessagePinnedBy", fields: [pinnedByProfileId], references: [id], onDelete: SetNull)
+  attachments     ChannelMessageAttachment[]
+  mentions        ChannelMessageMention[]
+  reactions       ChannelMessageReaction[]
+
+  @@index([channelId])
+  @@index([fromProfileId])
+  @@index([createdAt])
+  @@index([channelId, pinnedAt])
+  @@map("channel_messages")
+}
+
+model ChannelMessageAttachment {
+  id         String @id @default(cuid())
+  messageId  String
+  documentId String
+
+  message  ChannelMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  document Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, documentId])
+  @@map("channel_message_attachments")
+}
+
+model ChannelMessageMention {
+  id        String @id @default(cuid())
+  messageId String
+  profileId String
+
+  message ChannelMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  profile Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, profileId])
+  @@map("channel_message_mentions")
+}
+
+model ChannelMessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  profileId String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message ChannelMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  profile Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, profileId, emoji])
+  @@index([messageId])
+  @@index([profileId])
+  @@map("channel_message_reactions")
+}

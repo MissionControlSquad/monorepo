@@ -1,4 +1,4 @@
-import type { Agent } from "@prisma/client";
+import type { Agent } from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { emit } from "../events";
 import { EventTypes } from "../constants";

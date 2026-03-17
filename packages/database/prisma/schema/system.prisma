@@ -1,0 +1,45 @@
+// ─── System ───────────────────────────────────────────────────────
+
+enum FlagManagedBy {
+  system
+  user
+}
+
+/// Singleton — global system settings
+model SystemSettings {
+  id             String   @id @default("global")
+  shutdownActive Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+/// Singleton — stores the activated license
+model License {
+  id             String   @id @default("active")
+  token          String   @db.Text
+  plan           String
+  org            String
+  maxAgents      Int      @default(-1)
+  maxProjects    Int      @default(-1)
+  maxSeats       Int      @default(-1)
+  features       String[] @default([])
+  instanceId     String?
+  expiresAt      DateTime
+  activatedAt    DateTime @default(now())
+  lastVerifiedAt DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("licenses")
+}
+
+model FeatureFlag {
+  id          String        @id @default(cuid())
+  key         String        @unique
+  enabled     Boolean       @default(false)
+  managedBy   FlagManagedBy @default(system)
+  description String?
+  updatedAt   DateTime      @updatedAt
+
+  @@map("feature_flags")
+}

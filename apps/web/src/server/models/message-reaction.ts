@@ -1,4 +1,4 @@
-import type { MessageReaction } from "@prisma/client";
+import type { MessageReaction } from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { Model } from "./base";
 

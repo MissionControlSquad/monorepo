@@ -3,7 +3,7 @@ import { activityModel, agentModel } from "../../models";
 import { prisma } from "../../prisma";
 import { Roles } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
-import { ActivityConnectionRef } from "../types/activity";
+import { ActivityConnectionRef } from "@agentcenter/graphql-server";
 
 const ACTIVITY_PAGE_SIZE = 30;
 

@@ -1,4 +1,4 @@
-import type { ProjectDocRevision } from "@prisma/client";
+import type { ProjectDocRevision } from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { Model } from "./base";
 

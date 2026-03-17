@@ -1,12 +1,17 @@
 import { Client, fetchExchange, subscriptionExchange } from "urql";
 import { cacheExchange } from "@urql/exchange-graphcache";
 import { createClient as createSSEClient } from "graphql-sse";
-import { KANBAN_BOARD_QUERY } from "./queries/tasks";
-import { MESSAGES_BY_TASK_QUERY, MESSAGES_BY_TASK_CONNECTION_QUERY } from "./queries/messages";
-import { CHANNEL_MESSAGES_QUERY, CHANNEL_MESSAGE_CONNECTION_QUERY } from "./queries/channels";
-import { ACTIVITIES_FOR_AGENT_QUERY, ACTIVITIES_BY_AGENT_QUERY } from "./queries/activities";
-import { AGENT_ACTIONS_BY_AGENT_QUERY } from "./queries/agent-actions";
-import { NOTIFICATIONS_BY_AGENT_QUERY } from "./queries/notifications";
+import {
+  KANBAN_BOARD_QUERY,
+  MESSAGES_BY_TASK_QUERY,
+  MESSAGES_BY_TASK_CONNECTION_QUERY,
+  CHANNEL_MESSAGES_QUERY,
+  CHANNEL_MESSAGE_CONNECTION_QUERY,
+  ACTIVITIES_FOR_AGENT_QUERY,
+  ACTIVITIES_BY_AGENT_QUERY,
+  AGENT_ACTIONS_BY_AGENT_QUERY,
+  NOTIFICATIONS_BY_AGENT_QUERY,
+} from "@agentcenter/graphql-client";
 
 const KANBAN_STATUS_KEYS = [
   "inbox",

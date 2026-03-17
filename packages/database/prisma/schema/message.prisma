@@ -1,0 +1,65 @@
+// ─── Messages (task-scoped) ───────────────────────────────────────
+
+model Message {
+  id            String   @id @default(cuid())
+  taskId        String
+  fromProfileId String
+  content       String
+  projectId     String?
+  createdAt     DateTime @default(now())
+
+  task              Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fromProfile       Profile             @relation(fields: [fromProfileId], references: [id], onDelete: Cascade)
+  project           Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  attachments       MessageAttachment[]
+  mentions          MessageMention[]
+  reactions         MessageReaction[]
+  notifications     Notification[]
+  userNotifications UserNotification[]
+
+  @@index([taskId])
+  @@index([fromProfileId])
+  @@index([createdAt])
+  @@index([projectId])
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id         String @id @default(cuid())
+  messageId  String
+  documentId String
+
+  message  Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, documentId])
+  @@map("message_attachments")
+}
+
+model MessageMention {
+  id        String @id @default(cuid())
+  messageId String
+  profileId String
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, profileId])
+  @@map("message_mentions")
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  profileId String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, profileId, emoji])
+  @@index([messageId])
+  @@index([profileId])
+  @@map("message_reactions")
+}

@@ -1,4 +1,4 @@
-import type { Document } from "@prisma/client";
+import type { Document } from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { emit } from "../events";
 import { EventTypes } from "../constants";

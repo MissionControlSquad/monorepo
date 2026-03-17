@@ -1,4 +1,4 @@
-import type { UserNotificationType } from "@prisma/client";
+import type { UserNotificationType } from "@agentcenter/database";
 
 interface TemplateData {
   title: string;

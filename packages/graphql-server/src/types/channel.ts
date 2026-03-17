@@ -1,5 +1,5 @@
 import { builder } from "../builder";
-import { prisma } from "../../prisma";
+import { prisma } from "@agentcenter/database";
 
 // User (human account); minimal exposure for Profile.user relation
 builder.prismaObject("User", {

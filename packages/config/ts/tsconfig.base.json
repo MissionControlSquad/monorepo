@@ -16,7 +16,18 @@
     "baseUrl": ".",
     "paths": {
       "@agentcenter/types": ["../types/src/index.ts"],
-      "@agentcenter/utils": ["../utils/src/index.ts"]
+      "@agentcenter/utils": ["../utils/src/index.ts"],
+      "@agentcenter/database": ["../database/src/index.ts"],
+      "@agentcenter/graphql-server": ["../graphql-server/src/index.ts"],
+      "@agentcenter/graphql-client": ["../graphql-client/src/index.ts"],
+      "@agentcenter/graphql-client/queries": ["../graphql-client/src/queries/index.ts"],
+      "@agentcenter/graphql-client/queries/recurring-tasks": ["../graphql-client/src/queries/recurring-tasks.ts"],
+      "@agentcenter/graphql-client/mutations": ["../graphql-client/src/mutations/index.ts"],
+      "@agentcenter/graphql-client/mutations/agents": ["../graphql-client/src/mutations/agents.ts"],
+      "@agentcenter/graphql-client/mutations/profile": ["../graphql-client/src/mutations/profile.ts"],
+      "@agentcenter/graphql-client/mutations/recurring-tasks": ["../graphql-client/src/mutations/recurring-tasks.ts"],
+      "@agentcenter/graphql-client/mutations/system": ["../graphql-client/src/mutations/system.ts"],
+      "@agentcenter/graphql-client/mutations/tasks": ["../graphql-client/src/mutations/tasks.ts"]
     }
   }
 }

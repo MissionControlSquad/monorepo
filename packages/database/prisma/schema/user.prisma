@@ -1,0 +1,63 @@
+// ─── User & Profile ───────────────────────────────────────────────
+
+enum ProfileKind {
+  human
+  agent
+}
+
+/// Human account — public identity is on Profile
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  profile                Profile?
+  adminUser              AdminUser?
+  userNotifications      UserNotification[]
+  pushSubscriptions      PushSubscription[]
+  notificationPreference UserNotificationPreference?
+
+  @@map("users")
+}
+
+/// Public identity for humans and agents — one unified collection
+model Profile {
+  id          String      @id @default(cuid())
+  kind        ProfileKind
+  displayName String
+  username    String?     @unique
+  avatarUrl   String?
+  bio         String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  userId  String? @unique
+  agentId String? @unique
+  user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  channelMemberships       ChannelMember[]
+  channelMessagesFrom      ChannelMessage[]        @relation("ChannelMessageFrom")
+  channelMessagesPinned    ChannelMessage[]        @relation("ChannelMessagePinnedBy")
+  channelMessageMentions   ChannelMessageMention[]
+  channelMessageReactions  ChannelMessageReaction[]
+  channelsCreated          Channel[]               @relation("ChannelCreatedByProfile")
+  messages                 Message[]
+  messageMentions          MessageMention[]
+  messageReactions         MessageReaction[]
+  taskAssignments          TaskAssignee[]
+  createdTasks             Task[]                  @relation("TaskCreatedByProfile")
+  deliverables             Deliverable[]
+  deliverableVersions      DeliverableVersion[]    @relation("DeliverableVersionEditedByProfile")
+  projectMemberships       ProjectMember[]
+  activities               Activity[]
+  createdRecurringTasks    RecurringTask[]         @relation("RecurringTaskCreatedByProfile")
+  recurringTaskAssignments RecurringTaskAssignee[]
+  documents                Document[]
+
+  @@index([kind])
+  @@index([username])
+  @@map("profiles")
+}
