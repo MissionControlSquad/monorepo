@@ -27,7 +27,8 @@ builder.mutationField("createRecurringTask", (t) =>
       if (args.projectId) await assertProjectWritable(args.projectId);
 
       const config = validateRecurrenceConfig(JSON.parse(args.recurrenceConfig));
-      const nextDueAt = calculateInitialDueDate(config);
+      const timezone = args.timezone ?? "UTC";
+      const nextDueAt = calculateInitialDueDate(config, timezone);
 
       const assigneeIds = args.assigneeIds ?? [];
       await assertAssignableAgents(assigneeIds);
@@ -91,8 +92,13 @@ builder.mutationField("updateRecurringTask", (t) =>
       if (args.recurrenceConfig) {
         const config = validateRecurrenceConfig(JSON.parse(args.recurrenceConfig));
         data.recurrenceConfig = config as any;
-        // Recalculate nextDueAt when config changes
-        data.nextDueAt = calculateInitialDueDate(config);
+        // Recalculate nextDueAt when config changes, using the new or existing timezone
+        const existing = await recurringTaskModel.delegate.findUniqueOrThrow({
+          where: { id: args.id },
+          select: { timezone: true },
+        });
+        const timezone = (args.timezone as string) ?? existing.timezone ?? "UTC";
+        data.nextDueAt = calculateInitialDueDate(config, timezone);
       }
 
       const updated = await recurringTaskModel.delegate.update({

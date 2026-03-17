@@ -36,7 +36,7 @@ class RecurringTaskModel extends Model<RecurringTask> {
   async resume(id: string): Promise<RecurringTask> {
     const rt = await this.findByIdOrThrow(id);
     const config = rt.recurrenceConfig as unknown as RecurrenceConfig;
-    const nextDueAt = calculateInitialDueDate(config);
+    const nextDueAt = calculateInitialDueDate(config, rt.timezone ?? "UTC");
 
     return prisma.recurringTask.update({
       where: { id },

@@ -135,12 +135,9 @@ export const TaskCard = memo(function TaskCard({ task, agents: _agents, onClick 
                 const agentIsOffline = agent.lastHeartbeat
                   ? Date.now() - new Date(agent.lastHeartbeat).getTime() > HEARTBEAT_TIMEOUT_MS
                   : true;
+                const tooltipText = `${agent.name}${isWorking ? ` (${detailedLabel || "Working"})` : ""}${agentIsOffline ? " [Offline]" : ""}`;
                 return (
-                  <div
-                    key={agent.id}
-                    className="relative"
-                    title={`${agent.name}${isWorking ? ` (${detailedLabel || "Working"})` : ""}${agentIsOffline ? " [Offline]" : ""}`}
-                  >
+                  <div key={agent.id} className="relative group/avatar">
                     <ProfileAvatar
                       agentId={agent.id}
                       size="sm"
@@ -155,6 +152,11 @@ export const TaskCard = memo(function TaskCard({ task, agents: _agents, onClick 
                     {agentIsOffline && (
                       <WifiOff className="absolute bottom-0 right-0 w-2.5 h-2.5 text-muted-foreground bg-background rounded-full" />
                     )}
+                    {/* Styled tooltip */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-[11px] font-medium text-white bg-neutral-900 dark:bg-neutral-700 rounded-md whitespace-nowrap opacity-0 pointer-events-none group-hover/avatar:opacity-100 transition-opacity z-50 shadow-lg">
+                      {tooltipText}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900 dark:border-t-neutral-700" />
+                    </div>
                   </div>
                 );
               })}

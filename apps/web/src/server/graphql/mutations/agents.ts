@@ -129,10 +129,27 @@ builder.mutationField("updateAgentProfile", (t) =>
       personality: t.arg.string(),
       identityEmoji: t.arg.string(),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
+      // Require authenticated admin session for profile updates
+      if (!ctx.session?.profileId) {
+        throw new Error("Authentication required");
+      }
+
       const data: Record<string, unknown> = {};
       if (args.name !== undefined && args.name !== null) data.name = args.name;
-      if (args.role !== undefined && args.role !== null) data.role = args.role;
+      if (args.role !== undefined && args.role !== null) {
+        // Prevent setting role to Squad Lead — only the system should assign this role
+        if (args.role === Roles.SQUAD_LEAD) {
+          const existing = await agentModel.delegate.findUnique({
+            where: { id: args.id },
+            select: { role: true },
+          });
+          if (existing?.role !== Roles.SQUAD_LEAD) {
+            throw new Error("Cannot promote an agent to Squad Lead via profile update");
+          }
+        }
+        data.role = args.role;
+      }
       if (args.personality !== undefined) data.personality = args.personality ?? null;
       if (args.identityEmoji !== undefined) data.identityEmoji = args.identityEmoji ?? null;
 

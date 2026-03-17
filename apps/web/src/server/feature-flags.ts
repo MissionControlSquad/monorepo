@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { isFeatureLicensed } from "./license";
 
 interface FlagEntry {
   key: string;
@@ -34,9 +35,19 @@ export async function getFeatureFlags(): Promise<Map<string, FlagEntry>> {
   return flagCache;
 }
 
+/**
+ * Check if a feature is enabled.
+ * Double-gated: feature flag must be enabled AND license must include the feature.
+ * If no license is configured (hosted mode), only the flag check applies.
+ */
 export async function isFeatureEnabled(key: string): Promise<boolean> {
   const flags = await getFeatureFlags();
-  return flags.get(key)?.enabled ?? true; // Default to enabled if flag doesn't exist
+  const flagEnabled = flags.get(key)?.enabled ?? true;
+  if (!flagEnabled) return false;
+
+  // Also check license allows this feature
+  const licensed = await isFeatureLicensed(key);
+  return licensed;
 }
 
 export async function getAllFlags(): Promise<FlagEntry[]> {

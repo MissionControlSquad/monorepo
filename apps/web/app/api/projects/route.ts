@@ -4,6 +4,7 @@ import { successResponse, errorResponse, handleError } from "../_lib/json-respon
 import { validateBody, createProjectSchema } from "../_lib/validation";
 import { Roles } from "@/server/constants";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
+import { checkLicenseLimit } from "@/server/license";
 
 export async function GET(request: Request) {
   try {
@@ -48,6 +49,16 @@ export async function POST(request: Request) {
     }
 
     const { name, description, memberIds } = v.data;
+
+    // Enforce license limit on project count
+    const projectCount = await projectModel.count({ where: { status: "active" } });
+    const limitCheck = await checkLicenseLimit("projects", projectCount);
+    if (!limitCheck.allowed) {
+      return errorResponse(
+        `Project limit reached (${limitCheck.limit}). Upgrade your plan to add more projects.`,
+        403,
+      );
+    }
 
     // Always include the creating Squad Lead
     const allMemberIds = [...new Set([...(memberIds ?? []), agent.id])];

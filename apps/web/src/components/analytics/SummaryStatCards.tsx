@@ -21,10 +21,12 @@ export function SummaryStatCards() {
   const [statusResult] = useQuery({
     query: TASK_STATUS_COUNTS_QUERY,
     variables: { projectId: projectId ?? undefined },
+    requestPolicy: "cache-and-network",
   });
   const [cycleResult] = useQuery({
     query: TASK_CYCLE_TIMES_QUERY,
     variables: { projectId: projectId ?? undefined },
+    requestPolicy: "cache-and-network",
   });
   const statusCounts = statusResult.data?.taskStatusCounts;
   const cycleTimes = cycleResult.data?.taskCycleTimes;

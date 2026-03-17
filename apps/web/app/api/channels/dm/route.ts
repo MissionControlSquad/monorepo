@@ -1,5 +1,7 @@
 import { prisma } from "@/server/prisma";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
+import { isFeatureEnabled } from "@/server/feature-flags";
+import { FLAG_KEYS } from "@/lib/feature-flag-keys";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { validateBody, createDMSchema } from "../../_lib/validation";
@@ -89,6 +91,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    if (!(await isFeatureEnabled(FLAG_KEYS.CHANNELS))) {
+      return errorResponse("Channels feature is not available on your current plan", 403);
+    }
     const v = await validateBody(request, createDMSchema);
     if (v.error) return v.error;
     const agent = await resolveAgent(request);

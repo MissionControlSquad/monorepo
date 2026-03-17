@@ -14,6 +14,7 @@ import { ensureAgentProfile } from "@/server/agent-profile";
 import { Prisma } from "@prisma/client";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { validateBody, createAgentSchema } from "../../_lib/validation";
+import { checkLicenseLimit } from "@/server/license";
 
 /**
  * POST /api/agents/create
@@ -42,6 +43,15 @@ export async function POST(request: Request) {
 
     if (existing) {
       return errorResponse(`Username "${username}" is already taken`, 409);
+    }
+
+    // Enforce license limit on agent count
+    const limitCheck = await checkLicenseLimit("agents", agentCount);
+    if (!limitCheck.allowed) {
+      return errorResponse(
+        `Agent limit reached (${limitCheck.limit}). Upgrade your plan to add more agents.`,
+        403,
+      );
     }
 
     // Create agent — invalidate the cached agent list used for @mention resolution

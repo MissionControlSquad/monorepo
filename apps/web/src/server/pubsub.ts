@@ -129,6 +129,52 @@ export type PubSubEvents = {
   [key: `agent:stream:${string}`]: [AgentDmPayload];
 };
 
+/**
+ * Derive a per-client namespace from the database URL so that
+ * multiple containers sharing one Redis never leak events to each other.
+ * e.g. "postgresql://...@host/client_dharmik-jagodana" → "client_dharmik-jagodana:"
+ */
+function getRedisNamespace(): string {
+  const url = process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL_NON_POOLING || "";
+  const match = url.match(/\/([^/?]+)(?:\?|$)/);
+  return match ? `${match[1]}:` : "";
+}
+
+/**
+ * Wraps an EventTarget to transparently prefix all event types with a namespace.
+ * This isolates Redis pubsub channels per client without changing any topic strings
+ * or TypeScript types in the rest of the codebase.
+ */
+class NamespacedEventTarget implements EventTarget {
+  constructor(
+    private target: EventTarget,
+    private prefix: string,
+  ) {}
+
+  addEventListener(
+    type: string,
+    callback: EventListenerOrEventListenerObject | null,
+    options?: boolean | AddEventListenerOptions,
+  ): void {
+    this.target.addEventListener(`${this.prefix}${type}`, callback, options);
+  }
+
+  removeEventListener(
+    type: string,
+    callback: EventListenerOrEventListenerObject | null,
+    options?: boolean | EventListenerOptions,
+  ): void {
+    this.target.removeEventListener(`${this.prefix}${type}`, callback, options);
+  }
+
+  dispatchEvent(event: Event): boolean {
+    const nsEvent = new CustomEvent(`${this.prefix}${event.type}`, {
+      detail: (event as CustomEvent).detail,
+    });
+    return this.target.dispatchEvent(nsEvent);
+  }
+}
+
 function buildPubSub() {
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) {
@@ -145,7 +191,11 @@ function buildPubSub() {
   const publishClient = new Redis(redisUrl, { lazyConnect: true });
   const subscribeClient = new Redis(redisUrl, { lazyConnect: true });
 
-  const eventTarget = createRedisEventTarget({ publishClient, subscribeClient });
+  const redisEventTarget = createRedisEventTarget({ publishClient, subscribeClient });
+
+  // Namespace channels so multiple clients sharing one Redis are fully isolated
+  const ns = getRedisNamespace();
+  const eventTarget = ns ? new NamespacedEventTarget(redisEventTarget, ns) : redisEventTarget;
 
   return createPubSub<PubSubEvents>({ eventTarget });
 }

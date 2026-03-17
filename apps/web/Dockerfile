@@ -25,8 +25,17 @@ RUN npm run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
+LABEL org.opencontainers.image.title="AgentCenter"
+LABEL org.opencontainers.image.description="Self-hosted AI agent management platform. Orchestrate, schedule, and monitor AI agents from a single dashboard."
+LABEL org.opencontainers.image.url="https://agentcenter.cloud"
+LABEL org.opencontainers.image.source="https://github.com/MissionControlSquad/app"
+LABEL org.opencontainers.image.documentation="https://github.com/MissionControlSquad/app/blob/main/self-hosted/SETUP.md"
+LABEL org.opencontainers.image.vendor="AgentCenter"
+LABEL org.opencontainers.image.licenses="Proprietary"
+
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
@@ -49,8 +58,8 @@ RUN npm install prisma@6 --save-exact --no-package-lock 2>/dev/null || true
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
-# Create cache directory writable by nextjs user
-RUN mkdir -p .next/cache && chown -R nextjs:nodejs .next/cache
+# Create cache + data directories writable by nextjs user
+RUN mkdir -p .next/cache data && chown -R nextjs:nodejs .next/cache data
 
 # Copy entrypoint
 COPY docker-entrypoint.sh ./

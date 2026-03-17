@@ -2,6 +2,8 @@ import { prisma } from "../prisma";
 import { generateApiKey } from "../api-key";
 import { randomBytes } from "crypto";
 import { computeCronSchedule } from "../agent-config-generator";
+import { isFeatureEnabled } from "../feature-flags";
+import { FLAG_KEYS } from "../../lib/feature-flag-keys";
 import {
   createServer,
   getServer,
@@ -107,7 +109,13 @@ interface CreateCloudVMParams {
 export async function createCloudVM(params: CreateCloudVMParams): Promise<{ vmId: string }> {
   const { name, region = "ash", serverType = "cpx11" } = params;
 
-  // Check VM limit
+  // Feature gate — cloud_vms must be enabled in both feature flags and license
+  const allowed = await isFeatureEnabled(FLAG_KEYS.CLOUD_VMS);
+  if (!allowed) {
+    throw new Error("Cloud VMs are not available on your current plan");
+  }
+
+  // Check VM limit (safety cap)
   const existingCount = await prisma.cloudVM.count({
     where: { status: { notIn: ["destroyed", "error"] } },
   });

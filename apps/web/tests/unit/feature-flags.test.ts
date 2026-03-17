@@ -9,6 +9,11 @@ vi.mock("../../src/server/prisma", () => ({
   },
 }));
 
+// Mock the license module — in tests, all features are licensed
+vi.mock("../../src/server/license", () => ({
+  isFeatureLicensed: vi.fn().mockResolvedValue(true),
+}));
+
 import { prisma } from "../../src/server/prisma";
 import {
   getFeatureFlags,

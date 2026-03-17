@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/prisma";
 import { uploadFileToR2 } from "@/server/storage/r2";
+import { isFeatureEnabled } from "@/server/feature-flags";
+import { FLAG_KEYS } from "@/lib/feature-flag-keys";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
 import { writeFile, mkdir } from "fs/promises";
@@ -25,6 +27,13 @@ const BLOCKED_MIME_TYPES = new Set([
  * Falls back to local filesystem storage if R2 is unreachable.
  */
 export async function POST(request: Request) {
+  if (!(await isFeatureEnabled(FLAG_KEYS.CHANNELS))) {
+    return NextResponse.json(
+      { error: "Channels feature is not available on your current plan" },
+      { status: 403 },
+    );
+  }
+
   let profileId: string | null = null;
   let agentId: string | null = null;
 

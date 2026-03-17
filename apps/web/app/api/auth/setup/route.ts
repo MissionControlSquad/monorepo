@@ -9,11 +9,12 @@ import {
 import { createRateLimiter } from "@/server/rate-limit";
 import { ensureUserAndProfileForAdmin } from "../_lib/ensure-profile";
 import { validateBody, setupSchema } from "../../_lib/validation";
+import { getClientIp } from "../../_lib/client-ip";
 
 const setupLimiter = createRateLimiter({ max: 3, windowSec: 60 });
 
 export async function POST(request: Request) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = getClientIp(request.headers);
   const check = setupLimiter.check(ip);
   if (!check.allowed) {
     return NextResponse.json(

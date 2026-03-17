@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "./pubsub";
-import { addDays, addWeeks, addMonths, setDate, startOfDay } from "date-fns";
+import { addDays, addWeeks, addMonths } from "date-fns";
 import { taskModel } from "./models/task";
 import { isSystemShutdown } from "./system-settings";
 import { filterAvailableAssignees } from "./assignment-guard";
@@ -70,54 +70,126 @@ export function validateRecurrenceConfig(input: unknown): RecurrenceConfig {
   return config;
 }
 
+// ─── Timezone Helpers ───────────────────────────────────────────────
+
+/** Extract date/time components as seen in a specific timezone. */
+function getPartsInTz(date: Date, tz: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const v = (t: Intl.DateTimeFormatPartTypes) => parseInt(parts.find((p) => p.type === t)!.value);
+  return {
+    year: v("year"),
+    month: v("month"),
+    day: v("day"),
+    hour: v("hour") === 24 ? 0 : v("hour"),
+    minute: v("minute"),
+  };
+}
+
+/** Get the UTC offset in milliseconds for a timezone at a given instant. */
+function tzOffsetMs(date: Date, tz: string): number {
+  const u = getPartsInTz(date, "UTC");
+  const t = getPartsInTz(date, tz);
+  const uMs = Date.UTC(u.year, u.month - 1, u.day, u.hour, u.minute);
+  const tMs = Date.UTC(t.year, t.month - 1, t.day, t.hour, t.minute);
+  return tMs - uMs;
+}
+
+/** Get the day of week (0=Sun, 6=Sat) for a date as seen in a timezone. */
+function getDayOfWeekInTz(date: Date, tz: string): number {
+  const { year, month, day } = getPartsInTz(date, tz);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+/** Get year/month/day as seen in a timezone. */
+function getDateInTz(date: Date, tz: string) {
+  const { year, month, day } = getPartsInTz(date, tz);
+  return { year, month, day };
+}
+
 // ─── Date Calculation ───────────────────────────────────────────────
 
-function applyTime(date: Date, time: string): Date {
+/**
+ * Apply HH:MM time to a date, interpreting the time in the given timezone.
+ * Returns a UTC Date that corresponds to the given time in the timezone.
+ */
+function applyTime(date: Date, time: string, timezone: string = "UTC"): Date {
   const [hours, minutes] = time.split(":").map(Number);
-  const result = new Date(date);
-  result.setHours(hours, minutes, 0, 0);
+
+  // Get the calendar date as seen in the target timezone
+  const { year, month, day } = getPartsInTz(date, timezone);
+
+  // Create the desired datetime as if it were UTC
+  const desiredAsUtc = Date.UTC(year, month - 1, day, hours, minutes, 0, 0);
+
+  // Get the offset at this approximate point
+  const approx = new Date(desiredAsUtc);
+  const offset = tzOffsetMs(approx, timezone);
+
+  // The actual UTC time = desired local time - offset
+  const result = new Date(desiredAsUtc - offset);
+
+  // Handle DST transitions: offset may differ at the result time
+  const actualOffset = tzOffsetMs(result, timezone);
+  if (actualOffset !== offset) {
+    return new Date(desiredAsUtc - actualOffset);
+  }
+
   return result;
 }
 
-export function calculateNextDueDate(config: RecurrenceConfig, currentDue: Date): Date {
+export function calculateNextDueDate(
+  config: RecurrenceConfig,
+  currentDue: Date,
+  timezone: string = "UTC",
+): Date {
   const time = config.time ?? "09:00";
 
   switch (config.type) {
     case "daily": {
-      return applyTime(addDays(currentDue, config.interval), time);
+      return applyTime(addDays(currentDue, config.interval), time, timezone);
     }
 
     case "weekly": {
       if (config.daysOfWeek && config.daysOfWeek.length > 0) {
         // Find the next applicable day of week
         const sortedDays = [...config.daysOfWeek].sort((a, b) => a - b);
-        const currentDay = currentDue.getDay();
+        const currentDay = getDayOfWeekInTz(currentDue, timezone);
         // Find next day in the same week
         const nextInWeek = sortedDays.find((d) => d > currentDay);
         if (nextInWeek !== undefined) {
           const diff = nextInWeek - currentDay;
-          return applyTime(addDays(currentDue, diff), time);
+          return applyTime(addDays(currentDue, diff), time, timezone);
         }
         // Wrap to next interval's first day
         const weeksToAdd = config.interval;
-        const baseDate = addWeeks(startOfDay(currentDue), weeksToAdd);
+        const baseDate = addWeeks(currentDue, weeksToAdd);
         const targetDay = sortedDays[0];
-        const baseDayOfWeek = baseDate.getDay();
+        const baseDayOfWeek = getDayOfWeekInTz(baseDate, timezone);
         const daysToTarget = (targetDay - baseDayOfWeek + 7) % 7;
-        return applyTime(addDays(baseDate, daysToTarget), time);
+        return applyTime(addDays(baseDate, daysToTarget), time, timezone);
       }
-      return applyTime(addWeeks(currentDue, config.interval), time);
+      return applyTime(addWeeks(currentDue, config.interval), time, timezone);
     }
 
     case "monthly": {
       const nextMonth = addMonths(currentDue, config.interval);
       if (config.dayOfMonth) {
-        const maxDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+        const { year, month } = getDateInTz(nextMonth, timezone);
+        const maxDay = new Date(year, month, 0).getDate();
         const day = Math.min(config.dayOfMonth, maxDay);
-        const result = setDate(nextMonth, day);
-        return applyTime(result, time);
+        // Build a date for that day in the timezone, then apply time
+        const targetDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        return applyTime(targetDate, time, timezone);
       }
-      return applyTime(nextMonth, time);
+      return applyTime(nextMonth, time, timezone);
     }
 
     default:
@@ -125,51 +197,60 @@ export function calculateNextDueDate(config: RecurrenceConfig, currentDue: Date)
   }
 }
 
-export function calculateInitialDueDate(config: RecurrenceConfig, startFrom?: Date): Date {
+export function calculateInitialDueDate(
+  config: RecurrenceConfig,
+  timezone: string = "UTC",
+  startFrom?: Date,
+): Date {
   const now = startFrom ?? new Date();
   const time = config.time ?? "09:00";
 
   switch (config.type) {
     case "daily": {
       // Next occurrence is tomorrow (or today if time hasn't passed)
-      const todayWithTime = applyTime(now, time);
+      const todayWithTime = applyTime(now, time, timezone);
       if (todayWithTime > now) return todayWithTime;
-      return applyTime(addDays(now, 1), time);
+      return applyTime(addDays(now, 1), time, timezone);
     }
 
     case "weekly": {
       if (config.daysOfWeek && config.daysOfWeek.length > 0) {
         const sortedDays = [...config.daysOfWeek].sort((a, b) => a - b);
-        const currentDay = now.getDay();
+        const currentDay = getDayOfWeekInTz(now, timezone);
         // Check today or later this week
         for (const day of sortedDays) {
           if (day > currentDay) {
-            return applyTime(addDays(now, day - currentDay), time);
+            return applyTime(addDays(now, day - currentDay), time, timezone);
           }
           if (day === currentDay) {
-            const todayWithTime = applyTime(now, time);
+            const todayWithTime = applyTime(now, time, timezone);
             if (todayWithTime > now) return todayWithTime;
           }
         }
         // Next week's first day
         const daysUntilNext = (sortedDays[0] - currentDay + 7) % 7 || 7;
-        return applyTime(addDays(now, daysUntilNext), time);
+        return applyTime(addDays(now, daysUntilNext), time, timezone);
       }
       // Same day next week
-      return applyTime(addWeeks(now, 1), time);
+      return applyTime(addWeeks(now, 1), time, timezone);
     }
 
     case "monthly": {
       if (config.dayOfMonth) {
-        const maxDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const { year, month } = getDateInTz(now, timezone);
+        const maxDay = new Date(year, month, 0).getDate();
         const day = Math.min(config.dayOfMonth, maxDay);
-        const thisMonth = applyTime(setDate(now, day), time);
+        const thisMonthDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        const thisMonth = applyTime(thisMonthDate, time, timezone);
         if (thisMonth > now) return thisMonth;
-        const nextMonth = addMonths(now, 1);
-        const maxDayNext = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
-        return applyTime(setDate(nextMonth, Math.min(config.dayOfMonth, maxDayNext)), time);
+        const nextMonthDate = addMonths(thisMonthDate, 1);
+        const { year: ny, month: nm } = getDateInTz(nextMonthDate, timezone);
+        const maxDayNext = new Date(ny, nm, 0).getDate();
+        const dayNext = Math.min(config.dayOfMonth, maxDayNext);
+        const nextDate = new Date(Date.UTC(ny, nm - 1, dayNext, 12, 0, 0));
+        return applyTime(nextDate, time, timezone);
       }
-      return applyTime(addMonths(now, 1), time);
+      return applyTime(addMonths(now, 1), time, timezone);
     }
 
     default:
@@ -233,9 +314,10 @@ export async function triggerRecurringTaskNow(recurringTaskId: string): Promise<
   });
 
   // Advance nextDueAt to the next future date, skipping any missed dates
+  const timezone = rt.timezone ?? "UTC";
   let nextDue = rt.nextDueAt ?? now;
   while (nextDue <= now) {
-    nextDue = calculateNextDueDate(config, nextDue);
+    nextDue = calculateNextDueDate(config, nextDue, timezone);
   }
 
   await prisma.recurringTask.update({
@@ -320,9 +402,10 @@ export async function generateRecurringTasks(opts?: { projectId?: string }): Pro
     });
 
     // Advance nextDueAt to the next future date, skipping any missed dates
-    let nextDue = calculateNextDueDate(config, rt.nextDueAt!);
+    const timezone = rt.timezone ?? "UTC";
+    let nextDue = calculateNextDueDate(config, rt.nextDueAt!, timezone);
     while (nextDue <= now) {
-      nextDue = calculateNextDueDate(config, nextDue);
+      nextDue = calculateNextDueDate(config, nextDue, timezone);
     }
 
     await prisma.recurringTask.update({

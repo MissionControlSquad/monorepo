@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { processEvent } from "@/server/events/ingest";
 import { createRateLimiter } from "@/server/rate-limit";
 import { log, logWarn } from "../../_lib/logger";
+import { getClientIp } from "../../_lib/client-ip";
 
 const ingestLimiter = createRateLimiter({ max: 120, windowSec: 60 });
 
@@ -13,7 +14,7 @@ const ingestLimiter = createRateLimiter({ max: 120, windowSec: 60 });
  */
 export async function POST(request: Request) {
   try {
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const ip = getClientIp(request.headers);
     const check = ingestLimiter.check(ip);
     if (!check.allowed) {
       logWarn("events/ingest", `Rate limited: ip=${ip}`, request);

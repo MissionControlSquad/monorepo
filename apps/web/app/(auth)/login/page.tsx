@@ -41,6 +41,14 @@ export default function LoginPage() {
       .then((data) => {
         if (!data.setupComplete) {
           router.replace("/setup");
+        } else if (
+          data.license?.status === "none" ||
+          data.license?.status === "expired" ||
+          data.license?.status === "invalid" ||
+          data.license?.status === "revoked"
+        ) {
+          // License not active — redirect to activation
+          router.replace("/activate");
         } else {
           setChecking(false);
         }

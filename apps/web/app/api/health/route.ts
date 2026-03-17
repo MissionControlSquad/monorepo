@@ -22,7 +22,7 @@ export async function GET() {
     await prisma.$queryRaw<[{ ok: 1 }]>(Prisma.sql`SELECT 1 as ok`);
     checks.database = { status: "pass", latencyMs: Math.round(performance.now() - start) };
   } catch (err) {
-    checks.database = { status: "fail", error: err instanceof Error ? err.message : "unknown" };
+    checks.database = { status: "fail", error: "connection_failed" };
   }
 
   // --- Redis ---
@@ -36,7 +36,7 @@ export async function GET() {
       checks.redis = { status: "pass", latencyMs: Math.round(performance.now() - start) };
     }
   } catch (err) {
-    checks.redis = { status: "fail", error: err instanceof Error ? err.message : "unknown" };
+    checks.redis = { status: "fail", error: "connection_failed" };
   }
 
   // --- Retry Queue ---
@@ -51,7 +51,7 @@ export async function GET() {
     ]);
     checks.retryQueue = { status: "pass", pendingRetries, deadLettered };
   } catch (err) {
-    checks.retryQueue = { status: "fail", error: err instanceof Error ? err.message : "unknown" };
+    checks.retryQueue = { status: "fail", error: "query_failed" };
   }
 
   // --- Notification Metrics ---

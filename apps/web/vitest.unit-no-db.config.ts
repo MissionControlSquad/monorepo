@@ -15,6 +15,7 @@ export default defineConfig({
       "tests/unit/notification-handler.test.ts",
       "tests/unit/json-response.test.ts",
       "tests/unit/logger.test.ts",
+      "tests/unit/license.test.ts",
     ],
   },
   resolve: {

@@ -23,6 +23,7 @@ export function CompletionTrendChart() {
   const [trendResult] = useQuery({
     query: TASK_COMPLETION_TREND_QUERY,
     variables: { days: 30, projectId: projectId ?? undefined },
+    requestPolicy: "cache-and-network",
   });
   const trend = trendResult.data?.taskCompletionTrend;
 

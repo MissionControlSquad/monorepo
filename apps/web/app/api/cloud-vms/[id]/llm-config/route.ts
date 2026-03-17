@@ -27,10 +27,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     return successResponse({ ok: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[llm-config] Error:", message);
-    if (message.includes("Invalid API key")) {
-      return errorResponse(message, 400);
+    console.error("[llm-config] Error:", err instanceof Error ? err.message : "Unknown error");
+    if (err instanceof Error && err.message.includes("Invalid API key")) {
+      return errorResponse("Invalid API key", 400);
     }
     return handleError(err);
   }

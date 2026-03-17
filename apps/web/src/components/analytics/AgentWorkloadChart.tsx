@@ -23,6 +23,7 @@ export function AgentWorkloadChart() {
   const [workloadResult] = useQuery({
     query: AGENT_WORKLOAD_DISTRIBUTION_QUERY,
     variables: { projectId: projectId ?? undefined },
+    requestPolicy: "cache-and-network",
   });
   const workload = workloadResult.data?.agentWorkloadDistribution;
 

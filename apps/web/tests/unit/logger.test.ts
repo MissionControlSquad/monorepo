@@ -44,7 +44,7 @@ describe("logger", () => {
     log("api", "created task", req);
 
     const parsed = JSON.parse(spy.mock.calls[0][0]);
-    expect(parsed.ip).toBe("1.2.3.4");
+    expect(parsed.ip).toBe("10.0.0.1"); // rightmost entry = proxy-appended real IP
     expect(parsed.method).toBe("POST");
     expect(parsed.path).toBe("/api/tasks");
   });

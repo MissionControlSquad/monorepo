@@ -11,6 +11,7 @@ export function ReviewMetricsCard() {
   const [metricsResult] = useQuery({
     query: REVIEW_METRICS_QUERY,
     variables: { projectId: projectId ?? undefined },
+    requestPolicy: "cache-and-network",
   });
   const metrics = metricsResult.data?.reviewMetrics;
 

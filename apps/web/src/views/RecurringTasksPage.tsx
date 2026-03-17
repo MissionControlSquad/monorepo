@@ -127,11 +127,22 @@ function formatNextDue(dateStr: string | null | undefined): string {
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
+  const timeStr = date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
   if (diffMs < 0) return "Overdue";
-  if (diffHours < 1) return "Less than 1 hour";
-  if (diffHours < 24) return `In ${diffHours} hour${diffHours !== 1 ? "s" : ""}`;
-  if (diffDays < 7) return `In ${diffDays} day${diffDays !== 1 ? "s" : ""}`;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  if (diffHours < 1) return `Less than 1 hour (${timeStr})`;
+  if (diffHours < 24) return `In ${diffHours} hour${diffHours !== 1 ? "s" : ""} (${timeStr})`;
+  if (diffDays < 7) {
+    const dayStr = date.toLocaleDateString(undefined, { weekday: "short" });
+    return `In ${diffDays} day${diffDays !== 1 ? "s" : ""} (${dayStr} ${timeStr})`;
+  }
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function describeRecurrence(config: RecurrenceConfig | null | undefined): string {
@@ -177,6 +188,7 @@ export function RecurringTasksPage() {
   const [result, reexecute] = useQuery({
     query: RECURRING_TASKS_QUERY,
     variables: { projectId, includeInactive: true },
+    requestPolicy: "cache-and-network",
   });
 
   const [, executePause] = useMutation(PAUSE_RECURRING_TASK);
@@ -578,6 +590,7 @@ function RecurringTaskModal({
   const onSubmit = async (data: RecurringTaskValues) => {
     try {
       const config = buildConfig();
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
       if (editing) {
         const res = await executeUpdate({
@@ -589,6 +602,7 @@ function RecurringTaskModal({
           tags: data.tags.length > 0 ? data.tags : [],
           assigneeIds: data.selectedAgentIds.length > 0 ? data.selectedAgentIds : [],
           projectId: data.selectedProjectId,
+          timezone,
         });
         if (res.error) throw res.error;
         toast.success("Recurring task updated");
@@ -601,6 +615,7 @@ function RecurringTaskModal({
           tags: data.tags.length > 0 ? data.tags : [],
           assigneeIds: data.selectedAgentIds.length > 0 ? data.selectedAgentIds : [],
           projectId: data.selectedProjectId,
+          timezone,
         });
         if (res.error) throw res.error;
         toast.success("Recurring task created");

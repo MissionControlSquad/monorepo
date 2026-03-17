@@ -22,6 +22,7 @@ export function ActivityTrendChart() {
   const [trendResult] = useQuery({
     query: ACTIVITY_TREND_QUERY,
     variables: { days: 30, projectId: projectId ?? undefined },
+    requestPolicy: "cache-and-network",
   });
   const trend = trendResult.data?.activityTrend;
 

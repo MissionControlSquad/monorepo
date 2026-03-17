@@ -22,6 +22,7 @@ export function TaskStatusChart() {
   const [statusResult] = useQuery({
     query: TASK_STATUS_COUNTS_QUERY,
     variables: { projectId: projectId ?? undefined },
+    requestPolicy: "cache-and-network",
   });
   const statusCounts = statusResult.data?.taskStatusCounts;
 

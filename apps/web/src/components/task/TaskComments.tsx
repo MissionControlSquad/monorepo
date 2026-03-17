@@ -33,6 +33,7 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
     query: MESSAGES_BY_TASK_CONNECTION_QUERY,
     variables: { taskId, first: 100, before: null },
     pause: !taskId,
+    requestPolicy: "cache-and-network",
   });
   const connection = connectionResult.data?.messagesByTaskConnection;
   const latestMessages = connection?.messages ?? [];

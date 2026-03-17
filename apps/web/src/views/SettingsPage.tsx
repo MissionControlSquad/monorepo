@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
-import { ShieldOff, Lock, ToggleRight } from "lucide-react";
+import { ShieldOff, Lock, KeyRound } from "lucide-react";
 import {
   SET_SYSTEM_SHUTDOWN,
   SYSTEM_SETTINGS_QUERY,
   CHANGE_PASSWORD,
 } from "../lib/graphql/mutations/system";
-import { UPDATE_FEATURE_FLAG } from "../lib/graphql/mutations/feature-flags";
 import { Breadcrumbs, Card, Button, ConfirmDialog, PageLayout } from "../components/ui";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,8 +22,6 @@ import {
   FormMessage,
 } from "@/components/ui/shadcn/form";
 import { Input } from "@/components/ui/shadcn/input";
-import { Switch } from "@/components/ui/shadcn/switch";
-import { useFeatureFlags } from "../components/context/FeatureFlagContext";
 
 const changePasswordSchema = z
   .object({
@@ -43,13 +40,27 @@ export function SettingsPage() {
   const [systemSettingsResult] = useQuery({ query: SYSTEM_SETTINGS_QUERY });
   const [, executeSetShutdown] = useMutation(SET_SYSTEM_SHUTDOWN);
   const [, executeChangePassword] = useMutation(CHANGE_PASSWORD);
-  const [, executeUpdateFlag] = useMutation(UPDATE_FEATURE_FLAG);
   const shutdownActive = systemSettingsResult.data?.systemSettings?.shutdownActive ?? false;
-  const { flags } = useFeatureFlags();
-  const [togglingFlag, setTogglingFlag] = useState<string | null>(null);
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const [licenseInfo, setLicenseInfo] = useState<{
+    status: string;
+    plan: string | null;
+    org: string | null;
+    expiresAt: string | null;
+    features: string[];
+    maxAgents: number;
+    maxProjects: number;
+    maxSeats: number;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/license")
+      .then((r) => r.json())
+      .then(setLicenseInfo)
+      .catch(() => {});
+  }, []);
 
   const form = useForm<ChangePasswordValues>({
     resolver: zodResolver(changePasswordSchema),
@@ -166,67 +177,80 @@ export function SettingsPage() {
         </Form>
       </Card>
 
-      {/* Feature Flags */}
-      <Card padding="lg" className="space-y-4">
-        <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-muted">
-            <ToggleRight className="w-5 h-5 text-muted-foreground" />
+      {/* License */}
+      {licenseInfo && licenseInfo.status !== "none" && (
+        <Card padding="lg" className="space-y-4">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-muted">
+              <KeyRound className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base font-semibold text-foreground">License</h2>
+              <p className="text-sm text-muted-foreground mt-1">Your current license details</p>
+            </div>
+            <span
+              className={`text-xs px-2 py-1 rounded-full font-medium ${
+                licenseInfo.status === "active"
+                  ? "bg-emerald-500/10 text-emerald-600"
+                  : licenseInfo.status === "grace"
+                    ? "bg-amber-500/10 text-amber-600"
+                    : "bg-destructive/10 text-destructive"
+              }`}
+            >
+              {licenseInfo.status}
+            </span>
           </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-foreground">Feature Flags</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Toggle features on or off. System-managed flags can only be changed by infrastructure.
-            </p>
-          </div>
-        </div>
 
-        <div className="divide-y divide-border">
-          {flags.map((flag) => {
-            const isUserManaged = flag.managedBy === "user";
-            const isToggling = togglingFlag === flag.key;
-            return (
-              <div
-                key={flag.key}
-                className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
-              >
-                <div className="flex-1 min-w-0 pr-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-foreground">{flag.key}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                        isUserManaged
-                          ? "bg-primary/10 text-primary"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {flag.managedBy}
-                    </span>
-                  </div>
-                  {flag.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5">{flag.description}</p>
-                  )}
-                </div>
-                <Switch
-                  checked={flag.enabled}
-                  disabled={!isUserManaged || isToggling}
-                  onCheckedChange={async (checked) => {
-                    setTogglingFlag(flag.key);
-                    try {
-                      const result = await executeUpdateFlag({ key: flag.key, enabled: checked });
-                      if (result.error) throw result.error;
-                      toast.success(`${flag.key} ${checked ? "enabled" : "disabled"}`);
-                    } catch {
-                      toast.error(`Failed to update ${flag.key}`);
-                    } finally {
-                      setTogglingFlag(null);
-                    }
-                  }}
-                />
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            {licenseInfo.org && (
+              <div>
+                <span className="text-muted-foreground">Organization</span>
+                <p className="font-medium text-foreground">{licenseInfo.org}</p>
               </div>
-            );
-          })}
-        </div>
-      </Card>
+            )}
+            {licenseInfo.plan && (
+              <div>
+                <span className="text-muted-foreground">Plan</span>
+                <p className="font-medium text-foreground capitalize">{licenseInfo.plan}</p>
+              </div>
+            )}
+            {licenseInfo.expiresAt && (
+              <div>
+                <span className="text-muted-foreground">Expires</span>
+                <p className="font-medium text-foreground">
+                  {new Date(licenseInfo.expiresAt).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+            <div>
+              <span className="text-muted-foreground">Limits</span>
+              <p className="font-medium text-foreground">
+                {licenseInfo.maxAgents === -1 ? "Unlimited" : licenseInfo.maxAgents} agents
+                {" / "}
+                {licenseInfo.maxProjects === -1 ? "Unlimited" : licenseInfo.maxProjects} projects
+                {" / "}
+                {licenseInfo.maxSeats === -1 ? "Unlimited" : licenseInfo.maxSeats} seats
+              </p>
+            </div>
+          </div>
+
+          {licenseInfo.features.length > 0 && (
+            <div>
+              <span className="text-sm text-muted-foreground">Licensed features</span>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {licenseInfo.features.map((f) => (
+                  <span
+                    key={f}
+                    className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
+                  >
+                    {f}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* System Shutdown */}
       <div

@@ -1,5 +1,9 @@
+import { getClientIp } from "./client-ip";
+
 function getIp(request?: Request): string | undefined {
-  return request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (!request) return undefined;
+  const ip = getClientIp(request.headers);
+  return ip !== "unknown" ? ip : undefined;
 }
 
 function getRequestMeta(request?: Request) {

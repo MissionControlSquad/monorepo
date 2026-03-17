@@ -4,20 +4,25 @@ export async function register() {
     const { runStartupMigrations } = await import("./src/server/startup-migrations");
     await runStartupMigrations();
 
+    // Initialize license (check stored license in DB, start heartbeat if valid)
+    const { initLicense, stopTokenRefresh } = await import("./src/server/license");
+    await initLicense();
+
     const { startRetryProcessor, stopRetryProcessor } =
       await import("./src/server/services/notification-retry");
     startRetryProcessor();
 
-    // Graceful shutdown: stop retry processor before exiting
+    // Graceful shutdown: stop heartbeat + retry processor before exiting
     const shutdown = () => {
       console.info(
         JSON.stringify({
           timestamp: new Date().toISOString(),
           level: "info",
           tag: "instrumentation",
-          message: "Shutting down — stopping retry processor",
+          message: "Shutting down — stopping license refresh and retry processor",
         }),
       );
+      stopTokenRefresh();
       stopRetryProcessor();
       process.exit(0);
     };

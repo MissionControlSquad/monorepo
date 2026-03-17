@@ -39,6 +39,7 @@ export function AgentActivityHeatmap() {
   const [result] = useQuery({
     query: AGENT_ACTIVITY_HEATMAP_QUERY,
     variables: { days: 28, projectId: projectId ?? undefined },
+    requestPolicy: "cache-and-network",
   });
   const cells: HeatmapCell[] | undefined = result.data?.agentActivityHeatmap;
 

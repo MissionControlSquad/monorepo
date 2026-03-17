@@ -4,6 +4,7 @@ import { invalidateProjectsList } from "../../cache";
 import { Roles } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 import { prisma } from "../../prisma";
+import { checkLicenseLimit } from "../../license";
 
 builder.mutationField("createProject", (t) =>
   t.prismaField({
@@ -15,6 +16,15 @@ builder.mutationField("createProject", (t) =>
       memberIds: t.arg.stringList(),
     },
     resolve: async (query, _root, args) => {
+      // Enforce license limit on project count
+      const projectCount = await projectModel.count({ where: { status: "active" } });
+      const limitCheck = await checkLicenseLimit("projects", projectCount);
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Project limit reached (${limitCheck.limit}). Upgrade your plan to add more projects.`,
+        );
+      }
+
       // Auto-include Squad Lead's profile
       const squadLead = await agentModel.findOne({
         where: { role: Roles.SQUAD_LEAD },

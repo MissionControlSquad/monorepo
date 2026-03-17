@@ -1,5 +1,6 @@
 import { createRateLimiter } from "@/server/rate-limit";
 import { errorResponse } from "./json-response";
+import { getClientIp } from "./client-ip";
 
 /**
  * Pre-configured rate limiters for different API route groups.
@@ -32,7 +33,7 @@ export async function checkRateLimit(
   limiter: ReturnType<typeof createRateLimiter>,
   request: Request,
 ): Promise<Response | null> {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = getClientIp(request.headers);
   const check = await limiter.checkAsync(ip);
   if (!check.allowed) {
     return errorResponse("Too many requests. Try again later.", 429);

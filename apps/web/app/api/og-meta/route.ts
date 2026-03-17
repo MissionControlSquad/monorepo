@@ -1,6 +1,51 @@
 import { NextResponse } from "next/server";
 
 /**
+ * Block private/internal IP ranges to prevent SSRF attacks.
+ */
+function isPrivateUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    const hostname = parsed.hostname;
+
+    // Block common internal hostnames
+    if (
+      hostname === "localhost" ||
+      hostname === "[::1]" ||
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".internal")
+    ) {
+      return true;
+    }
+
+    // Block private IPv4 ranges
+    const ipv4Match = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+    if (ipv4Match) {
+      const [, a, b] = ipv4Match.map(Number);
+      if (
+        a === 10 || // 10.0.0.0/8
+        a === 127 || // 127.0.0.0/8
+        (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
+        (a === 192 && b === 168) || // 192.168.0.0/16
+        (a === 169 && b === 254) || // 169.254.0.0/16 (AWS metadata)
+        a === 0 // 0.0.0.0/8
+      ) {
+        return true;
+      }
+    }
+
+    // Block non-http(s) schemes
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * GET /api/og-meta?url=<encoded-url>
  * Fetches Open Graph metadata for a given URL.
  * Returns: { title, description, image, siteName, url }
@@ -17,6 +62,10 @@ export async function GET(request: Request) {
     new URL(url); // validate
   } catch {
     return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+  }
+
+  if (isPrivateUrl(url)) {
+    return NextResponse.json({ error: "URL not allowed" }, { status: 403 });
   }
 
   try {

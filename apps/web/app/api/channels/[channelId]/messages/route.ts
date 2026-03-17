@@ -3,6 +3,8 @@ import { pubsub, channelMessageTopic } from "@/server/pubsub";
 import { notifyAgentChannelMembers } from "@/server/dm-notify";
 import { escapeHtml } from "@/server/sanitize";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
+import { isFeatureEnabled } from "@/server/feature-flags";
+import { FLAG_KEYS } from "@/lib/feature-flag-keys";
 import { parseMentionIds } from "@/lib/mentions";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
@@ -76,6 +78,9 @@ export async function GET(request: Request, ctx: RouteContext) {
 // ---------- POST — Agent sends a message ----------
 
 export async function POST(request: Request, ctx: RouteContext) {
+  if (!(await isFeatureEnabled(FLAG_KEYS.CHANNELS))) {
+    return errorResponse("Channels feature is not available on your current plan", 403);
+  }
   const limited = await checkRateLimit(apiLimiters.channels, request);
   if (limited) return limited;
 

@@ -60,6 +60,8 @@ export function requestContext(request: Request): ErrorContext {
   return {
     route: url.pathname,
     method: request.method,
-    ip: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim(),
+    ip:
+      request.headers.get("x-real-ip")?.trim() ||
+      request.headers.get("x-forwarded-for")?.split(",").pop()?.trim(),
   };
 }

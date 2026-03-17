@@ -3,7 +3,13 @@ import { schema } from "@/server/graphql/schema";
 import { prisma } from "@/server/prisma";
 import type { GraphQLContext } from "@/server/graphql/builder";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
+import { isLicenseActive } from "@/server/license";
 import { apiLimiters, checkRateLimit } from "../_lib/rate-limit-check";
+
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
+/** Maximum allowed query depth to prevent deeply nested DoS queries. */
+const MAX_QUERY_DEPTH = 12;
 
 function getSessionTokenFromRequest(request: Request): string | null {
   const cookie = request.headers.get("cookie");
@@ -14,6 +20,8 @@ function getSessionTokenFromRequest(request: Request): string | null {
 
 const yoga = createYoga<GraphQLContext>({
   schema,
+  // Disable introspection in production to prevent schema leaking
+  parserAndValidationCache: !IS_PRODUCTION,
   context: async ({ request }) => {
     const token = getSessionTokenFromRequest(request);
     let session: GraphQLContext["session"] = null;
@@ -31,8 +39,8 @@ const yoga = createYoga<GraphQLContext>({
   },
   graphqlEndpoint: "/api/graphql",
   fetchAPI: { Response },
-  // Enable GraphiQL playground in development
-  graphiql: process.env.NODE_ENV !== "production",
+  // Disable GraphiQL and schema introspection in production
+  graphiql: !IS_PRODUCTION,
   // Suppress noisy ResponseAborted errors from SSE client disconnects
   logging: {
     debug: console.debug,
@@ -53,10 +61,63 @@ const yoga = createYoga<GraphQLContext>({
 
 const yogaHandler = yoga as unknown as (req: Request) => Promise<Response>;
 
-function withRateLimit(handler: (req: Request) => Promise<Response>) {
+/**
+ * Estimate query depth from the raw query string.
+ * Counts nested selection set braces as a proxy for depth.
+ */
+function estimateQueryDepth(query: string): number {
+  let depth = 0;
+  let maxDepth = 0;
+  for (const ch of query) {
+    if (ch === "{") {
+      depth++;
+      if (depth > maxDepth) maxDepth = depth;
+    } else if (ch === "}") {
+      depth--;
+    }
+  }
+  return maxDepth;
+}
+
+function withLicenseAndRateLimit(handler: (req: Request) => Promise<Response>) {
   return async (req: Request) => {
+    // License gate — block all GraphQL when license is not active
+    const licensed = await isLicenseActive();
+    if (!licensed) {
+      return Response.json(
+        { errors: [{ message: "License not active. Please activate your license at /activate" }] },
+        { status: 403 },
+      );
+    }
     const limited = await checkRateLimit(apiLimiters.graphql, req);
     if (limited) return limited;
+
+    // Query depth check — prevent deeply nested DoS queries
+    if (req.method === "POST") {
+      try {
+        const cloned = req.clone();
+        const body = await cloned.json();
+        const query = body?.query;
+        if (typeof query === "string") {
+          // Block introspection in production
+          if (IS_PRODUCTION && query.includes("__schema")) {
+            return Response.json(
+              { errors: [{ message: "Introspection is disabled" }] },
+              { status: 400 },
+            );
+          }
+          if (estimateQueryDepth(query) > MAX_QUERY_DEPTH) {
+            return Response.json(
+              { errors: [{ message: "Query depth exceeds maximum allowed depth" }] },
+              { status: 400 },
+            );
+          }
+        }
+      } catch {
+        // If body parsing fails, let Yoga handle the error
+      }
+    }
+
     return handler(req);
   };
 }
@@ -64,5 +125,5 @@ function withRateLimit(handler: (req: Request) => Promise<Response>) {
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-export const GET = withRateLimit(yogaHandler);
-export const POST = withRateLimit(yogaHandler);
+export const GET = withLicenseAndRateLimit(yogaHandler);
+export const POST = withLicenseAndRateLimit(yogaHandler);

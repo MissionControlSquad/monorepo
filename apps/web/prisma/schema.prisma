@@ -993,6 +993,26 @@ model SystemSettings {
   @@map("system_settings")
 }
 
+// ─── License (singleton — stores activated license) ──────────────
+
+model License {
+  id             String   @id @default("active")
+  token          String   @db.Text
+  plan           String
+  org            String
+  maxAgents      Int      @default(-1)
+  maxProjects    Int      @default(-1)
+  maxSeats       Int      @default(-1)
+  features       String[] @default([])
+  instanceId     String?
+  expiresAt      DateTime
+  activatedAt    DateTime @default(now())
+  lastVerifiedAt DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("licenses")
+}
+
 // ─── Cloud VMs ────────────────────────────────────────────────────
 
 model CloudVM {

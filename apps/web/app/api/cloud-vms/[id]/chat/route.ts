@@ -120,8 +120,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             safeClose();
           });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "SSH connection failed";
-        safeEnqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
+        safeEnqueue(
+          encoder.encode(`data: ${JSON.stringify({ error: "SSH connection failed" })}\n\n`),
+        );
         safeEnqueue(encoder.encode("data: [DONE]\n\n"));
         safeClose();
       }

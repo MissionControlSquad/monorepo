@@ -56,6 +56,14 @@ const serverSchema = z.object({
     .optional()
     .transform((v) => v || undefined),
 
+  // ── License ─────────────────────────────────────────────────
+  LICENSE_SERVER_URL: z
+    .union([z.string().url(), z.literal("")])
+    .optional()
+    .transform((v) => v || undefined),
+  LICENSE_REFRESH_TOKEN: z.string().optional(),
+  LICENSE_PUBLIC_KEY: z.string().optional(),
+
   // ── Optional ─────────────────────────────────────────────
   NEXT_PUBLIC_MC_URL: z
     .union([z.string().url(), z.literal("")])

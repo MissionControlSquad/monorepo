@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
+import { getClientIp } from "./app/api/_lib/client-ip";
 
 const COOKIE_NAME = "mc_session";
 
@@ -77,6 +78,7 @@ function checkGlobalRateLimit(ip: string): { limited: boolean; retryAfter: numbe
 const PUBLIC_EXACT = new Set([
   "/login",
   "/setup",
+  "/activate",
   "/reset-password",
   "/favicon.ico",
   "/logo.png",
@@ -86,6 +88,7 @@ const PUBLIC_EXACT = new Set([
 
 const PUBLIC_PREFIXES = [
   "/api/auth/", // Auth endpoints (login, logout, setup, status)
+  "/api/license", // License activation (public — before auth)
   "/api/events/", // Agent event ingestion (Bearer token auth in handler)
   "/api/agents/me", // Agent-scoped "me" routes (Bearer token auth in handler)
   "/api/cron/", // Cron jobs (CRON_SECRET auth in handler)
@@ -143,7 +146,7 @@ export async function middleware(request: NextRequest) {
 
   // --- Global Rate Limiting ---
   if (!isRateLimitExempt(pathname)) {
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const ip = getClientIp(request.headers);
     const { limited, retryAfter } = checkGlobalRateLimit(ip);
 
     if (limited) {

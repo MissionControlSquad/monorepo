@@ -216,6 +216,9 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
   // Track the last boardResult.data reference we applied, so we can detect fresh data
   const appliedDataRef = useRef<Record<string, TaskCardType[]> | null>(null);
 
+  // Track recent subscription updates to avoid reinitializing columns from graphcache echoes
+  const lastSubUpdateRef = useRef<number>(0);
+
   // Reset column states when project or filters change to avoid showing stale data
   const filterKey = JSON.stringify(filterVariables);
   useEffect(() => {
@@ -233,6 +236,9 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
     if (switchingProject && boardResult.fetching) return;
     // Skip if we already applied this exact data reference (no new data from server)
     if (boardResult.data === appliedDataRef.current) return;
+    // Skip graphcache echoes caused by subscription updates — the subscription handler
+    // already applied the change locally, so reinitializing would cause tasks to flicker.
+    if (Date.now() - lastSubUpdateRef.current < 2000 && !switchingProject) return;
 
     const data = boardResult.data;
     appliedDataRef.current = data;
@@ -278,6 +284,10 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
     (_prev, data) => {
       const updated = data?.taskUpdated;
       if (!updated?.id || !updated.status) return data;
+
+      // Mark that a subscription update is being applied so the board data
+      // initialization effect skips the graphcache echo that follows.
+      lastSubUpdateRef.current = Date.now();
 
       setColumnStates((prev) => {
         // Find which column currently holds the task
