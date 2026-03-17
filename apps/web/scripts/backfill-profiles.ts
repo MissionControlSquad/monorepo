@@ -5,7 +5,7 @@
  */
 
 import { prisma } from "../src/server/prisma";
-import { ProfileKind } from "@prisma/client";
+import { ProfileKind } from "@agentcenter/database";
 
 async function main() {
   const agents = await prisma.agent.findMany({ orderBy: { id: "asc" } });

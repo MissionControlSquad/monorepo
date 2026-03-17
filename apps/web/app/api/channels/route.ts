@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/server/prisma";
-import type { ChannelVisibility } from "@prisma/client";
+import type { ChannelVisibility } from "@agentcenter/database";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { resolveAgent } from "../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
