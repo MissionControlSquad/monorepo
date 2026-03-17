@@ -1,4 +1,4 @@
-import { createYoga } from "graphql-yoga";
+import { createYoga } from "@agentcenter/graphql-server";
 import { schema } from "@/server/graphql/schema";
 import { prisma } from "@/server/prisma";
 import type { GraphQLContext } from "@/server/graphql/builder";
