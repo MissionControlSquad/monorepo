@@ -1,90 +1,138 @@
-import { StyleSheet, View, TextInput, TouchableOpacity, Text } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { useState } from "react";
-import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
+import { login } from "../../src/api/auth";
+import { useAuth } from "../../src/context/AuthContext";
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { onLogin } = useAuth();
 
   const handleLogin = async () => {
+    if (!username.trim() || !password.trim()) {
+      Alert.alert("Missing fields", "Please enter your username and password.");
+      return;
+    }
     setLoading(true);
     try {
-      // TODO: Call API endpoint /api/auth/token with email/password
-      // For now, mock the token
-      const mockToken = "mock-jwt-token-" + Date.now();
-      await SecureStore.setItemAsync("authToken", mockToken);
+      const { profileId } = await login(username.trim(), password);
+      onLogin(profileId);
       router.replace("/(dashboard)");
-    } catch (error) {
-      console.error("Login failed:", error);
-      alert("Login failed");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Login failed";
+      Alert.alert("Sign in failed", msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>AgentCenter</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        editable={!loading}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        editable={!loading}
-      />
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>{loading ? "Signing in..." : "Sign In"}</Text>
-      </TouchableOpacity>
-    </View>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <View style={styles.inner}>
+        <Text style={styles.logo}>AgentCenter</Text>
+        <Text style={styles.subtitle}>Mission Control</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Username"
+          placeholderTextColor="#9ca3af"
+          value={username}
+          onChangeText={setUsername}
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!loading}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#9ca3af"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          editable={!loading}
+        />
+
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleLogin}
+          disabled={loading}
+          activeOpacity={0.8}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Sign In</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#f9fafb",
   },
-  title: {
-    fontSize: 24,
+  inner: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  logo: {
+    fontSize: 30,
     fontWeight: "bold",
-    marginBottom: 20,
+    color: "#111827",
     textAlign: "center",
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: "#6b7280",
+    textAlign: "center",
+    marginBottom: 40,
   },
   input: {
+    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ddd",
-    padding: 12,
+    borderColor: "#e5e7eb",
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: "#111827",
     marginBottom: 12,
-    borderRadius: 8,
   },
   button: {
-    backgroundColor: "#007AFF",
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: "#2563eb",
+    borderRadius: 10,
+    paddingVertical: 14,
     alignItems: "center",
+    marginTop: 8,
   },
   buttonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   buttonText: {
     color: "#fff",
+    fontSize: 16,
     fontWeight: "600",
   },
 });
