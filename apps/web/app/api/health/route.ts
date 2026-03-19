@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@agentcenter/database";
 import { getRedisClient } from "@/server/redis";
 import { getMetrics } from "@/server/services/notification-metrics";
 

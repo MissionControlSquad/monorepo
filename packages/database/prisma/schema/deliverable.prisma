@@ -1,0 +1,62 @@
+// ─── Deliverables ─────────────────────────────────────────────────
+
+enum DeliverableKind {
+  markdown
+  code
+  file
+  link
+}
+
+model Deliverable {
+  id         String          @id @default(cuid())
+  taskId     String
+  profileId  String
+  projectId  String?
+  title      String
+  kind       DeliverableKind
+  content    String?
+  language   String?
+  storageKey String?         // R2 object key
+  fileName   String?
+  mimeType   String?
+  fileSize   Int?
+  url        String?
+  version    Int             @default(1)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  task     Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  profile  Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  project  Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  versions DeliverableVersion[]
+
+  @@index([taskId])
+  @@index([profileId])
+  @@index([taskId, profileId])
+  @@index([projectId])
+  @@map("deliverables")
+}
+
+model DeliverableVersion {
+  id                String          @id @default(cuid())
+  deliverableId     String
+  version           Int
+  title             String
+  kind              DeliverableKind
+  content           String?
+  language          String?
+  storageKey        String?
+  fileName          String?
+  mimeType          String?
+  fileSize          Int?
+  url               String?
+  editedByProfileId String?
+  createdAt         DateTime        @default(now())
+
+  deliverable     Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  editedByProfile Profile?    @relation("DeliverableVersionEditedByProfile", fields: [editedByProfileId], references: [id], onDelete: SetNull)
+
+  @@index([deliverableId])
+  @@index([deliverableId, version])
+  @@map("deliverable_versions")
+}

@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --version && nvm --version 2>/dev/null || echo \"nvm not found\")",
+      "Bash(nvm ls-remote:*)",
+      "Bash(clear:*)",
+      "Bash(psql --version)",
+      "Bash(docker --version)",
+      "Bash(npx prisma:*)",
+      "Bash(npx tsc:*)",
+      "Bash(grep -r \"Content-Security-Policy\\\\|contentSecurityPolicy\\\\|script-src\\\\|unsafe-eval\" '/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo/apps/web' --include=*.ts --include=*.tsx --include=*.js --include=*.mjs -l)",
+      "Bash(find '/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-app' -maxdepth 2 -type f \\\\\\(-name Dockerfile* -o -name docker-compose* -o -name *.config.* \\\\\\))",
+      "Bash(find '/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo' -maxdepth 2 -type f \\\\\\(-name Dockerfile* -o -name docker-compose* \\\\\\))",
+      "Bash(\"/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo/.github/workflows/docker-publish.yaml\":*)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(BASE=\"/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo\" __NEW_LINE_69941224a71f4d5a__ echo \"=== packages/database ===\" find \"$BASE/packages/database\" -not -path \"*/node_modules/*\" -not -path \"*/migrations/*\" -type f)",
+      "Bash(BASE=\"/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo/apps/web\")",
+      "Bash(__NEW_LINE_b32bf79d82dd6bde__ echo:*)",
+      "Read(//Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo/$BASE/src/server/**)",
+      "Read(//Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo/$BASE/src/server/graphql/**)",
+      "Read(//Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo/$BASE/src/lib/**)",
+      "Bash(sed -i '' 's|context: ./apps/web$|context: .\\\\n          file: apps/web/Dockerfile|' \"/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo/.github/workflows/release.yaml\")",
+      "Bash(sed -i '' 's|context: ./apps/web$|context: .\\\\n          file: apps/web/Dockerfile|' \"/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo/.github/workflows/docker-publish.yaml\")",
+      "Bash(BASE=\"/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo\" __NEW_LINE_243c009b9692d657__ echo \"=== packages/ overview ===\" ls \"$BASE/packages/\" __NEW_LINE_243c009b9692d657__ echo \"\" echo \"=== apps/web/src/server/graphql/ \\(should have NO types/ or generated/\\) ===\" ls \"$BASE/apps/web/src/server/graphql/\" __NEW_LINE_243c009b9692d657__ echo \"\" echo \"=== apps/web prisma gone ===\" ls \"$BASE/apps/web/\")",
+      "Bash(echo '\\(no prisma dir\\)' __NEW_LINE_243c009b9692d657__ echo echo '=== Stale @prisma/client imports in apps/web/src/server/ ===' grep -rn \"from @prisma/client\\\\|from ''''@prisma/client''''\" $BASE/apps/web/src/server/)",
+      "Bash('BASE=/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo' __NEW_LINE_2f6c50b17c23e834__ echo '=== Remaining @prisma/client in apps/web/src \\(should be 0\\) ===' grep -rn \"\"@prisma/client\"\" $BASE/apps/web/src)"
+    ]
+  }
+}

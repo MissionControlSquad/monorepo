@@ -1,4 +1,4 @@
-import type { Deliverable } from "@prisma/client";
+import type { Deliverable } from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { emit } from "../events";
 import { EventTypes } from "../constants";

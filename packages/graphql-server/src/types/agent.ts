@@ -1,5 +1,5 @@
 import { builder } from "../builder";
-import { CURRENT_CONFIG_VERSION } from "../../config-version";
+import { CURRENT_CONFIG_VERSION } from "../config-version";
 
 builder.prismaObject("Agent", {
   fields: (t) => ({

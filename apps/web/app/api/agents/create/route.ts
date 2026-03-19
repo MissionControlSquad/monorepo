@@ -11,7 +11,7 @@ import { workspacePathUnix } from "@/server/workspace-paths";
 import { invalidateAgentListCache } from "@/server/cache";
 import { pubsub, PubSubEvent } from "@/server/pubsub";
 import { ensureAgentProfile } from "@/server/agent-profile";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { validateBody, createAgentSchema } from "../../_lib/validation";
 import { checkLicenseLimit } from "@/server/license";

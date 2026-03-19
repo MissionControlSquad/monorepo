@@ -4,7 +4,7 @@ import type {
   UserNotificationType,
   UserNotification,
   UserNotificationPreference,
-} from "@prisma/client";
+} from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { sendPushToUser } from "./push";
 import { sendEmail } from "./email";

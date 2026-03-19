@@ -1,4 +1,4 @@
-import { DeliverableKind } from "@prisma/client";
+import { DeliverableKind } from "@agentcenter/database";
 import { builder } from "../builder";
 import { prisma } from "../../prisma";
 import { taskModel, agentModel, deliverableModel } from "../../models";

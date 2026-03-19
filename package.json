@@ -11,6 +11,9 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "db:generate": "turbo run db:generate --filter=@agentcenter/database",
+    "db:migrate": "turbo run db:migrate --filter=@agentcenter/database",
+    "db:migrate:deploy": "turbo run db:migrate:deploy --filter=@agentcenter/database",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "prepare": "husky"

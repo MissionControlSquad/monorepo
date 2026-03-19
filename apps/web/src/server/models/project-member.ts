@@ -1,4 +1,4 @@
-import type { ProjectMember } from "@prisma/client";
+import type { ProjectMember } from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { Model } from "./base";
 

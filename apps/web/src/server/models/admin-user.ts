@@ -1,4 +1,4 @@
-import type { AdminUser } from "@prisma/client";
+import type { AdminUser } from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { Model } from "./base";
 

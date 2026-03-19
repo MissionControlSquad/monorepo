@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "@agentcenter/database";
 
 interface TaskFilterArgs {
   priorities?: string[] | null;

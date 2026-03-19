@@ -1,7 +1,7 @@
 import { builder } from "../builder";
 import { messageModel } from "../../models";
 import { prisma } from "../../prisma";
-import { MessageConnectionRef } from "../types/message";
+import { MessageConnectionRef } from "@agentcenter/graphql-server";
 
 builder.queryField("messagesByTask", (t) =>
   t.prismaField({

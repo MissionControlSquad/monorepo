@@ -1,0 +1,39 @@
+// ─── Documents ────────────────────────────────────────────────────
+
+enum DocumentType {
+  deliverable
+  research
+  protocol
+  note
+  file
+}
+
+model Document {
+  id                 String       @id @default(cuid())
+  title              String
+  content            String
+  type               DocumentType
+  taskId             String?
+  projectId          String?
+  createdById        String?
+  createdByProfileId String?
+  storageKey         String?
+  fileName           String?
+  mimeType           String?
+  fileSize           Int?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  createdBy                 Agent?                    @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdByProfile          Profile?                  @relation(fields: [createdByProfileId], references: [id], onDelete: SetNull)
+  task                      Task?                     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project                   Project?                  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  messageAttachments        MessageAttachment[]
+  channelMessageAttachments ChannelMessageAttachment[]
+
+  @@index([taskId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([projectId])
+  @@map("documents")
+}

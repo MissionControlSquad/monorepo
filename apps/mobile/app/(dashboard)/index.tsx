@@ -1,66 +1,146 @@
-import { StyleSheet, View, FlatList, Text, TouchableOpacity } from "react-native";
-import { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
+import { useQuery } from "urql";
 import { useRouter } from "expo-router";
-import { urqlClient } from "../../src/api/client";
+import { TASKS_QUERY } from "../../src/lib/graphql/queries";
+import type { TaskStatus, Priority } from "../../src/types";
 
-// Mock task type for now
+interface TaskAssignee {
+  id: string;
+  profileId: string;
+  profile: { id: string; displayName: string; username: string; avatarUrl: string | null };
+}
+
 interface Task {
   id: string;
   title: string;
-  status: "inbox" | "assigned" | "in_progress" | "review" | "done";
+  status: TaskStatus;
+  priority: Priority | null;
+  taskNumber: number;
+  dueDate: string | null;
+  tags: string[];
+  assignees: TaskAssignee[];
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  inbox: "#6b7280",
+  assigned: "#2563eb",
+  in_progress: "#d97706",
+  review: "#7c3aed",
+  done: "#16a34a",
+  blocked: "#dc2626",
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+  low: "#6b7280",
+  medium: "#d97706",
+  high: "#dc2626",
+  urgent: "#7c3aed",
+};
+
+function statusLabel(status: string): string {
+  return status.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export default function TaskListScreen() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const [result, reexecute] = useQuery<{ tasks: Task[] }>({
+    query: TASKS_QUERY,
+    variables: { limit: 100 },
+    requestPolicy: "cache-and-network",
+  });
 
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        // TODO: Use urqlClient to fetch tasks from GraphQL API
-        setTasks([]);
-      } catch (error) {
-        console.error("Failed to fetch tasks:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data, fetching, error } = result;
+  const tasks = data?.tasks ?? [];
 
-    fetchTasks();
-  }, []);
-
-  const handleTaskPress = (taskId: string) => {
-    router.push(`/task/${taskId}`);
-  };
-
-  if (loading) {
+  if (fetching && tasks.length === 0) {
     return (
-      <View style={styles.container}>
-        <Text>Loading tasks...</Text>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#2563eb" />
+      </View>
+    );
+  }
+
+  if (error && tasks.length === 0) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.errorText}>Failed to load tasks</Text>
+        <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {tasks.length === 0 ? (
-        <Text style={styles.emptyText}>No tasks yet</Text>
-      ) : (
-        <FlatList
-          data={tasks}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.taskItem}
-              onPress={() => handleTaskPress(item.id)}
-            >
-              <Text style={styles.taskTitle}>{item.title}</Text>
-              <Text style={styles.taskStatus}>{item.status}</Text>
-            </TouchableOpacity>
-          )}
-        />
-      )}
+      <FlatList
+        data={tasks}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={fetching}
+            onRefresh={() => reexecute({ requestPolicy: "network-only" })}
+            tintColor="#2563eb"
+          />
+        }
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>No tasks yet</Text>
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => router.push(`/task/${item.id}`)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.taskNumber}>#{item.taskNumber}</Text>
+              {item.priority && (
+                <View
+                  style={[
+                    styles.priorityBadge,
+                    { backgroundColor: PRIORITY_COLORS[item.priority] + "22" },
+                  ]}
+                >
+                  <Text
+                    style={[styles.priorityText, { color: PRIORITY_COLORS[item.priority] }]}
+                  >
+                    {item.priority}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.taskTitle} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <View style={styles.cardFooter}>
+              <View
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: STATUS_COLORS[item.status] + "22" },
+                ]}
+              >
+                <Text style={[styles.statusText, { color: STATUS_COLORS[item.status] }]}>
+                  {statusLabel(item.status)}
+                </Text>
+              </View>
+              {item.assignees.length > 0 && (
+                <Text style={styles.assignees} numberOfLines={1}>
+                  {item.assignees.map((a) => a.profile.displayName).join(", ")}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        )}
+      />
     </View>
   );
 }
@@ -68,26 +148,90 @@ export default function TaskListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#f9fafb",
+  },
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f9fafb",
+    gap: 12,
+  },
+  listContent: {
     padding: 16,
-    backgroundColor: "#fff",
+    gap: 10,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyText: {
-    textAlign: "center",
-    marginTop: 20,
-    color: "#999",
-  },
-  taskItem: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-    padding: 12,
-  },
-  taskTitle: {
+    color: "#9ca3af",
     fontSize: 16,
+  },
+  errorText: {
+    color: "#dc2626",
+    fontSize: 16,
+  },
+  retryText: {
+    color: "#2563eb",
+    fontSize: 14,
     fontWeight: "600",
   },
-  taskStatus: {
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    gap: 8,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  taskNumber: {
     fontSize: 12,
-    color: "#999",
-    marginTop: 4,
+    color: "#9ca3af",
+    fontWeight: "500",
+  },
+  priorityBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  priorityText: {
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  taskTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
+    lineHeight: 20,
+  },
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  statusBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  assignees: {
+    fontSize: 12,
+    color: "#6b7280",
+    flex: 1,
+    textAlign: "right",
   },
 });

@@ -1,4 +1,4 @@
-import type { AgentAction } from "@prisma/client";
+import type { AgentAction } from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { Model } from "./base";
 

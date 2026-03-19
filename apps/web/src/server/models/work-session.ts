@@ -1,4 +1,4 @@
-import type { WorkSession } from "@prisma/client";
+import type { WorkSession } from "@agentcenter/database";
 import { prisma } from "../prisma";
 import { Model } from "./base";
 

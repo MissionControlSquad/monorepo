@@ -1,4 +1,4 @@
-import type { Agent } from "@prisma/client";
+import type { Agent } from "@agentcenter/database";
 
 export class TTLCache<T> {
   private cache = new Map<string, { value: T; expiresAt: number }>();

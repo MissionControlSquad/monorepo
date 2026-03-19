@@ -1,6 +1,6 @@
 import { prisma } from "../src/server/prisma";
 import { generateApiKey } from "../src/server/api-key";
-import type { Agent, Task, Project } from "@prisma/client";
+import type { Agent, Task, Project } from "@agentcenter/database";
 
 // ─── Admin Auth Helpers ────────────────────────────────────────────
 

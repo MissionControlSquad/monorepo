@@ -3,7 +3,7 @@ import { pubsub, PubSubEvent, activityProjectTopic } from "../../pubsub";
 import { EventTypes, TaskStatus } from "../../constants";
 import { taskModel, activityModel } from "../../models";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
-import type { ActivityType } from "@prisma/client";
+import type { ActivityType } from "@agentcenter/database";
 
 /** Resolve an agentId to a profileId. Returns undefined if resolution fails. */
 async function resolveAgentProfile(agentId: string): Promise<string | undefined> {

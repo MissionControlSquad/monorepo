@@ -1,4 +1,4 @@
-import { ProjectMemberStatus } from "@prisma/client";
+import { ProjectMemberStatus } from "@agentcenter/database";
 import { on } from "../bus";
 import { invalidateMemberCaches } from "../../cache";
 import { notificationModel, projectMemberModel } from "../../models";

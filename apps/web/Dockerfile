@@ -1,11 +1,24 @@
+# ── Build context: monorepo root ──────────────────────────────────
+# Build with: docker build -f apps/web/Dockerfile .
+
 # ── Stage 1: Install dependencies ──────────────────────────────────
 FROM node:22-alpine AS deps
 WORKDIR /app
 
+# Copy workspace manifests (for npm workspaces install)
 COPY package.json package-lock.json* ./
-COPY prisma ./prisma/
+COPY apps/web/package.json ./apps/web/package.json
+COPY packages/database/package.json ./packages/database/package.json
+COPY packages/graphql-server/package.json ./packages/graphql-server/package.json
+COPY packages/graphql-client/package.json ./packages/graphql-client/package.json
+COPY packages/config/package.json ./packages/config/package.json
+COPY packages/types/package.json ./packages/types/package.json
+COPY packages/utils/package.json ./packages/utils/package.json
 
-RUN npm ci
+# Copy prisma schema so `prisma generate` can run during npm ci postinstall hooks
+COPY packages/database/prisma ./packages/database/prisma
+
+RUN npm ci --workspace=apps/web --include-workspace-root
 
 # ── Stage 2: Build the Next.js app ────────────────────────────────
 FROM node:22-alpine AS build
@@ -14,10 +27,12 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client (needs schema + node_modules)
-RUN npx prisma generate
+# Generate Prisma client from packages/database schema
+# (outputs pothos-types.ts → packages/graphql-server/src/generated/)
+RUN cd packages/database && npx prisma generate
 
 # Build Next.js in standalone mode
+WORKDIR /app/apps/web
 ENV NEXT_PHASE=phase-production-build
 RUN npm run build
 
@@ -41,15 +56,15 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 # Copy standalone server output
-COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
+COPY --from=build /app/apps/web/.next/standalone ./
+COPY --from=build /app/apps/web/.next/static ./.next/static
+COPY --from=build /app/apps/web/public ./public
 
 # Copy Prisma schema + migrations for runtime migrate deploy
-COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/packages/database/prisma ./prisma
 
 # Copy agent templates (read at runtime by agent-config-generator)
-COPY --from=build /app/src/server/agent-templates ./src/server/agent-templates
+COPY --from=build /app/apps/web/src/server/agent-templates ./src/server/agent-templates
 
 # Install only prisma CLI for migrations (separate from app deps)
 RUN npm install prisma@6 --save-exact --no-package-lock 2>/dev/null || true
@@ -62,7 +77,7 @@ COPY --from=build /app/node_modules/@prisma/client ./node_modules/@prisma/client
 RUN mkdir -p .next/cache data && chown -R nextjs:nodejs .next/cache data
 
 # Copy entrypoint
-COPY docker-entrypoint.sh ./
+COPY apps/web/docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
 USER nextjs
