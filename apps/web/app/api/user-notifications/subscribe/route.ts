@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { prisma } from "@/server/prisma";
+import { upsertPushSubscription, deletePushSubscription } from "@agentcenter/database";
 import { resolveUserId } from "../../_lib/resolve-session";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { isFeatureEnabled } from "@/server/feature-flags";
@@ -20,22 +20,15 @@ export async function POST(request: Request) {
       return errorResponse("Invalid push subscription", 400);
     }
 
-    const subscription = await prisma.pushSubscription.upsert({
-      where: { userId_endpoint: { userId, endpoint } },
-      create: {
-        userId,
-        endpoint,
-        p256dh: keys.p256dh,
-        auth: keys.auth,
-        userAgent: request.headers.get("user-agent") ?? undefined,
-      },
-      update: {
-        p256dh: keys.p256dh,
-        auth: keys.auth,
-      },
+    await upsertPushSubscription({
+      userId,
+      endpoint,
+      p256dh: keys.p256dh,
+      auth: keys.auth,
+      userAgent: request.headers.get("user-agent") ?? undefined,
     });
 
-    return successResponse({ id: subscription.id }, 201);
+    return successResponse({ success: true }, 201);
   } catch (err) {
     return handleError(err);
   }
@@ -50,9 +43,7 @@ export async function DELETE(request: Request) {
       return errorResponse("endpoint is required", 400);
     }
 
-    await prisma.pushSubscription.deleteMany({
-      where: { userId, endpoint: body.endpoint },
-    });
+    await deletePushSubscription(userId, body.endpoint);
 
     return successResponse({ success: true });
   } catch (err) {

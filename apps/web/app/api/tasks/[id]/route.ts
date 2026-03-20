@@ -1,4 +1,4 @@
-import { prisma } from "@/server/prisma";
+import { diffTaskAssignees } from "@agentcenter/database";
 import { taskModel } from "@/server/models/task";
 import { agentModel } from "@/server/models";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "@/server/pubsub";
@@ -97,19 +97,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
       // Atomic transaction to prevent race conditions with concurrent updates
       if (addedProfileIds.length > 0 || removedProfileIds.length > 0) {
-        await prisma.$transaction(async (tx) => {
-          if (addedProfileIds.length > 0) {
-            await tx.taskAssignee.createMany({
-              data: addedProfileIds.map((profileId: string) => ({ taskId: id, profileId })),
-              skipDuplicates: true,
-            });
-          }
-          if (removedProfileIds.length > 0) {
-            await tx.taskAssignee.deleteMany({
-              where: { taskId: id, profileId: { in: removedProfileIds } },
-            });
-          }
-        });
+        await diffTaskAssignees(id, addedProfileIds, removedProfileIds);
       }
 
       if (addedProfileIds.length > 0 || removedProfileIds.length > 0) {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/server/prisma";
+import { findProfileByAgentId, createFileDocument } from "@agentcenter/database";
 import { uploadFileToR2 } from "@/server/storage/r2";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@/lib/feature-flag-keys";
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     try {
       const agent = await resolveAgent(request);
       agentId = agent.id;
-      const profile = await prisma.profile.findUnique({ where: { agentId: agent.id } });
+      const profile = await findProfileByAgentId(agent.id);
       if (profile) profileId = profile.id;
     } catch {
       // fall through to session check
@@ -122,18 +122,14 @@ export async function POST(request: Request) {
   }
 
   // Step 3: Create Document record
-  const document = await prisma.document.create({
-    data: {
-      title: fileName,
-      content: "",
-      type: "file",
-      storageKey,
-      fileName,
-      mimeType,
-      fileSize,
-      createdById: agentId ?? null,
-      createdByProfileId: profileId ?? null,
-    },
+  const document = await createFileDocument({
+    title: fileName,
+    storageKey,
+    fileName,
+    mimeType,
+    fileSize,
+    createdById: agentId ?? null,
+    createdByProfileId: profileId ?? null,
   });
 
   return NextResponse.json({

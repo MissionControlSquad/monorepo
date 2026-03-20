@@ -1,4 +1,4 @@
-import { prisma } from "@/server/prisma";
+import { findCloudVMConnection } from "@agentcenter/database";
 import { computeCronSchedule } from "@/server/agent-config-generator";
 import { ensureHeartbeatCron } from "@/server/services/cloud-vm-cron";
 import {
@@ -20,10 +20,7 @@ export async function GET(
   try {
     const { id, agentSlug } = await params;
 
-    const vm = await prisma.cloudVM.findUnique({
-      where: { id },
-      select: { ipv4: true, sshPrivateKey: true, status: true },
-    });
+    const vm = await findCloudVMConnection(id);
 
     if (!vm) return errorResponse("VM not found", 404);
     if (vm.status !== "running" || !vm.ipv4 || !vm.sshPrivateKey) {
@@ -80,10 +77,7 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const { action = "all" } = body as { action?: string };
 
-    const vm = await prisma.cloudVM.findUnique({
-      where: { id },
-      select: { ipv4: true, sshPrivateKey: true, status: true },
-    });
+    const vm = await findCloudVMConnection(id);
 
     if (!vm) return errorResponse("VM not found", 404);
     if (vm.status !== "running" || !vm.ipv4 || !vm.sshPrivateKey) {

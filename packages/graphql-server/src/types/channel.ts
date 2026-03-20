@@ -1,5 +1,5 @@
 import { builder } from "../builder";
-import { prisma } from "@agentcenter/database";
+import { getChannelUnreadCount } from "@agentcenter/database";
 
 // User (human account); minimal exposure for Profile.user relation
 builder.prismaObject("User", {
@@ -47,17 +47,7 @@ builder.prismaObject("Channel", {
       args: { profileId: t.arg.string({ required: false }) },
       resolve: async (channel, args) => {
         if (!args.profileId) return 0;
-        const member = await prisma.channelMember.findUnique({
-          where: {
-            channelId_profileId: { channelId: channel.id, profileId: args.profileId },
-          },
-          select: { lastReadAt: true, joinedAt: true },
-        });
-        if (!member) return 0;
-        const since = member.lastReadAt ?? member.joinedAt;
-        return prisma.channelMessage.count({
-          where: { channelId: channel.id, createdAt: { gt: since } },
-        });
+        return getChannelUnreadCount(channel.id, args.profileId);
       },
     }),
   }),

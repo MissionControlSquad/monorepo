@@ -1,4 +1,4 @@
-import { prisma } from "@/server/prisma";
+import { findCloudVMRaw, listAgentsByVM, findAgentById } from "@agentcenter/database";
 import { assignAgentToVM } from "@/server/services/cloud-vm";
 import { ensureAgentOnVM } from "@/server/services/cloud-vm-ensure";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
@@ -12,23 +12,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
 
-    const vm = await prisma.cloudVM.findUnique({ where: { id } });
+    const vm = await findCloudVMRaw(id);
     if (!vm) {
       return errorResponse("VM not found", 404);
     }
 
-    const agents = await prisma.agent.findMany({
-      where: { cloudVmId: id },
-      select: {
-        id: true,
-        name: true,
-        username: true,
-        identityEmoji: true,
-        status: true,
-        role: true,
-        apiKeyPrefix: true,
-      },
-    });
+    const agents = await listAgentsByVM(id);
 
     return successResponse({ agents });
   } catch (err) {
@@ -55,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return errorResponse("agentId is required", 400);
     }
 
-    const agent = await prisma.agent.findUnique({ where: { id: agentId } });
+    const agent = await findAgentById(agentId);
     if (!agent) {
       return errorResponse("Agent not found", 404);
     }

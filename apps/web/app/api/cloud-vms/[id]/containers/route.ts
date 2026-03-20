@@ -1,4 +1,4 @@
-import { prisma } from "@/server/prisma";
+import { findCloudVMConnection } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { getVMSSHConfig } from "@/server/services/cloud-vm-utils";
 import { sshExec } from "@/server/services/ssh";
@@ -11,10 +11,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
 
-    const vm = await prisma.cloudVM.findUnique({
-      where: { id },
-      select: { ipv4: true, sshPrivateKey: true, status: true },
-    });
+    const vm = await findCloudVMConnection(id);
 
     if (!vm) return errorResponse("VM not found", 404);
     if (vm.status !== "running" || !vm.ipv4 || !vm.sshPrivateKey) {

@@ -1,4 +1,10 @@
-import { prisma } from "@/server/prisma";
+import {
+  listMemberChannels,
+  getChannelUnreadCount,
+  findChannelBySlug,
+  createDmChannel,
+  findProfileForDisplay,
+} from "@agentcenter/database";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@/lib/feature-flag-keys";
@@ -13,54 +19,14 @@ export async function GET(request: Request) {
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
     // Find all DM channels the agent is a member of
-    const memberships = await prisma.channelMember.findMany({
-      where: {
-        profileId: agentProfileId,
-        channel: { visibility: "dm" },
-      },
-      include: {
-        channel: {
-          include: {
-            members: {
-              include: {
-                profile: {
-                  select: {
-                    id: true,
-                    kind: true,
-                    displayName: true,
-                    username: true,
-                    avatarUrl: true,
-                  },
-                },
-              },
-            },
-            messages: {
-              orderBy: { createdAt: "desc" },
-              take: 1,
-              select: {
-                id: true,
-                content: true,
-                fromProfileId: true,
-                createdAt: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const memberships = await listMemberChannels(agentProfileId, "dm");
 
     // Build response with unread counts
     const channels = await Promise.all(
       memberships.map(async (membership) => {
         const channel = membership.channel;
-        const sinceDate = membership.lastReadAt ?? membership.joinedAt;
 
-        const unreadCount = await prisma.channelMessage.count({
-          where: {
-            channelId: channel.id,
-            createdAt: { gt: sinceDate },
-          },
-        });
+        const unreadCount = await getChannelUnreadCount(channel.id, agentProfileId);
 
         const otherMember = channel.members.find((m) => m.profileId !== agentProfileId);
 
@@ -105,10 +71,7 @@ export async function POST(request: Request) {
     }
 
     // Verify the other profile exists
-    const otherProfile = await prisma.profile.findUnique({
-      where: { id: otherProfileId },
-      select: { id: true, kind: true, displayName: true, username: true, avatarUrl: true },
-    });
+    const otherProfile = await findProfileForDisplay(otherProfileId);
     if (!otherProfile) {
       return errorResponse("Profile not found", 404);
     }
@@ -118,10 +81,7 @@ export async function POST(request: Request) {
     const slug = `dm-${id1}-${id2}`;
 
     // Return existing channel if it already exists
-    const existing = await prisma.channel.findUnique({
-      where: { slug },
-      select: { id: true, slug: true, visibility: true },
-    });
+    const existing = await findChannelBySlug(slug);
     if (existing) {
       log("dm", `OPENED agent="${agent.name}" → "${otherProfile.displayName}" (existing)`, request);
       return successResponse({
@@ -133,22 +93,7 @@ export async function POST(request: Request) {
     }
 
     // Create new DM channel with both members
-    const channel = await prisma.channel.create({
-      data: {
-        name: "Direct message",
-        slug,
-        visibility: "dm",
-        projectId: null,
-        createdByProfileId: agentProfileId,
-        members: {
-          create: [
-            { profileId: agentProfileId, role: "creator" },
-            { profileId: otherProfileId, role: "member" },
-          ],
-        },
-      },
-      select: { id: true, slug: true },
-    });
+    const channel = await createDmChannel(agentProfileId, otherProfileId, slug);
 
     log("dm", `OPENED agent="${agent.name}" → "${otherProfile.displayName}" (new)`, request);
     return successResponse(

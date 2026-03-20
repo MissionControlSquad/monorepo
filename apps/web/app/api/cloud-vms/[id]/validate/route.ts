@@ -1,4 +1,4 @@
-import { prisma } from "@/server/prisma";
+import { findCloudVMConnection, findAgentBySlug } from "@agentcenter/database";
 import { sshExec } from "@/server/services/ssh";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { computeCronSchedule } from "@/server/agent-config-generator";
@@ -49,10 +49,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       autoFix?: boolean;
     };
 
-    const vm = await prisma.cloudVM.findUnique({
-      where: { id },
-      select: { ipv4: true, sshPrivateKey: true, status: true },
-    });
+    const vm = await findCloudVMConnection(id);
 
     if (!vm) return errorResponse("VM not found", 404);
     if (vm.status !== "running" || !vm.ipv4 || !vm.sshPrivateKey) {
@@ -166,12 +163,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
 
       // Look up the agent from DB for config generation
-      const agent = await prisma.agent.findFirst({
-        where: {
-          cloudVmId: id,
-          OR: [{ username: agentId }, { name: agentId }],
-        },
-      });
+      const agent = await findAgentBySlug(id, agentId);
 
       if (!agent) {
         return errorResponse(`Agent "${agentId}" not found in database for this VM`, 404);

@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { prisma } from "@/server/prisma";
+import { countUnreadUserNotifications } from "@agentcenter/database";
 import { resolveUserId } from "../../_lib/resolve-session";
 import { successResponse, handleError } from "../../_lib/json-response";
 
@@ -8,9 +8,7 @@ export async function GET(request: Request) {
   try {
     const { userId } = await resolveUserId(request);
 
-    const count = await prisma.userNotification.count({
-      where: { userId, channel: "in_app", readAt: null },
-    });
+    const count = await countUnreadUserNotifications(userId);
 
     return successResponse({ count });
   } catch (err) {

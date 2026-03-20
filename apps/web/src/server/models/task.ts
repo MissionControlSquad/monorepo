@@ -1,8 +1,14 @@
 import type { Task, Prisma, TaskAssignee } from "@agentcenter/database";
-import { prisma, notDeleted } from "../prisma";
+import {
+  findTaskByNumber,
+  findTaskByIdSelect,
+  setTaskAssignees,
+  softDeleteTask,
+} from "@agentcenter/database";
 import { emit } from "../events";
 import { EventTypes } from "../constants";
 import { Model } from "./base";
+import { prisma } from "../prisma";
 import type { FieldChange } from "../events/types";
 
 /**
@@ -23,40 +29,23 @@ class TaskModel extends Model<Task> {
     id: string,
     select: S,
   ): Promise<Prisma.TaskGetPayload<{ select: S }> | null> {
-    return prisma.task.findFirst({
-      where: { id, ...notDeleted },
-      select,
-    }) as Promise<Prisma.TaskGetPayload<{ select: S }> | null>;
+    return findTaskByIdSelect(id, select);
   }
 
   /** Find a single task by taskNumber (excludes soft-deleted) */
   findByNumber(taskNumber: number, args?: { include?: Prisma.TaskInclude }): Promise<Task | null> {
-    return prisma.task.findFirst({
-      ...args,
-      where: { taskNumber, ...notDeleted },
-    });
+    return findTaskByNumber(taskNumber, args);
   }
 
   /** Set assignees for a task (replace all) — runs in a single transaction.
    *  Accepts profileIds (not agentIds). */
-  async setAssignees(taskId: string, profileIds: string[]): Promise<TaskAssignee[]> {
-    return prisma.$transaction(async (tx) => {
-      await tx.taskAssignee.deleteMany({ where: { taskId } });
-      if (profileIds.length === 0) return [];
-      await tx.taskAssignee.createMany({
-        data: profileIds.map((profileId) => ({ taskId, profileId })),
-        skipDuplicates: true,
-      });
-      return tx.taskAssignee.findMany({ where: { taskId } });
-    });
+  setAssignees(taskId: string, profileIds: string[]): Promise<TaskAssignee[]> {
+    return setTaskAssignees(taskId, profileIds);
   }
 
   /** Soft-delete a task */
   softDelete(id: string) {
-    return prisma.task.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    return softDeleteTask(id);
   }
 
   // ── Emit helpers ─────────────────────────────────────────
