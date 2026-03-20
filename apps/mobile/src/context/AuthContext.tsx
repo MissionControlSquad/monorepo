@@ -14,7 +14,7 @@ interface AuthContextValue {
   isSignedIn: boolean;
   profileId: string | null;
   serverUrl: string | null;
-  urqlClient: Client | null;
+  urqlClient: Client;
   onLogin: (serverUrl: string, profileId: string) => void;
   onLogout: () => Promise<void>;
 }
@@ -24,7 +24,7 @@ const AuthContext = createContext<AuthContextValue>({
   isSignedIn: false,
   profileId: null,
   serverUrl: null,
-  urqlClient: null,
+  urqlClient: createUrqlClient(),
   onLogin: () => {},
   onLogout: async () => {},
 });
@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
-  const [urqlClient, setUrqlClient] = useState<Client | null>(null);
+  const [urqlClient, setUrqlClient] = useState<Client>(() => createUrqlClient());
 
   useEffect(() => {
     loadSession()
@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsSignedIn(false);
     setProfileId(null);
     setServerUrl(null);
-    setUrqlClient(null);
+    setUrqlClient(createUrqlClient());
   };
 
   return (

@@ -7,10 +7,9 @@ import {
   RefreshControl,
   TouchableOpacity,
 } from "react-native";
-import { useEffect } from "react";
 import { useQuery } from "urql";
+import { useRouter } from "expo-router";
 import { AGENTS_QUERY } from "@agentcenter/graphql-client";
-import { getStoredServerUrl, getStoredCookie } from "../../src/api/session";
 
 interface Agent {
   id: string;
@@ -74,6 +73,7 @@ function isOnline(agent: Agent): boolean {
 }
 
 export default function AgentsScreen() {
+  const router = useRouter();
   const [result, reexecute] = useQuery<{ agents: Agent[] }>({
     query: AGENTS_QUERY,
     requestPolicy: "cache-and-network",
@@ -81,33 +81,6 @@ export default function AgentsScreen() {
 
   const { data, fetching, error } = result;
   const agents = data?.agents ?? [];
-
-  // Diagnostic: raw fetch test on mount
-  useEffect(() => {
-    const serverUrl = getStoredServerUrl();
-    const cookie = getStoredCookie();
-    console.log("[Diagnostic] serverUrl:", serverUrl);
-    console.log("[Diagnostic] cookie available:", !!cookie);
-    if (!serverUrl) {
-      console.warn("[Diagnostic] No server URL stored — urql will use localhost:3000 fallback");
-      return;
-    }
-    fetch(`${serverUrl}/api/graphql`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}),
-      },
-      body: JSON.stringify({ query: "{ __typename }" }),
-    })
-      .then(async (res) => {
-        const text = await res.text();
-        console.log("[Diagnostic] graphql status:", res.status, res.statusText);
-        console.log("[Diagnostic] graphql body:", text.slice(0, 300));
-      })
-      .catch((err) => console.error("[Diagnostic] fetch error:", err));
-  }, []);
 
   if (fetching && agents.length === 0) {
     return (
@@ -149,7 +122,11 @@ export default function AgentsScreen() {
           const online = isOnline(item);
           const statusColor = getStatusColor(item);
           return (
-            <View style={styles.card}>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => router.push(`/agent/${item.id}`)}
+              activeOpacity={0.7}
+            >
               <View style={styles.cardLeft}>
                 <View style={styles.emojiContainer}>
                   <Text style={styles.emoji}>{item.identityEmoji ?? "🤖"}</Text>
@@ -188,7 +165,7 @@ export default function AgentsScreen() {
                 </View>
                 <Text style={styles.levelText}>{item.level}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
       />

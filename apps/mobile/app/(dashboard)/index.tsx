@@ -8,7 +8,9 @@ import {
   RefreshControl,
 } from "react-native";
 import { useQuery } from "urql";
-import { useRouter } from "expo-router";
+import { useRouter, useNavigation } from "expo-router";
+import { useEffect } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
 import type { TaskStatus, Priority } from "../../src/types";
 
@@ -51,6 +53,21 @@ function statusLabel(status: string): string {
 
 export default function TaskListScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => router.push("/task/create")}
+          style={{ marginRight: 16 }}
+        >
+          <Ionicons name="add" size={26} color="#2563eb" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, router]);
+
   const [result, reexecute] = useQuery<{ tasks: Task[] }>({
     query: TASKS_QUERY,
     variables: { limit: 100 },

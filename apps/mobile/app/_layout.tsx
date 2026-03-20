@@ -12,11 +12,14 @@ function RootLayoutNav() {
       <Stack.Screen name="auth/login" options={{ headerShown: false }} />
       <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />
       <Stack.Screen name="task/[id]" options={{ title: "Task Details" }} />
+      <Stack.Screen name="task/create" options={{ title: "New Task", presentation: "modal" }} />
+      <Stack.Screen name="deliverable/[id]" options={{ title: "Deliverable" }} />
+      <Stack.Screen name="agent/[id]" options={{ title: "Agent" }} />
       <Stack.Screen name="channels/[id]" options={{ title: "Channel" }} />
     </Stack>
   );
 
-  return urqlClient ? <Provider value={urqlClient}>{content}</Provider> : content;
+  return <Provider value={urqlClient}>{content}</Provider>;
 }
 
 export default function RootLayout() {
