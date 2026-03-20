@@ -1,6 +1,6 @@
 /**
- * App-wide configuration.
- * Set EXPO_PUBLIC_API_URL in your .env to point at your AgentCenter instance.
- * Defaults to localhost:3000 for local development.
+ * Server URL is no longer configured here.
+ * Users enter their own server URL on the login screen.
+ * The URL is stored securely via SecureStore and accessed through
+ * getStoredServerUrl() in src/api/session.ts.
  */
-export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";

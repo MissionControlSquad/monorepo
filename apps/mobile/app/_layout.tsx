@@ -1,15 +1,15 @@
 import "../global.css";
 import { Stack } from "expo-router";
 import { Provider } from "urql";
-import { urqlClient } from "../src/api/client";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
 
 function RootLayoutNav() {
-  const { isLoading, isSignedIn } = useAuth();
+  const { isLoading, isSignedIn, urqlClient } = useAuth();
 
   if (isLoading) return null;
 
-  return (
+  // Wrap in Provider only when signed in and client is ready
+  const content = (
     <Stack>
       {!isSignedIn ? (
         <Stack.Screen name="auth/login" options={{ headerShown: false }} />
@@ -22,14 +22,14 @@ function RootLayoutNav() {
       )}
     </Stack>
   );
+
+  return urqlClient ? <Provider value={urqlClient}>{content}</Provider> : content;
 }
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <Provider value={urqlClient}>
-        <RootLayoutNav />
-      </Provider>
+      <RootLayoutNav />
     </AuthProvider>
   );
 }

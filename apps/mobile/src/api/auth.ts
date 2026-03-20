@@ -1,11 +1,14 @@
-import { API_URL } from "../config";
 import { saveSession, clearSession } from "./session";
 
 export async function login(
+  serverUrl: string,
   username: string,
   password: string,
 ): Promise<{ profileId: string; username: string }> {
-  const res = await fetch(`${API_URL}/api/auth/login`, {
+  // Normalize: strip trailing slash
+  const base = serverUrl.replace(/\/+$/, "");
+
+  const res = await fetch(`${base}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
@@ -29,7 +32,7 @@ export async function login(
   const user = (body.username as string) ?? "";
 
   if (cookie && profileId) {
-    await saveSession(cookie, profileId);
+    await saveSession(base, cookie, profileId);
   }
 
   return { profileId, username: user };
