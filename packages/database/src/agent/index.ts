@@ -10,3 +10,18 @@ export {
   getAgentApiKeyHash,
   findAgentsByCurrentTaskId,
 } from "./update";
+export {
+  getLatestAgentActionIds,
+  countActiveTaskAssigneesByProfile,
+  countCompletedTaskAssigneesByProfile,
+} from "./queries";
+export {
+  getAgentTasksAssignedRaw,
+  getAgentTasksCompletedRaw,
+  getAgentDeliverablesRaw,
+  getAgentWorkTimeRaw,
+  getAgentQueueStatsRaw,
+  getAgentWorkloadRaw,
+  getAgentActivityHeatmapRaw,
+  getActivityTrendRaw,
+} from "./analytics";

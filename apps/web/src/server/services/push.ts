@@ -1,6 +1,6 @@
 import webpush from "web-push";
 import { env } from "../env";
-import { prisma } from "@agentcenter/database";
+import { deleteExpiredPushSubscription, getPushSubscriptionsForUser } from "@agentcenter/database";
 import { logError } from "../logger";
 
 let configured = false;
@@ -45,9 +45,7 @@ export async function sendPushNotification(
       err instanceof Error && "statusCode" in err ? (err as { statusCode: number }).statusCode : 0;
     if (statusCode === 410 || statusCode === 404) {
       // Subscription expired — clean up
-      await prisma.pushSubscription
-        .delete({ where: { id: subscription.id } })
-        .catch((err) => console.error("[push] Failed to clean up expired subscription:", err));
+      await deleteExpiredPushSubscription(subscription.id);
       return false;
     }
     logError(
@@ -64,9 +62,7 @@ export async function sendPushNotification(
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<void> {
   if (!ensureConfigured()) return;
 
-  const subscriptions = await prisma.pushSubscription.findMany({
-    where: { userId },
-  });
+  const subscriptions = await getPushSubscriptionsForUser(userId);
 
   await Promise.allSettled(subscriptions.map((sub) => sendPushNotification(sub, payload)));
 }

@@ -3,7 +3,7 @@ import { agentModel, projectModel, projectMemberModel } from "../../models";
 import { invalidateProjectsList } from "../../cache";
 import { Roles } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
-import { prisma } from "@agentcenter/database";
+import { findProfilesWithAgentIdsByIds, findProfileAgentId } from "@agentcenter/database";
 import { checkLicenseLimit } from "../../license";
 
 builder.mutationField("createProject", (t) =>
@@ -66,10 +66,7 @@ builder.mutationField("createProject", (t) =>
       });
 
       // Resolve profileIds → agentIds for event/notification compat
-      const profiles = await prisma.profile.findMany({
-        where: { id: { in: profileIds }, agentId: { not: null } },
-        select: { agentId: true },
-      });
+      const profiles = await findProfilesWithAgentIdsByIds(profileIds);
       const agentIds = profiles.map((p) => p.agentId!);
 
       await projectModel.emitCreated(project, {
@@ -173,10 +170,7 @@ builder.mutationField("addProjectMember", (t) =>
       });
 
       // Look up agent info for events (if this profile is an agent)
-      const profile = await prisma.profile.findUnique({
-        where: { id: resolvedProfileId },
-        select: { agentId: true },
-      });
+      const profile = await findProfileAgentId(resolvedProfileId);
 
       if (profile?.agentId) {
         const [project, agent] = await Promise.all([
@@ -236,11 +230,8 @@ builder.mutationField("removeProjectMember", (t) =>
       if (args.profileId) {
         resolvedProfileId = args.profileId;
         // Look up agentId from profile for Squad Lead check
-        const profile = await prisma.profile.findUnique({
-          where: { id: args.profileId },
-          select: { agentId: true },
-        });
-        resolvedAgentId = profile?.agentId ?? null;
+        const profileData = await findProfileAgentId(args.profileId);
+        resolvedAgentId = profileData?.agentId ?? null;
       } else if (args.agentId) {
         resolvedAgentId = args.agentId;
         resolvedProfileId = await getOrCreateAgentProfileId(args.agentId);

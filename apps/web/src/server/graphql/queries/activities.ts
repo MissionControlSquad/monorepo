@@ -1,6 +1,6 @@
 import { builder } from "../builder";
 import { activityModel, agentModel } from "../../models";
-import { prisma } from "@agentcenter/database";
+import { getActivityCursor, listActivitiesPage } from "@agentcenter/database";
 import { Roles } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 import { ActivityConnectionRef } from "@agentcenter/graphql-server";
@@ -29,20 +29,12 @@ builder.queryField("activitiesConnection", (t) =>
       };
 
       if (args.after) {
-        const cursor = await prisma.activity.findFirst({
-          where: { id: args.after },
-          select: { createdAt: true },
-        });
+        const cursor = await getActivityCursor(args.after);
         if (!cursor) return { activities: [], hasMore: false };
         where.createdAt = { lt: cursor.createdAt };
       }
 
-      const rows = await prisma.activity.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        take: first + 1,
-        include,
-      });
+      const rows = await listActivitiesPage(where, { take: first + 1, include });
 
       const hasMore = rows.length > first;
       const activities = hasMore ? rows.slice(0, first) : rows;

@@ -1,6 +1,10 @@
 import { builder } from "../builder";
 import { messageModel } from "../../models";
-import { prisma } from "@agentcenter/database";
+import {
+  getMessageCursor,
+  listMessagesBeforeCursor,
+  listLatestMessages,
+} from "@agentcenter/database";
 import { MessageConnectionRef } from "@agentcenter/graphql-server";
 
 builder.queryField("messagesByTask", (t) =>
@@ -35,35 +39,15 @@ builder.queryField("messagesByTaskConnection", (t) =>
     },
     resolve: async (_root, args) => {
       const first = Math.min(Math.max(1, args.first ?? MESSAGE_PAGE_SIZE), 100);
-      const include = {
-        fromProfile: true,
-        task: true,
-        attachments: { include: { document: true } },
-        mentions: { include: { profile: true } },
-        reactions: { include: { profile: true } },
-      };
       if (args.before) {
-        const beforeMsg = await prisma.message.findFirst({
-          where: { id: args.before!, taskId: args.taskId },
-          select: { createdAt: true },
-        });
-        if (!beforeMsg) return { messages: [], hasOlder: false };
-        const older = await prisma.message.findMany({
-          where: { taskId: args.taskId, createdAt: { lt: beforeMsg.createdAt } },
-          orderBy: { createdAt: "desc" },
-          take: first + 1,
-          include,
-        });
+        const cursor = await getMessageCursor(args.taskId, args.before!);
+        if (!cursor) return { messages: [], hasOlder: false };
+        const older = await listMessagesBeforeCursor(args.taskId, cursor.createdAt, first + 1);
         const hasOlder = older.length > first;
         const messages = (hasOlder ? older.slice(0, first) : older).reverse();
         return { messages, hasOlder };
       }
-      const latest = await prisma.message.findMany({
-        where: { taskId: args.taskId },
-        orderBy: { createdAt: "desc" },
-        take: first + 1,
-        include,
-      });
+      const latest = await listLatestMessages(args.taskId, first + 1);
       const hasOlder = latest.length > first;
       const messages = (hasOlder ? latest.slice(0, first) : latest).reverse();
       return { messages, hasOlder };

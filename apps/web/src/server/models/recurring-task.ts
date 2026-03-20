@@ -3,14 +3,14 @@ import {
   setRecurringTaskAssignees,
   pauseRecurringTask,
   resumeRecurringTask,
+  recurringTaskDelegate,
 } from "@agentcenter/database";
-import { prisma } from "@agentcenter/database";
 import { Model } from "./base";
 import { calculateInitialDueDate, type RecurrenceConfig } from "../recurring-tasks";
 
 class RecurringTaskModel extends Model<RecurringTask> {
   constructor() {
-    super(() => prisma.recurringTask);
+    super(recurringTaskDelegate);
   }
 
   /** Set assignees for a recurring task (replace all) — runs in a single transaction. */

@@ -1,5 +1,5 @@
 import { builder } from "../builder";
-import { prisma } from "@agentcenter/database";
+import { runTaskUpdateTransaction } from "@agentcenter/database";
 import { taskModel, agentModel } from "../../models";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "../../pubsub";
 import { TaskStatus } from "../../constants";
@@ -239,29 +239,12 @@ builder.mutationField("updateTask", (t) =>
       }
 
       // Wrap task update + assignee changes in a single transaction
-      const task = await prisma.$transaction(async (tx) => {
-        const updated = await tx.task.update({
-          where: { id: args.id },
-          ...query,
-          data,
-        });
-
-        if (args.assigneeIds) {
-          if (addedProfileIds.length > 0) {
-            await tx.taskAssignee.createMany({
-              data: addedProfileIds.map((profileId) => ({ taskId: args.id, profileId })),
-              skipDuplicates: true,
-            });
-          }
-          if (removedProfileIds.length > 0) {
-            await tx.taskAssignee.deleteMany({
-              where: { taskId: args.id, profileId: { in: removedProfileIds } },
-            });
-          }
-        }
-
-        return updated;
-      });
+      const task = await runTaskUpdateTransaction(
+        args.id,
+        data,
+        args.assigneeIds ? { addedProfileIds, removedProfileIds } : null,
+        query,
+      );
 
       // Emit assignee events outside the transaction (side effects)
       if (args.assigneeIds && (addedAgentIds.length > 0 || removedAgentIds.length > 0)) {

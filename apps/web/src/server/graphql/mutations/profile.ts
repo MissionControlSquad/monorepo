@@ -1,6 +1,6 @@
 import { GraphQLError } from "graphql";
 import { builder } from "../builder";
-import { prisma } from "@agentcenter/database";
+import { findProfileForUpdate, updateProfile } from "@agentcenter/database";
 
 builder.mutationField("updateMyProfile", (t) =>
   t.prismaField({
@@ -15,10 +15,7 @@ builder.mutationField("updateMyProfile", (t) =>
         throw new GraphQLError("Authentication required");
       }
 
-      const profile = await prisma.profile.findUnique({
-        where: { id: ctx.session.profileId },
-        select: { id: true, kind: true },
-      });
+      const profile = await findProfileForUpdate(ctx.session.profileId);
 
       if (!profile) {
         throw new GraphQLError("Profile not found");
@@ -46,11 +43,7 @@ builder.mutationField("updateMyProfile", (t) =>
         data.avatarUrl = args.avatarUrl?.trim() || null;
       }
 
-      return prisma.profile.update({
-        ...query,
-        where: { id: profile.id },
-        data,
-      });
+      return updateProfile(profile.id, data, query);
     },
   }),
 );

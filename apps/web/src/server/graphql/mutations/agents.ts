@@ -5,7 +5,7 @@ import { Roles } from "../../constants";
 import { applyAgentStatusUpdate } from "../../agent-status";
 import { ensureAgentProfile } from "../../agent-profile";
 import { pubsub, PubSubEvent } from "../../pubsub";
-import { prisma } from "@agentcenter/database";
+import { findCloudVMForSSH, findProfileForAgentId } from "@agentcenter/database";
 import { getVMSSHConfig, getAgentSlug, computeAgentCronIndex } from "../../services/cloud-vm-utils";
 import { removeAgentCrons, ensureHeartbeatCron } from "../../services/cloud-vm-cron";
 import { computeCronSchedule } from "../../agent-config-generator";
@@ -277,10 +277,7 @@ builder.mutationField("setAgentVacation", (t) =>
         // Remove heartbeat cron on cloud VMs (non-fatal)
         if (agent.cloudVmId) {
           try {
-            const vm = await prisma.cloudVM.findUnique({
-              where: { id: agent.cloudVmId },
-              select: { ipv4: true, sshPrivateKey: true },
-            });
+            const vm = await findCloudVMForSSH(agent.cloudVmId);
             if (vm) {
               const sshConfig = getVMSSHConfig(vm);
               const agentSlug = getAgentSlug(agent);
@@ -299,10 +296,7 @@ builder.mutationField("setAgentVacation", (t) =>
         // Re-add heartbeat cron on cloud VMs (non-fatal)
         if (agent.cloudVmId) {
           try {
-            const vm = await prisma.cloudVM.findUnique({
-              where: { id: agent.cloudVmId },
-              select: { ipv4: true, sshPrivateKey: true },
-            });
+            const vm = await findCloudVMForSSH(agent.cloudVmId);
             if (vm) {
               const sshConfig = getVMSSHConfig(vm);
               const agentSlug = getAgentSlug(agent);
@@ -322,12 +316,7 @@ builder.mutationField("setAgentVacation", (t) =>
       // Log activity
       const profileId = ctx.session?.profileId;
       const who = profileId
-        ? ((
-            await prisma.profile.findUnique({
-              where: { id: profileId },
-              select: { displayName: true },
-            })
-          )?.displayName ?? "Someone")
+        ? ((await findProfileForAgentId(profileId))?.displayName ?? "Someone")
         : "Someone";
       const action = args.onVacation ? "put on vacation" : "returned from vacation";
       const cronNote = agent.cloudVmId

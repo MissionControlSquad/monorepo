@@ -1,5 +1,18 @@
 import { builder } from "../builder";
-import { prisma } from "@agentcenter/database";
+import {
+  listChannels,
+  findChannelByIdQuery,
+  findChannelBySlugNullable,
+  listChannelMessagesSimple,
+  listChannelPinnedMessages,
+  searchChannelMessages,
+  getChannelMessageCursor,
+  listChannelMessagesBeforeCursor,
+  listLatestChannelMessages,
+  findProfilesQuery,
+  findProfileByIdQuery,
+  listChannelsInCommon,
+} from "@agentcenter/database";
 import { ChannelMessageConnectionRef } from "@agentcenter/graphql-server";
 
 /** List channels. If profileId is provided, returns public channels + channels where this profile is a member. If projectId is provided, only channels scoped to that project. If visibility is provided, only that visibility (e.g. "dm" for direct messages). */
@@ -50,12 +63,7 @@ builder.queryField("channels", (t) =>
           ];
         }
       }
-      return prisma.channel.findMany({
-        ...query,
-        where,
-        orderBy: { updatedAt: "desc" },
-        take,
-      });
+      return listChannels(where, { take, orderBy: { updatedAt: "desc" } }, query);
     },
   }),
 );
@@ -65,11 +73,7 @@ builder.queryField("channel", (t) =>
     type: "Channel",
     nullable: true,
     args: { id: t.arg.string({ required: true }) },
-    resolve: (query, _root, args) =>
-      prisma.channel.findUnique({
-        ...query,
-        where: { id: args.id },
-      }),
+    resolve: (query, _root, args) => findChannelByIdQuery(args.id, query),
   }),
 );
 
@@ -78,11 +82,7 @@ builder.queryField("channelBySlug", (t) =>
     type: "Channel",
     nullable: true,
     args: { slug: t.arg.string({ required: true }) },
-    resolve: (query, _root, args) =>
-      prisma.channel.findUnique({
-        ...query,
-        where: { slug: args.slug },
-      }),
+    resolve: (query, _root, args) => findChannelBySlugNullable(args.slug, query),
   }),
 );
 
@@ -94,12 +94,12 @@ builder.queryField("channelMessages", (t) =>
       limit: t.arg.int({ defaultValue: 100 }),
     },
     resolve: (query, _root, args) =>
-      prisma.channelMessage.findMany({
-        ...query,
-        where: { channelId: args.channelId },
-        orderBy: { createdAt: "asc" },
-        take: Math.min(args.limit ?? 100, 500),
-      }),
+      listChannelMessagesSimple(
+        args.channelId,
+        Math.min(args.limit ?? 100, 500),
+        { createdAt: "asc" },
+        query,
+      ),
   }),
 );
 
@@ -112,12 +112,7 @@ builder.queryField("channelPinnedMessages", (t) =>
       limit: t.arg.int({ defaultValue: 50 }),
     },
     resolve: (query, _root, args) =>
-      prisma.channelMessage.findMany({
-        ...query,
-        where: { channelId: args.channelId, pinnedAt: { not: null } },
-        orderBy: { pinnedAt: "desc" },
-        take: Math.min(args.limit ?? 50, 100),
-      }),
+      listChannelPinnedMessages(args.channelId, Math.min(args.limit ?? 50, 100), query),
   }),
 );
 
@@ -138,21 +133,15 @@ builder.queryField("searchChannelMessages", (t) =>
       const q = (args.query ?? "").trim();
       const mentionedId = args.mentionedProfileId ?? null;
       if (!q && !mentionedId) return [];
-      const where: {
-        channelId: string;
-        content?: { contains: string; mode: "insensitive" };
-        mentions?: { some: { profileId: string } };
-      } = {
-        channelId: args.channelId,
-      };
-      if (q) where.content = { contains: q, mode: "insensitive" };
-      if (mentionedId) where.mentions = { some: { profileId: mentionedId } };
-      return prisma.channelMessage.findMany({
-        ...query,
-        where,
-        orderBy: { createdAt: "desc" },
-        take: Math.min(args.limit ?? 25, 50),
-      });
+      return searchChannelMessages(
+        args.channelId,
+        {
+          query: q || undefined,
+          mentionedProfileId: mentionedId,
+          take: Math.min(args.limit ?? 25, 50),
+        },
+        query,
+      );
     },
   }),
 );
@@ -172,35 +161,19 @@ builder.queryField("channelMessageConnection", (t) =>
     },
     resolve: async (_root, args) => {
       const first = Math.min(Math.max(1, args.first ?? CHANNEL_MESSAGE_PAGE_SIZE), 100);
-      const include = {
-        fromProfile: true,
-        pinnedByProfile: true,
-        reactions: { include: { profile: true } },
-        mentions: { include: { profile: true } },
-        attachments: { include: { document: true } },
-      };
       if (args.before) {
-        const beforeMsg = await prisma.channelMessage.findFirst({
-          where: { id: args.before!, channelId: args.channelId },
-          select: { createdAt: true },
-        });
-        if (!beforeMsg) return { messages: [], hasOlder: false };
-        const older = await prisma.channelMessage.findMany({
-          where: { channelId: args.channelId, createdAt: { lt: beforeMsg.createdAt } },
-          orderBy: { createdAt: "desc" },
-          take: first + 1,
-          include,
-        });
+        const cursor = await getChannelMessageCursor(args.channelId, args.before!);
+        if (!cursor) return { messages: [], hasOlder: false };
+        const older = await listChannelMessagesBeforeCursor(
+          args.channelId,
+          cursor.createdAt,
+          first + 1,
+        );
         const hasOlder = older.length > first;
         const messages = (hasOlder ? older.slice(0, first) : older).reverse();
         return { messages, hasOlder };
       }
-      const latest = await prisma.channelMessage.findMany({
-        where: { channelId: args.channelId },
-        orderBy: { createdAt: "desc" },
-        take: first + 1,
-        include,
-      });
+      const latest = await listLatestChannelMessages(args.channelId, first + 1);
       const hasOlder = latest.length > first;
       const messages = (hasOlder ? latest.slice(0, first) : latest).reverse();
       return { messages, hasOlder };
@@ -213,11 +186,10 @@ builder.queryField("profiles", (t) =>
     type: ["Profile"],
     args: { limit: t.arg.int({ defaultValue: 200 }) },
     resolve: (query, _root, args) =>
-      prisma.profile.findMany({
-        ...query,
-        orderBy: { displayName: "asc" },
-        take: Math.min(args.limit ?? 200, 500),
-      }),
+      findProfilesQuery(
+        {},
+        { ...query, orderBy: { displayName: "asc" }, take: Math.min(args.limit ?? 200, 500) },
+      ),
   }),
 );
 
@@ -226,11 +198,7 @@ builder.queryField("profile", (t) =>
     type: "Profile",
     nullable: true,
     args: { id: t.arg.string({ required: true }) },
-    resolve: (query, _root, args) =>
-      prisma.profile.findUnique({
-        ...query,
-        where: { id: args.id },
-      }),
+    resolve: (query, _root, args) => findProfileByIdQuery(args.id, query),
   }),
 );
 
@@ -246,18 +214,7 @@ builder.queryField("channelsInCommon", (t) =>
     resolve: async (query, _root, args) => {
       if (args.myProfileId === args.otherProfileId) return [];
       const take = Math.min(args.limit ?? 20, 50);
-      return prisma.channel.findMany({
-        ...query,
-        where: {
-          visibility: "private",
-          AND: [
-            { members: { some: { profileId: args.myProfileId } } },
-            { members: { some: { profileId: args.otherProfileId } } },
-          ],
-        },
-        orderBy: { createdAt: "desc" },
-        take,
-      });
+      return listChannelsInCommon(args.myProfileId, args.otherProfileId, take, query);
     },
   }),
 );

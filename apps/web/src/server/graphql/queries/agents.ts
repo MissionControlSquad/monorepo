@@ -1,5 +1,9 @@
 import { builder } from "../builder";
-import { prisma } from "@agentcenter/database";
+import {
+  getLatestAgentActionIds,
+  countActiveTaskAssigneesByProfile,
+  countCompletedTaskAssigneesByProfile,
+} from "@agentcenter/database";
 import {
   agentModel,
   statusHistoryModel,
@@ -61,11 +65,7 @@ builder.queryField("agentLatestTransitions", (t) =>
       // Cache the expensive DISTINCT ON scan (5 min TTL)
       let latestIds = transitionIdsCache.get("all");
       if (!latestIds) {
-        latestIds = await prisma.$queryRaw`
-          SELECT DISTINCT ON ("agentId") id
-          FROM status_history
-          ORDER BY "agentId", timestamp DESC
-        `;
+        latestIds = await getLatestAgentActionIds();
         transitionIdsCache.set("all", latestIds!);
       }
       if (!latestIds || latestIds.length === 0) return [];
@@ -103,18 +103,8 @@ builder.queryField("agentProfileStats", (t) =>
         queueTotal,
         queueCompleted,
       ] = await Promise.all([
-        prisma.taskAssignee.count({
-          where: {
-            profileId,
-            ...(projectId ? { task: { projectId } } : {}),
-          },
-        }),
-        prisma.taskAssignee.count({
-          where: {
-            profileId,
-            task: { status: "done", ...(projectId ? { projectId } : {}) },
-          },
-        }),
+        countActiveTaskAssigneesByProfile(profileId, projectId ?? undefined),
+        countCompletedTaskAssigneesByProfile(profileId, projectId ?? undefined),
         deliverableModel.count({
           where: { profileId, ...taskFilter },
         }),

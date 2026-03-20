@@ -1,1 +1,1 @@
-export { prisma, notDeleted } from "@agentcenter/database";
+export { prisma, notDeleted } from "@agentcenter/database/client";

@@ -4,11 +4,11 @@ import {
   findTaskByIdSelect,
   setTaskAssignees,
   softDeleteTask,
+  taskDelegate,
 } from "@agentcenter/database";
 import { emit } from "../events";
 import { EventTypes } from "../constants";
 import { Model } from "./base";
-import { prisma } from "@agentcenter/database";
 import type { FieldChange } from "../events/types";
 
 /**
@@ -21,7 +21,7 @@ import type { FieldChange } from "../events/types";
  */
 class TaskModel extends Model<Task> {
   constructor() {
-    super(() => prisma.task, { softDelete: true });
+    super(taskDelegate, { softDelete: true });
   }
 
   /** Find a single task by ID with select (excludes soft-deleted) */

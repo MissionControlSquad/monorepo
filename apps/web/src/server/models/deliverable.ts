@@ -1,12 +1,12 @@
 import type { Deliverable } from "@agentcenter/database";
-import { prisma } from "@agentcenter/database";
+import { deliverableDelegate } from "@agentcenter/database";
 import { emit } from "../events";
 import { EventTypes } from "../constants";
 import { Model } from "./base";
 
 class DeliverableModel extends Model<Deliverable> {
   constructor() {
-    super(() => prisma.deliverable);
+    super(deliverableDelegate);
   }
 
   async emitSubmitted(

@@ -1,12 +1,12 @@
 import type { Document } from "@agentcenter/database";
-import { prisma } from "@agentcenter/database";
+import { documentDelegate } from "@agentcenter/database";
 import { emit } from "../events";
 import { EventTypes } from "../constants";
 import { Model } from "./base";
 
 class DocumentModel extends Model<Document> {
   constructor() {
-    super(() => prisma.document);
+    super(documentDelegate);
   }
 
   async emitCreated(

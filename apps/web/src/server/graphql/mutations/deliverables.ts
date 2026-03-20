@@ -1,6 +1,6 @@
 import { DeliverableKind } from "@agentcenter/database";
 import { builder } from "../builder";
-import { prisma } from "@agentcenter/database";
+import { runDeliverableRevisionTransaction } from "@agentcenter/database";
 import { taskModel, agentModel, deliverableModel } from "../../models";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 
@@ -96,42 +96,21 @@ builder.mutationField("reviseDeliverable", (t) =>
       const editedByProfileId = await getOrCreateAgentProfileId(args.agentId);
 
       // Snapshot + update in a single transaction to prevent version corruption
-      const deliverable = await prisma.$transaction(async (tx) => {
-        // Snapshot current state as a version
-        await tx.deliverableVersion.create({
-          data: {
-            deliverableId: current.id,
-            version: current.version,
-            title: current.title,
-            kind: current.kind,
-            content: current.content ?? undefined,
-            language: current.language ?? undefined,
-            storageKey: current.storageKey ?? undefined,
-            fileName: current.fileName ?? undefined,
-            mimeType: current.mimeType ?? undefined,
-            fileSize: current.fileSize ?? undefined,
-            url: current.url ?? undefined,
-            editedByProfileId,
-          },
-        });
-
-        // Update deliverable in-place with incremented version
-        return tx.deliverable.update({
-          where: { id: args.id },
-          ...query,
-          data: {
-            version: current.version + 1,
-            ...(args.title ? { title: args.title } : {}),
-            ...(args.content !== undefined ? { content: args.content } : {}),
-            ...(args.language !== undefined ? { language: args.language } : {}),
-            ...(args.storageKey !== undefined ? { storageKey: args.storageKey } : {}),
-            ...(args.fileName !== undefined ? { fileName: args.fileName } : {}),
-            ...(args.mimeType !== undefined ? { mimeType: args.mimeType } : {}),
-            ...(args.fileSize !== undefined ? { fileSize: args.fileSize } : {}),
-            ...(args.url !== undefined ? { url: args.url } : {}),
-          },
-        });
-      });
+      const deliverable = await runDeliverableRevisionTransaction(
+        current,
+        editedByProfileId,
+        {
+          title: args.title ?? undefined,
+          content: args.content ?? undefined,
+          language: args.language ?? undefined,
+          storageKey: args.storageKey ?? undefined,
+          fileName: args.fileName ?? undefined,
+          mimeType: args.mimeType ?? undefined,
+          fileSize: args.fileSize ?? undefined,
+          url: args.url ?? undefined,
+        },
+        query,
+      );
 
       const [task, agent] = await Promise.all([
         taskModel.findByIdSelect(current.taskId, {

@@ -1,4 +1,16 @@
-import { prisma } from "@agentcenter/database";
+import {
+  logCloudVMEvent,
+  updateCloudVM as updateCloudVMRecord,
+  getCloudVMOrThrow,
+  countActiveCloudVMs,
+  createCloudVM as createCloudVMRecord,
+  getAgentOrThrow,
+  updateAgent,
+  findAgentsByCloudVmId,
+  updateManyAgentsByVm,
+  findAgentByVmAndSlug,
+  listRunningCloudVMsForRepair,
+} from "@agentcenter/database";
 import { generateApiKey } from "../api-key";
 import { randomBytes } from "crypto";
 import { computeCronSchedule } from "../agent-config-generator";
@@ -37,12 +49,12 @@ const MAX_VMS_PER_WORKSPACE = 10;
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-async function log(vmId: string, message: string, level = "info") {
-  await prisma.cloudVMLog.create({ data: { vmId, message, level } });
+async function log(vmId: string, message: string, level: "info" | "warn" | "error" = "info") {
+  await logCloudVMEvent(vmId, message, level);
 }
 
 async function updateVM(vmId: string, data: Record<string, unknown>) {
-  await prisma.cloudVM.update({ where: { id: vmId }, data });
+  await updateCloudVMRecord(vmId, data as any);
 }
 
 async function setStep(vmId: string, status: string, setupStep: string, setupProgress: number) {
@@ -116,9 +128,7 @@ export async function createCloudVM(params: CreateCloudVMParams): Promise<{ vmId
   }
 
   // Check VM limit (safety cap)
-  const existingCount = await prisma.cloudVM.count({
-    where: { status: { notIn: ["destroyed", "error"] } },
-  });
+  const existingCount = await countActiveCloudVMs();
   if (existingCount >= MAX_VMS_PER_WORKSPACE) {
     throw new Error(`Maximum ${MAX_VMS_PER_WORKSPACE} active VMs allowed`);
   }
@@ -146,20 +156,18 @@ export async function createCloudVM(params: CreateCloudVMParams): Promise<{ vmId
   }
 
   // Create VM record
-  const vm = await prisma.cloudVM.create({
-    data: {
-      name: name || null,
-      provider: "hetzner",
-      status: "provisioning",
-      serverName,
-      region,
-      serverType,
-      sshPublicKey: publicKey,
-      sshPrivateKey: storedPrivateKey,
-      hetznerSshKeyId,
-      setupStep: "creating_server",
-      setupProgress: 5,
-    },
+  const vm = await createCloudVMRecord({
+    name: name || null,
+    provider: "hetzner",
+    status: "provisioning",
+    serverName,
+    region,
+    serverType,
+    sshPublicKey: publicKey,
+    sshPrivateKey: storedPrivateKey,
+    hetznerSshKeyId,
+    setupStep: "creating_server",
+    setupProgress: 5,
   });
 
   await log(vm.id, "SSH key generated and uploaded to Hetzner");
@@ -204,7 +212,7 @@ export async function createCloudVM(params: CreateCloudVMParams): Promise<{ vmId
 // ─── Provision VM (SSH Pipeline) ────────────────────────────────────
 
 export async function provisionVM(vmId: string): Promise<void> {
-  const vm = await prisma.cloudVM.findUniqueOrThrow({ where: { id: vmId } });
+  const vm = await getCloudVMOrThrow(vmId);
 
   if (!vm.externalServerId || !vm.ipv4) {
     await failVM(vmId, "provision_start", "Server not created yet");
@@ -639,7 +647,7 @@ async function cleanupAgentFromVM(
   oldVmId: string,
   agent: { id: string; name: string; username: string | null },
 ): Promise<void> {
-  const oldVm = await prisma.cloudVM.findUnique({ where: { id: oldVmId } });
+  const oldVm = await getCloudVMOrThrow(oldVmId).catch(() => null);
   if (!oldVm || oldVm.status !== "running" || !oldVm.ipv4 || !oldVm.sshPrivateKey) {
     // Old VM is not reachable — just clear the DB reference
     await log(oldVmId, `Skipping cleanup for agent "${agent.name}" — old VM not reachable`);
@@ -693,12 +701,12 @@ interface AssignAgentParams {
 export async function assignAgentToVM(params: AssignAgentParams): Promise<void> {
   const { agentId, cloudVmId } = params;
 
-  const vm = await prisma.cloudVM.findUniqueOrThrow({ where: { id: cloudVmId } });
+  const vm = await getCloudVMOrThrow(cloudVmId);
   if (vm.status !== "running") {
     throw new Error("Can only assign agents to a running VM");
   }
 
-  const agent = await prisma.agent.findUniqueOrThrow({ where: { id: agentId } });
+  const agent = await getAgentOrThrow(agentId);
 
   // If agent is on a different VM, clean up the old VM first
   if (agent.cloudVmId && agent.cloudVmId !== cloudVmId) {
@@ -710,15 +718,12 @@ export async function assignAgentToVM(params: AssignAgentParams): Promise<void> 
   const agentSlug = getAgentSlug(agent);
 
   // Update agent in DB
-  await prisma.agent.update({
-    where: { id: agentId },
-    data: {
-      cloudVmId,
-      hostingType: "cloudVM",
-      apiKeyHash: hash,
-      apiKeyPrefix: prefix,
-      apiKeyCreatedAt: new Date(),
-    },
+  await updateAgent(agentId, {
+    cloudVmId,
+    hostingType: "cloudVM",
+    apiKeyHash: hash,
+    apiKeyPrefix: prefix,
+    apiKeyCreatedAt: new Date(),
   });
 
   try {
@@ -736,9 +741,10 @@ export async function assignAgentToVM(params: AssignAgentParams): Promise<void> 
     });
 
     // Merge agent list into existing openclaw.json (preserving gateway.auth.token, env, etc.)
-    const vmAgents = await prisma.agent.findMany({
-      where: { cloudVmId },
-      select: { username: true, name: true, llmModel: true },
+    const vmAgents = await findAgentsByCloudVmId(cloudVmId, {
+      username: true,
+      name: true,
+      llmModel: true,
     });
 
     // Ensure gateway, hooks, security config AND agents list in a single config write
@@ -796,10 +802,7 @@ export async function assignAgentToVM(params: AssignAgentParams): Promise<void> 
     }
 
     // 4. Reset agent in DB
-    await prisma.agent.update({
-      where: { id: agentId },
-      data: { cloudVmId: null, hostingType: "selfHosted" },
-    });
+    await updateAgent(agentId, { cloudVmId: null, hostingType: "selfHosted" });
 
     const message = err instanceof Error ? err.message : "Unknown error";
     await log(cloudVmId, `Failed to configure agent "${agent.name}" on VM: ${message}`, "error");
@@ -810,17 +813,14 @@ export async function assignAgentToVM(params: AssignAgentParams): Promise<void> 
 // ─── Unassign Agent ─────────────────────────────────────────────────
 
 export async function unassignAgentFromVM(agentId: string): Promise<void> {
-  const agent = await prisma.agent.findUniqueOrThrow({ where: { id: agentId } });
+  const agent = await getAgentOrThrow(agentId);
   if (!agent.cloudVmId) {
     throw new Error("Agent is not assigned to any VM");
   }
 
   const vmId = agent.cloudVmId;
 
-  await prisma.agent.update({
-    where: { id: agentId },
-    data: { cloudVmId: null, hostingType: "selfHosted" },
-  });
+  await updateAgent(agentId, { cloudVmId: null, hostingType: "selfHosted" });
 
   await log(vmId, `Agent "${agent.name}" unassigned from VM`);
 }
@@ -828,7 +828,7 @@ export async function unassignAgentFromVM(agentId: string): Promise<void> {
 // ─── Destroy Cloud VM ───────────────────────────────────────────────
 
 export async function destroyCloudVM(vmId: string): Promise<void> {
-  const vm = await prisma.cloudVM.findUniqueOrThrow({ where: { id: vmId } });
+  const vm = await getCloudVMOrThrow(vmId);
   if (vm.status === "destroyed") {
     throw new Error("VM is already destroyed");
   }
@@ -836,10 +836,7 @@ export async function destroyCloudVM(vmId: string): Promise<void> {
   await updateVM(vmId, { status: "destroying" });
 
   // Unassign all agents
-  await prisma.agent.updateMany({
-    where: { cloudVmId: vmId },
-    data: { cloudVmId: null, hostingType: "selfHosted" },
-  });
+  await updateManyAgentsByVm(vmId, { cloudVmId: null, hostingType: "selfHosted" });
 
   await log(vmId, "Destroying server...");
 
@@ -875,7 +872,7 @@ export async function destroyCloudVM(vmId: string): Promise<void> {
 // ─── Stop / Start ───────────────────────────────────────────────────
 
 export async function stopCloudVM(vmId: string): Promise<void> {
-  const vm = await prisma.cloudVM.findUniqueOrThrow({ where: { id: vmId } });
+  const vm = await getCloudVMOrThrow(vmId);
   if (vm.status !== "running") {
     throw new Error("Can only stop a running VM");
   }
@@ -889,7 +886,7 @@ export async function stopCloudVM(vmId: string): Promise<void> {
 }
 
 export async function startCloudVM(vmId: string): Promise<void> {
-  const vm = await prisma.cloudVM.findUniqueOrThrow({ where: { id: vmId } });
+  const vm = await getCloudVMOrThrow(vmId);
   if (vm.status !== "stopped") {
     throw new Error("Can only start a stopped VM");
   }
@@ -1010,7 +1007,7 @@ export async function configureLLMOnVM(params: ConfigureLLMParams): Promise<void
   // Validate API key before deploying to VM
   await validateApiKey(providerId, apiKey);
 
-  const vm = await prisma.cloudVM.findUniqueOrThrow({ where: { id: vmId } });
+  const vm = await getCloudVMOrThrow(vmId);
   if (vm.status !== "running") {
     throw new Error("Can only configure LLM on a running VM");
   }
@@ -1140,7 +1137,7 @@ export async function configureLLMOnVM(params: ConfigureLLMParams): Promise<void
  * Does NOT touch API keys — just switches which model all agents use by default.
  */
 export async function setVMDefaultModel(vmId: string, model: string): Promise<void> {
-  const vm = await prisma.cloudVM.findUniqueOrThrow({ where: { id: vmId } });
+  const vm = await getCloudVMOrThrow(vmId);
   if (vm.status !== "running") {
     throw new Error("Can only change model on a running VM");
   }
@@ -1185,18 +1182,13 @@ export async function setAgentModelOnVM(
   agentSlug: string,
   model: string | null,
 ): Promise<void> {
-  const vm = await prisma.cloudVM.findUniqueOrThrow({ where: { id: vmId } });
+  const vm = await getCloudVMOrThrow(vmId);
   if (vm.status !== "running") {
     throw new Error("Can only change agent model on a running VM");
   }
 
   // Find the agent in DB
-  const agent = await prisma.agent.findFirst({
-    where: {
-      cloudVmId: vmId,
-      OR: [{ username: agentSlug }, { name: agentSlug }],
-    },
-  });
+  const agent = await findAgentByVmAndSlug(vmId, agentSlug);
   if (!agent) {
     throw new Error(`Agent "${agentSlug}" not found on VM`);
   }
@@ -1235,10 +1227,7 @@ export async function setAgentModelOnVM(
   }
 
   // Update DB
-  await prisma.agent.update({
-    where: { id: agent.id },
-    data: { llmModel: model },
-  });
+  await updateAgent(agent.id, { llmModel: model });
 
   await log(
     vmId,
@@ -1257,7 +1246,7 @@ export async function setAgentModelOnVM(
  * 5. Send bootstrap messages to agents for cron + identity setup
  */
 export async function repairOpenClawService(vmId: string): Promise<void> {
-  const vm = await prisma.cloudVM.findUniqueOrThrow({ where: { id: vmId } });
+  const vm = await getCloudVMOrThrow(vmId);
   if (vm.status !== "running") {
     throw new Error("Can only repair a running VM");
   }
@@ -1322,20 +1311,17 @@ export async function repairOpenClawService(vmId: string): Promise<void> {
     ].join(" && "),
   );
   // ── 3. Re-upload agent config files + rebuild agents list ──
-  const vmAgents = await prisma.agent.findMany({
-    where: { cloudVmId: vmId },
-    select: {
-      id: true,
-      name: true,
-      username: true,
-      role: true,
-      identityEmoji: true,
-      personality: true,
-      level: true,
-      templateId: true,
-      apiKeyHash: true,
-      llmModel: true,
-    },
+  const vmAgents = await findAgentsByCloudVmId(vmId, {
+    id: true,
+    name: true,
+    username: true,
+    role: true,
+    identityEmoji: true,
+    personality: true,
+    level: true,
+    templateId: true,
+    apiKeyHash: true,
+    llmModel: true,
   });
 
   // Apply full gateway, hooks, security config AND agents list in a single config write
@@ -1409,9 +1395,7 @@ export async function repairOpenClawService(vmId: string): Promise<void> {
  * Returns the count of VMs repaired.
  */
 export async function repairAllRunningVMs(): Promise<number> {
-  const vms = await prisma.cloudVM.findMany({
-    where: { status: "running", ipv4: { not: null }, sshPrivateKey: { not: null } },
-  });
+  const vms = await listRunningCloudVMsForRepair();
 
   let repaired = 0;
   for (const vm of vms) {

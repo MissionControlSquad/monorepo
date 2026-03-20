@@ -1,4 +1,10 @@
-import { prisma } from "@agentcenter/database";
+import {
+  getChannelVisibility,
+  getChannelMessageForNotify,
+  getMessageMentionedProfileIds,
+  getChannelAgentMembers,
+  getChannelHumanMembers,
+} from "@agentcenter/database";
 import { pubsub, agentStreamTopic } from "./pubsub";
 import { notify } from "./services/notification";
 
@@ -17,53 +23,22 @@ export async function notifyAgentChannelMembers(
   senderProfileId: string,
 ) {
   // Fetch channel with slug and visibility
-  const channel = await prisma.channel.findUnique({
-    where: { id: channelId },
-    select: { visibility: true, slug: true },
-  });
+  const channel = await getChannelVisibility(channelId);
   if (!channel) return;
 
   const isDm = channel.visibility === "dm";
 
   // Fetch the message with sender profile for the push payload
-  const message = await prisma.channelMessage.findUnique({
-    where: { id: messageId },
-    select: {
-      id: true,
-      channelId: true,
-      content: true,
-      fromProfileId: true,
-      createdAt: true,
-      fromProfile: {
-        select: {
-          id: true,
-          kind: true,
-          displayName: true,
-          username: true,
-          avatarUrl: true,
-        },
-      },
-    },
-  });
+  const message = await getChannelMessageForNotify(messageId);
 
   if (!message) return;
 
   // Mentions (used by both agent and human notification logic)
-  const mentions = await prisma.channelMessageMention.findMany({
-    where: { messageId },
-    select: { profileId: true },
-  });
-  const mentionedIds = new Set(mentions.map((m) => m.profileId));
+  const mentionedProfileIds = await getMessageMentionedProfileIds(messageId);
+  const mentionedIds = new Set(mentionedProfileIds);
 
   // ─── Agent notifications ───────────────────────────────────────────
-  const agentMembers = await prisma.channelMember.findMany({
-    where: {
-      channelId,
-      profileId: { not: senderProfileId },
-      profile: { kind: "agent" },
-    },
-    select: { profileId: true },
-  });
+  const agentMembers = await getChannelAgentMembers(channelId, senderProfileId);
 
   if (agentMembers.length > 0) {
     const agentsToNotify = isDm
@@ -82,17 +57,7 @@ export async function notifyAgentChannelMembers(
   }
 
   // ─── Human push notifications ──────────────────────────────────────
-  const humanMembers = await prisma.channelMember.findMany({
-    where: {
-      channelId,
-      profileId: { not: senderProfileId },
-      profile: { kind: "human" },
-    },
-    select: {
-      profileId: true,
-      profile: { select: { userId: true } },
-    },
-  });
+  const humanMembers = await getChannelHumanMembers(channelId, senderProfileId);
 
   const humanUserIds = (
     isDm ? humanMembers : humanMembers.filter((m) => mentionedIds.has(m.profileId))

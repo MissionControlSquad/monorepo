@@ -1,6 +1,10 @@
 import { builder } from "../builder";
 import { taskModel, messageModel } from "../../models";
-import { prisma } from "@agentcenter/database";
+import {
+  getAllProfilesForMentions,
+  findProfilesAgentIds,
+  findProfileDisplayAndAgentId,
+} from "@agentcenter/database";
 import { pubsub, messageTopic } from "../../pubsub";
 import { parseMentionIds } from "../../../lib/mentions";
 
@@ -15,9 +19,7 @@ builder.mutationField("createMessage", (t) =>
     },
     resolve: async (query, _root, args) => {
       // Parse @mentions from content — match profiles by @[id:xxx], @username, @displayName word
-      const profiles = await prisma.profile.findMany({
-        select: { id: true, displayName: true, username: true },
-      });
+      const profiles = await getAllProfilesForMentions();
 
       const mentionedProfileIds: string[] = [];
 
@@ -88,18 +90,10 @@ builder.mutationField("createMessage", (t) =>
       });
 
       // Resolve fromProfile display name for event
-      const fromProfile = await prisma.profile.findUnique({
-        where: { id: args.fromProfileId },
-        select: { displayName: true, agentId: true },
-      });
+      const fromProfile = await findProfileDisplayAndAgentId(args.fromProfileId);
 
       // Resolve mentioned profileIds → agentIds for notification/subscription compat
-      const mentionedProfiles = mentionedProfileIds.length
-        ? await prisma.profile.findMany({
-            where: { id: { in: mentionedProfileIds } },
-            select: { agentId: true },
-          })
-        : [];
+      const mentionedProfiles = await findProfilesAgentIds(mentionedProfileIds);
       const mentionedAgentIds = mentionedProfiles
         .map((p) => p.agentId)
         .filter((id): id is string => id != null);

@@ -1,4 +1,4 @@
-export { prisma, notDeleted } from "./client";
+export { notDeleted } from "./client";
 export type { PrismaClient } from "@prisma/client";
 export * from "@prisma/client";
 
@@ -18,3 +18,8 @@ export * from "./project";
 export * from "./password-reset";
 export * from "./feature-flag";
 export * from "./license";
+export * from "./delegates";
+export * from "./push-subscription";
+export * from "./activity";
+export * from "./message";
+export * from "./deliverable";

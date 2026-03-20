@@ -4,3 +4,15 @@ export { updateCloudVM, markCloudVMError, updateCloudVMUptime, retryCloudVMProvi
 export { logCloudVMEvent } from "./log-event";
 export { findStaleSetupCloudVMs } from "./find-stale-setup";
 export { findCloudVMForEnsure } from "./find-or-throw";
+export { findAgentsByVMId } from "./service-ops";
+export {
+  getCloudVMOrThrow,
+  countActiveCloudVMs,
+  createCloudVM,
+  findCloudVMForSSH,
+  getAgentOrThrow,
+  findAgentsByCloudVmId,
+  updateManyAgentsByVm,
+  findAgentByVmAndSlug,
+  listRunningCloudVMsForRepair,
+} from "./vm-ops";
