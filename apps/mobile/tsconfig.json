@@ -2,7 +2,9 @@
   "extends": "../../packages/config/ts/tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "jsx": "react-jsx",
     "module": "esnext",
     "moduleResolution": "bundler",
@@ -12,11 +14,24 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@agentcenter/types": ["../../packages/types/src"],
-      "@agentcenter/utils": ["../../packages/utils/src"],
-      "@agentcenter/config": ["../../packages/config"]
+      "@agentcenter/types": [
+        "../../packages/types/src"
+      ],
+      "@agentcenter/utils": [
+        "../../packages/utils/src"
+      ],
+      "@agentcenter/config": [
+        "../../packages/config"
+      ]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", ".expo"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "nativewind-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".expo"
+  ]
 }
