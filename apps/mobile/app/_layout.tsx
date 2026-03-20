@@ -3,22 +3,29 @@ import { Stack } from "expo-router";
 import { Provider } from "urql";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
+import { DrawerProvider } from "../src/context/DrawerContext";
+import { AppDrawer } from "../src/components/AppDrawer";
+import { View } from "react-native";
 
 function RootLayoutNav() {
   const { urqlClient } = useAuth();
 
   const content = (
-    <Stack>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="auth/login" options={{ headerShown: false }} />
-      <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />
-      <Stack.Screen name="task/[id]" options={{ title: "Task Details" }} />
-      <Stack.Screen name="task/create" options={{ title: "New Task", presentation: "modal" }} />
-      <Stack.Screen name="deliverable/[id]" options={{ title: "Deliverable" }} />
-      <Stack.Screen name="agent/[id]" options={{ title: "Agent" }} />
-      <Stack.Screen name="channels/[id]" options={{ title: "Channel" }} />
-      <Stack.Screen name="profile" options={{ title: "Profile", presentation: "modal" }} />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+        <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />
+        <Stack.Screen name="task/[id]" options={{ title: "Task Details" }} />
+        <Stack.Screen name="task/create" options={{ title: "New Task", presentation: "modal" }} />
+        <Stack.Screen name="deliverable/[id]" options={{ title: "Deliverable" }} />
+        <Stack.Screen name="agent/[id]" options={{ title: "Agent" }} />
+        <Stack.Screen name="channels/[id]" options={{ title: "Channel" }} />
+        <Stack.Screen name="profile" options={{ title: "Profile", presentation: "modal" }} />
+        <Stack.Screen name="settings" options={{ title: "Settings", presentation: "modal" }} />
+      </Stack>
+      <AppDrawer />
+    </View>
   );
 
   return <Provider value={urqlClient}>{content}</Provider>;
@@ -27,9 +34,11 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <RootLayoutNav />
-      </AuthProvider>
+      <DrawerProvider>
+        <AuthProvider>
+          <RootLayoutNav />
+        </AuthProvider>
+      </DrawerProvider>
     </SafeAreaProvider>
   );
 }

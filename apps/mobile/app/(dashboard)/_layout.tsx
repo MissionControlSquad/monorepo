@@ -1,9 +1,10 @@
-import { Tabs, useRouter } from "expo-router";
+import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { TouchableOpacity } from "react-native";
+import { useDrawer } from "../../src/context/DrawerContext";
 
 export default function DashboardLayout() {
-  const router = useRouter();
+  const { openDrawer } = useDrawer();
 
   return (
     <Tabs
@@ -18,7 +19,7 @@ export default function DashboardLayout() {
         headerTitleStyle: { fontWeight: "600", color: "#111827" },
         headerShadowVisible: false,
         headerRight: () => (
-          <TouchableOpacity onPress={() => router.push("/profile")} style={{ marginRight: 16 }}>
+          <TouchableOpacity onPress={openDrawer} style={{ marginRight: 16 }}>
             <Ionicons name="person-circle-outline" size={26} color="#6b7280" />
           </TouchableOpacity>
         ),

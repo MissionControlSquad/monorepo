@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { ME_QUERY, UPDATE_MY_PROFILE } from "@agentcenter/graphql-client";
 import { useAuth } from "../src/context/AuthContext";
+import { getStoredCookie } from "../src/api/session";
 
 interface Profile {
   id: string;
@@ -58,10 +59,16 @@ export default function ProfileScreen() {
     if (profile) {
       setDisplayName(profile.displayName ?? "");
       setBio(profile.bio ?? "");
-      setAvatarUrl(profile.avatarUrl ?? null);
+      // avatarUrl from server may be relative (/api/storage/...) — make absolute
+      const raw = profile.avatarUrl ?? null;
+      if (raw && !raw.startsWith("http") && serverUrl) {
+        setAvatarUrl(`${serverUrl}${raw}`);
+      } else {
+        setAvatarUrl(raw);
+      }
       setDirty(false);
     }
-  }, [profile]);
+  }, [profile, serverUrl]);
 
   const handlePickAvatar = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -71,7 +78,7 @@ export default function ProfileScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.85,
@@ -94,19 +101,25 @@ export default function ProfileScreen() {
       const formData = new FormData();
       formData.append("file", { uri, name: fileName, type: mimeType } as unknown as Blob);
 
+      const cookie = getStoredCookie();
       const res = await fetch(`${serverUrl}/api/profile/avatar`, {
         method: "POST",
         credentials: "include",
+        headers: {
+          ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}),
+        },
         body: formData,
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Upload failed");
+        throw new Error(data.error ?? `Upload failed (${res.status})`);
       }
 
       const { avatarUrl: newUrl } = await res.json();
-      setAvatarUrl(newUrl);
+      // Server returns a relative URL (/api/storage/...) — make it absolute
+      const absoluteUrl = newUrl.startsWith("http") ? newUrl : `${serverUrl}${newUrl}`;
+      setAvatarUrl(absoluteUrl);
       reexecute({ requestPolicy: "network-only" });
     } catch (err) {
       Alert.alert("Upload failed", (err as Error).message || "Could not upload avatar");
