@@ -17,6 +17,7 @@ function RootLayoutNav() {
       <Stack.Screen name="deliverable/[id]" options={{ title: "Deliverable" }} />
       <Stack.Screen name="agent/[id]" options={{ title: "Agent" }} />
       <Stack.Screen name="channels/[id]" options={{ title: "Channel" }} />
+      <Stack.Screen name="profile" options={{ title: "Profile", presentation: "modal" }} />
     </Stack>
   );
 
