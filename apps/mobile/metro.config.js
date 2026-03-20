@@ -1,5 +1,6 @@
 const { getDefaultConfig } = require("expo/metro-config");
 const { mergeConfig } = require("metro");
+const { withNativeWind } = require("nativewind/metro");
 const path = require("path");
 
 const projectRoot = __dirname;
@@ -14,13 +15,6 @@ const config = mergeConfig(expoConfig, {
     path.resolve(monorepoRoot, "packages/config"),
     path.resolve(monorepoRoot, "packages/graphql-client"),
   ],
-  // Use Node.js fs.watch instead of watchman (watchman is broken on this system
-  // due to libfmt.10.dylib missing — fmt was upgraded to v12 which has libfmt.11.dylib)
-  watcher: {
-    watchman: {
-      deferStates: [],
-    },
-  },
   resolver: {
     blockList: [
       ...Array.from(expoConfig.resolver.blockList ?? []),
@@ -37,7 +31,7 @@ const config = mergeConfig(expoConfig, {
   },
 });
 
-module.exports = config;
+module.exports = withNativeWind(config, { input: "./global.css" });
 
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
