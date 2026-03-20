@@ -8,7 +8,7 @@ import { TASK_STATUSES } from "../../lib/constants";
 import { TimeAgo } from "../common/TimeAgo";
 import { ClipboardList, FolderKanban } from "lucide-react";
 import { Card, Badge, SkeletonList } from "../ui";
-import type { TaskListItem, Project } from "@/lib/types";
+import type { TaskListItem, Project } from "@agentcenter/types";
 
 interface AssignedTasksListProps {
   agentId: string;

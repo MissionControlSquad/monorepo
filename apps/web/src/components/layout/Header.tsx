@@ -7,7 +7,7 @@ import { GlobalSearch } from "./GlobalSearch";
 import { Button } from "../ui";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { WhenFeatureEnabled } from "../context/FeatureFlagContext";
-import { FLAG_KEYS } from "../../lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 interface HeaderProps {
   onToggleActivity: () => void;

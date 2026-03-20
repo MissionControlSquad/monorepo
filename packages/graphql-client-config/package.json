@@ -1,0 +1,12 @@
+{
+  "name": "@agentcenter/graphql-client-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "urql": "*"
+  }
+}

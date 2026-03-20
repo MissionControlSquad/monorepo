@@ -4,8 +4,8 @@ import React, { createContext, useContext, useMemo } from "react";
 import { useQuery, useSubscription } from "urql";
 import { FEATURE_FLAGS_QUERY } from "../../lib/graphql/queries";
 import { FEATURE_FLAGS_CHANGED_SUBSCRIPTION } from "../../lib/graphql/subscriptions";
-import { FLAG_DEFAULTS } from "../../lib/feature-flag-keys";
-import type { FlagKey } from "../../lib/feature-flag-keys";
+import { FLAG_DEFAULTS } from "@agentcenter/utils";
+import type { FlagKey } from "@agentcenter/utils";
 
 type ManagedBy = "system" | "user";
 

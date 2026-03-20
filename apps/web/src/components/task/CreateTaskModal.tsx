@@ -58,7 +58,7 @@ import {
 } from "../../lib/graphql/mutations";
 import { useTaskNavigation } from "../../hooks/useTaskNavigation";
 import { useCurrentProject } from "../context/AppContext";
-import type { Agent, ProjectMember, TaskTemplate, Project } from "@/lib/types";
+import type { Agent, ProjectMember, TaskTemplate, Project } from "@agentcenter/types";
 
 const blankFormSchema = z.object({
   title: z.string().min(1, "Title is required"),

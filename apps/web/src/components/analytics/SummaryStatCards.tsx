@@ -12,7 +12,7 @@ import {
   UserCheck,
   Eye,
 } from "lucide-react";
-import { formatDuration } from "../../lib/formatDuration";
+import { formatDuration } from "@agentcenter/utils";
 import { useCurrentProject } from "../context/AppContext";
 import { Card, CardSkeleton } from "../ui";
 

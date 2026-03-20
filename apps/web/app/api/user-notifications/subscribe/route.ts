@@ -4,7 +4,7 @@ import { upsertPushSubscription, deletePushSubscription } from "@agentcenter/dat
 import { resolveUserId } from "../../_lib/resolve-session";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@/lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 export async function POST(request: Request) {
   try {

@@ -7,7 +7,7 @@ import {
 } from "@agentcenter/database";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@/lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { validateBody, createDMSchema } from "../../_lib/validation";

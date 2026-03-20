@@ -27,7 +27,7 @@ import { AGENTS_QUERY } from "../lib/graphql/queries";
 import { CREATE_TASK_FROM_DASHBOARD } from "../lib/graphql/mutations/tasks";
 import { Button, Badge } from "../components/ui";
 import { useFeatureFlag } from "../components/context/FeatureFlagContext";
-import { FLAG_KEYS } from "../lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { CopyButton } from "../components/common/CopyButton";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";

@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/shadcn/select";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Project } from "@/lib/types";
+import type { Project } from "@agentcenter/types";
 
 const createChannelSchema = z.object({
   name: z.string().min(1, "Channel name is required"),

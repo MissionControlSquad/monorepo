@@ -29,7 +29,7 @@ import { AgentStatusBadge } from "./AgentStatusBadge";
 import { type AgentDetailedStatus } from "../../lib/constants";
 import { Button } from "@/components/ui";
 import { Checkbox } from "@/components/ui/shadcn/checkbox";
-import type { Agent, AgentAction } from "@/lib/types";
+import type { Agent, AgentAction } from "@agentcenter/types";
 
 interface LiveAgentViewProps {
   agentId: string | null;

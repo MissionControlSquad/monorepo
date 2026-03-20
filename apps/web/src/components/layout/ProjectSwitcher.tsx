@@ -8,7 +8,7 @@ import { ChevronDown, FolderOpen, Plus, Check, Settings2, Search } from "lucide-
 import { useCurrentProject } from "../context/AppContext";
 import { CreateProjectModal } from "../project/CreateProjectModal";
 import { Button } from "@/components/ui";
-import type { Project } from "../../lib/types";
+import type { Project } from "@agentcenter/types";
 
 export function ProjectSwitcher({ fullWidth }: { fullWidth?: boolean } = {}) {
   const { projectId, setProjectId } = useCurrentProject();

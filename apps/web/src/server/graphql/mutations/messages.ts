@@ -6,7 +6,7 @@ import {
   findProfileDisplayAndAgentId,
 } from "@agentcenter/database";
 import { pubsub, messageTopic } from "../../pubsub";
-import { parseMentionIds } from "../../../lib/mentions";
+import { parseMentionIds } from "@agentcenter/utils";
 
 builder.mutationField("createMessage", (t) =>
   t.prismaField({

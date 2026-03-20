@@ -9,7 +9,7 @@ import { CREATE_PROJECT } from "../../lib/graphql/mutations";
 import { ProjectMemberEditor } from "./ProjectMemberEditor";
 import { Button } from "../ui";
 import { Input } from "@/components/ui/shadcn/input";
-import type { ProfileWithAgent } from "@/lib/types";
+import type { ProfileWithAgent } from "@agentcenter/types";
 import { useForm } from "react-hook-form";
 import {
   Form,

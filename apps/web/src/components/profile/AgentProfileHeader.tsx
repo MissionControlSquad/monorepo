@@ -13,7 +13,7 @@ import { useAgentStatus } from "../context/AgentStatusContext";
 import { AGENT_LEVELS } from "../../lib/constants";
 import type { AgentDetailedStatus, AgentLevel } from "../../lib/constants";
 import { Button } from "../ui";
-import type { Agent } from "@/lib/types";
+import type { Agent } from "@agentcenter/types";
 
 interface AgentProfileHeaderProps {
   agent: Agent;

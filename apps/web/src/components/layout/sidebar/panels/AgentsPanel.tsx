@@ -12,7 +12,7 @@ import { AgentRow } from "../AgentRow";
 import { SidebarPanelHeader } from "../SidebarPanelHeader";
 import { SidebarSkeleton } from "../SidebarSkeleton";
 import { SidebarEmptyState } from "../SidebarEmptyState";
-import type { Agent, ProjectMember, StatusHistoryEntry } from "@/lib/types";
+import type { Agent, ProjectMember, StatusHistoryEntry } from "@agentcenter/types";
 
 interface AgentsPanelProps {
   onTaskClick?: (taskId: string) => void;

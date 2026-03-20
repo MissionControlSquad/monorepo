@@ -20,8 +20,8 @@ import { CopyButton } from "../common/CopyButton";
 import { TimeAgo } from "../common/TimeAgo";
 import { Badge, Button } from "../ui";
 import { DELIVERABLE_VERSIONS_QUERY } from "../../lib/graphql/queries";
-import { getAssetUrl } from "../../lib/asset-url";
-import type { Deliverable, Agent, DeliverableVersion } from "@/lib/types";
+import { getAssetUrl } from "@agentcenter/utils";
+import type { Deliverable, Agent, DeliverableVersion } from "@agentcenter/types";
 
 interface DeliverableFullViewProps {
   deliverable: Deliverable;

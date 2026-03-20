@@ -19,8 +19,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { MentionSuggestionList } from "./MentionSuggestionList";
-import type { ResolveAllMentionMaps } from "../../lib/mentions";
-import { rawToDisplay, displayToRaw, ZWS, type MentionMapEntry } from "../../lib/mentionDisplay";
+import type { ResolveAllMentionMaps } from "@agentcenter/utils";
+import { rawToDisplay, displayToRaw, ZWS, type MentionMapEntry } from "@agentcenter/utils";
 
 const MIRROR_STYLE_PROPS = [
   "fontFamily",

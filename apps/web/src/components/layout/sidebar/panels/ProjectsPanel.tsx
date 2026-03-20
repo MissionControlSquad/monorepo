@@ -12,7 +12,7 @@ import { SidebarSkeleton } from "../SidebarSkeleton";
 import { SidebarEmptyState } from "../SidebarEmptyState";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import { Button } from "../../../ui";
-import type { Project } from "@/lib/types";
+import type { Project } from "@agentcenter/types";
 
 export function ProjectsPanel() {
   const pathname = usePathname();

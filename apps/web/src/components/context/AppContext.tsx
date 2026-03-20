@@ -5,7 +5,7 @@ import { useQuery } from "urql";
 import { PROJECTS_QUERY, ME_QUERY } from "../../lib/graphql/queries";
 import { useAgentStatus } from "./AgentStatusContext";
 import { FeatureFlagProvider } from "./FeatureFlagContext";
-import type { Agent, Project } from "../../lib/types";
+import type { Agent, Project } from "@agentcenter/types";
 
 /** Logged-in user's profile (from session). Used for channels and comments when present. */
 export interface CurrentUserProfile {

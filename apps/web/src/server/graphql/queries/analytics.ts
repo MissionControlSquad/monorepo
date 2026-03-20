@@ -1,6 +1,6 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS } from "../../../lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import {
   getAgentTasksAssignedRaw,
   getAgentTasksCompletedRaw,

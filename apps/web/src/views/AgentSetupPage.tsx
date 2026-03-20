@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Button, Badge, Card } from "@/components/ui";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
-import { FLAG_KEYS } from "@/lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 interface ConfigFile {
   filename: string;

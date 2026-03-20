@@ -29,7 +29,7 @@ import { CopyButton } from "../common/CopyButton";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { Button } from "../ui";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
-import type { Agent } from "@/lib/types";
+import type { Agent } from "@agentcenter/types";
 
 interface AgentDetailDialogProps {
   agentId: string | null;

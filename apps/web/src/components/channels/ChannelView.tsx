@@ -28,7 +28,7 @@ import { useMentionData, useMentionSuggestions } from "../context/MentionDataCon
 import { MarkdownWithMentions, MentionText } from "../common/MarkdownWithMentions";
 import { MentionTextArea } from "../common/MentionTextArea";
 import { ChannelMessageContent } from "./ChannelMessageContent";
-import { type MentionSuggestionCategory, MENTION_SUGGESTION_CATEGORIES } from "../../lib/mentions";
+import { type MentionSuggestionCategory, MENTION_SUGGESTION_CATEGORIES } from "@agentcenter/utils";
 
 import { ChannelMessageReactions, EMOJI_MAP, EMOJI_KEYS } from "./ChannelMessageReactions";
 import { ChannelAttachment } from "./ChannelAttachment";
@@ -38,7 +38,7 @@ import { useFileUpload, formatFileSize } from "../../hooks/useFileUpload";
 import { useChannelsLayout } from "./ChannelsLayoutContext";
 import { createPortal } from "react-dom";
 import { ConfirmDialog, Button } from "../ui";
-import type { ChannelMessage, ChannelMember, MessageAttachment } from "@/lib/types";
+import type { ChannelMessage, ChannelMember, MessageAttachment } from "@agentcenter/types";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/shadcn/popover";
 import {

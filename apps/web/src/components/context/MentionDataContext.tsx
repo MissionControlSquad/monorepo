@@ -3,12 +3,12 @@
 import React, { createContext, useContext, useMemo } from "react";
 import { useQuery } from "urql";
 import { PROFILES_QUERY, TASKS_QUERY } from "../../lib/graphql/queries";
-import type { MentionSuggestionCategory } from "../../lib/mentions";
-import { MENTION_SUGGESTION_CATEGORIES } from "../../lib/mentions";
+import type { MentionSuggestionCategory } from "@agentcenter/utils";
+import { MENTION_SUGGESTION_CATEGORIES } from "@agentcenter/utils";
 import { useAppContext } from "./AppContext";
 import { useAgentStatus } from "./AgentStatusContext";
 import { buildMentionSources } from "../common/buildMentionSources";
-import type { ProfileWithAgent, Agent, TaskListItem, Project } from "../../lib/types";
+import type { ProfileWithAgent, Agent, TaskListItem, Project } from "@agentcenter/types";
 
 const TASKS_LIMIT = 50;
 

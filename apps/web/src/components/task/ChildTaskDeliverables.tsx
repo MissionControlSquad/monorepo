@@ -6,7 +6,7 @@ import { DELIVERABLES_BY_CHILD_TASKS_QUERY } from "../../lib/graphql/queries";
 import { useDeliverableNavigation } from "../../hooks/useDeliverableNavigation";
 import { GitBranch, ChevronDown, ChevronRight } from "lucide-react";
 import { DeliverableCard } from "./DeliverableCard";
-import type { Deliverable, Agent, TaskRef } from "@/lib/types";
+import type { Deliverable, Agent, TaskRef } from "@agentcenter/types";
 
 interface ChildTaskDeliverableGroup {
   task: TaskRef & { taskNumber?: number; status?: string };

@@ -14,7 +14,7 @@ import { Badge } from "../ui/Badge";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import { Button } from "../ui";
 import { Popover, PopoverContent, PopoverAnchor } from "@/components/ui/shadcn/popover";
-import type { TaskStatus } from "@/lib/types";
+import type { TaskStatus } from "@agentcenter/types";
 
 interface SearchTask {
   _id: string;

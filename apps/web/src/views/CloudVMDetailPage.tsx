@@ -28,7 +28,7 @@ import {
   ChevronDown,
   Box,
 } from "lucide-react";
-import { LLM_PROVIDERS, LLM_PROVIDERS_MAP, PROVIDER_COLORS } from "../lib/llm-providers";
+import { LLM_PROVIDERS, LLM_PROVIDERS_MAP, PROVIDER_COLORS } from "@agentcenter/utils";
 import { toast } from "sonner";
 import { Breadcrumbs, Button, Badge, Card, ConfirmDialog, Input } from "../components/ui";
 

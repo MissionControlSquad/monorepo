@@ -6,7 +6,7 @@ import { Badge, Button } from "../ui";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { ProfilePickerDialog } from "../ui/ProfilePickerDialog";
 import type { ProfilePickerItem } from "../ui/ProfilePickerDialog";
-import type { ProfileWithAgent } from "@/lib/types";
+import type { ProfileWithAgent } from "@agentcenter/types";
 
 interface ProjectMemberEditorProps {
   profiles: ProfileWithAgent[];

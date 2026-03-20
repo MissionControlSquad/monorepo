@@ -6,10 +6,10 @@ import { Button } from "../ui";
 import { MarkdownWithMentions } from "./MarkdownWithMentions";
 import { MentionTextArea } from "./MentionTextArea";
 import { useMentionData, useMentionSuggestions } from "../context/MentionDataContext";
-import { parseMentions } from "../../lib/mentions";
-import type { MentionSuggestionCategory } from "../../lib/mentions";
-import { MENTION_SUGGESTION_CATEGORIES } from "../../lib/mentions";
-import type { Agent } from "@/lib/types";
+import { parseMentions } from "@agentcenter/utils";
+import type { MentionSuggestionCategory } from "@agentcenter/utils";
+import { MENTION_SUGGESTION_CATEGORIES } from "@agentcenter/utils";
+import type { Agent } from "@agentcenter/types";
 
 interface MarkdownEditorProps {
   value: string;

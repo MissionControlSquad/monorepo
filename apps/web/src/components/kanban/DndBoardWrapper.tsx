@@ -13,7 +13,7 @@ import { useMutation } from "urql";
 import { setPendingMoveInsertAfter } from "../../lib/graphql/client";
 import { UPDATE_TASK } from "../../lib/graphql/mutations";
 import { TaskCard } from "./TaskCard";
-import type { TaskCard as TaskCardType, Agent } from "@/lib/types";
+import type { TaskCard as TaskCardType, Agent } from "@agentcenter/types";
 
 interface DndBoardWrapperProps {
   children: ReactNode;

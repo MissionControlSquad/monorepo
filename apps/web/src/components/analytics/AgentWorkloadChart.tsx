@@ -16,7 +16,7 @@ import { ChartCard } from "./ChartCard";
 import { STATUS_COLORS, CHART_THEME } from "@/lib/chart-colors";
 
 import { useCurrentProject } from "../context/AppContext";
-import type { AgentWorkloadEntry } from "@/lib/types";
+import type { AgentWorkloadEntry } from "@agentcenter/types";
 
 export function AgentWorkloadChart() {
   const { projectId } = useCurrentProject();

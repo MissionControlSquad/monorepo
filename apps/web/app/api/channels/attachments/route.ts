@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { findProfileByAgentId, createFileDocument } from "@agentcenter/database";
 import { uploadFileToR2 } from "@/server/storage/r2";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@/lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
 import { writeFile, mkdir } from "fs/promises";

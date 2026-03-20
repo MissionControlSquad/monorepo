@@ -18,7 +18,7 @@ import { useProfileSidebar } from "../context/ProfileSidebarContext";
 import { useAgentDetail } from "../context/AgentDetailContext";
 import { useTaskNavigation } from "../../hooks/useTaskNavigation";
 import { useProjectDetail } from "../context/ProjectDetailContext";
-import { resolveAllMentionHandles } from "../../lib/mentions";
+import { resolveAllMentionHandles } from "@agentcenter/utils";
 
 export interface MarkdownWithMentionsProps {
   content: string;

@@ -18,9 +18,9 @@ import {
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
-import { FLAG_KEYS } from "../../../lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { Button } from "../../ui";
-import { getAssetUrl } from "../../../lib/asset-url";
+import { getAssetUrl } from "@agentcenter/utils";
 
 interface IconRailProps {
   onCreateTask: () => void;

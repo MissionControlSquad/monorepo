@@ -17,7 +17,7 @@ import {
   type AgentDetailedStatus,
 } from "../../lib/constants";
 import { useAgentStatus } from "../context/AgentStatusContext";
-import type { TaskCard as TaskCardType, TaskAssignee, Agent } from "@/lib/types";
+import type { TaskCard as TaskCardType, TaskAssignee, Agent } from "@agentcenter/types";
 
 interface ResolvedAssignee {
   id: string;

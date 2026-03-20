@@ -69,7 +69,7 @@ import { MarkdownWithMentions } from "../components/common/MarkdownWithMentions"
 import { TimeAgo } from "../components/common/TimeAgo";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 import { WhenFeatureEnabled } from "../components/context/FeatureFlagContext";
-import { FLAG_KEYS } from "../lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 // ─── Profile Result ──────────────────────────────────────────────────────────
 

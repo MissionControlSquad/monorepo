@@ -15,7 +15,7 @@ import { generateApiKey } from "../api-key";
 import { randomBytes } from "crypto";
 import { computeCronSchedule } from "../agent-config-generator";
 import { isFeatureEnabled } from "../feature-flags";
-import { FLAG_KEYS } from "../../lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import {
   createServer,
   getServer,
@@ -28,7 +28,7 @@ import {
 import { generateSSHKeyPair, encryptPrivateKey } from "./ssh-keys";
 import { sshExec, sshUploadFile, sshTestConnection } from "./ssh";
 import { env } from "../env";
-import { LLM_PROVIDERS_MAP } from "../../lib/llm-providers";
+import { LLM_PROVIDERS_MAP } from "@agentcenter/utils";
 import { VM_USER, VM_HOME, VM_CONFIG_DIR, VM_CONFIG_PATH, VM_WORKSPACE } from "./cloud-vm-paths";
 import { ensureHeartbeatCron, removeAgentCrons } from "./cloud-vm-cron";
 import {

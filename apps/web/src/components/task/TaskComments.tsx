@@ -17,7 +17,7 @@ import { MessageReactions } from "./MessageReactions";
 import { Button } from "../ui";
 import { MessageCircle, Send, Loader2 } from "lucide-react";
 import { useAppContext } from "../context/AppContext";
-import type { TaskMessage } from "@/lib/types";
+import type { TaskMessage } from "@agentcenter/types";
 
 interface TaskCommentsProps {
   taskId: string;

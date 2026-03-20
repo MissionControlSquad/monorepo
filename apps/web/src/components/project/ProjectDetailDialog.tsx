@@ -7,7 +7,7 @@ import { X, FolderKanban, ListTodo, Users } from "lucide-react";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import Link from "next/link";
 import { Button, Badge } from "../ui";
-import type { Project, ProjectMember, TaskListItem } from "@/lib/types";
+import type { Project, ProjectMember, TaskListItem } from "@agentcenter/types";
 
 interface ProjectDetailDialogProps {
   projectId: string | null;

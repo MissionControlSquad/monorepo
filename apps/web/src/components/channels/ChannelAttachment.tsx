@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { FileText, Download, Image as ImageIcon, Film, Music, X } from "lucide-react";
 import { formatFileSize } from "../../hooks/useFileUpload";
 import { Button } from "@/components/ui";
-import { getAssetUrl } from "../../lib/asset-url";
+import { getAssetUrl } from "@agentcenter/utils";
 
 interface AttachmentDocument {
   id: string;

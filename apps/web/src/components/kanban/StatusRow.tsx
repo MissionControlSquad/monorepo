@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { TaskCard } from "./TaskCard";
 import { Button } from "../ui";
-import type { TaskCard as TaskCardType, Agent } from "@/lib/types";
+import type { TaskCard as TaskCardType, Agent } from "@agentcenter/types";
 const COLUMN_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   inbox: Inbox,
   assigned: UserCheck,

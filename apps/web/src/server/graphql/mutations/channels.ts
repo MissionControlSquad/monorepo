@@ -1,6 +1,6 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS } from "../../../lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import {
   createChannelActivityMessage,
   createTeamChannel,
@@ -30,7 +30,7 @@ import {
 import { pubsub, channelMessageTopic, channelReactionTopic } from "../../pubsub";
 import { assertProjectWritable } from "../../system-settings";
 import { notifyAgentChannelMembers } from "../../dm-notify";
-import { parseMentionIds } from "../../../lib/mentions";
+import { parseMentionIds } from "@agentcenter/utils";
 
 const CHANNEL_VISIBILITY = ["public", "private", "dm"] as const;
 const CHANNEL_MESSAGE_REACTION_EMOJIS = [

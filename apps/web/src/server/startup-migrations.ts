@@ -8,7 +8,7 @@ import {
   updateProfileAvatarUrl,
   ensureFeatureFlagExists,
 } from "@agentcenter/database";
-import { FLAG_KEYS } from "../lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 /**
  * Convert raw presigned R2 URLs in Profile.avatarUrl to proxy paths.

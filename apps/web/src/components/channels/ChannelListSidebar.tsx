@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { Button, SkeletonList } from "@/components/ui";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/shadcn/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/shadcn/sheet";
-import type { Channel } from "@/lib/types";
+import type { Channel } from "@agentcenter/types";
 
 type ProjectFilter = "all" | "project";
 

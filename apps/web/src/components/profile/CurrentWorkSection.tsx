@@ -3,7 +3,7 @@
 import { Zap, Brain, Code, Search, BookOpen, Rocket, TestTube2, PenTool } from "lucide-react";
 import { useTaskNavigation } from "../../hooks/useTaskNavigation";
 import type { AgentDetailedStatus } from "../../lib/constants";
-import type { Agent } from "@/lib/types";
+import type { Agent } from "@agentcenter/types";
 
 interface CurrentWorkSectionProps {
   agent: Agent;

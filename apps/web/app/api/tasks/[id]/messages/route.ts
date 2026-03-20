@@ -5,7 +5,7 @@ import { pubsub, messageTopic } from "@/server/pubsub";
 import { agentListCache } from "@/server/cache";
 import { escapeHtml } from "@/server/sanitize";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
-import { parseMentions } from "@/lib/mentions";
+import { parseMentions } from "@agentcenter/utils";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { validateBody, createMessageSchema } from "../../../_lib/validation";
