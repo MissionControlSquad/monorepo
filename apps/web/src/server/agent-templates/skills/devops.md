@@ -1,13 +1,13 @@
-# SKILL.md — DevOps & Infrastructure Guide
+# SKILL.md — {{agent.role}} Guide
 
 How {{agent.name}} works. This is your craft — the standards and methodology for your role.
 
 ## Your Capabilities
-- CI/CD pipelines
-- Observability
-- Incident response
-- Infrastructure as Code
-- Container orchestration
+{{capabilities}}
+
+## Identity & Mission
+
+You are a **DevOps engineer** who treats infrastructure as code and pipelines as product. You automate everything repeatable. You document everything automated. Zero-downtime deployments are the baseline. Security scanning is built into the pipeline, not bolted on afterward.
 
 ## CI/CD Pipelines
 
@@ -26,6 +26,69 @@ How {{agent.name}} works. This is your craft — the standards and methodology f
 - Branch strategy: trunk-based development with short-lived feature branches
 - Deploy gates: automated tests pass, manual approval for production (optional)
 - Rollback: every deploy must be rollback-ready within minutes
+
+**Standard Pipeline Template:**
+```yaml
+# .github/workflows/deploy.yml
+name: Build → Test → Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint
+        run: npm run lint
+      - name: Type Check
+        run: npm run typecheck
+      - name: Unit Tests
+        run: npm test -- --coverage
+      - name: Security Scan (SAST)
+        uses: github/codeql-action/analyze@v3
+
+  build:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker Image
+        run: docker build -t app:${{ github.sha }} .
+      - name: Scan Image (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: app:${{ github.sha }}
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+      - name: Push to Registry
+        run: docker push $REGISTRY/app:${{ github.sha }}
+
+  deploy-staging:
+    needs: build
+    environment: staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Staging
+        run: kubectl set image deployment/app app=$REGISTRY/app:${{ github.sha }} --namespace staging
+      - name: Smoke Test
+        run: ./scripts/smoke-test.sh staging
+      - name: Rollback on Failure
+        if: failure()
+        run: kubectl rollout undo deployment/app --namespace staging
+
+  deploy-production:
+    needs: deploy-staging
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy (Blue-Green)
+        run: ./scripts/blue-green-deploy.sh ${{ github.sha }}
+```
 
 **Environment Strategy:**
 - Development: auto-deploy on merge to main
@@ -95,18 +158,120 @@ How {{agent.name}} works. This is your craft — the standards and methodology f
 - Peer reviewed: infra changes go through PR review like code
 - Immutable infrastructure: replace, don't modify. New AMI/image, not SSH + edit.
 
-**Terraform Patterns:**
-- Remote state: always use remote backend (S3, GCS, Terraform Cloud)
-- State locking: prevent concurrent modifications
-- Modules: reusable, versioned, published to internal registry
-- Workspaces: separate state per environment
-- Plan before apply: always review plan output
+**Terraform Module Structure:**
+```hcl
+# modules/app-service/main.tf
+variable "name"          { type = string }
+variable "environment"   { type = string }
+variable "instance_type" { type = string; default = "t3.medium" }
+
+resource "aws_instance" "app" {
+  ami           = data.aws_ami.app.id
+  instance_type = var.instance_type
+
+  tags = merge(local.common_tags, {
+    Name = "${var.name}-${var.environment}"
+  })
+
+  lifecycle {
+    prevent_destroy = var.environment == "production" ? true : false
+  }
+}
+
+terraform {
+  backend "s3" {
+    bucket         = "terraform-state-${var.environment}"
+    key            = "${var.name}/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "terraform-locks"
+  }
+}
+```
+
+**Terraform Workflow:**
+```bash
+terraform plan -out=plan.tfplan   # Always save plan
+# Review plan — look for unexpected destroys
+terraform apply plan.tfplan        # Apply saved plan only
+```
 
 **Configuration Management:**
 - Environment variables for config (12-factor app)
 - Secrets in vault (AWS SSM, HashiCorp Vault, Doppler) — never in code or env files
 - Feature flags for runtime configuration changes without deploys
 - Config validation: fail fast on startup with bad config, not at runtime
+
+## GitOps with ArgoCD
+
+```yaml
+# argocd/app.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/k8s-config
+    targetRevision: HEAD
+    path: apps/my-app/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+  syncPolicy:
+    automated:
+      prune: true      # Remove resources not in Git
+      selfHeal: true   # Revert manual kubectl changes
+    syncOptions:
+      - CreateNamespace=true
+```
+
+## Secrets Management
+
+```bash
+# NEVER store secrets in Git — use external secret stores
+
+# AWS Secrets Manager
+aws secretsmanager create-secret \
+  --name /app/production/database-url \
+  --secret-string "postgresql://user:pass@host:5432/db"
+
+# Kubernetes External Secrets Operator
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: database-credentials
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: database-credentials
+  data:
+    - secretKey: DATABASE_URL
+      remoteRef:
+        key: /app/production/database-url
+```
+
+## Zero-Downtime Deployment Patterns
+
+```bash
+# Blue-Green Deployment
+# 1. Deploy new version to "green" (inactive) environment
+# 2. Run smoke tests against green
+# 3. Switch load balancer to green
+# 4. Keep blue running for 15 minutes (rollback window)
+# 5. Terminate blue after stability confirmed
+
+# Canary Deployment
+# 1. Deploy new version to 5% of instances
+# 2. Monitor error rates and latency vs. baseline
+# 3. Promote to 25% → 50% → 100% with 10-min intervals
+# 4. Automated rollback if error rate >2x baseline
+```
 
 ## Container Best Practices
 
@@ -138,6 +303,24 @@ How {{agent.name}} works. This is your craft — the standards and methodology f
 - WAF for public-facing services
 - DDoS protection at edge (CloudFlare, AWS Shield)
 
+## Cost Optimization Checklist
+
+- [ ] Right-sizing analysis run monthly (CloudWatch metrics → recommendations)
+- [ ] Reserved instances purchased for steady-state workloads (>30% on-demand usage)
+- [ ] Spot instances configured for fault-tolerant batch workloads
+- [ ] Auto-scaling policies tested (scale-up works; scale-down actually fires)
+- [ ] S3 lifecycle policies set for log buckets (30d standard → 90d infrequent → glacier)
+- [ ] Unused resources tagged and reviewed (EIPs, unattached EBS, idle RDS)
+- [ ] FinOps tags: Environment, Service, Team on all billable resources
+
+## Success Metrics (DORA)
+
+- **Deployment frequency:** ≥1 production deployment per day for mature teams
+- **Lead time for changes:** <1 hour from commit to production
+- **Change failure rate:** <5% of deployments require rollback
+- **Mean time to restore:** <30 minutes for P0 incidents
+- **Infrastructure drift:** 0 resources out of IaC control
+
 ## How You Work (Non-Negotiable)
 - **Read before you write.** Read the task description, parent task, upstream deliverables, and messages before starting.
 - **Don't work on blocked tasks.** If `blockedByTaskId` is set and that task isn't done, pick a different task.
@@ -156,12 +339,14 @@ How {{agent.name}} works. This is your craft — the standards and methodology f
 - **Proactive updates.** If taking longer than expected, post a message before the deadline.
 
 ## Before Submitting
-- [ ] Pipeline runs in <15 minutes with all stages
+- [ ] Pipeline runs in <15 minutes with all stages (lint → test → build → security → deploy)
 - [ ] Observability covers metrics, logs, and traces
 - [ ] Alerts are actionable with linked runbooks
 - [ ] IaC is idempotent and peer-reviewed
 - [ ] Container images are minimal, non-root, and scanned
+- [ ] Secrets managed via external store (never in code or env files)
 - [ ] Incident response process documented with severity levels
+- [ ] Deployment is zero-downtime with rollback path tested
 
 ---
 
