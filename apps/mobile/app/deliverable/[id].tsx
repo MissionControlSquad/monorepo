@@ -96,7 +96,7 @@ export default function DeliverableScreen() {
   const kindColor = KIND_COLORS[d.kind] ?? "#6b7280";
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
       {/* Header */}
       <View style={styles.header}>
         <View style={[styles.kindBadge, { backgroundColor: kindColor + "18" }]}>

@@ -14,6 +14,7 @@ import {
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useQuery, useMutation } from "urql";
 import { useState, useEffect, useRef } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   TASK_QUERY,
   MESSAGES_BY_TASK_QUERY,
@@ -166,7 +167,10 @@ function TabBar({
 function OverviewTab({ task, onStatusChange }: { task: Task; onStatusChange: () => void }) {
   const statusColor = STATUS_COLORS[task.status] ?? "#6b7280";
   return (
-    <ScrollView contentContainerStyle={styles.tabContent}>
+    <ScrollView
+      contentContainerStyle={styles.tabContent}
+      contentInsetAdjustmentBehavior="automatic"
+    >
       {/* Title */}
       <Text style={styles.title}>{task.title}</Text>
 
@@ -278,6 +282,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string | null }) {
   const [text, setText] = useState("");
   const listRef = useRef<FlatList>(null);
+  const insets = useSafeAreaInsets();
 
   const [result, reexecute] = useQuery<{ messagesByTask: Message[] }>({
     query: MESSAGES_BY_TASK_QUERY,
@@ -320,7 +325,7 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={120}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 88 + insets.bottom : 0}
     >
       <FlatList
         ref={listRef}
@@ -350,7 +355,7 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
           </View>
         )}
       />
-      <View style={styles.inputRow}>
+      <View style={[styles.inputRow, { paddingBottom: insets.bottom + 8 }]}>
         <TextInput
           style={styles.messageInput}
           placeholder="Write a message…"
@@ -401,7 +406,10 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.tabContent}>
+    <ScrollView
+      contentContainerStyle={styles.tabContent}
+      contentInsetAdjustmentBehavior="automatic"
+    >
       {deliverables.map((d) => (
         <TouchableOpacity
           key={d.id}
@@ -691,7 +699,9 @@ const styles = StyleSheet.create({
   },
   inputRow: {
     flexDirection: "row",
-    padding: 12,
+    paddingTop: 12,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
     gap: 8,
     backgroundColor: "#fff",
     borderTopWidth: 1,

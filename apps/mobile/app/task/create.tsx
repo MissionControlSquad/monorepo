@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation } from "urql";
 import { CREATE_TASK_FROM_DASHBOARD } from "@agentcenter/graphql-client";
 
@@ -27,6 +28,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 export default function CreateTaskScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority | null>(null);
@@ -60,7 +62,11 @@ export default function CreateTaskScreen() {
       style={{ flex: 1, backgroundColor: "#f9fafb" }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Title */}
         <View style={styles.field}>
           <Text style={styles.label}>Title *</Text>

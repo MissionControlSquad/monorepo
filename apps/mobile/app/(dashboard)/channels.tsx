@@ -81,6 +81,7 @@ export default function ChannelsScreen() {
       <FlatList
         data={channels}
         keyExtractor={(item) => item.id}
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={channels.length === 0 ? styles.emptyContainer : styles.listContent}
         refreshControl={
           <RefreshControl

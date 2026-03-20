@@ -109,6 +109,7 @@ export default function AgentsScreen() {
       <FlatList
         data={agents}
         keyExtractor={(item) => item.id}
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={agents.length === 0 ? styles.emptyContainer : styles.listContent}
         refreshControl={
           <RefreshControl

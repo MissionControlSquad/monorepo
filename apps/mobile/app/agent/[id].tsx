@@ -262,7 +262,7 @@ function StatCard({ label, value, isText }: { label: string; value: number | str
 
 function OverviewTab({ agent, router }: { agent: Agent; router: ReturnType<typeof useRouter> }) {
   return (
-    <ScrollView contentContainerStyle={styles.tabContent}>
+    <ScrollView contentContainerStyle={styles.tabContent} contentInsetAdjustmentBehavior="automatic">
       {agent.currentTask && agent.currentTaskRef && (
         <TouchableOpacity
           style={styles.currentTaskCard}
@@ -349,6 +349,7 @@ function QueueTab({
     <FlatList
       data={items}
       keyExtractor={(item) => item.id}
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.listContent}
       renderItem={({ item }) => {
         const color = QUEUE_STATUS_COLORS[item.status] ?? "#6b7280";
@@ -411,6 +412,7 @@ function HistoryTab({
     <FlatList
       data={history}
       keyExtractor={(item) => item.id}
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.listContent}
       renderItem={({ item }) => (
         <View style={styles.historyCard}>

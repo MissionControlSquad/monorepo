@@ -101,6 +101,7 @@ export default function TaskListScreen() {
       <FlatList
         data={tasks}
         keyExtractor={(item) => item.id}
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.listContent}
         refreshControl={
           <RefreshControl
