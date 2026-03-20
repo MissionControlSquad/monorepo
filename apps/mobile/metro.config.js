@@ -18,8 +18,13 @@ const config = mergeConfig(expoConfig, {
   resolver: {
     blockList: [
       ...Array.from(expoConfig.resolver.blockList ?? []),
+      // Block symlinked @agentcenter packages in root node_modules (use packages/ directly instead)
       new RegExp(
         `^${escapeRegex(path.resolve(monorepoRoot, "node_modules/@agentcenter"))}.*`
+      ),
+      // Block graphql-client's own node_modules to avoid urql version conflicts
+      new RegExp(
+        `^${escapeRegex(path.resolve(monorepoRoot, "packages/graphql-client/node_modules"))}.*`
       ),
     ],
     extraNodeModules: {
@@ -27,6 +32,9 @@ const config = mergeConfig(expoConfig, {
       "@agentcenter/utils": path.resolve(monorepoRoot, "packages/utils"),
       "@agentcenter/config": path.resolve(monorepoRoot, "packages/config"),
       "@agentcenter/graphql-client": path.resolve(monorepoRoot, "packages/graphql-client"),
+      // Force single urql instance (root node_modules v4)
+      "urql": path.resolve(monorepoRoot, "node_modules/urql"),
+      "graphql": path.resolve(monorepoRoot, "node_modules/graphql"),
     },
   },
 });

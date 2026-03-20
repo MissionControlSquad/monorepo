@@ -13,8 +13,8 @@ import {
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useQuery, useMutation } from "urql";
 import { useState, useEffect, useRef } from "react";
-import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY } from "../../src/lib/graphql/queries";
-import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ } from "../../src/lib/graphql/mutations";
+import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY } from "@agentcenter/graphql-client";
+import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 
 interface FromProfile {

@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useQuery } from "urql";
 import { useRouter } from "expo-router";
-import { CHANNELS_QUERY } from "../../src/lib/graphql/queries";
+import { CHANNELS_QUERY } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 
 interface ChannelMember {

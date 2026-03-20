@@ -7,9 +7,13 @@ export default function DashboardLayout() {
       screenOptions={{
         tabBarActiveTintColor: "#2563eb",
         tabBarInactiveTintColor: "#9ca3af",
-        tabBarStyle: { borderTopColor: "#e5e7eb" },
+        tabBarStyle: {
+          borderTopColor: "#e5e7eb",
+          backgroundColor: "#fff",
+        },
         headerStyle: { backgroundColor: "#fff" },
         headerTitleStyle: { fontWeight: "600", color: "#111827" },
+        headerShadowVisible: false,
       }}
     >
       <Tabs.Screen
@@ -23,22 +27,32 @@ export default function DashboardLayout() {
         }}
       />
       <Tabs.Screen
-        name="channels"
-        options={{
-          title: "Messages",
-          tabBarLabel: "Messages",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubble-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="agents"
         options={{
           title: "Agents",
           tabBarLabel: "Agents",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="channels"
+        options={{
+          title: "Channels",
+          tabBarLabel: "Channels",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbubble-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="projects"
+        options={{
+          title: "Projects",
+          tabBarLabel: "Projects",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="folder-outline" size={size} color={color} />
           ),
         }}
       />

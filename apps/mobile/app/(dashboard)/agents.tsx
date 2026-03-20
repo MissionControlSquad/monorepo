@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useQuery } from "urql";
-import { AGENTS_QUERY } from "../../src/lib/graphql/queries";
+import { AGENTS_QUERY } from "@agentcenter/graphql-client";
 
 interface Agent {
   id: string;
@@ -89,9 +89,12 @@ export default function AgentsScreen() {
   }
 
   if (error && agents.length === 0) {
+    const msg = error.networkError?.message ?? error.graphQLErrors?.[0]?.message ?? error.message;
+    console.error("[AgentsScreen] urql error:", error);
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>Failed to load agents</Text>
+        <Text style={[styles.errorText, { fontSize: 12, marginTop: 4 }]} numberOfLines={4}>{msg}</Text>
         <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>

@@ -10,8 +10,8 @@ import {
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useQuery, useMutation } from "urql";
 import { useEffect } from "react";
-import { TASK_QUERY } from "../../src/lib/graphql/queries";
-import { UPDATE_TASK } from "../../src/lib/graphql/mutations";
+import { TASK_QUERY } from "@agentcenter/graphql-client";
+import { UPDATE_TASK } from "@agentcenter/graphql-client";
 
 interface Profile {
   id: string;

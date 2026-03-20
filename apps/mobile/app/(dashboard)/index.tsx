@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useQuery } from "urql";
 import { useRouter } from "expo-router";
-import { TASKS_QUERY } from "../../src/lib/graphql/queries";
+import { TASKS_QUERY } from "@agentcenter/graphql-client";
 import type { TaskStatus, Priority } from "../../src/types";
 
 interface TaskAssignee {
