@@ -1,7 +1,11 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { TouchableOpacity } from "react-native";
+import { useAuth } from "../../src/context/AuthContext";
 
 export default function DashboardLayout() {
+  const { onLogout } = useAuth();
+
   return (
     <Tabs
       screenOptions={{
@@ -14,6 +18,11 @@ export default function DashboardLayout() {
         headerStyle: { backgroundColor: "#fff" },
         headerTitleStyle: { fontWeight: "600", color: "#111827" },
         headerShadowVisible: false,
+        headerRight: () => (
+          <TouchableOpacity onPress={onLogout} style={{ marginRight: 16 }}>
+            <Ionicons name="log-out-outline" size={22} color="#6b7280" />
+          </TouchableOpacity>
+        ),
       }}
     >
       <Tabs.Screen

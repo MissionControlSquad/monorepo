@@ -7,8 +7,10 @@ import {
   RefreshControl,
   TouchableOpacity,
 } from "react-native";
+import { useEffect } from "react";
 import { useQuery } from "urql";
 import { AGENTS_QUERY } from "@agentcenter/graphql-client";
+import { getStoredServerUrl, getStoredCookie } from "../../src/api/session";
 
 interface Agent {
   id: string;
@@ -79,6 +81,33 @@ export default function AgentsScreen() {
 
   const { data, fetching, error } = result;
   const agents = data?.agents ?? [];
+
+  // Diagnostic: raw fetch test on mount
+  useEffect(() => {
+    const serverUrl = getStoredServerUrl();
+    const cookie = getStoredCookie();
+    console.log("[Diagnostic] serverUrl:", serverUrl);
+    console.log("[Diagnostic] cookie available:", !!cookie);
+    if (!serverUrl) {
+      console.warn("[Diagnostic] No server URL stored — urql will use localhost:3000 fallback");
+      return;
+    }
+    fetch(`${serverUrl}/api/graphql`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}),
+      },
+      body: JSON.stringify({ query: "{ __typename }" }),
+    })
+      .then(async (res) => {
+        const text = await res.text();
+        console.log("[Diagnostic] graphql status:", res.status, res.statusText);
+        console.log("[Diagnostic] graphql body:", text.slice(0, 300));
+      })
+      .catch((err) => console.error("[Diagnostic] fetch error:", err));
+  }, []);
 
   if (fetching && agents.length === 0) {
     return (
