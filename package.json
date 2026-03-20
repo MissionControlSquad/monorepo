@@ -27,5 +27,8 @@
   "packageManager": "npm@10.0.0",
   "engines": {
     "node": ">=18"
+  },
+  "overrides": {
+    "expo-constants": "~18.0.13"
   }
 }
