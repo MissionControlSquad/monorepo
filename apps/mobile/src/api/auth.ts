@@ -31,9 +31,16 @@ export async function login(
   const profileId = (body.profileId as string) ?? "";
   const user = (body.username as string) ?? "";
 
-  if (cookie && profileId) {
-    await saveSession(base, cookie, profileId);
+  if (!profileId) {
+    throw new Error("Login succeeded but no profile ID returned");
   }
+
+  // Always persist serverUrl + profileId. On iOS the native networking layer
+  // (NSURLSession) stores the Set-Cookie internally and strips it from the
+  // JS-visible headers, so `cookie` may be empty — that's OK because
+  // `credentials: "include"` in the urql client lets the native cookie jar
+  // attach it automatically to subsequent requests.
+  await saveSession(base, cookie, profileId);
 
   return { profileId, username: user };
 }

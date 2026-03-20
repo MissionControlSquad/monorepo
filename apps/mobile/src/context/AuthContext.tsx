@@ -39,12 +39,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadSession()
       .then(() => {
-        const cookie = getStoredCookie();
-        if (cookie) {
+        const storedUrl = getStoredServerUrl();
+        const storedProfile = getStoredProfileId();
+        // On iOS, cookie may live in native jar rather than SecureStore, so
+        // we check for serverUrl+profileId as the sign-in indicator.
+        if (storedUrl && storedProfile) {
           setIsSignedIn(true);
-          setProfileId(getStoredProfileId());
-          setServerUrl(getStoredServerUrl());
-          setUrqlClient(createUrqlClient());
+          setProfileId(storedProfile);
+          setServerUrl(storedUrl);
+          setUrqlClient(createUrqlClient(storedUrl));
         }
       })
       .catch(() => {})
@@ -55,7 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsSignedIn(true);
     setProfileId(pid);
     setServerUrl(url);
-    setUrqlClient(createUrqlClient());
+    // Pass URL directly — don't rely on getStoredServerUrl() which may lag
+    setUrqlClient(createUrqlClient(url));
   };
 
   const onLogout = async () => {
