@@ -1,22 +1,44 @@
 const { getDefaultConfig } = require("expo/metro-config");
-const { withNativeWind } = require("nativewind/metro");
+const { mergeConfig } = require("metro");
 const path = require("path");
 
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, "../..");
 
-const config = getDefaultConfig(projectRoot);
+const expoConfig = getDefaultConfig(projectRoot);
 
-// Watch all workspace packages so Metro picks up changes there
-config.watchFolders = [monorepoRoot];
+const config = mergeConfig(expoConfig, {
+  watchFolders: [
+    path.resolve(monorepoRoot, "packages/types"),
+    path.resolve(monorepoRoot, "packages/utils"),
+    path.resolve(monorepoRoot, "packages/config"),
+    path.resolve(monorepoRoot, "packages/graphql-client"),
+  ],
+  // Use Node.js fs.watch instead of watchman (watchman is broken on this system
+  // due to libfmt.10.dylib missing — fmt was upgraded to v12 which has libfmt.11.dylib)
+  watcher: {
+    watchman: {
+      deferStates: [],
+    },
+  },
+  resolver: {
+    blockList: [
+      ...Array.from(expoConfig.resolver.blockList ?? []),
+      new RegExp(
+        `^${escapeRegex(path.resolve(monorepoRoot, "node_modules/@agentcenter"))}.*`
+      ),
+    ],
+    extraNodeModules: {
+      "@agentcenter/types": path.resolve(monorepoRoot, "packages/types"),
+      "@agentcenter/utils": path.resolve(monorepoRoot, "packages/utils"),
+      "@agentcenter/config": path.resolve(monorepoRoot, "packages/config"),
+      "@agentcenter/graphql-client": path.resolve(monorepoRoot, "packages/graphql-client"),
+    },
+  },
+});
 
-// Let Metro resolve modules from both the app and the monorepo root
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, "node_modules"),
-  path.resolve(monorepoRoot, "node_modules"),
-];
+module.exports = config;
 
-// Enable package.json "exports" field resolution (needed for @agentcenter/* packages)
-config.resolver.unstable_enablePackageExports = true;
-
-module.exports = withNativeWind(config, { input: "./global.css" });
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
