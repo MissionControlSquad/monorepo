@@ -1,6 +1,6 @@
 import { builder } from "../builder";
 import { taskModel, messageModel } from "../../models";
-import { prisma } from "../../prisma";
+import { prisma } from "@agentcenter/database";
 import { pubsub, messageTopic } from "../../pubsub";
 import { parseMentionIds } from "../../../lib/mentions";
 

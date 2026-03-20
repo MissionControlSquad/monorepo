@@ -5,7 +5,14 @@ import type {
   UserNotification,
   UserNotificationPreference,
 } from "@agentcenter/database";
-import { prisma } from "../prisma";
+import {
+  getUserNotificationPreferences,
+  createUserNotification,
+  markUserNotificationSent,
+  markUserNotificationFailed,
+  getUserEmail,
+  type CreateUserNotificationInput,
+} from "@agentcenter/database";
 import { sendPushToUser } from "./push";
 import { sendEmail } from "./email";
 import { renderEmailTemplate } from "./email-templates";
@@ -150,10 +157,7 @@ export function computeNextRetryAt(retryCount: number): Date {
 export async function dispatchNotification(record: UserNotification): Promise<void> {
   switch (record.channel) {
     case "in_app":
-      await prisma.userNotification.update({
-        where: { id: record.id },
-        data: { status: "sent", sentAt: new Date() },
-      });
+      await markUserNotificationSent(record.id);
       break;
 
     case "push":
@@ -162,22 +166,14 @@ export async function dispatchNotification(record: UserNotification): Promise<vo
         body: record.body,
         url: record.url ?? undefined,
       });
-      await prisma.userNotification.update({
-        where: { id: record.id },
-        data: { status: "sent", sentAt: new Date() },
-      });
+      await markUserNotificationSent(record.id);
       break;
 
     case "email": {
-      const user = await prisma.user.findUnique({
-        where: { id: record.userId },
-        select: { email: true },
-      });
+      const email = await getUserEmail(record.userId);
+      const user = email ? { email } : null;
       if (!user?.email) {
-        await prisma.userNotification.update({
-          where: { id: record.id },
-          data: { status: "sent", sentAt: new Date() },
-        });
+        await markUserNotificationSent(record.id);
         break;
       }
 
@@ -194,10 +190,7 @@ export async function dispatchNotification(record: UserNotification): Promise<vo
       });
 
       if (sent) {
-        await prisma.userNotification.update({
-          where: { id: record.id },
-          data: { status: "sent", sentAt: new Date() },
-        });
+        await markUserNotificationSent(record.id);
       } else {
         throw new Error("Email delivery failed");
       }
@@ -214,14 +207,11 @@ export async function handleDispatchFailure(
 
   if (nextCount >= MAX_RETRIES) {
     // Dead letter
-    await prisma.userNotification.update({
-      where: { id: record.id },
-      data: {
-        status: "failed",
-        errorMsg: `[dead] ${errorMsg}`.slice(0, 500),
-        retryCount: nextCount,
-        nextRetryAt: null,
-      },
+    await markUserNotificationFailed(record.id, {
+      status: "failed",
+      errorMsg: `[dead] ${errorMsg}`.slice(0, 500),
+      retryCount: nextCount,
+      nextRetryAt: null,
     });
     incrementCounter("deadLettered");
     logError(
@@ -230,14 +220,11 @@ export async function handleDispatchFailure(
     );
   } else {
     const nextRetryAt = computeNextRetryAt(nextCount);
-    await prisma.userNotification.update({
-      where: { id: record.id },
-      data: {
-        status: "failed",
-        errorMsg: errorMsg.slice(0, 500),
-        retryCount: nextCount,
-        nextRetryAt,
-      },
+    await markUserNotificationFailed(record.id, {
+      status: "failed",
+      errorMsg: errorMsg.slice(0, 500),
+      retryCount: nextCount,
+      nextRetryAt,
     });
     incrementCounter("failed");
     logWarn(
@@ -276,11 +263,7 @@ export async function notify(params: NotifyParams): Promise<void> {
   }
 
   // Load user preferences (create defaults if none exist)
-  const prefs = await prisma.userNotificationPreference.upsert({
-    where: { userId },
-    create: { userId },
-    update: {},
-  });
+  const prefs = await getUserNotificationPreferences(userId);
 
   // Check if this notification type is enabled
   const prefField = TYPE_PREF_MAP[type];
@@ -308,22 +291,20 @@ export async function notify(params: NotifyParams): Promise<void> {
     const isDeferred = quietEnd && channel !== "in_app";
 
     try {
-      const record = await prisma.userNotification.create({
-        data: {
-          userId,
-          type,
-          channel,
-          status: isDeferred ? "pending" : "pending",
-          title,
-          body,
-          taskId,
-          messageId,
-          url,
-          metadata: (metadata as any) ?? undefined,
-          dedupKey: `${dedupKey}:${channel}`,
-          nextRetryAt: isDeferred ? quietEnd : undefined,
-        },
-      });
+      const record = await createUserNotification({
+        userId,
+        type,
+        channel,
+        status: "pending",
+        title,
+        body,
+        taskId,
+        messageId,
+        url,
+        metadata: (metadata as any) ?? undefined,
+        dedupKey: `${dedupKey}:${channel}`,
+        nextRetryAt: isDeferred ? quietEnd : undefined,
+      } as CreateUserNotificationInput);
       records.push(record);
       incrementCounter("created");
 

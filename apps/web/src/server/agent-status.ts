@@ -14,7 +14,12 @@
  * When a direct update changes status (idle/active/blocked), we emit agent.status_applied
  * so statusHistory and activity handlers can record it (agentState does not listen).
  */
-import { prisma } from "./prisma";
+import {
+  updateAgent,
+  updateAgentStatusAtomically,
+  getAgentApiKeyHash,
+  findAgentsByCurrentTaskId,
+} from "@agentcenter/database";
 import { pubsub, PubSubEvent } from "./pubsub";
 import { emit } from "./events/bus";
 import { EventTypes } from "./constants";
@@ -70,30 +75,14 @@ export async function applyAgentStatusUpdate(
   if (statusInPayload) {
     // Use a transaction to atomically read previous status and apply the update,
     // preventing a concurrent process from changing status between read and write.
-    previous = await prisma.$transaction(async (tx) => {
-      const row = await tx.agent.findUnique({
-        where: { id: agentId },
-        select: { status: true, detailedStatus: true, name: true },
-      });
-      await tx.agent.update({
-        where: { id: agentId },
-        data: updateData,
-      });
-      return row ? { ...row, status: row.status as string } : undefined;
-    });
+    previous = await updateAgentStatusAtomically(agentId, updateData);
   } else {
-    await prisma.agent.update({
-      where: { id: agentId },
-      data: updateData,
-    });
+    await updateAgent(agentId, updateData);
   }
 
   // So REST resolveAgent() sees fresh setupStatus (avoids 403 after sync_identity or reactivate)
   if ("setupStatus" in data && data.setupStatus != null) {
-    const row = await prisma.agent.findUnique({
-      where: { id: agentId },
-      select: { apiKeyHash: true },
-    });
+    const row = await getAgentApiKeyHash(agentId);
     if (row?.apiKeyHash) invalidateAgentCache(row.apiKeyHash);
   }
 
@@ -122,10 +111,7 @@ export async function applyAgentStatusUpdate(
  * Used when a task is deleted.
  */
 export async function clearCurrentTaskForAgentsWithTask(taskId: string): Promise<void> {
-  const agents = await prisma.agent.findMany({
-    where: { currentTaskId: taskId },
-    select: { id: true },
-  });
+  const agents = await findAgentsByCurrentTaskId(taskId);
   for (const agent of agents) {
     await applyAgentStatusUpdate(agent.id, {
       currentTaskId: null,

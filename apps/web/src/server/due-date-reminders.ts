@@ -1,4 +1,4 @@
-import { prisma } from "./prisma";
+import { findTasksDueForAssignee } from "@agentcenter/database";
 import { getOrCreateAgentProfileId } from "./agent-profile";
 import { notificationModel } from "./models";
 import { pubsub, notificationTopic } from "./pubsub";
@@ -15,15 +15,7 @@ export async function generateDueDateReminders(agentId: string): Promise<number>
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
   // Find tasks assigned to this agent that have a due date, are not deleted, and not done
-  const tasks = await prisma.task.findMany({
-    where: {
-      deletedAt: null,
-      status: { not: "done" },
-      dueDate: { not: null, lte: in24h },
-      assignees: { some: { profileId } },
-    },
-    select: { id: true, title: true, dueDate: true },
-  });
+  const tasks = await findTasksDueForAssignee(profileId, in24h);
 
   if (tasks.length === 0) return 0;
 

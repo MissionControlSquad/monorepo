@@ -1,4 +1,4 @@
-import { notDeleted } from "../prisma";
+import { notDeleted } from "@agentcenter/database";
 
 // ─── Utility types ───────────────────────────────────────────────────
 

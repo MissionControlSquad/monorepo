@@ -13,3 +13,8 @@ export * from "./cloud-vm";
 export * from "./agent";
 export * from "./document";
 export * from "./health";
+export * from "./system-settings";
+export * from "./project";
+export * from "./password-reset";
+export * from "./feature-flag";
+export * from "./license";

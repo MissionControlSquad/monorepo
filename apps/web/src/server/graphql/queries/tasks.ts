@@ -1,6 +1,6 @@
 import { builder } from "../builder";
 import { taskModel, agentModel, workSessionModel } from "../../models";
-import { prisma, notDeleted } from "../../prisma";
+import { prisma, notDeleted } from "@agentcenter/database";
 import { workSummaryCache } from "../../cache";
 import { Roles } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";

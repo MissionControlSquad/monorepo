@@ -8,7 +8,7 @@
 import { sshExec, sshExecStream, sshUploadFile, type SSHConfig } from "./ssh";
 import { decryptPrivateKey } from "./ssh-keys";
 import { env } from "../env";
-import { prisma } from "../prisma";
+import { prisma } from "@agentcenter/database";
 import { generateApiKey } from "../api-key";
 import { generateAgentConfig, getMcUrl } from "../agent-config-generator";
 import { VM_CONFIG_PATH, VM_WORKSPACE, VM_USER, OPENCLAW_CMD_PREFIX } from "./cloud-vm-paths";

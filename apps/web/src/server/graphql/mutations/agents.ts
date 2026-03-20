@@ -5,7 +5,7 @@ import { Roles } from "../../constants";
 import { applyAgentStatusUpdate } from "../../agent-status";
 import { ensureAgentProfile } from "../../agent-profile";
 import { pubsub, PubSubEvent } from "../../pubsub";
-import { prisma } from "../../prisma";
+import { prisma } from "@agentcenter/database";
 import { getVMSSHConfig, getAgentSlug, computeAgentCronIndex } from "../../services/cloud-vm-utils";
 import { removeAgentCrons, ensureHeartbeatCron } from "../../services/cloud-vm-cron";
 import { computeCronSchedule } from "../../agent-config-generator";

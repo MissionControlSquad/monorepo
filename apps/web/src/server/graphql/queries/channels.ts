@@ -1,5 +1,5 @@
 import { builder } from "../builder";
-import { prisma } from "../../prisma";
+import { prisma } from "@agentcenter/database";
 import { ChannelMessageConnectionRef } from "@agentcenter/graphql-server";
 
 /** List channels. If profileId is provided, returns public channels + channels where this profile is a member. If projectId is provided, only channels scoped to that project. If visibility is provided, only that visibility (e.g. "dm" for direct messages). */

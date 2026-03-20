@@ -1,6 +1,6 @@
 import { DeliverableKind } from "@agentcenter/database";
 import { builder } from "../builder";
-import { prisma } from "../../prisma";
+import { prisma } from "@agentcenter/database";
 import { taskModel, agentModel, deliverableModel } from "../../models";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 

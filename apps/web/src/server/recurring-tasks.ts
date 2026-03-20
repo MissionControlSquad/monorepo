@@ -1,4 +1,4 @@
-import { prisma } from "./prisma";
+import { prisma } from "@agentcenter/database";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "./pubsub";
 import { addDays, addWeeks, addMonths } from "date-fns";
 import { taskModel } from "./models/task";

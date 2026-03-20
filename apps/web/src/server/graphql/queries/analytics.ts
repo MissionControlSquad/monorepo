@@ -1,7 +1,7 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "../../../lib/feature-flag-keys";
-import { prisma, notDeleted } from "../../prisma";
+import { prisma, notDeleted } from "@agentcenter/database";
 import { agentModel, activityModel } from "../../models";
 import { taskModel } from "../../models/task";
 import {

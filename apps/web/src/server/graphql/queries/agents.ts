@@ -1,5 +1,5 @@
 import { builder } from "../builder";
-import { prisma } from "../../prisma";
+import { prisma } from "@agentcenter/database";
 import {
   agentModel,
   statusHistoryModel,

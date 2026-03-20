@@ -6,3 +6,8 @@ export { markAllUserNotificationsRead } from "./mark-all-read";
 export { getUserNotificationPreferences, saveUserNotificationPreferences } from "./preferences";
 export { upsertPushSubscription, deletePushSubscription } from "./push-subscription";
 export type { PushSubscriptionInput } from "./push-subscription";
+export { createUserNotification } from "./create";
+export type { CreateUserNotificationInput } from "./create";
+export { markUserNotificationSent, markUserNotificationFailed } from "./update-status";
+export { findRetryableUserNotifications } from "./find-retryable";
+export { getUserEmail } from "./get-user-email";

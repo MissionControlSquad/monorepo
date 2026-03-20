@@ -2,7 +2,13 @@ import crypto from "crypto";
 import os from "os";
 import fs from "fs";
 import path from "path";
-import { prisma } from "./prisma";
+import {
+  getStoredLicense as dbGetStoredLicense,
+  upsertLicenseRecord,
+  updateLicenseAccessToken as dbUpdateLicenseAccessToken,
+  deleteLicenseRecord,
+  markLicenseRecordRevoked,
+} from "@agentcenter/database";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -164,7 +170,7 @@ function getFingerprint(): string {
 // ── DB Operations ───────────────────────────────────────────────
 
 export async function getStoredLicense() {
-  return prisma.license.findUnique({ where: { id: LICENSE_ID } });
+  return dbGetStoredLicense(LICENSE_ID);
 }
 
 /**
@@ -177,76 +183,42 @@ async function storeLicense(
   accessToken: string,
   payload: AccessTokenPayload,
 ) {
-  await prisma.license.upsert({
-    where: { id: LICENSE_ID },
-    create: {
-      id: LICENSE_ID,
-      token: refreshToken, // refresh token (permanent)
-      instanceId: accessToken, // access token (24h)
-      plan: payload.plan,
-      org: payload.org,
-      maxAgents: payload.maxAgents,
-      maxProjects: payload.maxProjects,
-      maxSeats: payload.maxSeats,
-      features: payload.features,
-      expiresAt: new Date(payload.exp * 1000),
-      lastVerifiedAt: new Date(),
-    },
-    update: {
-      token: refreshToken,
-      instanceId: accessToken,
-      plan: payload.plan,
-      org: payload.org,
-      maxAgents: payload.maxAgents,
-      maxProjects: payload.maxProjects,
-      maxSeats: payload.maxSeats,
-      features: payload.features,
-      expiresAt: new Date(payload.exp * 1000),
-      lastVerifiedAt: new Date(),
-    },
+  await upsertLicenseRecord(LICENSE_ID, {
+    token: refreshToken,
+    instanceId: accessToken,
+    plan: payload.plan,
+    org: payload.org,
+    maxAgents: payload.maxAgents,
+    maxProjects: payload.maxProjects,
+    maxSeats: payload.maxSeats,
+    features: payload.features,
+    expiresAt: new Date(payload.exp * 1000),
+    lastVerifiedAt: new Date(),
   });
 }
 
 /** Update just the access token after a refresh */
 async function updateAccessToken(accessToken: string, payload: AccessTokenPayload) {
-  await prisma.license
-    .update({
-      where: { id: LICENSE_ID },
-      data: {
-        instanceId: accessToken,
-        plan: payload.plan,
-        org: payload.org,
-        maxAgents: payload.maxAgents,
-        maxProjects: payload.maxProjects,
-        maxSeats: payload.maxSeats,
-        features: payload.features,
-        expiresAt: new Date(payload.exp * 1000),
-        lastVerifiedAt: new Date(),
-      },
-    })
-    .catch(() => {});
+  await dbUpdateLicenseAccessToken(LICENSE_ID, {
+    instanceId: accessToken,
+    plan: payload.plan,
+    org: payload.org,
+    maxAgents: payload.maxAgents,
+    maxProjects: payload.maxProjects,
+    maxSeats: payload.maxSeats,
+    features: payload.features,
+    expiresAt: new Date(payload.exp * 1000),
+    lastVerifiedAt: new Date(),
+  });
 }
 
 export async function clearStoredLicense() {
-  await prisma.license.deleteMany({ where: { id: LICENSE_ID } });
+  await deleteLicenseRecord(LICENSE_ID);
 }
 
 /** Mark the license as revoked — clears access token so status becomes "revoked" immediately */
 async function markLicenseRevoked(reason: string) {
-  await prisma.license
-    .update({
-      where: { id: LICENSE_ID },
-      data: {
-        instanceId: null, // clear access token — no more access
-        plan: "revoked",
-        features: [],
-        maxAgents: 0,
-        maxProjects: 0,
-        maxSeats: 0,
-        expiresAt: new Date(), // expired now
-      },
-    })
-    .catch(() => {});
+  await markLicenseRecordRevoked(LICENSE_ID);
   logLicense("warn", `License marked as revoked: ${reason}`);
 }
 

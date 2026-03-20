@@ -3,7 +3,7 @@
  * and update displayName / username / avatarUrl when the agent's identity changes.
  * Called from sync_identity and heartbeat.
  */
-import { prisma } from "./prisma";
+import { prisma } from "@agentcenter/database";
 
 const PROFILE_USERNAME_MAX_LEN = 64;
 

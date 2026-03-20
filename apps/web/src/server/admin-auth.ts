@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { hash, compare } from "bcryptjs";
 import { env } from "./env";
-import { prisma } from "./prisma";
+import { getAdminUserSessionsRevokedAt, revokeAllAdminUserSessions } from "@agentcenter/database";
 
 const BCRYPT_ROUNDS = 12;
 const SESSION_DURATION = 7 * 24 * 60 * 60; // 7 days in seconds
@@ -44,10 +44,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
 
     // Check if sessions have been revoked for this user
     if (session.sub && session.iat) {
-      const admin = await prisma.adminUser.findUnique({
-        where: { id: session.sub },
-        select: { sessionsRevokedAt: true },
-      });
+      const admin = await getAdminUserSessionsRevokedAt(session.sub);
       if (admin?.sessionsRevokedAt) {
         const revokedAtSec = Math.floor(admin.sessionsRevokedAt.getTime() / 1000);
         if (session.iat < revokedAtSec) {
@@ -67,10 +64,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
  * All tokens issued before this timestamp will be rejected.
  */
 export async function revokeAllSessions(adminUserId: string): Promise<void> {
-  await prisma.adminUser.update({
-    where: { id: adminUserId },
-    data: { sessionsRevokedAt: new Date() },
-  });
+  await revokeAllAdminUserSessions(adminUserId);
 }
 
 export function getSessionCookieOptions() {

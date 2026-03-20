@@ -10,7 +10,7 @@
  * - Gateway restart if needed
  */
 
-import { prisma } from "@/server/prisma";
+import { findCloudVMForEnsure, findAgentById } from "@agentcenter/database";
 import { computeCronSchedule } from "@/server/agent-config-generator";
 import { sshExec } from "./ssh";
 import { ensureHeartbeatCron } from "./cloud-vm-cron";
@@ -40,16 +40,14 @@ interface EnsureResult {
 }
 
 export async function ensureAgentOnVM(vmId: string, agentId: string): Promise<EnsureResult> {
-  const vm = await prisma.cloudVM.findUniqueOrThrow({
-    where: { id: vmId },
-    select: { ipv4: true, sshPrivateKey: true, status: true },
-  });
+  const vm = await findCloudVMForEnsure(vmId);
 
   if (vm.status !== "running") {
     throw new Error("VM is not running");
   }
 
-  const agent = await prisma.agent.findUniqueOrThrow({ where: { id: agentId } });
+  const agent = await findAgentById(agentId);
+  if (!agent) throw new Error(`Agent ${agentId} not found`);
   const agentSlug = getAgentSlug(agent);
   const sshConfig = getVMSSHConfig(vm);
   const checks: EnsureCheck[] = [];

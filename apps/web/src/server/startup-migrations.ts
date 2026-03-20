@@ -3,7 +3,7 @@
  * Each migration is idempotent and guarded by a check so it only does real
  * work when there are rows to fix.
  */
-import { prisma } from "./prisma";
+import { prisma } from "@agentcenter/database";
 import { FLAG_KEYS } from "../lib/feature-flag-keys";
 
 /**

@@ -3,7 +3,7 @@ import { agentModel, projectModel, projectMemberModel } from "../../models";
 import { invalidateProjectsList } from "../../cache";
 import { Roles } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
-import { prisma } from "../../prisma";
+import { prisma } from "@agentcenter/database";
 import { checkLicenseLimit } from "../../license";
 
 builder.mutationField("createProject", (t) =>

@@ -4,3 +4,9 @@ export { findAgentBySlug } from "./find-by-slug";
 export { findStaleAgents, isAgentStill } from "./find-stale";
 export { getAgentPreflightStats } from "./get-preflight-stats";
 export type { AgentPreflightStats } from "./get-preflight-stats";
+export {
+  updateAgent,
+  updateAgentStatusAtomically,
+  getAgentApiKeyHash,
+  findAgentsByCurrentTaskId,
+} from "./update";

@@ -1,5 +1,5 @@
 import { builder } from "../builder";
-import { prisma } from "../../prisma";
+import { prisma } from "@agentcenter/database";
 import { taskModel, agentModel } from "../../models";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "../../pubsub";
 import { TaskStatus } from "../../constants";

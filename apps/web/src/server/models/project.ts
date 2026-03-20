@@ -1,5 +1,5 @@
 import type { Project } from "@agentcenter/database";
-import { prisma } from "../prisma";
+import { prisma } from "@agentcenter/database";
 import { emit } from "../events";
 import { EventTypes } from "../constants";
 import { Model } from "./base";

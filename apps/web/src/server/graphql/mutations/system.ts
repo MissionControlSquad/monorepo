@@ -3,7 +3,13 @@ import { builder } from "../builder";
 import { isSystemShutdown, setSystemShutdown, setProjectShutdown } from "../../system-settings";
 import { activityModel } from "../../models";
 import { pubsub, PubSubEvent } from "../../pubsub";
-import { prisma } from "../../prisma";
+import {
+  findProfileForDisplay,
+  getProjectStatus,
+  findAdminUserById,
+  updateAdminUserPassword,
+  listAdminUsers,
+} from "@agentcenter/database";
 import { verifyPassword, hashPassword, revokeAllSessions } from "../../admin-auth";
 import { createPasswordResetToken, invalidateAllResetTokens } from "../../password-reset";
 
@@ -35,12 +41,7 @@ builder.mutationField("setSystemShutdown", (t) =>
       // Log activity with who toggled it
       const profileId = ctx.session?.profileId;
       const who = profileId
-        ? ((
-            await prisma.profile.findUnique({
-              where: { id: profileId },
-              select: { displayName: true },
-            })
-          )?.displayName ?? "Someone")
+        ? ((await findProfileForDisplay(profileId))?.displayName ?? "Someone")
         : "Someone";
       const action = args.active ? "activated" : "deactivated";
       const activity = await activityModel.create({
@@ -80,17 +81,9 @@ builder.mutationField("setProjectShutdown", (t) =>
 
       const profileId = ctx.session?.profileId;
       const who = profileId
-        ? ((
-            await prisma.profile.findUnique({
-              where: { id: profileId },
-              select: { displayName: true },
-            })
-          )?.displayName ?? "Someone")
+        ? ((await findProfileForDisplay(profileId))?.displayName ?? "Someone")
         : "Someone";
-      const project = await prisma.project.findUnique({
-        where: { id: args.projectId },
-        select: { name: true },
-      });
+      const project = await getProjectStatus(args.projectId);
       const action = args.active ? "activated" : "deactivated";
       const activity = await activityModel.create({
         data: {
@@ -133,20 +126,14 @@ builder.mutationField("changePassword", (t) =>
         throw new GraphQLError("New password must be at least 8 characters");
       }
 
-      const admin = await prisma.adminUser.findUnique({
-        where: { id: ctx.session.sub },
-        select: { id: true, passwordHash: true },
-      });
+      const admin = await findAdminUserById(ctx.session.sub);
       if (!admin) throw new GraphQLError("Session expired. Please log in again.");
 
       const valid = await verifyPassword(args.currentPassword, admin.passwordHash);
       if (!valid) throw new GraphQLError("Current password is incorrect");
 
       const newHash = await hashPassword(args.newPassword);
-      await prisma.adminUser.update({
-        where: { id: admin.id },
-        data: { passwordHash: newHash },
-      });
+      await updateAdminUserPassword(admin.id, newHash);
 
       await revokeAllSessions(admin.id);
       await invalidateAllResetTokens(admin.id);
@@ -173,10 +160,7 @@ builder.mutationField("generatePasswordResetLink", (t) =>
     resolve: async (_root, args, ctx) => {
       if (!ctx.session?.sub) throw new GraphQLError("Authentication required");
 
-      const targetAdmin = await prisma.adminUser.findUnique({
-        where: { id: args.adminUserId },
-        select: { id: true, username: true },
-      });
+      const targetAdmin = await findAdminUserById(args.adminUserId);
       if (!targetAdmin) throw new GraphQLError("Selected admin user not found");
 
       const { plainToken, expiresAt } = await createPasswordResetToken(
@@ -212,10 +196,7 @@ builder.queryField("adminUsers", (t) =>
     resolve: async (_root, _args, ctx) => {
       if (!ctx.session?.sub) throw new GraphQLError("Authentication required");
 
-      return prisma.adminUser.findMany({
-        select: { id: true, username: true, createdAt: true },
-        orderBy: { createdAt: "asc" },
-      });
+      return listAdminUsers();
     },
   }),
 );

@@ -1,6 +1,11 @@
 import { on } from "../bus";
 import { EventTypes } from "../../constants";
-import { prisma } from "../../prisma";
+import {
+  getTaskCreatorProfile,
+  getTaskProjectId,
+  getProjectHumanUserIdsByProjectId,
+  getHumanUserIdsFromProfileIds,
+} from "@agentcenter/database";
 import { notify } from "../../services/notification";
 
 /**
@@ -8,71 +13,26 @@ import { notify } from "../../services/notification";
  * Returns null if the creator is not a human user.
  */
 async function getTaskCreatorUserId(taskId: string): Promise<string | null> {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
-    select: {
-      createdByProfile: {
-        select: { userId: true, kind: true },
-      },
-    },
-  });
-  if (!task?.createdByProfile) return null;
-  if (task.createdByProfile.kind !== "human") return null;
-  return task.createdByProfile.userId;
+  const profile = await getTaskCreatorProfile(taskId);
+  if (!profile) return null;
+  if (profile.kind !== "human") return null;
+  return profile.userId;
 }
 
 /**
  * Get all human user IDs who are members of the task's project.
  */
 async function getProjectHumanUserIds(taskId: string): Promise<string[]> {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
-    select: { projectId: true },
-  });
-  if (!task?.projectId) return [];
-
-  const members = await prisma.projectMember.findMany({
-    where: { projectId: task.projectId, status: "active" },
-    select: {
-      profile: {
-        select: { userId: true, kind: true },
-      },
-    },
-  });
-
-  return members
-    .filter((m) => m.profile.kind === "human" && m.profile.userId)
-    .map((m) => m.profile.userId!);
+  const projectId = await getTaskProjectId(taskId);
+  if (!projectId) return [];
+  return getProjectHumanUserIdsByProjectId(projectId);
 }
 
 /**
  * Get human user IDs from profile IDs.
  */
 async function getUserIdsFromProfileIds(profileIds: string[]): Promise<string[]> {
-  if (!profileIds.length) return [];
-  const profiles = await prisma.profile.findMany({
-    where: { id: { in: profileIds }, kind: "human" },
-    select: { userId: true },
-  });
-  return profiles.filter((p) => p.userId).map((p) => p.userId!);
-}
-
-/**
- * Get all human user IDs who are members of a project (by project ID directly).
- */
-async function getProjectHumanUserIdsByProjectId(projectId: string): Promise<string[]> {
-  const members = await prisma.projectMember.findMany({
-    where: { projectId, status: "active" },
-    select: {
-      profile: {
-        select: { userId: true, kind: true },
-      },
-    },
-  });
-
-  return members
-    .filter((m) => m.profile.kind === "human" && m.profile.userId)
-    .map((m) => m.profile.userId!);
+  return getHumanUserIdsFromProfileIds(profileIds);
 }
 
 function taskUrl(taskId: string, taskNumber?: number): string {

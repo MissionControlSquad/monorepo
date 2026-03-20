@@ -1,7 +1,7 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "../../../lib/feature-flag-keys";
-import { prisma } from "../../prisma";
+import { prisma } from "@agentcenter/database";
 import { pubsub, channelMessageTopic, channelReactionTopic } from "../../pubsub";
 import { assertProjectWritable } from "../../system-settings";
 import { notifyAgentChannelMembers } from "../../dm-notify";

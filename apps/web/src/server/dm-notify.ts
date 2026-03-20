@@ -1,4 +1,4 @@
-import { prisma } from "./prisma";
+import { prisma } from "@agentcenter/database";
 import { pubsub, agentStreamTopic } from "./pubsub";
 import { notify } from "./services/notification";
 

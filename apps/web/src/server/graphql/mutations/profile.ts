@@ -1,6 +1,6 @@
 import { GraphQLError } from "graphql";
 import { builder } from "../builder";
-import { prisma } from "../../prisma";
+import { prisma } from "@agentcenter/database";
 
 builder.mutationField("updateMyProfile", (t) =>
   t.prismaField({

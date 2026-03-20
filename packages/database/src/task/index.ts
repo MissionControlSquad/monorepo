@@ -4,3 +4,5 @@ export { setTaskAssignees } from "./set-assignees";
 export { softDeleteTask } from "./soft-delete";
 export { diffTaskAssignees } from "./diff-assignees";
 export { countActiveTaskAssignmentsByProfile } from "./count-active-by-profile";
+export { findTasksDueForAssignee } from "./find-due-for-assignee";
+export { getTaskCreatorProfile, getTaskProjectId } from "./get-creator-profile";

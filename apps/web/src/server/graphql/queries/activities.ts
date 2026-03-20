@@ -1,6 +1,6 @@
 import { builder } from "../builder";
 import { activityModel, agentModel } from "../../models";
-import { prisma } from "../../prisma";
+import { prisma } from "@agentcenter/database";
 import { Roles } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 import { ActivityConnectionRef } from "@agentcenter/graphql-server";

@@ -1,6 +1,6 @@
 import webpush from "web-push";
 import { env } from "../env";
-import { prisma } from "../prisma";
+import { prisma } from "@agentcenter/database";
 import { logError } from "../logger";
 
 let configured = false;

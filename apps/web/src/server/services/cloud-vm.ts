@@ -1,4 +1,4 @@
-import { prisma } from "../prisma";
+import { prisma } from "@agentcenter/database";
 import { generateApiKey } from "../api-key";
 import { randomBytes } from "crypto";
 import { computeCronSchedule } from "../agent-config-generator";

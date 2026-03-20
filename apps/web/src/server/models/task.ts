@@ -8,7 +8,7 @@ import {
 import { emit } from "../events";
 import { EventTypes } from "../constants";
 import { Model } from "./base";
-import { prisma } from "../prisma";
+import { prisma } from "@agentcenter/database";
 import type { FieldChange } from "../events/types";
 
 /**

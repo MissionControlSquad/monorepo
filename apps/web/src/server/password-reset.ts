@@ -1,5 +1,9 @@
 import { randomBytes, createHash } from "crypto";
-import { prisma } from "./prisma";
+import {
+  createPasswordResetTokenRecord,
+  consumePasswordResetTokenRecord,
+  invalidatePasswordResetTokenRecords,
+} from "@agentcenter/database";
 
 const RESET_TOKEN_PREFIX = "reset_";
 const RANDOM_BYTES = 32; // 64 hex chars
@@ -20,13 +24,11 @@ export async function createPasswordResetToken(targetAdminId: string, createdByA
   const { plainToken, hash } = generateResetToken();
   const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MINUTES * 60 * 1000);
 
-  await prisma.passwordResetToken.create({
-    data: {
-      tokenHash: hash,
-      adminUserId: targetAdminId,
-      createdById: createdByAdminId,
-      expiresAt,
-    },
+  await createPasswordResetTokenRecord({
+    tokenHash: hash,
+    adminUserId: targetAdminId,
+    createdById: createdByAdminId,
+    expiresAt,
   });
 
   return { plainToken, expiresAt };
@@ -42,24 +44,7 @@ export async function consumeResetToken(
   const hash = hashResetToken(plainToken);
   const now = new Date();
 
-  // Atomic: only update if not already used and not expired
-  const result = await prisma.passwordResetToken.updateMany({
-    where: {
-      tokenHash: hash,
-      usedAt: null,
-      expiresAt: { gt: now },
-    },
-    data: { usedAt: now },
-  });
-
-  if (result.count === 0) return null;
-
-  const token = await prisma.passwordResetToken.findUnique({
-    where: { tokenHash: hash },
-    select: { adminUserId: true },
-  });
-
-  return token ? { adminUserId: token.adminUserId } : null;
+  return consumePasswordResetTokenRecord(hash, now);
 }
 
 /**
@@ -67,11 +52,5 @@ export async function consumeResetToken(
  * Called after any password change to prevent reuse.
  */
 export async function invalidateAllResetTokens(adminUserId: string) {
-  await prisma.passwordResetToken.updateMany({
-    where: {
-      adminUserId,
-      usedAt: null,
-    },
-    data: { usedAt: new Date() },
-  });
+  await invalidatePasswordResetTokenRecords(adminUserId);
 }
