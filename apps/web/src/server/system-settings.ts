@@ -1,9 +1,15 @@
 import {
   getOrCreateSystemSettings,
   setSystemShutdownActive,
+  getOnboardingProgress as dbGetOnboardingProgress,
+  setOnboardingCategory as dbSetOnboardingCategory,
+  completeOnboarding as dbCompleteOnboarding,
+  type OnboardingProgress,
   getProjectStatus,
   setProjectShutdownActive as dbSetProjectShutdown,
 } from "@agentcenter/database";
+
+export type { OnboardingProgress };
 
 export async function isSystemShutdown(): Promise<boolean> {
   const row = await getOrCreateSystemSettings();
@@ -13,6 +19,22 @@ export async function isSystemShutdown(): Promise<boolean> {
 export async function setSystemShutdown(active: boolean): Promise<void> {
   await setSystemShutdownActive(active);
 }
+
+// ── Onboarding ────────────────────────────────────────────────────
+
+export async function getOnboardingProgress(): Promise<OnboardingProgress> {
+  return dbGetOnboardingProgress();
+}
+
+export async function setOnboardingCategory(categoryId: string): Promise<void> {
+  await dbSetOnboardingCategory(categoryId);
+}
+
+export async function completeOnboarding(): Promise<void> {
+  await dbCompleteOnboarding();
+}
+
+// ── Projects ──────────────────────────────────────────────────────
 
 export async function isProjectShutdown(projectId: string): Promise<boolean> {
   const project = await getProjectStatus(projectId);

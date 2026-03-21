@@ -68,7 +68,7 @@ export default function ActivateLicensePage() {
       }
 
       toast.success("License activated successfully");
-      router.push("/login");
+      router.push("/");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

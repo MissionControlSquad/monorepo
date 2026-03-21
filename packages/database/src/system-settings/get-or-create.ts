@@ -23,3 +23,42 @@ export async function setSystemShutdownActive(active: boolean): Promise<void> {
     update: { shutdownActive: active },
   });
 }
+
+// ── Onboarding ────────────────────────────────────────────────────
+
+export interface OnboardingProgress {
+  completed: boolean;
+  /** The selected use-case category (e.g. "solo-founder", "dev-team") */
+  categoryId: string | null;
+}
+
+export async function getOnboardingProgress(): Promise<OnboardingProgress> {
+  const row = await getOrCreateSystemSettings();
+  return {
+    completed: row.onboardingCompleted,
+    categoryId: row.onboardingCategoryId,
+  };
+}
+
+export async function setOnboardingCategory(categoryId: string): Promise<void> {
+  await prisma.systemSettings.upsert({
+    where: { id: SINGLETON_ID },
+    create: { id: SINGLETON_ID, onboardingCategoryId: categoryId },
+    update: { onboardingCategoryId: categoryId },
+  });
+}
+
+export async function completeOnboarding(): Promise<void> {
+  await prisma.systemSettings.upsert({
+    where: { id: SINGLETON_ID },
+    create: {
+      id: SINGLETON_ID,
+      onboardingCompleted: true,
+      onboardingCategoryId: null,
+    },
+    update: {
+      onboardingCompleted: true,
+      onboardingCategoryId: null,
+    },
+  });
+}

@@ -14,6 +14,7 @@ import {
   Clock,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { PushPermissionBanner } from "./PushPermissionBanner";
 
 interface Notification {
   id: string;
@@ -100,6 +101,8 @@ export function NotificationDropdown({ onClose, onMarkAllRead }: NotificationDro
           Mark all read
         </button>
       </div>
+
+      <PushPermissionBanner />
 
       <div className="max-h-96 overflow-y-auto">
         {loading && (

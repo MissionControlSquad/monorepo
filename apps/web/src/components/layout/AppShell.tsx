@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Toaster } from "sonner";
 import { Header } from "./Header";
 import { IconRail } from "./sidebar/IconRail";
@@ -14,15 +14,11 @@ import { useAgentDetail } from "../context/AgentDetailContext";
 import { useProjectDetail } from "../context/ProjectDetailContext";
 import { AgentDetailDialog } from "../agent/AgentDetailDialog";
 import { ProjectDetailDialog } from "../project/ProjectDetailDialog";
-import { OnboardingView } from "../onboarding/OnboardingView";
 import { ErrorBoundary, PanelErrorFallback } from "../common/ErrorBoundary";
 import { useTaskNavigation } from "../../hooks/useTaskNavigation";
 import { useAgentStatus } from "../context/AgentStatusContext";
 import type { Agent } from "@agentcenter/types";
 import { Button } from "../ui";
-import { PushPermissionBanner } from "../notifications/PushPermissionBanner";
-import { WhenFeatureEnabled } from "../context/FeatureFlagContext";
-import { FLAG_KEYS } from "@agentcenter/utils";
 import { KeyboardShortcutsOverlay } from "../common/KeyboardShortcutsOverlay";
 import { useGoShortcuts } from "../../hooks/useGoShortcuts";
 const CreateTaskModal = lazy(() =>
@@ -35,6 +31,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, modal }: AppShellProps) {
+  const router = useRouter();
   const openTask = useTaskNavigation();
   const { agents } = useAgentStatus();
   useGoShortcuts();
@@ -50,6 +47,11 @@ export function AppShell({ children, modal }: AppShellProps) {
   const { closeProfile: handleCloseProfile } = useProfileSidebar();
   const { openAgentId, closeAgent } = useAgentDetail();
   const { openProjectId, closeProject } = useProjectDetail();
+
+  const pathname = usePathname();
+
+  // ── Onboarding gate: fetch persisted onboarding status ──
+  const [onboardingDone, setOnboardingDone] = useState<boolean | undefined>(undefined);
 
   useEffect(() => setMounted(true), []);
 
@@ -69,6 +71,34 @@ export function AppShell({ children, modal }: AppShellProps) {
       };
     }
   }, [activityOpen]);
+
+  // Close mobile overlay on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Fetch onboarding status once on mount
+  useEffect(() => {
+    fetch("/api/onboarding")
+      .then((r) => r.json())
+      .then((d) => setOnboardingDone(d.completed ?? false))
+      .catch(() => setOnboardingDone(true)); // fail-open so the app isn't permanently locked
+  }, []);
+
+  // Derive whether we need to redirect to onboarding
+  // If agents already exist, onboarding is effectively done regardless of the DB flag
+  const hasAgents = agents !== undefined && agents.length > 0;
+  const isOnboardingOrAgentRoute =
+    pathname === "/onboarding" || pathname === "/agents" || pathname?.startsWith("/agents/");
+  const needsOnboarding =
+    onboardingDone !== undefined && !onboardingDone && !hasAgents && !isOnboardingOrAgentRoute;
+
+  // Redirect to onboarding if not completed
+  useEffect(() => {
+    if (needsOnboarding) {
+      router.push("/onboarding");
+    }
+  }, [needsOnboarding, router]);
 
   const handleNotificationClick = useCallback(
     (taskId: string) => {
@@ -109,15 +139,10 @@ export function AppShell({ children, modal }: AppShellProps) {
     setActivityOpen(false);
   }, []);
 
-  const pathname = usePathname();
+  // ── Early returns (all hooks are above) ──
 
-  // Close mobile overlay on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
-  // Show loader while agents are being fetched
-  if (agents === undefined) {
+  // Show loader while agents or onboarding status are being fetched
+  if (agents === undefined || onboardingDone === undefined) {
     return (
       <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -128,53 +153,51 @@ export function AppShell({ children, modal }: AppShellProps) {
     );
   }
 
-  // Show onboarding only when there are no agents at all (or only deactivated ones),
-  // but allow through if user is already on an agent creation/setup route
-  const isAgentRoute = pathname === "/agents" || pathname?.startsWith("/agents/");
-  const hasRelevantAgents = agents.some(
-    (a: Agent) => a.setupStatus === "active" || a.setupStatus === "pending_setup",
-  );
-  const showOnboarding = !hasRelevantAgents && !isAgentRoute;
+  if (needsOnboarding) {
+    return (
+      <div className="min-h-screen bg-muted flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-border border-t-indigo-600 rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show a "waiting" banner when all agents are pending_setup (none active yet)
   const hasActiveAgent = agents.some((a: Agent) => a.setupStatus === "active");
   const hasPendingAgent = agents.some((a: Agent) => a.setupStatus === "pending_setup");
   const showWaitingBanner = hasPendingAgent && !hasActiveAgent;
 
-  if (showOnboarding) {
-    return (
-      <>
-        <OnboardingView />
-        <Toaster position="bottom-right" richColors />
-      </>
-    );
-  }
+  const isOnboarding = pathname === "/onboarding";
 
   return (
     <div className="flex h-screen bg-muted">
       {/* Sidebar backdrop (mobile) */}
-      {mobileOpen && (
+      {mobileOpen && !isOnboarding && (
         <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={handleCloseSidebar} />
       )}
 
-      {/* Icon rail only */}
-      <aside
-        className={`
-          fixed inset-y-0 left-0 z-50
-          transition-all duration-200 ease-out
-          lg:static lg:z-50 lg:shrink-0
-          ${sidebarCollapsed ? "lg:-translate-x-full lg:w-0 lg:overflow-hidden" : "lg:translate-x-0"}
-          ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-        `}
-      >
-        <ErrorBoundary
-          fallback={({ resetErrorBoundary, error }) => (
-            <PanelErrorFallback label="Sidebar" error={error} onRetry={resetErrorBoundary} />
-          )}
+      {/* Icon rail — hidden during onboarding */}
+      {!isOnboarding && (
+        <aside
+          className={`
+            fixed inset-y-0 left-0 z-50
+            transition-all duration-200 ease-out
+            lg:static lg:z-50 lg:shrink-0
+            ${sidebarCollapsed ? "lg:-translate-x-full lg:w-0 lg:overflow-hidden" : "lg:translate-x-0"}
+            ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+          `}
         >
-          <IconRail onCreateTask={handleOpenCreateTask} />
-        </ErrorBoundary>
-      </aside>
+          <ErrorBoundary
+            fallback={({ resetErrorBoundary, error }) => (
+              <PanelErrorFallback label="Sidebar" error={error} onRetry={resetErrorBoundary} />
+            )}
+          >
+            <IconRail onCreateTask={handleOpenCreateTask} />
+          </ErrorBoundary>
+        </aside>
+      )}
 
       {/* Main column: navbar + content */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -190,22 +213,16 @@ export function AppShell({ children, modal }: AppShellProps) {
 
         <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
           {showWaitingBanner && (
-            <div className="mx-4 mt-4 px-4 py-3 bg-warning-muted border border-warning/30 rounded-lg flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-warning animate-pulse flex-shrink-0" />
-              <p className="text-sm text-warning">
+            <div className="mx-4 mt-3 mb-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-lg flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse flex-shrink-0" />
+              <p className="text-sm text-amber-700 dark:text-amber-400">
                 Waiting for agents to connect&hellip;{" "}
-                <Link
-                  href="/agents"
-                  className="font-medium text-warning underline underline-offset-2 hover:text-warning"
-                >
+                <Link href="/agents" className="font-medium underline underline-offset-2">
                   View setup instructions
                 </Link>
               </p>
             </div>
           )}
-          <WhenFeatureEnabled flag={FLAG_KEYS.NOTIFICATIONS}>
-            <PushPermissionBanner />
-          </WhenFeatureEnabled>
           <Suspense
             fallback={
               <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">

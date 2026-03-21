@@ -54,6 +54,10 @@ export const createAgentSchema = z.object({
   workspacePath: optStr(500),
 });
 
+export const batchCreateAgentSchema = z.object({
+  agents: z.array(createAgentSchema).min(1).max(20),
+});
+
 export const createTaskSchema = z.object({
   title: str(500),
   description: str(10000),
