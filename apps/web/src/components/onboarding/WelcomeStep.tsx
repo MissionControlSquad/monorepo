@@ -28,7 +28,7 @@ const HIGHLIGHTS = [
 
 export function WelcomeStep({ onNext }: WelcomeStepProps) {
   return (
-    <div className="min-h-dvh bg-muted flex flex-col items-center justify-center px-4 py-8 sm:py-12 overflow-y-auto">
+    <div className="h-dvh bg-muted flex flex-col items-center justify-center px-4 py-8 sm:py-12 overflow-y-auto">
       <div className="max-w-4xl w-full">
         {/* Hero */}
         <div className="text-center mb-8 sm:mb-12">

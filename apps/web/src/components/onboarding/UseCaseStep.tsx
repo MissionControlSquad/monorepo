@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, Users, Star } from "lucide-react";
 import { USE_CASES, type OnboardingUseCase } from "@/lib/onboarding-use-cases";
 import { TEMPLATES } from "@/lib/agent-wizard-templates";
+import { getAgentName } from "@/lib/agent-default-names";
 
 interface UseCaseStepProps {
   onSelect: (useCase: OnboardingUseCase) => void;
@@ -11,8 +12,8 @@ interface UseCaseStepProps {
 
 export function UseCaseStep({ onSelect, onBack }: UseCaseStepProps) {
   return (
-    <div className="min-h-dvh bg-muted overflow-y-auto">
-      <div className="max-w-4xl w-full mx-auto px-4 py-4 sm:py-6">
+    <div className="h-dvh bg-muted overflow-y-auto">
+      <div className="max-w-4xl w-full mx-auto px-4 py-4 sm:py-6 min-h-full">
         {/* Nav bar */}
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <button
@@ -41,41 +42,52 @@ export function UseCaseStep({ onSelect, onBack }: UseCaseStepProps) {
 
         {/* Use case cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mb-4">
-          {USE_CASES.filter((uc) => uc.id !== "custom").map((uc) => (
-            <button
-              key={uc.id}
-              onClick={() => onSelect(uc)}
-              className="text-left p-4 rounded-xl border border-border bg-background hover:border-primary/40 hover:shadow-sm transition-all group"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-xl">{uc.emoji}</span>
-                    <h3 className="font-semibold text-foreground text-sm group-hover:text-primary transition-colors">
-                      {uc.title}
-                    </h3>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed mb-2">
-                    {uc.subtitle}
-                  </p>
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70">
-                    <div className="flex gap-0.5">
-                      {uc.templateIds.map((id) => {
-                        const t = TEMPLATES.find((t) => t.id === id);
-                        return t ? (
-                          <span key={id} className="text-xs" title={t.role}>
-                            {t.emoji}
-                          </span>
-                        ) : null;
-                      })}
+          {USE_CASES.filter((uc) => uc.id !== "custom").map((uc) => {
+            const isRecommended = uc.id === "solo-founder";
+            const agentNames = uc.templateIds
+              .map((id) => {
+                const t = TEMPLATES.find((t) => t.id === id);
+                return t ? getAgentName(t.id, t.name) : null;
+              })
+              .filter(Boolean);
+
+            return (
+              <button
+                key={uc.id}
+                onClick={() => onSelect(uc)}
+                className={`text-left p-4 rounded-xl border bg-background hover:border-primary/40 hover:shadow-sm transition-all group relative ${
+                  isRecommended ? "border-primary/30 ring-1 ring-primary/10" : "border-border"
+                }`}
+              >
+                {isRecommended && (
+                  <span className="absolute -top-2.5 left-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-medium">
+                    <Star className="w-2.5 h-2.5" />
+                    Recommended
+                  </span>
+                )}
+
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-xl">{uc.emoji}</span>
+                      <h3 className="font-semibold text-foreground text-sm group-hover:text-primary transition-colors">
+                        {uc.title}
+                      </h3>
                     </div>
-                    <span className="ml-0.5">{uc.templateIds.length} agents</span>
+                    <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+                      {uc.subtitle}
+                    </p>
+
+                    {/* Agent names */}
+                    <p className="text-[11px] text-muted-foreground/60 truncate">
+                      {agentNames.join(", ")}
+                    </p>
                   </div>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground/20 group-hover:text-primary transition-colors mt-0.5 shrink-0" />
                 </div>
-                <ArrowRight className="w-4 h-4 text-muted-foreground/20 group-hover:text-primary transition-colors mt-0.5 shrink-0" />
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
 
         {/* Custom option */}

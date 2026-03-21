@@ -6,13 +6,14 @@ import { WelcomeStep } from "./WelcomeStep";
 import { UseCaseStep } from "./UseCaseStep";
 import { TeamPreviewStep, type TeamAgent } from "./TeamPreviewStep";
 import { BatchCreateStep } from "./BatchCreateStep";
+import { SuccessStep } from "./SuccessStep";
 import { TEMPLATES } from "@/lib/agent-wizard-templates";
 import { USE_CASES } from "@/lib/onboarding-use-cases";
 import { getAgentName } from "@/lib/agent-default-names";
 import type { OnboardingUseCase } from "@/lib/onboarding-use-cases";
 import { useAgentStatus } from "../context/AgentStatusContext";
 
-type Step = "welcome" | "use-case" | "preview" | "creating";
+type Step = "welcome" | "use-case" | "preview" | "creating" | "success";
 
 function nameToUsername(name: string): string {
   return name
@@ -52,6 +53,7 @@ export function OnboardingWizard() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [licenseLimit, setLicenseLimit] = useState<number | null>(null);
   const [resolved, setResolved] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
 
   const fetchLicenseLimit = useCallback(async () => {
     try {
@@ -103,14 +105,21 @@ export function OnboardingWizard() {
       });
   }, [resolved, router]);
 
+  // Fade transition helper
+  const goToStep = useCallback((next: Step) => {
+    setTransitioning(true);
+    setTimeout(() => {
+      setStep(next);
+      setTransitioning(false);
+    }, 150);
+  }, []);
+
   const handleUseCaseSelect = useCallback(
     (useCase: OnboardingUseCase) => {
-      // Custom: start with just the squad lead; other use cases get the full team
       const teamIds = useCase.id === "custom" ? ["squad-lead"] : useCase.templateIds;
       setTeam(templateIdsToTeam(teamIds));
-      setStep("preview");
+      goToStep("preview");
 
-      // Persist category selection
       fetch("/api/onboarding", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -119,20 +128,22 @@ export function OnboardingWizard() {
 
       if (licenseLimit === null) fetchLicenseLimit();
     },
-    [router, licenseLimit, fetchLicenseLimit],
+    [licenseLimit, fetchLicenseLimit, goToStep],
   );
 
-  const handleBack = useCallback((to: Step) => {
-    setStep(to);
-    // Clear saved category when going back to welcome/use-case
-    if (to === "welcome" || to === "use-case") {
-      fetch("/api/onboarding", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoryId: null }),
-      }).catch(() => {});
-    }
-  }, []);
+  const handleBack = useCallback(
+    (to: Step) => {
+      goToStep(to);
+      if (to === "welcome" || to === "use-case") {
+        fetch("/api/onboarding", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ categoryId: null }),
+        }).catch(() => {});
+      }
+    },
+    [goToStep],
+  );
 
   const handleCreate = useCallback(async () => {
     setStep("creating");
@@ -163,25 +174,31 @@ export function OnboardingWizard() {
         return;
       }
 
+      // Varied timing for natural feel
       const batchResults = data.results as unknown[];
       for (let i = 0; i < batchResults.length; i++) {
         setCreatedCount(i + 1);
         if (i < batchResults.length - 1) {
-          await new Promise((r) => setTimeout(r, 400));
+          const delay = 200 + Math.random() * 400;
+          await new Promise((r) => setTimeout(r, delay));
         }
       }
 
       await fetch("/api/onboarding", { method: "POST" }).catch(() => {});
       refetchAgents();
-      router.push("/");
+      setStep("success");
     } catch {
       setCreateError("Network error. Please check your connection and try again.");
     }
-  }, [team, refetchAgents, router]);
+  }, [team, refetchAgents]);
+
+  const handleSuccessComplete = useCallback(() => {
+    router.push("/");
+  }, [router]);
 
   if (!resolved) {
     return (
-      <div className="min-h-[100dvh] bg-muted flex items-center justify-center">
+      <div className="h-dvh bg-muted flex items-center justify-center overflow-y-auto">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-border border-t-primary rounded-full animate-spin" />
           <p className="text-sm text-muted-foreground">Loading...</p>
@@ -190,33 +207,46 @@ export function OnboardingWizard() {
     );
   }
 
-  switch (step) {
-    case "welcome":
-      return <WelcomeStep onNext={() => setStep("use-case")} />;
+  const content = (() => {
+    switch (step) {
+      case "welcome":
+        return <WelcomeStep onNext={() => goToStep("use-case")} />;
 
-    case "use-case":
-      return <UseCaseStep onSelect={handleUseCaseSelect} onBack={() => handleBack("welcome")} />;
+      case "use-case":
+        return <UseCaseStep onSelect={handleUseCaseSelect} onBack={() => handleBack("welcome")} />;
 
-    case "preview":
-      return (
-        <TeamPreviewStep
-          team={team}
-          licenseLimit={licenseLimit}
-          onUpdateTeam={setTeam}
-          onBack={() => handleBack("use-case")}
-          onCreate={handleCreate}
-        />
-      );
+      case "preview":
+        return (
+          <TeamPreviewStep
+            team={team}
+            licenseLimit={licenseLimit}
+            onUpdateTeam={setTeam}
+            onBack={() => handleBack("use-case")}
+            onCreate={handleCreate}
+          />
+        );
 
-    case "creating":
-      return (
-        <BatchCreateStep
-          team={team}
-          createdCount={createdCount}
-          error={createError}
-          onRetry={createError ? handleCreate : undefined}
-          onBack={createError ? () => setStep("preview") : undefined}
-        />
-      );
-  }
+      case "creating":
+        return (
+          <BatchCreateStep
+            team={team}
+            createdCount={createdCount}
+            error={createError}
+            onRetry={createError ? handleCreate : undefined}
+            onBack={createError ? () => setStep("preview") : undefined}
+          />
+        );
+
+      case "success":
+        return <SuccessStep agentCount={team.length} onComplete={handleSuccessComplete} />;
+    }
+  })();
+
+  return (
+    <div
+      className={`transition-opacity duration-150 ${transitioning ? "opacity-0" : "opacity-100"}`}
+    >
+      {content}
+    </div>
+  );
 }

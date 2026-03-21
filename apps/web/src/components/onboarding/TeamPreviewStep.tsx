@@ -82,7 +82,7 @@ export function TeamPreviewStep({
   const editingAgent = editIndex !== null ? team[editIndex] : null;
 
   return (
-    <div className="min-h-dvh bg-muted flex flex-col">
+    <div className="h-dvh bg-muted flex flex-col overflow-hidden">
       {/* Header */}
       <div className="shrink-0 px-4 pt-4 sm:pt-6 pb-3">
         <div className="max-w-4xl w-full mx-auto">

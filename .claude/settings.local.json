@@ -58,7 +58,11 @@
       "Bash(ls:*)",
       "Bash(cat:*)",
       "Bash(find /Users/dharmikjagodana/AgentCenter/monorepo -path *src/server/models* -type f)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(psql -h 127.0.0.1 -U dharmikjagodana -d postgres -c \"SELECT pg_terminate_backend\\(pid\\) FROM pg_stat_activity WHERE datname = ''''clawd'''' AND pid <> pg_backend_pid\\(\\);\")",
+      "Bash(POSTGRES_PRISMA_URL=postgresql://dharmikjagodana@127.0.0.1:5432/clawd POSTGRES_URL_NON_POOLING=postgresql://dharmikjagodana@127.0.0.1:5432/clawd npx prisma db push --schema=packages/database/prisma/schema --accept-data-loss)"
     ]
   }
 }

@@ -30,7 +30,7 @@ export function BatchCreateStep({
   }, [createdCount]);
 
   return (
-    <div className="min-h-dvh bg-muted overflow-y-auto flex flex-col items-center justify-center px-4 py-8 sm:py-12">
+    <div className="h-dvh bg-muted overflow-y-auto flex flex-col items-center justify-center px-4 py-8 sm:py-12">
       <div className="max-w-lg w-full">
         <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-1.5 text-center">
           {error ? "Something went wrong" : "Creating your team..."}
