@@ -23,7 +23,12 @@
       "Bash(sed -i '' 's|context: ./apps/web$|context: .\\\\n          file: apps/web/Dockerfile|' \"/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo/.github/workflows/docker-publish.yaml\")",
       "Bash(BASE=\"/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo\" __NEW_LINE_243c009b9692d657__ echo \"=== packages/ overview ===\" ls \"$BASE/packages/\" __NEW_LINE_243c009b9692d657__ echo \"\" echo \"=== apps/web/src/server/graphql/ \\(should have NO types/ or generated/\\) ===\" ls \"$BASE/apps/web/src/server/graphql/\" __NEW_LINE_243c009b9692d657__ echo \"\" echo \"=== apps/web prisma gone ===\" ls \"$BASE/apps/web/\")",
       "Bash(echo '\\(no prisma dir\\)' __NEW_LINE_243c009b9692d657__ echo echo '=== Stale @prisma/client imports in apps/web/src/server/ ===' grep -rn \"from @prisma/client\\\\|from ''''@prisma/client''''\" $BASE/apps/web/src/server/)",
-      "Bash('BASE=/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo' __NEW_LINE_2f6c50b17c23e834__ echo '=== Remaining @prisma/client in apps/web/src \\(should be 0\\) ===' grep -rn \"\"@prisma/client\"\" $BASE/apps/web/src)"
+      "Bash('BASE=/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo' __NEW_LINE_2f6c50b17c23e834__ echo '=== Remaining @prisma/client in apps/web/src \\(should be 0\\) ===' grep -rn \"\"@prisma/client\"\" $BASE/apps/web/src)",
+      "Bash(pg_isready 2>&1)",
+      "Bash(brew install:*)",
+      "Bash(export PATH=\"/opt/homebrew/opt/postgresql@16/bin:$PATH\")",
+      "Bash(createdb clawd:*)",
+      "Bash(npm run:*)"
     ]
   }
 }
