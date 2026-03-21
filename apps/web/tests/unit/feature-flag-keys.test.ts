@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { FLAG_KEYS, FLAG_DEFAULTS } from "../../src/lib/feature-flag-keys";
-import type { FlagKey } from "../../src/lib/feature-flag-keys";
+import { FLAG_KEYS, FLAG_DEFAULTS } from "@agentcenter/utils";
+import type { FlagKey } from "@agentcenter/utils";
 
 describe("FLAG_KEYS", () => {
   it("contains all expected flag keys", () => {

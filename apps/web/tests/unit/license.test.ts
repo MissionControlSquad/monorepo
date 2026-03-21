@@ -19,22 +19,21 @@ vi.hoisted(() => {
   delete process.env.VITEST;
 });
 
-// ── Mock prisma ─────────────────────────────────────────────────
+// ── Mock @agentcenter/database ──────────────────────────────────
+// license.ts imports getStoredLicense, upsertLicenseRecord, deleteLicenseRecord, etc.
+// from @agentcenter/database, which internally uses prisma. We mock at the package level.
 
 const mockFindUnique = vi.fn();
 const mockUpsert = vi.fn();
 const mockDeleteMany = vi.fn();
 const mockUpdate = vi.fn();
 
-vi.mock("../../src/server/prisma", () => ({
-  prisma: {
-    license: {
-      findUnique: (...args: unknown[]) => mockFindUnique(...args),
-      upsert: (...args: unknown[]) => mockUpsert(...args),
-      deleteMany: (...args: unknown[]) => mockDeleteMany(...args),
-      update: (...args: unknown[]) => mockUpdate(...args),
-    },
-  },
+vi.mock("@agentcenter/database", () => ({
+  getStoredLicense: (...args: unknown[]) => mockFindUnique(...args),
+  upsertLicenseRecord: (...args: unknown[]) => mockUpsert(...args),
+  deleteLicenseRecord: (...args: unknown[]) => mockDeleteMany(...args),
+  updateLicenseAccessToken: (...args: unknown[]) => mockUpdate(...args),
+  markLicenseRecordRevoked: vi.fn(),
 }));
 
 // ── Mock filesystem (no real keys on disk) ──────────────────────
@@ -451,10 +450,10 @@ describe("license module", () => {
   // ── clearStoredLicense ──────────────────────────────────────
 
   describe("clearStoredLicense", () => {
-    it("calls prisma deleteMany with correct ID", async () => {
-      mockDeleteMany.mockResolvedValue({ count: 1 });
+    it("calls deleteLicenseRecord with correct ID", async () => {
+      mockDeleteMany.mockResolvedValue(undefined);
       await clearStoredLicense();
-      expect(mockDeleteMany).toHaveBeenCalledWith({ where: { id: "active" } });
+      expect(mockDeleteMany).toHaveBeenCalledWith("active");
     });
   });
 });

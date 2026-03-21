@@ -1,12 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// Mock prisma before importing the module
-vi.mock("../../src/server/prisma", () => ({
-  prisma: {
-    featureFlag: {
-      findMany: vi.fn(),
-    },
-  },
+// Mock @agentcenter/database — feature-flags.ts imports listAllFeatureFlags from it
+const mockListAllFeatureFlags = vi.fn();
+
+vi.mock("@agentcenter/database", () => ({
+  listAllFeatureFlags: (...args: unknown[]) => mockListAllFeatureFlags(...args),
 }));
 
 // Mock the license module — in tests, all features are licensed
@@ -14,15 +12,12 @@ vi.mock("../../src/server/license", () => ({
   isFeatureLicensed: vi.fn().mockResolvedValue(true),
 }));
 
-import { prisma } from "../../src/server/prisma";
 import {
   getFeatureFlags,
   isFeatureEnabled,
   getAllFlags,
   invalidateFlagCache,
 } from "../../src/server/feature-flags";
-
-const mockFindMany = prisma.featureFlag.findMany as ReturnType<typeof vi.fn>;
 
 const sampleFlags = [
   { key: "channels", enabled: true, managedBy: "system" as const, description: "Channels" },
@@ -34,8 +29,8 @@ describe("feature-flags server module", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     invalidateFlagCache();
-    mockFindMany.mockReset();
-    mockFindMany.mockResolvedValue(sampleFlags);
+    mockListAllFeatureFlags.mockReset();
+    mockListAllFeatureFlags.mockResolvedValue(sampleFlags);
   });
 
   afterEach(() => {
@@ -45,7 +40,7 @@ describe("feature-flags server module", () => {
   describe("getFeatureFlags", () => {
     it("fetches flags from database on first call", async () => {
       const flags = await getFeatureFlags();
-      expect(mockFindMany).toHaveBeenCalledOnce();
+      expect(mockListAllFeatureFlags).toHaveBeenCalledOnce();
       expect(flags.size).toBe(3);
       expect(flags.get("channels")?.enabled).toBe(true);
       expect(flags.get("cloud_vms")?.enabled).toBe(false);
@@ -55,17 +50,17 @@ describe("feature-flags server module", () => {
       await getFeatureFlags();
       await getFeatureFlags();
       await getFeatureFlags();
-      expect(mockFindMany).toHaveBeenCalledOnce();
+      expect(mockListAllFeatureFlags).toHaveBeenCalledOnce();
     });
 
     it("refreshes cache after TTL expires", async () => {
       await getFeatureFlags();
-      expect(mockFindMany).toHaveBeenCalledOnce();
+      expect(mockListAllFeatureFlags).toHaveBeenCalledOnce();
 
       vi.advanceTimersByTime(61_000); // past the 60s TTL
 
       await getFeatureFlags();
-      expect(mockFindMany).toHaveBeenCalledTimes(2);
+      expect(mockListAllFeatureFlags).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -100,19 +95,19 @@ describe("feature-flags server module", () => {
   describe("invalidateFlagCache", () => {
     it("forces a refresh on next access", async () => {
       await getFeatureFlags();
-      expect(mockFindMany).toHaveBeenCalledOnce();
+      expect(mockListAllFeatureFlags).toHaveBeenCalledOnce();
 
       invalidateFlagCache();
 
       await getFeatureFlags();
-      expect(mockFindMany).toHaveBeenCalledTimes(2);
+      expect(mockListAllFeatureFlags).toHaveBeenCalledTimes(2);
     });
 
     it("picks up new data after invalidation", async () => {
       await getFeatureFlags();
 
       // Update mock to return different data
-      mockFindMany.mockResolvedValue([
+      mockListAllFeatureFlags.mockResolvedValue([
         { key: "channels", enabled: false, managedBy: "system", description: "Channels" },
       ]);
 

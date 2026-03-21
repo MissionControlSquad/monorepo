@@ -10,6 +10,9 @@ jobs:
   unit-no-db:
     name: Unit (no DB)
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PRISMA_URL: "postgresql://unused:unused@localhost:5432/unused"
+      POSTGRES_URL_NON_POOLING: "postgresql://unused:unused@localhost:5432/unused"
     steps:
       - uses: actions/checkout@v4
 
