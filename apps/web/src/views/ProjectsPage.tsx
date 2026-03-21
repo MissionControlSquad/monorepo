@@ -8,7 +8,7 @@ import { FolderKanban, Plus, Search } from "lucide-react";
 import { ProjectCard } from "../components/project/ProjectCard";
 import { CreateProjectModal } from "../components/project/CreateProjectModal";
 import { Breadcrumbs, Button, Input, EmptyState, SkeletonList, PageLayout } from "../components/ui";
-import type { Project } from "../lib/types";
+import type { Project } from "@agentcenter/types";
 
 export function ProjectsPage() {
   const router = useRouter();

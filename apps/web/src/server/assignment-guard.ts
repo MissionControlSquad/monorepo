@@ -1,5 +1,5 @@
 import { agentModel } from "./models";
-import { prisma } from "./prisma";
+import { findProfilesWithAgentId, findAgentsUnavailableByIds } from "@agentcenter/database";
 import { isSystemShutdown, isProjectShutdown } from "./system-settings";
 
 /**
@@ -84,19 +84,13 @@ export async function filterAvailableAssignees(
 ): Promise<{ profileId: string }[]> {
   if (assignees.length === 0) return assignees;
 
-  const profiles = await prisma.profile.findMany({
-    where: { id: { in: assignees.map((a) => a.profileId) } },
-    select: { id: true, agentId: true },
-  });
+  const profiles = await findProfilesWithAgentId(assignees.map((a) => a.profileId));
 
   const agentIds = profiles.map((p) => p.agentId).filter((id): id is string => id != null);
 
   if (agentIds.length === 0) return assignees;
 
-  const unavailable = await prisma.agent.findMany({
-    where: { id: { in: agentIds }, ...UNAVAILABLE_AGENT_WHERE },
-    select: { id: true },
-  });
+  const unavailable = await findAgentsUnavailableByIds(agentIds, UNAVAILABLE_AGENT_WHERE);
   const unavailableIds = new Set(unavailable.map((a) => a.id));
 
   const blockedProfileIds = new Set(

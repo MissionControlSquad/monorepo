@@ -9,7 +9,7 @@ import { log } from "../../../_lib/logger";
 import { assertProjectMember } from "../../../_lib/project-access";
 import { isSystemShutdown } from "@/server/system-settings";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@/lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 type RouteContext = { params: Promise<{ id: string }> };
 

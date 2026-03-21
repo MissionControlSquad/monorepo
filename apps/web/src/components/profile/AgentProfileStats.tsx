@@ -3,7 +3,7 @@
 import { useQuery } from "urql";
 import { AGENT_PROFILE_STATS_QUERY } from "../../lib/graphql/queries";
 import { CheckCircle2, FileText, Clock, ListChecks, ClipboardList } from "lucide-react";
-import { formatDuration } from "../../lib/formatDuration";
+import { formatDuration } from "@agentcenter/utils";
 import { Card, CardSkeleton } from "../ui";
 
 interface AgentProfileStatsProps {

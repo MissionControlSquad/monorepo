@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { Breadcrumbs, Button } from "@/components/ui";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
-import { FLAG_KEYS } from "@/lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import Link from "next/link";
 import { useMutation } from "urql";
 import { SET_AGENT_ACTIVATION, SET_AGENT_VACATION } from "../lib/graphql/mutations/agents";

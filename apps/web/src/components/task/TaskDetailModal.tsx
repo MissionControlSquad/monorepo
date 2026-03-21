@@ -74,7 +74,7 @@ import type {
   TaskListItem,
   TaskStatus,
   Priority,
-} from "@/lib/types";
+} from "@agentcenter/types";
 
 interface TaskDetailModalProps {
   task: TaskDetail | null;

@@ -1,4 +1,4 @@
-import { prisma } from "@/server/prisma";
+import { listCloudVMs } from "@agentcenter/database";
 import { createCloudVM } from "@/server/services/cloud-vm";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
 import { validateBody, createCloudVMSchema } from "../_lib/validation";
@@ -10,16 +10,7 @@ import { apiLimiters, checkRateLimit } from "../_lib/rate-limit-check";
  */
 export async function GET() {
   try {
-    const vms = await prisma.cloudVM.findMany({
-      where: { status: { notIn: ["destroyed"] } },
-      include: {
-        agents: {
-          select: { id: true, name: true, identityEmoji: true, username: true, status: true },
-        },
-        _count: { select: { agents: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const vms = await listCloudVMs();
 
     return successResponse({ vms });
   } catch (err) {

@@ -4,7 +4,7 @@ import RelayPlugin from "@pothos/plugin-relay";
 import SimpleObjectsPlugin from "@pothos/plugin-simple-objects";
 import type PrismaTypes from "./generated/pothos-types";
 import { getDatamodel } from "./generated/pothos-types";
-import { prisma } from "@agentcenter/database";
+import { prisma } from "@agentcenter/database/client";
 import type { YogaInitialContext } from "graphql-yoga";
 
 /** Token payload stored in the mc_session JWT cookie. */

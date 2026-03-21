@@ -26,15 +26,10 @@ export async function resolveUserId(
 ): Promise<{ userId: string; session: SessionPayload }> {
   const session = await resolveSession(request);
 
-  // Import prisma lazily to avoid circular dependency issues
-  const { prisma } = await import("@/server/prisma");
+  const { getAdminUserUserId } = await import("@agentcenter/database");
 
-  const admin = await prisma.adminUser.findUnique({
-    where: { id: session.sub },
-    select: { userId: true },
-  });
+  const userId = await getAdminUserUserId(session.sub);
+  if (!userId) throw { error: "User account not found", status: 404 };
 
-  if (!admin?.userId) throw { error: "User account not found", status: 404 };
-
-  return { userId: admin.userId, session };
+  return { userId, session };
 }

@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useQuery } from "urql";
-import { AGENTS_QUERY } from "../../src/lib/graphql/queries";
+import { useRouter } from "expo-router";
+import { AGENTS_QUERY } from "@agentcenter/graphql-client";
 
 interface Agent {
   id: string;
@@ -72,6 +73,7 @@ function isOnline(agent: Agent): boolean {
 }
 
 export default function AgentsScreen() {
+  const router = useRouter();
   const [result, reexecute] = useQuery<{ agents: Agent[] }>({
     query: AGENTS_QUERY,
     requestPolicy: "cache-and-network",
@@ -89,9 +91,12 @@ export default function AgentsScreen() {
   }
 
   if (error && agents.length === 0) {
+    const msg = error.networkError?.message ?? error.graphQLErrors?.[0]?.message ?? error.message;
+    console.error("[AgentsScreen] urql error:", error);
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>Failed to load agents</Text>
+        <Text style={[styles.errorText, { fontSize: 12, marginTop: 4 }]} numberOfLines={4}>{msg}</Text>
         <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
@@ -104,6 +109,7 @@ export default function AgentsScreen() {
       <FlatList
         data={agents}
         keyExtractor={(item) => item.id}
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={agents.length === 0 ? styles.emptyContainer : styles.listContent}
         refreshControl={
           <RefreshControl
@@ -117,7 +123,11 @@ export default function AgentsScreen() {
           const online = isOnline(item);
           const statusColor = getStatusColor(item);
           return (
-            <View style={styles.card}>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => router.push(`/agent/${item.id}`)}
+              activeOpacity={0.7}
+            >
               <View style={styles.cardLeft}>
                 <View style={styles.emojiContainer}>
                   <Text style={styles.emoji}>{item.identityEmoji ?? "🤖"}</Text>
@@ -156,7 +166,7 @@ export default function AgentsScreen() {
                 </View>
                 <Text style={styles.levelText}>{item.level}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
       />

@@ -1,7 +1,17 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS } from "../../../lib/feature-flag-keys";
-import { prisma, notDeleted } from "../../prisma";
+import { FLAG_KEYS } from "@agentcenter/utils";
+import {
+  getAgentTasksAssignedRaw,
+  getAgentTasksCompletedRaw,
+  getAgentDeliverablesRaw,
+  getAgentWorkTimeRaw,
+  getAgentQueueStatsRaw,
+  getAgentWorkloadRaw,
+  getAgentActivityHeatmapRaw,
+  getActivityTrendRaw,
+  notDeleted,
+} from "@agentcenter/database";
 import { agentModel, activityModel } from "../../models";
 import { taskModel } from "../../models/task";
 import {
@@ -248,85 +258,11 @@ builder.queryField("agentProductivity", (t) =>
       const [agents, assignedRows, completedRows, deliverableRows, workTimeRows, queueRows] =
         await Promise.all([
           agentModel.findMany({ select: { id: true, name: true } }),
-
-          // Tasks assigned per agent (join profiles to resolve profileId → agentId)
-          projectId
-            ? (prisma.$queryRaw`
-                SELECT p."agentId", COUNT(*)::int AS count
-                FROM task_assignees ta
-                JOIN profiles p ON p.id = ta."profileId"
-                JOIN tasks t ON t.id = ta."taskId"
-                WHERE t."projectId" = ${projectId} AND t."deletedAt" IS NULL AND p."agentId" IS NOT NULL
-                GROUP BY p."agentId"
-              ` as Promise<{ agentId: string; count: number }[]>)
-            : (prisma.$queryRaw`
-                SELECT p."agentId", COUNT(*)::int AS count
-                FROM task_assignees ta
-                JOIN profiles p ON p.id = ta."profileId"
-                JOIN tasks t ON t.id = ta."taskId"
-                WHERE t."deletedAt" IS NULL AND p."agentId" IS NOT NULL
-                GROUP BY p."agentId"
-              ` as Promise<{ agentId: string; count: number }[]>),
-
-          // Tasks completed per agent
-          projectId
-            ? (prisma.$queryRaw`
-                SELECT p."agentId", COUNT(*)::int AS count
-                FROM task_assignees ta
-                JOIN profiles p ON p.id = ta."profileId"
-                JOIN tasks t ON t.id = ta."taskId"
-                WHERE t.status = 'done' AND t."projectId" = ${projectId} AND t."deletedAt" IS NULL AND p."agentId" IS NOT NULL
-                GROUP BY p."agentId"
-              ` as Promise<{ agentId: string; count: number }[]>)
-            : (prisma.$queryRaw`
-                SELECT p."agentId", COUNT(*)::int AS count
-                FROM task_assignees ta
-                JOIN profiles p ON p.id = ta."profileId"
-                JOIN tasks t ON t.id = ta."taskId"
-                WHERE t.status = 'done' AND t."deletedAt" IS NULL AND p."agentId" IS NOT NULL
-                GROUP BY p."agentId"
-              ` as Promise<{ agentId: string; count: number }[]>),
-
-          // Deliverables per agent (join profiles to resolve profileId → agentId)
-          projectId
-            ? (prisma.$queryRaw`
-                SELECT p."agentId", COUNT(*)::int AS count
-                FROM deliverables d
-                JOIN profiles p ON p.id = d."profileId"
-                WHERE d."projectId" = ${projectId} AND p."agentId" IS NOT NULL
-                GROUP BY p."agentId"
-              ` as Promise<{ agentId: string; count: number }[]>)
-            : (prisma.$queryRaw`
-                SELECT p."agentId", COUNT(*)::int AS count
-                FROM deliverables d
-                JOIN profiles p ON p.id = d."profileId"
-                WHERE p."agentId" IS NOT NULL
-                GROUP BY p."agentId"
-              ` as Promise<{ agentId: string; count: number }[]>),
-
-          // Total work time per agent
-          projectId
-            ? (prisma.$queryRaw`
-                SELECT "agentId", COALESCE(SUM(duration), 0)::int AS total_ms
-                FROM work_sessions
-                WHERE "eventType" IN ('started', 'continued') AND "projectId" = ${projectId}
-                GROUP BY "agentId"
-              ` as Promise<{ agentId: string; total_ms: number }[]>)
-            : (prisma.$queryRaw`
-                SELECT "agentId", COALESCE(SUM(duration), 0)::int AS total_ms
-                FROM work_sessions
-                WHERE "eventType" IN ('started', 'continued')
-                GROUP BY "agentId"
-              ` as Promise<{ agentId: string; total_ms: number }[]>),
-
-          // Queue total + completed per agent
-          prisma.$queryRaw`
-            SELECT "agentId",
-              COUNT(*)::int AS total,
-              COUNT(*) FILTER (WHERE status = 'completed')::int AS done
-            FROM agent_queue_items
-            GROUP BY "agentId"
-          ` as Promise<{ agentId: string; total: number; done: number }[]>,
+          getAgentTasksAssignedRaw(projectId),
+          getAgentTasksCompletedRaw(projectId),
+          getAgentDeliverablesRaw(projectId),
+          getAgentWorkTimeRaw(projectId),
+          getAgentQueueStatsRaw(),
         ]);
 
       // Build lookup maps
@@ -384,23 +320,7 @@ builder.queryField("agentWorkloadDistribution", (t) =>
       // 2 queries instead of N+1
       const [agents, statusRows] = await Promise.all([
         agentModel.findMany({ select: { id: true, name: true } }),
-        projectId
-          ? (prisma.$queryRaw`
-              SELECT p."agentId", t.status, COUNT(*)::int AS count
-              FROM task_assignees ta
-              JOIN profiles p ON p.id = ta."profileId"
-              JOIN tasks t ON t.id = ta."taskId"
-              WHERE t."projectId" = ${projectId} AND t."deletedAt" IS NULL AND p."agentId" IS NOT NULL
-              GROUP BY p."agentId", t.status
-            ` as Promise<{ agentId: string; status: string; count: number }[]>)
-          : (prisma.$queryRaw`
-              SELECT p."agentId", t.status, COUNT(*)::int AS count
-              FROM task_assignees ta
-              JOIN profiles p ON p.id = ta."profileId"
-              JOIN tasks t ON t.id = ta."taskId"
-              WHERE t."deletedAt" IS NULL AND p."agentId" IS NOT NULL
-              GROUP BY p."agentId", t.status
-            ` as Promise<{ agentId: string; status: string; count: number }[]>),
+        getAgentWorkloadRaw(projectId),
       ]);
 
       // Build nested map: agentId -> status -> count
@@ -504,23 +424,7 @@ builder.queryField("agentActivityHeatmap", (t) =>
       const since = new Date();
       since.setDate(since.getDate() - daysBack);
 
-      const rows = args.projectId
-        ? await (prisma.$queryRaw`
-            SELECT EXTRACT(DOW FROM "timestamp" AT TIME ZONE 'UTC')::int AS dow,
-                   EXTRACT(HOUR FROM "timestamp" AT TIME ZONE 'UTC')::int AS hour,
-                   COUNT(*)::int AS count
-            FROM agent_actions
-            WHERE "timestamp" >= ${since} AND "projectId" = ${args.projectId}
-            GROUP BY dow, hour
-          ` as Promise<{ dow: number; hour: number; count: number }[]>)
-        : await (prisma.$queryRaw`
-            SELECT EXTRACT(DOW FROM "timestamp" AT TIME ZONE 'UTC')::int AS dow,
-                   EXTRACT(HOUR FROM "timestamp" AT TIME ZONE 'UTC')::int AS hour,
-                   COUNT(*)::int AS count
-            FROM agent_actions
-            WHERE "timestamp" >= ${since}
-            GROUP BY dow, hour
-          ` as Promise<{ dow: number; hour: number; count: number }[]>);
+      const rows = await getAgentActivityHeatmapRaw(since, args.projectId);
 
       // Postgres DOW: 0=Sun, 1=Mon ... 6=Sat → remap to 0=Mon ... 6=Sun
       const result = rows.map((r) => ({
@@ -555,19 +459,7 @@ builder.queryField("activityTrend", (t) =>
 
       // Use database-level aggregation to avoid the previous 5,000 record cap
       // that silently undercounted older days when activity was high.
-      const dayCounts = args.projectId
-        ? await (prisma.$queryRaw`
-            SELECT DATE("timestamp" AT TIME ZONE 'UTC') AS day, COUNT(*)::int AS count
-            FROM agent_actions
-            WHERE "timestamp" >= ${since} AND "projectId" = ${args.projectId}
-            GROUP BY day
-          ` as Promise<{ day: Date; count: number }[]>)
-        : await (prisma.$queryRaw`
-            SELECT DATE("timestamp" AT TIME ZONE 'UTC') AS day, COUNT(*)::int AS count
-            FROM agent_actions
-            WHERE "timestamp" >= ${since}
-            GROUP BY day
-          ` as Promise<{ day: Date; count: number }[]>);
+      const dayCounts = await getActivityTrendRaw(since, args.projectId);
 
       const dayCountMap = new Map<string, number>();
       for (const row of dayCounts) {

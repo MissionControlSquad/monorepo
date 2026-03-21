@@ -1,4 +1,9 @@
-import { prisma } from "./prisma";
+import {
+  findRecurringTaskOrThrow,
+  findDueRecurringTasks,
+  advanceRecurringTaskDueAt,
+  getProjectStatus,
+} from "@agentcenter/database";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "./pubsub";
 import { addDays, addWeeks, addMonths } from "date-fns";
 import { taskModel } from "./models/task";
@@ -270,16 +275,10 @@ export async function triggerRecurringTaskNow(recurringTaskId: string): Promise<
     throw new Error("System is in shutdown mode. Cannot trigger recurring tasks.");
   }
 
-  const rt = await prisma.recurringTask.findUniqueOrThrow({
-    where: { id: recurringTaskId },
-    include: { assignees: true },
-  });
+  const rt = await findRecurringTaskOrThrow(recurringTaskId);
 
   if (rt.projectId) {
-    const project = await prisma.project.findUnique({
-      where: { id: rt.projectId },
-      select: { status: true, shutdownActive: true },
-    });
+    const project = await getProjectStatus(rt.projectId);
     if (project?.status === "archived") {
       throw new Error("This project is archived. Cannot trigger recurring tasks.");
     }
@@ -320,13 +319,7 @@ export async function triggerRecurringTaskNow(recurringTaskId: string): Promise<
     nextDue = calculateNextDueDate(config, nextDue, timezone);
   }
 
-  await prisma.recurringTask.update({
-    where: { id: rt.id },
-    data: {
-      nextDueAt: nextDue,
-      lastGeneratedAt: now,
-    },
-  });
+  await advanceRecurringTaskDueAt(rt.id, nextDue, now);
 
   // Emit events
   await taskModel.emitCreated(task, {
@@ -365,12 +358,7 @@ export async function generateRecurringTasks(opts?: { projectId?: string }): Pro
     where.projectId = opts.projectId;
   }
 
-  const recurringTasks = await prisma.recurringTask.findMany({
-    where,
-    include: {
-      assignees: true,
-    },
-  });
+  const recurringTasks = await findDueRecurringTasks(where);
 
   if (recurringTasks.length === 0) return 0;
 
@@ -408,13 +396,7 @@ export async function generateRecurringTasks(opts?: { projectId?: string }): Pro
       nextDue = calculateNextDueDate(config, nextDue, timezone);
     }
 
-    await prisma.recurringTask.update({
-      where: { id: rt.id },
-      data: {
-        nextDueAt: nextDue,
-        lastGeneratedAt: now,
-      },
-    });
+    await advanceRecurringTaskDueAt(rt.id, nextDue, now);
 
     // Emit events
     await taskModel.emitCreated(task, {

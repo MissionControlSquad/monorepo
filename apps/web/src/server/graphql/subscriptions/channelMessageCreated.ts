@@ -1,5 +1,5 @@
 import { builder } from "../builder";
-import { prisma } from "../../prisma";
+import { getChannelMessageWithQuery } from "@agentcenter/database";
 import { pubsub, channelMessageTopic } from "../../pubsub";
 
 builder.subscriptionField("channelMessageCreated", (t) =>
@@ -11,12 +11,11 @@ builder.subscriptionField("channelMessageCreated", (t) =>
     },
     subscribe: (_root, args) => pubsub.subscribe(channelMessageTopic(args.channelId)),
     resolve: async (query, payload) => {
-      const message = await prisma.channelMessage.findUnique({
-        ...query,
-        where: { id: payload.messageId },
-      });
-      if (!message) return null as any;
-      return message;
+      try {
+        return await getChannelMessageWithQuery(payload.messageId, query);
+      } catch {
+        return null as any;
+      }
     },
   }),
 );

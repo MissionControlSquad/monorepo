@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/server/prisma";
+import { findAdminUserByUsername } from "@agentcenter/database";
 import {
   verifyPassword,
   createSessionToken,
@@ -37,9 +37,7 @@ export async function POST(request: Request) {
   const { username, password } = result.data;
 
   const normalizedUsername = username.trim().toLowerCase();
-  const admin = await prisma.adminUser.findUnique({
-    where: { username: normalizedUsername },
-  });
+  const admin = await findAdminUserByUsername(normalizedUsername);
 
   if (!admin) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });

@@ -10,7 +10,7 @@ import { X, CheckCircle2, Circle, Clock, AlertCircle, SkipForward, Play } from "
 import { TimeAgo } from "../common/TimeAgo";
 import { Button, Badge, Input } from "../ui";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
-import type { Agent, AgentQueueItem } from "@/lib/types";
+import type { Agent, AgentQueueItem } from "@agentcenter/types";
 
 interface AgentQueueDialogProps {
   agentId: string | null;

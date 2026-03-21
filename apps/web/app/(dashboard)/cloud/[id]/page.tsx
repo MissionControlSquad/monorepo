@@ -1,5 +1,5 @@
 import { FeatureGate } from "@/components/common/FeatureGate";
-import { FLAG_KEYS } from "@/lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { CloudVMDetailPage } from "@/views/CloudVMDetailPage";
 
 export default async function CloudVMDetail({ params }: { params: Promise<{ id: string }> }) {

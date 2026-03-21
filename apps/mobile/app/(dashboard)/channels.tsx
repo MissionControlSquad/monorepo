@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useQuery } from "urql";
 import { useRouter } from "expo-router";
-import { CHANNELS_QUERY } from "../../src/lib/graphql/queries";
+import { CHANNELS_QUERY } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 
 interface ChannelMember {
@@ -81,6 +81,7 @@ export default function ChannelsScreen() {
       <FlatList
         data={channels}
         keyExtractor={(item) => item.id}
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={channels.length === 0 ? styles.emptyContainer : styles.listContent}
         refreshControl={
           <RefreshControl

@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/shadcn/select";
-import type { Activity as ActivityType } from "../../lib/types";
+import type { Activity as ActivityType } from "@agentcenter/types";
 
 const PAGE_SIZE = 30;
 

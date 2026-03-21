@@ -1,12 +1,12 @@
 import type { Agent } from "@agentcenter/database";
-import { prisma } from "../prisma";
+import { agentDelegate } from "@agentcenter/database";
 import { emit } from "../events";
 import { EventTypes } from "../constants";
 import { Model } from "./base";
 
 class AgentModel extends Model<Agent> {
   constructor() {
-    super(() => prisma.agent);
+    super(agentDelegate);
   }
 
   async emitJoined(agent: Pick<Agent, "id" | "name">) {

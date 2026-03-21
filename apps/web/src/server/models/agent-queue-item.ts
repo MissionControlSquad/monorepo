@@ -1,12 +1,12 @@
 import type { AgentQueueItem } from "@agentcenter/database";
-import { prisma } from "../prisma";
+import { agentQueueItemDelegate } from "@agentcenter/database";
 import { emit } from "../events";
 import { EventTypes } from "../constants";
 import { Model } from "./base";
 
 class AgentQueueItemModel extends Model<AgentQueueItem> {
   constructor() {
-    super(() => prisma.agentQueueItem);
+    super(agentQueueItemDelegate);
   }
 
   async emitItemCreated(

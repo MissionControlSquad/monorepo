@@ -2,7 +2,7 @@ import { builder } from "../builder";
 import { projectModel, projectDocModel, projectDocRevisionModel } from "../../models";
 import { invalidateProjectContext } from "../../cache";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS } from "../../../lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 builder.mutationField("createProjectDoc", (t) =>
   t.prismaField({

@@ -7,7 +7,7 @@ import { ACTIVITY_CREATED_SUBSCRIPTION } from "../../lib/graphql/subscriptions";
 import { Coffee } from "lucide-react";
 import { ActivityItem } from "../layout/ActivityFeed";
 import { Card, SkeletonList } from "../ui";
-import type { Activity } from "@/lib/types";
+import type { Activity } from "@agentcenter/types";
 
 interface AgentActivityTimelineProps {
   agentId: string;

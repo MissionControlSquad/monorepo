@@ -23,7 +23,7 @@ import { StatusDot } from "../../agent/AgentStatusBadge";
 import { useAgentStatus } from "../../context/AgentStatusContext";
 import { AGENT_DETAILED_STATUSES, type AgentDetailedStatus } from "../../../lib/constants";
 import { ProfileAvatar } from "../../ui/ProfileAvatar";
-import type { Agent, WorkSummary, StatusHistoryEntry } from "@/lib/types";
+import type { Agent, WorkSummary, StatusHistoryEntry } from "@agentcenter/types";
 
 export function useWorkTimer(taskId: string | undefined) {
   const [workSummaryResult] = useQuery({

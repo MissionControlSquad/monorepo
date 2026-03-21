@@ -1,5 +1,5 @@
 import { agentModel } from "@/server/models";
-import { prisma } from "@/server/prisma";
+import { listRunningCloudVMsWithAgents } from "@agentcenter/database";
 import { getTemplate } from "@/server/agent-templates";
 import {
   generateAgentConfig,
@@ -69,21 +69,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     });
 
     // Fetch available cloud VMs for the "Deploy to VM" option
-    const cloudVms = await prisma.cloudVM.findMany({
-      where: { status: "running" },
-      select: {
-        id: true,
-        name: true,
-        region: true,
-        serverType: true,
-        ipv4: true,
-        agents: {
-          select: { id: true, name: true, identityEmoji: true, username: true, role: true },
-          orderBy: { name: "asc" },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const cloudVms = await listRunningCloudVMsWithAgents();
 
     return successResponse({
       agent: {

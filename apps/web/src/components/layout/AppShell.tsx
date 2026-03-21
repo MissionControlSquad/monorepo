@@ -18,11 +18,11 @@ import { OnboardingView } from "../onboarding/OnboardingView";
 import { ErrorBoundary, PanelErrorFallback } from "../common/ErrorBoundary";
 import { useTaskNavigation } from "../../hooks/useTaskNavigation";
 import { useAgentStatus } from "../context/AgentStatusContext";
-import type { Agent } from "../../lib/types";
+import type { Agent } from "@agentcenter/types";
 import { Button } from "../ui";
 import { PushPermissionBanner } from "../notifications/PushPermissionBanner";
 import { WhenFeatureEnabled } from "../context/FeatureFlagContext";
-import { FLAG_KEYS } from "../../lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { KeyboardShortcutsOverlay } from "../common/KeyboardShortcutsOverlay";
 import { useGoShortcuts } from "../../hooks/useGoShortcuts";
 const CreateTaskModal = lazy(() =>

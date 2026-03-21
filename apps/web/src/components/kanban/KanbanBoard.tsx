@@ -19,7 +19,7 @@ import { FilterSidebar } from "./FilterSidebar";
 import { Columns3, LayoutList } from "lucide-react";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { Card } from "../ui";
-import type { TaskCard as TaskCardType, TaskAssignee } from "@/lib/types";
+import type { TaskCard as TaskCardType, TaskAssignee } from "@agentcenter/types";
 
 const DndBoardWrapper = lazy(() => import("./DndBoardWrapper"));
 

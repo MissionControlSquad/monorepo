@@ -14,7 +14,7 @@ import { AGENTS_QUERY, AGENT_LATEST_TRANSITIONS_QUERY } from "../../lib/graphql/
 import { AGENT_STATUS_CHANGED_SUBSCRIPTION } from "../../lib/graphql/subscriptions";
 import { HEARTBEAT_TIMEOUT_MS } from "../../lib/constants";
 import { formatTimeAgo } from "../common/TimeAgo";
-import type { Agent, StatusHistoryEntry } from "../../lib/types";
+import type { Agent, StatusHistoryEntry } from "@agentcenter/types";
 
 export interface OnlineInfo {
   isOnline: boolean;

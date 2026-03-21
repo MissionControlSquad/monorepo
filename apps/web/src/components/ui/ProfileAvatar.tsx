@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { useMentionData } from "../context/MentionDataContext";
-import { getAssetUrl } from "@/lib/asset-url";
+import { getAssetUrl } from "@agentcenter/utils";
 
 const SIZE_CLASSES = {
   "2xs": "w-4 h-4",

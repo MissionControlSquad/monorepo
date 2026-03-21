@@ -8,7 +8,7 @@ import { validateBody, createQueueItemSchema } from "../_lib/validation";
 import { log } from "../_lib/logger";
 import { isSystemShutdown } from "@/server/system-settings";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@/lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 export async function GET(request: Request) {
   try {

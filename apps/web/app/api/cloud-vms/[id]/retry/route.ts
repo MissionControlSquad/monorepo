@@ -1,4 +1,4 @@
-import { prisma } from "@/server/prisma";
+import { findCloudVMRaw, retryCloudVMProvisioning, logCloudVMEvent } from "@agentcenter/database";
 import { provisionVM } from "@/server/services/cloud-vm";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 
@@ -10,7 +10,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
 
-    const vm = await prisma.cloudVM.findUnique({ where: { id } });
+    const vm = await findCloudVMRaw(id);
     if (!vm) {
       return errorResponse("VM not found", 404);
     }
@@ -24,24 +24,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     }
 
     // Reset status and fire-and-forget provisioning
-    await prisma.cloudVM.update({
-      where: { id },
-      data: {
-        status: "provisioning",
-        errorMessage: null,
-        errorAt: null,
-        setupStep: "retrying",
-        setupProgress: 5,
-      },
-    });
-
-    await prisma.cloudVMLog.create({
-      data: {
-        vmId: id,
-        message: "Retrying provisioning...",
-        level: "info",
-      },
-    });
+    await retryCloudVMProvisioning(id);
+    await logCloudVMEvent(id, "Retrying provisioning...", "info");
 
     provisionVM(id).catch((err) => {
       console.error(`[cloud-vm] retry provisionVM(${id}) error:`, err);

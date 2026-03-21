@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, memo } from "react";
 import { Search, X, SlidersHorizontal } from "lucide-react";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import { Button } from "../ui";
-import type { Agent } from "@/lib/types";
+import type { Agent } from "@agentcenter/types";
 
 export type DueDateFilter = "overdue" | "today" | "this_week" | "no_due_date";
 

@@ -3,8 +3,12 @@
  * Each migration is idempotent and guarded by a check so it only does real
  * work when there are rows to fix.
  */
-import { prisma } from "./prisma";
-import { FLAG_KEYS } from "../lib/feature-flag-keys";
+import {
+  findProfilesWithR2AvatarUrl,
+  updateProfileAvatarUrl,
+  ensureFeatureFlagExists,
+} from "@agentcenter/database";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 /**
  * Convert raw presigned R2 URLs in Profile.avatarUrl to proxy paths.
@@ -12,12 +16,7 @@ import { FLAG_KEYS } from "../lib/feature-flag-keys";
  */
 async function normalizeAvatarUrls() {
   // Only fetch profiles whose avatarUrl looks like an R2 presigned URL
-  const profiles = await prisma.profile.findMany({
-    where: {
-      avatarUrl: { contains: "r2.cloudflarestorage.com" },
-    },
-    select: { id: true, avatarUrl: true },
-  });
+  const profiles = await findProfilesWithR2AvatarUrl();
 
   if (profiles.length === 0) return;
 
@@ -34,10 +33,7 @@ async function normalizeAvatarUrls() {
       if (!storageKey) continue;
 
       const normalized = `/api/storage/${storageKey}?public=1`;
-      await prisma.profile.update({
-        where: { id: profile.id },
-        data: { avatarUrl: normalized },
-      });
+      await updateProfileAvatarUrl(profile.id, normalized);
       updated++;
     } catch {
       // Not a valid URL — skip
@@ -112,11 +108,8 @@ async function ensureFeatureFlags() {
 
   let created = 0;
   for (const flag of defaults) {
-    const existing = await prisma.featureFlag.findUnique({ where: { key: flag.key } });
-    if (!existing) {
-      await prisma.featureFlag.create({ data: flag });
-      created++;
-    }
+    const didCreate = await ensureFeatureFlagExists(flag);
+    if (didCreate) created++;
   }
 
   if (created > 0) {

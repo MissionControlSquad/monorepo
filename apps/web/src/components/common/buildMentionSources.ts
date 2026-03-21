@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { formatMention } from "../../lib/mentions";
-import type { MentionSuggestionCategory } from "../../lib/mentions";
+import { formatMention } from "@agentcenter/utils";
+import type { MentionSuggestionCategory } from "@agentcenter/utils";
 import type { MentionSuggestionSource } from "./MentionTextArea";
 import {
   renderProfileSuggestion,
@@ -10,7 +10,7 @@ import {
   renderTaskSuggestion,
   renderProjectSuggestion,
 } from "./MentionSuggestionList";
-import type { ProfileWithAgent, Agent, TaskListItem, Project } from "@/lib/types";
+import type { ProfileWithAgent, Agent, TaskListItem, Project } from "@agentcenter/types";
 
 export interface BuildMentionSourcesOptions {
   categories: MentionSuggestionCategory[];

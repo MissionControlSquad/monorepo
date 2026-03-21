@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/server/prisma";
+import { updateAdminUserPassword } from "@agentcenter/database";
 import {
   hashPassword,
   createSessionToken,
@@ -49,11 +49,7 @@ export async function POST(request: Request) {
 
   // Update password
   const newHash = await hashPassword(newPassword);
-  const admin = await prisma.adminUser.update({
-    where: { id: adminUserId },
-    data: { passwordHash: newHash },
-    select: { id: true, username: true },
-  });
+  const admin = await updateAdminUserPassword(adminUserId, newHash);
 
   // Revoke all sessions and invalidate remaining tokens
   await revokeAllSessions(adminUserId);

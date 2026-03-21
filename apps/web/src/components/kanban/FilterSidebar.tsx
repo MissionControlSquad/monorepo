@@ -8,7 +8,7 @@ import { Button } from "../ui";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/shadcn/sheet";
 import type { FilterState, DueDateFilter } from "./FilterBar";
-import type { Agent, ProjectMember } from "@/lib/types";
+import type { Agent, ProjectMember } from "@agentcenter/types";
 
 const PRIORITIES = [
   { id: "low", label: "Low", color: "bg-muted text-foreground border-border" },

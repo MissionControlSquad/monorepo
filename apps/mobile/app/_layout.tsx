@@ -1,35 +1,44 @@
 import "../global.css";
 import { Stack } from "expo-router";
 import { Provider } from "urql";
-import { urqlClient } from "../src/api/client";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
+import { DrawerProvider } from "../src/context/DrawerContext";
+import { AppDrawer } from "../src/components/AppDrawer";
+import { View } from "react-native";
 
 function RootLayoutNav() {
-  const { isLoading, isSignedIn } = useAuth();
+  const { urqlClient } = useAuth();
 
-  if (isLoading) return null;
-
-  return (
-    <Stack>
-      {!isSignedIn ? (
+  const content = (
+    <View style={{ flex: 1 }}>
+      <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="auth/login" options={{ headerShown: false }} />
-      ) : (
-        <>
-          <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />
-          <Stack.Screen name="task/[id]" options={{ title: "Task Details" }} />
-          <Stack.Screen name="channels/[id]" options={{ title: "Channel" }} />
-        </>
-      )}
-    </Stack>
+        <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />
+        <Stack.Screen name="task/[id]" options={{ title: "Task Details" }} />
+        <Stack.Screen name="task/create" options={{ title: "New Task", presentation: "modal" }} />
+        <Stack.Screen name="deliverable/[id]" options={{ title: "Deliverable" }} />
+        <Stack.Screen name="agent/[id]" options={{ title: "Agent" }} />
+        <Stack.Screen name="channels/[id]" options={{ title: "Channel" }} />
+        <Stack.Screen name="profile" options={{ title: "Profile", presentation: "modal" }} />
+        <Stack.Screen name="settings" options={{ title: "Settings", presentation: "modal" }} />
+      </Stack>
+      <AppDrawer />
+    </View>
   );
+
+  return <Provider value={urqlClient}>{content}</Provider>;
 }
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <Provider value={urqlClient}>
-        <RootLayoutNav />
-      </Provider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <DrawerProvider>
+        <AuthProvider>
+          <RootLayoutNav />
+        </AuthProvider>
+      </DrawerProvider>
+    </SafeAreaProvider>
   );
 }

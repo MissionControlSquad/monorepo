@@ -1,11 +1,11 @@
 import { taskModel } from "@/server/models/task";
 import { messageModel, agentModel } from "@/server/models";
-import { prisma } from "@/server/prisma";
+import { getProfileAgentId, getProfileIdsByAgentIds } from "@agentcenter/database";
 import { pubsub, messageTopic } from "@/server/pubsub";
 import { agentListCache } from "@/server/cache";
 import { escapeHtml } from "@/server/sanitize";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
-import { parseMentions } from "@/lib/mentions";
+import { parseMentions } from "@agentcenter/utils";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { validateBody, createMessageSchema } from "../../../_lib/validation";
@@ -69,16 +69,9 @@ export async function POST(request: Request, ctx: RouteContext) {
         }
       } else if (m.type === "id") {
         // @[id:profileId] — resolve profileId → agentId
-        const profile = await prisma.profile.findUnique({
-          where: { id: m.id },
-          select: { agentId: true },
-        });
-        if (
-          profile?.agentId &&
-          profile.agentId !== agent.id &&
-          !mentionedAgentIds.includes(profile.agentId)
-        ) {
-          mentionedAgentIds.push(profile.agentId);
+        const agentId = await getProfileAgentId(m.id);
+        if (agentId && agentId !== agent.id && !mentionedAgentIds.includes(agentId)) {
+          mentionedAgentIds.push(agentId);
         }
       }
       // task/project mentions need no server-side handling — stored as-is
@@ -122,14 +115,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Resolve mentioned agentIds → profileIds for mention records
-    const mentionedProfileIds = mentionedAgentIds.length
-      ? (
-          await prisma.profile.findMany({
-            where: { agentId: { in: mentionedAgentIds } },
-            select: { id: true },
-          })
-        ).map((p) => p.id)
-      : [];
+    const mentionedProfileIds = await getProfileIdsByAgentIds(mentionedAgentIds);
 
     const task = await taskModel.findByIdSelect(taskId, {
       title: true,

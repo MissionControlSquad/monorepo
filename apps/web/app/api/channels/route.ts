@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { prisma } from "@/server/prisma";
+import { listMemberChannels, getChannelUnreadCount } from "@agentcenter/database";
 import type { ChannelVisibility } from "@agentcenter/database";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { resolveAgent } from "../_lib/resolve-agent";
@@ -26,53 +26,13 @@ export async function GET(request: Request) {
     }
     const visibility = visibilityParam as ChannelVisibility | null;
 
-    const memberships = await prisma.channelMember.findMany({
-      where: {
-        profileId: agentProfileId,
-        ...(visibility ? { channel: { visibility } } : {}),
-      },
-      include: {
-        channel: {
-          include: {
-            members: {
-              include: {
-                profile: {
-                  select: {
-                    id: true,
-                    kind: true,
-                    displayName: true,
-                    username: true,
-                    avatarUrl: true,
-                  },
-                },
-              },
-            },
-            messages: {
-              orderBy: { createdAt: "desc" },
-              take: 1,
-              select: {
-                id: true,
-                content: true,
-                fromProfileId: true,
-                createdAt: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const memberships = await listMemberChannels(agentProfileId, visibility ?? undefined);
 
     const channels = await Promise.all(
       memberships.map(async (membership) => {
         const channel = membership.channel;
-        const sinceDate = membership.lastReadAt ?? membership.joinedAt;
 
-        const unreadCount = await prisma.channelMessage.count({
-          where: {
-            channelId: channel.id,
-            createdAt: { gt: sinceDate },
-          },
-        });
+        const unreadCount = await getChannelUnreadCount(channel.id, agentProfileId);
 
         // For DMs, extract the other person's profile
         const otherProfile =

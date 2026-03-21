@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { CloudPanel } from "@/components/layout/sidebar/panels/CloudPanel";
 import { FeatureGate } from "@/components/common/FeatureGate";
-import { FLAG_KEYS } from "@/lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 export default function CloudLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

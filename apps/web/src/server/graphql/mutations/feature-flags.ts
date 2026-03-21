@@ -1,6 +1,9 @@
 import { GraphQLError } from "graphql";
 import { builder } from "../builder";
-import { prisma } from "../../prisma";
+import {
+  findFeatureFlagByKey,
+  updateFeatureFlag as dbUpdateFeatureFlag,
+} from "@agentcenter/database";
 import { invalidateFlagCache } from "../../feature-flags";
 import { pubsub, PubSubEvent } from "../../pubsub";
 
@@ -21,9 +24,7 @@ builder.mutationField("updateFeatureFlag", (t) =>
       enabled: t.arg.boolean({ required: true }),
     },
     resolve: async (_root, args) => {
-      const flag = await prisma.featureFlag.findUnique({
-        where: { key: args.key },
-      });
+      const flag = await findFeatureFlagByKey(args.key);
 
       if (!flag) {
         throw new GraphQLError(`Feature flag "${args.key}" not found`);
@@ -35,10 +36,7 @@ builder.mutationField("updateFeatureFlag", (t) =>
         );
       }
 
-      const updated = await prisma.featureFlag.update({
-        where: { key: args.key },
-        data: { enabled: args.enabled },
-      });
+      const updated = await dbUpdateFeatureFlag(args.key, { enabled: args.enabled });
 
       // Invalidate server cache and push real-time update to all clients
       invalidateFlagCache();

@@ -5,7 +5,7 @@ import { AGENT_STATUS_HISTORY_QUERY } from "../../lib/graphql/queries";
 import { Clock } from "lucide-react";
 import { TimeAgo } from "../common/TimeAgo";
 import { STATUS_DOT_CLASSES, AGENT_DETAILED_STATUSES } from "../../lib/constants";
-import type { StatusHistoryEntry } from "@/lib/types";
+import type { StatusHistoryEntry } from "@agentcenter/types";
 
 interface StatusHistoryTimelineProps {
   agentId: string;

@@ -8,7 +8,7 @@
 import { sshExec, sshExecStream, sshUploadFile, type SSHConfig } from "./ssh";
 import { decryptPrivateKey } from "./ssh-keys";
 import { env } from "../env";
-import { prisma } from "../prisma";
+import { findAgentsByVMId, updateAgent } from "@agentcenter/database";
 import { generateApiKey } from "../api-key";
 import { generateAgentConfig, getMcUrl } from "../agent-config-generator";
 import { VM_CONFIG_PATH, VM_WORKSPACE, VM_USER, OPENCLAW_CMD_PREFIX } from "./cloud-vm-paths";
@@ -191,12 +191,7 @@ export async function computeAgentCronIndex(
   agentSlug: string,
   preloadedAgents?: { username?: string | null; name: string }[],
 ): Promise<number> {
-  const agents =
-    preloadedAgents ??
-    (await prisma.agent.findMany({
-      where: { cloudVmId: vmId },
-      select: { username: true, name: true },
-    }));
+  const agents = preloadedAgents ?? (await findAgentsByVMId(vmId));
 
   const slugs = agents.map((a) => getAgentSlug(a)).sort();
   const index = slugs.indexOf(agentSlug);
@@ -292,9 +287,10 @@ export async function uploadAgentConfigFiles(
     const needsIdentity = !opts.onlyMissing || !existingFiles.has("IDENTITY.md");
     if (needsIdentity) {
       const { plainKey, hash, prefix } = generateApiKey();
-      await prisma.agent.update({
-        where: { id: opts.agentId },
-        data: { apiKeyHash: hash, apiKeyPrefix: prefix, apiKeyCreatedAt: new Date() },
+      await updateAgent(opts.agentId, {
+        apiKeyHash: hash,
+        apiKeyPrefix: prefix,
+        apiKeyCreatedAt: new Date(),
       });
       apiKeyForConfig = plainKey;
     } else {

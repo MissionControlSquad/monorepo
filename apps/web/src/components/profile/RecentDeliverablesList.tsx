@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { TimeAgo } from "../common/TimeAgo";
 import { Card, Button, SkeletonList } from "../ui";
-import type { Deliverable } from "@/lib/types";
+import type { Deliverable } from "@agentcenter/types";
 
 interface RecentDeliverablesListProps {
   agentId: string;

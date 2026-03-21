@@ -1,4 +1,4 @@
-import { prisma } from "../prisma";
+import { findRetryableUserNotifications } from "@agentcenter/database";
 import { dispatchNotification, handleDispatchFailure } from "./notification";
 import { logError, log } from "../logger";
 import { incrementCounter } from "./notification-metrics";
@@ -17,17 +17,7 @@ let intervalId: ReturnType<typeof setInterval> | null = null;
 export async function processRetries(): Promise<void> {
   const now = new Date();
 
-  const records = await prisma.userNotification.findMany({
-    where: {
-      nextRetryAt: { lte: now },
-      OR: [
-        { status: "failed", retryCount: { lt: 5 } },
-        { status: "pending", nextRetryAt: { not: null } },
-      ],
-    },
-    orderBy: { nextRetryAt: "asc" },
-    take: BATCH_SIZE,
-  });
+  const records = await findRetryableUserNotifications(now, BATCH_SIZE);
 
   if (records.length === 0) return;
 

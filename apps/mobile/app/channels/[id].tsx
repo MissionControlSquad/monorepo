@@ -13,8 +13,9 @@ import {
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useQuery, useMutation } from "urql";
 import { useState, useEffect, useRef } from "react";
-import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY } from "../../src/lib/graphql/queries";
-import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ } from "../../src/lib/graphql/mutations";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY } from "@agentcenter/graphql-client";
+import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 
 interface FromProfile {
@@ -60,6 +61,7 @@ export default function ChannelDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
   const { profileId } = useAuth();
+  const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList>(null);
@@ -137,7 +139,7 @@ export default function ChannelDetailScreen() {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={90}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 88 + insets.bottom : 0}
     >
       <FlatList
         ref={listRef}
@@ -176,7 +178,7 @@ export default function ChannelDetailScreen() {
           );
         }}
       />
-      <View style={styles.inputBar}>
+      <View style={[styles.inputBar, { paddingBottom: insets.bottom + 8 }]}>
         <TextInput
           style={styles.input}
           placeholder="Message..."
@@ -298,7 +300,9 @@ const styles = StyleSheet.create({
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",
-    padding: 12,
+    paddingTop: 12,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
     gap: 10,
     backgroundColor: "#fff",
     borderTopWidth: 1,

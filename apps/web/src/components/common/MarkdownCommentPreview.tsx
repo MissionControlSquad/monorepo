@@ -11,7 +11,7 @@ import {
   getHandleForTask,
   getHandleForProject,
   type MentionType,
-} from "../../lib/mentions";
+} from "@agentcenter/utils";
 import "./MarkdownComment.css";
 
 /** Allowed data attributes for mention links (for DOMPurify). */

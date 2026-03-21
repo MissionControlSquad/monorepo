@@ -6,7 +6,7 @@ import { ListTodo } from "lucide-react";
 import Link from "next/link";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { Badge } from "../ui";
-import type { Project, ProjectMember } from "@/lib/types";
+import type { Project, ProjectMember } from "@agentcenter/types";
 
 interface ProjectCardProps {
   project: Project;

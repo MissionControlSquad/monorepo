@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/server/prisma";
+import { updateProfileAvatar } from "@agentcenter/database";
 import { uploadFileToR2 } from "@/server/storage/r2";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
 import { writeFile, mkdir } from "fs/promises";
@@ -88,10 +88,7 @@ export async function POST(request: Request) {
   const avatarUrl = `/api/storage/${storageKey}?public=1`;
 
   // Update the profile
-  await prisma.profile.update({
-    where: { id: profileId },
-    data: { avatarUrl },
-  });
+  await updateProfileAvatar(profileId, avatarUrl);
 
   return NextResponse.json({ avatarUrl });
 }

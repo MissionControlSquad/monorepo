@@ -8,7 +8,7 @@ import { useCurrentProject } from "../context/AppContext";
 import { CreateProjectModal } from "../project/CreateProjectModal";
 import { Button } from "../ui";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/shadcn/sheet";
-import type { Project } from "../../lib/types";
+import type { Project } from "@agentcenter/types";
 
 interface ProjectSidebarProps {
   isOpen: boolean;

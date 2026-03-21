@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { taskModel } from "@/server/models/task";
 import { messageModel, agentModel } from "@/server/models";
-import { prisma } from "@/server/prisma";
+import { getProfileIdsByAgentIds } from "@agentcenter/database";
 import { pubsub, messageTopic } from "@/server/pubsub";
 import { agentListCache } from "@/server/cache";
 import { escapeHtml } from "@/server/sanitize";
@@ -112,14 +112,7 @@ export async function POST(request: Request) {
     }
 
     // Resolve mentioned agentIds → profileIds for mention records
-    const mentionedProfileIds = mentionedAgentIds.length
-      ? (
-          await prisma.profile.findMany({
-            where: { agentId: { in: mentionedAgentIds } },
-            select: { id: true },
-          })
-        ).map((p) => p.id)
-      : [];
+    const mentionedProfileIds = await getProfileIdsByAgentIds(mentionedAgentIds);
 
     const task = await taskModel.findByIdSelect(taskId, {
       title: true,

@@ -12,8 +12,8 @@ import { AgentRow } from "../AgentRow";
 import { SidebarSkeleton } from "../SidebarSkeleton";
 import { SidebarEmptyState } from "../SidebarEmptyState";
 import { useFeatureFlags } from "../../../context/FeatureFlagContext";
-import { FLAG_KEYS } from "../../../../lib/feature-flag-keys";
-import type { Agent, ProjectMember, StatusHistoryEntry } from "@/lib/types";
+import { FLAG_KEYS } from "@agentcenter/utils";
+import type { Agent, ProjectMember, StatusHistoryEntry } from "@agentcenter/types";
 
 const NAV_LINKS: { href: string; icon: typeof LayoutDashboard; label: string; flag?: string }[] = [
   { href: "/", icon: LayoutDashboard, label: "Kanban Board" },

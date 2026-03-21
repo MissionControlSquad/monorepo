@@ -1,5 +1,5 @@
 import type { MessageReaction } from "@agentcenter/database";
-import { prisma } from "../prisma";
+import { messageReactionDelegate } from "@agentcenter/database";
 import { Model } from "./base";
 
-export const messageReactionModel = new Model<MessageReaction>(() => prisma.messageReaction);
+export const messageReactionModel = new Model<MessageReaction>(messageReactionDelegate);

@@ -1,7 +1,7 @@
 "use client";
 
 import { FeatureGate } from "@/components/common/FeatureGate";
-import { FLAG_KEYS } from "@/lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { ChannelsLayoutProvider } from "@/components/channels/ChannelsLayoutContext";
 import { ChannelsPanel } from "@/components/layout/sidebar/panels/ChannelsPanel";
 

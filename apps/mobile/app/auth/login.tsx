@@ -15,6 +15,7 @@ import { login } from "../../src/api/auth";
 import { useAuth } from "../../src/context/AuthContext";
 
 export default function LoginScreen() {
+  const [serverUrl, setServerUrl] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,14 +23,22 @@ export default function LoginScreen() {
   const { onLogin } = useAuth();
 
   const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) {
-      Alert.alert("Missing fields", "Please enter your username and password.");
+    if (!serverUrl.trim() || !username.trim() || !password.trim()) {
+      Alert.alert("Missing fields", "Please enter your server URL, username, and password.");
       return;
     }
+
+    // Basic URL validation
+    const url = serverUrl.trim();
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      Alert.alert("Invalid URL", "Server URL must start with http:// or https://");
+      return;
+    }
+
     setLoading(true);
     try {
-      const { profileId } = await login(username.trim(), password);
-      onLogin(profileId);
+      const { profileId } = await login(url, username.trim(), password);
+      onLogin(url, profileId);
       router.replace("/(dashboard)");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Login failed";
@@ -48,6 +57,20 @@ export default function LoginScreen() {
         <Text style={styles.logo}>AgentCenter</Text>
         <Text style={styles.subtitle}>Mission Control</Text>
 
+        <Text style={styles.label}>Server URL</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="https://your-instance.com"
+          placeholderTextColor="#9ca3af"
+          value={serverUrl}
+          onChangeText={setServerUrl}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          editable={!loading}
+        />
+
+        <Text style={styles.label}>Username</Text>
         <TextInput
           style={styles.input}
           placeholder="Username"
@@ -58,6 +81,8 @@ export default function LoginScreen() {
           autoCorrect={false}
           editable={!loading}
         />
+
+        <Text style={styles.label}>Password</Text>
         <TextInput
           style={styles.input}
           placeholder="Password"
@@ -107,7 +132,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6b7280",
     textAlign: "center",
-    marginBottom: 40,
+    marginBottom: 32,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#374151",
+    marginBottom: 4,
+    marginTop: 4,
   },
   input: {
     backgroundColor: "#fff",

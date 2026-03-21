@@ -1,4 +1,4 @@
-import { prisma } from "./prisma";
+import { listAllFeatureFlags } from "@agentcenter/database";
 import { isFeatureLicensed } from "./license";
 
 interface FlagEntry {
@@ -13,7 +13,7 @@ let lastRefresh = 0;
 const CACHE_TTL = 60_000; // 1 minute
 
 async function refreshCache(): Promise<Map<string, FlagEntry>> {
-  const flags = await prisma.featureFlag.findMany();
+  const flags = await listAllFeatureFlags();
   const map = new Map<string, FlagEntry>();
   for (const f of flags) {
     map.set(f.key, {

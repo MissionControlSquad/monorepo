@@ -1,6 +1,6 @@
 import { stopCloudVM } from "@/server/services/cloud-vm";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
-import { prisma } from "@/server/prisma";
+import { findCloudVMRaw } from "@agentcenter/database";
 
 /**
  * POST /api/cloud-vms/[id]/stop
@@ -10,7 +10,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
 
-    const vm = await prisma.cloudVM.findUnique({ where: { id } });
+    const vm = await findCloudVMRaw(id);
     if (!vm) {
       return errorResponse("VM not found", 404);
     }

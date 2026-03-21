@@ -1,11 +1,36 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS } from "../../../lib/feature-flag-keys";
-import { prisma } from "../../prisma";
+import { FLAG_KEYS } from "@agentcenter/utils";
+import {
+  createChannelActivityMessage,
+  createTeamChannel,
+  findChannelBySlugNullable,
+  createDmChannelFull,
+  getChannelVisibilityOrThrow,
+  findChannelMemberRecord,
+  findChannelMemberRole,
+  createChannelMember,
+  deleteChannelMember,
+  markChannelMemberRead,
+  createChannelMessageFull,
+  getChannelMessageOrThrow,
+  getChannelMessagePinStatus,
+  findChannelMessageReaction,
+  deleteChannelMessageReaction,
+  createChannelMessageReaction,
+  getChannelMessageWithQuery,
+  updateChannelMessageContent,
+  deleteChannelMessage,
+  pinChannelMessage,
+  unpinChannelMessage,
+  findChannelById,
+  deleteChannel,
+  getAllProfilesForMentions,
+} from "@agentcenter/database";
 import { pubsub, channelMessageTopic, channelReactionTopic } from "../../pubsub";
 import { assertProjectWritable } from "../../system-settings";
 import { notifyAgentChannelMembers } from "../../dm-notify";
-import { parseMentionIds } from "../../../lib/mentions";
+import { parseMentionIds } from "@agentcenter/utils";
 
 const CHANNEL_VISIBILITY = ["public", "private", "dm"] as const;
 const CHANNEL_MESSAGE_REACTION_EMOJIS = [
@@ -16,28 +41,6 @@ const CHANNEL_MESSAGE_REACTION_EMOJIS = [
   "party",
   "think",
 ] as const;
-
-/** Create a channel activity message (join/add/remove/leave) and publish for real-time.
- * Use @[id:profileId] in content for mentions so they render as clickable profile links.
- * mentionedProfileIds are stored as ChannelMessageMention for consistency. */
-async function createChannelActivityMessage(
-  channelId: string,
-  fromProfileId: string,
-  content: string,
-  mentionedProfileIds: string[] = [],
-): Promise<void> {
-  const message = await prisma.channelMessage.create({
-    data: {
-      channelId,
-      fromProfileId,
-      content,
-      mentions: {
-        create: mentionedProfileIds.map((profileId) => ({ profileId })),
-      },
-    },
-  });
-  pubsub.publish(channelMessageTopic(channelId), { channelId, messageId: message.id });
-}
 
 builder.mutationField("createChannel", (t) =>
   t.prismaField({
@@ -64,23 +67,17 @@ builder.mutationField("createChannel", (t) =>
 
       if (args.projectId) await assertProjectWritable(args.projectId);
 
-      return prisma.channel.create({
-        ...query,
-        data: {
+      return createTeamChannel(
+        {
           name: args.name,
           slug,
           visibility,
           description: args.description ?? undefined,
           projectId: args.projectId ?? undefined,
           createdByProfileId: args.createdByProfileId,
-          members: {
-            create: {
-              profileId: args.createdByProfileId,
-              role: "creator",
-            },
-          },
         },
-      });
+        query,
+      );
     },
   }),
 );
@@ -101,31 +98,20 @@ builder.mutationField("startConversation", (t) =>
       const [id1, id2] = [args.myProfileId, args.otherProfileId].sort();
       const slug = `dm-${id1}-${id2}`;
 
-      const existing = await prisma.channel.findUnique({
-        ...query,
-        where: { slug },
-      });
+      const existing = await findChannelBySlugNullable(slug, query);
       if (existing) {
         if (existing.visibility === "dm") return existing;
         throw new Error("A channel already exists for this conversation.");
       }
 
-      return prisma.channel.create({
-        ...query,
-        data: {
-          name: "Direct message",
+      return createDmChannelFull(
+        {
           slug,
-          visibility: "dm",
-          projectId: null, // DMs are global, not tied to a project
           createdByProfileId: args.myProfileId,
-          members: {
-            create: [
-              { profileId: args.myProfileId, role: "creator" },
-              { profileId: args.otherProfileId, role: "member" },
-            ],
-          },
+          otherProfileId: args.otherProfileId,
         },
-      });
+        query,
+      );
     },
   }),
 );
@@ -139,10 +125,7 @@ builder.mutationField("joinChannel", (t) =>
     },
     resolve: async (query, _root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
-      const channel = await prisma.channel.findUniqueOrThrow({
-        where: { id: args.channelId },
-        select: { visibility: true },
-      });
+      const channel = await getChannelVisibilityOrThrow(args.channelId);
       if (channel.visibility === "dm") {
         throw new Error(
           "Direct messages cannot be joined. Start a conversation with that person instead.",
@@ -153,20 +136,19 @@ builder.mutationField("joinChannel", (t) =>
           "Only public channels can be joined directly. Ask the channel creator to add you.",
         );
       }
-      const existing = await prisma.channelMember.findUnique({
-        where: { channelId_profileId: { channelId: args.channelId, profileId: args.profileId } },
-      });
+      const existing = await findChannelMemberRecord(args.channelId, args.profileId);
       if (existing) return existing;
 
-      const member = await prisma.channelMember.create({
-        ...query,
-        data: {
-          channelId: args.channelId,
-          profileId: args.profileId,
-          role: "member",
-        },
+      const member = await createChannelMember(args.channelId, args.profileId, "member", query);
+      const msg = await createChannelActivityMessage(
+        args.channelId,
+        args.profileId,
+        "Joined the channel.",
+      );
+      pubsub.publish(channelMessageTopic(args.channelId), {
+        channelId: args.channelId,
+        messageId: msg.id,
       });
-      await createChannelActivityMessage(args.channelId, args.profileId, "Joined the channel.");
       return member;
     },
   }),
@@ -182,10 +164,7 @@ builder.mutationField("addChannelMember", (t) =>
     },
     resolve: async (query, _root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
-      const channel = await prisma.channel.findUniqueOrThrow({
-        where: { id: args.channelId },
-        select: { visibility: true, createdByProfileId: true },
-      });
+      const channel = await getChannelVisibilityOrThrow(args.channelId);
       if (channel.visibility === "dm") {
         throw new Error(
           "Direct messages allow only two participants. You cannot add people to a DM.",
@@ -199,25 +178,20 @@ builder.mutationField("addChannelMember", (t) =>
       if (args.addedByProfileId !== channel.createdByProfileId) {
         throw new Error("Only the channel creator can add members.");
       }
-      const existing = await prisma.channelMember.findUnique({
-        where: { channelId_profileId: { channelId: args.channelId, profileId: args.profileId } },
-      });
+      const existing = await findChannelMemberRecord(args.channelId, args.profileId);
       if (existing) return existing;
 
-      const member = await prisma.channelMember.create({
-        ...query,
-        data: {
-          channelId: args.channelId,
-          profileId: args.profileId,
-          role: "member",
-        },
-      });
-      await createChannelActivityMessage(
+      const member = await createChannelMember(args.channelId, args.profileId, "member", query);
+      const msg = await createChannelActivityMessage(
         args.channelId,
         args.addedByProfileId,
         `Added @[id:${args.profileId}] to the channel.`,
         [args.profileId],
       );
+      pubsub.publish(channelMessageTopic(args.channelId), {
+        channelId: args.channelId,
+        messageId: msg.id,
+      });
       return member;
     },
   }),
@@ -233,10 +207,7 @@ builder.mutationField("removeChannelMember", (t) =>
     },
     resolve: async (_root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
-      const channel = await prisma.channel.findUniqueOrThrow({
-        where: { id: args.channelId },
-        select: { visibility: true, createdByProfileId: true },
-      });
+      const channel = await getChannelVisibilityOrThrow(args.channelId);
       if (channel.visibility === "dm") {
         throw new Error(
           "Cannot remove participants from a direct message. They can leave the conversation.",
@@ -248,23 +219,22 @@ builder.mutationField("removeChannelMember", (t) =>
       if (args.removedByProfileId !== channel.createdByProfileId) {
         throw new Error("Only the channel creator can remove members.");
       }
-      const member = await prisma.channelMember.findUnique({
-        where: { channelId_profileId: { channelId: args.channelId, profileId: args.profileId } },
-        select: { role: true },
-      });
+      const member = await findChannelMemberRole(args.channelId, args.profileId);
       if (!member) return true;
       if (member.role === "creator") {
         throw new Error("Cannot remove the channel creator.");
       }
-      await prisma.channelMember.delete({
-        where: { channelId_profileId: { channelId: args.channelId, profileId: args.profileId } },
-      });
-      await createChannelActivityMessage(
+      await deleteChannelMember(args.channelId, args.profileId);
+      const msg = await createChannelActivityMessage(
         args.channelId,
         args.removedByProfileId,
         `Removed @[id:${args.profileId}] from the channel.`,
         [args.profileId],
       );
+      pubsub.publish(channelMessageTopic(args.channelId), {
+        channelId: args.channelId,
+        messageId: msg.id,
+      });
       return true;
     },
   }),
@@ -279,20 +249,23 @@ builder.mutationField("leaveChannel", (t) =>
     },
     resolve: async (_root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
-      const member = await prisma.channelMember.findUnique({
-        where: { channelId_profileId: { channelId: args.channelId, profileId: args.profileId } },
-        select: { role: true },
-      });
+      const member = await findChannelMemberRole(args.channelId, args.profileId);
       if (!member) return true;
       if (member.role === "creator") {
         throw new Error(
           "Channel creator cannot leave. Transfer ownership or delete the channel first.",
         );
       }
-      await createChannelActivityMessage(args.channelId, args.profileId, "Left the channel.");
-      await prisma.channelMember.delete({
-        where: { channelId_profileId: { channelId: args.channelId, profileId: args.profileId } },
+      const msg = await createChannelActivityMessage(
+        args.channelId,
+        args.profileId,
+        "Left the channel.",
+      );
+      pubsub.publish(channelMessageTopic(args.channelId), {
+        channelId: args.channelId,
+        messageId: msg.id,
       });
+      await deleteChannelMember(args.channelId, args.profileId);
       return true;
     },
   }),
@@ -307,13 +280,7 @@ builder.mutationField("markChannelRead", (t) =>
     },
     resolve: async (_root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
-      await prisma.channelMember.updateMany({
-        where: {
-          channelId: args.channelId,
-          profileId: args.profileId,
-        },
-        data: { lastReadAt: new Date() },
-      });
+      await markChannelMemberRead(args.channelId, args.profileId);
       return true;
     },
   }),
@@ -371,18 +338,12 @@ builder.mutationField("createChannelMessage", (t) =>
     },
     resolve: async (query, _root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
-      const membership = await prisma.channelMember.findUnique({
-        where: {
-          channelId_profileId: { channelId: args.channelId, profileId: args.fromProfileId },
-        },
-      });
+      const membership = await findChannelMemberRecord(args.channelId, args.fromProfileId);
       if (!membership) {
         throw new Error("You must be a member of the channel to post.");
       }
 
-      const profiles = await prisma.profile.findMany({
-        select: { id: true, displayName: true, username: true },
-      });
+      const profiles = await getAllProfilesForMentions();
       const validProfileIds = new Set<string>(profiles.map((p: { id: string }) => p.id));
       const mentionedProfileIds = parseMentionedProfileIds(
         args.content,
@@ -391,20 +352,16 @@ builder.mutationField("createChannelMessage", (t) =>
         validProfileIds,
       );
 
-      const message = await prisma.channelMessage.create({
-        ...query,
-        data: {
+      const message = await createChannelMessageFull(
+        {
           channelId: args.channelId,
           fromProfileId: args.fromProfileId,
           content: args.content,
-          attachments: {
-            create: (args.attachmentIds ?? []).map((documentId) => ({ documentId })),
-          },
-          mentions: {
-            create: mentionedProfileIds.map((profileId) => ({ profileId })),
-          },
+          attachmentIds: args.attachmentIds ?? [],
+          mentionedProfileIds,
         },
-      });
+        query,
+      );
 
       pubsub.publish(channelMessageTopic(args.channelId), {
         channelId: args.channelId,
@@ -434,39 +391,17 @@ builder.mutationField("toggleChannelMessageReaction", (t) =>
       if (!CHANNEL_MESSAGE_REACTION_EMOJIS.includes(args.emoji as any)) {
         throw new Error(`Invalid emoji. Valid: ${CHANNEL_MESSAGE_REACTION_EMOJIS.join(", ")}`);
       }
-      const message = await prisma.channelMessage.findUniqueOrThrow({
-        where: { id: args.messageId },
-        select: { channelId: true },
-      });
+      const message = await getChannelMessageOrThrow(args.messageId);
 
-      const existing = await prisma.channelMessageReaction.findUnique({
-        where: {
-          messageId_profileId_emoji: {
-            messageId: args.messageId,
-            profileId: args.profileId,
-            emoji: args.emoji,
-          },
-        },
-      });
+      const existing = await findChannelMessageReaction(args.messageId, args.profileId, args.emoji);
 
       if (existing) {
-        await prisma.channelMessageReaction.delete({
-          where: { id: existing.id },
-        });
+        await deleteChannelMessageReaction(existing.id);
       } else {
-        await prisma.channelMessageReaction.create({
-          data: {
-            messageId: args.messageId,
-            profileId: args.profileId,
-            emoji: args.emoji,
-          },
-        });
+        await createChannelMessageReaction(args.messageId, args.profileId, args.emoji);
       }
 
-      const updated = await prisma.channelMessage.findUniqueOrThrow({
-        ...query,
-        where: { id: args.messageId },
-      });
+      const updated = await getChannelMessageWithQuery(args.messageId, query);
       pubsub.publish(channelReactionTopic(message.channelId), {
         channelId: message.channelId,
         messageId: args.messageId,
@@ -486,16 +421,11 @@ builder.mutationField("updateChannelMessage", (t) =>
     },
     resolve: async (query, _root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
-      const message = await prisma.channelMessage.findUniqueOrThrow({
-        where: { id: args.messageId },
-        select: { id: true, channelId: true, fromProfileId: true },
-      });
+      const message = await getChannelMessageOrThrow(args.messageId);
       if (message.fromProfileId !== args.profileId) {
         throw new Error("Only the message author can edit this message.");
       }
-      const profiles = await prisma.profile.findMany({
-        select: { id: true, displayName: true, username: true },
-      });
+      const profiles = await getAllProfilesForMentions();
       const validProfileIds = new Set<string>(profiles.map((p: { id: string }) => p.id));
       const mentionedProfileIds = parseMentionedProfileIds(
         args.content,
@@ -503,17 +433,12 @@ builder.mutationField("updateChannelMessage", (t) =>
         profiles as { id: string; username: string | null; displayName: string }[],
         validProfileIds,
       );
-      await prisma.channelMessageMention.deleteMany({ where: { messageId: args.messageId } });
-      const updated = await prisma.channelMessage.update({
-        ...query,
-        where: { id: args.messageId },
-        data: {
-          content: args.content,
-          mentions: {
-            create: mentionedProfileIds.map((profileId) => ({ profileId })),
-          },
-        },
-      });
+      const updated = await updateChannelMessageContent(
+        args.messageId,
+        args.content,
+        mentionedProfileIds,
+        query,
+      );
       pubsub.publish(channelMessageTopic(message.channelId), {
         channelId: message.channelId,
         messageId: updated.id,
@@ -532,23 +457,15 @@ builder.mutationField("deleteChannelMessage", (t) =>
     },
     resolve: async (_root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
-      const message = await prisma.channelMessage.findUniqueOrThrow({
-        where: { id: args.messageId },
-        select: { channelId: true, fromProfileId: true },
-      });
-      const membership = await prisma.channelMember.findUnique({
-        where: {
-          channelId_profileId: { channelId: message.channelId, profileId: args.profileId },
-        },
-        select: { role: true },
-      });
+      const message = await getChannelMessageOrThrow(args.messageId);
+      const membership = await findChannelMemberRole(message.channelId, args.profileId);
       if (!membership) throw new Error("You must be a member of the channel.");
       const isAuthor = message.fromProfileId === args.profileId;
       const isCreator = membership.role === "creator";
       if (!isAuthor && !isCreator) {
         throw new Error("Only the message author or channel creator can delete this message.");
       }
-      await prisma.channelMessage.delete({ where: { id: args.messageId } });
+      await deleteChannelMessage(args.messageId);
       return true;
     },
   }),
@@ -563,22 +480,11 @@ builder.mutationField("pinChannelMessage", (t) =>
     },
     resolve: async (query, _root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
-      const message = await prisma.channelMessage.findUniqueOrThrow({
-        where: { id: args.messageId },
-        select: { channelId: true, pinnedAt: true },
-      });
-      const membership = await prisma.channelMember.findUnique({
-        where: {
-          channelId_profileId: { channelId: message.channelId, profileId: args.profileId },
-        },
-      });
+      const message = await getChannelMessagePinStatus(args.messageId);
+      const membership = await findChannelMemberRecord(message.channelId, args.profileId);
       if (!membership) throw new Error("You must be a member of the channel to pin messages.");
       if (message.pinnedAt) throw new Error("This message is already pinned.");
-      return prisma.channelMessage.update({
-        ...query,
-        where: { id: args.messageId },
-        data: { pinnedAt: new Date(), pinnedByProfileId: args.profileId },
-      });
+      return pinChannelMessage(args.messageId, args.profileId, query);
     },
   }),
 );
@@ -592,22 +498,11 @@ builder.mutationField("unpinChannelMessage", (t) =>
     },
     resolve: async (query, _root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
-      const message = await prisma.channelMessage.findUniqueOrThrow({
-        where: { id: args.messageId },
-        select: { channelId: true, pinnedAt: true },
-      });
-      const membership = await prisma.channelMember.findUnique({
-        where: {
-          channelId_profileId: { channelId: message.channelId, profileId: args.profileId },
-        },
-      });
+      const message = await getChannelMessagePinStatus(args.messageId);
+      const membership = await findChannelMemberRecord(message.channelId, args.profileId);
       if (!membership) throw new Error("You must be a member of the channel to unpin messages.");
       if (!message.pinnedAt) throw new Error("This message is not pinned.");
-      return prisma.channelMessage.update({
-        ...query,
-        where: { id: args.messageId },
-        data: { pinnedAt: null, pinnedByProfileId: null },
-      });
+      return unpinChannelMessage(args.messageId, query);
     },
   }),
 );
@@ -621,26 +516,18 @@ builder.mutationField("deleteChannel", (t) =>
     },
     resolve: async (_root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
-      const channel = await prisma.channel.findUnique({
-        where: { id: args.channelId },
-        select: { visibility: true },
-      });
+      const channel = await findChannelById(args.channelId);
       if (!channel) {
         throw new Error("Channel not found.");
       }
       if (channel.visibility === "dm") {
         throw new Error("Direct message conversations cannot be deleted.");
       }
-      const member = await prisma.channelMember.findUnique({
-        where: {
-          channelId_profileId: { channelId: args.channelId, profileId: args.profileId },
-        },
-        select: { role: true },
-      });
+      const member = await findChannelMemberRole(args.channelId, args.profileId);
       if (!member || member.role !== "creator") {
         throw new Error("Only the channel creator can delete the channel.");
       }
-      await prisma.channel.delete({ where: { id: args.channelId } });
+      await deleteChannel(args.channelId);
       return true;
     },
   }),

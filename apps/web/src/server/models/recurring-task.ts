@@ -1,35 +1,26 @@
 import type { RecurringTask, RecurringTaskAssignee } from "@agentcenter/database";
-import { prisma } from "../prisma";
+import {
+  setRecurringTaskAssignees,
+  pauseRecurringTask,
+  resumeRecurringTask,
+  recurringTaskDelegate,
+} from "@agentcenter/database";
 import { Model } from "./base";
 import { calculateInitialDueDate, type RecurrenceConfig } from "../recurring-tasks";
 
 class RecurringTaskModel extends Model<RecurringTask> {
   constructor() {
-    super(() => prisma.recurringTask);
+    super(recurringTaskDelegate);
   }
 
   /** Set assignees for a recurring task (replace all) — runs in a single transaction. */
-  async setAssignees(
-    recurringTaskId: string,
-    profileIds: string[],
-  ): Promise<RecurringTaskAssignee[]> {
-    return prisma.$transaction(async (tx) => {
-      await tx.recurringTaskAssignee.deleteMany({ where: { recurringTaskId } });
-      if (profileIds.length === 0) return [];
-      await tx.recurringTaskAssignee.createMany({
-        data: profileIds.map((profileId) => ({ recurringTaskId, profileId })),
-        skipDuplicates: true,
-      });
-      return tx.recurringTaskAssignee.findMany({ where: { recurringTaskId } });
-    });
+  setAssignees(recurringTaskId: string, profileIds: string[]): Promise<RecurringTaskAssignee[]> {
+    return setRecurringTaskAssignees(recurringTaskId, profileIds);
   }
 
   /** Pause a recurring task */
-  async pause(id: string): Promise<RecurringTask> {
-    return prisma.recurringTask.update({
-      where: { id },
-      data: { isActive: false },
-    });
+  pause(id: string): Promise<RecurringTask> {
+    return pauseRecurringTask(id);
   }
 
   /** Resume a recurring task, recalculating nextDueAt */
@@ -37,11 +28,7 @@ class RecurringTaskModel extends Model<RecurringTask> {
     const rt = await this.findByIdOrThrow(id);
     const config = rt.recurrenceConfig as unknown as RecurrenceConfig;
     const nextDueAt = calculateInitialDueDate(config, rt.timezone ?? "UTC");
-
-    return prisma.recurringTask.update({
-      where: { id },
-      data: { isActive: true, nextDueAt },
-    });
+    return resumeRecurringTask(id, nextDueAt);
   }
 }
 

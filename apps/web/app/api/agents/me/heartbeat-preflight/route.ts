@@ -6,7 +6,7 @@ import { CURRENT_CONFIG_VERSION } from "@/server/config-version";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { getAgentProjectIds } from "../../../_lib/project-access";
 import { Roles } from "@/server/constants";
-import { prisma } from "@/server/prisma";
+import { getAgentPreflightStats } from "@agentcenter/database";
 import { applyAgentStatusUpdate } from "@/server/agent-status";
 
 /**
@@ -85,82 +85,23 @@ export async function GET(request: Request) {
     const profileId = await getOrCreateAgentProfileId(agent.id);
     const projectIds = await getAgentProjectIds(agent.id);
 
-    const [assignedCount, inboxCount, unreadCount, notificationCount, pendingReviewCount] =
-      await Promise.all([
-        // Assigned tasks (non-done, non-deleted)
-        prisma.taskAssignee.count({
-          where: {
-            profileId,
-            task: {
-              status: { notIn: ["done"] },
-              deletedAt: null,
-            },
-          },
-        }),
-
-        // Inbox tasks across agent's projects (+ unscoped)
-        prisma.task.count({
-          where: {
-            status: "inbox",
-            deletedAt: null,
-            OR: [
-              ...(projectIds.length > 0 ? [{ projectId: { in: projectIds } }] : []),
-              { projectId: null },
-            ],
-          },
-        }),
-
-        // Unread messages: check if ANY channel has messages newer than lastReadAt
-        (async () => {
-          const memberships = await prisma.channelMember.findMany({
-            where: { profileId },
-            select: { channelId: true, lastReadAt: true },
-          });
-          if (memberships.length === 0) return 0;
-
-          // Single query: check all channels at once using OR conditions
-          const orConditions = memberships.map((m) => ({
-            channelId: m.channelId,
-            ...(m.lastReadAt ? { createdAt: { gt: m.lastReadAt } } : {}),
-            fromProfileId: { not: profileId },
-          }));
-
-          const unreadCount = await prisma.channelMessage.count({
-            where: { OR: orConditions },
-            take: 1,
-          });
-          return unreadCount > 0 ? 1 : 0;
-        })(),
-
-        // Undelivered notifications
-        prisma.notification.count({
-          where: {
-            mentionedAgentId: agent.id,
-            delivered: false,
-          },
-        }),
-
-        // Pending review tasks (lead agents only)
-        agent.role === Roles.SQUAD_LEAD
-          ? prisma.task.count({
-              where: {
-                status: "review",
-                deletedAt: null,
-                ...(projectIds.length > 0 ? { projectId: { in: projectIds } } : {}),
-              },
-            })
-          : 0,
-      ]);
+    const {
+      activeTaskAssignments,
+      inboxTaskCount,
+      reviewTaskCount,
+      unreadChannelMessages,
+      undeliveredMentions,
+    } = await getAgentPreflightStats(profileId, agent.id, projectIds);
 
     // Config upgrade available?
     const upgradeAvailable =
       !!agent.configVersion && agent.configVersion !== CURRENT_CONFIG_VERSION;
 
-    const hasAssignedTasks = assignedCount > 0;
-    const hasInboxTasks = inboxCount > 0;
-    const hasUnreadMessages = unreadCount > 0;
-    const hasNotifications = notificationCount > 0;
-    const hasPendingReview = pendingReviewCount > 0;
+    const hasAssignedTasks = activeTaskAssignments > 0;
+    const hasInboxTasks = inboxTaskCount > 0;
+    const hasUnreadMessages = unreadChannelMessages > 0;
+    const hasNotifications = undeliveredMentions > 0;
+    const hasPendingReview = agent.role === Roles.SQUAD_LEAD && reviewTaskCount > 0;
 
     const shouldWork =
       hasAssignedTasks ||
@@ -172,7 +113,7 @@ export async function GET(request: Request) {
 
     log(
       "preflight",
-      `agent="${agent.name}" shouldWork=${shouldWork} assigned=${assignedCount} inbox=${inboxCount} unread=${unreadCount} notifications=${notificationCount} review=${pendingReviewCount}`,
+      `agent="${agent.name}" shouldWork=${shouldWork} assigned=${activeTaskAssignments} inbox=${inboxTaskCount} unread=${unreadChannelMessages} notifications=${undeliveredMentions} review=${reviewTaskCount}`,
       request,
     );
     return successResponse({

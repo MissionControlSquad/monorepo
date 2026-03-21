@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/server/prisma";
-import { Prisma } from "@agentcenter/database";
+import { pingDatabase, getNotificationHealthStats } from "@agentcenter/database";
 import { getRedisClient } from "@/server/redis";
 import { getMetrics } from "@/server/services/notification-metrics";
 
@@ -19,8 +18,12 @@ export async function GET() {
   // --- Database ---
   try {
     const start = performance.now();
-    await prisma.$queryRaw<[{ ok: 1 }]>(Prisma.sql`SELECT 1 as ok`);
-    checks.database = { status: "pass", latencyMs: Math.round(performance.now() - start) };
+    const ok = await pingDatabase();
+    if (ok) {
+      checks.database = { status: "pass", latencyMs: Math.round(performance.now() - start) };
+    } else {
+      checks.database = { status: "fail", error: "connection_failed" };
+    }
   } catch (err) {
     checks.database = { status: "fail", error: "connection_failed" };
   }
@@ -41,14 +44,8 @@ export async function GET() {
 
   // --- Retry Queue ---
   try {
-    const [pendingRetries, deadLettered] = await Promise.all([
-      prisma.userNotification.count({
-        where: { status: "failed", retryCount: { lt: 5 } },
-      }),
-      prisma.userNotification.count({
-        where: { errorMsg: { startsWith: "[dead]" } },
-      }),
-    ]);
+    const { failedCount: pendingRetries, deadCount: deadLettered } =
+      await getNotificationHealthStats();
     checks.retryQueue = { status: "pass", pendingRetries, deadLettered };
   } catch (err) {
     checks.retryQueue = { status: "fail", error: "query_failed" };

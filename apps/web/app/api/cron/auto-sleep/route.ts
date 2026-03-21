@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/server/prisma";
+import { findStaleAgents, isAgentStill } from "@agentcenter/database";
 import { env } from "@/server/env";
 import { applyAgentStatusUpdate } from "@/server/agent-status";
 
@@ -12,26 +12,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const threshold = new Date(Date.now() - HEARTBEAT_TIMEOUT_MS);
-
-  const staleAgents = await prisma.agent.findMany({
-    where: {
-      status: { not: "idle" },
-      OR: [{ lastHeartbeat: { lt: threshold } }, { lastHeartbeat: null }],
-    },
-    select: { id: true, name: true, status: true, detailedStatus: true },
-  });
+  const staleAgents = await findStaleAgents(HEARTBEAT_TIMEOUT_MS);
 
   let sleptCount = 0;
   for (const agent of staleAgents) {
     // Re-check so we don't overwrite a concurrent heartbeat (single write via central module)
-    const stillStale = await prisma.agent.findFirst({
-      where: {
-        id: agent.id,
-        status: { not: "idle" },
-        OR: [{ lastHeartbeat: { lt: threshold } }, { lastHeartbeat: null }],
-      },
-    });
+    const stillStale = await isAgentStill(agent.id, HEARTBEAT_TIMEOUT_MS);
     if (stillStale) {
       await applyAgentStatusUpdate(agent.id, {
         status: "idle",

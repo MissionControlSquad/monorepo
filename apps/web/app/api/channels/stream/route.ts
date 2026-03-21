@@ -1,4 +1,4 @@
-import { prisma } from "@/server/prisma";
+import { getChannelStreamData } from "@agentcenter/database";
 import { pubsub, agentStreamTopic } from "@/server/pubsub";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { resolveAgent } from "../../_lib/resolve-agent";
@@ -55,34 +55,9 @@ export async function GET(request: Request) {
 
         // --- Catch-up: replay unread messages from all channels ---
         try {
-          const memberships = await prisma.channelMember.findMany({
-            where: { profileId: agentProfileId },
-            select: { channelId: true, lastReadAt: true, joinedAt: true },
-          });
+          const { memberships, messagesByChannel } = await getChannelStreamData(agentProfileId);
 
-          for (const membership of memberships) {
-            const since = membership.lastReadAt ?? membership.joinedAt;
-            const unread = await prisma.channelMessage.findMany({
-              where: {
-                channelId: membership.channelId,
-                createdAt: { gt: since },
-                fromProfileId: { not: agentProfileId }, // skip own messages
-              },
-              include: {
-                fromProfile: {
-                  select: {
-                    id: true,
-                    kind: true,
-                    displayName: true,
-                    username: true,
-                    avatarUrl: true,
-                  },
-                },
-              },
-              orderBy: { createdAt: "asc" },
-              take: 50,
-            });
-
+          for (const { channelId, messages: unread } of messagesByChannel) {
             for (const msg of unread) {
               sentMessageIds.add(msg.id);
               send(

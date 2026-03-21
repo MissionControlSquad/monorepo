@@ -19,7 +19,7 @@ import { ProfilePickerDialog } from "../../../ui/ProfilePickerDialog";
 import type { ProfilePickerItem } from "../../../ui/ProfilePickerDialog";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import { Button } from "../../../ui";
-import type { Channel, ChannelMember } from "@/lib/types";
+import type { Channel, ChannelMember } from "@agentcenter/types";
 
 type ProjectFilter = "all" | "project";
 

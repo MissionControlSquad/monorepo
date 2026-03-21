@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/server/prisma";
+import {
+  findStaleSetupCloudVMs,
+  markCloudVMError,
+  logCloudVMEvent,
+  listRunningCloudVMs,
+  updateCloudVMUptime,
+} from "@agentcenter/database";
 import { env } from "@/server/env";
 import { deleteServer, deleteSSHKey } from "@/server/services/hetzner";
 
@@ -8,15 +14,6 @@ const SETUP_TIMEOUT_MS = 20 * 60 * 1000;
 
 // CX22 cost: ~$4.49/mo ~ 0.6 cents/hour
 const COST_CENTS_PER_HOUR = 0.6;
-
-const SETUP_STATUSES = [
-  "provisioning",
-  "waiting_for_ssh",
-  "installing_deps",
-  "installing_openclaw",
-  "configuring",
-  "starting_service",
-] as const;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -29,12 +26,7 @@ export async function GET(request: Request) {
   let uptimeUpdated = 0;
 
   // 1. VMs stuck in any setup state > 20 minutes
-  const stuckVMs = await prisma.cloudVM.findMany({
-    where: {
-      status: { in: [...SETUP_STATUSES] },
-      updatedAt: { lt: new Date(now.getTime() - SETUP_TIMEOUT_MS) },
-    },
-  });
+  const stuckVMs = await findStaleSetupCloudVMs(SETUP_TIMEOUT_MS);
 
   for (const vm of stuckVMs) {
     // Clean up Hetzner server
@@ -55,31 +47,19 @@ export async function GET(request: Request) {
       }
     }
 
-    await prisma.cloudVM.update({
-      where: { id: vm.id },
-      data: {
-        status: "error",
-        errorMessage: `Timed out during setup (stuck in "${vm.status}" for >20 min)`,
-        errorAt: now,
-        setupStep: null,
-      },
-    });
+    await markCloudVMError(
+      vm.id,
+      `Timed out during setup (stuck in "${vm.status}" for >20 min)`,
+      now,
+    );
 
-    await prisma.cloudVMLog.create({
-      data: {
-        vmId: vm.id,
-        message: `Timed out during setup (status: ${vm.status})`,
-        level: "error",
-      },
-    });
+    await logCloudVMEvent(vm.id, `Timed out during setup (status: ${vm.status})`, "error");
 
     timedOut++;
   }
 
   // 2. Update uptime and estimated cost for running VMs
-  const runningVMs = await prisma.cloudVM.findMany({
-    where: { status: "running" },
-  });
+  const runningVMs = await listRunningCloudVMs();
 
   for (const vm of runningVMs) {
     const secondsSinceUpdate = Math.floor((now.getTime() - vm.updatedAt.getTime()) / 1000);
@@ -89,13 +69,7 @@ export async function GET(request: Request) {
     const totalHours = newTotalSeconds / 3600;
     const estimatedCostCents = Math.round(totalHours * COST_CENTS_PER_HOUR);
 
-    await prisma.cloudVM.update({
-      where: { id: vm.id },
-      data: {
-        totalUptimeSeconds: newTotalSeconds,
-        estimatedCostCents,
-      },
-    });
+    await updateCloudVMUptime(vm.id, newTotalSeconds, estimatedCostCents);
 
     uptimeUpdated++;
   }

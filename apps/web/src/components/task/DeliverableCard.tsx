@@ -7,8 +7,8 @@ import { useHighlightedHtml } from "../../lib/useHighlight";
 import { Badge, Button } from "../ui";
 import { MentionText } from "../common/MarkdownWithMentions";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
-import { getAssetUrl } from "../../lib/asset-url";
-import type { Deliverable, Agent } from "@/lib/types";
+import { getAssetUrl } from "@agentcenter/utils";
+import type { Deliverable, Agent } from "@agentcenter/types";
 
 interface DeliverableCardProps {
   deliverable: Deliverable;

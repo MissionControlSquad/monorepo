@@ -1,6 +1,6 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS } from "../../../lib/feature-flag-keys";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { agentModel, messageModel } from "../../models";
 import { taskModel } from "../../models/task";
 import { Roles, TaskStatus } from "../../constants";

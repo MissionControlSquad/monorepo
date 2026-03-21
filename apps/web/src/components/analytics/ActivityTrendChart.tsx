@@ -15,7 +15,7 @@ import { format, parseISO } from "date-fns";
 import { ChartCard } from "./ChartCard";
 import { CHART_THEME } from "@/lib/chart-colors";
 import { useCurrentProject } from "../context/AppContext";
-import type { TrendPoint } from "@/lib/types";
+import type { TrendPoint } from "@agentcenter/types";
 
 export function ActivityTrendChart() {
   const { projectId } = useCurrentProject();

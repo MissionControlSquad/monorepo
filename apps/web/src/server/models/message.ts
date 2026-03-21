@@ -1,12 +1,12 @@
 import type { Message } from "@agentcenter/database";
-import { prisma } from "../prisma";
+import { messageDelegate } from "@agentcenter/database";
 import { emit } from "../events";
 import { EventTypes } from "../constants";
 import { Model } from "./base";
 
 class MessageModel extends Model<Message> {
   constructor() {
-    super(() => prisma.message);
+    super(messageDelegate);
   }
 
   async emitCreated(

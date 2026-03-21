@@ -1,8 +1,7 @@
-import { ProjectMemberStatus } from "@agentcenter/database";
+import { ProjectMemberStatus, findProfilesWithAgentIds } from "@agentcenter/database";
 import { on } from "../bus";
 import { invalidateMemberCaches } from "../../cache";
 import { notificationModel, projectMemberModel } from "../../models";
-import { prisma } from "../../prisma";
 
 on("project.member_added", async (e) => {
   if (e.type !== "project.member_added") return;
@@ -28,10 +27,7 @@ on("project.member_added", async (e) => {
   });
 
   // Resolve profileIds → agentIds for notification
-  const profiles = await prisma.profile.findMany({
-    where: { id: { in: members.map((m) => m.profileId) }, agentId: { not: null } },
-    select: { agentId: true },
-  });
+  const profiles = await findProfilesWithAgentIds(members.map((m) => m.profileId));
 
   const otherAgentIds = profiles.map((p) => p.agentId!).filter((id) => id !== e.agentId);
 
@@ -69,10 +65,7 @@ on("project.member_removed", async (e) => {
   });
 
   // Resolve profileIds → agentIds for notification
-  const profiles = await prisma.profile.findMany({
-    where: { id: { in: members.map((m) => m.profileId) }, agentId: { not: null } },
-    select: { agentId: true },
-  });
+  const profiles = await findProfilesWithAgentIds(members.map((m) => m.profileId));
 
   const otherAgentIds = profiles.map((p) => p.agentId!).filter((id) => id !== e.agentId);
 

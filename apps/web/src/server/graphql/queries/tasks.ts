@@ -1,6 +1,6 @@
 import { builder } from "../builder";
 import { taskModel, agentModel, workSessionModel } from "../../models";
-import { prisma, notDeleted } from "../../prisma";
+import { groupTasksByStatus } from "@agentcenter/database";
 import { workSummaryCache } from "../../cache";
 import { Roles } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
@@ -117,14 +117,9 @@ builder.queryField("taskCountsByStatus", (t) =>
     },
     resolve: async (_root, args) => {
       const filterWhere = buildTaskFilterWhere(args);
-      const results = await prisma.task.groupBy({
-        by: ["status"],
-        _count: { status: true },
-        where: {
-          ...notDeleted,
-          ...projectFilter(args.projectId),
-          ...filterWhere,
-        },
+      const results = await groupTasksByStatus({
+        ...projectFilter(args.projectId),
+        ...filterWhere,
       });
       return results.map((r) => ({
         status: r.status,

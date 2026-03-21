@@ -5,7 +5,7 @@ import { DELIVERABLES_BY_TASK_QUERY } from "../../lib/graphql/queries";
 import { useDeliverableNavigation } from "../../hooks/useDeliverableNavigation";
 import { Package } from "lucide-react";
 import { DeliverableCard } from "./DeliverableCard";
-import type { Agent, Deliverable } from "@/lib/types";
+import type { Agent, Deliverable } from "@agentcenter/types";
 
 interface TaskDeliverablesProps {
   taskId: string;
