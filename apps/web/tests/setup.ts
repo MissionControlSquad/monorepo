@@ -60,10 +60,13 @@ async function truncateAll() {
 
 beforeAll(async () => {
   // Push schema to test database
-  execSync("npx prisma db push --skip-generate --accept-data-loss", {
-    stdio: "inherit",
-    env: { ...process.env },
-  });
+  execSync(
+    "npx prisma db push --skip-generate --accept-data-loss --schema ../../packages/database/prisma/schema",
+    {
+      stdio: "inherit",
+      env: { ...process.env },
+    },
+  );
 
   // Start with a clean database
   await truncateAll();
