@@ -46,7 +46,7 @@ export function ProjectsPanel() {
             variant="ghost"
             size="icon-xs"
             onClick={() => setCreateOpen(true)}
-            className="text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50"
+            className="text-muted-foreground hover:text-primary hover:bg-primary/10"
             title="New project"
           >
             <Plus className="w-4 h-4" />
@@ -79,7 +79,7 @@ export function ProjectsPanel() {
               projects?.length === 0 ? (
                 <Link
                   href="/projects"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors"
                 >
                   <Plus className="w-3 h-3" />
                   Create a project
@@ -97,7 +97,7 @@ export function ProjectsPanel() {
                     href={`/projects/${p.id}`}
                     className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-left transition-colors ${
                       isSelected
-                        ? "bg-indigo-50 text-indigo-800 font-medium"
+                        ? "bg-primary/10 text-primary font-medium"
                         : "text-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >

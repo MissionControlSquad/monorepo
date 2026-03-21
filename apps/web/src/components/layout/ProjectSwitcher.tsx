@@ -102,7 +102,7 @@ export function ProjectSwitcher({ fullWidth }: { fullWidth?: boolean } = {}) {
                     <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
                     <span className="truncate flex-1 min-w-0 text-left">All Projects</span>
                     {projectId === null && (
-                      <Check className="w-3.5 h-3.5 text-indigo-600 ml-auto shrink-0" />
+                      <Check className="w-3.5 h-3.5 text-primary ml-auto shrink-0" />
                     )}
                   </button>
                   {projects && projects.length > 0 && (
@@ -128,7 +128,7 @@ export function ProjectSwitcher({ fullWidth }: { fullWidth?: boolean } = {}) {
                     <span className="text-[10px] font-medium text-warning shrink-0">Paused</span>
                   )}
                   {projectId === p.id && (
-                    <Check className="w-3.5 h-3.5 text-indigo-600 ml-auto shrink-0" />
+                    <Check className="w-3.5 h-3.5 text-primary ml-auto shrink-0" />
                   )}
                 </button>
               ))}
@@ -147,7 +147,7 @@ export function ProjectSwitcher({ fullWidth }: { fullWidth?: boolean } = {}) {
                 setOpen(false);
                 setIsCreateOpen(true);
               }}
-              className="w-full justify-start gap-2 px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 h-auto font-normal rounded-none"
+              className="w-full justify-start gap-2 px-3 py-2 text-sm text-primary hover:bg-primary/10 h-auto font-normal rounded-none"
             >
               <Plus className="w-4 h-4 shrink-0" />
               <span>New Project</span>

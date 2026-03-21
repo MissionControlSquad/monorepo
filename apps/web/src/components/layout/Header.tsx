@@ -76,7 +76,7 @@ export const Header = memo(function Header({
               aria-label="Toggle activity feed"
               className={
                 activityOpen
-                  ? "bg-indigo-50 text-indigo-700"
+                  ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }
             >

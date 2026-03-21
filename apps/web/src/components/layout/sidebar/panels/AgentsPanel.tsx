@@ -51,7 +51,7 @@ export function AgentsPanel({ onTaskClick }: AgentsPanelProps) {
         action={
           <Link
             href="/agents/new"
-            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-primary hover:bg-primary/10 rounded-md transition-colors"
             title="Add agent"
           >
             <UserPlus className="w-3 h-3" />
@@ -71,7 +71,7 @@ export function AgentsPanel({ onTaskClick }: AgentsPanelProps) {
             action={
               <Link
                 href="/agents/new"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors"
               >
                 <Plus className="w-3 h-3" />
                 Add your first agent

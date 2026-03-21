@@ -131,7 +131,7 @@ export function ChannelsPanel() {
               variant="ghost"
               size="icon-xs"
               onClick={() => channelsLayout?.openCreateModal()}
-              className="text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50"
+              className="text-muted-foreground hover:text-primary hover:bg-primary/10"
               title="Create channel"
               aria-label="Create channel"
             >
@@ -195,7 +195,7 @@ export function ChannelsPanel() {
                 variant="ghost"
                 size="icon-xs"
                 onClick={() => setStartDmOpen(true)}
-                className="text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50"
+                className="text-muted-foreground hover:text-primary hover:bg-primary/10"
                 title="New message"
                 aria-label="New message"
               >
@@ -223,7 +223,7 @@ export function ChannelsPanel() {
                         href={`/channels/${ch.slug}`}
                         className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm transition-colors ${
                           isActive
-                            ? "bg-indigo-50 text-indigo-800 font-medium"
+                            ? "bg-primary/10 text-primary font-medium"
                             : "text-foreground hover:bg-muted hover:text-foreground"
                         }`}
                       >
@@ -241,7 +241,7 @@ export function ChannelsPanel() {
                           )}
                         </span>
                         {(ch.unreadCount ?? 0) > 0 && (
-                          <span className="shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-indigo-600 text-white text-xs font-medium flex items-center justify-center">
+                          <span className="shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium flex items-center justify-center">
                             {ch.unreadCount! > 99 ? "99+" : ch.unreadCount}
                           </span>
                         )}
@@ -269,7 +269,7 @@ export function ChannelsPanel() {
                 <Button
                   variant="ghost"
                   onClick={() => channelsLayout?.openCreateModal()}
-                  className="text-sm font-medium text-indigo-600 hover:text-indigo-700 h-auto p-0"
+                  className="text-sm font-medium text-primary hover:text-primary/80 h-auto p-0"
                 >
                   Create one
                 </Button>
@@ -286,14 +286,14 @@ export function ChannelsPanel() {
                       href={`/channels/${ch.slug}`}
                       className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm transition-colors ${
                         isActive
-                          ? "bg-indigo-50 text-indigo-800 font-medium"
+                          ? "bg-primary/10 text-primary font-medium"
                           : "text-foreground hover:bg-muted hover:text-foreground"
                       }`}
                     >
                       <Icon className="w-4 h-4 shrink-0 text-muted-foreground" />
                       <span className="truncate flex-1 min-w-0">{ch.name}</span>
                       {(ch.unreadCount ?? 0) > 0 && (
-                        <span className="shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-indigo-600 text-white text-xs font-medium flex items-center justify-center">
+                        <span className="shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium flex items-center justify-center">
                           {ch.unreadCount! > 99 ? "99+" : ch.unreadCount}
                         </span>
                       )}

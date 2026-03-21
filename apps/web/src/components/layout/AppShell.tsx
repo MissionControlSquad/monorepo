@@ -146,7 +146,7 @@ export function AppShell({ children, modal }: AppShellProps) {
     return (
       <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-border border-t-indigo-600 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-border border-t-primary rounded-full animate-spin" />
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -157,7 +157,7 @@ export function AppShell({ children, modal }: AppShellProps) {
     return (
       <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-border border-t-indigo-600 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-border border-t-primary rounded-full animate-spin" />
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>

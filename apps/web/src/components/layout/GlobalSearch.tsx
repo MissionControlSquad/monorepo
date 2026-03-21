@@ -251,7 +251,9 @@ export function GlobalSearch() {
                         onClick={() => navigateToItem({ type: "task", id: task._id, data: task })}
                         onMouseEnter={() => setHighlightIndex(idx)}
                         className={`w-full text-left flex items-center gap-2.5 px-3 py-2 text-sm transition rounded-lg ${
-                          highlightIndex === idx ? "bg-indigo-50 text-indigo-900" : "hover:bg-muted"
+                          highlightIndex === idx
+                            ? "bg-primary/10 text-foreground"
+                            : "hover:bg-muted"
                         }`}
                       >
                         <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -279,7 +281,9 @@ export function GlobalSearch() {
                         onClick={() => navigateToItem({ type: "message", id: msg._id, data: msg })}
                         onMouseEnter={() => setHighlightIndex(idx)}
                         className={`w-full text-left flex items-start gap-2.5 px-3 py-2 text-sm transition rounded-lg ${
-                          highlightIndex === idx ? "bg-indigo-50 text-indigo-900" : "hover:bg-muted"
+                          highlightIndex === idx
+                            ? "bg-primary/10 text-foreground"
+                            : "hover:bg-muted"
                         }`}
                       >
                         <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
@@ -318,7 +322,9 @@ export function GlobalSearch() {
                         }
                         onMouseEnter={() => setHighlightIndex(idx)}
                         className={`w-full text-left flex items-start gap-2.5 px-3 py-2 text-sm transition rounded-lg ${
-                          highlightIndex === idx ? "bg-indigo-50 text-indigo-900" : "hover:bg-muted"
+                          highlightIndex === idx
+                            ? "bg-primary/10 text-foreground"
+                            : "hover:bg-muted"
                         }`}
                       >
                         <Package className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />

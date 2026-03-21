@@ -120,7 +120,7 @@ function AssigneeSection({
             isActive={unassignedOnly}
             onClick={onToggleUnassigned}
             avatarClass={
-              unassignedOnly ? "bg-indigo-200 text-indigo-700" : "bg-muted text-muted-foreground"
+              unassignedOnly ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
             }
           />
         )}
@@ -175,21 +175,18 @@ function AgentRow({
       type="button"
       onClick={onClick}
       className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm transition-colors ${
-        isActive ? "bg-indigo-50 text-indigo-700" : "text-muted-foreground hover:bg-muted"
+        isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
       }`}
     >
       <div
         className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-          avatarClass ??
-          (isActive
-            ? "bg-gradient-to-br from-indigo-400 to-indigo-600 text-white"
-            : "bg-gray-300 text-white")
+          avatarClass ?? (isActive ? "bg-primary text-white" : "bg-muted-foreground/40 text-white")
         }`}
       >
         {avatar}
       </div>
       <span className="truncate">{label}</span>
-      {isActive && <div className="ml-auto w-2 h-2 rounded-full bg-indigo-500 shrink-0" />}
+      {isActive && <div className="ml-auto w-2 h-2 rounded-full bg-primary shrink-0" />}
     </button>
   );
 }

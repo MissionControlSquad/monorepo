@@ -90,7 +90,7 @@ export function NotificationPreferences() {
                 onClick={() => toggle(key)}
                 disabled={saving}
                 className={`relative w-9 h-5 rounded-full transition-colors ${
-                  prefs[key] ? "bg-indigo-600" : "bg-gray-300"
+                  prefs[key] ? "bg-primary" : "bg-muted-foreground/40"
                 }`}
               >
                 <span
@@ -114,7 +114,7 @@ export function NotificationPreferences() {
                 onClick={() => toggle(key)}
                 disabled={saving}
                 className={`relative w-9 h-5 rounded-full transition-colors ${
-                  prefs[key] ? "bg-indigo-600" : "bg-gray-300"
+                  prefs[key] ? "bg-primary" : "bg-muted-foreground/40"
                 }`}
               >
                 <span

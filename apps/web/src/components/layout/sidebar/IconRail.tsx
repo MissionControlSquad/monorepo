@@ -100,7 +100,7 @@ export function IconRail({ onCreateTask }: IconRailProps) {
         variant="primary"
         size="icon"
         onClick={onCreateTask}
-        className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white mb-3"
+        className="rounded-xl mb-3"
         title="New Task"
         aria-label="New Task"
       >

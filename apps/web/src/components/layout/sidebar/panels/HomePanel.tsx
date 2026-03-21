@@ -66,7 +66,7 @@ export function HomePanel() {
                 href={href}
                 className={`flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium rounded-lg transition-colors ${
                   active
-                    ? "bg-indigo-50 text-indigo-700"
+                    ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
               >
@@ -117,7 +117,7 @@ export function HomePanel() {
         <div className="flex-shrink-0 px-2 pb-2">
           <Link
             href="/agents"
-            className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
           >
             View all agents
             <ChevronRight className="w-3 h-3" />

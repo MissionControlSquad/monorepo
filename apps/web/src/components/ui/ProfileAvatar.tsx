@@ -177,7 +177,7 @@ function ProfileAvatarCore({ src, name, emoji, size = "md", className }: Profile
       <div
         className={cn(
           dim,
-          "rounded-full flex items-center justify-center bg-indigo-100 shrink-0",
+          "rounded-full flex items-center justify-center bg-primary/10 shrink-0",
           EMOJI_TEXT[size],
           className,
         )}
@@ -191,7 +191,7 @@ function ProfileAvatarCore({ src, name, emoji, size = "md", className }: Profile
     <div
       className={cn(
         dim,
-        "rounded-full flex items-center justify-center text-white font-bold bg-gradient-to-br from-blue-400 to-indigo-500 shrink-0",
+        "rounded-full flex items-center justify-center text-primary-foreground font-bold bg-primary shrink-0",
         INITIAL_TEXT[size],
         className,
       )}

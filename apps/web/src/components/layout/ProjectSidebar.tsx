@@ -34,7 +34,7 @@ export function ProjectSidebar({ isOpen, onClose }: ProjectSidebarProps) {
           onClick={() => handleSelect(null)}
           className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${
             projectId === null
-              ? "bg-indigo-50 text-indigo-700 border-l-2 border-indigo-500"
+              ? "bg-primary/10 text-primary border-l-2 border-primary"
               : "text-foreground hover:bg-muted border-l-2 border-transparent"
           }`}
         >
@@ -52,7 +52,7 @@ export function ProjectSidebar({ isOpen, onClose }: ProjectSidebarProps) {
             onClick={() => handleSelect(project.id)}
             className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
               projectId === project.id
-                ? "bg-indigo-50 text-indigo-700 font-medium border-l-2 border-indigo-500"
+                ? "bg-primary/10 text-primary font-medium border-l-2 border-primary"
                 : "text-foreground hover:bg-muted border-l-2 border-transparent"
             }`}
           >

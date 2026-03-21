@@ -16,7 +16,7 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
         <div
           className={cn(
             "inline-flex items-center justify-center size-16 rounded-2xl",
-            "bg-indigo-100 text-indigo-600 mb-5 [&_svg]:size-8",
+            "bg-primary/10 text-primary mb-5 [&_svg]:size-8",
           )}
         >
           {icon}

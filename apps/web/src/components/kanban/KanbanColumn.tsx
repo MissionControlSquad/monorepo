@@ -25,7 +25,7 @@ const COLUMN_ICON_MAP: Record<string, React.ComponentType<{ className?: string }
 
 const COLOR_CLASSES = {
   gray: "bg-muted text-foreground",
-  blue: "bg-indigo-100 text-indigo-700",
+  blue: "bg-primary/10 text-primary",
   yellow: "bg-amber-100 text-amber-700",
   purple: "bg-purple-100 text-purple-700",
   green: "bg-emerald-100 text-emerald-700",
@@ -43,7 +43,7 @@ const BADGE_VARIANT_MAP: Record<string, "gray" | "blue" | "yellow" | "green" | "
 
 const ICON_COLOR_MAP: Record<string, string> = {
   gray: "text-muted-foreground",
-  blue: "text-indigo-500",
+  blue: "text-primary",
   yellow: "text-amber-500",
   purple: "text-purple-500",
   green: "text-emerald-500",
@@ -126,7 +126,7 @@ export const KanbanColumn = memo(function KanbanColumn({
         }}
         className={`p-1.5 rounded-lg transition-all duration-200 flex-1 overflow-y-auto ${
           isOver
-            ? "bg-indigo-50/80 border-2 border-dashed border-indigo-300"
+            ? "bg-primary/5 border-2 border-dashed border-primary/30"
             : "border-2 border-transparent"
         }`}
       >

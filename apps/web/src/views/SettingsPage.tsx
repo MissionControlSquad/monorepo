@@ -191,9 +191,9 @@ export function SettingsPage() {
             <span
               className={`text-xs px-2 py-1 rounded-full font-medium ${
                 licenseInfo.status === "active"
-                  ? "bg-emerald-500/10 text-emerald-600"
+                  ? "bg-success-muted text-success"
                   : licenseInfo.status === "grace"
-                    ? "bg-amber-500/10 text-amber-600"
+                    ? "bg-warning-muted text-warning"
                     : "bg-destructive/10 text-destructive"
               }`}
             >

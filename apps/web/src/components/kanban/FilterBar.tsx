@@ -125,13 +125,13 @@ export const FilterBar = memo(function FilterBar({
       chips.push({
         key: `agent-${agentId}`,
         label: agent.name,
-        color: "bg-indigo-100 text-indigo-700",
+        color: "bg-primary/10 text-primary",
       });
     }
   }
 
   for (const tag of filters.tags) {
-    chips.push({ key: `tag-${tag}`, label: tag, color: "bg-gray-800 text-white" });
+    chips.push({ key: `tag-${tag}`, label: tag, color: "bg-foreground text-background" });
   }
 
   if (filters.noProjectOnly) {
@@ -189,14 +189,14 @@ export const FilterBar = memo(function FilterBar({
         onClick={onOpenFilters}
         className={`relative flex items-center gap-1.5 shrink-0 ${
           activeCount > 0
-            ? "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+            ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
             : "bg-background text-muted-foreground border-border hover:bg-muted"
         }`}
       >
         <SlidersHorizontal className="w-4 h-4" />
         <span>Filters</span>
         {activeCount > 0 && (
-          <span className="inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold rounded-full bg-indigo-600 text-white">
+          <span className="inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold rounded-full bg-primary text-primary-foreground">
             {activeCount}
           </span>
         )}

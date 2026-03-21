@@ -95,7 +95,7 @@ export function ProfileSidebar({ onClose, mounted }: ProfileSidebarProps) {
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
           {!openProfileId ? null : result.fetching && !profile ? (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <div className="w-8 h-8 border-2 border-border border-t-indigo-600 rounded-full animate-spin" />
+              <div className="w-8 h-8 border-2 border-border border-t-primary rounded-full animate-spin" />
               <p className="text-sm text-muted-foreground">Loading profile...</p>
             </div>
           ) : profile ? (

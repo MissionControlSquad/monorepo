@@ -150,7 +150,7 @@ export function ActivityFeed({ onTaskClick, onClose }: ActivityFeedProps) {
       <div className="flex-shrink-0 px-4 py-3 border-b border-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
-            <Activity className="w-5 h-5 text-indigo-600" />
+            <Activity className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-semibold text-foreground">Activity Feed</h2>
             {filteredActivities.length > 0 && (
               <span className="text-xs text-muted-foreground">({filteredActivities.length})</span>
@@ -308,7 +308,7 @@ function ActivityList({
       <div className="flex-1 overflow-y-auto p-8 text-center">
         {hasActiveFilters ? (
           <>
-            <Activity className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <Activity className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-muted-foreground text-sm">
               No activities match the selected filters
             </p>
@@ -316,15 +316,15 @@ function ActivityList({
               variant="ghost"
               size="sm"
               onClick={clearFilters}
-              className="mt-3 text-indigo-600 hover:text-indigo-700"
+              className="mt-3 text-primary hover:text-primary/80"
             >
               Clear filters
             </Button>
           </>
         ) : (
           <>
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-indigo-50 flex items-center justify-center">
-              <Coffee className="w-8 h-8 text-indigo-400" />
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+              <Coffee className="w-8 h-8 text-primary/70" />
             </div>
             <h3 className="text-sm font-semibold text-foreground mb-1">All quiet on the front</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
@@ -457,7 +457,7 @@ export function ActivityItem({
           {profile && (
             <div className="flex items-center gap-1">
               {profile.agentId ? (
-                <Bot className="w-3 h-3 text-indigo-400 shrink-0" />
+                <Bot className="w-3 h-3 text-primary/70 shrink-0" />
               ) : (
                 <User className="w-3 h-3 text-emerald-400 shrink-0" />
               )}

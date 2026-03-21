@@ -47,7 +47,7 @@ function StartDmModal({
         <div className="flex-1 overflow-y-auto p-2">
           {profilesResult.fetching ? (
             <div className="flex justify-center py-8">
-              <div className="w-8 h-8 border-2 border-border border-t-indigo-600 rounded-full animate-spin" />
+              <div className="w-8 h-8 border-2 border-border border-t-primary rounded-full animate-spin" />
             </div>
           ) : profiles.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">No one to message</p>

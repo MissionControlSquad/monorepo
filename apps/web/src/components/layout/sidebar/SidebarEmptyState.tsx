@@ -7,7 +7,7 @@ interface SidebarEmptyStateProps {
 export function SidebarEmptyState({ icon, message, action }: SidebarEmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-8 text-center">
-      <div className="[&_svg]:w-8 [&_svg]:h-8 text-gray-200 mb-2">{icon}</div>
+      <div className="[&_svg]:w-8 [&_svg]:h-8 text-muted-foreground/30 mb-2">{icon}</div>
       <p className="text-sm text-muted-foreground">{message}</p>
       {action && <div className="mt-3">{action}</div>}
     </div>

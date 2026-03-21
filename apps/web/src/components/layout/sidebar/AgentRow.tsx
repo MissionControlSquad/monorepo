@@ -133,7 +133,7 @@ export const AgentRow = memo(function AgentRow({
 
   return (
     <div
-      className={`rounded-lg transition cursor-pointer ${isPending ? "bg-amber-50 border border-dashed border-amber-300" : isVacation ? "opacity-50 pointer-events-none" : isSelected ? "bg-indigo-50" : "hover:bg-muted"}`}
+      className={`rounded-lg transition cursor-pointer ${isPending ? "bg-warning-muted border border-dashed border-warning/30" : isVacation ? "opacity-50 pointer-events-none" : isSelected ? "bg-primary/10" : "hover:bg-muted"}`}
       onClick={() => router.push(`/agents/${agent.id}`)}
     >
       <div className="flex items-center px-3 py-2 gap-3">
@@ -149,7 +149,7 @@ export const AgentRow = memo(function AgentRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium text-foreground truncate hover:text-indigo-600 transition">
+            <span className="text-sm font-medium text-foreground truncate hover:text-primary transition">
               {agent.name}
             </span>
             {isVacation && <Palmtree className="w-3 h-3 text-warning flex-shrink-0" />}

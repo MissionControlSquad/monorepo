@@ -45,7 +45,7 @@ const TYPE_COLORS: Record<string, string> = {
   task_approved: "text-green-500",
   task_rejected: "text-red-500",
   new_comment: "text-muted-foreground",
-  mention: "text-indigo-500",
+  mention: "text-primary",
   deliverable_submitted: "text-purple-500",
   task_assigned: "text-blue-500",
 };
@@ -96,7 +96,7 @@ export function NotificationDropdown({ onClose, onMarkAllRead }: NotificationDro
         <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
         <button
           onClick={handleMarkAllRead}
-          className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+          className="text-xs text-primary hover:text-primary/80 font-medium"
         >
           Mark all read
         </button>
@@ -126,7 +126,7 @@ export function NotificationDropdown({ onClose, onMarkAllRead }: NotificationDro
               key={n.id}
               onClick={() => handleClick(n)}
               className={`w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0 flex gap-3 ${
-                isUnread ? "bg-indigo-50/50" : ""
+                isUnread ? "bg-primary/5" : ""
               }`}
             >
               <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${iconColor}`} />
@@ -141,7 +141,7 @@ export function NotificationDropdown({ onClose, onMarkAllRead }: NotificationDro
                   {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
                 </p>
               </div>
-              {isUnread && <span className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shrink-0" />}
+              {isUnread && <span className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />}
             </button>
           );
         })}

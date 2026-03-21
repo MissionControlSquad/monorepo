@@ -209,7 +209,7 @@ export const TaskCard = memo(function TaskCard({ task, agents: _agents, onClick 
           )}
           {task.parentTaskId && (
             <span
-              className="inline-flex items-center gap-0.5 text-[10px] text-indigo-500 font-medium"
+              className="inline-flex items-center gap-0.5 text-[10px] text-primary font-medium"
               title="Child task"
             >
               <ArrowUpRight className="w-3 h-3" />

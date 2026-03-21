@@ -18,15 +18,15 @@ interface CloudVM {
 
 const STATUS_COLORS: Record<string, { dot: string; text: string }> = {
   running: { dot: "bg-success", text: "text-success" },
-  stopped: { dot: "bg-gray-400", text: "text-muted-foreground" },
+  stopped: { dot: "bg-muted-foreground", text: "text-muted-foreground" },
   error: { dot: "bg-destructive", text: "text-destructive" },
-  provisioning: { dot: "bg-blue-400", text: "text-blue-600" },
-  waiting_for_ssh: { dot: "bg-blue-400", text: "text-blue-600" },
-  installing_deps: { dot: "bg-indigo-400", text: "text-indigo-600" },
-  installing_openclaw: { dot: "bg-indigo-400", text: "text-indigo-600" },
-  configuring: { dot: "bg-violet-400", text: "text-violet-600" },
-  starting_service: { dot: "bg-purple-400", text: "text-purple-600" },
-  destroying: { dot: "bg-orange-400", text: "text-orange-600" },
+  provisioning: { dot: "bg-primary", text: "text-primary" },
+  waiting_for_ssh: { dot: "bg-primary", text: "text-primary" },
+  installing_deps: { dot: "bg-primary", text: "text-primary" },
+  installing_openclaw: { dot: "bg-primary", text: "text-primary" },
+  configuring: { dot: "bg-primary", text: "text-primary" },
+  starting_service: { dot: "bg-primary", text: "text-primary" },
+  destroying: { dot: "bg-warning", text: "text-warning" },
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -92,7 +92,7 @@ export function CloudPanel() {
         action={
           <Link
             href="/cloud"
-            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-primary hover:bg-primary/10 rounded-md transition-colors"
           >
             Manage
           </Link>
@@ -114,7 +114,7 @@ export function CloudPanel() {
             action={
               <Link
                 href="/cloud"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors"
               >
                 <Plus className="w-3 h-3" />
                 Create a VM
@@ -133,7 +133,7 @@ export function CloudPanel() {
                     href={`/cloud/${vm.id}`}
                     className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-colors ${
                       isActive
-                        ? "bg-indigo-50 text-indigo-800 font-medium"
+                        ? "bg-primary/10 text-primary font-medium"
                         : "text-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
