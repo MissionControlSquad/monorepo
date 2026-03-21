@@ -19,6 +19,7 @@ import { MarkdownWithMentions } from "../common/MarkdownWithMentions";
 import { CopyButton } from "../common/CopyButton";
 import { TimeAgo } from "../common/TimeAgo";
 import { Badge, Button } from "../ui";
+import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { DELIVERABLE_VERSIONS_QUERY } from "../../lib/graphql/queries";
 import { getAssetUrl } from "@agentcenter/utils";
 import type { Deliverable, Agent, DeliverableVersion } from "@agentcenter/types";
@@ -240,9 +241,11 @@ export function DeliverableFullView({
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                   {agent && (
                     <>
-                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-[10px] font-bold">
-                        {agent.avatar || agent.name?.[0]}
-                      </div>
+                      {"id" in agent ? (
+                        <ProfileAvatar agentId={agent.id as string} size="xs" />
+                      ) : (
+                        <ProfileAvatar name={agent.name} size="xs" />
+                      )}
                       <span className="text-xs text-muted-foreground">{agent.name}</span>
                       <span className="text-xs text-gray-300">·</span>
                     </>

@@ -48,7 +48,7 @@ export function OnboardingView() {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-neutral-950 flex flex-col">
+    <div className="min-h-screen bg-muted flex flex-col">
       {/* Hero */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center">
         <div className="mb-8">
@@ -59,8 +59,8 @@ export function OnboardingView() {
             height={72}
             className="mx-auto rounded-2xl mb-6"
           />
-          <h1 className="text-4xl font-bold text-neutral-100 mb-4">Welcome to AgentCenter</h1>
-          <p className="text-lg text-neutral-400 max-w-2xl mx-auto leading-relaxed">
+          <h1 className="text-4xl font-bold text-foreground mb-4">Welcome to AgentCenter</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             AgentCenter is your autonomous AI agent management system. Build a squad of specialized
             agents that wake up on schedule, collaborate on tasks, and deliver results — all
             coordinated from this dashboard.
@@ -73,29 +73,31 @@ export function OnboardingView() {
             size="lg"
             iconRight={<ArrowRight />}
             onClick={() => router.push("/agents/new")}
-            className="px-8 py-4 text-lg shadow-lg shadow-indigo-900/20"
+            className="px-8 py-4 text-lg"
           >
             Create Your First Agent
           </Button>
-          <p className="text-sm text-neutral-500 mt-3">
+          <p className="text-sm text-muted-foreground mt-3">
             Start with a lead agent to coordinate your squad
           </p>
         </div>
 
         {/* Feature grid */}
         <div className="max-w-4xl w-full">
-          <h2 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-6">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-6">
             What you can do with AgentCenter
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {FEATURES.map((feature) => (
               <div
                 key={feature.title}
-                className="text-left p-5 rounded-xl border border-neutral-800 hover:border-neutral-700 transition-colors"
+                className="text-left p-5 rounded-xl border border-border bg-background hover:shadow-sm transition-all"
               >
-                <feature.icon className="w-5 h-5 text-neutral-400 mb-3" />
-                <h3 className="font-semibold text-neutral-100 text-sm mb-1.5">{feature.title}</h3>
-                <p className="text-xs text-neutral-500 leading-relaxed">{feature.description}</p>
+                <feature.icon className="w-5 h-5 text-muted-foreground mb-3" />
+                <h3 className="font-semibold text-foreground text-sm mb-1.5">{feature.title}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
@@ -103,8 +105,8 @@ export function OnboardingView() {
       </div>
 
       {/* Footer */}
-      <div className="border-t border-neutral-800 px-4 py-6">
-        <div className="flex items-center justify-center gap-2 text-xs text-neutral-600">
+      <div className="border-t border-border px-4 py-6">
+        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
           <span>agentcenter.cloud</span>
         </div>
       </div>

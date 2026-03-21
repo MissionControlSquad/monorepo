@@ -16,6 +16,7 @@ import { CopyButton } from "../common/CopyButton";
 import { MessageReactions } from "./MessageReactions";
 import { Button } from "../ui";
 import { MessageCircle, Send, Loader2 } from "lucide-react";
+import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { useAppContext } from "../context/AppContext";
 import type { TaskMessage } from "@agentcenter/types";
 
@@ -252,12 +253,12 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
                   className={`flex gap-3 group ${message._optimistic ? "animate-pulse" : ""}`}
                 >
                   {/* Avatar */}
-                  <div className="shrink-0">
-                    <div
-                      className={`w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-xs font-bold ${message._optimistic ? "opacity-50" : ""}`}
-                    >
-                      {sender?.avatarUrl?.[0] || sender?.displayName?.[0] || "?"}
-                    </div>
+                  <div className={`shrink-0 ${message._optimistic ? "opacity-50" : ""}`}>
+                    {sender?.id ? (
+                      <ProfileAvatar profileId={sender.id} size="sm+" />
+                    ) : (
+                      <ProfileAvatar name={sender?.displayName} size="sm+" />
+                    )}
                   </div>
 
                   {/* Content */}

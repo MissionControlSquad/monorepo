@@ -8,6 +8,7 @@ import { CHANNELS_QUERY, PROFILES_QUERY } from "../../lib/graphql/queries";
 import { START_CONVERSATION } from "../../lib/graphql/mutations";
 import { useAppContext, useCurrentProject } from "../context/AppContext";
 import { useChannelsLayout } from "./ChannelsLayoutContext";
+import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { Hash, Lock, Plus, MessageSquare, FolderKanban } from "lucide-react";
 import { CreateChannelModal } from "@/components/channels/CreateChannelModal";
 import { toast } from "sonner";
@@ -65,13 +66,7 @@ function StartDmModal({
                       onClick={() => onSelect(p.id)}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm hover:bg-muted transition-colors"
                     >
-                      <span className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-muted-foreground shrink-0 overflow-hidden">
-                        {p.avatarUrl ? (
-                          <img src={p.avatarUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          (p.displayName?.[0] ?? "?")
-                        )}
-                      </span>
+                      <ProfileAvatar profileId={p.id} size="md+" />
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-foreground truncate">{p.displayName}</p>
                         {p.username && (

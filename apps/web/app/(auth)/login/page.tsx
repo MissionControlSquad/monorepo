@@ -104,7 +104,7 @@ export default function LoginPage() {
         </div>
 
         {/* Form Card */}
-        <div className="rounded-xl border border-border bg-card p-6">
+        <div className="p-0 sm:rounded-xl sm:border sm:border-border sm:bg-card sm:p-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField

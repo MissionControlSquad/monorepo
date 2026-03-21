@@ -20,7 +20,7 @@ import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { Button } from "../../ui";
-import { getAssetUrl } from "@agentcenter/utils";
+import { ProfileAvatar } from "../../ui/ProfileAvatar";
 
 interface IconRailProps {
   onCreateTask: () => void;
@@ -115,16 +115,11 @@ export function IconRail({ onCreateTask }: IconRailProps) {
           title={currentUserProfile?.displayName ?? "Account"}
           aria-label={currentUserProfile?.displayName ?? "Account"}
         >
-          {getAssetUrl(currentUserProfile?.avatarUrl) ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={getAssetUrl(currentUserProfile?.avatarUrl)!}
-              alt=""
-              className="w-full h-full object-cover"
-            />
+          {currentUserProfile?.id ? (
+            <ProfileAvatar profileId={currentUserProfile.id} size="md+" />
           ) : (
             <span className="w-full h-full bg-muted flex items-center justify-center text-sm font-medium text-muted-foreground">
-              {currentUserProfile?.displayName?.[0] ?? "?"}
+              ?
             </span>
           )}
         </button>

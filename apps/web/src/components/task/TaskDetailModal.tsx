@@ -1126,9 +1126,7 @@ export function TaskDetailModal({
                             key={entry.agentName ?? entry.agentId}
                             className="flex items-center gap-2"
                           >
-                            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-[8px] font-bold">
-                              {entry.agentName?.[0] ?? "?"}
-                            </div>
+                            <ProfileAvatar agentId={entry.agentId} size="2xs" />
                             <span className="text-xs text-muted-foreground flex-1 truncate">
                               {entry.agentName ?? "Unknown"}
                             </span>

@@ -63,7 +63,7 @@ export const USE_CASES: OnboardingUseCase[] = [
     id: "custom",
     emoji: "🛠️",
     title: "Custom",
-    subtitle: "Start from scratch and pick your own agents",
+    subtitle: "Start with a lead agent and build your own team",
     templateIds: [],
   },
 ];

@@ -8,25 +8,36 @@ import { TeamPreviewStep, type TeamAgent } from "./TeamPreviewStep";
 import { BatchCreateStep } from "./BatchCreateStep";
 import { TEMPLATES } from "@/lib/agent-wizard-templates";
 import { USE_CASES } from "@/lib/onboarding-use-cases";
+import { getAgentName } from "@/lib/agent-default-names";
 import type { OnboardingUseCase } from "@/lib/onboarding-use-cases";
 import { useAgentStatus } from "../context/AgentStatusContext";
 
 type Step = "welcome" | "use-case" | "preview" | "creating";
+
+function nameToUsername(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "");
+}
 
 function templateIdsToTeam(ids: string[]): TeamAgent[] {
   return ids
     .map((id) => {
       const t = TEMPLATES.find((t) => t.id === id);
       if (!t) return null;
+      const agentName = getAgentName(t.id, t.name);
       return {
         templateId: t.id,
-        name: t.name,
+        name: agentName,
+        username: nameToUsername(agentName),
         role: t.role,
         emoji: t.emoji,
         description: t.description,
         personality: t.personality,
         level: t.level,
         capabilities: t.capabilities,
+        skills: t.skills,
       };
     })
     .filter((a): a is TeamAgent => a !== null);
@@ -42,9 +53,25 @@ export function OnboardingWizard() {
   const [licenseLimit, setLicenseLimit] = useState<number | null>(null);
   const [resolved, setResolved] = useState(false);
 
+  const fetchLicenseLimit = useCallback(async () => {
+    try {
+      const res = await fetch("/api/license");
+      if (res.ok) {
+        const data = await res.json();
+        const limit = data.maxAgents;
+        setLicenseLimit(limit === -1 ? null : (limit ?? null));
+      }
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  // Pre-fetch license limit on mount
+  useEffect(() => {
+    fetchLicenseLimit();
+  }, [fetchLicenseLimit]);
+
   // On mount: fetch saved progress from the API.
-  // The GET endpoint auto-completes onboarding if agents already exist,
-  // so if it returns completed=true, AppShell will handle the redirect.
   useEffect(() => {
     if (resolved) return;
 
@@ -52,8 +79,6 @@ export function OnboardingWizard() {
       .then((r) => r.json())
       .then((data) => {
         if (data.completed) {
-          // Onboarding already done (API auto-completed because agents exist)
-          // Redirect to dashboard — AppShell will allow through
           router.push("/");
           return;
         }
@@ -78,26 +103,11 @@ export function OnboardingWizard() {
       });
   }, [resolved, router]);
 
-  const fetchLicenseLimit = useCallback(async () => {
-    try {
-      const res = await fetch("/api/license");
-      if (res.ok) {
-        const data = await res.json();
-        const limit = data.maxAgents;
-        setLicenseLimit(limit === -1 ? null : (limit ?? null));
-      }
-    } catch {
-      // Non-critical
-    }
-  }, []);
-
   const handleUseCaseSelect = useCallback(
     (useCase: OnboardingUseCase) => {
-      if (useCase.id === "custom") {
-        router.push("/agents/new");
-        return;
-      }
-      setTeam(templateIdsToTeam(useCase.templateIds));
+      // Custom: start with just the squad lead; other use cases get the full team
+      const teamIds = useCase.id === "custom" ? ["squad-lead"] : useCase.templateIds;
+      setTeam(templateIdsToTeam(teamIds));
       setStep("preview");
 
       // Persist category selection
@@ -132,6 +142,7 @@ export function OnboardingWizard() {
     const payload = team.map((a) => ({
       name: a.name,
       role: a.role,
+      username: a.username,
       identityEmoji: a.emoji,
       personality: a.personality,
       level: a.level as "junior" | "specialist" | "senior" | "lead",
@@ -170,10 +181,10 @@ export function OnboardingWizard() {
 
   if (!resolved) {
     return (
-      <div className="min-h-[100dvh] bg-neutral-950 flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-muted flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-neutral-700 border-t-indigo-500 rounded-full animate-spin" />
-          <p className="text-sm text-neutral-500">Loading...</p>
+          <div className="w-8 h-8 border-2 border-border border-t-primary rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -198,6 +209,14 @@ export function OnboardingWizard() {
       );
 
     case "creating":
-      return <BatchCreateStep team={team} createdCount={createdCount} error={createError} />;
+      return (
+        <BatchCreateStep
+          team={team}
+          createdCount={createdCount}
+          error={createError}
+          onRetry={createError ? handleCreate : undefined}
+          onBack={createError ? () => setStep("preview") : undefined}
+        />
+      );
   }
 }

@@ -10,6 +10,7 @@ import { MarkdownWithMentions } from "../common/MarkdownWithMentions";
 import { CopyButton } from "../common/CopyButton";
 import { TimeAgo } from "../common/TimeAgo";
 import { Button } from "../ui";
+import { ProfileAvatar } from "../ui/ProfileAvatar";
 import {
   Select,
   SelectContent,
@@ -446,14 +447,9 @@ export function ActivityItem({
     >
       <div className="flex items-start gap-2.5">
         {profile ? (
-          <div
-            className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center flex-shrink-0 text-white text-xs font-medium"
-            title={profile.displayName}
-          >
-            {profile.displayName?.[0]}
-          </div>
+          <ProfileAvatar profileId={profile.id} size="sm+" />
         ) : (
-          <div className="w-7 h-7 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+          <div className="w-7 h-7 bg-muted rounded-full flex items-center justify-center shrink-0">
             <Activity className="w-3.5 h-3.5 text-muted-foreground" />
           </div>
         )}

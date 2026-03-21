@@ -108,7 +108,7 @@ export default function ActivateLicensePage() {
 
         {/* Current license status banner (if expired/revoked/invalid) */}
         {currentLicense && currentLicense.status !== "none" && (
-          <div className="mb-4 rounded-xl border border-border bg-card p-4">
+          <div className="mb-4 p-3 sm:rounded-xl sm:border sm:border-border sm:bg-card sm:p-4">
             <div className="flex items-center gap-3">
               {currentLicense.status === "expired" && (
                 <Clock className="h-5 w-5 text-amber-500 shrink-0" />
@@ -146,7 +146,7 @@ export default function ActivateLicensePage() {
         )}
 
         {/* Activation Card */}
-        <div className="rounded-xl border border-border bg-card p-6">
+        <div className="p-0 sm:rounded-xl sm:border sm:border-border sm:bg-card sm:p-6">
           <form onSubmit={handleActivate} className="space-y-4">
             <div>
               <label
