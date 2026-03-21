@@ -2,6 +2,17 @@
 
 import { useSyncExternalStore } from "react";
 
+interface ElectronAPI {
+  isElectron: boolean;
+  execute: (args: string[]) => Promise<{ stdout: string; stderr: string; code: number }>;
+}
+
+declare global {
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
+}
+
 function getIsElectron() {
   return typeof window !== "undefined" && !!window.electronAPI?.isElectron;
 }

@@ -57,7 +57,7 @@ export async function GET(request: Request) {
         try {
           const { memberships, messagesByChannel } = await getChannelStreamData(agentProfileId);
 
-          for (const { channelId, messages: unread } of messagesByChannel) {
+          for (const { messages: unread } of messagesByChannel) {
             for (const msg of unread) {
               sentMessageIds.add(msg.id);
               send(

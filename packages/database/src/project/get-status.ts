@@ -9,7 +9,7 @@ import { prisma } from "../client";
 export async function getProjectStatus(projectId: string) {
   return prisma.project.findUnique({
     where: { id: projectId },
-    select: { status: true, shutdownActive: true },
+    select: { status: true, shutdownActive: true, name: true },
   });
 }
 

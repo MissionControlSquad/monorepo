@@ -14,8 +14,11 @@ declare global {
 }
 
 export function getClientEnv<K extends keyof RuntimeEnv>(key: K): string | undefined {
-  if (typeof window !== "undefined" && window.__ENV__?.[key]) {
-    return window.__ENV__[key];
+  if (typeof globalThis !== "undefined" && "window" in globalThis) {
+    const win = globalThis as unknown as { __ENV__?: RuntimeEnv };
+    if (win.__ENV__?.[key]) {
+      return win.__ENV__[key];
+    }
   }
   return undefined;
 }

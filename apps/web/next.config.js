@@ -1,3 +1,5 @@
+const path = require("path");
+
 const withBundleAnalyzer = process.env.ANALYZE === "true"
   ? require("@next/bundle-analyzer")({ enabled: true })
   : (config) => config;
@@ -5,6 +7,7 @@ const withBundleAnalyzer = process.env.ANALYZE === "true"
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   devIndicators:false,
   eslint: { ignoreDuringBuilds: false },
   serverExternalPackages: ["@prisma/client", "ioredis", "ssh2", "web-push"],

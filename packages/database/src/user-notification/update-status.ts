@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "../client";
+import type { NotificationStatus } from "@prisma/client";
 
 export async function markUserNotificationSent(id: string): Promise<void> {
   await prisma.userNotification.update({
@@ -16,7 +17,7 @@ export async function markUserNotificationSent(id: string): Promise<void> {
 export async function markUserNotificationFailed(
   id: string,
   data: {
-    status: string;
+    status: NotificationStatus;
     errorMsg: string;
     retryCount: number;
     nextRetryAt: Date | null;

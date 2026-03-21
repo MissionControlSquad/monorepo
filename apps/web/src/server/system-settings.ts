@@ -5,8 +5,6 @@ import {
   setProjectShutdownActive as dbSetProjectShutdown,
 } from "@agentcenter/database";
 
-const SINGLETON_ID = "global";
-
 export async function isSystemShutdown(): Promise<boolean> {
   const row = await getOrCreateSystemSettings();
   return row.shutdownActive;

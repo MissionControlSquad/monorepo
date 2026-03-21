@@ -6,30 +6,6 @@
  */
 
 import { prisma } from "../client";
-import type {
-  Agent,
-  Task,
-  RecurringTask,
-  Project,
-  Notification,
-  Activity,
-  AdminUser,
-  AgentAction,
-  AgentQueueItem,
-  CloudVM,
-  DeliverableVersion,
-  Deliverable,
-  Document,
-  Message,
-  MessageReaction,
-  ProjectDoc,
-  ProjectDocRevision,
-  ProjectMember,
-  StatusHistory,
-  Subscription,
-  TaskTemplate,
-  WorkSession,
-} from "@prisma/client";
 
 export const agentDelegate = () => prisma.agent;
 export const taskDelegate = () => prisma.task;

@@ -7,7 +7,7 @@
 
 import { prisma } from "../client";
 
-const SETUP_STATUSES = ["provisioning", "setting_up", "configuring"] as const;
+const SETUP_STATUSES = ["provisioning", "waiting_for_ssh", "installing_deps", "installing_openclaw", "configuring", "starting_service"] as const;
 
 export async function findStaleSetupCloudVMs(timeoutMs: number) {
   const threshold = new Date(Date.now() - timeoutMs);
