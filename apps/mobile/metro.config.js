@@ -6,6 +6,7 @@ const path = require("path");
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, "../..");
 
+
 const expoConfig = getDefaultConfig(projectRoot);
 
 const config = mergeConfig(expoConfig, {

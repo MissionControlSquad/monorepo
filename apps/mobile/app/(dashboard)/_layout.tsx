@@ -1,10 +1,11 @@
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { TouchableOpacity } from "react-native";
+import { TouchableOpacity, View } from "react-native";
 import { useDrawer } from "../../src/context/DrawerContext";
 
 export default function DashboardLayout() {
   const { openDrawer } = useDrawer();
+  const router = useRouter();
 
   return (
     <Tabs
@@ -42,6 +43,16 @@ export default function DashboardLayout() {
           tabBarLabel: "Agents",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
+          ),
+          headerRight: () => (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+              <TouchableOpacity onPress={() => router.push("/agent/create")} style={{ padding: 8 }}>
+                <Ionicons name="add" size={26} color="#2563eb" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
+                <Ionicons name="person-circle-outline" size={26} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />

@@ -19,6 +19,8 @@ function RootLayoutNav() {
         <Stack.Screen name="task/[id]" options={{ title: "Task Details" }} />
         <Stack.Screen name="task/create" options={{ title: "New Task", presentation: "modal" }} />
         <Stack.Screen name="deliverable/[id]" options={{ title: "Deliverable" }} />
+        <Stack.Screen name="agent/create" options={{ title: "New Agent", presentation: "modal" }} />
+        <Stack.Screen name="agent/edit" options={{ title: "Edit Agent" }} />
         <Stack.Screen name="agent/[id]" options={{ title: "Agent" }} />
         <Stack.Screen name="channels/[id]" options={{ title: "Channel" }} />
         <Stack.Screen name="profile" options={{ title: "Profile", presentation: "modal" }} />
