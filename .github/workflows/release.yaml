@@ -7,9 +7,11 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  IMAGE_NAME: agentcenter
 
 jobs:
-  publish:
+  # ── Job 1: Build and smoke test (single platform, fast) ──────────
+  build-and-test:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -18,23 +20,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set image name
-        id: image
-        run: |
-          echo "name=${OWNER,,}/agentcenter" >> "$GITHUB_OUTPUT"
-        env:
-          OWNER: ${{ github.repository_owner }}
-
-      - name: Extract version tag
-        id: meta
-        run: |
-          TAG="${{ github.ref_name }}"
-          VERSION="${TAG#v}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Set up QEMU (for multi-platform builds)
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -46,14 +31,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build tags
-        id: tags
-        run: |
-          TAGS="${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ steps.meta.outputs.version }}"
-          TAGS="$TAGS,${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest"
-          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
-
-      - name: Build test image (local platform only)
+      - name: Build test image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -65,16 +43,17 @@ jobs:
 
       - name: Smoke test container
         run: |
-          # Start container without the entrypoint (skip DB migration)
           docker run -d --name smoke-test \
             -p 3000:3000 \
-            -e DATABASE_URL="postgresql://fake:fake@localhost:5432/fake" \
+            -e POSTGRES_PRISMA_URL="postgresql://fake:fake@localhost:5432/fake" \
+            -e POSTGRES_URL_NON_POOLING="postgresql://fake:fake@localhost:5432/fake" \
+            -e AUTH_SECRET="ci-smoke-test-secret" \
+            -e CRON_SECRET="ci-smoke-test-cron" \
             -e HOSTNAME=0.0.0.0 \
             --entrypoint node \
             agentcenter:test \
             apps/web/server.js
 
-          # Wait for the server to respond (up to 30s)
           for i in $(seq 1 30); do
             if curl -sf -o /dev/null http://localhost:3000; then
               echo "Health check passed on attempt $i"
@@ -91,17 +70,127 @@ jobs:
           docker stop smoke-test
           docker rm smoke-test
 
-      - name: Build and push (multi-platform)
+  # ── Job 2: Build and push each platform in parallel ──────────────
+  push-image:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image name
+        id: image
+        run: |
+          echo "name=${OWNER,,}/${{ env.IMAGE_NAME }}" >> "$GITHUB_OUTPUT"
+        env:
+          OWNER: ${{ github.repository_owner }}
+
+      - name: Extract version
+        id: meta
+        run: |
+          TAG="${{ github.ref_name }}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare platform pair
+        id: platform
+        run: |
+          PAIR=$(echo "${{ matrix.platform }}" | tr '/' '-')
+          echo "pair=$PAIR" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: apps/web/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.tags.outputs.tags }}
+          platforms: ${{ matrix.platform }}
           labels: |
             org.opencontainers.image.version=${{ steps.meta.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ steps.platform.outputs.pair }}
+          cache-to: type=gha,scope=${{ steps.platform.outputs.pair }},mode=max
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ steps.platform.outputs.pair }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # ── Job 3: Create multi-platform manifest and tag ────────────────
+  merge-and-tag:
+    needs: push-image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Set image name
+        id: image
+        run: |
+          echo "name=${OWNER,,}/${{ env.IMAGE_NAME }}" >> "$GITHUB_OUTPUT"
+        env:
+          OWNER: ${{ github.repository_owner }}
+
+      - name: Extract version
+        id: meta
+        run: |
+          TAG="${{ github.ref_name }}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create manifest and push tags
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ steps.image.outputs.name }}"
+          VERSION="${{ steps.meta.outputs.version }}"
+
+          # Create manifest from all platform digests
+          docker buildx imagetools create \
+            -t "$IMAGE:$VERSION" \
+            -t "$IMAGE:latest" \
+            $(printf "$IMAGE@sha256:%s " $(ls /tmp/digests/))
