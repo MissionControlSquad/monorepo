@@ -21,6 +21,7 @@ import {
   MESSAGES_BY_TASK_QUERY,
   DELIVERABLES_BY_TASK_QUERY,
   CHILD_TASKS_QUERY,
+  TASK_WORK_SUMMARY_QUERY,
 } from "@agentcenter/graphql-client";
 import { UPDATE_TASK, CREATE_MESSAGE } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
@@ -269,6 +270,20 @@ function TabBar({
   );
 }
 
+interface WorkSummary {
+  totalWorkTimeMs: number;
+  activeSessionCount: number;
+  agentBreakdown: { agentId: string; agentName: string; totalMs: number }[];
+}
+
+function fmtDuration(ms: number): string {
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return "<1m";
+}
+
 function OverviewTab({ task, onStatusChange }: { task: Task; onStatusChange: () => void }) {
   const router = useRouter();
   const statusColor = STATUS_COLORS[task.status] ?? "#6b7280";
@@ -280,6 +295,13 @@ function OverviewTab({ task, onStatusChange }: { task: Task; onStatusChange: () 
     pause: !task.id,
   });
   const childTasks = childResult.data?.childTasks ?? [];
+
+  const [workResult] = useQuery<{ taskWorkSummary: WorkSummary | null }>({
+    query: TASK_WORK_SUMMARY_QUERY,
+    variables: { taskId: task.id },
+    requestPolicy: "cache-and-network",
+  });
+  const workSummary = workResult.data?.taskWorkSummary;
 
   return (
     <ScrollView
@@ -448,6 +470,32 @@ function OverviewTab({ task, onStatusChange }: { task: Task; onStatusChange: () 
               </View>
             ))}
           </View>
+        </View>
+      )}
+
+      {/* Work time */}
+      {workSummary && workSummary.totalWorkTimeMs > 0 && (
+        <View style={styles.card}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={styles.cardLabel}>Work Time</Text>
+            {workSummary.activeSessionCount > 0 && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#16a34a" }} />
+                <Text style={{ fontSize: 11, color: "#16a34a", fontWeight: "600" }}>
+                  {workSummary.activeSessionCount} active
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", marginTop: 4 }}>
+            {fmtDuration(workSummary.totalWorkTimeMs)}
+          </Text>
+          {workSummary.agentBreakdown.map((ab) => (
+            <View key={ab.agentId} style={styles.detailRow}>
+              <Text style={styles.detailKey} numberOfLines={1}>{ab.agentName}</Text>
+              <Text style={styles.detailValue}>{fmtDuration(ab.totalMs)}</Text>
+            </View>
+          ))}
         </View>
       )}
     </ScrollView>

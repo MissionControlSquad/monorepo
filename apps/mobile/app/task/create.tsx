@@ -59,6 +59,7 @@ export default function CreateTaskScreen() {
   const [blockedByTaskId, setBlockedByTaskId] = useState<string | null>(null);
   const [taskPickerOpen, setTaskPickerOpen] = useState(false);
   const [taskPickerSearch, setTaskPickerSearch] = useState("");
+  const [dueDate, setDueDate] = useState("");
 
   const [profilesResult] = useQuery<{ profiles: Profile[] }>({
     query: PROFILES_QUERY,
@@ -94,6 +95,7 @@ export default function CreateTaskScreen() {
       tags: finalTags.length > 0 ? finalTags : undefined,
       projectId: projectId ?? undefined,
       blockedByTaskId: blockedByTaskId ?? undefined,
+      dueDate: dueDate.trim() ? new Date(dueDate.trim()).toISOString() : undefined,
     });
     setLoading(false);
 
@@ -181,6 +183,20 @@ export default function CreateTaskScreen() {
               </TouchableOpacity>
             ))}
           </View>
+        </View>
+
+        {/* Due Date */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Due Date</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#9ca3af"
+            value={dueDate}
+            onChangeText={setDueDate}
+            keyboardType="numbers-and-punctuation"
+            returnKeyType="done"
+          />
         </View>
 
         {/* Assignees */}

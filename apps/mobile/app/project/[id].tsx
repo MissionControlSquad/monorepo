@@ -11,6 +11,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
 } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useQuery, useMutation } from "urql";
@@ -27,6 +28,7 @@ import {
   REMOVE_PROJECT_MEMBER,
   CREATE_PROJECT_DOC,
   DELETE_PROJECT_DOC,
+  PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 
@@ -410,6 +412,113 @@ function TasksTab({ projectId }: { projectId: string }) {
 
 // ── Members Tab ───────────────────────────────────────────────────────────────
 
+interface ProfileOption {
+  id: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+  agent: { identityEmoji: string | null } | null;
+}
+
+function AddMemberModal({
+  projectId,
+  existingProfileIds,
+  visible,
+  onClose,
+  onAdded,
+}: {
+  projectId: string;
+  existingProfileIds: string[];
+  visible: boolean;
+  onClose: () => void;
+  onAdded: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const [search, setSearch] = useState("");
+  const [, addMember] = useMutation(ADD_PROJECT_MEMBER);
+
+  const [profilesResult] = useQuery<{ profiles: ProfileOption[] }>({
+    query: PROFILES_QUERY,
+    variables: { limit: 100 },
+    pause: !visible,
+  });
+
+  const profiles = (profilesResult.data?.profiles ?? []).filter(
+    (p) =>
+      !existingProfileIds.includes(p.id) &&
+      (search.trim() === "" ||
+        p.displayName.toLowerCase().includes(search.toLowerCase()) ||
+        (p.username ?? "").toLowerCase().includes(search.toLowerCase()))
+  );
+
+  async function handleAdd(profileId: string) {
+    const res = await addMember({ projectId, profileId });
+    if (res.error) {
+      Alert.alert("Error", res.error.message);
+    } else {
+      onAdded();
+      onClose();
+    }
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: "#f9fafb" }}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Add Member</Text>
+          <TouchableOpacity onPress={onClose} style={styles.modalClose}>
+            <Ionicons name="close" size={22} color="#374151" />
+          </TouchableOpacity>
+        </View>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" }}>
+          <TextInput
+            style={[styles.docInput, { marginBottom: 0 }]}
+            placeholder="Search profiles…"
+            placeholderTextColor="#9ca3af"
+            value={search}
+            onChangeText={setSearch}
+            autoFocus
+          />
+        </View>
+        {profilesResult.fetching ? (
+          <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
+        ) : (
+          <FlatList
+            data={profiles}
+            keyExtractor={(p) => p.id}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+            ListEmptyComponent={
+              <View style={{ padding: 32, alignItems: "center" }}>
+                <Text style={{ color: "#9ca3af", fontSize: 15 }}>No profiles found</Text>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.memberCard,
+                  pressed && { backgroundColor: "#f3f4f6" },
+                ]}
+                onPress={() => handleAdd(item.id)}
+              >
+                <View style={styles.memberAvatarLg}>
+                  <Text style={styles.memberAvatarText}>
+                    {item.agent?.identityEmoji ?? item.displayName.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.memberInfo}>
+                  <Text style={styles.memberName}>{item.displayName}</Text>
+                  <Text style={styles.memberUsername}>@{item.username}</Text>
+                </View>
+                <Ionicons name="add-circle-outline" size={22} color="#2563eb" />
+              </Pressable>
+            )}
+          />
+        )}
+      </View>
+    </Modal>
+  );
+}
+
 function MembersTab({
   project,
   onRefresh,
@@ -418,6 +527,7 @@ function MembersTab({
   onRefresh: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const [addModalOpen, setAddModalOpen] = useState(false);
   const [, removeMember] = useMutation(REMOVE_PROJECT_MEMBER);
 
   function confirmRemove(member: ProjectMember) {
@@ -446,45 +556,64 @@ function MembersTab({
   }
 
   return (
-    <FlatList
-      data={project.members}
-      keyExtractor={(m) => m.id}
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={[
-        styles.tabContent,
-        { paddingBottom: insets.bottom + 16 },
-        project.members.length === 0 && styles.emptyFlex,
-      ]}
-      ListEmptyComponent={
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No members yet</Text>
-        </View>
-      }
-      renderItem={({ item }) => (
-        <View style={styles.memberCard}>
-          <View style={styles.memberAvatarLg}>
-            <Text style={styles.memberAvatarText}>
-              {item.profile.agent?.identityEmoji ??
-                item.profile.displayName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <View style={styles.memberInfo}>
-            <Text style={styles.memberName}>{item.profile.displayName}</Text>
-            <Text style={styles.memberUsername}>@{item.profile.username}</Text>
-            {item.profile.agentId && item.profile.agent && (
-              <Text style={styles.memberRole}>{item.profile.agent.role}</Text>
-            )}
-          </View>
+    <>
+      <FlatList
+        data={project.members}
+        keyExtractor={(m) => m.id}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[
+          styles.tabContent,
+          { paddingBottom: insets.bottom + 16 },
+          project.members.length === 0 && styles.emptyFlex,
+        ]}
+        ListHeaderComponent={
           <TouchableOpacity
-            style={styles.removeBtn}
-            onPress={() => confirmRemove(item)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.addMemberBtn}
+            onPress={() => setAddModalOpen(true)}
+            activeOpacity={0.7}
           >
-            <Ionicons name="person-remove-outline" size={18} color="#dc2626" />
+            <Ionicons name="person-add-outline" size={18} color="#2563eb" />
+            <Text style={styles.addMemberBtnText}>Add Member</Text>
           </TouchableOpacity>
-        </View>
-      )}
-    />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No members yet</Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <View style={styles.memberCard}>
+            <View style={styles.memberAvatarLg}>
+              <Text style={styles.memberAvatarText}>
+                {item.profile.agent?.identityEmoji ??
+                  item.profile.displayName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.memberInfo}>
+              <Text style={styles.memberName}>{item.profile.displayName}</Text>
+              <Text style={styles.memberUsername}>@{item.profile.username}</Text>
+              {item.profile.agentId && item.profile.agent && (
+                <Text style={styles.memberRole}>{item.profile.agent.role}</Text>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.removeBtn}
+              onPress={() => confirmRemove(item)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="person-remove-outline" size={18} color="#dc2626" />
+            </TouchableOpacity>
+          </View>
+        )}
+      />
+      <AddMemberModal
+        projectId={project.id}
+        existingProfileIds={project.members.map((m) => m.profileId)}
+        visible={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onAdded={onRefresh}
+      />
+    </>
   );
 }
 
@@ -1017,6 +1146,18 @@ const styles = StyleSheet.create({
   memberUsername: { fontSize: 12, color: "#9ca3af" },
   memberRole: { fontSize: 12, color: "#6b7280", textTransform: "capitalize" },
   removeBtn: { padding: 4 },
+  addMemberBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#eff6ff",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+  },
+  addMemberBtnText: { fontSize: 14, fontWeight: "600", color: "#2563eb" },
 
   // Docs tab
   docCard: {
