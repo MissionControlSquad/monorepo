@@ -171,6 +171,11 @@ export function AppDrawer() {
             onPress={() => navigate("/activity")}
           />
           <DrawerItem
+            icon="notifications-outline"
+            label="Notifications"
+            onPress={() => navigate("/notifications")}
+          />
+          <DrawerItem
             icon="settings-outline"
             label="Settings"
             onPress={() => navigate("/settings")}

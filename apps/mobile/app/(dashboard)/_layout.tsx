@@ -34,6 +34,16 @@ export default function DashboardLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="checkmark-circle-outline" size={size} color={color} />
           ),
+          headerRight: () => (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+              <TouchableOpacity onPress={() => router.push("/notifications")} style={{ padding: 8 }}>
+                <Ionicons name="notifications-outline" size={24} color="#6b7280" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
+                <Ionicons name="person-circle-outline" size={26} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
@@ -63,6 +73,16 @@ export default function DashboardLayout() {
           tabBarLabel: "Channels",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubble-outline" size={size} color={color} />
+          ),
+          headerRight: () => (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+              <TouchableOpacity onPress={() => router.push("/channels/create")} style={{ padding: 8 }}>
+                <Ionicons name="add" size={26} color="#2563eb" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
+                <Ionicons name="person-circle-outline" size={26} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />

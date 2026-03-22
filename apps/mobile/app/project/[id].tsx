@@ -752,7 +752,17 @@ export default function ProjectDetailScreen() {
 
   useEffect(() => {
     if (project) {
-      navigation.setOptions({ title: project.name });
+      navigation.setOptions({
+        title: project.name,
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={() => router.push(`/kanban/${project.id}`)}
+            style={{ marginRight: 16 }}
+          >
+            <Ionicons name="grid-outline" size={22} color="#2563eb" />
+          </TouchableOpacity>
+        ),
+      });
     }
   }, [project?.name]);
 

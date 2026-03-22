@@ -15,7 +15,7 @@ import { useQuery, useMutation } from "urql";
 import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY } from "@agentcenter/graphql-client";
-import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ } from "@agentcenter/graphql-client";
+import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_MESSAGE_REACTION } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 
 interface FromProfile {
@@ -79,6 +79,7 @@ export default function ChannelDetailScreen() {
 
   const [, executeSend] = useMutation(CREATE_CHANNEL_MESSAGE);
   const [, executeMarkRead] = useMutation(MARK_CHANNEL_READ);
+  const [, executeToggleReaction] = useMutation(TOGGLE_MESSAGE_REACTION);
 
   const channel = channelResult.data?.channel;
   const messages = messagesResult.data?.channelMessages ?? [];
@@ -154,6 +155,35 @@ export default function ChannelDetailScreen() {
         }
         renderItem={({ item }) => {
           const isMe = item.fromProfileId === profileId;
+
+          // Group reactions by emoji
+          const reactionGroups: Record<string, { emoji: string; count: number; iMine: boolean }> = {};
+          for (const r of item.reactions ?? []) {
+            if (!reactionGroups[r.emoji]) {
+              reactionGroups[r.emoji] = { emoji: r.emoji, count: 0, iMine: false };
+            }
+            reactionGroups[r.emoji].count++;
+            if (r.profileId === profileId) reactionGroups[r.emoji].iMine = true;
+          }
+          const reactionList = Object.values(reactionGroups);
+
+          function handleReact(emoji: string) {
+            if (!profileId) return;
+            executeToggleReaction({ messageId: item.id, profileId, emoji }).then(() =>
+              reexecute({ requestPolicy: "network-only" })
+            );
+          }
+
+          function showEmojiPicker() {
+            Alert.alert("React", undefined, [
+              ...["👍","❤️","😂","🎉","🔥","👀"].map((e) => ({
+                text: e,
+                onPress: () => handleReact(e),
+              })),
+              { text: "Cancel", style: "cancel" },
+            ]);
+          }
+
           return (
             <View style={[styles.messageRow, isMe && styles.messageRowMe]}>
               {!isMe && (
@@ -163,16 +193,43 @@ export default function ChannelDetailScreen() {
                   </Text>
                 </View>
               )}
-              <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-                {!isMe && (
-                  <Text style={styles.senderName}>{item.fromProfile.displayName}</Text>
+              <View style={styles.bubbleCol}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onLongPress={showEmojiPicker}
+                  delayLongPress={400}
+                >
+                  <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
+                    {!isMe && (
+                      <Text style={styles.senderName}>{item.fromProfile.displayName}</Text>
+                    )}
+                    <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
+                      {item.content}
+                    </Text>
+                    <Text style={[styles.timestamp, isMe && styles.timestampMe]}>
+                      {formatTime(item.createdAt)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                {reactionList.length > 0 && (
+                  <View style={[styles.reactionsRow, isMe && styles.reactionsRowMe]}>
+                    {reactionList.map((r) => (
+                      <TouchableOpacity
+                        key={r.emoji}
+                        style={[styles.reactionPill, r.iMine && styles.reactionPillMine]}
+                        onPress={() => handleReact(r.emoji)}
+                      >
+                        <Text style={styles.reactionEmoji}>{r.emoji}</Text>
+                        <Text style={[styles.reactionCount, r.iMine && styles.reactionCountMine]}>
+                          {r.count}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity style={styles.addReactionBtn} onPress={showEmojiPicker}>
+                      <Text style={styles.addReactionText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
-                <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
-                  {item.content}
-                </Text>
-                <Text style={[styles.timestamp, isMe && styles.timestampMe]}>
-                  {formatTime(item.createdAt)}
-                </Text>
               </View>
             </View>
           );
@@ -335,4 +392,43 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
   },
+
+  bubbleCol: { flexDirection: "column", gap: 4, maxWidth: "75%" },
+
+  reactionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    paddingLeft: 2,
+  },
+  reactionsRowMe: { justifyContent: "flex-end", paddingLeft: 0, paddingRight: 2 },
+  reactionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  reactionPillMine: {
+    backgroundColor: "#dbeafe",
+    borderColor: "#93c5fd",
+  },
+  reactionEmoji: { fontSize: 13 },
+  reactionCount: { fontSize: 11, color: "#6b7280", fontWeight: "600" },
+  reactionCountMine: { color: "#2563eb" },
+  addReactionBtn: {
+    backgroundColor: "#f3f4f6",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addReactionText: { fontSize: 13, color: "#9ca3af", fontWeight: "600" },
 });
