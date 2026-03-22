@@ -1,19 +1,48 @@
+# Dependencies (reinstalled inside container)
 node_modules
 **/node_modules
+
+# Build artifacts
 **/.next
 **/dist
+**/.turbo
+
+# Environment / secrets
 .env*
-*.md
+
+# Git
 .git
-apps/web/tests
-apps/web/scripts
-vitest*.config.*
-eslint.config.*
-.prettierrc*
-# Exclude non-web apps from build context
+.gitignore
+
+# CI / IDE / tooling
+.github
+.claude
+.husky
+.vscode
+.turbo
+.editorconfig
+.nvmrc
+.prettierrc
+.prettierignore
+turbo.json
+
+# Documentation
+docs
+README.md
+DEPLOYMENT.md
+FEATURES.md
+FEATURES-PROGRESS.md
+PROGRESS.md
+SETUP.md
+plan.md
+
+# Non-web apps
 apps/mobile
 apps/desktop
-# Exclude unused packages from build context
-packages/config
-packages/types
-packages/utils
+
+# Test / dev files
+apps/web/tests
+apps/web/scripts
+**/vitest*.config.*
+**/eslint.config.*
+

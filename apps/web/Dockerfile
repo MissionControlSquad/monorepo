@@ -11,6 +11,7 @@ COPY apps/web/package.json ./apps/web/package.json
 COPY packages/database/package.json ./packages/database/package.json
 COPY packages/graphql-server/package.json ./packages/graphql-server/package.json
 COPY packages/graphql-client/package.json ./packages/graphql-client/package.json
+COPY packages/graphql-client-config/package.json ./packages/graphql-client-config/package.json
 COPY packages/config/package.json ./packages/config/package.json
 COPY packages/types/package.json ./packages/types/package.json
 COPY packages/utils/package.json ./packages/utils/package.json
@@ -55,16 +56,16 @@ ENV HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy standalone server output
+# Copy standalone server output (preserves monorepo structure)
 COPY --from=build /app/apps/web/.next/standalone ./
-COPY --from=build /app/apps/web/.next/static ./.next/static
-COPY --from=build /app/apps/web/public ./public
+COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build /app/apps/web/public ./apps/web/public
 
 # Copy Prisma schema + migrations for runtime migrate deploy
 COPY --from=build /app/packages/database/prisma ./prisma
 
 # Copy agent templates (read at runtime by agent-config-generator)
-COPY --from=build /app/apps/web/src/server/agent-templates ./src/server/agent-templates
+COPY --from=build /app/apps/web/src/server/agent-templates ./apps/web/src/server/agent-templates
 
 # Install only prisma CLI for migrations (separate from app deps)
 RUN npm install prisma@6 --save-exact --no-package-lock 2>/dev/null || true
@@ -74,7 +75,7 @@ COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
 # Create cache + data directories writable by nextjs user
-RUN mkdir -p .next/cache data && chown -R nextjs:nodejs .next/cache data
+RUN mkdir -p apps/web/.next/cache data && chown -R nextjs:nodejs apps/web/.next/cache data
 
 # Copy entrypoint
 COPY apps/web/docker-entrypoint.sh ./

@@ -71,7 +71,45 @@ jobs:
           fi
           echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push
+      - name: Build test image (local platform only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          load: true
+          tags: agentcenter:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test container
+        run: |
+          # Start container without the entrypoint (skip DB migration)
+          docker run -d --name smoke-test \
+            -p 3000:3000 \
+            -e DATABASE_URL="postgresql://fake:fake@localhost:5432/fake" \
+            -e HOSTNAME=0.0.0.0 \
+            --entrypoint node \
+            agentcenter:test \
+            apps/web/server.js
+
+          # Wait for the server to respond (up to 30s)
+          for i in $(seq 1 30); do
+            if curl -sf -o /dev/null http://localhost:3000; then
+              echo "Health check passed on attempt $i"
+              break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "Health check failed after 30 attempts"
+              docker logs smoke-test
+              exit 1
+            fi
+            sleep 1
+          done
+
+          docker stop smoke-test
+          docker rm smoke-test
+
+      - name: Build and push (multi-platform)
         uses: docker/build-push-action@v5
         with:
           context: .

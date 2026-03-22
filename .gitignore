@@ -37,3 +37,4 @@ release/
 
 # Turbo
 .turbo
+.claude/settings.local.json
