@@ -4,6 +4,8 @@ import { Providers } from "@/providers";
 import { isLicenseActive } from "@/server/license";
 import { adminUserModel } from "@/server/models";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
   modal,
