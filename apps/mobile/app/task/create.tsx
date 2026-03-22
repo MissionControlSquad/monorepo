@@ -11,7 +11,7 @@ import {
   Platform,
 } from "react-native";
 import { useState } from "react";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation } from "urql";
 import { CREATE_TASK_FROM_DASHBOARD } from "@agentcenter/graphql-client";
@@ -29,6 +29,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 export default function CreateTaskScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { projectId } = useLocalSearchParams<{ projectId?: string }>();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority | null>(null);
@@ -47,6 +48,7 @@ export default function CreateTaskScreen() {
       description: description.trim(),
       priority: priority ?? undefined,
       assigneeIds: [],
+      projectId: projectId ?? undefined,
     });
     setLoading(false);
 

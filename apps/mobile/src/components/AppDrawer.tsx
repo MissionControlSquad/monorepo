@@ -166,6 +166,11 @@ export function AppDrawer() {
             onPress={() => navigate("/profile")}
           />
           <DrawerItem
+            icon="pulse-outline"
+            label="Activity Feed"
+            onPress={() => navigate("/activity")}
+          />
+          <DrawerItem
             icon="settings-outline"
             label="Settings"
             onPress={() => navigate("/settings")}

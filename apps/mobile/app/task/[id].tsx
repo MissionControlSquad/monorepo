@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
 } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useQuery, useMutation } from "urql";
@@ -19,9 +20,11 @@ import {
   TASK_QUERY,
   MESSAGES_BY_TASK_QUERY,
   DELIVERABLES_BY_TASK_QUERY,
+  CHILD_TASKS_QUERY,
 } from "@agentcenter/graphql-client";
 import { UPDATE_TASK, CREATE_MESSAGE } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
+import { getStoredCookie } from "../../src/api/session";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -57,8 +60,17 @@ interface Task {
   projectId: string | null;
   createdByProfile: Profile | null;
   parentTask: { id: string; title: string; taskNumber: number; status: string } | null;
+  blockedByTask: { id: string; title: string; taskNumber: number; status: string } | null;
   project: { id: string; name: string } | null;
   assignees: TaskAssignee[];
+}
+
+interface ChildTask {
+  id: string;
+  title: string;
+  taskNumber: number;
+  status: string;
+  priority: string | null;
 }
 
 interface Message {
@@ -137,6 +149,99 @@ function statusLabel(s: string) {
   return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// ── Reject Modal ──────────────────────────────────────────────────────────────
+
+function RejectModal({
+  visible,
+  onClose,
+  onConfirm,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string, changes: string[]) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [changeText, setChangeText] = useState("");
+  const [changes, setChanges] = useState<string[]>([]);
+
+  function addChange() {
+    const t = changeText.trim();
+    if (!t) return;
+    setChanges((c) => [...c, t]);
+    setChangeText("");
+  }
+
+  function removeChange(i: number) {
+    setChanges((c) => c.filter((_, idx) => idx !== i));
+  }
+
+  function handleConfirm() {
+    if (!reason.trim()) {
+      Alert.alert("Error", "Rejection reason is required");
+      return;
+    }
+    onConfirm(reason.trim(), changes);
+    setReason("");
+    setChangeText("");
+    setChanges([]);
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Reject Task</Text>
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+              <Text style={{ fontSize: 22, color: "#374151" }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
+            <View style={{ gap: 6 }}>
+              <Text style={styles.rejectLabel}>Rejection Reason *</Text>
+              <TextInput
+                style={[styles.rejectInput, { height: 80 }]}
+                value={reason}
+                onChangeText={setReason}
+                placeholder="Why is this being rejected?"
+                multiline
+                textAlignVertical="top"
+              />
+            </View>
+            <View style={{ gap: 6 }}>
+              <Text style={styles.rejectLabel}>Changes Needed</Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TextInput
+                  style={[styles.rejectInput, { flex: 1 }]}
+                  value={changeText}
+                  onChangeText={setChangeText}
+                  placeholder="Add a required change"
+                  returnKeyType="done"
+                  onSubmitEditing={addChange}
+                />
+                <TouchableOpacity style={styles.addChangeBtn} onPress={addChange}>
+                  <Text style={styles.addChangeBtnText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+              {changes.map((c, i) => (
+                <View key={i} style={styles.changeItem}>
+                  <Text style={styles.changeText} numberOfLines={2}>• {c}</Text>
+                  <TouchableOpacity onPress={() => removeChange(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={{ color: "#dc2626", fontSize: 16 }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity style={styles.rejectConfirmBtn} onPress={handleConfirm}>
+              <Text style={styles.rejectConfirmBtnText}>Reject Task</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function TabBar({
@@ -165,7 +270,17 @@ function TabBar({
 }
 
 function OverviewTab({ task, onStatusChange }: { task: Task; onStatusChange: () => void }) {
+  const router = useRouter();
   const statusColor = STATUS_COLORS[task.status] ?? "#6b7280";
+
+  const [childResult] = useQuery<{ childTasks: ChildTask[] }>({
+    query: CHILD_TASKS_QUERY,
+    variables: { parentTaskId: task.id },
+    requestPolicy: "cache-and-network",
+    pause: !task.id,
+  });
+  const childTasks = childResult.data?.childTasks ?? [];
+
   return (
     <ScrollView
       contentContainerStyle={styles.tabContent}
@@ -203,11 +318,46 @@ function OverviewTab({ task, onStatusChange }: { task: Task; onStatusChange: () 
           </View>
         )}
         {task.project && (
-          <View style={[styles.badge, { backgroundColor: "#f3f4f6" }]}>
+          <TouchableOpacity
+            style={[styles.badge, { backgroundColor: "#f3f4f6" }]}
+            onPress={() => router.push(`/project/${task.project!.id}`)}
+          >
             <Text style={[styles.badgeText, { color: "#6b7280" }]}>📁 {task.project.name}</Text>
-          </View>
+          </TouchableOpacity>
         )}
       </View>
+
+      {/* Blocked-by dependency */}
+      {task.blockedByTask && (
+        <TouchableOpacity
+          style={styles.blockedByCard}
+          onPress={() => router.push(`/task/${task.blockedByTask!.id}`)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.blockedByLabel}>🚫 Blocked by</Text>
+          <View style={styles.blockedByRow}>
+            <Text style={styles.blockedByTaskNum}>#{task.blockedByTask.taskNumber}</Text>
+            <Text style={styles.blockedByTaskTitle} numberOfLines={1}>
+              {task.blockedByTask.title}
+            </Text>
+            <View
+              style={[
+                styles.miniPill,
+                { backgroundColor: (STATUS_COLORS[task.blockedByTask.status] ?? "#6b7280") + "22" },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.miniPillText,
+                  { color: STATUS_COLORS[task.blockedByTask.status] ?? "#6b7280" },
+                ]}
+              >
+                {task.blockedByTask.status.replace("_", " ")}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* Description */}
       {task.description ? (
@@ -237,6 +387,36 @@ function OverviewTab({ task, onStatusChange }: { task: Task; onStatusChange: () 
         </View>
       )}
 
+      {/* Subtasks */}
+      {(childTasks.length > 0 || childResult.fetching) && (
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Subtasks ({childTasks.length})</Text>
+          {childResult.fetching ? (
+            <ActivityIndicator size="small" color="#2563eb" />
+          ) : (
+            childTasks.map((ct) => (
+              <TouchableOpacity
+                key={ct.id}
+                style={styles.subtaskRow}
+                onPress={() => router.push(`/task/${ct.id}`)}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[
+                    styles.subtaskDot,
+                    { backgroundColor: STATUS_COLORS[ct.status] ?? "#6b7280" },
+                  ]}
+                />
+                <Text style={styles.subtaskNum}>#{ct.taskNumber}</Text>
+                <Text style={styles.subtaskTitle} numberOfLines={1}>
+                  {ct.title}
+                </Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+      )}
+
       {/* Details */}
       <View style={styles.card}>
         <Text style={styles.cardLabel}>Details</Text>
@@ -246,10 +426,14 @@ function OverviewTab({ task, onStatusChange }: { task: Task; onStatusChange: () 
           <DetailRow label="Created by" value={task.createdByProfile.displayName} />
         )}
         {task.parentTask && (
-          <DetailRow
-            label="Parent Task"
-            value={`#${task.parentTask.taskNumber} ${task.parentTask.title}`}
-          />
+          <TouchableOpacity
+            onPress={() => router.push(`/task/${task.parentTask!.id}`)}
+          >
+            <DetailRow
+              label="Parent Task"
+              value={`#${task.parentTask.taskNumber} ${task.parentTask.title}`}
+            />
+          </TouchableOpacity>
         )}
       </View>
 
@@ -436,6 +620,137 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
   );
 }
 
+// ── Approve / Reject bar ──────────────────────────────────────────────────────
+
+function ApproveRejectBar({
+  task,
+  onDone,
+}: {
+  task: Task;
+  onDone: () => void;
+}) {
+  const { serverUrl } = useAuth();
+  const insets = useSafeAreaInsets();
+  const [loading, setLoading] = useState<"approve" | "reject" | null>(null);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+
+  async function handleApprove() {
+    Alert.alert("Approve Task", "Add an optional approval comment?", [
+      {
+        text: "Approve without comment",
+        onPress: () => doApprove(""),
+      },
+      {
+        text: "Add Comment",
+        onPress: () => {
+          Alert.prompt(
+            "Approval Comment",
+            "Optional comment",
+            (comment) => doApprove(comment ?? ""),
+            "plain-text"
+          );
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  }
+
+  async function doApprove(comment: string) {
+    if (!serverUrl) return;
+    setLoading("approve");
+    try {
+      const cookie = getStoredCookie();
+      const res = await fetch(`${serverUrl}/api/tasks/${task.id}/approve`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}),
+        },
+        body: JSON.stringify({ approvalComment: comment || undefined }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert("Error", (err as { error?: string }).error ?? "Failed to approve");
+      } else {
+        onDone();
+      }
+    } catch {
+      Alert.alert("Error", "Network error");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function doReject(reason: string, changes: string[]) {
+    if (!serverUrl) return;
+    setLoading("reject");
+    setShowRejectModal(false);
+    try {
+      const cookie = getStoredCookie();
+      const res = await fetch(`${serverUrl}/api/tasks/${task.id}/reject`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}),
+        },
+        body: JSON.stringify({ rejectionReason: reason, changesNeeded: changes }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert("Error", (err as { error?: string }).error ?? "Failed to reject");
+      } else {
+        onDone();
+      }
+    } catch {
+      Alert.alert("Error", "Network error");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  return (
+    <>
+      <View
+        style={[
+          styles.approveRejectBar,
+          { paddingBottom: insets.bottom > 0 ? insets.bottom : 16 },
+        ]}
+      >
+        <Text style={styles.reviewLabel}>Awaiting Review</Text>
+        <View style={styles.approveRejectBtns}>
+          <TouchableOpacity
+            style={[styles.rejectBtn, loading !== null && { opacity: 0.6 }]}
+            onPress={() => setShowRejectModal(true)}
+            disabled={loading !== null}
+          >
+            {loading === "reject" ? (
+              <ActivityIndicator size="small" color="#dc2626" />
+            ) : (
+              <Text style={styles.rejectBtnText}>✕ Reject</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.approveBtn, loading !== null && { opacity: 0.6 }]}
+            onPress={handleApprove}
+            disabled={loading !== null}
+          >
+            {loading === "approve" ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.approveBtnText}>✓ Approve</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+      <RejectModal
+        visible={showRejectModal}
+        onClose={() => setShowRejectModal(false)}
+        onConfirm={doReject}
+      />
+    </>
+  );
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function TaskDetailScreen() {
@@ -493,6 +808,8 @@ export default function TaskDetailScreen() {
     );
   }
 
+  const showApproveReject = task.status === "review";
+
   return (
     <View style={{ flex: 1, backgroundColor: "#f9fafb" }}>
       <TabBar
@@ -500,14 +817,22 @@ export default function TaskDetailScreen() {
         active={activeTab}
         onPress={setActiveTab}
       />
-      {activeTab === 0 && (
-        <OverviewTab task={task} onStatusChange={handleStatusChange} />
-      )}
-      {activeTab === 1 && (
-        <MessagesTab taskId={task.id} profileId={profileId} />
-      )}
-      {activeTab === 2 && (
-        <DeliverablesTab taskId={task.id} />
+      <View style={{ flex: 1 }}>
+        {activeTab === 0 && (
+          <OverviewTab task={task} onStatusChange={handleStatusChange} />
+        )}
+        {activeTab === 1 && (
+          <MessagesTab taskId={task.id} profileId={profileId} />
+        )}
+        {activeTab === 2 && (
+          <DeliverablesTab taskId={task.id} />
+        )}
+      </View>
+      {showApproveReject && (
+        <ApproveRejectBar
+          task={task}
+          onDone={() => reexecute({ requestPolicy: "network-only" })}
+        />
       )}
     </View>
   );
@@ -597,6 +922,34 @@ const styles = StyleSheet.create({
     color: "#374151",
     lineHeight: 22,
   },
+
+  // Blocked-by
+  blockedByCard: {
+    backgroundColor: "#fef2f2",
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    gap: 6,
+  },
+  blockedByLabel: { fontSize: 12, fontWeight: "700", color: "#dc2626" },
+  blockedByRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  blockedByTaskNum: { fontSize: 12, color: "#9ca3af", fontWeight: "500" },
+  blockedByTaskTitle: { fontSize: 13, color: "#111827", flex: 1, fontWeight: "500" },
+  miniPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  miniPillText: { fontSize: 10, fontWeight: "600", textTransform: "capitalize" },
+
+  // Subtasks
+  subtaskRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+  },
+  subtaskDot: { width: 8, height: 8, borderRadius: 4 },
+  subtaskNum: { fontSize: 12, color: "#9ca3af", fontWeight: "500", width: 32 },
+  subtaskTitle: { fontSize: 13, color: "#374151", flex: 1 },
+
   assigneeRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -770,4 +1123,99 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#d1d5db",
   },
+
+  // Approve/Reject bar
+  approveRejectBar: {
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    gap: 10,
+  },
+  reviewLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#7c3aed",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    textAlign: "center",
+  },
+  approveRejectBtns: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  rejectBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#dc2626",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rejectBtnText: {
+    color: "#dc2626",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  approveBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: "#16a34a",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  approveBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+
+  // Reject modal
+  modalContainer: { flex: 1, backgroundColor: "#fff" },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+  },
+  modalTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
+  rejectLabel: { fontSize: 13, fontWeight: "600", color: "#374151" },
+  rejectInput: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 15,
+    color: "#111827",
+    backgroundColor: "#f9fafb",
+  },
+  addChangeBtn: {
+    backgroundColor: "#2563eb",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    justifyContent: "center",
+  },
+  addChangeBtnText: { color: "#fff", fontWeight: "600" },
+  changeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+  },
+  changeText: { flex: 1, fontSize: 13, color: "#374151" },
+  rejectConfirmBtn: {
+    backgroundColor: "#dc2626",
+    borderRadius: 10,
+    padding: 14,
+    alignItems: "center",
+  },
+  rejectConfirmBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 });

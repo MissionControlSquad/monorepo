@@ -25,6 +25,7 @@ function RootLayoutNav() {
         <Stack.Screen name="channels/[id]" options={{ title: "Channel" }} />
         <Stack.Screen name="project/[id]" options={{ title: "Project" }} />
         <Stack.Screen name="project/create" options={{ title: "New Project", presentation: "modal" }} />
+        <Stack.Screen name="activity" options={{ title: "Activity Feed" }} />
         <Stack.Screen name="profile" options={{ title: "Profile", presentation: "modal" }} />
         <Stack.Screen name="settings" options={{ title: "Settings", presentation: "modal" }} />
       </Stack>
