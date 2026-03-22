@@ -7,11 +7,13 @@ import { DrawerProvider } from "../src/context/DrawerContext";
 import { AppDrawer } from "../src/components/AppDrawer";
 import { OfflineBanner } from "../src/components/OfflineBanner";
 import { useTheme } from "../src/hooks/useTheme";
+import { usePushNotifications } from "../src/hooks/usePushNotifications";
 import { View } from "react-native";
 
 function RootLayoutNav() {
   const { urqlClient } = useAuth();
   const { colors } = useTheme();
+  usePushNotifications();
 
   const content = (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
