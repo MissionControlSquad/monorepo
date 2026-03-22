@@ -27,6 +27,8 @@ import {
   DELETE_QUEUE_ITEM,
   ON_AGENT_STATUS_CHANGE,
 } from "@agentcenter/graphql-client";
+import { getStoredCookie } from "../../src/api/session";
+import { useAuth } from "../../src/context/AuthContext";
 
 // ── Inline mutations not exported from index ──────────────────────────────────
 
@@ -105,7 +107,7 @@ const ACTION_ICONS: Record<string, string> = {
   command: "⚙️", analysis: "🔬", research: "🧪",
 };
 
-type Tab = "overview" | "queue" | "activity" | "history";
+type Tab = "overview" | "queue" | "activity" | "history" | "setup";
 
 function capLabel(s: string) { return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
 function isOnline(hb: string | null) { return !!hb && new Date(hb).getTime() > Date.now() - 2 * 60 * 1000; }
@@ -294,7 +296,7 @@ export default function AgentDetailScreen() {
 
       {/* Tab bar */}
       <View style={styles.tabBar}>
-        {(["overview", "queue", "activity", "history"] as Tab[]).map((tab) => (
+        {(["overview", "queue", "activity", "history", ...(agent.setupStatus === "pending_setup" ? ["setup"] : [])] as Tab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
@@ -333,6 +335,7 @@ export default function AgentDetailScreen() {
           onRefresh={() => reexecuteHistory({ requestPolicy: "network-only" })}
         />
       )}
+      {activeTab === "setup" && <SetupTab agentId={id} />}
     </View>
   );
 }
@@ -643,6 +646,88 @@ function HistoryTab({ history, fetching, onRefresh }: {
   );
 }
 
+// ── Setup Tab ────────────────────────────────────────────────────────────────
+
+interface AgentSetup {
+  configFiles: { path: string; content: string }[];
+  cronCommand: string | null;
+}
+
+function SetupTab({ agentId }: { agentId: string }) {
+  const { serverUrl } = useAuth();
+  const insets = useSafeAreaInsets();
+  const [setup, setSetup] = useState<AgentSetup | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!serverUrl) return;
+    const cookie = getStoredCookie();
+    fetch(`${serverUrl}/api/agents/${agentId}/setup`, {
+      headers: cookie ? { Cookie: `mc_session=${cookie}` } : {},
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data: AgentSetup) => setSetup(data))
+      .catch(() => setError("Failed to load setup instructions"))
+      .finally(() => setLoading(false));
+  }, [agentId, serverUrl]);
+
+  if (loading) return <View style={styles.center}><ActivityIndicator color="#2563eb" /></View>;
+  if (error) return <View style={styles.center}><Text style={styles.errorText}>{error}</Text></View>;
+  if (!setup) return <View style={styles.center}><Text style={styles.emptyText}>No setup data</Text></View>;
+
+  return (
+    <ScrollView
+      contentContainerStyle={[styles.tabContent, { paddingBottom: insets.bottom + 16 }]}
+      contentInsetAdjustmentBehavior="automatic"
+    >
+      {/* Cron command */}
+      {setup.cronCommand && (
+        <View style={styles.setupCard}>
+          <Text style={styles.setupCardTitle}>Cron Command</Text>
+          <Text style={styles.setupHint}>Add this to your crontab to start the agent</Text>
+          <View style={styles.codeBlock}>
+            <Text style={styles.codeText} selectable>{setup.cronCommand}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Config files */}
+      {setup.configFiles.length > 0 && (
+        <View style={styles.setupCard}>
+          <Text style={styles.setupCardTitle}>Config Files ({setup.configFiles.length})</Text>
+          <Text style={styles.setupHint}>Create these files on the agent's host machine</Text>
+          {setup.configFiles.map((file) => (
+            <View key={file.path} style={styles.configFileBlock}>
+              <TouchableOpacity
+                style={styles.configFileHeader}
+                onPress={() => setExpanded(expanded === file.path ? null : file.path)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.configFilePath} numberOfLines={1}>{file.path}</Text>
+                <Ionicons
+                  name={expanded === file.path ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  color="#6b7280"
+                />
+              </TouchableOpacity>
+              {expanded === file.path && (
+                <ScrollView horizontal showsHorizontalScrollIndicator style={styles.configFileContent}>
+                  <Text style={styles.codeText} selectable>{file.content}</Text>
+                </ScrollView>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -766,4 +851,25 @@ const styles = StyleSheet.create({
   primaryBtn: { backgroundColor: "#2563eb", borderRadius: 10, paddingVertical: 13, alignItems: "center" },
   primaryBtnDisabled: { opacity: 0.45 },
   primaryBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+
+  // Setup tab
+  setupCard: {
+    backgroundColor: "#fff", borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: "#e5e7eb", gap: 8,
+  },
+  setupCardTitle: { fontSize: 14, fontWeight: "700", color: "#111827" },
+  setupHint: { fontSize: 12, color: "#9ca3af", marginBottom: 4 },
+  codeBlock: {
+    backgroundColor: "#1e293b", borderRadius: 8, padding: 12,
+  },
+  codeText: { fontSize: 12, color: "#e2e8f0", fontFamily: "monospace", lineHeight: 18 },
+  configFileBlock: {
+    borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 8, overflow: "hidden",
+  },
+  configFileHeader: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    padding: 10, backgroundColor: "#f8fafc",
+  },
+  configFilePath: { fontSize: 12, color: "#374151", fontWeight: "500", flex: 1 },
+  configFileContent: { backgroundColor: "#1e293b", maxHeight: 200 },
 });

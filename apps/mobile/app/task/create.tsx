@@ -17,7 +17,7 @@ import { useState } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "urql";
-import { CREATE_TASK_FROM_DASHBOARD, PROFILES_QUERY, TASKS_QUERY } from "@agentcenter/graphql-client";
+import { CREATE_TASK_FROM_DASHBOARD, PROFILES_QUERY, TASKS_QUERY, TASK_TEMPLATES_QUERY } from "@agentcenter/graphql-client";
 import { Avatar } from "../../src/components/Avatar";
 
 const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
@@ -45,6 +45,12 @@ interface TaskOption {
   status: string;
 }
 
+interface TaskTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
 export default function CreateTaskScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -60,6 +66,7 @@ export default function CreateTaskScreen() {
   const [taskPickerOpen, setTaskPickerOpen] = useState(false);
   const [taskPickerSearch, setTaskPickerSearch] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
 
   const [profilesResult] = useQuery<{ profiles: Profile[] }>({
     query: PROFILES_QUERY,
@@ -71,6 +78,11 @@ export default function CreateTaskScreen() {
     query: TASKS_QUERY,
     variables: { limit: 200 },
     pause: !taskPickerOpen,
+  });
+
+  const [templatesResult] = useQuery<{ taskTemplates: TaskTemplate[] }>({
+    query: TASK_TEMPLATES_QUERY,
+    pause: !templatePickerOpen,
   });
 
   const [, createTask] = useMutation(CREATE_TASK_FROM_DASHBOARD);
@@ -116,6 +128,65 @@ export default function CreateTaskScreen() {
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
       >
+        {/* Template picker */}
+        <TouchableOpacity
+          style={styles.templateBtn}
+          onPress={() => setTemplatePickerOpen(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.templateBtnText}>📋 Use Template</Text>
+        </TouchableOpacity>
+
+        {/* Template picker modal */}
+        <Modal
+          visible={templatePickerOpen}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setTemplatePickerOpen(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Task Templates</Text>
+              <TouchableOpacity onPress={() => setTemplatePickerOpen(false)}>
+                <Text style={styles.modalDone}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            {templatesResult.fetching ? (
+              <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
+            ) : (templatesResult.data?.taskTemplates ?? []).length === 0 ? (
+              <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 8 }}>
+                <Text style={{ fontSize: 15, color: "#9ca3af" }}>No templates available</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={templatesResult.data?.taskTemplates ?? []}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+                renderItem={({ item }) => (
+                  <Pressable
+                    style={styles.profileRow}
+                    onPress={() => {
+                      setTitle(item.name);
+                      if (item.description) setDescription(item.description);
+                      setTemplatePickerOpen(false);
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.profileName}>{item.name}</Text>
+                      {item.description ? (
+                        <Text style={styles.profileUsername} numberOfLines={2}>
+                          {item.description}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text style={{ color: "#2563eb", fontSize: 13, fontWeight: "600" }}>Use</Text>
+                  </Pressable>
+                )}
+              />
+            )}
+          </View>
+        </Modal>
+
         {/* Title */}
         <View style={styles.field}>
           <Text style={styles.label}>Title *</Text>
@@ -503,6 +574,21 @@ const styles = StyleSheet.create({
   cancelBtnText: {
     fontSize: 15,
     color: "#6b7280",
+  },
+  templateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 10,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+  },
+  templateBtnText: {
+    fontSize: 14,
+    color: "#374151",
+    fontWeight: "500",
   },
   assigneeSelector: {
     backgroundColor: "#fff",

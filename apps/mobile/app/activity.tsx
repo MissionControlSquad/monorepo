@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useQuery } from "urql";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ACTIVITIES_CONNECTION_QUERY } from "@agentcenter/graphql-client";
 
@@ -50,21 +50,6 @@ interface ActivitiesConnection {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const TYPE_ICONS: Record<string, string> = {
-  task_created: "add-circle-outline",
-  task_updated: "pencil-outline",
-  task_completed: "checkmark-circle",
-  task_rejected: "close-circle",
-  task_approved: "checkmark-done-circle",
-  task_assigned: "person-add-outline",
-  task_unassigned: "person-remove-outline",
-  agent_status_changed: "pulse-outline",
-  message_sent: "chatbubble-outline",
-  deliverable_created: "document-outline",
-  project_created: "folder-open-outline",
-  project_updated: "folder-outline",
-};
-
 const TYPE_COLORS: Record<string, string> = {
   task_created: "#2563eb",
   task_updated: "#d97706",
@@ -79,10 +64,6 @@ const TYPE_COLORS: Record<string, string> = {
   project_created: "#d97706",
   project_updated: "#6b7280",
 };
-
-function getIcon(type: string) {
-  return TYPE_ICONS[type] ?? "information-circle-outline";
-}
 
 function getColor(type: string) {
   return TYPE_COLORS[type] ?? "#6b7280";
@@ -109,29 +90,47 @@ const PAGE_SIZE = 30;
 export default function ActivityScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [allActivities, setAllActivities] = useState<Activity[]>([]);
+  const [after, setAfter] = useState<string | undefined>(undefined);
+  const [accumulated, setAccumulated] = useState<Activity[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [result, reexecute] = useQuery<{ activitiesConnection: ActivitiesConnection }>({
     query: ACTIVITIES_CONNECTION_QUERY,
-    variables: { first: PAGE_SIZE, after: undefined },
+    variables: { first: PAGE_SIZE, after },
     requestPolicy: "cache-and-network",
   });
 
   const { data, fetching, error } = result;
   const connection = data?.activitiesConnection;
-  const activities = connection?.activities ?? [];
+  const pageFetched = connection?.activities ?? [];
   const hasMore = connection?.hasMore ?? false;
 
+  // Merge page into accumulated list (avoid duplicates)
+  const displayed: Activity[] = (() => {
+    if (pageFetched.length === 0) return accumulated;
+    const ids = new Set(accumulated.map((a) => a.id));
+    const newOnes = pageFetched.filter((a) => !ids.has(a.id));
+    return [...accumulated, ...newOnes];
+  })();
+
   function handleRefresh() {
-    setCursor(undefined);
-    setAllActivities([]);
+    setAfter(undefined);
+    setAccumulated([]);
     reexecute({ requestPolicy: "network-only" });
   }
 
-  // Combine initial + paginated
-  const displayed = allActivities.length > 0 ? allActivities : activities;
+  const handleLoadMore = useCallback(() => {
+    if (!hasMore || loadingMore || fetching) return;
+    const last = pageFetched[pageFetched.length - 1];
+    if (!last) return;
+    // Commit current page into accumulated before advancing cursor
+    setAccumulated((prev) => {
+      const ids = new Set(prev.map((a) => a.id));
+      const newOnes = pageFetched.filter((a) => !ids.has(a.id));
+      return [...prev, ...newOnes];
+    });
+    setAfter(last.id);
+  }, [hasMore, loadingMore, fetching, pageFetched]);
 
   if (fetching && displayed.length === 0) {
     return (
@@ -164,7 +163,7 @@ export default function ActivityScreen() {
       ]}
       refreshControl={
         <RefreshControl
-          refreshing={fetching && displayed.length > 0}
+          refreshing={fetching && displayed.length === 0}
           onRefresh={handleRefresh}
           tintColor="#2563eb"
         />
@@ -178,13 +177,10 @@ export default function ActivityScreen() {
         hasMore ? (
           <TouchableOpacity
             style={styles.loadMoreBtn}
-            onPress={() => {
-              // Simple approach: just show more from existing data
-              // In a full implementation this would use pagination cursor
-            }}
-            disabled={loadingMore}
+            onPress={handleLoadMore}
+            disabled={fetching}
           >
-            {loadingMore ? (
+            {fetching ? (
               <ActivityIndicator size="small" color="#2563eb" />
             ) : (
               <Text style={styles.loadMoreText}>Load more</Text>
