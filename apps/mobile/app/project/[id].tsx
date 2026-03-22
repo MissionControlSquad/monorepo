@@ -739,6 +739,7 @@ function DocsTab({ projectId }: { projectId: string }) {
 export default function ProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
   const [result, reexecute] = useQuery<{ project: Project }>({

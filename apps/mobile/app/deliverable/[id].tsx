@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Linking,
   Platform,
+  Image,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useQuery } from "urql";
@@ -60,9 +62,50 @@ function formatFileSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const IMAGE_MIMES = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/svg+xml"];
+
+function isImageMime(mimeType: string | null): boolean {
+  return IMAGE_MIMES.includes(mimeType ?? "");
+}
+
+function SimpleMarkdown({ content }: { content: string }) {
+  const lines = content.split("\n");
+  return (
+    <View style={{ gap: 4 }}>
+      {lines.map((line, i) => {
+        if (line.startsWith("### ")) {
+          return <Text key={i} style={mdStyles.h3}>{line.slice(4)}</Text>;
+        }
+        if (line.startsWith("## ")) {
+          return <Text key={i} style={mdStyles.h2}>{line.slice(3)}</Text>;
+        }
+        if (line.startsWith("# ")) {
+          return <Text key={i} style={mdStyles.h1}>{line.slice(2)}</Text>;
+        }
+        if (line.startsWith("- ") || line.startsWith("* ")) {
+          return <Text key={i} style={mdStyles.bullet}>• {line.slice(2)}</Text>;
+        }
+        if (line.startsWith("```") || line === "") {
+          return <View key={i} style={{ height: line === "" ? 8 : 0 }} />;
+        }
+        return <Text key={i} style={mdStyles.body}>{line}</Text>;
+      })}
+    </View>
+  );
+}
+
+const mdStyles = StyleSheet.create({
+  h1: { fontSize: 20, fontWeight: "800", color: "#111827", marginTop: 8, marginBottom: 4 },
+  h2: { fontSize: 17, fontWeight: "700", color: "#111827", marginTop: 6, marginBottom: 2 },
+  h3: { fontSize: 15, fontWeight: "700", color: "#374151", marginTop: 4 },
+  body: { fontSize: 15, color: "#374151", lineHeight: 24 },
+  bullet: { fontSize: 15, color: "#374151", lineHeight: 24, paddingLeft: 8 },
+});
+
 export default function DeliverableScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
+  const { width } = useWindowDimensions();
 
   const [result] = useQuery<{ deliverable: Deliverable | null }>({
     query: DELIVERABLE_QUERY,
@@ -125,10 +168,7 @@ export default function DeliverableScreen() {
       {d.kind === "link" && d.url ? (
         <View style={styles.contentCard}>
           <Text style={styles.sectionLabel}>URL</Text>
-          <TouchableOpacity
-            onPress={() => Linking.openURL(d.url!)}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity onPress={() => Linking.openURL(d.url!)} activeOpacity={0.7}>
             <Text style={styles.linkText}>{d.url}</Text>
           </TouchableOpacity>
         </View>
@@ -141,10 +181,26 @@ export default function DeliverableScreen() {
             <Text style={styles.codeText}>{d.content}</Text>
           </ScrollView>
         </View>
-      ) : d.content ? (
+      ) : d.kind === "markdown" && d.content ? (
         <View style={styles.contentCard}>
           <Text style={styles.sectionLabel}>Content</Text>
-          <Text style={styles.markdownText}>{d.content}</Text>
+          <SimpleMarkdown content={d.content} />
+        </View>
+      ) : d.kind === "file" && d.url && isImageMime(d.mimeType) ? (
+        <View style={styles.contentCard}>
+          <Text style={styles.sectionLabel}>Preview</Text>
+          <Image
+            source={{ uri: d.url }}
+            style={{ width: width - 64, height: (width - 64) * 0.6, borderRadius: 8 }}
+            resizeMode="contain"
+          />
+          <TouchableOpacity
+            style={[styles.downloadBtn, { marginTop: 8 }]}
+            onPress={() => Linking.openURL(d.url!)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.downloadBtnText}>📥 Open Full Image</Text>
+          </TouchableOpacity>
         </View>
       ) : d.url ? (
         <View style={styles.contentCard}>
@@ -155,6 +211,11 @@ export default function DeliverableScreen() {
           >
             <Text style={styles.downloadBtnText}>📥 Open / Download File</Text>
           </TouchableOpacity>
+        </View>
+      ) : d.content ? (
+        <View style={styles.contentCard}>
+          <Text style={styles.sectionLabel}>Content</Text>
+          <Text style={styles.markdownText}>{d.content}</Text>
         </View>
       ) : null}
     </ScrollView>

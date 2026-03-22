@@ -17,7 +17,7 @@ import { useState } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "urql";
-import { CREATE_TASK_FROM_DASHBOARD, PROFILES_QUERY } from "@agentcenter/graphql-client";
+import { CREATE_TASK_FROM_DASHBOARD, PROFILES_QUERY, TASKS_QUERY } from "@agentcenter/graphql-client";
 import { Avatar } from "../../src/components/Avatar";
 
 const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
@@ -38,6 +38,13 @@ interface Profile {
   agent: { identityEmoji: string | null } | null;
 }
 
+interface TaskOption {
+  id: string;
+  taskNumber: number;
+  title: string;
+  status: string;
+}
+
 export default function CreateTaskScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -47,11 +54,22 @@ export default function CreateTaskScreen() {
   const [priority, setPriority] = useState<Priority | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [assigneeModalOpen, setAssigneeModalOpen] = useState(false);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+  const [blockedByTaskId, setBlockedByTaskId] = useState<string | null>(null);
+  const [taskPickerOpen, setTaskPickerOpen] = useState(false);
+  const [taskPickerSearch, setTaskPickerSearch] = useState("");
 
   const [profilesResult] = useQuery<{ profiles: Profile[] }>({
     query: PROFILES_QUERY,
     variables: { limit: 100 },
     pause: !assigneeModalOpen,
+  });
+
+  const [tasksResult] = useQuery<{ tasks: TaskOption[] }>({
+    query: TASKS_QUERY,
+    variables: { limit: 200 },
+    pause: !taskPickerOpen,
   });
 
   const [, createTask] = useMutation(CREATE_TASK_FROM_DASHBOARD);
@@ -63,12 +81,19 @@ export default function CreateTaskScreen() {
       return;
     }
     setLoading(true);
+    // Commit any pending tag input on submit
+    const finalTags = tagInput.trim()
+      ? [...tags, tagInput.trim()]
+      : tags;
+
     const res = await createTask({
       title: title.trim(),
       description: description.trim(),
       priority: priority ?? undefined,
       assigneeIds: selectedIds,
+      tags: finalTags.length > 0 ? finalTags : undefined,
       projectId: projectId ?? undefined,
+      blockedByTaskId: blockedByTaskId ?? undefined,
     });
     setLoading(false);
 
@@ -184,6 +209,142 @@ export default function CreateTaskScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        {/* Tags */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Tags</Text>
+          {tags.length > 0 && (
+            <View style={styles.assigneeChips}>
+              {tags.map((tag) => (
+                <TouchableOpacity
+                  key={tag}
+                  style={styles.tagChip}
+                  onPress={() => setTags((prev) => prev.filter((t) => t !== tag))}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.tagChipText}>{tag} ✕</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          <TextInput
+            style={styles.input}
+            placeholder="Type a tag and press space or comma…"
+            placeholderTextColor="#9ca3af"
+            value={tagInput}
+            onChangeText={(text) => {
+              if (text.endsWith(" ") || text.endsWith(",")) {
+                const tag = text.replace(/[, ]+$/, "").trim();
+                if (tag && !tags.includes(tag)) {
+                  setTags((prev) => [...prev, tag]);
+                }
+                setTagInput("");
+              } else {
+                setTagInput(text);
+              }
+            }}
+            onSubmitEditing={() => {
+              const tag = tagInput.trim();
+              if (tag && !tags.includes(tag)) {
+                setTags((prev) => [...prev, tag]);
+              }
+              setTagInput("");
+            }}
+            returnKeyType="done"
+            blurOnSubmit={false}
+          />
+        </View>
+
+        {/* Blocked By */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Blocked By</Text>
+          <TouchableOpacity
+            style={styles.assigneeSelector}
+            onPress={() => setTaskPickerOpen(true)}
+            activeOpacity={0.7}
+          >
+            {blockedByTaskId ? (
+              (() => {
+                const t = tasksResult.data?.tasks.find((x) => x.id === blockedByTaskId);
+                return (
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text style={{ fontSize: 15, color: "#111827" }}>
+                      {t ? `#${t.taskNumber} ${t.title}` : blockedByTaskId}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={(e) => { e.stopPropagation(); setBlockedByTaskId(null); }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={{ color: "#6b7280", fontSize: 16 }}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })()
+            ) : (
+              <Text style={styles.assigneePlaceholder}>Select blocking task…</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Task picker modal (blocked-by) */}
+        <Modal
+          visible={taskPickerOpen}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setTaskPickerOpen(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Blocked By Task</Text>
+              <TouchableOpacity onPress={() => setTaskPickerOpen(false)}>
+                <Text style={styles.modalDone}>Done</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" }}>
+              <TextInput
+                style={[styles.input, { marginBottom: 0 }]}
+                placeholder="Search tasks…"
+                placeholderTextColor="#9ca3af"
+                value={taskPickerSearch}
+                onChangeText={setTaskPickerSearch}
+                autoFocus
+              />
+            </View>
+            {tasksResult.fetching ? (
+              <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
+            ) : (
+              <FlatList
+                data={(tasksResult.data?.tasks ?? []).filter((t) =>
+                  taskPickerSearch.trim() === "" ||
+                  t.title.toLowerCase().includes(taskPickerSearch.toLowerCase()) ||
+                  String(t.taskNumber).includes(taskPickerSearch)
+                )}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+                renderItem={({ item }) => {
+                  const selected = blockedByTaskId === item.id;
+                  return (
+                    <Pressable
+                      style={[styles.profileRow, selected && styles.profileRowSelected]}
+                      onPress={() => {
+                        setBlockedByTaskId(selected ? null : item.id);
+                        setTaskPickerOpen(false);
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.profileName}>
+                          #{item.taskNumber} {item.title}
+                        </Text>
+                        <Text style={styles.profileUsername}>{item.status.replace("_", " ")}</Text>
+                      </View>
+                      {selected && <Text style={styles.checkmark}>✓</Text>}
+                    </Pressable>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </Modal>
 
         {/* Assignee picker modal */}
         <Modal
@@ -355,6 +516,19 @@ const styles = StyleSheet.create({
   assigneeChipText: {
     fontSize: 13,
     color: "#1d4ed8",
+    fontWeight: "500",
+  },
+  tagChip: {
+    backgroundColor: "#f3f4f6",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  tagChipText: {
+    fontSize: 13,
+    color: "#374151",
     fontWeight: "500",
   },
   modalContainer: {
