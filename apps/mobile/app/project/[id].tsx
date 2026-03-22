@@ -472,7 +472,7 @@ function AddMemberModal({
         </View>
         <View style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" }}>
           <TextInput
-            style={[styles.docInput, { marginBottom: 0 }]}
+            style={[styles.editInput, { marginBottom: 0 }]}
             placeholder="Search profiles…"
             placeholderTextColor="#9ca3af"
             value={search}
