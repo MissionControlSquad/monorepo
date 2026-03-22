@@ -186,6 +186,7 @@ export function AppDrawer() {
           <DrawerItem icon="pulse-outline" label="Activity Feed" onPress={() => navigate("/activity")} colors={colors} />
           <DrawerItem icon="bar-chart-outline" label="Analytics" onPress={() => navigate("/analytics")} colors={colors} />
           <DrawerItem icon="repeat-outline" label="Recurring Tasks" onPress={() => navigate("/recurring-tasks")} colors={colors} />
+          <DrawerItem icon="document-text-outline" label="Task Templates" onPress={() => navigate("/task-templates")} colors={colors} />
           <DrawerItem icon="notifications-outline" label="Notifications" onPress={() => navigate("/notifications")} colors={colors} />
           <DrawerItem icon="settings-outline" label="Settings" onPress={() => navigate("/settings")} colors={colors} />
         </View>

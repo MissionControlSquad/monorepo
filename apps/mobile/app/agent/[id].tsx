@@ -310,7 +310,7 @@ export default function AgentDetailScreen() {
         ))}
       </View>
 
-      {activeTab === "overview" && <OverviewTab agent={agent} router={router} />}
+      {activeTab === "overview" && <OverviewTab agent={agent} router={router} onRefresh={() => reexecuteAgent({ requestPolicy: "network-only" })} />}
       {activeTab === "queue" && (
         <QueueTab
           agentId={id}
@@ -353,7 +353,8 @@ function StatCard({ label, value, isText }: { label: string; value: number | str
 
 // ── Overview Tab ──────────────────────────────────────────────────────────────
 
-function OverviewTab({ agent, router }: { agent: Agent; router: ReturnType<typeof useRouter> }) {
+function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: ReturnType<typeof useRouter>; onRefresh: () => void }) {
+  const { serverUrl } = useAuth();
   return (
     <ScrollView contentContainerStyle={styles.tabContent} contentInsetAdjustmentBehavior="automatic">
       {agent.currentTask && agent.currentTaskRef && (
@@ -373,7 +374,54 @@ function OverviewTab({ agent, router }: { agent: Agent; router: ReturnType<typeo
         <InfoRow label="Level" value={capLabel(agent.level)} />
         {agent.hostingType && <InfoRow label="Hosting" value={capLabel(agent.hostingType)} />}
         {agent.workspacePath && <InfoRow label="Workspace" value={agent.workspacePath} mono />}
-        {agent.apiKeyPrefix && <InfoRow label="API Key" value={`${agent.apiKeyPrefix}…`} mono />}
+        {agent.apiKeyPrefix && (
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" }}>
+            <Text style={styles.infoKey}>API Key</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <Text style={[styles.infoValue, { fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }]}>
+                {agent.apiKeyPrefix}…
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  Alert.alert(
+                    "Regenerate API Key",
+                    "The current key will stop working immediately. Continue?",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Regenerate",
+                        style: "destructive",
+                        onPress: async () => {
+                          try {
+                            const cookie = getStoredCookie();
+                            const res = await fetch(`${serverUrl}/api/agents/${agent.id}/regenerate-key`, {
+                              method: "POST",
+                              headers: { ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}) },
+                            });
+                            const data = await res.json() as { apiKey?: string; error?: string };
+                            if (!res.ok) {
+                              Alert.alert("Error", data.error ?? "Failed to regenerate");
+                            } else {
+                              Alert.alert("New API Key", data.apiKey ?? "", [
+                                { text: "Copy & Close", onPress: onRefresh },
+                              ]);
+                            }
+                          } catch {
+                            Alert.alert("Error", "Network error");
+                          }
+                        },
+                      },
+                    ]
+                  );
+                }}
+                style={{ backgroundColor: "#fef3c7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 11, fontWeight: "600", color: "#d97706" }}>Regen</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         {agent.setupStatus && <InfoRow label="Setup" value={capLabel(agent.setupStatus)} />}
         <InfoRow label="Joined" value={fmtDate(agent.createdAt)} />
         {agent.lastHeartbeat && (

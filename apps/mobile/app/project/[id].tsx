@@ -24,6 +24,7 @@ import {
   PROJECT_DOCS_BY_PROJECT_QUERY,
   PROJECT_DOC_QUERY,
   UPDATE_PROJECT,
+  ARCHIVE_PROJECT,
   ADD_PROJECT_MEMBER,
   REMOVE_PROJECT_MEMBER,
   CREATE_PROJECT_DOC,
@@ -877,20 +878,46 @@ export default function ProjectDetailScreen() {
     requestPolicy: "cache-and-network",
   });
 
+  const [, archiveProject] = useMutation(ARCHIVE_PROJECT);
+
   const { data, fetching, error } = result;
   const project = data?.project;
+
+  function handleArchive() {
+    Alert.alert(
+      "Archive Project",
+      "This project will be archived and hidden from active lists. Tasks will remain accessible.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Archive",
+          style: "destructive",
+          onPress: async () => {
+            const res = await archiveProject({ id });
+            if (res.error) Alert.alert("Error", res.error.message ?? "Failed to archive");
+            else router.back();
+          },
+        },
+      ]
+    );
+  }
 
   useEffect(() => {
     if (project) {
       navigation.setOptions({
         title: project.name,
         headerRight: () => (
-          <TouchableOpacity
-            onPress={() => router.push(`/kanban/${project.id}`)}
-            style={{ marginRight: 16 }}
-          >
-            <Ionicons name="grid-outline" size={22} color="#2563eb" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+            <TouchableOpacity
+              onPress={() => router.push(`/kanban/${project.id}`)}
+              style={{ padding: 8 }}
+            >
+              <Ionicons name="grid-outline" size={22} color="#2563eb" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleArchive} style={{ padding: 8 }}>
+              <Ionicons name="archive-outline" size={22} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
         ),
       });
     }
