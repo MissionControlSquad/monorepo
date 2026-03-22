@@ -6,9 +6,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
 } from "react-native";
 import { useQuery } from "urql";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { CHANNELS_QUERY } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 
@@ -46,6 +48,7 @@ function channelIcon(channel: Channel): string {
 export default function ChannelsScreen() {
   const router = useRouter();
   const { profileId } = useAuth();
+  const [search, setSearch] = useState("");
 
   const [result, reexecute] = useQuery<{ channels: Channel[] }>({
     query: CHANNELS_QUERY,
@@ -55,9 +58,15 @@ export default function ChannelsScreen() {
   });
 
   const { data, fetching, error } = result;
-  const channels = data?.channels ?? [];
+  const allChannels = data?.channels ?? [];
+  const channels = search.trim()
+    ? allChannels.filter((c) =>
+        channelDisplayName(c, profileId).toLowerCase().includes(search.toLowerCase()) ||
+        (c.description ?? "").toLowerCase().includes(search.toLowerCase())
+      )
+    : allChannels;
 
-  if (fetching && channels.length === 0) {
+  if (fetching && allChannels.length === 0) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#2563eb" />
@@ -65,7 +74,7 @@ export default function ChannelsScreen() {
     );
   }
 
-  if (error && channels.length === 0) {
+  if (error && allChannels.length === 0) {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>Failed to load channels</Text>
@@ -78,6 +87,20 @@ export default function ChannelsScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Search bar */}
+      <View style={styles.searchBar}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search channels…"
+          placeholderTextColor="#9ca3af"
+          value={search}
+          onChangeText={setSearch}
+          clearButtonMode="while-editing"
+          returnKeyType="search"
+        />
+      </View>
+
       <FlatList
         data={channels}
         keyExtractor={(item) => item.id}
@@ -85,12 +108,16 @@ export default function ChannelsScreen() {
         contentContainerStyle={channels.length === 0 ? styles.emptyContainer : styles.listContent}
         refreshControl={
           <RefreshControl
-            refreshing={fetching}
+            refreshing={fetching && allChannels.length === 0}
             onRefresh={() => reexecute({ requestPolicy: "network-only" })}
             tintColor="#2563eb"
           />
         }
-        ListEmptyComponent={<Text style={styles.emptyText}>No channels</Text>}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>
+            {search ? "No matching channels" : "No channels"}
+          </Text>
+        }
         renderItem={({ item }) => {
           const displayName = channelDisplayName(item, profileId);
           const icon = channelIcon(item);
@@ -207,5 +234,23 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 11,
     fontWeight: "700",
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  searchIcon: { fontSize: 14 },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: "#111827",
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
 });

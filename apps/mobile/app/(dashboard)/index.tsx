@@ -7,10 +7,12 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  TextInput,
 } from "react-native";
 import { useQuery } from "urql";
 import { useRouter } from "expo-router";
 import { useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
 import { TaskCard } from "../../src/components/TaskCard";
 
@@ -45,7 +47,9 @@ const FILTERS: { key: StatusFilter; label: string }[] = [
 
 export default function TaskListScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<StatusFilter>("all");
+  const [search, setSearch] = useState("");
 
   const [result, reexecute] = useQuery<{ tasks: Task[] }>({
     query: TASKS_QUERY,
@@ -55,7 +59,14 @@ export default function TaskListScreen() {
 
   const { data, fetching, error } = result;
   const allTasks = data?.tasks ?? [];
-  const tasks = filter === "all" ? allTasks : allTasks.filter((t) => t.status === filter);
+  const filteredByStatus = filter === "all" ? allTasks : allTasks.filter((t) => t.status === filter);
+  const tasks = search.trim()
+    ? filteredByStatus.filter(
+        (t) =>
+          t.title.toLowerCase().includes(search.toLowerCase()) ||
+          String(t.taskNumber).includes(search)
+      )
+    : filteredByStatus;
 
   if (fetching && allTasks.length === 0) {
     return (
@@ -78,6 +89,20 @@ export default function TaskListScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Search bar */}
+      <View style={styles.searchBar}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search tasks…"
+          placeholderTextColor="#9ca3af"
+          value={search}
+          onChangeText={setSearch}
+          clearButtonMode="while-editing"
+          returnKeyType="search"
+        />
+      </View>
+
       {/* Status filter chips */}
       <ScrollView
         horizontal
@@ -128,6 +153,15 @@ export default function TaskListScreen() {
           />
         )}
       />
+
+      {/* FAB — Create task */}
+      <TouchableOpacity
+        style={[styles.fab, { bottom: insets.bottom + 20 }]}
+        onPress={() => router.push("/task/create")}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.fabIcon}>+</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -145,7 +179,43 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, color: "#6b7280", fontWeight: "500" },
   chipTextActive: { color: "#2563eb", fontWeight: "600" },
 
-  listContent: { padding: 16, gap: 10 },
+  listContent: { padding: 16, gap: 10, paddingBottom: 90 },
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { color: "#9ca3af", fontSize: 16 },
+
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  searchIcon: { fontSize: 14 },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: "#111827",
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+
+  fab: {
+    position: "absolute",
+    right: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#2563eb",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  fabIcon: { fontSize: 28, color: "#fff", lineHeight: 32 },
 });

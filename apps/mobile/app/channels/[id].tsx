@@ -9,11 +9,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
+  ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useQuery, useMutation } from "urql";
 import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY } from "@agentcenter/graphql-client";
 import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_MESSAGE_REACTION } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
@@ -64,6 +67,7 @@ export default function ChannelDetailScreen() {
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   const [channelResult] = useQuery<{ channel: Channel | null }>({
@@ -87,7 +91,14 @@ export default function ChannelDetailScreen() {
 
   useEffect(() => {
     if (channel) {
-      navigation.setOptions({ title: channel.name });
+      navigation.setOptions({
+        title: channel.name,
+        headerRight: () => (
+          <TouchableOpacity onPress={() => setMembersOpen(true)} style={{ marginRight: 16, padding: 4 }}>
+            <Ionicons name="people-outline" size={22} color="#2563eb" />
+          </TouchableOpacity>
+        ),
+      });
     }
   }, [channel, navigation]);
 
@@ -235,6 +246,45 @@ export default function ChannelDetailScreen() {
           );
         }}
       />
+      {/* Members panel */}
+      <Modal
+        visible={membersOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setMembersOpen(false)}
+      >
+        <View style={styles.membersModal}>
+          <View style={styles.membersHeader}>
+            <Text style={styles.membersTitle}>
+              Members ({channel?.members.length ?? 0})
+            </Text>
+            <TouchableOpacity onPress={() => setMembersOpen(false)} style={{ padding: 4 }}>
+              <Ionicons name="close" size={22} color="#374151" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+            {(channel?.members ?? []).map((m) => (
+              <View key={m.id} style={styles.memberRow}>
+                <View style={styles.memberAvatar}>
+                  <Text style={styles.memberAvatarText}>
+                    {m.profile.displayName.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.memberName}>{m.profile.displayName}</Text>
+                  <Text style={styles.memberMeta}>
+                    {m.profile.kind === "agent" ? "🤖 Agent" : "👤 Human"} · @{m.profile.username}
+                  </Text>
+                </View>
+                {m.id === profileId && (
+                  <Text style={styles.memberYou}>you</Text>
+                )}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+
       <View style={[styles.inputBar, { paddingBottom: insets.bottom + 8 }]}>
         <TextInput
           style={styles.input}
@@ -431,4 +481,46 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   addReactionText: { fontSize: 13, color: "#9ca3af", fontWeight: "600" },
+
+  // Members modal
+  membersModal: { flex: 1, backgroundColor: "#f9fafb" },
+  membersHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+    backgroundColor: "#fff",
+  },
+  membersTitle: { fontSize: 17, fontWeight: "600", color: "#111827" },
+  memberRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    gap: 12,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
+  memberAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#dbeafe",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  memberAvatarText: { fontSize: 16, fontWeight: "700", color: "#1d4ed8" },
+  memberName: { fontSize: 15, fontWeight: "500", color: "#111827" },
+  memberMeta: { fontSize: 12, color: "#9ca3af", marginTop: 1 },
+  memberYou: {
+    fontSize: 11,
+    color: "#2563eb",
+    fontWeight: "600",
+    backgroundColor: "#eff6ff",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
 });

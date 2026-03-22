@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  TextInput,
 } from "react-native";
 import { useQuery } from "urql";
 import { useRouter } from "expo-router";
@@ -55,6 +56,7 @@ function memberEmojis(members: ProjectMember[]): string {
 export default function ProjectsScreen() {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [search, setSearch] = useState("");
 
   const [result, reexecute] = useQuery<{ projects: Project[] }>({
     query: PROJECTS_QUERY,
@@ -63,10 +65,16 @@ export default function ProjectsScreen() {
 
   const { data, fetching, error } = result;
   const allProjects = data?.projects ?? [];
-  const projects =
+  const byStatus =
     statusFilter === "all"
       ? allProjects
       : allProjects.filter((p) => p.status === statusFilter);
+  const projects = search.trim()
+    ? byStatus.filter((p) =>
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        (p.description ?? "").toLowerCase().includes(search.toLowerCase())
+      )
+    : byStatus;
 
   const filters: { key: StatusFilter; label: string }[] = [
     { key: "all", label: "All" },
@@ -95,6 +103,20 @@ export default function ProjectsScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Search */}
+      <View style={styles.searchBar}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search projects…"
+          placeholderTextColor="#9ca3af"
+          value={search}
+          onChangeText={setSearch}
+          clearButtonMode="while-editing"
+          returnKeyType="search"
+        />
+      </View>
+
       {/* Status filter */}
       <ScrollView
         horizontal
@@ -140,7 +162,11 @@ export default function ProjectsScreen() {
             tintColor="#2563eb"
           />
         }
-        ListEmptyComponent={<Text style={styles.emptyText}>No projects</Text>}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>
+            {search ? "No matching projects" : "No projects"}
+          </Text>
+        }
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.card}
@@ -237,4 +263,22 @@ const styles = StyleSheet.create({
   statusBadgeText: { color: "#fff", fontSize: 11, fontWeight: "600" },
   description: { fontSize: 13, color: "#6b7280", lineHeight: 18 },
   members: { fontSize: 12, color: "#9ca3af" },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  searchIcon: { fontSize: 14 },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: "#111827",
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
 });
