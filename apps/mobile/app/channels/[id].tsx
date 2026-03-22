@@ -18,7 +18,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, CHANNEL_PINNED_MESSAGES_QUERY, ON_NEW_CHANNEL_MESSAGE } from "@agentcenter/graphql-client";
-import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_MESSAGE_REACTION } from "@agentcenter/graphql-client";
+import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_CHANNEL_MESSAGE_REACTION, UPDATE_CHANNEL_MESSAGE, DELETE_CHANNEL_MESSAGE, PIN_CHANNEL_MESSAGE, UNPIN_CHANNEL_MESSAGE } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 import { MentionInput } from "../../src/components/MentionInput";
 
@@ -108,7 +108,11 @@ export default function ChannelDetailScreen() {
 
   const [, executeSend] = useMutation(CREATE_CHANNEL_MESSAGE);
   const [, executeMarkRead] = useMutation(MARK_CHANNEL_READ);
-  const [, executeToggleReaction] = useMutation(TOGGLE_MESSAGE_REACTION);
+  const [, executeToggleReaction] = useMutation(TOGGLE_CHANNEL_MESSAGE_REACTION);
+  const [, executeUpdateMessage] = useMutation(UPDATE_CHANNEL_MESSAGE);
+  const [, executeDeleteMessage] = useMutation(DELETE_CHANNEL_MESSAGE);
+  const [, executePinMessage] = useMutation(PIN_CHANNEL_MESSAGE);
+  const [, executeUnpinMessage] = useMutation(UNPIN_CHANNEL_MESSAGE);
 
   // Real-time subscription — accumulate new messages as they arrive
   const [subResult] = useSubscription(
@@ -249,14 +253,64 @@ export default function ChannelDetailScreen() {
             );
           }
 
-          function showEmojiPicker() {
-            Alert.alert("React", undefined, [
-              ...["👍","❤️","😂","🎉","🔥","👀"].map((e) => ({
-                text: e,
-                onPress: () => handleReact(e),
-              })),
-              { text: "Cancel", style: "cancel" },
-            ]);
+          function showMessageActions() {
+            const isPinned = !!item.pinnedAt;
+            const baseActions: { text: string; onPress?: () => void; style?: "cancel" | "destructive" }[] = [
+              {
+                text: isPinned ? "📌 Unpin" : "📌 Pin",
+                onPress: () => {
+                  if (!profileId) return;
+                  const fn = isPinned ? executeUnpinMessage : executePinMessage;
+                  fn({ messageId: item.id, profileId }).then(() => reexecute({ requestPolicy: "network-only" }));
+                },
+              },
+              {
+                text: "😀 React",
+                onPress: () => {
+                  Alert.alert("React", undefined, [
+                    ...["👍","❤️","😂","🎉","🔥","👀"].map((e) => ({
+                      text: e,
+                      onPress: () => handleReact(e),
+                    })),
+                    { text: "Cancel", style: "cancel" as const },
+                  ]);
+                },
+              },
+            ];
+            if (isMe) {
+              baseActions.push({
+                text: "✏️ Edit",
+                onPress: () => {
+                  Alert.prompt("Edit Message", undefined, (newContent) => {
+                    if (!newContent?.trim() || !profileId) return;
+                    executeUpdateMessage({ messageId: item.id, profileId, content: newContent.trim() }).then(() =>
+                      reexecute({ requestPolicy: "network-only" })
+                    );
+                  }, "plain-text", item.content);
+                },
+              });
+              baseActions.push({
+                text: "🗑️ Delete",
+                style: "destructive",
+                onPress: () => {
+                  Alert.alert("Delete Message", "This cannot be undone.", [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Delete",
+                      style: "destructive",
+                      onPress: () => {
+                        if (!profileId) return;
+                        executeDeleteMessage({ messageId: item.id, profileId }).then(() =>
+                          reexecute({ requestPolicy: "network-only" })
+                        );
+                      },
+                    },
+                  ]);
+                },
+              });
+            }
+            baseActions.push({ text: "Cancel", style: "cancel" });
+            Alert.alert("Message", undefined, baseActions);
           }
 
           return (
@@ -271,8 +325,8 @@ export default function ChannelDetailScreen() {
               <View style={styles.bubbleCol}>
                 <TouchableOpacity
                   activeOpacity={0.85}
-                  onLongPress={showEmojiPicker}
-                  delayLongPress={400}
+                  onLongPress={showMessageActions}
+                  delayLongPress={350}
                 >
                   <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
                     {!isMe && (
@@ -328,7 +382,7 @@ export default function ChannelDetailScreen() {
                         </Text>
                       </TouchableOpacity>
                     ))}
-                    <TouchableOpacity style={styles.addReactionBtn} onPress={showEmojiPicker}>
+                    <TouchableOpacity style={styles.addReactionBtn} onPress={showMessageActions}>
                       <Text style={styles.addReactionText}>+</Text>
                     </TouchableOpacity>
                   </View>

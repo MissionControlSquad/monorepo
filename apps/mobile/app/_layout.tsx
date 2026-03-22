@@ -40,6 +40,7 @@ function RootLayoutNav() {
         <Stack.Screen name="project/create" options={{ title: "New Project", presentation: "modal" }} />
         <Stack.Screen name="activity" options={{ title: "Activity Feed" }} />
         <Stack.Screen name="analytics" options={{ title: "Analytics" }} />
+        <Stack.Screen name="recurring-tasks" options={{ title: "Recurring Tasks" }} />
         <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
         <Stack.Screen name="channels/create" options={{ title: "New Channel", presentation: "modal" }} />
         <Stack.Screen name="kanban/[projectId]" options={{ title: "Kanban" }} />

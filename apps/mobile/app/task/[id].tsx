@@ -23,7 +23,7 @@ import {
   CHILD_TASKS_QUERY,
   TASK_WORK_SUMMARY_QUERY,
 } from "@agentcenter/graphql-client";
-import { UPDATE_TASK, CREATE_MESSAGE } from "@agentcenter/graphql-client";
+import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 import { getStoredCookie } from "../../src/api/session";
 import { MentionInput } from "../../src/components/MentionInput";
@@ -75,6 +75,12 @@ interface ChildTask {
   priority: string | null;
 }
 
+interface MessageReaction {
+  id: string;
+  profileId: string;
+  emoji: string;
+}
+
 interface Message {
   id: string;
   taskId: string;
@@ -82,6 +88,7 @@ interface Message {
   content: string;
   createdAt: string;
   fromProfile: Profile;
+  reactions: MessageReaction[];
 }
 
 interface Deliverable {
@@ -512,6 +519,8 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "🎉", "🔥", "✅"];
+
 function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string | null }) {
   const [text, setText] = useState("");
   const listRef = useRef<FlatList>(null);
@@ -524,6 +533,7 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
   });
 
   const [, sendMessage] = useMutation(CREATE_MESSAGE);
+  const [, toggleReaction] = useMutation(TOGGLE_MESSAGE_REACTION);
 
   const messages = result.data?.messagesByTask ?? [];
 
@@ -571,22 +581,81 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
         ListEmptyComponent={
           <Text style={styles.emptyText}>No messages yet. Start the conversation.</Text>
         }
-        renderItem={({ item }) => (
-          <View style={styles.messageRow}>
-            <View style={styles.messageAvatar}>
-              <Text style={styles.messageAvatarText}>
-                {item.fromProfile.displayName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.messageBubble}>
-              <View style={styles.messageHeader}>
-                <Text style={styles.messageSender}>{item.fromProfile.displayName}</Text>
-                <Text style={styles.messageTime}>{formatTime(item.createdAt)}</Text>
+        renderItem={({ item }) => {
+          const reactionGroups: Record<string, { emoji: string; count: number; iMine: boolean }> = {};
+          for (const r of item.reactions ?? []) {
+            if (!reactionGroups[r.emoji]) reactionGroups[r.emoji] = { emoji: r.emoji, count: 0, iMine: false };
+            reactionGroups[r.emoji].count++;
+            if (r.profileId === profileId) reactionGroups[r.emoji].iMine = true;
+          }
+          const reactionList = Object.values(reactionGroups);
+
+          function handleReact(emoji: string) {
+            if (!profileId) return;
+            toggleReaction({ messageId: item.id, profileId, emoji }).then(() =>
+              reexecute({ requestPolicy: "network-only" })
+            );
+          }
+
+          function showEmojiPicker() {
+            const actions: { text: string; onPress?: () => void; style?: "cancel" }[] = REACTION_EMOJIS.map((e) => ({ text: e, onPress: () => handleReact(e) }));
+            actions.push({ text: "Cancel", style: "cancel" });
+            Alert.alert("Add Reaction", undefined, actions);
+          }
+
+          return (
+            <View style={styles.messageRow}>
+              <View style={styles.messageAvatar}>
+                <Text style={styles.messageAvatarText}>
+                  {item.fromProfile.displayName.charAt(0).toUpperCase()}
+                </Text>
               </View>
-              <Text style={styles.messageContent}>{item.content}</Text>
+              <View style={{ flex: 1 }}>
+                <View style={styles.messageBubble}>
+                  <View style={styles.messageHeader}>
+                    <Text style={styles.messageSender}>{item.fromProfile.displayName}</Text>
+                    <Text style={styles.messageTime}>{formatTime(item.createdAt)}</Text>
+                  </View>
+                  <Text style={styles.messageContent}>{item.content}</Text>
+                </View>
+                {(reactionList.length > 0 || true) && (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4, paddingLeft: 2 }}>
+                    {reactionList.map((r) => (
+                      <TouchableOpacity
+                        key={r.emoji}
+                        onPress={() => handleReact(r.emoji)}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          backgroundColor: r.iMine ? "#dbeafe" : "#f3f4f6",
+                          borderRadius: 12,
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          gap: 3,
+                          borderWidth: r.iMine ? 1 : 0,
+                          borderColor: r.iMine ? "#93c5fd" : "transparent",
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={{ fontSize: 12 }}>{r.emoji}</Text>
+                        <Text style={{ fontSize: 11, color: r.iMine ? "#2563eb" : "#6b7280", fontWeight: "600" }}>
+                          {r.count}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity
+                      onPress={showEmojiPicker}
+                      style={{ backgroundColor: "#f3f4f6", borderRadius: 12, paddingHorizontal: 7, paddingVertical: 2 }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={{ fontSize: 12, color: "#9ca3af" }}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
-        )}
+          );
+        }}
       />
       <View style={[styles.inputRow, { paddingBottom: insets.bottom + 8 }]}>
         <MentionInput
@@ -679,10 +748,11 @@ function ApproveRejectBar({
   task: Task;
   onDone: () => void;
 }) {
-  const { serverUrl } = useAuth();
+  const { serverUrl, profileId } = useAuth();
   const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState<"approve" | "reject" | null>(null);
+  const [loading, setLoading] = useState<"approve" | "reject" | "clarify" | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [, requestClarification] = useMutation(REQUEST_CLARIFICATION);
 
   async function handleApprove() {
     Alert.alert("Approve Task", "Add an optional approval comment?", [
@@ -731,6 +801,21 @@ function ApproveRejectBar({
     }
   }
 
+  async function handleClarify() {
+    Alert.prompt("Request Clarification", "What questions do you have? (separate multiple with newlines)", async (input) => {
+      if (!input?.trim() || !profileId) return;
+      const questions = input.split("\n").map((q) => q.trim()).filter(Boolean);
+      setLoading("clarify");
+      try {
+        const res = await requestClarification({ reviewerId: profileId, taskId: task.id, questions });
+        if (res.error) Alert.alert("Error", res.error.message ?? "Failed to request clarification");
+        else onDone();
+      } finally {
+        setLoading(null);
+      }
+    }, "plain-text");
+  }
+
   async function doReject(reason: string, changes: string[]) {
     if (!serverUrl) return;
     setLoading("reject");
@@ -768,6 +853,17 @@ function ApproveRejectBar({
       >
         <Text style={styles.reviewLabel}>Awaiting Review</Text>
         <View style={styles.approveRejectBtns}>
+          <TouchableOpacity
+            style={[styles.clarifyBtn, loading !== null && { opacity: 0.6 }]}
+            onPress={handleClarify}
+            disabled={loading !== null}
+          >
+            {loading === "clarify" ? (
+              <ActivityIndicator size="small" color="#7c3aed" />
+            ) : (
+              <Text style={styles.clarifyBtnText}>? Clarify</Text>
+            )}
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.rejectBtn, loading !== null && { opacity: 0.6 }]}
             onPress={() => setShowRejectModal(true)}
@@ -1194,6 +1290,20 @@ const styles = StyleSheet.create({
   approveRejectBtns: {
     flexDirection: "row",
     gap: 10,
+  },
+  clarifyBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#7c3aed",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clarifyBtnText: {
+    color: "#7c3aed",
+    fontWeight: "700",
+    fontSize: 15,
   },
   rejectBtn: {
     flex: 1,
