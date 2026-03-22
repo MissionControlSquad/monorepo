@@ -17,7 +17,7 @@ import { useQuery, useMutation, useSubscription } from "urql";
 import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, ON_NEW_CHANNEL_MESSAGE } from "@agentcenter/graphql-client";
+import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, CHANNEL_PINNED_MESSAGES_QUERY, ON_NEW_CHANNEL_MESSAGE } from "@agentcenter/graphql-client";
 import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_MESSAGE_REACTION } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 
@@ -29,6 +29,20 @@ interface FromProfile {
   avatarUrl: string | null;
 }
 
+interface Attachment {
+  id: string;
+  messageId: string;
+  documentId: string;
+  document: {
+    id: string;
+    title: string;
+    type: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+  };
+}
+
 interface Message {
   id: string;
   channelId: string;
@@ -36,8 +50,11 @@ interface Message {
   content: string;
   createdAt: string;
   updatedAt: string;
+  pinnedAt: string | null;
+  pinnedByProfileId: string | null;
   fromProfile: FromProfile;
   reactions: { id: string; profileId: string; emoji: string; profile: { id: string; displayName: string } }[];
+  attachments: Attachment[];
 }
 
 interface Channel {
@@ -68,6 +85,7 @@ export default function ChannelDetailScreen() {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [pinnedOpen, setPinnedOpen] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   const [channelResult] = useQuery<{ channel: Channel | null }>({
@@ -78,6 +96,12 @@ export default function ChannelDetailScreen() {
   const [messagesResult, reexecute] = useQuery<{ channelMessages: Message[] }>({
     query: CHANNEL_MESSAGES_QUERY,
     variables: { channelId: id, limit: 100 },
+    requestPolicy: "cache-and-network",
+  });
+
+  const [pinnedResult] = useQuery<{ channelPinnedMessages: Message[] }>({
+    query: CHANNEL_PINNED_MESSAGES_QUERY,
+    variables: { channelId: id, limit: 50 },
     requestPolicy: "cache-and-network",
   });
 
@@ -97,6 +121,7 @@ export default function ChannelDetailScreen() {
   );
 
   const channel = channelResult.data?.channel;
+  const pinnedMessages = pinnedResult.data?.channelPinnedMessages ?? [];
   const baseMessages = messagesResult.data?.channelMessages ?? [];
   // Merge subscription messages with fetched messages, deduplicate by id
   const liveMessages = subResult.data ?? [];
@@ -182,6 +207,21 @@ export default function ChannelDetailScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+        ListHeaderComponent={
+          pinnedMessages.length > 0 ? (
+            <TouchableOpacity
+              style={styles.pinnedBanner}
+              onPress={() => setPinnedOpen(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.pinnedBannerIcon}>📌</Text>
+              <Text style={styles.pinnedBannerText}>
+                {pinnedMessages.length} pinned {pinnedMessages.length === 1 ? "message" : "messages"}
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color="#92400e" />
+            </TouchableOpacity>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No messages yet. Say hello!</Text>
@@ -245,6 +285,34 @@ export default function ChannelDetailScreen() {
                     </Text>
                   </View>
                 </TouchableOpacity>
+                {(item.attachments ?? []).length > 0 && (
+                  <View style={styles.attachmentsRow}>
+                    {(item.attachments ?? []).map((a) => {
+                      const mime = a.document.mimeType ?? "";
+                      const icon = mime.startsWith("image/") ? "🖼️"
+                        : mime.startsWith("video/") ? "🎬"
+                        : mime.startsWith("audio/") ? "🎵"
+                        : mime === "application/pdf" ? "📄"
+                        : "📎";
+                      const size = a.document.fileSize
+                        ? a.document.fileSize > 1_000_000
+                          ? `${(a.document.fileSize / 1_000_000).toFixed(1)} MB`
+                          : `${Math.round(a.document.fileSize / 1024)} KB`
+                        : null;
+                      return (
+                        <View key={a.id} style={styles.attachmentPill}>
+                          <Text style={styles.attachmentIcon}>{icon}</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.attachmentName} numberOfLines={1}>
+                              {a.document.fileName || a.document.title}
+                            </Text>
+                            {size && <Text style={styles.attachmentSize}>{size}</Text>}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
                 {reactionList.length > 0 && (
                   <View style={[styles.reactionsRow, isMe && styles.reactionsRowMe]}>
                     {reactionList.map((r) => (
@@ -302,6 +370,41 @@ export default function ChannelDetailScreen() {
                 {m.id === profileId && (
                   <Text style={styles.memberYou}>you</Text>
                 )}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Pinned messages modal */}
+      <Modal
+        visible={pinnedOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setPinnedOpen(false)}
+      >
+        <View style={styles.membersModal}>
+          <View style={styles.membersHeader}>
+            <Text style={styles.membersTitle}>
+              📌 Pinned Messages ({pinnedMessages.length})
+            </Text>
+            <TouchableOpacity onPress={() => setPinnedOpen(false)} style={{ padding: 4 }}>
+              <Ionicons name="close" size={22} color="#374151" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}>
+            {pinnedMessages.map((msg) => (
+              <View key={msg.id} style={styles.pinnedMessageCard}>
+                <View style={styles.pinnedMessageHeader}>
+                  <View style={styles.avatarCircle}>
+                    <Text style={styles.avatarText}>
+                      {msg.fromProfile.displayName.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.senderName}>{msg.fromProfile.displayName}</Text>
+                  <Text style={styles.timestamp}>{formatTime(msg.createdAt)}</Text>
+                </View>
+                <Text style={styles.pinnedMessageContent}>{msg.content}</Text>
               </View>
             ))}
           </ScrollView>
@@ -493,6 +596,75 @@ const styles = StyleSheet.create({
   reactionEmoji: { fontSize: 13 },
   reactionCount: { fontSize: 11, color: "#6b7280", fontWeight: "600" },
   reactionCountMine: { color: "#2563eb" },
+  // Pinned banner
+  pinnedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#fef3c7",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+  },
+  pinnedBannerIcon: { fontSize: 14 },
+  pinnedBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#92400e",
+  },
+
+  // Attachments
+  attachmentsRow: {
+    gap: 6,
+    marginTop: 2,
+  },
+  attachmentPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  attachmentIcon: { fontSize: 16 },
+  attachmentName: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#374151",
+  },
+  attachmentSize: {
+    fontSize: 11,
+    color: "#9ca3af",
+    marginTop: 1,
+  },
+
+  // Pinned message card
+  pinnedMessageCard: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  pinnedMessageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  pinnedMessageContent: {
+    fontSize: 14,
+    color: "#374151",
+    lineHeight: 20,
+  },
+
   addReactionBtn: {
     backgroundColor: "#f3f4f6",
     borderRadius: 12,
