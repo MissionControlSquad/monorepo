@@ -5,14 +5,25 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
 import { DrawerProvider } from "../src/context/DrawerContext";
 import { AppDrawer } from "../src/components/AppDrawer";
+import { OfflineBanner } from "../src/components/OfflineBanner";
+import { useTheme } from "../src/hooks/useTheme";
 import { View } from "react-native";
 
 function RootLayoutNav() {
   const { urqlClient } = useAuth();
+  const { colors } = useTheme();
 
   const content = (
-    <View style={{ flex: 1 }}>
-      <Stack>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <OfflineBanner />
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.headerBg },
+          headerTintColor: colors.text,
+          headerTitleStyle: { color: colors.text },
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="auth/login" options={{ headerShown: false }} />
         <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />

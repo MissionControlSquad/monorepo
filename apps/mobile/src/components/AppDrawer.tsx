@@ -2,7 +2,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   Animated,
   Pressable,
   Image,
@@ -18,6 +17,7 @@ import { useAuth } from "../context/AuthContext";
 import { useQuery } from "urql";
 import { ME_QUERY } from "@agentcenter/graphql-client";
 import { getStoredServerUrl } from "../api/session";
+import { useTheme } from "../hooks/useTheme";
 
 interface Profile {
   id: string;
@@ -35,6 +35,7 @@ export function AppDrawer() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
+  const { colors } = useTheme();
 
   const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -83,7 +84,6 @@ export function AppDrawer() {
 
   const navigate = (path: string) => {
     closeDrawer();
-    // small delay so drawer closes before push animation
     setTimeout(() => router.push(path as Parameters<typeof router.push>[0]), 100);
   };
 
@@ -100,32 +100,42 @@ export function AppDrawer() {
   const initials = profile?.displayName?.[0]?.toUpperCase() ?? "?";
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={{ ...{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 } }} pointerEvents="box-none">
       {/* Backdrop */}
-      <Animated.View style={[styles.backdrop, { opacity }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={closeDrawer} />
+      <Animated.View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.35)", opacity }}>
+        <Pressable style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} onPress={closeDrawer} />
       </Animated.View>
 
-      {/* Drawer panel — slides in from right */}
+      {/* Drawer panel */}
       <Animated.View
-        style={[
-          styles.drawer,
-          {
-            transform: [{ translateX }],
-            paddingTop: insets.top + 12,
-            paddingBottom: insets.bottom + 16,
-            right: 0,
-            width: Math.min(DRAWER_WIDTH, screenWidth * 0.78),
-          },
-        ]}
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          right: 0,
+          width: Math.min(DRAWER_WIDTH, screenWidth * 0.78),
+          backgroundColor: colors.background,
+          shadowColor: colors.shadow,
+          shadowOffset: { width: -3, height: 0 },
+          shadowOpacity: 0.15,
+          shadowRadius: 12,
+          elevation: 20,
+          paddingTop: insets.top + 12,
+          paddingBottom: insets.bottom + 16,
+          transform: [{ translateX }],
+        }}
       >
         {/* Close button */}
-        <TouchableOpacity style={styles.closeBtn} onPress={closeDrawer} activeOpacity={0.7}>
-          <Ionicons name="close" size={22} color="#6b7280" />
+        <TouchableOpacity
+          style={{ alignSelf: "flex-end", padding: 12, marginRight: 4 }}
+          onPress={closeDrawer}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="close" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
 
         {/* Profile section */}
-        <View style={styles.profileSection}>
+        <View style={{ alignItems: "center", paddingHorizontal: 20, paddingBottom: 20, gap: 4 }}>
           {profile?.avatarUrl ? (
             <Image
               source={{
@@ -133,62 +143,62 @@ export function AppDrawer() {
                   ? profile.avatarUrl
                   : `${getStoredServerUrl() ?? ""}${profile.avatarUrl}`,
               }}
-              style={styles.avatar}
+              style={{ width: 72, height: 72, borderRadius: 36, marginBottom: 8 }}
             />
           ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarInitials}>{initials}</Text>
+            <View
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 36,
+                backgroundColor: colors.accentSurface,
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 8,
+              }}
+            >
+              <Text style={{ fontSize: 28, fontWeight: "700", color: colors.accent }}>
+                {initials}
+              </Text>
             </View>
           )}
-          <Text style={styles.profileName} numberOfLines={1}>
+          <Text style={{ fontSize: 17, fontWeight: "700", color: colors.text }} numberOfLines={1}>
             {profile?.displayName ?? "…"}
           </Text>
           {profile?.username ? (
-            <Text style={styles.profileUsername} numberOfLines={1}>
+            <Text style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
               @{profile.username}
             </Text>
           ) : null}
           {profile?.user?.email ? (
-            <Text style={styles.profileEmail} numberOfLines={1}>
+            <Text style={{ fontSize: 12, color: colors.textMuted }} numberOfLines={1}>
               {profile.user.email}
             </Text>
           ) : null}
         </View>
 
         {/* Divider */}
-        <View style={styles.divider} />
+        <View style={{ height: 1, backgroundColor: colors.divider }} />
 
         {/* Navigation items */}
-        <View style={styles.nav}>
-          <DrawerItem
-            icon="person-outline"
-            label="Profile"
-            onPress={() => navigate("/profile")}
-          />
-          <DrawerItem
-            icon="pulse-outline"
-            label="Activity Feed"
-            onPress={() => navigate("/activity")}
-          />
-          <DrawerItem
-            icon="notifications-outline"
-            label="Notifications"
-            onPress={() => navigate("/notifications")}
-          />
-          <DrawerItem
-            icon="settings-outline"
-            label="Settings"
-            onPress={() => navigate("/settings")}
-          />
+        <View style={{ paddingVertical: 8 }}>
+          <DrawerItem icon="person-outline" label="Profile" onPress={() => navigate("/profile")} colors={colors} />
+          <DrawerItem icon="pulse-outline" label="Activity Feed" onPress={() => navigate("/activity")} colors={colors} />
+          <DrawerItem icon="notifications-outline" label="Notifications" onPress={() => navigate("/notifications")} colors={colors} />
+          <DrawerItem icon="settings-outline" label="Settings" onPress={() => navigate("/settings")} colors={colors} />
         </View>
 
         {/* Divider */}
-        <View style={styles.divider} />
+        <View style={{ height: 1, backgroundColor: colors.divider }} />
 
         {/* Sign out */}
-        <TouchableOpacity style={styles.signOutBtn} onPress={handleLogout} activeOpacity={0.7}>
-          <Ionicons name="log-out-outline" size={20} color="#dc2626" />
-          <Text style={styles.signOutText}>Sign Out</Text>
+        <TouchableOpacity
+          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 14, marginTop: "auto" }}
+          onPress={handleLogout}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="log-out-outline" size={20} color={colors.danger} />
+          <Text style={{ fontSize: 15, fontWeight: "600", color: colors.danger }}>Sign Out</Text>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -199,127 +209,33 @@ function DrawerItem({
   icon,
   label,
   onPress,
+  colors,
 }: {
   icon: React.ComponentProps<typeof Ionicons>["name"];
   label: string;
   onPress: () => void;
+  colors: ReturnType<typeof useTheme>["colors"];
 }) {
   return (
-    <TouchableOpacity style={styles.navItem} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.navIconWrap}>
-        <Ionicons name={icon} size={20} color="#374151" />
+    <TouchableOpacity
+      style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 14 }}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          backgroundColor: colors.navIconBg,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Ionicons name={icon} size={20} color={colors.icon} />
       </View>
-      <Text style={styles.navLabel}>{label}</Text>
-      <Ionicons name="chevron-forward" size={16} color="#d1d5db" style={{ marginLeft: "auto" }} />
+      <Text style={{ fontSize: 15, fontWeight: "500", color: colors.text }}>{label}</Text>
+      <Ionicons name="chevron-forward" size={16} color={colors.border} style={{ marginLeft: "auto" }} />
     </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.35)",
-  },
-  drawer: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    backgroundColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: -3, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 20,
-    paddingHorizontal: 0,
-  },
-
-  closeBtn: {
-    alignSelf: "flex-end",
-    padding: 12,
-    marginRight: 4,
-  },
-
-  profileSection: {
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    gap: 4,
-  },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    marginBottom: 8,
-  },
-  avatarPlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "#dbeafe",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  avatarInitials: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#2563eb",
-  },
-  profileName: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  profileUsername: {
-    fontSize: 13,
-    color: "#6b7280",
-  },
-  profileEmail: {
-    fontSize: 12,
-    color: "#9ca3af",
-  },
-
-  divider: {
-    height: 1,
-    backgroundColor: "#f3f4f6",
-    marginHorizontal: 0,
-  },
-
-  nav: {
-    paddingVertical: 8,
-  },
-  navItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  navIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  navLabel: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: "#111827",
-  },
-
-  signOutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    marginTop: "auto",
-  },
-  signOutText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#dc2626",
-  },
-});

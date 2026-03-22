@@ -26,6 +26,7 @@ import {
 import { UPDATE_TASK, CREATE_MESSAGE } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 import { getStoredCookie } from "../../src/api/session";
+import { MentionInput } from "../../src/components/MentionInput";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -588,7 +589,7 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
         )}
       />
       <View style={[styles.inputRow, { paddingBottom: insets.bottom + 8 }]}>
-        <TextInput
+        <MentionInput
           style={styles.messageInput}
           placeholder="Write a message…"
           placeholderTextColor="#9ca3af"
@@ -596,6 +597,7 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
           onChangeText={setText}
           multiline
           maxLength={2000}
+          suggestionsAbove
         />
         <TouchableOpacity
           style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}

@@ -20,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, CHANNEL_PINNED_MESSAGES_QUERY, ON_NEW_CHANNEL_MESSAGE } from "@agentcenter/graphql-client";
 import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_MESSAGE_REACTION } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
+import { MentionInput } from "../../src/components/MentionInput";
 
 interface FromProfile {
   id: string;
@@ -412,7 +413,7 @@ export default function ChannelDetailScreen() {
       </Modal>
 
       <View style={[styles.inputBar, { paddingBottom: insets.bottom + 8 }]}>
-        <TextInput
+        <MentionInput
           style={styles.input}
           placeholder="Message..."
           placeholderTextColor="#9ca3af"
@@ -421,6 +422,7 @@ export default function ChannelDetailScreen() {
           multiline
           maxLength={2000}
           editable={!sending}
+          suggestionsAbove
         />
         <TouchableOpacity
           style={[styles.sendButton, (!message.trim() || sending) && styles.sendButtonDisabled]}
