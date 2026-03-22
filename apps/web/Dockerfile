@@ -25,7 +25,9 @@ RUN npm ci --workspace=apps/web --include-workspace-root
 FROM node:22-alpine AS build
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
+# Copy all installed dependencies (includes workspace-level node_modules)
+COPY --from=deps /app .
+# Overlay source code (node_modules excluded by .dockerignore)
 COPY . .
 
 # Generate Prisma client from packages/database schema
