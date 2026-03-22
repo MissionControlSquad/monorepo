@@ -74,6 +74,16 @@ export default function DashboardLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="folder-outline" size={size} color={color} />
           ),
+          headerRight: () => (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+              <TouchableOpacity onPress={() => router.push("/project/create")} style={{ padding: 8 }}>
+                <Ionicons name="add" size={26} color="#2563eb" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
+                <Ionicons name="person-circle-outline" size={26} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+          ),
         }}
       />
     </Tabs>
