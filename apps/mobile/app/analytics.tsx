@@ -254,10 +254,27 @@ export default function AnalyticsScreen() {
     statusResult.fetching && !status &&
     cycleResult.fetching && !cycle;
 
+  const hasError = !!(statusResult.error && !status && cycleResult.error && !cycle);
+
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
         <ActivityIndicator color={colors.accent} size="large" />
+      </View>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background, gap: 12, padding: 32 }}>
+        <Text style={{ fontSize: 15, color: colors.danger, textAlign: "center" }}>Failed to load analytics</Text>
+        <TouchableOpacity
+          onPress={onRefresh}
+          style={{ backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 }}
+          activeOpacity={0.7}
+        >
+          <Text style={{ color: "#fff", fontWeight: "600" }}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }

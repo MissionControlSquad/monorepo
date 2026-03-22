@@ -62,7 +62,7 @@ interface Channel {
   id: string;
   name: string;
   visibility: string;
-  members: { id: string; profileId: string; profile: { id: string; kind: string; displayName: string } }[];
+  members: { id: string; profileId: string; profile: { id: string; kind: string; displayName: string; username?: string | null } }[];
 }
 
 function formatTime(dateStr: string): string {
@@ -288,7 +288,7 @@ export default function ChannelDetailScreen() {
                 </TouchableOpacity>
                 {(item.attachments ?? []).length > 0 && (
                   <View style={styles.attachmentsRow}>
-                    {(item.attachments ?? []).map((a) => {
+                    {(item.attachments ?? []).map((a: Attachment) => {
                       const mime = a.document.mimeType ?? "";
                       const icon = mime.startsWith("image/") ? "🖼️"
                         : mime.startsWith("video/") ? "🎬"

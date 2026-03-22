@@ -14,10 +14,13 @@ export function useNetworkStatus() {
     const serverUrl = getStoredServerUrl();
     if (!serverUrl) return;
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4000);
       const res = await fetch(`${serverUrl}/api/health`, {
         method: "GET",
-        signal: AbortSignal.timeout(4000),
+        signal: controller.signal,
       });
+      clearTimeout(timer);
       setIsOnline(res.ok || res.status < 500);
     } catch {
       setIsOnline(false);
