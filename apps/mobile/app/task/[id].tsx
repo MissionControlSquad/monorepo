@@ -902,6 +902,7 @@ function ApproveRejectBar({
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
   const { profileId } = useAuth();
 
@@ -916,8 +917,21 @@ export default function TaskDetailScreen() {
   const task = data?.task;
 
   useEffect(() => {
-    if (task) navigation.setOptions({ title: `#${task.taskNumber} · ${task.title.slice(0, 30)}` });
-  }, [task, navigation]);
+    if (task) {
+      navigation.setOptions({
+        title: `#${task.taskNumber} · ${task.title.slice(0, 30)}`,
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={() => router.push(`/task/edit?id=${task.id}` as Parameters<typeof router.push>[0])}
+            style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 15, fontWeight: "600", color: "#2563eb" }}>Edit</Text>
+          </TouchableOpacity>
+        ),
+      });
+    }
+  }, [task, navigation, router]);
 
   const handleStatusChange = () => {
     if (!task) return;
