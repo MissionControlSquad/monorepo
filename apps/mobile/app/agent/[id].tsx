@@ -12,7 +12,7 @@ import {
   Modal,
 } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import { useQuery, useMutation, gql } from "urql";
+import { useQuery, useMutation, useSubscription, gql } from "urql";
 import { useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +25,7 @@ import {
   CREATE_QUEUE_ITEM,
   UPDATE_QUEUE_ITEM_STATUS,
   DELETE_QUEUE_ITEM,
+  ON_AGENT_STATUS_CHANGE,
 } from "@agentcenter/graphql-client";
 
 // ── Inline mutations not exported from index ──────────────────────────────────
@@ -152,7 +153,18 @@ export default function AgentDetailScreen() {
   const [, setVacation] = useMutation(SET_AGENT_VACATION);
   const [, setActivation] = useMutation(SET_AGENT_ACTIVATION);
 
-  const agent = agentResult.data?.agent;
+  // Live agent status via subscription
+  const [statusSubResult] = useSubscription({
+    query: ON_AGENT_STATUS_CHANGE,
+    variables: { agentId: id },
+  });
+
+  const agentBase = agentResult.data?.agent;
+  const liveStatus = statusSubResult.data?.agentStatusChanged;
+  // Overlay live status fields onto the fetched agent object
+  const agent = agentBase && liveStatus
+    ? { ...agentBase, status: liveStatus.status, detailedStatus: liveStatus.detailedStatus, statusMessage: liveStatus.statusMessage, lastHeartbeat: liveStatus.lastHeartbeat }
+    : agentBase;
   const stats = statsResult.data?.agentProfileStats;
 
   useEffect(() => {

@@ -1,4 +1,5 @@
-import { createClient, fetchExchange } from "urql";
+import { createClient, fetchExchange, subscriptionExchange } from "urql";
+import { createClient as createWsClient } from "graphql-ws";
 import { getStoredCookie, getStoredServerUrl } from "./session";
 
 /**
@@ -14,10 +15,34 @@ import { getStoredCookie, getStoredServerUrl } from "./session";
  */
 export function createUrqlClient(serverUrl?: string) {
   const url = serverUrl ?? getStoredServerUrl() ?? "http://localhost:3000";
+  const wsUrl = url.replace(/^http/, "ws") + "/api/graphql";
+
+  const wsClient = createWsClient({
+    url: wsUrl,
+    connectionParams: () => {
+      const cookie = getStoredCookie();
+      return cookie ? { Cookie: `mc_session=${cookie}` } : {};
+    },
+    shouldRetry: () => true,
+    retryAttempts: Infinity,
+  });
 
   return createClient({
     url: `${url}/api/graphql`,
-    exchanges: [fetchExchange],
+    exchanges: [
+      fetchExchange,
+      subscriptionExchange({
+        forwardSubscription(request) {
+          const input = { ...request, query: request.query ?? "" };
+          return {
+            subscribe(sink) {
+              const unsubscribe = wsClient.subscribe(input, sink);
+              return { unsubscribe };
+            },
+          };
+        },
+      }),
+    ],
     fetchOptions: () => {
       const cookie = getStoredCookie();
       return {

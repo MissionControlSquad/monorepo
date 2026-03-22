@@ -13,11 +13,11 @@ import {
   ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useNavigation } from "expo-router";
-import { useQuery, useMutation } from "urql";
+import { useQuery, useMutation, useSubscription } from "urql";
 import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY } from "@agentcenter/graphql-client";
+import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, ON_NEW_CHANNEL_MESSAGE } from "@agentcenter/graphql-client";
 import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_MESSAGE_REACTION } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 
@@ -85,8 +85,24 @@ export default function ChannelDetailScreen() {
   const [, executeMarkRead] = useMutation(MARK_CHANNEL_READ);
   const [, executeToggleReaction] = useMutation(TOGGLE_MESSAGE_REACTION);
 
+  // Real-time subscription — accumulate new messages as they arrive
+  const [subResult] = useSubscription(
+    { query: ON_NEW_CHANNEL_MESSAGE, variables: { channelId: id } },
+    (prev: Message[] = [], response: { newChannelMessage: Message }) => {
+      const incoming = response.newChannelMessage;
+      if (!incoming) return prev;
+      const exists = prev.some((m) => m.id === incoming.id);
+      return exists ? prev : [...prev, incoming];
+    }
+  );
+
   const channel = channelResult.data?.channel;
-  const messages = messagesResult.data?.channelMessages ?? [];
+  const baseMessages = messagesResult.data?.channelMessages ?? [];
+  // Merge subscription messages with fetched messages, deduplicate by id
+  const liveMessages = subResult.data ?? [];
+  const allIds = new Set(baseMessages.map((m) => m.id));
+  const merged = [...baseMessages, ...liveMessages.filter((m: Message) => !allIds.has(m.id))];
+  const messages = merged;
   const { fetching, error } = messagesResult;
 
   useEffect(() => {
@@ -107,6 +123,13 @@ export default function ChannelDetailScreen() {
       executeMarkRead({ channelId: id, profileId });
     }
   }, [messages.length, id, profileId]);
+
+  // Auto-scroll when new messages arrive via subscription
+  useEffect(() => {
+    if (liveMessages.length > 0) {
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [liveMessages.length]);
 
   const handleSend = async () => {
     const content = message.trim();
