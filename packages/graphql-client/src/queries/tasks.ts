@@ -100,6 +100,36 @@ const TASK_DETAIL_FIELDS = `
 
 // ── Queries ─────────────────────────────────────────────────
 
+// Unique operation name prevents urql from linking to active TASK_QUERY in detail screen
+export const TASK_EDIT_QUERY = gql`
+  query TaskEdit($id: String!) {
+    task(id: $id) {
+      id
+      title
+      description
+      status
+      priority
+      taskNumber
+      dueDate
+      tags
+      parentTaskId
+      blockedByTaskId
+      projectId
+      assignees {
+        id
+        profileId
+        profile {
+          id
+          displayName
+          username
+          avatarUrl
+          agent { identityEmoji }
+        }
+      }
+    }
+  }
+`;
+
 export const TASKS_QUERY = gql`
   query Tasks($limit: Int, $projectId: String) {
     tasks(limit: $limit, projectId: $projectId) {

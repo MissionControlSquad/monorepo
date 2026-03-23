@@ -14,7 +14,7 @@ import {
   Clipboard,
 } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import { useQuery, useMutation, useSubscription, gql } from "urql";
+import { useQuery, useMutation, useSubscription } from "urql";
 import { useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,27 +30,11 @@ import {
   ON_AGENT_STATUS_CHANGE,
   TASKS_BY_STATUS_FOR_AGENT_QUERY,
   DELIVERABLES_BY_AGENT_QUERY,
+  SET_AGENT_VACATION,
+  SET_AGENT_ACTIVATION,
 } from "@agentcenter/graphql-client";
 import { getStoredCookie } from "../../src/api/session";
 import { useAuth } from "../../src/context/AuthContext";
-
-// ── Inline mutations not exported from index ──────────────────────────────────
-
-const SET_AGENT_VACATION = gql`
-  mutation SetAgentVacation($id: String!, $onVacation: Boolean!) {
-    setAgentVacation(id: $id, onVacation: $onVacation) {
-      id name role status isOnVacation setupStatus detailedStatus statusMessage currentTask currentTaskId
-    }
-  }
-`;
-
-const SET_AGENT_ACTIVATION = gql`
-  mutation SetAgentActivation($id: String!, $deactivated: Boolean!) {
-    setAgentActivation(id: $id, deactivated: $deactivated) {
-      id name role status setupStatus detailedStatus statusMessage currentTask currentTaskId
-    }
-  }
-`;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

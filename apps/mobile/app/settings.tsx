@@ -15,16 +15,7 @@ import { useNavigation } from "expo-router";
 import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { CHANGE_PASSWORD, SET_SYSTEM_SHUTDOWN } from "@agentcenter/graphql-client";
-import { gql } from "urql";
-
-const SYSTEM_SETTINGS_QUERY = gql`
-  query SystemSettings {
-    systemSettings {
-      shutdownActive
-    }
-  }
-`;
+import { CHANGE_PASSWORD, SET_SYSTEM_SHUTDOWN, SYSTEM_SETTINGS_QUERY } from "@agentcenter/graphql-client";
 import { useAuth } from "../src/context/AuthContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────

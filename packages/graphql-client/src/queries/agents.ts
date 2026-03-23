@@ -120,6 +120,20 @@ export const AGENT_LATEST_TRANSITIONS_QUERY = gql`
   }
 `;
 
+// Unique operation name prevents urql from linking to active AGENT_QUERY in detail screen
+export const AGENT_EDIT_QUERY = gql`
+  query AgentEdit($id: String!) {
+    agent(id: $id) {
+      id
+      name
+      role
+      personality
+      identityEmoji
+      username
+    }
+  }
+`;
+
 export const AGENT_PROFILE_STATS_QUERY = gql`
   query AgentProfileStats($agentId: String!, $projectId: String) {
     agentProfileStats(agentId: $agentId, projectId: $projectId) {

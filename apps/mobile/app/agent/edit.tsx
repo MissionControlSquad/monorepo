@@ -12,46 +12,9 @@ import {
 } from "react-native";
 import { useState, useEffect } from "react";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import { useQuery, useMutation, gql } from "urql";
+import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-// Separate operation name prevents urql from linking this to AgentDetailScreen's active AGENT_QUERY
-const AGENT_EDIT_QUERY = gql`
-  query AgentEdit($id: String!) {
-    agent(id: $id) {
-      id
-      name
-      role
-      personality
-      identityEmoji
-      username
-    }
-  }
-`;
-
-const UPDATE_AGENT_PROFILE = gql`
-  mutation UpdateAgentProfile(
-    $id: String!
-    $name: String
-    $role: String
-    $personality: String
-    $identityEmoji: String
-  ) {
-    updateAgentProfile(
-      id: $id
-      name: $name
-      role: $role
-      personality: $personality
-      identityEmoji: $identityEmoji
-    ) {
-      id
-      name
-      role
-      personality
-      identityEmoji
-    }
-  }
-`;
+import { AGENT_EDIT_QUERY, UPDATE_AGENT_PROFILE } from "@agentcenter/graphql-client";
 
 const EMOJI_PRESETS = [
   "🤖","🦾","🧠","⚡","🎯","🔧","🚀","🌟","🦊","🐉",
