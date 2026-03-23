@@ -18,7 +18,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   TASK_QUERY,
-  AGENTS_QUERY,
+  AGENTS_FOR_TASK_QUERY,
   PROJECTS_QUERY,
   MESSAGES_BY_TASK_QUERY,
   DELIVERABLES_BY_TASK_QUERY,
@@ -998,7 +998,7 @@ export default function TaskDetailScreen() {
   const task = data?.task;
 
   const [agentsResult] = useQuery<{ agents: { id: string; name: string; identityEmoji: string; currentTaskId: string | null }[] }>({
-    query: AGENTS_QUERY,
+    query: AGENTS_FOR_TASK_QUERY,
     requestPolicy: "cache-only",
     pause: !task,
   });

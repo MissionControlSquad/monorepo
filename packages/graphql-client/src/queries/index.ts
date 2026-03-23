@@ -1,5 +1,7 @@
 export {
   AGENTS_QUERY,
+  AGENTS_FOR_TASK_QUERY,
+  AGENTS_FOR_DELEGATE_QUERY,
   AGENT_QUERY,
   AGENT_EDIT_QUERY,
   AGENT_STATUS_HISTORY_QUERY,
@@ -39,7 +41,7 @@ export {
   CHANNELS_IN_COMMON_QUERY,
 } from "./channels";
 
-export { ME_QUERY } from "./me";
+export { ME_QUERY, ME_DRAWER_QUERY } from "./me";
 
 export {
   ACTIVITIES_BY_TASK_QUERY,

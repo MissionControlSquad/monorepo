@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useDrawer } from "../context/DrawerContext";
 import { useAuth } from "../context/AuthContext";
 import { useQuery } from "urql";
-import { ME_QUERY } from "@agentcenter/graphql-client";
+import { ME_DRAWER_QUERY } from "@agentcenter/graphql-client";
 import { getStoredServerUrl } from "../api/session";
 import { useTheme } from "../hooks/useTheme";
 import { useNotificationCount } from "../hooks/useNotificationCount";
@@ -42,7 +42,7 @@ export function AppDrawer() {
   const opacity = useRef(new Animated.Value(0)).current;
 
   const [result] = useQuery<{ me: Profile | null }>({
-    query: ME_QUERY,
+    query: ME_DRAWER_QUERY,
     requestPolicy: "cache-only",
     pause: !isOpen,
   });
