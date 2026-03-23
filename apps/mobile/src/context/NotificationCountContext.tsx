@@ -1,21 +1,16 @@
-import { createContext, useContext, useEffect, useRef } from "react";
-import { useQuery, useSubscription } from "urql";
-import { UNDELIVERED_NOTIFICATIONS_QUERY, ON_NOTIFICATION } from "@agentcenter/graphql-client";
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import { useAuth } from "./AuthContext";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface NotificationItem {
   id: string;
-  mentionedAgentId: string;
-  content: string;
-  taskId: string | null;
-  messageId: string | null;
-  delivered: boolean;
-  deliveredAt: string | null;
+  type: string;
+  title: string;
+  body: string;
+  url: string | null;
+  readAt: string | null;
   createdAt: string;
-  mentionedAgent: { id: string; name: string; identityEmoji: string | null };
-  task: { id: string; title: string; taskNumber: number; status: string } | null;
 }
 
 interface NotificationContextValue {
@@ -23,7 +18,9 @@ interface NotificationContextValue {
   notifications: NotificationItem[];
   fetching: boolean;
   error: boolean;
-  reexecute: (opts?: { requestPolicy: "network-only" }) => void;
+  reexecute: () => void;
+  markOneRead: (id: string) => void;
+  markAllRead: () => void;
 }
 
 // ── Context ────────────────────────────────────────────────────────────────────
@@ -34,48 +31,90 @@ const NotificationContext = createContext<NotificationContextValue>({
   fetching: false,
   error: false,
   reexecute: () => {},
+  markOneRead: () => {},
+  markAllRead: () => {},
 });
+
+const POLL_INTERVAL_MS = 30_000;
 
 // ── Provider ───────────────────────────────────────────────────────────────────
 
-/**
- * Runs UNDELIVERED_NOTIFICATIONS_QUERY exactly once for the whole app.
- * Both NotificationsScreen and AppDrawer / NotificationBell read from this
- * context instead of issuing their own duplicate queries.
- */
 export function NotificationCountProvider({ children }: { children: React.ReactNode }) {
-  const { profileId } = useAuth();
+  const { serverUrl, isSignedIn } = useAuth();
 
-  const [result, reexecute] = useQuery<{ undeliveredNotifications: NotificationItem[] }>({
-    query: UNDELIVERED_NOTIFICATIONS_QUERY,
-    requestPolicy: "network-only",
-    pause: !profileId,
-  });
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [fetching, setFetching] = useState(false);
+  const [error, setError] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [subResult] = useSubscription<{ notification: { id: string } }>({
-    query: ON_NOTIFICATION,
-    variables: { profileId: profileId ?? "" },
-    pause: !profileId,
-  });
-
-  const prevSubData = useRef<unknown>(null);
-  useEffect(() => {
-    if (subResult.data && subResult.data !== prevSubData.current) {
-      prevSubData.current = subResult.data;
-      reexecute({ requestPolicy: "network-only" });
+  const fetchNotifications = useCallback(async () => {
+    if (!serverUrl || !isSignedIn) return;
+    try {
+      setFetching(true);
+      const res = await fetch(`${serverUrl}/api/user-notifications?limit=50`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setNotifications(data.notifications ?? []);
+      setError(false);
+    } catch {
+      setError(true);
+    } finally {
+      setFetching(false);
     }
-  }, [subResult.data, reexecute]);
+  }, [serverUrl, isSignedIn]);
 
-  const notifications = result.data?.undeliveredNotifications ?? [];
+  const markOneRead = useCallback(async (id: string) => {
+    if (!serverUrl) return;
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n))
+    );
+    try {
+      await fetch(`${serverUrl}/api/user-notifications/${id}/read`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+    } catch {
+      // silent fail — optimistic update already applied
+    }
+  }, [serverUrl]);
+
+  const markAllRead = useCallback(async () => {
+    if (!serverUrl) return;
+    setNotifications((prev) => prev.map((n) => ({ ...n, readAt: new Date().toISOString() })));
+    try {
+      await fetch(`${serverUrl}/api/user-notifications/read-all`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+    } catch {
+      // silent fail
+    }
+  }, [serverUrl]);
+
+  // Initial fetch + polling
+  useEffect(() => {
+    if (!isSignedIn || !serverUrl) return;
+    fetchNotifications();
+    intervalRef.current = setInterval(fetchNotifications, POLL_INTERVAL_MS);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [isSignedIn, serverUrl, fetchNotifications]);
+
+  const unreadCount = notifications.filter((n) => !n.readAt).length;
 
   return (
     <NotificationContext.Provider
       value={{
-        count: notifications.length,
+        count: unreadCount,
         notifications,
-        fetching: result.fetching,
-        error: !!result.error,
-        reexecute,
+        fetching,
+        error,
+        reexecute: fetchNotifications,
+        markOneRead,
+        markAllRead,
       }}
     >
       {children}
@@ -83,7 +122,7 @@ export function NotificationCountProvider({ children }: { children: React.ReactN
   );
 }
 
-// ── Hooks ─────────────────────────────────────────────────────────────────────
+// ── Hooks ──────────────────────────────────────────────────────────────────────
 
 export function useNotificationCount(): number {
   return useContext(NotificationContext).count;

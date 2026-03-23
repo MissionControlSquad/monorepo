@@ -6,16 +6,39 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  Alert,
 } from "react-native";
-import { useMutation } from "urql";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  MARK_MANY_NOTIFICATIONS_DELIVERED,
-  MARK_NOTIFICATION_DELIVERED,
-} from "@agentcenter/graphql-client";
+import { Ionicons } from "@expo/vector-icons";
 import { useNotifications } from "../src/context/NotificationCountContext";
+
+// ── Types & constants ─────────────────────────────────────────────────────────
+
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
+const TYPE_ICONS: Record<string, IoniconName> = {
+  task_done: "checkmark-circle",
+  task_needs_review: "time",
+  task_clarification_requested: "help-circle",
+  task_approved: "checkmark-circle",
+  task_rejected: "close-circle",
+  new_comment: "chatbubble",
+  mention: "at",
+  deliverable_submitted: "document-text",
+  task_assigned: "person-add",
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  task_done: "#16a34a",
+  task_needs_review: "#d97706",
+  task_clarification_requested: "#2563eb",
+  task_approved: "#16a34a",
+  task_rejected: "#dc2626",
+  new_comment: "#6b7280",
+  mention: "#2563eb",
+  deliverable_submitted: "#7c3aed",
+  task_assigned: "#2563eb",
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -33,36 +56,14 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  inbox: "#6b7280",
-  assigned: "#2563eb",
-  in_progress: "#d97706",
-  review: "#7c3aed",
-  done: "#16a34a",
-  blocked: "#dc2626",
-};
-
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { notifications, fetching, error, reexecute, markOneRead, markAllRead } = useNotifications();
 
-  const { notifications, fetching, error, reexecute } = useNotifications();
-
-  const [, markManyDelivered] = useMutation(MARK_MANY_NOTIFICATIONS_DELIVERED);
-  const [, markOneDelivered] = useMutation(MARK_NOTIFICATION_DELIVERED);
-
-  async function handleMarkAllRead() {
-    if (notifications.length === 0) return;
-    const ids = notifications.map((n) => n.id);
-    const res = await markManyDelivered({ ids });
-    if (res.error) {
-      Alert.alert("Error", "Failed to mark notifications as read");
-    } else {
-      reexecute({ requestPolicy: "network-only" });
-    }
-  }
+  const unreadCount = notifications.filter((n) => !n.readAt).length;
 
   if (fetching && notifications.length === 0) {
     return (
@@ -76,7 +77,7 @@ export default function NotificationsScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>Failed to load notifications</Text>
-        <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
+        <TouchableOpacity onPress={reexecute}>
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -96,88 +97,84 @@ export default function NotificationsScreen() {
       refreshControl={
         <RefreshControl
           refreshing={fetching && notifications.length > 0}
-          onRefresh={() => reexecute({ requestPolicy: "network-only" })}
+          onRefresh={reexecute}
           tintColor="#2563eb"
         />
       }
       ListHeaderComponent={
         notifications.length > 0 ? (
           <View style={styles.header}>
-            <Text style={styles.headerCount}>
-              {notifications.length} unread
-            </Text>
-            <TouchableOpacity onPress={handleMarkAllRead}>
-              <Text style={styles.markAllText}>Mark all read</Text>
-            </TouchableOpacity>
+            {unreadCount > 0 ? (
+              <Text style={styles.headerCount}>{unreadCount} unread</Text>
+            ) : (
+              <Text style={styles.headerCount}>All read</Text>
+            )}
+            {unreadCount > 0 && (
+              <TouchableOpacity onPress={markAllRead}>
+                <Text style={styles.markAllText}>Mark all read</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : null
       }
       ListEmptyComponent={
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🔔</Text>
+          <Ionicons name="notifications-outline" size={48} color="#d1d5db" />
           <Text style={styles.emptyTitle}>All caught up</Text>
-          <Text style={styles.emptySubtitle}>No unread notifications</Text>
+          <Text style={styles.emptySubtitle}>No notifications yet</Text>
         </View>
       }
-      renderItem={({ item }) => (
-        <TouchableOpacity
-          style={styles.card}
-          activeOpacity={0.85}
-          onPress={async () => {
-            // Mark as read then navigate to task if available
-            await markOneDelivered({ id: item.id });
-            reexecute({ requestPolicy: "network-only" });
-            if (item.task) {
-              router.push(`/task/${item.task.id}`);
-            }
-          }}
-        >
-          {/* Unread dot */}
-          <View style={styles.unreadDot} />
+      renderItem={({ item }) => {
+        const isUnread = !item.readAt;
+        const iconName: IoniconName = TYPE_ICONS[item.type] ?? "alert-circle";
+        const iconColor = TYPE_COLORS[item.type] ?? "#6b7280";
 
-          {/* Agent badge + time + mark-read */}
-          <View style={styles.agentRow}>
-            <View style={styles.agentBadge}>
-              <Text style={styles.agentEmoji}>
-                {item.mentionedAgent.identityEmoji ?? "🤖"}
-              </Text>
-              <Text style={styles.agentName}>{item.mentionedAgent.name}</Text>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
-              <TouchableOpacity
-                onPress={async (e) => {
-                  e.stopPropagation?.();
-                  await markOneDelivered({ id: item.id });
-                  reexecute({ requestPolicy: "network-only" });
-                }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={styles.markReadBtn}
-              >
-                <Text style={styles.markReadBtnText}>✓</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+        return (
+          <TouchableOpacity
+            style={[styles.card, isUnread && styles.cardUnread]}
+            activeOpacity={0.75}
+            onPress={() => {
+              if (isUnread) markOneRead(item.id);
+              if (item.url) {
+                // Parse url to get path for router (strip origin)
+                try {
+                  const path = new URL(item.url).pathname;
+                  router.push(path as Parameters<typeof router.push>[0]);
+                } catch {
+                  // url may already be a path
+                  router.push(item.url as Parameters<typeof router.push>[0]);
+                }
+              }
+            }}
+          >
+            <View style={styles.cardRow}>
+              {/* Type icon */}
+              <View style={[styles.iconWrap, { backgroundColor: iconColor + "18" }]}>
+                <Ionicons name={iconName} size={18} color={iconColor} />
+              </View>
 
-          {/* Content */}
-          <Text style={styles.content}>{item.content}</Text>
+              {/* Content */}
+              <View style={styles.textWrap}>
+                <Text
+                  style={[styles.title, isUnread && styles.titleUnread]}
+                  numberOfLines={2}
+                >
+                  {item.title}
+                </Text>
+                {item.body ? (
+                  <Text style={styles.body} numberOfLines={2}>
+                    {item.body}
+                  </Text>
+                ) : null}
+                <Text style={styles.time}>{formatTime(item.createdAt)}</Text>
+              </View>
 
-          {/* Task link */}
-          {item.task && (
-            <View style={styles.taskLink}>
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: STATUS_COLORS[item.task.status] ?? "#6b7280" },
-                ]}
-              />
-              <Text style={styles.taskLinkText} numberOfLines={1}>
-                #{item.task.taskNumber} · {item.task.title}
-              </Text>
+              {/* Unread dot */}
+              {isUnread && <View style={styles.unreadDot} />}
             </View>
-          )}
-        </TouchableOpacity>
-      )}
+          </TouchableOpacity>
+        );
+      }}
     />
   );
 }
@@ -201,8 +198,7 @@ const styles = StyleSheet.create({
   headerCount: { fontSize: 13, color: "#6b7280", fontWeight: "500" },
   markAllText: { fontSize: 13, color: "#2563eb", fontWeight: "600" },
 
-  emptyState: { alignItems: "center", gap: 8 },
-  emptyIcon: { fontSize: 48 },
+  emptyState: { alignItems: "center", gap: 10 },
   emptyTitle: { fontSize: 17, fontWeight: "600", color: "#374151" },
   emptySubtitle: { fontSize: 14, color: "#9ca3af" },
 
@@ -212,53 +208,28 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: "#e5e7eb",
-    gap: 8,
-    position: "relative",
   },
+  cardUnread: { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" },
+  cardRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  textWrap: { flex: 1, gap: 3 },
+  title: { fontSize: 14, color: "#6b7280", lineHeight: 19 },
+  titleUnread: { color: "#111827", fontWeight: "600" },
+  body: { fontSize: 12, color: "#9ca3af", lineHeight: 17 },
+  time: { fontSize: 11, color: "#9ca3af", marginTop: 2 },
   unreadDot: {
-    position: "absolute",
-    top: 14,
-    right: 14,
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: "#2563eb",
+    marginTop: 4,
+    flexShrink: 0,
   },
-  agentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  agentBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  agentEmoji: { fontSize: 14 },
-  agentName: { fontSize: 12, fontWeight: "600", color: "#374151" },
-  timeText: { fontSize: 11, color: "#9ca3af" },
-  markReadBtn: { backgroundColor: "#f3f4f6", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
-  markReadBtnText: { fontSize: 11, color: "#6b7280", fontWeight: "600" },
-
-  content: { fontSize: 14, color: "#374151", lineHeight: 20 },
-
-  taskLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#eff6ff",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    alignSelf: "flex-start",
-    maxWidth: "100%",
-  },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  taskLinkText: { fontSize: 12, color: "#2563eb", fontWeight: "500", flex: 1 },
 });

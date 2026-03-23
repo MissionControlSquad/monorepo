@@ -9,20 +9,46 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  FlatList,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useMutation } from "urql";
+import { useMutation, useQuery } from "urql";
 import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CREATE_PROJECT } from "@agentcenter/graphql-client";
+import { CREATE_PROJECT, PROFILES_QUERY } from "@agentcenter/graphql-client";
+import { Ionicons } from "@expo/vector-icons";
+
+interface Profile {
+  id: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+  agentId: string | null;
+  agent?: { id: string; name: string; identityEmoji: string | null } | null;
+}
 
 export default function CreateProjectScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [selectedProfileIds, setSelectedProfileIds] = useState<string[]>([]);
   const [, createProject] = useMutation(CREATE_PROJECT);
   const [saving, setSaving] = useState(false);
+
+  const [profilesResult] = useQuery<{ profiles: Profile[] }>({
+    query: PROFILES_QUERY,
+    variables: { limit: 200 },
+    requestPolicy: "cache-and-network",
+  });
+
+  const profiles = profilesResult.data?.profiles ?? [];
+
+  function toggleProfile(id: string) {
+    setSelectedProfileIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
   async function handleCreate() {
     if (!name.trim()) {
@@ -33,6 +59,7 @@ export default function CreateProjectScreen() {
     const res = await createProject({
       name: name.trim(),
       description: description.trim() || undefined,
+      memberProfileIds: selectedProfileIds.length ? selectedProfileIds : undefined,
     });
     setSaving(false);
     if (res.error) {
@@ -78,6 +105,48 @@ export default function CreateProjectScreen() {
           />
         </View>
 
+        {/* Members */}
+        <View style={styles.field}>
+          <View style={styles.membersHeader}>
+            <Text style={styles.label}>Members</Text>
+            {selectedProfileIds.length > 0 && (
+              <Text style={styles.memberCount}>{selectedProfileIds.length} selected</Text>
+            )}
+          </View>
+          {profilesResult.fetching && profiles.length === 0 ? (
+            <ActivityIndicator size="small" color="#2563eb" style={{ marginTop: 8 }} />
+          ) : (
+            <View style={styles.membersList}>
+              {profiles.map((profile) => {
+                const selected = selectedProfileIds.includes(profile.id);
+                const isAgent = profile.agentId != null;
+                const emoji = isAgent ? (profile.agent?.identityEmoji ?? "🤖") : "👤";
+                return (
+                  <TouchableOpacity
+                    key={profile.id}
+                    style={[styles.memberRow, selected && styles.memberRowSelected]}
+                    onPress={() => toggleProfile(profile.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.memberEmoji}>{emoji}</Text>
+                    <View style={styles.memberInfo}>
+                      <Text style={styles.memberName} numberOfLines={1}>
+                        {profile.displayName}
+                      </Text>
+                      <Text style={styles.memberUsername}>@{profile.username}</Text>
+                    </View>
+                    <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
+                      {selected && (
+                        <Ionicons name="checkmark" size={14} color="#fff" />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
         <TouchableOpacity
           style={[styles.createBtn, saving && { opacity: 0.6 }]}
           onPress={handleCreate}
@@ -108,6 +177,39 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   multiline: { height: 100 },
+  membersHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  memberCount: { fontSize: 12, color: "#2563eb", fontWeight: "600" },
+  membersList: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    overflow: "hidden",
+  },
+  memberRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
+  memberRowSelected: { backgroundColor: "#eff6ff" },
+  memberEmoji: { fontSize: 18, width: 28, textAlign: "center" },
+  memberInfo: { flex: 1, gap: 1 },
+  memberName: { fontSize: 14, fontWeight: "500", color: "#111827" },
+  memberUsername: { fontSize: 12, color: "#9ca3af" },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "#d1d5db",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checkboxSelected: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
   createBtn: {
     backgroundColor: "#2563eb",
     borderRadius: 12,
