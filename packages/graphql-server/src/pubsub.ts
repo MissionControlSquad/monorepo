@@ -200,4 +200,9 @@ function buildPubSub() {
   return createPubSub<PubSubEvents>({ eventTarget });
 }
 
-export const pubsub = buildPubSub();
+/**
+ * globalThis singleton so the custom WS server and Next.js route handler
+ * share the same pubsub instance (critical for in-memory pubsub in dev).
+ */
+const globalForPubSub = globalThis as unknown as { __agentcenter_pubsub?: ReturnType<typeof buildPubSub> };
+export const pubsub = globalForPubSub.__agentcenter_pubsub ?? (globalForPubSub.__agentcenter_pubsub = buildPubSub());

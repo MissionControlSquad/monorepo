@@ -1,6 +1,6 @@
 import { Client, fetchExchange, subscriptionExchange } from "urql";
 import { cacheExchange } from "@urql/exchange-graphcache";
-import { createClient as createSSEClient } from "graphql-sse";
+import { createClient as createWSClient } from "graphql-ws";
 import {
   KANBAN_BOARD_QUERY,
   MESSAGES_BY_TASK_QUERY,
@@ -35,40 +35,68 @@ function kanbanCacheKeys(updatedTask: { projectId?: string | null }): { projectI
   return keys;
 }
 
-let sseRetryAttempt = 0;
 type ConnectionListener = (connected: boolean) => void;
-const connectionListeners = new Set<ConnectionListener>();
-let sseConnected = true;
+
+/**
+ * All WS state lives on `window` so it survives webpack HMR reloads.
+ * `globalThis` in Next.js webpack bundles can be scoped per chunk —
+ * `window` is the only truly global object on the client side.
+ */
+interface WsGlobal {
+  __ac_ws?: ReturnType<typeof createWSClient>;
+  __ac_ws_connected?: boolean;
+  __ac_ws_listeners?: Set<ConnectionListener>;
+}
+
+const win: WsGlobal = typeof window !== "undefined" ? (window as unknown as WsGlobal) : {};
+
+// Initialize state once — persists across HMR
+if (typeof window !== "undefined" && win.__ac_ws_listeners === undefined) {
+  win.__ac_ws_connected = true;
+  win.__ac_ws_listeners = new Set<ConnectionListener>();
+}
 
 function notifyConnectionState(connected: boolean) {
-  if (sseConnected === connected) return;
-  sseConnected = connected;
-  connectionListeners.forEach((fn) => fn(connected));
+  if (!win.__ac_ws_listeners) return;
+  if (win.__ac_ws_connected === connected) return;
+  win.__ac_ws_connected = connected;
+  win.__ac_ws_listeners.forEach((fn) => fn(connected));
 }
 
-/** Subscribe to SSE connection state changes. Returns unsubscribe function. */
+/** Subscribe to WebSocket connection state changes. Returns unsubscribe function. */
 export function onConnectionChange(fn: ConnectionListener): () => void {
-  connectionListeners.add(fn);
-  fn(sseConnected); // emit current state immediately
-  return () => connectionListeners.delete(fn);
+  if (!win.__ac_ws_listeners) return () => {};
+  win.__ac_ws_listeners.add(fn);
+  fn(win.__ac_ws_connected ?? true);
+  return () => win.__ac_ws_listeners?.delete(fn);
 }
 
-const sseClient = createSSEClient({
-  url: "/api/graphql",
-  retry: async () => {
-    notifyConnectionState(false);
-    const attempt = sseRetryAttempt++;
-    const baseDelay = Math.min(1000 * Math.pow(2, attempt), 30000);
-    const jitter = Math.random() * 1000;
-    await new Promise((resolve) => setTimeout(resolve, baseDelay + jitter));
-  },
-  on: {
-    connected() {
-      sseRetryAttempt = 0;
-      notifyConnectionState(true);
+function getWsUrl(): string {
+  if (typeof window === "undefined") return "";
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${window.location.host}/api/graphql`;
+}
+
+/** Create or reuse the singleton WS client. Stored on window to survive HMR. */
+if (typeof window !== "undefined" && !win.__ac_ws) {
+  win.__ac_ws = createWSClient({
+    url: getWsUrl,
+    lazyCloseTimeout: 5000,
+    retryAttempts: Infinity,
+    retryWait: async (retryCount) => {
+      const baseDelay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+      const jitter = Math.random() * 1000;
+      await new Promise((resolve) => setTimeout(resolve, baseDelay + jitter));
     },
-  },
-});
+    on: {
+      connected: () => notifyConnectionState(true),
+      closed: () => notifyConnectionState(false),
+      error: () => notifyConnectionState(false),
+    },
+  });
+}
+
+const wsClient = win.__ac_ws!;
 
 /** Shared kanban column-move updater. When insertAfterTaskId is provided, inserts at that position. */
 function makeKanbanUpdater(
@@ -423,7 +451,7 @@ export const urqlClient = new Client({
       forwardSubscription(operation) {
         return {
           subscribe(sink) {
-            const dispose = sseClient.subscribe(
+            const dispose = wsClient.subscribe(
               { query: operation.query!, variables: operation.variables },
               sink,
             );

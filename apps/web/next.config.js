@@ -10,7 +10,7 @@ const nextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../../"),
   devIndicators:false,
   eslint: { ignoreDuringBuilds: false },
-  serverExternalPackages: ["@prisma/client", "ioredis", "ssh2", "web-push"],
+  serverExternalPackages: ["@prisma/client", "ioredis", "ssh2", "web-push", "ws", "graphql-ws"],
   images: {
     remotePatterns: [
       {
@@ -64,7 +64,7 @@ const nextConfig = {
               "media-src 'self' blob: https://*.r2.cloudflarestorage.com",
               "object-src 'self' blob: https://*.r2.cloudflarestorage.com",
               "frame-src 'self' blob: https://*.r2.cloudflarestorage.com",
-              "connect-src 'self' https://*.r2.cloudflarestorage.com",
+              "connect-src 'self' ws: wss: https://*.r2.cloudflarestorage.com",
               "worker-src 'self' blob:",
               "frame-ancestors 'none'",
               "base-uri 'self'",

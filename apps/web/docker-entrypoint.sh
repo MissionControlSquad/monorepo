@@ -11,4 +11,4 @@ echo "Running database migrations..."
 node /prisma-cli/node_modules/prisma/build/index.js migrate deploy
 
 echo "Starting server..."
-exec node apps/web/server.js
+exec node apps/web/server.cjs
