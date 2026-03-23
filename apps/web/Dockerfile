@@ -65,12 +65,19 @@ COPY --from=build /app/apps/web/public ./apps/web/public
 
 # Copy Prisma schema + migrations for runtime migrate deploy
 COPY --from=build /app/packages/database/prisma ./prisma
+# Copy Prisma config (needed by migrate deploy to resolve schema/migration paths)
+COPY --from=build /app/packages/database/prisma.config.ts ./prisma.config.ts
+# Prisma resolves migrations relative to the schema directory (prisma/schema/),
+# but our migrations live at prisma/migrations/. Symlink so Prisma finds them.
+RUN ln -s /app/prisma/migrations /app/prisma/schema/migrations
 
 # Copy agent templates (read at runtime by agent-config-generator)
 COPY --from=build /app/apps/web/src/server/agent-templates ./apps/web/src/server/agent-templates
 
-# Install only prisma CLI for migrations (separate from app deps)
-RUN npm install prisma@6 --save-exact --no-package-lock 2>/dev/null || true
+# Install Prisma CLI in a separate directory so npm doesn't prune standalone node_modules
+RUN mkdir -p /prisma-cli && cd /prisma-cli && \
+    echo '{"private":true}' > package.json && \
+    npm install prisma@6.19.2 --save-exact
 
 # Copy generated Prisma client (needed by app at runtime)
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
