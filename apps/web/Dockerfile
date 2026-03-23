@@ -69,8 +69,8 @@ COPY --from=build /app/packages/database/prisma ./prisma
 # Copy agent templates (read at runtime by agent-config-generator)
 COPY --from=build /app/apps/web/src/server/agent-templates ./apps/web/src/server/agent-templates
 
-# Install only prisma CLI for migrations (separate from app deps)
-RUN npm install prisma@6 --save-exact --no-package-lock 2>/dev/null || true
+# Install Prisma CLI for runtime migrations
+RUN npm init -y > /dev/null 2>&1 && npm install prisma@6.19.2 --save-exact
 
 # Copy generated Prisma client (needed by app at runtime)
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
