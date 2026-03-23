@@ -8,11 +8,11 @@ import {
   TouchableOpacity,
   TextInput,
 } from "react-native";
-import { useQuery } from "urql";
+import { useQuery, useMutation } from "urql";
 import { useRouter } from "expo-router";
 import { useState, useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { AGENTS_QUERY } from "@agentcenter/graphql-client";
+import { AGENTS_QUERY, SET_AGENT_ACTIVATION } from "@agentcenter/graphql-client";
 
 interface Agent {
   id: string;
@@ -96,6 +96,8 @@ export default function AgentsScreen() {
     requestPolicy: "cache-and-network",
   });
 
+  const [, setActivation] = useMutation(SET_AGENT_ACTIVATION);
+
   const { data, fetching, error } = result;
   const allAgents = data?.agents ?? [];
 
@@ -142,6 +144,13 @@ export default function AgentsScreen() {
             <Ionicons name="close-circle" size={16} color="#9ca3af" />
           </TouchableOpacity>
         )}
+        <TouchableOpacity
+          onPress={() => router.push("/agent/create")}
+          style={styles.createBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.createBtnText}>+</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Filter tabs */}
@@ -228,6 +237,37 @@ export default function AgentsScreen() {
                   </View>
                 )}
                 <Text style={styles.levelText}>{item.level}</Text>
+                {!isPending && (
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, { backgroundColor: isDeactivated ? "#dbeafe" : "#fee2e2" }]}
+                    activeOpacity={0.7}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      Alert.alert(
+                        isDeactivated ? "Activate Agent" : "Deactivate Agent",
+                        isDeactivated
+                          ? `Activate ${item.name}?`
+                          : `Deactivate ${item.name}? They will stop working on tasks.`,
+                        [
+                          { text: "Cancel", style: "cancel" },
+                          {
+                            text: isDeactivated ? "Activate" : "Deactivate",
+                            style: isDeactivated ? "default" : "destructive",
+                            onPress: async () => {
+                              const res = await setActivation({ id: item.id, deactivated: !isDeactivated });
+                              if (res.error) Alert.alert("Error", res.error.message ?? "Failed");
+                              else reexecute({ requestPolicy: "network-only" });
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={[styles.toggleBtnText, { color: isDeactivated ? "#2563eb" : "#dc2626" }]}>
+                      {isDeactivated ? "Activate" : "Deactivate"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </TouchableOpacity>
           );
@@ -340,4 +380,20 @@ const styles = StyleSheet.create({
   statusBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
   statusText: { fontSize: 11, fontWeight: "600" },
   levelText: { fontSize: 11, color: "#9ca3af", textTransform: "capitalize" },
+  createBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#2563eb",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 4,
+  },
+  createBtnText: { fontSize: 20, color: "#fff", lineHeight: 24, fontWeight: "400" },
+  toggleBtn: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  toggleBtnText: { fontSize: 11, fontWeight: "600" },
 });

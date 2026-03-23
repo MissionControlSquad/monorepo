@@ -115,6 +115,13 @@ export default function ProjectsScreen() {
           clearButtonMode="while-editing"
           returnKeyType="search"
         />
+        <TouchableOpacity
+          onPress={() => router.push("/project/create")}
+          style={styles.createBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.createBtnText}>+</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Status filter */}
@@ -283,4 +290,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 4,
   },
+  createBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#2563eb",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  createBtnText: { fontSize: 20, color: "#fff", lineHeight: 24, fontWeight: "400" },
 });

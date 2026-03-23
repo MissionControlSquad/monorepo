@@ -23,6 +23,8 @@ import {
   RESUME_RECURRING_TASK,
   TRIGGER_RECURRING_TASK,
   DELETE_RECURRING_TASK,
+  PROJECTS_QUERY,
+  PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
 import { useTheme } from "../src/hooks/useTheme";
 import { EmptyState } from "../src/components/EmptyState";
@@ -108,6 +110,8 @@ function RecurringTaskFormModal({
     recurrenceConfig: string;
     priority: string | null;
     tags: string[];
+    projectId: string | null;
+    assigneeIds: string[];
   }) => Promise<void>;
   initialValues?: Partial<RecurringTask>;
   title: string;
@@ -122,7 +126,31 @@ function RecurringTaskFormModal({
     initialValues?.recurrenceConfig ? freqIndexFromConfig(initialValues.recurrenceConfig) : 0
   );
   const [tagsInput, setTagsInput] = useState((initialValues?.tags ?? []).join(", "));
+  const [timeInput, setTimeInput] = useState(() => {
+    try {
+      const c = initialValues?.recurrenceConfig;
+      const parsed = typeof c === "string" ? JSON.parse(c) : c;
+      return (parsed as { time?: string })?.time ?? "";
+    } catch { return ""; }
+  });
+  const [projectId, setProjectId] = useState<string | null>(initialValues?.projectId ?? null);
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const [projectsResult] = useQuery<{ projects: { id: string; name: string }[] }>({
+    query: PROJECTS_QUERY,
+    requestPolicy: "cache-and-network",
+    pause: !visible,
+  });
+  const [profilesResult] = useQuery<{ profiles: { id: string; displayName: string }[] }>({
+    query: PROFILES_QUERY,
+    variables: { limit: 100 },
+    requestPolicy: "cache-and-network",
+    pause: !visible,
+  });
+
+  const allProjects = projectsResult.data?.projects ?? [];
+  const allProfiles = profilesResult.data?.profiles ?? [];
 
   // Reset when modal opens
   const handleOpen = () => {
@@ -131,7 +159,40 @@ function RecurringTaskFormModal({
     setPriority(initialValues?.priority ?? null);
     setFreqIdx(initialValues?.recurrenceConfig ? freqIndexFromConfig(initialValues.recurrenceConfig) : 0);
     setTagsInput((initialValues?.tags ?? []).join(", "));
+    setProjectId(initialValues?.projectId ?? null);
+    setAssigneeIds([]);
+    try {
+      const c = initialValues?.recurrenceConfig;
+      const parsed = typeof c === "string" ? JSON.parse(c) : c;
+      setTimeInput((parsed as { time?: string })?.time ?? "");
+    } catch { setTimeInput(""); }
   };
+
+  function pickProject() {
+    const options = [
+      { text: "None", onPress: () => setProjectId(null) },
+      ...allProjects.map((p) => ({ text: p.name, onPress: () => setProjectId(p.id) })),
+      { text: "Cancel", style: "cancel" as const },
+    ];
+    Alert.alert("Assign Project", undefined, options);
+  }
+
+  function pickAssignees() {
+    const options = allProfiles.map((p) => ({
+      text: assigneeIds.includes(p.id) ? `✓ ${p.displayName}` : p.displayName,
+      onPress: () =>
+        setAssigneeIds((prev) =>
+          prev.includes(p.id) ? prev.filter((id) => id !== p.id) : [...prev, p.id]
+        ),
+    }));
+    Alert.alert("Assignees", "Tap to toggle", [...options, { text: "Done", style: "cancel" as const }]);
+  }
+
+  const selectedProject = allProjects.find((p) => p.id === projectId);
+  const selectedAssigneeNames = allProfiles
+    .filter((p) => assigneeIds.includes(p.id))
+    .map((p) => p.displayName)
+    .join(", ");
 
   const handleSave = async () => {
     if (!taskTitle.trim()) {
@@ -140,12 +201,16 @@ function RecurringTaskFormModal({
     }
     setSaving(true);
     const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+    const baseConfig = JSON.parse(FREQUENCIES[freqIdx].value) as Record<string, unknown>;
+    if (timeInput.trim()) baseConfig.time = timeInput.trim();
     await onSave({
       title: taskTitle.trim(),
       description: description.trim(),
-      recurrenceConfig: FREQUENCIES[freqIdx].value,
+      recurrenceConfig: JSON.stringify(baseConfig),
       priority: priority ?? null,
       tags,
+      projectId: projectId ?? null,
+      assigneeIds,
     });
     setSaving(false);
   };
@@ -261,6 +326,23 @@ function RecurringTaskFormModal({
             </View>
           </View>
 
+          {/* Time */}
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Time (HH:MM)</Text>
+            <TextInput
+              style={{
+                backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
+                borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.text,
+              }}
+              placeholder="09:00"
+              placeholderTextColor={colors.placeholder}
+              value={timeInput}
+              onChangeText={setTimeInput}
+              returnKeyType="done"
+              keyboardType="numbers-and-punctuation"
+            />
+          </View>
+
           {/* Tags */}
           <View style={{ gap: 6 }}>
             <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Tags</Text>
@@ -275,6 +357,44 @@ function RecurringTaskFormModal({
               onChangeText={setTagsInput}
               returnKeyType="done"
             />
+          </View>
+
+          {/* Project */}
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Project</Text>
+            <TouchableOpacity
+              onPress={pickProject}
+              style={{
+                backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
+                borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12,
+                flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 15, color: selectedProject ? colors.text : colors.placeholder }}>
+                {selectedProject ? selectedProject.name : "None"}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.textMuted }}>▼</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Assignees */}
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Assignees</Text>
+            <TouchableOpacity
+              onPress={pickAssignees}
+              style={{
+                backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
+                borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12,
+                flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 15, color: selectedAssigneeNames ? colors.text : colors.placeholder }} numberOfLines={1}>
+                {selectedAssigneeNames || "None"}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.textMuted }}>▼</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -488,8 +608,11 @@ export default function RecurringTasksScreen() {
         saveLabel="Create"
         onClose={() => setCreateOpen(false)}
         onSave={async (values) => {
+          const { projectId: pid, assigneeIds: aids, ...rest } = values;
           const res = await createTask({
-            ...values,
+            ...rest,
+            projectId: pid ?? undefined,
+            assigneeIds: aids.length ? aids : undefined,
             createdByProfileId: profileId ?? undefined,
           });
           if (res.error) {
@@ -510,7 +633,13 @@ export default function RecurringTasksScreen() {
         onClose={() => setEditTask(null)}
         onSave={async (values) => {
           if (!editTask) return;
-          const res = await updateTask({ id: editTask.id, ...values });
+          const { projectId: pid, assigneeIds: aids, ...rest } = values;
+          const res = await updateTask({
+            id: editTask.id,
+            ...rest,
+            projectId: pid ?? undefined,
+            assigneeIds: aids.length ? aids : undefined,
+          });
           if (res.error) {
             Alert.alert("Error", res.error.message ?? "Failed to update");
           } else {
