@@ -1,19 +1,13 @@
 import { createContext, useContext, useState, useCallback } from "react";
 import { useAuth } from "./AuthContext";
-import { NOTIFICATION_POLL_INTERVAL_MS } from "@agentcenter/utils";
+import {
+  NOTIFICATION_POLL_INTERVAL_MS,
+  fetchUserNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from "@agentcenter/utils";
 import { usePollingInterval } from "@agentcenter/hooks";
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-export interface NotificationItem {
-  id: string;
-  type: string;
-  title: string;
-  body: string;
-  url: string | null;
-  readAt: string | null;
-  createdAt: string;
-}
+import type { NotificationItem } from "@agentcenter/types";
 
 interface NotificationContextValue {
   count: number;
@@ -50,12 +44,8 @@ export function NotificationCountProvider({ children }: { children: React.ReactN
     if (!serverUrl || !isSignedIn) return;
     try {
       setFetching(true);
-      const res = await fetch(`${serverUrl}/api/user-notifications?limit=50`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
-      setNotifications(data.notifications ?? []);
+      const items = await fetchUserNotifications(serverUrl);
+      setNotifications(items);
       setError(false);
     } catch {
       setError(true);
@@ -69,27 +59,13 @@ export function NotificationCountProvider({ children }: { children: React.ReactN
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n))
     );
-    try {
-      await fetch(`${serverUrl}/api/user-notifications/${id}/read`, {
-        method: "PATCH",
-        credentials: "include",
-      });
-    } catch {
-      // silent fail — optimistic update already applied
-    }
+    await markNotificationRead(serverUrl, id);
   }, [serverUrl]);
 
   const markAllRead = useCallback(async () => {
     if (!serverUrl) return;
     setNotifications((prev) => prev.map((n) => ({ ...n, readAt: new Date().toISOString() })));
-    try {
-      await fetch(`${serverUrl}/api/user-notifications/read-all`, {
-        method: "PATCH",
-        credentials: "include",
-      });
-    } catch {
-      // silent fail
-    }
+    await markAllNotificationsRead(serverUrl);
   }, [serverUrl]);
 
   // Initial fetch + polling

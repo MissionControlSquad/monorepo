@@ -91,5 +91,5 @@ export function createZipBlob(files: { name: string; content: string }[]): Blob 
   view.setUint32(localOffset + 16, centralStart, true);
   view.setUint16(localOffset + 20, 0, true); // comment
 
-  return new Blob([buf], { type: "application/zip" });
+  return new Blob([bytes], { type: "application/zip" });
 }

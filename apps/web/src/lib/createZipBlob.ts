@@ -1,1 +1,1 @@
-export { createZipBlob } from "@agentcenter/utils";
+export { createZipBlob } from "@agentcenter/utils/zip";

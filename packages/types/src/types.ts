@@ -455,3 +455,15 @@ export interface FeatureFlag {
   managedBy: "system" | "user";
   description: string | null;
 }
+
+// ── Notifications ──────────────────────────────────────────────
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  url: string | null;
+  readAt: string | null;
+  createdAt: string;
+}

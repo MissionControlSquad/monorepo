@@ -12,7 +12,7 @@ import React, {
 import { useQuery, useSubscription } from "urql";
 import { AGENTS_QUERY, AGENT_LATEST_TRANSITIONS_QUERY } from "../../lib/graphql/queries";
 import { AGENT_STATUS_CHANGED_SUBSCRIPTION } from "../../lib/graphql/subscriptions";
-import { HEARTBEAT_TIMEOUT_MS } from "../../lib/constants";
+import { isAgentOnline, timeSinceHeartbeat } from "@agentcenter/utils";
 import { formatTimeAgo } from "../common/TimeAgo";
 import type { Agent, StatusHistoryEntry } from "@agentcenter/types";
 
@@ -91,15 +91,10 @@ export function AgentStatusProvider({ children }: { children: React.ReactNode })
       if (!agent.lastHeartbeat) {
         map.set(agent.id, FALLBACK_INFO);
       } else {
-        const heartbeatTime =
-          typeof agent.lastHeartbeat === "string"
-            ? new Date(agent.lastHeartbeat).getTime()
-            : agent.lastHeartbeat;
-        const elapsed = now - heartbeatTime;
         map.set(agent.id, {
-          isOnline: elapsed < HEARTBEAT_TIMEOUT_MS,
-          lastSeenFormatted: formatTimeAgo(heartbeatTime),
-          timeSinceLastHeartbeat: elapsed,
+          isOnline: isAgentOnline(agent.lastHeartbeat, now),
+          lastSeenFormatted: formatTimeAgo(agent.lastHeartbeat),
+          timeSinceLastHeartbeat: timeSinceHeartbeat(agent.lastHeartbeat, now),
         });
       }
     }

@@ -5,6 +5,7 @@ import { Bell } from "lucide-react";
 import { Button } from "../ui";
 import { NotificationDropdown } from "./NotificationDropdown";
 import { usePollingInterval } from "@agentcenter/hooks";
+import { fetchUnreadNotificationCount } from "@agentcenter/utils";
 
 export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -12,15 +13,8 @@ export function NotificationBell() {
   const ref = useRef<HTMLDivElement>(null);
 
   const fetchCount = useCallback(async () => {
-    try {
-      const res = await fetch("/api/user-notifications/unread-count");
-      if (res.ok) {
-        const data = await res.json();
-        setUnreadCount(data.count ?? 0);
-      }
-    } catch {
-      // silent fail
-    }
+    const count = await fetchUnreadNotificationCount("");
+    setUnreadCount(count);
   }, []);
 
   usePollingInterval(fetchCount, 30_000);

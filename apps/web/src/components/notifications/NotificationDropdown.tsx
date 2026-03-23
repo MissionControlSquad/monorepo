@@ -15,16 +15,14 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { PushPermissionBanner } from "./PushPermissionBanner";
+import {
+  fetchUserNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from "@agentcenter/utils";
+import type { NotificationItem } from "@agentcenter/types";
 
-interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  body: string;
-  url: string | null;
-  readAt: string | null;
-  createdAt: string;
-}
+type Notification = NotificationItem;
 
 const TYPE_ICONS: Record<string, typeof CheckCircle> = {
   task_done: CheckCircle,
@@ -61,10 +59,9 @@ export function NotificationDropdown({ onClose, onMarkAllRead }: NotificationDro
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/user-notifications?limit=20")
-      .then((r) => r.json())
-      .then((data) => {
-        setNotifications(data.notifications ?? []);
+    fetchUserNotifications("", 20)
+      .then((items) => {
+        setNotifications(items);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -72,9 +69,13 @@ export function NotificationDropdown({ onClose, onMarkAllRead }: NotificationDro
 
   const handleClick = useCallback(
     async (n: Notification) => {
-      // Mark as read
       if (!n.readAt) {
-        fetch(`/api/user-notifications/${n.id}/read`, { method: "PATCH" }).catch(() => {});
+        setNotifications((prev) =>
+          prev.map((item) =>
+            item.id === n.id ? { ...item, readAt: new Date().toISOString() } : item,
+          ),
+        );
+        markNotificationRead("", n.id);
       }
       if (n.url) {
         router.push(n.url);
@@ -85,8 +86,8 @@ export function NotificationDropdown({ onClose, onMarkAllRead }: NotificationDro
   );
 
   const handleMarkAllRead = useCallback(async () => {
-    await fetch("/api/user-notifications/read-all", { method: "PATCH" }).catch(() => {});
     setNotifications((prev) => prev.map((n) => ({ ...n, readAt: new Date().toISOString() })));
+    await markAllNotificationsRead("");
     onMarkAllRead();
   }, [onMarkAllRead]);
 
