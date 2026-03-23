@@ -17,8 +17,8 @@ import { useQuery, useMutation, useSubscription } from "urql";
 import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, CHANNEL_PINNED_MESSAGES_QUERY, ON_NEW_CHANNEL_MESSAGE } from "@agentcenter/graphql-client";
-import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_CHANNEL_MESSAGE_REACTION, UPDATE_CHANNEL_MESSAGE, DELETE_CHANNEL_MESSAGE, PIN_CHANNEL_MESSAGE, UNPIN_CHANNEL_MESSAGE } from "@agentcenter/graphql-client";
+import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, CHANNEL_PINNED_MESSAGES_QUERY, ON_NEW_CHANNEL_MESSAGE, PROFILES_QUERY } from "@agentcenter/graphql-client";
+import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_CHANNEL_MESSAGE_REACTION, UPDATE_CHANNEL_MESSAGE, DELETE_CHANNEL_MESSAGE, PIN_CHANNEL_MESSAGE, UNPIN_CHANNEL_MESSAGE, ADD_CHANNEL_MEMBER, REMOVE_CHANNEL_MEMBER, JOIN_CHANNEL, LEAVE_CHANNEL } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 import { MentionInput } from "../../src/components/MentionInput";
 
@@ -28,6 +28,13 @@ interface FromProfile {
   displayName: string;
   username: string;
   avatarUrl: string | null;
+}
+
+interface ProfileOption {
+  id: string;
+  kind: string;
+  displayName: string;
+  username: string | null;
 }
 
 interface Attachment {
@@ -87,11 +94,14 @@ export default function ChannelDetailScreen() {
   const [sending, setSending] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [pinnedOpen, setPinnedOpen] = useState(false);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [profileSearch, setProfileSearch] = useState("");
   const listRef = useRef<FlatList>(null);
 
-  const [channelResult] = useQuery<{ channel: Channel | null }>({
+  const [channelResult, reexecuteChannel] = useQuery<{ channel: Channel | null }>({
     query: CHANNEL_QUERY,
     variables: { id },
+    requestPolicy: "cache-and-network",
   });
 
   const [messagesResult, reexecute] = useQuery<{ channelMessages: Message[] }>({
@@ -113,6 +123,16 @@ export default function ChannelDetailScreen() {
   const [, executeDeleteMessage] = useMutation(DELETE_CHANNEL_MESSAGE);
   const [, executePinMessage] = useMutation(PIN_CHANNEL_MESSAGE);
   const [, executeUnpinMessage] = useMutation(UNPIN_CHANNEL_MESSAGE);
+  const [, executeAddMember] = useMutation(ADD_CHANNEL_MEMBER);
+  const [, executeRemoveMember] = useMutation(REMOVE_CHANNEL_MEMBER);
+  const [, executeJoin] = useMutation(JOIN_CHANNEL);
+  const [, executeLeave] = useMutation(LEAVE_CHANNEL);
+
+  const [profilesResult] = useQuery<{ profiles: ProfileOption[] }>({
+    query: PROFILES_QUERY,
+    pause: !addMemberOpen,
+    requestPolicy: "cache-and-network",
+  });
 
   // Real-time subscription — accumulate new messages as they arrive
   const [subResult] = useSubscription(
@@ -127,6 +147,15 @@ export default function ChannelDetailScreen() {
 
   const channel = channelResult.data?.channel;
   const pinnedMessages = pinnedResult.data?.channelPinnedMessages ?? [];
+  const memberIds = new Set((channel?.members ?? []).map((m) => m.profileId));
+  const isMember = profileId ? memberIds.has(profileId) : false;
+  const allProfiles = profilesResult.data?.profiles ?? [];
+  const filteredProfiles = allProfiles.filter((p) => {
+    if (memberIds.has(p.id)) return false;
+    if (!profileSearch.trim()) return true;
+    const q = profileSearch.toLowerCase();
+    return p.displayName.toLowerCase().includes(q) || (p.username ?? "").toLowerCase().includes(q);
+  });
   const baseMessages = messagesResult.data?.channelMessages ?? [];
   // Merge subscription messages with fetched messages, deduplicate by id
   const liveMessages = subResult.data ?? [];
@@ -146,7 +175,7 @@ export default function ChannelDetailScreen() {
         ),
       });
     }
-  }, [channel, navigation]);
+  }, [channel, navigation, isMember]);
 
   useEffect(() => {
     if (messages.length > 0 && profileId) {
@@ -408,6 +437,52 @@ export default function ChannelDetailScreen() {
               <Ionicons name="close" size={22} color="#374151" />
             </TouchableOpacity>
           </View>
+
+          {/* Join / Leave row */}
+          <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" }}>
+            {isMember ? (
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: "#fecaca", backgroundColor: "#fef2f2", alignItems: "center" }}
+                onPress={() => {
+                  if (!profileId) return;
+                  Alert.alert("Leave Channel", "You will no longer receive messages from this channel.", [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Leave",
+                      style: "destructive",
+                      onPress: async () => {
+                        await executeLeave({ channelId: id, profileId });
+                        reexecuteChannel({ requestPolicy: "network-only" });
+                      },
+                    },
+                  ]);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ color: "#dc2626", fontWeight: "600", fontSize: 14 }}>Leave Channel</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: "#bbf7d0", backgroundColor: "#f0fdf4", alignItems: "center" }}
+                onPress={async () => {
+                  if (!profileId) return;
+                  await executeJoin({ channelId: id, profileId });
+                  reexecuteChannel({ requestPolicy: "network-only" });
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ color: "#16a34a", fontWeight: "600", fontSize: 14 }}>Join Channel</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={{ flex: 1, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: "#bfdbfe", backgroundColor: "#eff6ff", alignItems: "center" }}
+              onPress={() => { setMembersOpen(false); setTimeout(() => setAddMemberOpen(true), 300); }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ color: "#2563eb", fontWeight: "600", fontSize: 14 }}>+ Add Member</Text>
+            </TouchableOpacity>
+          </View>
+
           <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
             {(channel?.members ?? []).map((m) => (
               <View key={m.id} style={styles.memberRow}>
@@ -422,11 +497,102 @@ export default function ChannelDetailScreen() {
                     {m.profile.kind === "agent" ? "🤖 Agent" : "👤 Human"} · @{m.profile.username}
                   </Text>
                 </View>
-                {m.id === profileId && (
+                {m.profileId === profileId ? (
                   <Text style={styles.memberYou}>you</Text>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (!profileId) return;
+                      Alert.alert("Remove Member", `Remove ${m.profile.displayName} from this channel?`, [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                          text: "Remove",
+                          style: "destructive",
+                          onPress: async () => {
+                            await executeRemoveMember({ channelId: id, profileId: m.profileId, removedByProfileId: profileId });
+                            reexecuteChannel({ requestPolicy: "network-only" });
+                          },
+                        },
+                      ]);
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={{ padding: 4 }}
+                  >
+                    <Ionicons name="person-remove-outline" size={16} color="#9ca3af" />
+                  </TouchableOpacity>
                 )}
               </View>
             ))}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Add Member modal */}
+      <Modal
+        visible={addMemberOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setAddMemberOpen(false)}
+      >
+        <View style={styles.membersModal}>
+          <View style={styles.membersHeader}>
+            <Text style={styles.membersTitle}>Add Member</Text>
+            <TouchableOpacity onPress={() => setAddMemberOpen(false)} style={{ padding: 4 }}>
+              <Ionicons name="close" size={22} color="#374151" />
+            </TouchableOpacity>
+          </View>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#f3f4f6", borderRadius: 10, paddingHorizontal: 12, gap: 8 }}>
+              <Ionicons name="search-outline" size={16} color="#9ca3af" />
+              <TextInput
+                style={{ flex: 1, fontSize: 14, color: "#111827", paddingVertical: 9 }}
+                placeholder="Search by name or username…"
+                placeholderTextColor="#9ca3af"
+                value={profileSearch}
+                onChangeText={setProfileSearch}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
+          <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+            {profilesResult.fetching && filteredProfiles.length === 0 ? (
+              <View style={{ padding: 24, alignItems: "center" }}>
+                <ActivityIndicator color="#2563eb" />
+              </View>
+            ) : filteredProfiles.length === 0 ? (
+              <View style={{ padding: 24, alignItems: "center" }}>
+                <Text style={{ color: "#9ca3af", fontSize: 14 }}>
+                  {profileSearch.trim() ? "No matching profiles" : "All profiles are already members"}
+                </Text>
+              </View>
+            ) : (
+              filteredProfiles.map((p) => (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[styles.memberRow, { justifyContent: "space-between" }]}
+                  onPress={async () => {
+                    if (!profileId) return;
+                    await executeAddMember({ channelId: id, profileId: p.id, addedByProfileId: profileId });
+                    reexecuteChannel({ requestPolicy: "network-only" });
+                    setAddMemberOpen(false);
+                    setProfileSearch("");
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.memberAvatar}>
+                    <Text style={styles.memberAvatarText}>{p.displayName.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.memberName}>{p.displayName}</Text>
+                    <Text style={styles.memberMeta}>
+                      {p.kind === "agent" ? "🤖 Agent" : "👤 Human"}{p.username ? ` · @${p.username}` : ""}
+                    </Text>
+                  </View>
+                  <Ionicons name="add-circle-outline" size={22} color="#2563eb" />
+                </TouchableOpacity>
+              ))
+            )}
           </ScrollView>
         </View>
       </Modal>
