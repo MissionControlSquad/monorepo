@@ -7,6 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   TextInput,
+  Alert,
 } from "react-native";
 import { useQuery, useMutation } from "urql";
 import { useRouter } from "expo-router";
