@@ -19,21 +19,23 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 /**
- * Returns `true` if a KeyboardEvent should be ignored for global shortcuts.
+ * Returns `true` if a keyboard event should be ignored for global shortcuts.
  * Filters out events fired while the user is typing in an input, textarea,
  * contentEditable element, or when a modifier key is held.
+ *
+ * Uses duck typing so it works without DOM lib (e.g. in React Native type-checks).
  */
 export function shouldIgnoreKeyboardShortcut(e: {
-  target: EventTarget | null;
-  metaKey: boolean;
-  ctrlKey: boolean;
-  altKey: boolean;
+  target?: unknown;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
 }): boolean {
-  const target = e.target as HTMLElement | null;
+  const target = e.target as { tagName?: string; isContentEditable?: boolean } | null | undefined;
   if (target) {
     const tag = target.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-    if ((target as HTMLElement).isContentEditable) return true;
+    if (target.isContentEditable) return true;
   }
   if (e.metaKey || e.ctrlKey || e.altKey) return true;
   return false;

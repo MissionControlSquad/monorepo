@@ -1,5 +1,3 @@
+// Universal hooks — work in React Native, browser, and Electron.
 export * from "./useDebounce";
-export * from "./useIsElectron";
-export * from "./useMediaQuery";
-export * from "./useScrollSentinel";
 export * from "./usePollingInterval";

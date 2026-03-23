@@ -1,3 +1,3 @@
 "use client";
 
-export { useScrollSentinel } from "@agentcenter/hooks";
+export { useScrollSentinel } from "@agentcenter/hooks/browser";

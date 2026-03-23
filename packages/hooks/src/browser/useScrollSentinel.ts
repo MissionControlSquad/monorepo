@@ -10,7 +10,7 @@ export function useScrollSentinel(
   loadMore: (numItems: number) => void,
   status: "CanLoadMore" | "LoadingMore" | "Exhausted" | "LoadingFirstPage",
   batchSize: number = 20,
-): React.RefObject<HTMLDivElement> {
+): React.RefObject<HTMLDivElement | null> {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

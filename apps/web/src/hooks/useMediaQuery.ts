@@ -1,1 +1,1 @@
-export { useMediaQuery } from "@agentcenter/hooks";
+export { useMediaQuery } from "@agentcenter/hooks/browser";
