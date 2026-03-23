@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: agentcenter
+  IMAGE_NAME: agentcenter-app
 
 jobs:
   # ── Job 1: Build and smoke test (single platform, fast) ──────────
