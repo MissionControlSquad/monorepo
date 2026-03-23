@@ -18,6 +18,7 @@ import { useQuery, useMutation } from "urql";
 import { useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
 import {
   PROJECT_QUERY,
   TASKS_BY_PROJECT_QUERY,
@@ -255,7 +256,7 @@ function OverviewTab({ project, onRefresh }: { project: Project; onRefresh: () =
             <Ionicons name="pencil-outline" size={16} color="#9ca3af" />
           </View>
           {project.description ? (
-            <Text style={styles.descriptionLarge}>{project.description}</Text>
+            <SimpleMarkdown content={project.description} />
           ) : (
             <Text style={styles.noDescription}>Tap to add description</Text>
           )}

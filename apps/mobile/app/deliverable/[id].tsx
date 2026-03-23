@@ -17,6 +17,7 @@ import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useQuery } from "urql";
 import { useEffect, useState } from "react";
 import { DELIVERABLE_QUERY, DELIVERABLE_VERSIONS_QUERY } from "@agentcenter/graphql-client";
+import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface Deliverable {
@@ -94,40 +95,6 @@ const IMAGE_MIMES = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image
 function isImageMime(mimeType: string | null): boolean {
   return IMAGE_MIMES.includes(mimeType ?? "");
 }
-
-function SimpleMarkdown({ content }: { content: string }) {
-  const lines = content.split("\n");
-  return (
-    <View style={{ gap: 4 }}>
-      {lines.map((line, i) => {
-        if (line.startsWith("### ")) {
-          return <Text key={i} style={mdStyles.h3}>{line.slice(4)}</Text>;
-        }
-        if (line.startsWith("## ")) {
-          return <Text key={i} style={mdStyles.h2}>{line.slice(3)}</Text>;
-        }
-        if (line.startsWith("# ")) {
-          return <Text key={i} style={mdStyles.h1}>{line.slice(2)}</Text>;
-        }
-        if (line.startsWith("- ") || line.startsWith("* ")) {
-          return <Text key={i} style={mdStyles.bullet}>• {line.slice(2)}</Text>;
-        }
-        if (line.startsWith("```") || line === "") {
-          return <View key={i} style={{ height: line === "" ? 8 : 0 }} />;
-        }
-        return <Text key={i} style={mdStyles.body}>{line}</Text>;
-      })}
-    </View>
-  );
-}
-
-const mdStyles = StyleSheet.create({
-  h1: { fontSize: 20, fontWeight: "800", color: "#111827", marginTop: 8, marginBottom: 4 },
-  h2: { fontSize: 17, fontWeight: "700", color: "#111827", marginTop: 6, marginBottom: 2 },
-  h3: { fontSize: 15, fontWeight: "700", color: "#374151", marginTop: 4 },
-  body: { fontSize: 15, color: "#374151", lineHeight: 24 },
-  bullet: { fontSize: 15, color: "#374151", lineHeight: 24, paddingLeft: 8 },
-});
 
 // ── Content renderer (shared between current and version preview) ─────────────
 

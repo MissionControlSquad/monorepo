@@ -26,6 +26,7 @@ import {
 import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION, APPROVE_TASK, REJECT_TASK, SAVE_TASK_AS_TEMPLATE } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 import { MentionInput } from "../../src/components/MentionInput";
+import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -391,7 +392,7 @@ function OverviewTab({ task, onStatusChange }: { task: Task; onStatusChange: () 
       {task.description ? (
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Description</Text>
-          <Text style={styles.description}>{task.description}</Text>
+          <SimpleMarkdown content={task.description} />
         </View>
       ) : null}
 
