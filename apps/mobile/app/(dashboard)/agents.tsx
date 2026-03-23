@@ -75,8 +75,8 @@ function isOnline(agent: Agent): boolean {
 
 function filterAgents(agents: Agent[], tab: FilterTab, search: string): Agent[] {
   let list = agents;
-  if (tab === "active") list = list.filter((a) => a.setupStatus === "ready");
-  else if (tab === "pending") list = list.filter((a) => a.setupStatus === "pending" || a.setupStatus === "waiting");
+  if (tab === "active") list = list.filter((a) => a.setupStatus === "active");
+  else if (tab === "pending") list = list.filter((a) => a.setupStatus === "pending_setup");
   else if (tab === "deactivated") list = list.filter((a) => a.setupStatus === "deactivated");
 
   if (search.trim()) {
@@ -103,8 +103,8 @@ export default function AgentsScreen() {
 
   const counts = useMemo(() => ({
     all: allAgents.length,
-    active: allAgents.filter((a) => a.setupStatus === "ready").length,
-    pending: allAgents.filter((a) => a.setupStatus === "pending" || a.setupStatus === "waiting").length,
+    active: allAgents.filter((a) => a.setupStatus === "active").length,
+    pending: allAgents.filter((a) => a.setupStatus === "pending_setup").length,
     deactivated: allAgents.filter((a) => a.setupStatus === "deactivated").length,
   }), [allAgents]);
 
@@ -182,7 +182,7 @@ export default function AgentsScreen() {
         renderItem={({ item }) => {
           const online = isOnline(item);
           const statusColor = getStatusColor(item);
-          const isPending = item.setupStatus === "pending" || item.setupStatus === "waiting";
+          const isPending = item.setupStatus === "pending_setup";
           const isDeactivated = item.setupStatus === "deactivated";
 
           return (

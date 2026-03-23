@@ -13,7 +13,7 @@ import {
   Modal,
 } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import { useQuery, useMutation } from "urql";
+import { useQuery, useMutation, useSubscription } from "urql";
 import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -22,6 +22,8 @@ import {
   DELIVERABLES_BY_TASK_QUERY,
   CHILD_TASKS_QUERY,
   TASK_WORK_SUMMARY_QUERY,
+  ON_TASK_UPDATED,
+  ON_NEW_MESSAGE,
 } from "@agentcenter/graphql-client";
 import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION, APPROVE_TASK, REJECT_TASK, SAVE_TASK_AS_TEMPLATE } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
@@ -531,6 +533,19 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
     requestPolicy: "cache-and-network",
   });
 
+  // Live message subscription — refetch when a new message arrives
+  const [messageSub] = useSubscription<{ newMessage: { id: string } }>({
+    query: ON_NEW_MESSAGE,
+    variables: { taskId },
+  });
+  const prevSubMsg = useRef<unknown>(null);
+  useEffect(() => {
+    if (messageSub.data && messageSub.data !== prevSubMsg.current) {
+      prevSubMsg.current = messageSub.data;
+      reexecute({ requestPolicy: "network-only" });
+    }
+  }, [messageSub.data]);
+
   const [, sendMessage] = useMutation(CREATE_MESSAGE);
   const [, toggleReaction] = useMutation(TOGGLE_MESSAGE_REACTION);
 
@@ -892,6 +907,15 @@ export default function TaskDetailScreen() {
     variables: { id },
     requestPolicy: "cache-and-network",
   });
+
+  // Subscribe to live task updates (status changes)
+  const [taskSub] = useSubscription<{ taskUpdated: { id: string; status: string } }>({
+    query: ON_TASK_UPDATED,
+    variables: { taskId: id },
+  });
+  useEffect(() => {
+    if (taskSub.data) reexecute({ requestPolicy: "network-only" });
+  }, [taskSub.data]);
 
   const [, executeUpdate] = useMutation(UPDATE_TASK);
   const [, saveAsTemplate] = useMutation(SAVE_TASK_AS_TEMPLATE);

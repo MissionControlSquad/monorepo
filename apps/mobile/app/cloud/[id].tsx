@@ -344,6 +344,7 @@ export default function CloudVMDetailScreen() {
   const displayName = vm.name || vm.serverName || vm.id.slice(0, 8);
   const isRunning = vm.status === "running";
   const isStopped = vm.status === "stopped";
+  const isError = vm.status === "error";
   const isTransitional = TRANSITIONAL.includes(vm.status);
   const isDestroyed = vm.status === "destroyed";
 
@@ -456,6 +457,31 @@ export default function CloudVMDetailScreen() {
                     <Ionicons name="refresh-outline" size={18} color="#374151" />
                   )}
                   <Text style={[styles.actionBtnText, { color: "#374151" }]}>Restart</Text>
+                </TouchableOpacity>
+              )}
+
+              {isError && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.actionBtnDefault]}
+                  onPress={() => {
+                    Alert.alert(
+                      "Retry Provisioning",
+                      "This will re-attempt the provisioning process for this VM.",
+                      [
+                        { text: "Cancel", style: "cancel" },
+                        { text: "Retry", onPress: () => handleAction("retry") },
+                      ]
+                    );
+                  }}
+                  disabled={!!actionLoading}
+                  activeOpacity={0.7}
+                >
+                  {actionLoading === "retry" ? (
+                    <ActivityIndicator size="small" color="#374151" />
+                  ) : (
+                    <Ionicons name="reload-outline" size={18} color="#374151" />
+                  )}
+                  <Text style={[styles.actionBtnText, { color: "#374151" }]}>Retry</Text>
                 </TouchableOpacity>
               )}
 
