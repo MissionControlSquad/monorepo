@@ -6,7 +6,8 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
-import { useLocalSearchParams, useNavigation } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
 
@@ -32,6 +33,8 @@ const PRIORITY_OPTIONS: { key: PriorityFilter; label: string }[] = [
 export default function KanbanScreen() {
   const { projectId } = useLocalSearchParams<{ projectId: string }>();
   const navigation = useNavigation();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("");
@@ -168,6 +171,15 @@ export default function KanbanScreen() {
         dueDateFilter={dueDateFilter || undefined}
         priorities={priorityFilter ? [priorityFilter] : undefined}
       />
+
+      {/* FAB */}
+      <TouchableOpacity
+        style={[styles.fab, { bottom: insets.bottom + 20 }]}
+        onPress={() => router.push(`/task/create?projectId=${projectId}` as Parameters<typeof router.push>[0])}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -215,4 +227,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   filterBadgeText: { fontSize: 9, color: "#fff", fontWeight: "700" },
+  fab: {
+    position: "absolute",
+    right: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#2563eb",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
 });

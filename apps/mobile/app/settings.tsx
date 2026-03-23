@@ -205,8 +205,11 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
   const [license, setLicense] = useState<LicenseData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [licenseKey, setLicenseKey] = useState("");
+  const [activating, setActivating] = useState(false);
+  const [activateError, setActivateError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchLicense = () => {
     if (!serverUrl) return;
     setLoading(true);
     fetch(`${serverUrl}/api/license`, { credentials: "include" })
@@ -217,7 +220,35 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
       .then((data) => setLicense(data))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [serverUrl]);
+  };
+
+  useEffect(() => { fetchLicense(); }, [serverUrl]);
+
+  const handleActivate = async () => {
+    if (!licenseKey.trim() || !serverUrl) return;
+    setActivating(true);
+    setActivateError(null);
+    try {
+      const res = await fetch(`${serverUrl}/api/license`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: licenseKey.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setActivateError(data.message ?? "Activation failed");
+        return;
+      }
+      setLicenseKey("");
+      Alert.alert("Success", "License activated successfully");
+      fetchLicense();
+    } catch (err) {
+      setActivateError((err as Error).message ?? "Something went wrong");
+    } finally {
+      setActivating(false);
+    }
+  };
 
   const statusColor: Record<string, string> = {
     active: "#16a34a",
@@ -283,6 +314,38 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
           )}
         </>
       )}
+
+      {/* Activate / update license */}
+      <View style={{ height: 1, backgroundColor: "#f3f4f6" }} />
+      <View style={styles.field}>
+        <Text style={styles.label}>{license?.status === "active" ? "Update License Key" : "Activate License"}</Text>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.inputFlex}
+            value={licenseKey}
+            onChangeText={setLicenseKey}
+            placeholder="Paste your license key…"
+            placeholderTextColor="#9ca3af"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+        </View>
+        {activateError ? <Text style={styles.errorText}>{activateError}</Text> : null}
+      </View>
+      <TouchableOpacity
+        style={[styles.primaryBtn, (!licenseKey.trim() || activating) && styles.primaryBtnDisabled]}
+        onPress={handleActivate}
+        disabled={!licenseKey.trim() || activating}
+        activeOpacity={0.8}
+      >
+        {activating ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <Text style={styles.primaryBtnText}>
+            {license?.status === "active" ? "Update License" : "Activate License"}
+          </Text>
+        )}
+      </TouchableOpacity>
     </View>
   );
 }

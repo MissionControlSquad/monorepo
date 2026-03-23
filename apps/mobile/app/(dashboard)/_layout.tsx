@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { TouchableOpacity, View } from "react-native";
 import { useDrawer } from "../../src/context/DrawerContext";
 import { useTheme } from "../../src/hooks/useTheme";
+import { NotificationBell } from "../../src/components/NotificationBell";
 
 export default function DashboardLayout() {
   const { openDrawer } = useDrawer();
@@ -41,9 +42,10 @@ export default function DashboardLayout() {
               <TouchableOpacity onPress={() => router.push("/search")} style={{ padding: 8 }}>
                 <Ionicons name="search-outline" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push("/notifications")} style={{ padding: 8 }}>
-                <Ionicons name="notifications-outline" size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
+              <NotificationBell
+                onPress={() => router.push("/notifications")}
+                color={colors.textSecondary}
+              />
               <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
                 <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
               </TouchableOpacity>

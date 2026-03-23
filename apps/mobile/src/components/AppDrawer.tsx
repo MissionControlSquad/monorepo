@@ -18,6 +18,7 @@ import { useQuery } from "urql";
 import { ME_QUERY } from "@agentcenter/graphql-client";
 import { getStoredServerUrl } from "../api/session";
 import { useTheme } from "../hooks/useTheme";
+import { useNotificationCount } from "../hooks/useNotificationCount";
 
 interface Profile {
   id: string;
@@ -47,6 +48,7 @@ export function AppDrawer() {
   });
 
   const profile = result.data?.me;
+  const notificationCount = useNotificationCount();
 
   useEffect(() => {
     if (isOpen) {
@@ -188,7 +190,7 @@ export function AppDrawer() {
           <DrawerItem icon="bar-chart-outline" label="Analytics" onPress={() => navigate("/analytics")} colors={colors} />
           <DrawerItem icon="repeat-outline" label="Recurring Tasks" onPress={() => navigate("/recurring-tasks")} colors={colors} />
           <DrawerItem icon="document-text-outline" label="Task Templates" onPress={() => navigate("/task-templates")} colors={colors} />
-          <DrawerItem icon="notifications-outline" label="Notifications" onPress={() => navigate("/notifications")} colors={colors} />
+          <DrawerItem icon="notifications-outline" label="Notifications" onPress={() => navigate("/notifications")} colors={colors} badge={notificationCount > 0 ? (notificationCount > 99 ? "99+" : String(notificationCount)) : undefined} />
           <DrawerItem icon="server-outline" label="Cloud VMs" onPress={() => navigate("/cloud")} colors={colors} />
           <DrawerItem icon="toggle-outline" label="Feature Flags" onPress={() => navigate("/feature-flags")} colors={colors} />
           <DrawerItem icon="settings-outline" label="Settings" onPress={() => navigate("/settings")} colors={colors} />
@@ -216,11 +218,13 @@ function DrawerItem({
   label,
   onPress,
   colors,
+  badge,
 }: {
   icon: React.ComponentProps<typeof Ionicons>["name"];
   label: string;
   onPress: () => void;
   colors: ReturnType<typeof useTheme>["colors"];
+  badge?: string;
 }) {
   return (
     <TouchableOpacity
@@ -241,7 +245,13 @@ function DrawerItem({
         <Ionicons name={icon} size={20} color={colors.icon} />
       </View>
       <Text style={{ fontSize: 15, fontWeight: "500", color: colors.text }}>{label}</Text>
-      <Ionicons name="chevron-forward" size={16} color={colors.border} style={{ marginLeft: "auto" }} />
+      {badge ? (
+        <View style={{ marginLeft: "auto", marginRight: 4, backgroundColor: "#dc2626", borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, minWidth: 20, alignItems: "center" }}>
+          <Text style={{ fontSize: 11, color: "#fff", fontWeight: "700" }}>{badge}</Text>
+        </View>
+      ) : (
+        <Ionicons name="chevron-forward" size={16} color={colors.border} style={{ marginLeft: "auto" }} />
+      )}
     </TouchableOpacity>
   );
 }
