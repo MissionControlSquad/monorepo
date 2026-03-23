@@ -11,6 +11,7 @@ import {
   TextInput,
   Modal,
   RefreshControl,
+  Clipboard,
 } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useQuery, useMutation, useSubscription, gql } from "urql";
@@ -1111,6 +1112,17 @@ function SetupTab({ agentId }: { agentId: string }) {
           <View style={styles.newKeyHeader}>
             <Ionicons name="warning-outline" size={16} color="#d97706" />
             <Text style={styles.newKeyTitle}>New API Key — Save now!</Text>
+            <TouchableOpacity
+              onPress={() => {
+                Clipboard.setString(newApiKey);
+                Alert.alert("Copied", "API key copied to clipboard");
+              }}
+              style={styles.copyBtn}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="copy-outline" size={14} color="#2563eb" />
+              <Text style={styles.copyBtnText}>Copy</Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.newKeyHint}>This key will only be shown once. It's embedded in the configs below.</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator>
@@ -1167,7 +1179,10 @@ function SetupTab({ agentId }: { agentId: string }) {
               <View style={styles.setupCardRow}>
                 <Text style={styles.setupCardTitle}>Bootstrap Message</Text>
                 <TouchableOpacity
-                  onPress={() => Alert.alert("Copied", "Bootstrap message copied (use Share/Copy for actual clipboard)")}
+                  onPress={() => {
+                    Clipboard.setString(setup.bootstrapMessage);
+                    Alert.alert("Copied", "Bootstrap message copied to clipboard");
+                  }}
                   style={styles.copyBtn}
                   activeOpacity={0.7}
                 >
@@ -1233,7 +1248,20 @@ function SetupTab({ agentId }: { agentId: string }) {
           {/* Cron command */}
           {setup.cronCommand && (
             <View style={styles.setupCard}>
-              <Text style={styles.setupCardTitle}>3. Heartbeat Cron</Text>
+              <View style={styles.setupCardRow}>
+                <Text style={styles.setupCardTitle}>3. Heartbeat Cron</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    Clipboard.setString(setup.cronCommand);
+                    Alert.alert("Copied", "Cron command copied to clipboard");
+                  }}
+                  style={styles.copyBtn}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="copy-outline" size={14} color="#2563eb" />
+                  <Text style={styles.copyBtnText}>Copy</Text>
+                </TouchableOpacity>
+              </View>
               <Text style={styles.setupHint}>Add this to your crontab to keep the agent running</Text>
               <View style={styles.codeBlock}>
                 <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled>
