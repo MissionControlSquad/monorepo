@@ -21,6 +21,30 @@ import { getStoredCookie } from "../../src/api/session";
 const LEVELS = ["junior", "mid", "senior", "lead"] as const;
 type Level = (typeof LEVELS)[number];
 
+interface AgentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  emoji: string;
+  role: string;
+  personality: string;
+  level: string;
+  category: string;
+}
+
+const AGENT_TEMPLATES: AgentTemplate[] = [
+  { id: "squad-lead", name: "Squad Lead", description: "Orchestrator — triages inbox, assigns work, reviews deliverables", emoji: "📋", role: "Squad Lead", personality: "The orchestrator. Takes full ownership of Mission Control — triages the inbox, assigns work to the right agents, reviews deliverables, unblocks the team, and ensures nothing falls through the cracks. Thinks strategically about priorities. Proactive: identifies what needs doing and makes it happen.", level: "lead", category: "management" },
+  { id: "researcher", name: "Research & Analysis", description: "Deep research, competitive analysis, SEO audits, and data gathering", emoji: "🔍", role: "Research Specialist", personality: "Thorough and analytical. Digs deep into topics, cross-references sources, and delivers well-structured findings.", level: "mid", category: "research" },
+  { id: "content-writer", name: "Content & Copywriting", description: "Blog posts, landing pages, documentation, and marketing copy", emoji: "✍️", role: "Content Writer", personality: "Creative and articulate. Adapts tone to audience, writes clean prose, and structures content for readability.", level: "mid", category: "content" },
+  { id: "frontend-dev", name: "Frontend Development", description: "React/Next.js components, UI implementation, and frontend features", emoji: "⚛️", role: "Frontend Developer", personality: "Detail-oriented and pragmatic. Writes clean, accessible code. Follows existing patterns and tests thoroughly.", level: "mid", category: "engineering" },
+  { id: "backend-dev", name: "Backend Development", description: "APIs, databases, authentication, server architecture, and performance", emoji: "🔧", role: "Backend Developer", personality: "Systematic and security-conscious. Designs clean APIs, writes safe database queries, and builds for reliability.", level: "mid", category: "engineering" },
+  { id: "ux-designer", name: "UI/UX Design", description: "Wireframes, design systems, user flows, and interface design", emoji: "🎨", role: "UX Designer", personality: "User-centric and visually thoughtful. Balances aesthetics with usability, thinks in systems.", level: "mid", category: "design" },
+  { id: "qa-testing", name: "QA & Testing", description: "Test strategy, automation, bug reporting, performance and accessibility testing", emoji: "🧪", role: "QA Engineer", personality: "Methodical and thorough. Designs tests that catch bugs before users do. Writes clear bug reports.", level: "mid", category: "testing" },
+  { id: "social-media", name: "Social Media", description: "Social posts, engagement strategy, content calendars, and community", emoji: "📱", role: "Social Media Manager", personality: "Trend-aware and engaging. Understands platform nuances, crafts scroll-stopping content.", level: "mid", category: "marketing" },
+  { id: "seo-strategist", name: "SEO Strategy", description: "Technical SEO, keyword research, on-page optimization, and rank tracking", emoji: "📈", role: "SEO Strategist", personality: "Data-driven and strategic. Understands search algorithms and creates actionable optimization plans.", level: "mid", category: "marketing" },
+  { id: "email-marketer", name: "Email Marketing", description: "Email sequences, deliverability, segmentation, and automation flows", emoji: "📧", role: "Email Marketer", personality: "Conversion-focused and analytical. Crafts emails that get opened and clicked. Tests everything.", level: "mid", category: "marketing" },
+];
+
 const EMOJI_PRESETS = [
   "🤖","🦾","🧠","⚡","🎯","🔧","🚀","🌟","🦊","🐉",
   "🐺","🦁","🐻","🦅","🦋","🌊","🔥","💎","🛡️","⚔️",
@@ -38,6 +62,7 @@ export default function CreateAgentScreen() {
   const insets = useSafeAreaInsets();
   const { serverUrl } = useAuth();
 
+  const [step, setStep] = useState<"template" | "form">("template");
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [role, setRole] = useState("");
@@ -48,6 +73,15 @@ export default function CreateAgentScreen() {
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState<CreatedAgent | null>(null);
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
+
+  function applyTemplate(t: AgentTemplate) {
+    setRole(t.role);
+    setEmoji(t.emoji);
+    setPersonality(t.personality);
+    const lvl = LEVELS.includes(t.level as Level) ? (t.level as Level) : "mid";
+    setLevel(lvl);
+    setStep("form");
+  }
 
   const handleCreate = async () => {
     if (!name.trim()) { Alert.alert("Required", "Agent name is required"); return; }
@@ -161,6 +195,43 @@ export default function CreateAgentScreen() {
           activeOpacity={0.8}
         >
           <Text style={styles.secondaryBtnText}>Back to Agents</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  }
+
+  if (step === "template") {
+    return (
+      <ScrollView
+        style={{ flex: 1, backgroundColor: "#f9fafb" }}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        <Text style={styles.sectionTitle}>Choose a Template</Text>
+        <Text style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>
+          Start with a pre-configured role, or begin from scratch.
+        </Text>
+        {AGENT_TEMPLATES.map((t) => (
+          <TouchableOpacity
+            key={t.id}
+            style={styles.templateCard}
+            onPress={() => applyTemplate(t)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.templateEmoji}>{t.emoji}</Text>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.templateName}>{t.name}</Text>
+              <Text style={styles.templateDesc} numberOfLines={2}>{t.description}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity
+          style={[styles.secondaryBtn, { marginTop: 8 }]}
+          onPress={() => setStep("form")}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.secondaryBtnText}>Start from Scratch</Text>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -383,6 +454,22 @@ const styles = StyleSheet.create({
   secondaryBtnText: { fontSize: 15, color: "#374151", fontWeight: "500" },
   cancelBtn: { alignItems: "center", paddingVertical: 10 },
   cancelBtnText: { fontSize: 15, color: "#6b7280" },
+
+  // Template selection
+  templateCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    gap: 12,
+  },
+  templateEmoji: { fontSize: 24, width: 32, textAlign: "center" },
+  templateName: { fontSize: 14, fontWeight: "600", color: "#111827" },
+  templateDesc: { fontSize: 12, color: "#6b7280", lineHeight: 16 },
 
   // Success screen
   successBanner: { alignItems: "center", paddingVertical: 24, gap: 8 },

@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   TASK_QUERY,
   AGENTS_QUERY,
+  PROJECTS_QUERY,
   MESSAGES_BY_TASK_QUERY,
   DELIVERABLES_BY_TASK_QUERY,
   DELIVERABLES_BY_CHILD_TASKS_QUERY,
@@ -296,9 +297,27 @@ function fmtDuration(ms: number): string {
   return "<1m";
 }
 
-function OverviewTab({ task, onStatusChange }: { task: Task; onStatusChange: () => void }) {
+function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; onStatusChange: () => void; onProjectAssign: (projectId: string) => void }) {
   const router = useRouter();
   const statusColor = STATUS_COLORS[task.status] ?? "#6b7280";
+  const [projectsResult] = useQuery<{ projects: { id: string; name: string; status: string }[] }>({
+    query: PROJECTS_QUERY,
+    requestPolicy: "cache-and-network",
+    pause: !!task.project,
+  });
+
+  function handleAssignProject() {
+    const projects = (projectsResult.data?.projects ?? []).filter((p) => p.status === "active");
+    if (projects.length === 0) { Alert.alert("No Projects", "No active projects available."); return; }
+    Alert.alert(
+      "Assign to Project",
+      "Select a project for this task",
+      [
+        ...projects.map((p) => ({ text: p.name, onPress: () => onProjectAssign(p.id) })),
+        { text: "Cancel", style: "cancel" as const },
+      ]
+    );
+  }
 
   const [childResult] = useQuery<{ childTasks: ChildTask[] }>({
     query: CHILD_TASKS_QUERY,
@@ -350,12 +369,20 @@ function OverviewTab({ task, onStatusChange }: { task: Task; onStatusChange: () 
             </Text>
           </View>
         )}
-        {task.project && (
+        {task.project ? (
           <TouchableOpacity
             style={[styles.badge, { backgroundColor: "#f3f4f6" }]}
             onPress={() => router.push(`/project/${task.project!.id}`)}
           >
             <Text style={[styles.badgeText, { color: "#6b7280" }]}>📁 {task.project.name}</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.badge, { backgroundColor: "#f3f4f6", borderStyle: "dashed", borderWidth: 1, borderColor: "#d1d5db" }]}
+            onPress={handleAssignProject}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.badgeText, { color: "#9ca3af" }]}>📁 Assign project</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -1069,7 +1096,15 @@ export default function TaskDetailScreen() {
       )}
       <View style={{ flex: 1 }}>
         {activeTab === 0 && (
-          <OverviewTab task={task} onStatusChange={handleStatusChange} />
+          <OverviewTab
+            task={task}
+            onStatusChange={handleStatusChange}
+            onProjectAssign={async (projectId) => {
+              const res = await executeUpdate({ id: task.id, projectId });
+              if (res.error) Alert.alert("Error", "Failed to assign project");
+              else reexecute({ requestPolicy: "network-only" });
+            }}
+          />
         )}
         {activeTab === 1 && (
           <MessagesTab taskId={task.id} profileId={profileId} />
