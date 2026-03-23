@@ -300,10 +300,12 @@ function fmtDuration(ms: number): string {
 function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; onStatusChange: () => void; onProjectAssign: (projectId: string) => void }) {
   const router = useRouter();
   const statusColor = STATUS_COLORS[task.status] ?? "#6b7280";
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const [projectsResult] = useQuery<{ projects: { id: string; name: string; status: string }[] }>({
     query: PROJECTS_QUERY,
     requestPolicy: "cache-and-network",
-    pause: !!task.project,
+    pause: !mounted || !!task.project,
   });
 
   function handleAssignProject() {
@@ -323,7 +325,7 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
     query: CHILD_TASKS_QUERY,
     variables: { parentTaskId: task.id },
     requestPolicy: "cache-and-network",
-    pause: !task.id,
+    pause: !mounted || !task.id,
   });
   const childTasks = childResult.data?.childTasks ?? [];
 
@@ -331,6 +333,7 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
     query: TASK_WORK_SUMMARY_QUERY,
     variables: { taskId: task.id },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
   const workSummary = workResult.data?.taskWorkSummary;
 

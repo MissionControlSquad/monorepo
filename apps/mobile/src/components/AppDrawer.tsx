@@ -8,7 +8,7 @@ import {
   Alert,
   useWindowDimensions,
 } from "react-native";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -41,10 +41,16 @@ export function AppDrawer() {
   const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
+  const [queryEnabled, setQueryEnabled] = useState(false);
+  useEffect(() => {
+    if (isOpen) setQueryEnabled(true);
+    else setQueryEnabled(false);
+  }, [isOpen]);
+
   const [result] = useQuery<{ me: Profile | null }>({
     query: ME_QUERY,
     requestPolicy: "cache-and-network",
-    pause: !isOpen,
+    pause: !queryEnabled,
   });
 
   const profile = result.data?.me;

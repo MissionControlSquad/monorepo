@@ -75,7 +75,7 @@ function parseFreqLabel(config: unknown): string {
       return c.interval ? `Every ${c.interval}w · ${dayNames}` : `Weekly · ${dayNames}`;
     }
     if (c.frequency === "monthly") return `Monthly · day ${c.dayOfMonth ?? 1}`;
-    if (c.type) return c.type;
+    if (c.type) return String(c.type);
     return typeof config === "string" ? config : JSON.stringify(config);
   } catch {
     return typeof config === "string" ? config : "—";
