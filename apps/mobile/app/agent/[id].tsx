@@ -398,6 +398,67 @@ function StatCard({ label, value, isText }: { label: string; value: number | str
   );
 }
 
+// ── Upgrade Banner ────────────────────────────────────────────────────────────
+
+function UpgradeBanner({ agentId, serverUrl }: { agentId: string; serverUrl: string | null }) {
+  const [requesting, setRequesting] = useState(false);
+  const [requested, setRequested] = useState(false);
+
+  const handleRequestUpgrade = async () => {
+    if (!serverUrl) return;
+    setRequesting(true);
+    try {
+      const cookie = await getStoredCookie();
+      const res = await fetch(`${serverUrl}/api/agents/${agentId}/request-config-upgrade`, {
+        method: "POST",
+        headers: cookie ? { Cookie: cookie } : {},
+      });
+      if (res.ok) {
+        setRequested(true);
+      } else {
+        Alert.alert("Error", "Could not create upgrade task. Try again.");
+      }
+    } catch {
+      Alert.alert("Error", "Network error. Try again.");
+    } finally {
+      setRequesting(false);
+    }
+  };
+
+  return (
+    <View style={{ backgroundColor: "#fffbeb", borderRadius: 12, borderWidth: 1, borderColor: "#fde68a", padding: 14, gap: 10 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <Ionicons name="arrow-up-circle" size={22} color="#d97706" />
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: "#92400e" }}>Upgrade Available</Text>
+          <Text style={{ fontSize: 12, color: "#b45309", marginTop: 2 }}>
+            A new version of the agent runtime is available. Create an upgrade task for the agent to apply it on next heartbeat.
+          </Text>
+        </View>
+      </View>
+      {requested ? (
+        <View style={{ backgroundColor: "#dcfce7", borderRadius: 8, padding: 10, flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
+          <Text style={{ fontSize: 12, color: "#15803d", fontWeight: "600" }}>Upgrade task created. Agent will apply it on next heartbeat.</Text>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={{ backgroundColor: "#d97706", borderRadius: 8, paddingVertical: 9, alignItems: "center", opacity: requesting ? 0.6 : 1 }}
+          onPress={handleRequestUpgrade}
+          disabled={requesting}
+          activeOpacity={0.8}
+        >
+          {requesting ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>Request Upgrade</Text>
+          )}
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
 // ── Overview Tab ──────────────────────────────────────────────────────────────
 
 function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: ReturnType<typeof useRouter>; onRefresh: () => void }) {
@@ -405,13 +466,7 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
       {agent.upgradeAvailable && (
-        <View style={{ backgroundColor: "#fffbeb", borderRadius: 12, borderWidth: 1, borderColor: "#fde68a", padding: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <Ionicons name="arrow-up-circle" size={22} color="#d97706" />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: "#92400e" }}>Upgrade Available</Text>
-            <Text style={{ fontSize: 12, color: "#b45309", marginTop: 2 }}>A new version of the agent runtime is available. Update the agent to get the latest features and fixes.</Text>
-          </View>
-        </View>
+        <UpgradeBanner agentId={agent.id} serverUrl={serverUrl} />
       )}
 
       {agent.currentTask && agent.currentTaskRef && (

@@ -26,6 +26,8 @@ import {
   PROJECT_DOC_REVISIONS_QUERY,
   UPDATE_PROJECT,
   ARCHIVE_PROJECT,
+  RESTORE_PROJECT,
+  SET_PROJECT_SHUTDOWN,
   ADD_PROJECT_MEMBER,
   REMOVE_PROJECT_MEMBER,
   CREATE_PROJECT_DOC,
@@ -65,6 +67,7 @@ interface Project {
   name: string;
   description: string | null;
   status: string;
+  shutdownActive: boolean;
   createdAt: string;
   updatedAt: string;
   members: ProjectMember[];
@@ -178,6 +181,17 @@ function OverviewTab({ project, onRefresh }: { project: Project; onRefresh: () =
     <ScrollView
       contentContainerStyle={styles.tabContent}
     >
+      {/* Shutdown banner */}
+      {project.shutdownActive && (
+        <View style={{ backgroundColor: "#fffbeb", borderRadius: 10, borderWidth: 1, borderColor: "#fde68a", padding: 12, flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Ionicons name="pause-circle-outline" size={20} color="#d97706" />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#92400e" }}>Project Paused</Text>
+            <Text style={{ fontSize: 12, color: "#b45309", marginTop: 2 }}>New task creation and agent work are blocked.</Text>
+          </View>
+        </View>
+      )}
+
       {/* Status + Created */}
       <View style={styles.metaRow}>
         <View
@@ -1081,27 +1095,59 @@ export default function ProjectDetailScreen() {
   });
 
   const [, archiveProject] = useMutation(ARCHIVE_PROJECT);
+  const [, restoreProject] = useMutation(RESTORE_PROJECT);
+  const [, setProjectShutdown] = useMutation(SET_PROJECT_SHUTDOWN);
 
   const { data, fetching, error } = result;
   const project = data?.project;
 
-  function handleArchive() {
-    Alert.alert(
-      "Archive Project",
-      "This project will be archived and hidden from active lists. Tasks will remain accessible.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Archive",
-          style: "destructive",
-          onPress: async () => {
-            const res = await archiveProject({ id });
-            if (res.error) Alert.alert("Error", res.error.message ?? "Failed to archive");
-            else router.back();
-          },
+  function handleMoreActions() {
+    if (!project) return;
+    const isArchived = project.status === "archived";
+    const isShutdown = project.shutdownActive;
+
+    Alert.alert("Project Actions", undefined, [
+      {
+        text: isShutdown ? "Resume Project" : "Pause Project",
+        onPress: async () => {
+          const res = await setProjectShutdown({ projectId: id, active: !isShutdown });
+          if (res.error) Alert.alert("Error", res.error.message ?? "Failed to update");
+          else reexecute({ requestPolicy: "network-only" });
         },
-      ]
-    );
+      },
+      isArchived
+        ? {
+            text: "Restore Project",
+            onPress: async () => {
+              const res = await restoreProject({ id });
+              if (res.error) Alert.alert("Error", res.error.message ?? "Failed to restore");
+              else reexecute({ requestPolicy: "network-only" });
+            },
+          }
+        : {
+            text: "Archive Project",
+            style: "destructive" as const,
+            onPress: () => {
+              Alert.alert(
+                "Archive Project",
+                "This project will be archived and hidden from active lists.",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Archive",
+                    style: "destructive",
+                    onPress: async () => {
+                      const res = await archiveProject({ id });
+                      if (res.error) Alert.alert("Error", res.error.message ?? "Failed to archive");
+                      else router.back();
+                    },
+                  },
+                ]
+              );
+            },
+          },
+      { text: "Cancel", style: "cancel" },
+    ]);
   }
 
   useEffect(() => {
@@ -1116,14 +1162,14 @@ export default function ProjectDetailScreen() {
             >
               <Ionicons name="grid-outline" size={22} color="#2563eb" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleArchive} style={{ padding: 8 }}>
-              <Ionicons name="archive-outline" size={22} color="#6b7280" />
+            <TouchableOpacity onPress={handleMoreActions} style={{ padding: 8 }}>
+              <Ionicons name="ellipsis-horizontal" size={22} color="#6b7280" />
             </TouchableOpacity>
           </View>
         ),
       });
     }
-  }, [project?.name]);
+  }, [project?.name, project?.status, project?.shutdownActive]);
 
   if (fetching && !project) {
     return (
