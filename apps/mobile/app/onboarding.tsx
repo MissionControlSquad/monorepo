@@ -9,7 +9,7 @@ import {
   TextInput,
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../src/context/AuthContext";
@@ -63,6 +63,30 @@ const USE_CASES = [
 ] as const;
 
 // ── Agent Templates (subset of web's agent-wizard-templates) ──────────────────
+
+// Marvel-inspired default names matching the web app
+const DEFAULT_AGENT_NAMES: Record<string, string> = {
+  "squad-lead": "Fury",
+  researcher: "Banner",
+  "content-writer": "Parker",
+  "frontend-dev": "Spider",
+  "sdr-sales": "Deadpool",
+  "seo-strategist": "Storm",
+  "social-media": "Squirrel",
+  "ad-copywriter": "Rogue",
+  "backend-dev": "Hulk",
+  devops: "Thor",
+  "qa-testing": "Domino",
+  "outbound-strategist": "Gambit",
+  "deal-strategist": "Kingpin",
+  "pipeline-analyst": "Cable",
+  "data-analyst": "Jarvis",
+  "technical-writer": "Shuri",
+};
+
+function getAgentName(templateId: string, fallback: string): string {
+  return DEFAULT_AGENT_NAMES[templateId] ?? fallback;
+}
 
 interface AgentTemplate {
   id: string;
@@ -122,10 +146,11 @@ function buildDraftAgents(templateIds: readonly string[]): DraftAgent[] {
   const ids = templateIds.length > 0 ? templateIds : ["squad-lead"];
   return ids.map((tid) => {
     const tmpl = TEMPLATES[tid] ?? { id: tid, name: tid, emoji: "🤖", role: tid, personality: "", level: "specialist" };
+    const agentName = getAgentName(tmpl.id, tmpl.name);
     return {
       templateId: tmpl.id,
-      name: tmpl.name,
-      username: slugify(tmpl.name),
+      name: agentName,
+      username: slugify(agentName),
       role: tmpl.role,
       emoji: tmpl.emoji,
       personality: tmpl.personality,
@@ -140,10 +165,25 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { serverUrl } = useAuth();
+  const { resumeCategory } = useLocalSearchParams<{ resumeCategory?: string }>();
 
-  const [step, setStep] = useState<Step>("welcome");
-  const [selectedUseCase, setSelectedUseCase] = useState<typeof USE_CASES[number] | null>(null);
-  const [draftAgents, setDraftAgents] = useState<DraftAgent[]>([]);
+  // Resume from a saved category (user closed app mid-onboarding)
+  const initialStep: Step = (() => {
+    if (!resumeCategory) return "welcome";
+    const uc = USE_CASES.find((u) => u.id === resumeCategory);
+    return uc ? "preview" : "welcome";
+  })();
+
+  const [step, setStep] = useState<Step>(initialStep);
+  const [selectedUseCase, setSelectedUseCase] = useState<typeof USE_CASES[number] | null>(() => {
+    if (!resumeCategory) return null;
+    return USE_CASES.find((u) => u.id === resumeCategory) ?? null;
+  });
+  const [draftAgents, setDraftAgents] = useState<DraftAgent[]>(() => {
+    if (!resumeCategory) return [];
+    const uc = USE_CASES.find((u) => u.id === resumeCategory);
+    return uc ? buildDraftAgents(uc.templateIds) : [];
+  });
   const [results, setResults] = useState<CreationResult[]>([]);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
 
@@ -156,6 +196,15 @@ export default function OnboardingScreen() {
     setSelectedUseCase(uc);
     setDraftAgents(buildDraftAgents(uc.templateIds));
     setStep("preview");
+    // Save progress so resuming the app restores to preview step
+    if (serverUrl) {
+      fetch(`${serverUrl}/api/onboarding`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ categoryId: uc.id }),
+      }).catch(() => {});
+    }
   };
 
   const handleCreate = async () => {

@@ -20,9 +20,10 @@ export default function Index() {
 
     fetch(`${serverUrl}/api/onboarding`, { credentials: "include", headers })
       .then((r) => r.json())
-      .then((data: { completed?: boolean }) => {
+      .then((data: { completed?: boolean; categoryId?: string | null }) => {
         if (data.completed === false) {
-          router.replace("/onboarding");
+          const params = data.categoryId ? `?resumeCategory=${data.categoryId}` : "";
+          router.replace(`/onboarding${params}` as Parameters<typeof router.replace>[0]);
         } else {
           router.replace("/(dashboard)");
         }
