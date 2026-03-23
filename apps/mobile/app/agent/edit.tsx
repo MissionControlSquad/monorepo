@@ -149,6 +149,16 @@ export default function EditAgentScreen() {
             />
           </View>
 
+          {agent?.username ? (
+            <View style={styles.field}>
+              <Text style={styles.label}>Username</Text>
+              <View style={[styles.input, { backgroundColor: "#f3f4f6", justifyContent: "center" }]}>
+                <Text style={{ fontSize: 14, color: "#9ca3af" }}>@{agent.username}</Text>
+              </View>
+              <Text style={{ fontSize: 11, color: "#9ca3af" }}>Username cannot be changed after creation</Text>
+            </View>
+          ) : null}
+
           <View style={styles.field}>
             <Text style={styles.label}>Emoji</Text>
             <View style={styles.emojiGrid}>

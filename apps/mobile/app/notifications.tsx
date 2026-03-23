@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   UNDELIVERED_NOTIFICATIONS_QUERY,
   MARK_MANY_NOTIFICATIONS_DELIVERED,
+  MARK_NOTIFICATION_DELIVERED,
 } from "@agentcenter/graphql-client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -83,6 +84,7 @@ export default function NotificationsScreen() {
   });
 
   const [, markManyDelivered] = useMutation(MARK_MANY_NOTIFICATIONS_DELIVERED);
+  const [, markOneDelivered] = useMutation(MARK_NOTIFICATION_DELIVERED);
 
   const { data, fetching, error } = result;
   const notifications = data?.undeliveredNotifications ?? [];
@@ -154,11 +156,22 @@ export default function NotificationsScreen() {
         </View>
       }
       renderItem={({ item }) => (
-        <View style={styles.card}>
+        <TouchableOpacity
+          style={styles.card}
+          activeOpacity={0.85}
+          onPress={async () => {
+            // Mark as read then navigate to task if available
+            await markOneDelivered({ id: item.id });
+            reexecute({ requestPolicy: "network-only" });
+            if (item.task) {
+              router.push(`/task/${item.task.id}`);
+            }
+          }}
+        >
           {/* Unread dot */}
           <View style={styles.unreadDot} />
 
-          {/* Agent badge */}
+          {/* Agent badge + time + mark-read */}
           <View style={styles.agentRow}>
             <View style={styles.agentBadge}>
               <Text style={styles.agentEmoji}>
@@ -166,7 +179,20 @@ export default function NotificationsScreen() {
               </Text>
               <Text style={styles.agentName}>{item.mentionedAgent.name}</Text>
             </View>
-            <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
+              <TouchableOpacity
+                onPress={async (e) => {
+                  e.stopPropagation?.();
+                  await markOneDelivered({ id: item.id });
+                  reexecute({ requestPolicy: "network-only" });
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.markReadBtn}
+              >
+                <Text style={styles.markReadBtnText}>✓</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Content */}
@@ -174,26 +200,19 @@ export default function NotificationsScreen() {
 
           {/* Task link */}
           {item.task && (
-            <TouchableOpacity
-              style={styles.taskLink}
-              onPress={() => router.push(`/task/${item.task!.id}`)}
-              activeOpacity={0.7}
-            >
+            <View style={styles.taskLink}>
               <View
                 style={[
                   styles.statusDot,
-                  {
-                    backgroundColor:
-                      STATUS_COLORS[item.task.status] ?? "#6b7280",
-                  },
+                  { backgroundColor: STATUS_COLORS[item.task.status] ?? "#6b7280" },
                 ]}
               />
               <Text style={styles.taskLinkText} numberOfLines={1}>
                 #{item.task.taskNumber} · {item.task.title}
               </Text>
-            </TouchableOpacity>
+            </View>
           )}
-        </View>
+        </TouchableOpacity>
       )}
     />
   );
@@ -257,7 +276,9 @@ const styles = StyleSheet.create({
   },
   agentEmoji: { fontSize: 14 },
   agentName: { fontSize: 12, fontWeight: "600", color: "#374151" },
-  timeText: { fontSize: 11, color: "#9ca3af", marginRight: 16 },
+  timeText: { fontSize: 11, color: "#9ca3af" },
+  markReadBtn: { backgroundColor: "#f3f4f6", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
+  markReadBtnText: { fontSize: 11, color: "#6b7280", fontWeight: "600" },
 
   content: { fontSize: 14, color: "#374151", lineHeight: 20 },
 

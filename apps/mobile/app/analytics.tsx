@@ -16,6 +16,7 @@ import {
   AGENT_PRODUCTIVITY_QUERY,
   TASK_COMPLETION_TREND_QUERY,
   REVIEW_METRICS_QUERY,
+  AGENT_ACTIVITY_HEATMAP_QUERY,
 } from "@agentcenter/graphql-client";
 import { useTheme } from "../src/hooks/useTheme";
 
@@ -57,6 +58,12 @@ interface ReviewMetrics {
   clarification: number;
 }
 
+interface HeatmapCell {
+  dayOfWeek: number; // 0=Sun … 6=Sat
+  hour: number;      // 0-23
+  count: number;
+}
+
 // --------------- helpers ---------------
 const STATUS_COLORS: Record<string, string> = {
   inbox: "#6b7280",
@@ -85,6 +92,61 @@ function fmtDate(dateStr: string): string {
 }
 
 // --------------- sub-components ---------------
+
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// Show 6 hour buckets: 0-3, 4-7, 8-11, 12-15, 16-19, 20-23
+const HOUR_BUCKETS = [0, 4, 8, 12, 16, 20];
+const HOUR_LABELS = ["12a", "4a", "8a", "12p", "4p", "8p"];
+
+function ActivityHeatmap({ cells, colors }: { cells: HeatmapCell[]; colors: ReturnType<typeof useTheme>["colors"] }) {
+  // Build lookup: dayOfWeek → hourBucket → count
+  const lookup: Record<number, Record<number, number>> = {};
+  for (const cell of cells) {
+    const bucket = HOUR_BUCKETS.findIndex((h, i) => cell.hour >= h && (i === HOUR_BUCKETS.length - 1 || cell.hour < HOUR_BUCKETS[i + 1]));
+    if (bucket === -1) continue;
+    if (!lookup[cell.dayOfWeek]) lookup[cell.dayOfWeek] = {};
+    lookup[cell.dayOfWeek][bucket] = (lookup[cell.dayOfWeek][bucket] ?? 0) + cell.count;
+  }
+
+  const maxCount = Math.max(1, ...cells.map((c) => c.count));
+
+  return (
+    <View style={{ gap: 4 }}>
+      {/* Hour labels */}
+      <View style={{ flexDirection: "row", marginLeft: 32 }}>
+        {HOUR_LABELS.map((label) => (
+          <Text key={label} style={{ flex: 1, fontSize: 9, color: colors.textMuted, textAlign: "center" }}>{label}</Text>
+        ))}
+      </View>
+      {/* Grid rows */}
+      {DAY_LABELS.map((day, dayIdx) => (
+        <View key={day} style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+          <Text style={{ width: 30, fontSize: 10, color: colors.textMuted }}>{day}</Text>
+          {HOUR_BUCKETS.map((_, bucketIdx) => {
+            const count = lookup[dayIdx]?.[bucketIdx] ?? 0;
+            const intensity = count / maxCount;
+            return (
+              <View
+                key={bucketIdx}
+                style={{
+                  flex: 1,
+                  height: 14,
+                  borderRadius: 3,
+                  backgroundColor: count === 0
+                    ? colors.surfaceAlt
+                    : `rgba(37, 99, 235, ${Math.max(0.12, intensity * 0.9)})`,
+                }}
+              />
+            );
+          })}
+        </View>
+      ))}
+      <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 4, textAlign: "right" }}>
+        Darker = more agent actions
+      </Text>
+    </View>
+  );
+}
 
 function SectionTitle({ title, colors }: { title: string; colors: ReturnType<typeof useTheme>["colors"] }) {
   return (
@@ -233,6 +295,12 @@ export default function AnalyticsScreen() {
     requestPolicy: "cache-and-network",
   });
 
+  const [heatmapResult, refetchHeatmap] = useQuery<{ agentActivityHeatmap: HeatmapCell[] }>({
+    query: AGENT_ACTIVITY_HEATMAP_QUERY,
+    variables: { days: 30 },
+    requestPolicy: "cache-and-network",
+  });
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     const opts = { requestPolicy: "network-only" as const };
@@ -241,14 +309,16 @@ export default function AnalyticsScreen() {
     refetchProductivity(opts);
     refetchTrend(opts);
     refetchReview(opts);
+    refetchHeatmap(opts);
     setTimeout(() => setRefreshing(false), 1200);
-  }, [refetchStatus, refetchCycle, refetchProductivity, refetchTrend, refetchReview]);
+  }, [refetchStatus, refetchCycle, refetchProductivity, refetchTrend, refetchReview, refetchHeatmap]);
 
   const status = statusResult.data?.taskStatusCounts;
   const cycle = cycleResult.data?.taskCycleTimes;
   const agents = productivityResult.data?.agentProductivity ?? [];
   const trend = trendResult.data?.taskCompletionTrend ?? [];
   const review = reviewResult.data?.reviewMetrics;
+  const heatmapCells = heatmapResult.data?.agentActivityHeatmap ?? [];
 
   const isLoading =
     statusResult.fetching && !status &&
@@ -447,6 +517,16 @@ export default function AnalyticsScreen() {
                   </Text>
                 </View>
               ))}
+          </View>
+        </View>
+      )}
+
+      {/* ── Activity Heatmap ── */}
+      {heatmapCells.length > 0 && (
+        <View style={{ gap: 10 }}>
+          <SectionTitle title="Activity Heatmap (last 30 days)" colors={colors} />
+          <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border }}>
+            <ActivityHeatmap cells={heatmapCells} colors={colors} />
           </View>
         </View>
       )}

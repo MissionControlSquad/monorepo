@@ -23,7 +23,7 @@ import {
   CHILD_TASKS_QUERY,
   TASK_WORK_SUMMARY_QUERY,
 } from "@agentcenter/graphql-client";
-import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION, APPROVE_TASK, REJECT_TASK } from "@agentcenter/graphql-client";
+import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION, APPROVE_TASK, REJECT_TASK, SAVE_TASK_AS_TEMPLATE } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 import { MentionInput } from "../../src/components/MentionInput";
 
@@ -893,21 +893,45 @@ export default function TaskDetailScreen() {
   });
 
   const [, executeUpdate] = useMutation(UPDATE_TASK);
+  const [, saveAsTemplate] = useMutation(SAVE_TASK_AS_TEMPLATE);
   const { data, fetching, error } = result;
   const task = data?.task;
+
+  const handleMoreActions = (taskId: string) => {
+    Alert.alert("Task Actions", undefined, [
+      {
+        text: "Save as Template",
+        onPress: async () => {
+          const res = await saveAsTemplate({ taskId });
+          if (res.error) Alert.alert("Error", res.error.message ?? "Failed to save as template");
+          else Alert.alert("Saved", "Task saved as a reusable template.");
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
 
   useEffect(() => {
     if (task) {
       navigation.setOptions({
         title: `#${task.taskNumber} · ${task.title.slice(0, 30)}`,
         headerRight: () => (
-          <TouchableOpacity
-            onPress={() => router.push(`/task/edit?id=${task.id}` as Parameters<typeof router.push>[0])}
-            style={{ paddingHorizontal: 8, paddingVertical: 4 }}
-            activeOpacity={0.7}
-          >
-            <Text style={{ fontSize: 15, fontWeight: "600", color: "#2563eb" }}>Edit</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <TouchableOpacity
+              onPress={() => router.push(`/task/edit?id=${task.id}` as Parameters<typeof router.push>[0])}
+              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "600", color: "#2563eb" }}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleMoreActions(task.id)}
+              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 22, color: "#6b7280", lineHeight: 24 }}>•••</Text>
+            </TouchableOpacity>
+          </View>
         ),
       });
     }

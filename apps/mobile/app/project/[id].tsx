@@ -23,6 +23,7 @@ import {
   TASKS_BY_PROJECT_QUERY,
   PROJECT_DOCS_BY_PROJECT_QUERY,
   PROJECT_DOC_QUERY,
+  PROJECT_DOC_REVISIONS_QUERY,
   UPDATE_PROJECT,
   ARCHIVE_PROJECT,
   ADD_PROJECT_MEMBER,
@@ -92,6 +93,17 @@ interface ProjectDocFull {
   content: string;
   summary: string | null;
   updatedAt: string;
+}
+
+interface DocRevision {
+  id: string;
+  docId: string;
+  title: string;
+  summary: string | null;
+  content: string;
+  editAction: string | null;
+  createdAt: string;
+  editedBy: { id: string; name: string; identityEmoji: string | null } | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -633,14 +645,24 @@ function DocViewModal({
   onEdited: () => void;
 }) {
   const [showEdit, setShowEdit] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [selectedRevision, setSelectedRevision] = useState<DocRevision | null>(null);
+
   const [result, reexecute] = useQuery<{ projectDoc: ProjectDocFull }>({
     query: PROJECT_DOC_QUERY,
     variables: { id: docId },
     pause: !visible || !docId,
     requestPolicy: "cache-and-network",
   });
+  const [revisionsResult] = useQuery<{ projectDocRevisions: DocRevision[] }>({
+    query: PROJECT_DOC_REVISIONS_QUERY,
+    variables: { docId },
+    pause: !showHistory || !docId,
+    requestPolicy: "cache-and-network",
+  });
 
   const doc = result.data?.projectDoc;
+  const revisions = revisionsResult.data?.projectDocRevisions ?? [];
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -650,17 +672,76 @@ function DocViewModal({
             <Ionicons name="close" size={22} color="#374151" />
           </TouchableOpacity>
           <Text style={[styles.modalTitle, { flex: 1, textAlign: "center" }]} numberOfLines={1}>
-            {doc?.title ?? "Loading…"}
+            {selectedRevision ? `v${revisions.length - revisions.indexOf(selectedRevision)} — ${selectedRevision.title}` : (doc?.title ?? "Loading...")}
           </Text>
-          <TouchableOpacity
-            onPress={() => setShowEdit(true)}
-            style={styles.modalClose}
-            disabled={!doc}
-          >
-            <Text style={{ color: "#2563eb", fontSize: 15, fontWeight: "600" }}>Edit</Text>
-          </TouchableOpacity>
+          {selectedRevision ? (
+            <TouchableOpacity onPress={() => setSelectedRevision(null)} style={styles.modalClose}>
+              <Text style={{ color: "#6b7280", fontSize: 14 }}>Back</Text>
+            </TouchableOpacity>
+          ) : showHistory ? (
+            <TouchableOpacity onPress={() => setShowHistory(false)} style={styles.modalClose}>
+              <Text style={{ color: "#6b7280", fontSize: 14 }}>Back</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ flexDirection: "row" }}>
+              <TouchableOpacity onPress={() => setShowHistory(true)} style={[styles.modalClose, { marginRight: 0 }]}>
+                <Ionicons name="time-outline" size={20} color="#6b7280" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowEdit(true)} style={styles.modalClose} disabled={!doc}>
+                <Text style={{ color: "#2563eb", fontSize: 15, fontWeight: "600" }}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-        {result.fetching ? (
+
+        {selectedRevision ? (
+          <ScrollView contentContainerStyle={styles.docContent}>
+            <View style={{ backgroundColor: "#fffbeb", borderRadius: 8, padding: 10, marginBottom: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Ionicons name="information-circle-outline" size={16} color="#d97706" />
+              <Text style={{ fontSize: 12, color: "#92400e", flex: 1 }}>
+                Viewing past revision — {new Date(selectedRevision.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                {selectedRevision.editedBy ? ` by ${selectedRevision.editedBy.identityEmoji ?? ""} ${selectedRevision.editedBy.name}` : ""}
+              </Text>
+            </View>
+            {selectedRevision.summary ? <Text style={styles.docSummary}>{selectedRevision.summary}</Text> : null}
+            <Text style={styles.docBody}>{selectedRevision.content}</Text>
+          </ScrollView>
+        ) : showHistory ? (
+          revisionsResult.fetching ? (
+            <View style={styles.center}><ActivityIndicator size="large" color="#2563eb" /></View>
+          ) : revisions.length === 0 ? (
+            <View style={styles.center}><Text style={styles.emptyText}>No revision history</Text></View>
+          ) : (
+            <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
+              {revisions.map((rev, idx) => (
+                <TouchableOpacity
+                  key={rev.id}
+                  style={{ backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: "#e5e7eb", padding: 14, gap: 4 }}
+                  onPress={() => setSelectedRevision(rev)}
+                  activeOpacity={0.75}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#111827" }}>
+                      Revision {revisions.length - idx}
+                      {idx === 0 && <Text style={{ color: "#16a34a", fontWeight: "600" }}> (Latest)</Text>}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#9ca3af" }}>
+                      {new Date(rev.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </Text>
+                  </View>
+                  {rev.editedBy && (
+                    <Text style={{ fontSize: 12, color: "#6b7280" }}>
+                      {rev.editedBy.identityEmoji ?? ""} {rev.editedBy.name}
+                    </Text>
+                  )}
+                  {rev.editAction && (
+                    <Text style={{ fontSize: 11, color: "#9ca3af", fontStyle: "italic" }}>{rev.editAction}</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )
+        ) : result.fetching ? (
           <View style={styles.center}>
             <ActivityIndicator size="large" color="#2563eb" />
           </View>
