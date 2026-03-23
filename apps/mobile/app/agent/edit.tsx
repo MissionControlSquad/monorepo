@@ -56,11 +56,15 @@ export default function EditAgentScreen() {
   const [emoji, setEmoji] = useState("🤖");
   const [personality, setPersonality] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   const [result] = useQuery({
     query: AGENT_QUERY,
     variables: { id },
     requestPolicy: "cache-first",
+    pause: !mounted,
   });
 
   const [{ fetching: saving }, updateProfile] = useMutation(UPDATE_AGENT_PROFILE);

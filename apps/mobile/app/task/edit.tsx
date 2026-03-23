@@ -77,11 +77,15 @@ export default function EditTaskScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   const [taskResult] = useQuery<{ task: Task | null }>({
     query: TASK_QUERY,
     variables: { id },
     requestPolicy: "cache-first",
+    pause: !mounted,
   });
 
   const task = taskResult.data?.task;
