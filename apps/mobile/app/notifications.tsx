@@ -8,42 +8,14 @@ import {
   RefreshControl,
   Alert,
 } from "react-native";
-import { useQuery, useMutation } from "urql";
+import { useMutation } from "urql";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  UNDELIVERED_NOTIFICATIONS_QUERY,
   MARK_MANY_NOTIFICATIONS_DELIVERED,
   MARK_NOTIFICATION_DELIVERED,
 } from "@agentcenter/graphql-client";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface AgentRef {
-  id: string;
-  name: string;
-  identityEmoji: string | null;
-}
-
-interface TaskRef {
-  id: string;
-  title: string;
-  taskNumber: number;
-  status: string;
-}
-
-interface Notification {
-  id: string;
-  mentionedAgentId: string;
-  content: string;
-  taskId: string | null;
-  messageId: string | null;
-  delivered: boolean;
-  deliveredAt: string | null;
-  createdAt: string;
-  mentionedAgent: AgentRef;
-  task: TaskRef | null;
-}
+import { useNotifications } from "../src/context/NotificationCountContext";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -76,18 +48,10 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [result, reexecute] = useQuery<{
-    undeliveredNotifications: Notification[];
-  }>({
-    query: UNDELIVERED_NOTIFICATIONS_QUERY,
-    requestPolicy: "cache-and-network",
-  });
+  const { notifications, fetching, error, reexecute } = useNotifications();
 
   const [, markManyDelivered] = useMutation(MARK_MANY_NOTIFICATIONS_DELIVERED);
   const [, markOneDelivered] = useMutation(MARK_NOTIFICATION_DELIVERED);
-
-  const { data, fetching, error } = result;
-  const notifications = data?.undeliveredNotifications ?? [];
 
   async function handleMarkAllRead() {
     if (notifications.length === 0) return;

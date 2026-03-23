@@ -4,6 +4,7 @@ import { Provider } from "urql";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
 import { DrawerProvider } from "../src/context/DrawerContext";
+import { NotificationCountProvider } from "../src/context/NotificationCountContext";
 import { AppDrawer } from "../src/components/AppDrawer";
 import { OfflineBanner } from "../src/components/OfflineBanner";
 import { useTheme } from "../src/hooks/useTheme";
@@ -59,6 +60,7 @@ function RootLayoutNav() {
   // Full app wrapped in urql Provider so GraphQL queries work.
   return (
     <Provider value={urqlClient}>
+      <NotificationCountProvider>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <OfflineBanner />
         <Stack
@@ -100,6 +102,7 @@ function RootLayoutNav() {
         </Stack>
         <AppDrawer />
       </View>
+      </NotificationCountProvider>
     </Provider>
   );
 }
