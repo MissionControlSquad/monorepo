@@ -7,11 +7,11 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
-import { useQuery } from "urql";
+import { useQuery, useSubscription } from "urql";
 import { useRouter } from "expo-router";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ACTIVITIES_CONNECTION_QUERY } from "@agentcenter/graphql-client";
+import { ACTIVITIES_CONNECTION_QUERY, ACTIVITY_CREATED_SUBSCRIPTION } from "@agentcenter/graphql-client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -93,6 +93,8 @@ export default function ActivityScreen() {
   const [after, setAfter] = useState<string | undefined>(undefined);
   const [accumulated, setAccumulated] = useState<Activity[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [liveItems, setLiveItems] = useState<Activity[]>([]);
+  const seenIds = useRef(new Set<string>());
 
   const [result, reexecute] = useQuery<{ activitiesConnection: ActivitiesConnection }>({
     query: ACTIVITIES_CONNECTION_QUERY,
@@ -100,22 +102,41 @@ export default function ActivityScreen() {
     requestPolicy: "cache-and-network",
   });
 
+  useSubscription(
+    { query: ACTIVITY_CREATED_SUBSCRIPTION },
+    (_prev, data: { activityCreated: Activity }) => {
+      const item = data?.activityCreated;
+      if (item && !seenIds.current.has(item.id)) {
+        seenIds.current.add(item.id);
+        setLiveItems((prev) => [item, ...prev]);
+      }
+      return data;
+    },
+  );
+
   const { data, fetching, error } = result;
   const connection = data?.activitiesConnection;
   const pageFetched = connection?.activities ?? [];
   const hasMore = connection?.hasMore ?? false;
 
-  // Merge page into accumulated list (avoid duplicates)
+  // Merge live (real-time) items on top, then paginated items below
   const displayed: Activity[] = (() => {
-    if (pageFetched.length === 0) return accumulated;
-    const ids = new Set(accumulated.map((a) => a.id));
-    const newOnes = pageFetched.filter((a) => !ids.has(a.id));
-    return [...accumulated, ...newOnes];
+    const base: Activity[] = (() => {
+      if (pageFetched.length === 0) return accumulated;
+      const ids = new Set(accumulated.map((a) => a.id));
+      const newOnes = pageFetched.filter((a) => !ids.has(a.id));
+      return [...accumulated, ...newOnes];
+    })();
+    const baseIds = new Set(base.map((a) => a.id));
+    const newLive = liveItems.filter((a) => !baseIds.has(a.id));
+    return [...newLive, ...base];
   })();
 
   function handleRefresh() {
     setAfter(undefined);
     setAccumulated([]);
+    setLiveItems([]);
+    seenIds.current.clear();
     reexecute({ requestPolicy: "network-only" });
   }
 

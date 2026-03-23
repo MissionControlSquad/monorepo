@@ -80,3 +80,31 @@ export const ON_NOTIFICATION = gql`
     }
   }
 `;
+
+export const ACTIVITY_CREATED_SUBSCRIPTION = gql`
+  subscription ActivityCreated($projectId: String) {
+    activityCreated(projectId: $projectId) {
+      id
+      type
+      profileId
+      taskId
+      projectId
+      message
+      metadata
+      createdAt
+      profile {
+        id
+        displayName
+        username
+        avatarUrl
+        agentId
+      }
+      task {
+        id
+        title
+        taskNumber
+        status
+      }
+    }
+  }
+`;
