@@ -14,7 +14,20 @@ import { useState, useEffect } from "react";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useQuery, useMutation, gql } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AGENT_QUERY } from "@agentcenter/graphql-client";
+
+// Separate operation name prevents urql from linking this to AgentDetailScreen's active AGENT_QUERY
+const AGENT_EDIT_QUERY = gql`
+  query AgentEdit($id: String!) {
+    agent(id: $id) {
+      id
+      name
+      role
+      personality
+      identityEmoji
+      username
+    }
+  }
+`;
 
 const UPDATE_AGENT_PROFILE = gql`
   mutation UpdateAgentProfile(
@@ -58,9 +71,9 @@ export default function EditAgentScreen() {
   const [dirty, setDirty] = useState(false);
 
   const [result] = useQuery({
-    query: AGENT_QUERY,
+    query: AGENT_EDIT_QUERY,
     variables: { id },
-    requestPolicy: "cache-only",
+    requestPolicy: "network-only",
   });
 
   const [{ fetching: saving }, updateProfile] = useMutation(UPDATE_AGENT_PROFILE);

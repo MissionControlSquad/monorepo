@@ -15,14 +15,43 @@ import {
 import { useState, useEffect } from "react";
 import { useRouter, useLocalSearchParams, useNavigation } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useMutation, useQuery } from "urql";
+import { useMutation, useQuery, gql } from "urql";
 import {
-  TASK_QUERY,
   UPDATE_TASK,
   PROFILES_QUERY,
   TASKS_QUERY,
   PROJECTS_QUERY,
 } from "@agentcenter/graphql-client";
+
+// Separate operation name prevents urql from linking this to TaskDetailScreen's active TASK_QUERY
+const TASK_EDIT_QUERY = gql`
+  query TaskEdit($id: String!) {
+    task(id: $id) {
+      id
+      title
+      description
+      status
+      priority
+      taskNumber
+      dueDate
+      tags
+      parentTaskId
+      blockedByTaskId
+      projectId
+      assignees {
+        id
+        profileId
+        profile {
+          id
+          displayName
+          username
+          avatarUrl
+          agent { identityEmoji }
+        }
+      }
+    }
+  }
+`;
 import { Avatar } from "../../src/components/Avatar";
 import { useTheme } from "../../src/hooks/useTheme";
 
@@ -84,9 +113,9 @@ export default function EditTaskScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const [taskResult] = useQuery<{ task: Task | null }>({
-    query: TASK_QUERY,
+    query: TASK_EDIT_QUERY,
     variables: { id },
-    requestPolicy: "cache-only",
+    requestPolicy: "network-only",
   });
 
   const task = taskResult.data?.task;
