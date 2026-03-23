@@ -23,32 +23,10 @@ export default function LoginScreen() {
   const { onLogin } = useAuth();
 
   const handleForgotPassword = () => {
-    const url = serverUrl.trim();
-    if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) {
-      Alert.alert("Server URL required", "Enter your server URL first so we know where to send the reset.");
-      return;
-    }
-    Alert.prompt(
-      "Reset Password",
-      "Enter your username to request a password reset token.",
-      async (inputUsername) => {
-        if (!inputUsername?.trim()) return;
-        try {
-          setLoading(true);
-          // The web app's reset-password route expects a token, not a request flow.
-          // On mobile, we guide the user to the web app for the full reset flow.
-          Alert.alert(
-            "Password Reset",
-            `Open ${url} in a browser and use the "Forgot password" link on the login page to receive a reset token via your admin setup.`,
-            [{ text: "OK" }]
-          );
-        } finally {
-          setLoading(false);
-        }
-      },
-      "plain-text",
-      username.trim()
-    );
+    router.push({
+      pathname: "/auth/reset-password",
+      params: serverUrl.trim() ? { serverUrl: serverUrl.trim() } : {},
+    });
   };
 
   const handleLogin = async () => {

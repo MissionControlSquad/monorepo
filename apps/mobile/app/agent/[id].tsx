@@ -404,6 +404,16 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
   const { serverUrl } = useAuth();
   return (
     <ScrollView contentContainerStyle={styles.tabContent}>
+      {agent.upgradeAvailable && (
+        <View style={{ backgroundColor: "#fffbeb", borderRadius: 12, borderWidth: 1, borderColor: "#fde68a", padding: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Ionicons name="arrow-up-circle" size={22} color="#d97706" />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: "#92400e" }}>Upgrade Available</Text>
+            <Text style={{ fontSize: 12, color: "#b45309", marginTop: 2 }}>A new version of the agent runtime is available. Update the agent to get the latest features and fixes.</Text>
+          </View>
+        </View>
+      )}
+
       {agent.currentTask && agent.currentTaskRef && (
         <TouchableOpacity
           style={styles.currentTaskCard}
@@ -478,12 +488,19 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
       </View>
 
       {agent.cloudVm && (
-        <View style={styles.infoCard}>
-          <Text style={styles.sectionLabel}>Cloud VM</Text>
+        <TouchableOpacity
+          style={[styles.infoCard, { borderColor: "#dbeafe" }]}
+          onPress={() => router.push(`/cloud/${agent.cloudVm!.id}`)}
+          activeOpacity={0.75}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={styles.sectionLabel}>Cloud VM</Text>
+            <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+          </View>
           <InfoRow label="Name" value={agent.cloudVm.name} />
           <InfoRow label="Status" value={capLabel(agent.cloudVm.status)} />
           {agent.cloudVm.ipv4 && <InfoRow label="IP" value={agent.cloudVm.ipv4} mono />}
-        </View>
+        </TouchableOpacity>
       )}
 
       {agent.personality && (

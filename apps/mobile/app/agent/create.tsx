@@ -39,10 +39,12 @@ export default function CreateAgentScreen() {
   const { serverUrl } = useAuth();
 
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [role, setRole] = useState("");
   const [emoji, setEmoji] = useState("🤖");
   const [level, setLevel] = useState<Level>("mid");
   const [personality, setPersonality] = useState("");
+  const [workspacePath, setWorkspacePath] = useState("");
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState<CreatedAgent | null>(null);
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
@@ -68,6 +70,8 @@ export default function CreateAgentScreen() {
           identityEmoji: emoji,
           level,
           personality: personality.trim() || undefined,
+          username: username.trim() || undefined,
+          workspacePath: workspacePath.trim() || undefined,
         }),
       });
 
@@ -200,6 +204,19 @@ export default function CreateAgentScreen() {
           </View>
 
           <View style={styles.field}>
+            <Text style={styles.label}>Username <Text style={styles.optional}>(optional)</Text></Text>
+            <TextInput
+              style={styles.input}
+              value={username}
+              onChangeText={(t) => setUsername(t.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}
+              placeholder="e.g. aria-dev"
+              placeholderTextColor="#9ca3af"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.field}>
             <Text style={styles.label}>Emoji</Text>
             <View style={styles.emojiGrid}>
               {EMOJI_PRESETS.map((e) => (
@@ -253,6 +270,24 @@ export default function CreateAgentScreen() {
           />
         </View>
 
+        {/* Workspace */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Workspace</Text>
+          <View style={styles.field}>
+            <Text style={styles.label}>Workspace Path <Text style={styles.optional}>(optional)</Text></Text>
+            <Text style={styles.hint}>Absolute path to the directory this agent will work in.</Text>
+            <TextInput
+              style={styles.input}
+              value={workspacePath}
+              onChangeText={setWorkspacePath}
+              placeholder="e.g. /home/aria/workspace"
+              placeholderTextColor="#9ca3af"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        </View>
+
         <TouchableOpacity
           style={[styles.primaryBtn, (!name.trim() || !role.trim() || loading) && styles.primaryBtnDisabled]}
           onPress={handleCreate}
@@ -288,6 +323,7 @@ const styles = StyleSheet.create({
   field: { gap: 6 },
   label: { fontSize: 13, fontWeight: "600", color: "#374151" },
   required: { color: "#dc2626" },
+  optional: { color: "#9ca3af", fontWeight: "400" },
   input: {
     backgroundColor: "#f9fafb",
     borderWidth: 1,

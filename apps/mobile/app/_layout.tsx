@@ -48,6 +48,7 @@ function RootLayoutNav() {
         }}
       >
         <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+        <Stack.Screen name="auth/reset-password" options={{ title: "Reset Password" }} />
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />
       </Stack>
@@ -70,6 +71,7 @@ function RootLayoutNav() {
         >
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+          <Stack.Screen name="auth/reset-password" options={{ title: "Reset Password" }} />
           <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />
           <Stack.Screen name="task/[id]" options={{ title: "Task Details" }} />
           <Stack.Screen name="task/create" options={{ title: "New Task", presentation: "modal" }} />
@@ -94,6 +96,7 @@ function RootLayoutNav() {
           <Stack.Screen name="settings" options={{ title: "Settings", presentation: "modal" }} />
           <Stack.Screen name="cloud" options={{ title: "Cloud VMs" }} />
           <Stack.Screen name="cloud/[id]" options={{ title: "VM" }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack>
         <AppDrawer />
       </View>
