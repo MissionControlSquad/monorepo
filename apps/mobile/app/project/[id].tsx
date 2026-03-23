@@ -164,7 +164,6 @@ function OverviewTab({ project, onRefresh }: { project: Project; onRefresh: () =
 
   return (
     <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.tabContent}
     >
       {/* Status + Created */}
@@ -348,7 +347,6 @@ function TasksTab({ projectId }: { projectId: string }) {
         <FlatList
           data={tasks}
           keyExtractor={(t) => t.id}
-          contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={[styles.tabContent, tasks.length === 0 && styles.emptyFlex]}
           ListEmptyComponent={
             <View style={styles.emptyState}>
@@ -565,7 +563,6 @@ function MembersTab({
       <FlatList
         data={project.members}
         keyExtractor={(m) => m.id}
-        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[
           styles.tabContent,
           { paddingBottom: insets.bottom + 16 },
@@ -929,7 +926,6 @@ function DocsTab({ projectId }: { projectId: string }) {
         <FlatList
           data={docs}
           keyExtractor={(d) => d.id}
-          contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={[styles.tabContent, docs.length === 0 && styles.emptyFlex]}
           ListEmptyComponent={
             <View style={styles.emptyState}>

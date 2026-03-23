@@ -356,7 +356,7 @@ function StatCard({ label, value, isText }: { label: string; value: number | str
 function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: ReturnType<typeof useRouter>; onRefresh: () => void }) {
   const { serverUrl } = useAuth();
   return (
-    <ScrollView contentContainerStyle={styles.tabContent} contentInsetAdjustmentBehavior="automatic">
+    <ScrollView contentContainerStyle={styles.tabContent}>
       {agent.currentTask && agent.currentTaskRef && (
         <TouchableOpacity
           style={styles.currentTaskCard}
@@ -533,7 +533,6 @@ function QueueTab({
             ...grouped.other.map((i) => ({ ...i, _group: "Other" })),
           ]}
           keyExtractor={(item) => item.id}
-          contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={styles.listContent}
           renderItem={({ item, index, separators }) => {
             const prevGroup = index > 0 ? (items as (QueueItem & { _group?: string })[])[index - 1]?._group : null;
@@ -630,7 +629,6 @@ function ActivityTab({ actions, fetching, onRefresh, router }: {
     <FlatList
       data={actions}
       keyExtractor={(a) => a.id}
-      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.listContent}
       renderItem={({ item }) => {
         const icon = ACTION_ICONS[item.actionType] ?? "⚡";
@@ -673,7 +671,6 @@ function HistoryTab({ history, fetching, onRefresh }: {
     <FlatList
       data={history}
       keyExtractor={(h) => h.id}
-      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.listContent}
       renderItem={({ item }) => (
         <View style={styles.historyCard}>
@@ -731,7 +728,6 @@ function SetupTab({ agentId }: { agentId: string }) {
   return (
     <ScrollView
       contentContainerStyle={[styles.tabContent, { paddingBottom: insets.bottom + 16 }]}
-      contentInsetAdjustmentBehavior="automatic"
     >
       {/* Cron command */}
       {setup.cronCommand && (

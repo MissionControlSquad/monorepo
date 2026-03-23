@@ -314,7 +314,6 @@ function OverviewTab({ task, onStatusChange }: { task: Task; onStatusChange: () 
   return (
     <ScrollView
       contentContainerStyle={styles.tabContent}
-      contentInsetAdjustmentBehavior="automatic"
     >
       {/* Title */}
       <Text style={styles.title}>{task.title}</Text>
@@ -711,7 +710,6 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
   return (
     <ScrollView
       contentContainerStyle={styles.tabContent}
-      contentInsetAdjustmentBehavior="automatic"
     >
       {deliverables.map((d) => (
         <TouchableOpacity
