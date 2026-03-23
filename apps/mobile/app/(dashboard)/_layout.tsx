@@ -38,6 +38,9 @@ export default function DashboardLayout() {
           ),
           headerRight: () => (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+              <TouchableOpacity onPress={() => router.push("/search")} style={{ padding: 8 }}>
+                <Ionicons name="search-outline" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => router.push("/notifications")} style={{ padding: 8 }}>
                 <Ionicons name="notifications-outline" size={24} color={colors.textSecondary} />
               </TouchableOpacity>

@@ -28,6 +28,7 @@ import {
   ADD_PROJECT_MEMBER,
   REMOVE_PROJECT_MEMBER,
   CREATE_PROJECT_DOC,
+  UPDATE_PROJECT_DOC,
   DELETE_PROJECT_DOC,
   PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
@@ -624,12 +625,15 @@ function DocViewModal({
   docId,
   visible,
   onClose,
+  onEdited,
 }: {
   docId: string;
   visible: boolean;
   onClose: () => void;
+  onEdited: () => void;
 }) {
-  const [result] = useQuery<{ projectDoc: ProjectDocFull }>({
+  const [showEdit, setShowEdit] = useState(false);
+  const [result, reexecute] = useQuery<{ projectDoc: ProjectDocFull }>({
     query: PROJECT_DOC_QUERY,
     variables: { id: docId },
     pause: !visible || !docId,
@@ -642,11 +646,18 @@ function DocViewModal({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.modalContainer}>
         <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle} numberOfLines={1}>
-            {doc?.title ?? "Loading…"}
-          </Text>
           <TouchableOpacity onPress={onClose} style={styles.modalClose}>
             <Ionicons name="close" size={22} color="#374151" />
+          </TouchableOpacity>
+          <Text style={[styles.modalTitle, { flex: 1, textAlign: "center" }]} numberOfLines={1}>
+            {doc?.title ?? "Loading…"}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setShowEdit(true)}
+            style={styles.modalClose}
+            disabled={!doc}
+          >
+            <Text style={{ color: "#2563eb", fontSize: 15, fontWeight: "600" }}>Edit</Text>
           </TouchableOpacity>
         </View>
         {result.fetching ? (
@@ -666,6 +677,116 @@ function DocViewModal({
           </View>
         )}
       </View>
+      {doc && (
+        <EditDocModal
+          doc={doc}
+          visible={showEdit}
+          onClose={() => setShowEdit(false)}
+          onSaved={() => {
+            setShowEdit(false);
+            reexecute({ requestPolicy: "network-only" });
+            onEdited();
+          }}
+        />
+      )}
+    </Modal>
+  );
+}
+
+function EditDocModal({
+  doc,
+  visible,
+  onClose,
+  onSaved,
+}: {
+  doc: ProjectDocFull;
+  visible: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(doc.title);
+  const [content, setContent] = useState(doc.content);
+  const [summary, setSummary] = useState(doc.summary ?? "");
+  const [saving, setSaving] = useState(false);
+  const [, updateDoc] = useMutation(UPDATE_PROJECT_DOC);
+
+  useEffect(() => {
+    if (visible) {
+      setTitle(doc.title);
+      setContent(doc.content);
+      setSummary(doc.summary ?? "");
+    }
+  }, [visible, doc]);
+
+  async function handleSave() {
+    if (!title.trim()) {
+      Alert.alert("Error", "Title is required");
+      return;
+    }
+    if (!content.trim()) {
+      Alert.alert("Error", "Content is required");
+      return;
+    }
+    setSaving(true);
+    const res = await updateDoc({
+      id: doc.id,
+      title: title.trim(),
+      content: content.trim(),
+      summary: summary.trim() || undefined,
+    });
+    setSaving(false);
+    if (res.error) {
+      Alert.alert("Error", res.error.message);
+    } else {
+      onSaved();
+    }
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={onClose} style={styles.modalClose}>
+              <Ionicons name="close" size={22} color="#374151" />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { flex: 1, textAlign: "center" }]}>Edit Doc</Text>
+            <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.modalClose}>
+              {saving ? (
+                <ActivityIndicator size="small" color="#2563eb" />
+              ) : (
+                <Text style={{ color: "#2563eb", fontSize: 15, fontWeight: "600" }}>Save</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={styles.tabContent} keyboardShouldPersistTaps="handled">
+            <Text style={styles.editLabel}>Title</Text>
+            <TextInput
+              style={styles.editInput}
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Document title"
+              autoFocus
+            />
+            <Text style={[styles.editLabel, { marginTop: 12 }]}>Summary</Text>
+            <TextInput
+              style={styles.editInput}
+              value={summary}
+              onChangeText={setSummary}
+              placeholder="Brief summary…"
+            />
+            <Text style={[styles.editLabel, { marginTop: 12 }]}>Content (Markdown)</Text>
+            <TextInput
+              style={[styles.editInput, { height: 240 }]}
+              value={content}
+              onChangeText={setContent}
+              placeholder="# Heading&#10;&#10;Your content here..."
+              multiline
+              textAlignVertical="top"
+            />
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -853,6 +974,7 @@ function DocsTab({ projectId }: { projectId: string }) {
         docId={selectedDocId ?? ""}
         visible={selectedDocId !== null}
         onClose={() => setSelectedDocId(null)}
+        onEdited={() => reexecute({ requestPolicy: "network-only" })}
       />
       <AddDocModal
         projectId={projectId}

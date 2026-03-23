@@ -44,6 +44,7 @@ function RootLayoutNav() {
         <Stack.Screen name="task-templates" options={{ title: "Task Templates" }} />
         <Stack.Screen name="task/edit" options={{ title: "Edit Task" }} />
         <Stack.Screen name="feature-flags" options={{ title: "Feature Flags" }} />
+        <Stack.Screen name="search" options={{ title: "Search" }} />
         <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
         <Stack.Screen name="channels/create" options={{ title: "New Channel", presentation: "modal" }} />
         <Stack.Screen name="kanban/[projectId]" options={{ title: "Kanban" }} />

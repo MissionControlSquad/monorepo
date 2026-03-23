@@ -182,6 +182,7 @@ export function AppDrawer() {
 
         {/* Navigation items */}
         <View style={{ paddingVertical: 8 }}>
+          <DrawerItem icon="search-outline" label="Search" onPress={() => navigate("/search")} colors={colors} />
           <DrawerItem icon="person-outline" label="Profile" onPress={() => navigate("/profile")} colors={colors} />
           <DrawerItem icon="pulse-outline" label="Activity Feed" onPress={() => navigate("/activity")} colors={colors} />
           <DrawerItem icon="bar-chart-outline" label="Analytics" onPress={() => navigate("/analytics")} colors={colors} />
