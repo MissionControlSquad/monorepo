@@ -14,28 +14,17 @@ import { useRouter } from "expo-router";
 import { useState, useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { AGENTS_QUERY, SET_AGENT_ACTIVATION } from "@agentcenter/graphql-client";
-import { DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, humanizeLabel } from "@agentcenter/utils";
+import {
+  DEFAULT_AGENT_EMOJI,
+  getAgentStatusColor,
+  getAgentStatusLabel,
+  isAgentOnline,
+  filterAgentsBySetup,
+  type AgentSetupFilter,
+} from "@agentcenter/utils";
+import type { Agent } from "@agentcenter/types";
 
-interface Agent {
-  id: string;
-  name: string;
-  role: string;
-  status: string;
-  detailedStatus: string | null;
-  statusMessage: string | null;
-  currentTaskId: string | null;
-  currentTask: string | null;
-  identityEmoji: string | null;
-  level: string;
-  username: string;
-  lastHeartbeat: string | null;
-  setupStatus: string | null;
-  isOnVacation: boolean;
-  upgradeAvailable: boolean;
-  profile: { id: string; displayName: string; username: string; avatarUrl: string | null } | null;
-}
-
-type FilterTab = "all" | "active" | "pending" | "deactivated";
+type FilterTab = AgentSetupFilter;
 
 const FILTER_LABELS: Record<FilterTab, string> = {
   all: "All",
@@ -43,50 +32,6 @@ const FILTER_LABELS: Record<FilterTab, string> = {
   pending: "Pending",
   deactivated: "Deactivated",
 };
-
-const STATUS_COLOR: Record<string, string> = {
-  active: "#16a34a",
-  idle: "#6b7280",
-  blocked: "#dc2626",
-};
-
-const DETAILED_STATUS_COLOR: Record<string, string> = {
-  thinking: "#7c3aed", coding: "#2563eb", reviewing: "#4f46e5",
-  researching: "#d97706", deploying: "#ea580c", testing: "#0891b2",
-  writing: "#059669", waiting_review: "#d97706", waiting_input: "#d97706",
-  waiting_dependency: "#d97706",
-};
-
-function getStatusColor(agent: Agent): string {
-  if (agent.detailedStatus && DETAILED_STATUS_COLOR[agent.detailedStatus]) {
-    return DETAILED_STATUS_COLOR[agent.detailedStatus];
-  }
-  return STATUS_COLOR[agent.status] ?? DEFAULT_COLOR;
-}
-
-function getStatusLabel(agent: Agent): string {
-  if (agent.isOnVacation) return "On Vacation";
-  if (agent.detailedStatus) return humanizeLabel(agent.detailedStatus);
-  return agent.status.charAt(0).toUpperCase() + agent.status.slice(1);
-}
-
-function isOnline(agent: Agent): boolean {
-  if (!agent.lastHeartbeat) return false;
-  return new Date(agent.lastHeartbeat).getTime() > Date.now() - 2 * 60 * 1000;
-}
-
-function filterAgents(agents: Agent[], tab: FilterTab, search: string): Agent[] {
-  let list = agents;
-  if (tab === "active") list = list.filter((a) => a.setupStatus === "active");
-  else if (tab === "pending") list = list.filter((a) => a.setupStatus === "pending_setup");
-  else if (tab === "deactivated") list = list.filter((a) => a.setupStatus === "deactivated");
-
-  if (search.trim()) {
-    const q = search.trim().toLowerCase();
-    list = list.filter((a) => a.name.toLowerCase().includes(q) || a.role.toLowerCase().includes(q));
-  }
-  return list;
-}
 
 export default function AgentsScreen() {
   const router = useRouter();
@@ -103,7 +48,7 @@ export default function AgentsScreen() {
   const { data, fetching, error } = result;
   const allAgents = data?.agents ?? [];
 
-  const filtered = useMemo(() => filterAgents(allAgents, filter, search), [allAgents, filter, search]);
+  const filtered = useMemo(() => filterAgentsBySetup(allAgents, filter, search), [allAgents, filter, search]);
 
   const counts = useMemo(() => ({
     all: allAgents.length,
@@ -191,8 +136,8 @@ export default function AgentsScreen() {
           </Text>
         }
         renderItem={({ item }) => {
-          const online = isOnline(item);
-          const statusColor = getStatusColor(item);
+          const online = isAgentOnline(item.lastHeartbeat);
+          const statusColor = getAgentStatusColor(item);
           const isPending = item.setupStatus === "pending_setup";
           const isDeactivated = item.setupStatus === "deactivated";
 
@@ -234,7 +179,7 @@ export default function AgentsScreen() {
                 ) : (
                   <View style={[styles.statusBadge, { backgroundColor: (online ? statusColor : "#6b7280") + "22" }]}>
                     <Text style={[styles.statusText, { color: online ? statusColor : "#6b7280" }]}>
-                      {online ? getStatusLabel(item) : "Offline"}
+                      {online ? getAgentStatusLabel(item) : "Offline"}
                     </Text>
                   </View>
                 )}
