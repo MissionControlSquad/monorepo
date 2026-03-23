@@ -117,3 +117,18 @@ export function formatDueDate(dateStr: string): string {
   if (days === 1) return "Due tomorrow";
   return `Due in ${days}d`;
 }
+
+/**
+ * Generate up-to-2-character initials from a display name.
+ * "Alice Bob" → "AB", "Alice" → "A", "" → "?"
+ */
+export function generateInitials(displayName: string): string {
+  return (
+    displayName
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "?"
+  );
+}

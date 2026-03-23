@@ -147,6 +147,24 @@ export function resolveAllMentionHandles(content: string, maps: ResolveAllMentio
   });
 }
 
+// ── Inline @mention text-input helpers ────────────────────────
+
+/**
+ * Detect if the cursor is inside a mention: text ending with @word.
+ * Returns the partial username being typed (after @), or null.
+ */
+export function getMentionQuery(text: string): string | null {
+  const match = text.match(/@(\w*)$/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Replace the trailing @query with @username followed by a space.
+ */
+export function insertMentionHandle(text: string, username: string): string {
+  return text.replace(/@(\w*)$/, `@${username} `);
+}
+
 /** Regex to match @handle (single word after @) for conversion to id. */
 const HANDLE_REGEX = /@(\w+)/g;
 

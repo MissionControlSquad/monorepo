@@ -10,6 +10,7 @@ import { useQuery } from "urql";
 import { useState, useCallback } from "react";
 import { PROFILES_QUERY } from "@agentcenter/graphql-client";
 import { useTheme } from "../hooks/useTheme";
+import { getMentionQuery, insertMentionHandle } from "@agentcenter/utils";
 
 interface Profile {
   id: string;
@@ -17,22 +18,6 @@ interface Profile {
   username: string;
   avatarUrl: string | null;
   agent: { identityEmoji: string | null } | null;
-}
-
-/**
- * Detect if the user is currently typing a mention: text ending with @word
- * Returns the partial username being typed (after @), or null if not in mention mode.
- */
-function getMentionQuery(text: string): string | null {
-  const match = text.match(/@(\w*)$/);
-  return match ? match[1] : null;
-}
-
-/**
- * Replace the trailing @query with @username in the text.
- */
-function insertMention(text: string, username: string): string {
-  return text.replace(/@(\w*)$/, `@${username} `);
 }
 
 interface MentionInputProps extends Omit<TextInputProps, "value" | "onChangeText"> {
@@ -73,7 +58,7 @@ export function MentionInput({
 
   const handleSelect = useCallback(
     (username: string) => {
-      onChangeText(insertMention(value, username));
+      onChangeText(insertMentionHandle(value, username));
     },
     [value, onChangeText]
   );

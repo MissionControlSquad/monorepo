@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, View } from "react-native";
 import { useAuth } from "../src/context/AuthContext";
 import { getStoredCookie } from "../src/api/session";
 import { useEffect, useState } from "react";
+import { fetchLicenseStatus, fetchOnboardingStatus } from "@agentcenter/utils";
 
 export default function Index() {
   const { isLoading, isSignedIn, serverUrl } = useAuth();
@@ -18,10 +19,8 @@ export default function Index() {
     if (cookie) headers.Cookie = `mc_session=${cookie}`;
 
     // Check license first, then onboarding
-    fetch(`${serverUrl}/api/license`, { credentials: "include", headers })
-      .then((r) => r.json())
-      .then((license: { status?: string }) => {
-        const status = license.status ?? "active";
+    fetchLicenseStatus(serverUrl, headers)
+      .then(({ status }) => {
         if (status === "none" || status === "expired") {
           router.replace("/(dashboard)");
           Alert.alert(
@@ -34,11 +33,8 @@ export default function Index() {
           return Promise.reject("license-gate");
         }
       })
-      .then(() =>
-        fetch(`${serverUrl}/api/onboarding`, { credentials: "include", headers })
-          .then((r) => r.json())
-      )
-      .then((data: { completed?: boolean; categoryId?: string | null }) => {
+      .then(() => fetchOnboardingStatus(serverUrl, headers))
+      .then((data) => {
         if (data.completed === false) {
           const params = data.categoryId ? `?resumeCategory=${data.categoryId}` : "";
           router.replace(`/onboarding${params}` as Parameters<typeof router.replace>[0]);

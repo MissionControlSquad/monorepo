@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useRouter } from "expo-router";
 import { login } from "../../src/api/auth";
 import { useAuth } from "../../src/context/AuthContext";
+import { isValidServerUrl, checkServerSetup } from "@agentcenter/utils";
 
 type Mode = "url" | "login" | "setup";
 
@@ -39,17 +40,15 @@ export default function LoginScreen() {
       Alert.alert("Missing field", "Please enter your server URL.");
       return;
     }
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    if (!isValidServerUrl(url)) {
       Alert.alert("Invalid URL", "Server URL must start with http:// or https://");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await fetch(`${url}/api/auth/status`);
-      if (!res.ok) throw new Error(`Server returned ${res.status}`);
-      const data = await res.json();
-      setMode(data.setupComplete === false ? "setup" : "login");
+      const { setupComplete } = await checkServerSetup(url);
+      setMode(setupComplete ? "login" : "setup");
     } catch {
       Alert.alert("Connection failed", "Could not connect to the server. Check the URL and try again.");
     } finally {

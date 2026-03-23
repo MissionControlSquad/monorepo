@@ -1,5 +1,6 @@
 import { View, Text, Image, StyleSheet } from "react-native";
 import { useAuth } from "../context/AuthContext";
+import { generateInitials } from "@agentcenter/utils";
 
 interface AvatarProps {
   avatarUrl?: string | null;
@@ -36,12 +37,7 @@ export function Avatar({ avatarUrl, displayName, size = 32, emoji }: AvatarProps
     );
   }
 
-  const initials = displayName
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const initials = generateInitials(displayName);
 
   return (
     <View

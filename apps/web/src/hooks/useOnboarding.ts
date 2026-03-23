@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { Agent } from "@agentcenter/types";
+import { fetchOnboardingStatus } from "@agentcenter/utils";
 
 interface OnboardingState {
   /** True while agents or onboarding status are still loading */
@@ -22,8 +23,7 @@ export function useOnboarding(agents: Agent[] | undefined): OnboardingState {
   const [onboardingDone, setOnboardingDone] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
-    fetch("/api/onboarding")
-      .then((r) => r.json())
+    fetchOnboardingStatus("")
       .then((d) => setOnboardingDone(d.completed ?? false))
       .catch(() => setOnboardingDone(true)); // fail-open so the app isn't permanently locked
   }, []);
