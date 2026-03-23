@@ -53,8 +53,12 @@ const LICENSE_ID = "active";
 
 // ── Public Key (bundled, env, or fetched from license server) ────
 
+// Next.js standalone server calls process.chdir(__dirname) which changes CWD
+// to apps/web/ — but the writable data directory is at /app/data in Docker.
+// Use DATA_DIR env (set in Dockerfile/docker-compose) or fall back to ./data (dev).
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const BUNDLED_KEY_PATH = path.join(process.cwd(), "license-public.pem");
-const CACHED_KEY_PATH = path.join(process.cwd(), "data", "license-public.pem");
+const CACHED_KEY_PATH = path.join(DATA_DIR, "license-public.pem");
 let cachedPublicKey: string | null = null;
 
 function getPublicKey(): string | null {
