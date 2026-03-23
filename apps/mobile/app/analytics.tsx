@@ -17,6 +17,8 @@ import {
   TASK_COMPLETION_TREND_QUERY,
   REVIEW_METRICS_QUERY,
   AGENT_ACTIVITY_HEATMAP_QUERY,
+  AGENT_WORKLOAD_DISTRIBUTION_QUERY,
+  ACTIVITY_TREND_QUERY,
 } from "@agentcenter/graphql-client";
 import { useTheme } from "../src/hooks/useTheme";
 
@@ -62,6 +64,17 @@ interface HeatmapCell {
   dayOfWeek: number; // 0=Sun … 6=Sat
   hour: number;      // 0-23
   count: number;
+}
+
+interface WorkloadEntry {
+  agentId: string;
+  agentName: string;
+  inbox: number;
+  assigned: number;
+  inProgress: number;
+  review: number;
+  done: number;
+  blocked: number;
 }
 
 // --------------- helpers ---------------
@@ -301,6 +314,17 @@ export default function AnalyticsScreen() {
     requestPolicy: "cache-and-network",
   });
 
+  const [workloadResult, refetchWorkload] = useQuery<{ agentWorkloadDistribution: WorkloadEntry[] }>({
+    query: AGENT_WORKLOAD_DISTRIBUTION_QUERY,
+    requestPolicy: "cache-and-network",
+  });
+
+  const [activityTrendResult, refetchActivityTrend] = useQuery<{ activityTrend: TrendPoint[] }>({
+    query: ACTIVITY_TREND_QUERY,
+    variables: vars,
+    requestPolicy: "cache-and-network",
+  });
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     const opts = { requestPolicy: "network-only" as const };
@@ -310,8 +334,10 @@ export default function AnalyticsScreen() {
     refetchTrend(opts);
     refetchReview(opts);
     refetchHeatmap(opts);
+    refetchWorkload(opts);
+    refetchActivityTrend(opts);
     setTimeout(() => setRefreshing(false), 1200);
-  }, [refetchStatus, refetchCycle, refetchProductivity, refetchTrend, refetchReview, refetchHeatmap]);
+  }, [refetchStatus, refetchCycle, refetchProductivity, refetchTrend, refetchReview, refetchHeatmap, refetchWorkload, refetchActivityTrend]);
 
   const status = statusResult.data?.taskStatusCounts;
   const cycle = cycleResult.data?.taskCycleTimes;
@@ -319,6 +345,8 @@ export default function AnalyticsScreen() {
   const trend = trendResult.data?.taskCompletionTrend ?? [];
   const review = reviewResult.data?.reviewMetrics;
   const heatmapCells = heatmapResult.data?.agentActivityHeatmap ?? [];
+  const workload = workloadResult.data?.agentWorkloadDistribution ?? [];
+  const activityTrend = activityTrendResult.data?.activityTrend ?? [];
 
   const isLoading =
     statusResult.fetching && !status &&
@@ -527,6 +555,118 @@ export default function AnalyticsScreen() {
           <SectionTitle title="Activity Heatmap (last 30 days)" colors={colors} />
           <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border }}>
             <ActivityHeatmap cells={heatmapCells} colors={colors} />
+          </View>
+        </View>
+      )}
+
+      {/* ── Activity Trend ── */}
+      <View style={{ gap: 10 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <SectionTitle title="Activity Trend" colors={colors} />
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            {DAYS_OPTIONS.map((d) => (
+              <TouchableOpacity
+                key={d}
+                onPress={() => setDays(d)}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  backgroundColor: days === d ? colors.accent : colors.surfaceAlt,
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "600", color: days === d ? "#fff" : colors.textSecondary }}>
+                  {d}d
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+        <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border }}>
+          {activityTrendResult.fetching && !activityTrend.length ? (
+            <ActivityIndicator color={colors.accent} />
+          ) : activityTrend.length === 0 ? (
+            <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center" }}>No data</Text>
+          ) : (
+            <TrendChart data={activityTrend} colors={colors} />
+          )}
+        </View>
+      </View>
+
+      {/* ── Agent Workload Distribution ── */}
+      {workload.length > 0 && (
+        <View style={{ gap: 10 }}>
+          <SectionTitle title="Agent Workload" colors={colors} />
+          <View style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, overflow: "hidden" }}>
+            {/* Table header */}
+            <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.surfaceAlt }}>
+              <Text style={{ flex: 1, fontSize: 11, fontWeight: "700", color: colors.textMuted }}>Agent</Text>
+              <Text style={{ width: 36, fontSize: 11, fontWeight: "700", color: colors.textMuted, textAlign: "right" }}>📥</Text>
+              <Text style={{ width: 36, fontSize: 11, fontWeight: "700", color: colors.textMuted, textAlign: "right" }}>🔄</Text>
+              <Text style={{ width: 36, fontSize: 11, fontWeight: "700", color: colors.textMuted, textAlign: "right" }}>🔍</Text>
+              <Text style={{ width: 36, fontSize: 11, fontWeight: "700", color: colors.textMuted, textAlign: "right" }}>✅</Text>
+            </View>
+            {workload
+              .slice()
+              .sort((a, b) => (b.assigned + b.inProgress + b.review) - (a.assigned + a.inProgress + a.review))
+              .map((entry, i) => {
+                const active = entry.assigned + entry.inProgress + entry.review;
+                return (
+                  <View
+                    key={entry.agentId}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderTopWidth: i === 0 ? 0 : 1,
+                      borderTopColor: colors.borderAlt,
+                    }}
+                  >
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "500", color: colors.text }} numberOfLines={1}>
+                        {entry.agentName}
+                      </Text>
+                      {/* Mini stacked bar */}
+                      <View style={{ height: 4, borderRadius: 2, flexDirection: "row", overflow: "hidden", backgroundColor: colors.surfaceAlt }}>
+                        {active > 0 && (
+                          <>
+                            <View style={{ flex: entry.assigned, backgroundColor: "#2563eb" }} />
+                            <View style={{ flex: entry.inProgress, backgroundColor: "#d97706" }} />
+                            <View style={{ flex: entry.review, backgroundColor: "#7c3aed" }} />
+                          </>
+                        )}
+                      </View>
+                    </View>
+                    <Text style={{ width: 36, fontSize: 12, color: colors.textMuted, textAlign: "right", fontVariant: ["tabular-nums"] }}>
+                      {entry.inbox}
+                    </Text>
+                    <Text style={{ width: 36, fontSize: 12, color: "#d97706", textAlign: "right", fontVariant: ["tabular-nums"], fontWeight: "600" }}>
+                      {entry.inProgress}
+                    </Text>
+                    <Text style={{ width: 36, fontSize: 12, color: "#7c3aed", textAlign: "right", fontVariant: ["tabular-nums"], fontWeight: "600" }}>
+                      {entry.review}
+                    </Text>
+                    <Text style={{ width: 36, fontSize: 12, color: "#16a34a", textAlign: "right", fontVariant: ["tabular-nums"] }}>
+                      {entry.done}
+                    </Text>
+                  </View>
+                );
+              })}
+            {/* Legend */}
+            <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.surfaceAlt, flexWrap: "wrap" }}>
+              {[
+                { color: "#2563eb", label: "Assigned" },
+                { color: "#d97706", label: "In Progress" },
+                { color: "#7c3aed", label: "Review" },
+              ].map(({ color, label }) => (
+                <View key={label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />
+                  <Text style={{ fontSize: 10, color: colors.textMuted }}>{label}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         </View>
       )}

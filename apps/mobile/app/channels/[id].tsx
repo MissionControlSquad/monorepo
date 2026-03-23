@@ -17,7 +17,7 @@ import { useQuery, useMutation, useSubscription } from "urql";
 import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, CHANNEL_PINNED_MESSAGES_QUERY, ON_NEW_CHANNEL_MESSAGE, PROFILES_QUERY } from "@agentcenter/graphql-client";
+import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, CHANNEL_PINNED_MESSAGES_QUERY, ON_NEW_CHANNEL_MESSAGE, PROFILES_QUERY, SEARCH_CHANNEL_MESSAGES_QUERY } from "@agentcenter/graphql-client";
 import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_CHANNEL_MESSAGE_REACTION, UPDATE_CHANNEL_MESSAGE, DELETE_CHANNEL_MESSAGE, PIN_CHANNEL_MESSAGE, UNPIN_CHANNEL_MESSAGE, ADD_CHANNEL_MEMBER, REMOVE_CHANNEL_MEMBER, JOIN_CHANNEL, LEAVE_CHANNEL } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 import { MentionInput } from "../../src/components/MentionInput";
@@ -96,6 +96,8 @@ export default function ChannelDetailScreen() {
   const [pinnedOpen, setPinnedOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [profileSearch, setProfileSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const listRef = useRef<FlatList>(null);
 
   const [channelResult, reexecuteChannel] = useQuery<{ channel: Channel | null }>({
@@ -113,6 +115,13 @@ export default function ChannelDetailScreen() {
   const [pinnedResult] = useQuery<{ channelPinnedMessages: Message[] }>({
     query: CHANNEL_PINNED_MESSAGES_QUERY,
     variables: { channelId: id, limit: 50 },
+    requestPolicy: "cache-and-network",
+  });
+
+  const [searchResult] = useQuery<{ searchChannelMessages: Message[] }>({
+    query: SEARCH_CHANNEL_MESSAGES_QUERY,
+    variables: { channelId: id, query: searchQuery.trim(), limit: 50 },
+    pause: !searchOpen || searchQuery.trim().length < 2,
     requestPolicy: "cache-and-network",
   });
 
@@ -169,13 +178,26 @@ export default function ChannelDetailScreen() {
       navigation.setOptions({
         title: channel.name,
         headerRight: () => (
-          <TouchableOpacity onPress={() => setMembersOpen(true)} style={{ marginRight: 16, padding: 4 }}>
-            <Ionicons name="people-outline" size={22} color="#2563eb" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+            <TouchableOpacity
+              onPress={() => {
+                setSearchOpen((v) => {
+                  if (v) setSearchQuery("");
+                  return !v;
+                });
+              }}
+              style={{ padding: 8 }}
+            >
+              <Ionicons name={searchOpen ? "close" : "search-outline"} size={20} color="#2563eb" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setMembersOpen(true)} style={{ padding: 8 }}>
+              <Ionicons name="people-outline" size={22} color="#2563eb" />
+            </TouchableOpacity>
+          </View>
         ),
       });
     }
-  }, [channel, navigation, isMember]);
+  }, [channel, navigation, isMember, searchOpen]);
 
   useEffect(() => {
     if (messages.length > 0 && profileId) {
@@ -229,15 +251,41 @@ export default function ChannelDetailScreen() {
     );
   }
 
+  const searchMessages = searchResult.data?.searchChannelMessages ?? [];
+  const displayMessages = searchOpen && searchQuery.trim().length >= 2 ? searchMessages : messages;
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 88 + insets.bottom : 0}
     >
+      {/* Search bar */}
+      {searchOpen && (
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={16} color="#9ca3af" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search messages…"
+            placeholderTextColor="#9ca3af"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Ionicons name="close-circle" size={16} color="#9ca3af" />
+            </TouchableOpacity>
+          )}
+          {searchResult.fetching && <ActivityIndicator size="small" color="#2563eb" style={{ marginLeft: 4 }} />}
+        </View>
+      )}
       <FlatList
-        ref={listRef}
-        data={messages}
+        ref={searchOpen ? undefined : listRef}
+        data={displayMessages}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
@@ -258,7 +306,13 @@ export default function ChannelDetailScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No messages yet. Say hello!</Text>
+            <Text style={styles.emptyText}>
+              {searchOpen && searchQuery.trim().length >= 2
+                ? "No messages match your search"
+                : searchOpen
+                ? "Type at least 2 characters to search"
+                : "No messages yet. Say hello!"}
+            </Text>
           </View>
         }
         renderItem={({ item }) => {
@@ -665,6 +719,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f9fafb",
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f3f4f6",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: "#111827",
+    paddingVertical: 4,
   },
   center: {
     flex: 1,
