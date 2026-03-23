@@ -121,6 +121,9 @@ export default function ProjectsScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        directionalLockEnabled={true}
         style={styles.filterBar}
         contentContainerStyle={styles.filterContent}
       >
@@ -218,15 +221,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   filterBar: {
-    maxHeight: 48,
+    height: 52,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#f3f4f6",
   },
-  filterContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 8, flexDirection: "row" },
+  filterContent: { paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: "#f3f4f6",
   },

@@ -107,6 +107,9 @@ export default function TaskListScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        directionalLockEnabled={true}
         style={styles.filterBar}
         contentContainerStyle={styles.filterContent}
       >
@@ -172,9 +175,9 @@ const styles = StyleSheet.create({
   errorText: { color: "#dc2626", fontSize: 16 },
   retryText: { color: "#2563eb", fontSize: 14, fontWeight: "600" },
 
-  filterBar: { maxHeight: 48, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
-  filterContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 8, flexDirection: "row" },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: "#f3f4f6" },
+  filterBar: { height: 52, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  filterContent: { paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#f3f4f6" },
   chipActive: { backgroundColor: "#dbeafe" },
   chipText: { fontSize: 13, color: "#6b7280", fontWeight: "500" },
   chipTextActive: { color: "#2563eb", fontWeight: "600" },

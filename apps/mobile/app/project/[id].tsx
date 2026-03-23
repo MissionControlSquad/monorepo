@@ -309,6 +309,9 @@ function TasksTab({ projectId }: { projectId: string }) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        directionalLockEnabled={true}
         style={styles.filterBar}
         contentContainerStyle={styles.filterContent}
       >
@@ -1122,11 +1125,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
+    minHeight: 46,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 13,
     alignItems: "center",
+    justifyContent: "center",
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
   },
@@ -1225,11 +1230,11 @@ const styles = StyleSheet.create({
   avatarMoreText: { fontSize: 12, fontWeight: "600", color: "#6b7280" },
 
   // Tasks tab
-  filterBar: { maxHeight: 48, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
-  filterContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 8, flexDirection: "row" },
+  filterBar: { height: 52, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  filterContent: { paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: "#f3f4f6",
   },

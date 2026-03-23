@@ -811,8 +811,8 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 16, fontWeight: "700", color: "#111827" },
   statLabel: { fontSize: 10, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.3 },
 
-  tabBar: { flexDirection: "row", backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" },
-  tabItem: { flex: 1, alignItems: "center", paddingVertical: 11, borderBottomWidth: 2, borderBottomColor: "transparent" },
+  tabBar: { flexDirection: "row", backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb", minHeight: 46 },
+  tabItem: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 13, borderBottomWidth: 2, borderBottomColor: "transparent" },
   tabItemActive: { borderBottomColor: "#2563eb" },
   tabText: { fontSize: 13, color: "#6b7280", fontWeight: "500" },
   tabTextActive: { color: "#2563eb", fontWeight: "600" },

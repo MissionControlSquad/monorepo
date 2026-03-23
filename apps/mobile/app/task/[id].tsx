@@ -1016,14 +1016,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
+    minHeight: 46,
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 13,
     alignItems: "center",
+    justifyContent: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
   },
   tabActive: {
-    borderBottomWidth: 2,
     borderBottomColor: "#2563eb",
   },
   tabText: {
