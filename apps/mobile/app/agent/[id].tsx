@@ -396,6 +396,7 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
                             const cookie = getStoredCookie();
                             const res = await fetch(`${serverUrl}/api/agents/${agent.id}/regenerate-key`, {
                               method: "POST",
+                              credentials: "include",
                               headers: { ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}) },
                             });
                             const data = await res.json() as { apiKey?: string; error?: string };
@@ -710,6 +711,7 @@ function SetupTab({ agentId }: { agentId: string }) {
     if (!serverUrl) return;
     const cookie = getStoredCookie();
     fetch(`${serverUrl}/api/agents/${agentId}/setup`, {
+      credentials: "include",
       headers: cookie ? { Cookie: `mc_session=${cookie}` } : {},
     })
       .then((r) => {

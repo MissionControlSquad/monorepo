@@ -23,9 +23,8 @@ import {
   CHILD_TASKS_QUERY,
   TASK_WORK_SUMMARY_QUERY,
 } from "@agentcenter/graphql-client";
-import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION } from "@agentcenter/graphql-client";
+import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION, APPROVE_TASK, REJECT_TASK } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
-import { getStoredCookie } from "../../src/api/session";
 import { MentionInput } from "../../src/components/MentionInput";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -746,11 +745,13 @@ function ApproveRejectBar({
   task: Task;
   onDone: () => void;
 }) {
-  const { serverUrl, profileId } = useAuth();
+  const { profileId } = useAuth();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState<"approve" | "reject" | "clarify" | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [, requestClarification] = useMutation(REQUEST_CLARIFICATION);
+  const [, approveTask] = useMutation(APPROVE_TASK);
+  const [, rejectTask] = useMutation(REJECT_TASK);
 
   async function handleApprove() {
     Alert.alert("Approve Task", "Add an optional approval comment?", [
@@ -774,26 +775,16 @@ function ApproveRejectBar({
   }
 
   async function doApprove(comment: string) {
-    if (!serverUrl) return;
+    if (!profileId) return;
     setLoading("approve");
     try {
-      const cookie = getStoredCookie();
-      const res = await fetch(`${serverUrl}/api/tasks/${task.id}/approve`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}),
-        },
-        body: JSON.stringify({ approvalComment: comment || undefined }),
+      const res = await approveTask({
+        reviewerId: profileId,
+        taskId: task.id,
+        approvalComment: comment || undefined,
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        Alert.alert("Error", (err as { error?: string }).error ?? "Failed to approve");
-      } else {
-        onDone();
-      }
-    } catch {
-      Alert.alert("Error", "Network error");
+      if (res.error) Alert.alert("Error", res.error.message ?? "Failed to approve");
+      else onDone();
     } finally {
       setLoading(null);
     }
@@ -815,27 +806,18 @@ function ApproveRejectBar({
   }
 
   async function doReject(reason: string, changes: string[]) {
-    if (!serverUrl) return;
+    if (!profileId) return;
     setLoading("reject");
     setShowRejectModal(false);
     try {
-      const cookie = getStoredCookie();
-      const res = await fetch(`${serverUrl}/api/tasks/${task.id}/reject`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}),
-        },
-        body: JSON.stringify({ rejectionReason: reason, changesNeeded: changes }),
+      const res = await rejectTask({
+        reviewerId: profileId,
+        taskId: task.id,
+        rejectionReason: reason,
+        changesNeeded: changes,
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        Alert.alert("Error", (err as { error?: string }).error ?? "Failed to reject");
-      } else {
-        onDone();
-      }
-    } catch {
-      Alert.alert("Error", "Network error");
+      if (res.error) Alert.alert("Error", res.error.message ?? "Failed to reject");
+      else onDone();
     } finally {
       setLoading(null);
     }

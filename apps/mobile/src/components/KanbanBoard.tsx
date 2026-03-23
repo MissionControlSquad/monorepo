@@ -9,34 +9,33 @@ import {
   RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuth } from "../context/AuthContext";
-import { getStoredCookie } from "../api/session";
+import { KANBAN_BOARD_QUERY, UPDATE_TASK } from "@agentcenter/graphql-client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface KanbanTask {
+interface KanbanTask {
   id: string;
   title: string;
   taskNumber: number;
   priority: string | null;
   status: string;
-  assignees?: { profile: { displayName: string; identityEmoji?: string | null } }[];
+  assignees?: { profile: { displayName: string } }[];
 }
 
-export interface BoardData {
+interface KanbanBoardData {
   inbox: KanbanTask[];
   assigned: KanbanTask[];
   in_progress: KanbanTask[];
   review: KanbanTask[];
-  done: KanbanTask[];
   blocked: KanbanTask[];
+  done: KanbanTask[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-export const KANBAN_COLUMNS: { key: keyof BoardData; label: string; color: string }[] = [
+const KANBAN_COLUMNS: { key: keyof KanbanBoardData; label: string; color: string }[] = [
   { key: "inbox", label: "Inbox", color: "#6b7280" },
   { key: "assigned", label: "Assigned", color: "#2563eb" },
   { key: "in_progress", label: "In Progress", color: "#d97706" },
@@ -162,38 +161,17 @@ interface KanbanBoardProps {
 export function KanbanBoard({ projectId, bottomPadding = 0 }: KanbanBoardProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { serverUrl } = useAuth();
 
-  const [board, setBoard] = useState<BoardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [result, reexecute] = useQuery<KanbanBoardData>({
+    query: KANBAN_BOARD_QUERY,
+    variables: { projectId: projectId ?? null },
+    requestPolicy: "cache-and-network",
+  });
 
-  useEffect(() => {
-    fetchBoard();
-  }, [projectId, serverUrl]);
+  const [, updateTask] = useMutation(UPDATE_TASK);
 
-  async function fetchBoard(isRefresh = false) {
-    if (!serverUrl) return;
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
-    setError(null);
-
-    try {
-      const cookie = getStoredCookie();
-      const qs = projectId ? `?projectId=${projectId}` : "";
-      const res = await fetch(`${serverUrl}/api/tasks/board${qs}`, {
-        headers: cookie ? { Cookie: `mc_session=${cookie}` } : {},
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setBoard(await res.json());
-    } catch {
-      setError("Failed to load board");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
+  const { data, fetching, error } = result;
+  const hasData = data != null;
 
   function moveTask(task: KanbanTask) {
     const targets = KANBAN_COLUMNS.filter((c) => c.key !== task.status);
@@ -211,40 +189,11 @@ export function KanbanBoard({ projectId, bottomPadding = 0 }: KanbanBoardProps) 
   }
 
   async function doMoveTask(task: KanbanTask, newStatus: string) {
-    if (!serverUrl) return;
-    // Optimistic update
-    setBoard((prev) => {
-      if (!prev) return prev;
-      const next = { ...prev };
-      (Object.keys(next) as (keyof BoardData)[]).forEach((k) => {
-        next[k] = next[k].filter((t) => t.id !== task.id);
-      });
-      const col = newStatus as keyof BoardData;
-      if (next[col]) next[col] = [{ ...task, status: newStatus }, ...next[col]];
-      return next;
-    });
-
-    try {
-      const cookie = getStoredCookie();
-      const res = await fetch(`${serverUrl}/api/tasks/${task.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}),
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!res.ok) {
-        Alert.alert("Error", "Failed to move task");
-        fetchBoard();
-      }
-    } catch {
-      Alert.alert("Error", "Network error");
-      fetchBoard();
-    }
+    const res = await updateTask({ id: task.id, status: newStatus });
+    if (res.error) Alert.alert("Error", "Failed to move task");
   }
 
-  if (loading) {
+  if (fetching && !hasData) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#2563eb" />
@@ -252,11 +201,11 @@ export function KanbanBoard({ projectId, bottomPadding = 0 }: KanbanBoardProps) 
     );
   }
 
-  if (error || !board) {
+  if (error && !hasData) {
     return (
       <View style={styles.center}>
-        <Text style={styles.errorText}>{error ?? "Unknown error"}</Text>
-        <TouchableOpacity onPress={() => fetchBoard()}>
+        <Text style={styles.errorText}>Failed to load board</Text>
+        <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -274,8 +223,8 @@ export function KanbanBoard({ projectId, bottomPadding = 0 }: KanbanBoardProps) 
         ]}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => fetchBoard(true)}
+            refreshing={fetching && hasData}
+            onRefresh={() => reexecute({ requestPolicy: "network-only" })}
             tintColor="#2563eb"
           />
         }
@@ -284,7 +233,7 @@ export function KanbanBoard({ projectId, bottomPadding = 0 }: KanbanBoardProps) 
           <Column
             key={col.key}
             col={col}
-            tasks={board[col.key] ?? []}
+            tasks={data?.[col.key] ?? []}
             onTaskPress={(id) => router.push(`/task/${id}`)}
             onTaskMove={moveTask}
           />
