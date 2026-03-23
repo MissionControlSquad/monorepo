@@ -20,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, CHANNEL_PINNED_MESSAGES_QUERY, ON_NEW_CHANNEL_MESSAGE, PROFILES_QUERY, SEARCH_CHANNEL_MESSAGES_QUERY } from "@agentcenter/graphql-client";
 import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_CHANNEL_MESSAGE_REACTION, UPDATE_CHANNEL_MESSAGE, DELETE_CHANNEL_MESSAGE, PIN_CHANNEL_MESSAGE, UNPIN_CHANNEL_MESSAGE, ADD_CHANNEL_MEMBER, REMOVE_CHANNEL_MEMBER, JOIN_CHANNEL, LEAVE_CHANNEL, DELETE_CHANNEL } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
+import { formatChatTime } from "@agentcenter/utils";
 import { MentionInput } from "../../src/components/MentionInput";
 
 interface FromProfile {
@@ -71,19 +72,6 @@ interface Channel {
   visibility: string;
   createdByProfileId: string;
   members: { id: string; profileId: string; profile: { id: string; kind: string; displayName: string; username?: string | null } }[];
-}
-
-function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const isToday =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (isToday) {
-    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  }
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export default function ChannelDetailScreen() {
@@ -422,7 +410,7 @@ export default function ChannelDetailScreen() {
                       {item.content}
                     </Text>
                     <Text style={[styles.timestamp, isMe && styles.timestampMe]}>
-                      {formatTime(item.createdAt)}
+                      {formatChatTime(item.createdAt)}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -713,7 +701,7 @@ export default function ChannelDetailScreen() {
                     </Text>
                   </View>
                   <Text style={styles.senderName}>{msg.fromProfile.displayName}</Text>
-                  <Text style={styles.timestamp}>{formatTime(msg.createdAt)}</Text>
+                  <Text style={styles.timestamp}>{formatChatTime(msg.createdAt)}</Text>
                 </View>
                 <Text style={styles.pinnedMessageContent}>{msg.content}</Text>
               </View>

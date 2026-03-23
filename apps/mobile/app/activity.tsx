@@ -12,7 +12,7 @@ import { useRouter } from "expo-router";
 import { useState, useCallback, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ACTIVITIES_CONNECTION_QUERY, ACTIVITY_CREATED_SUBSCRIPTION } from "@agentcenter/graphql-client";
-import { ACTIVITY_TYPE_HEX_COLORS, DEFAULT_COLOR, PAGE_SIZE_DEFAULT } from "@agentcenter/utils";
+import { ACTIVITY_TYPE_HEX_COLORS, DEFAULT_COLOR, PAGE_SIZE_DEFAULT, formatRelativeTime } from "@agentcenter/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -54,21 +54,6 @@ interface ActivitiesConnection {
 function getColor(type: string) {
   return ACTIVITY_TYPE_HEX_COLORS[type] ?? DEFAULT_COLOR;
 }
-
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -232,7 +217,7 @@ export default function ActivityScreen() {
                   <Text style={styles.actorName} numberOfLines={1}>
                     {item.profile?.displayName ?? "Unknown"}
                   </Text>
-                  <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
+                  <Text style={styles.timeText}>{formatRelativeTime(item.createdAt)}</Text>
                 </View>
 
                 {/* Message */}

@@ -17,7 +17,7 @@ import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useQuery } from "urql";
 import { useEffect, useState } from "react";
 import { DELIVERABLE_QUERY, DELIVERABLE_VERSIONS_QUERY } from "@agentcenter/graphql-client";
-import { DEFAULT_COLOR } from "@agentcenter/utils";
+import { DEFAULT_COLOR, formatDateWithTime, formatDate, formatFileSize } from "@agentcenter/utils";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -65,31 +65,6 @@ const KIND_ICONS: Record<string, string> = {
   link: "🔗",
   file: "📎",
 };
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatDateShort(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function formatFileSize(bytes: number | null): string {
-  if (!bytes) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 const IMAGE_MIMES = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/svg+xml"];
 
@@ -268,7 +243,7 @@ function VersionHistoryModal({
                         </View>
                       )}
                     </View>
-                    <Text style={vhStyles.versionDate}>{formatDateShort(item.createdAt)}</Text>
+                    <Text style={vhStyles.versionDate}>{formatDate(item.createdAt)}</Text>
                     {item.editedByProfile && (
                       <Text style={vhStyles.versionAuthor}>by {item.editedByProfile.displayName}</Text>
                     )}
@@ -362,7 +337,7 @@ function VersionPreviewModal({
         <View style={vpStyles.header}>
           <View style={{ flex: 1 }}>
             <Text style={vpStyles.title} numberOfLines={1}>{version.title}</Text>
-            <Text style={vpStyles.subtitle}>Version {version.version} · {formatDateShort(version.createdAt)}</Text>
+            <Text style={vpStyles.subtitle}>Version {version.version} · {formatDate(version.createdAt)}</Text>
           </View>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text style={vpStyles.closeBtn}>Done</Text>
@@ -513,7 +488,7 @@ export default function DeliverableScreen() {
         {/* Meta */}
         <View style={styles.metaCard}>
           <MetaRow label="Author" value={d.profile.displayName} />
-          <MetaRow label="Created" value={formatDate(d.createdAt)} />
+          <MetaRow label="Created" value={formatDateWithTime(d.createdAt)} />
           {d.task && (
             <MetaRow label="Task" value={`#${d.task.taskNumber} ${d.task.title}`} />
           )}

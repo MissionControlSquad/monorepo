@@ -1,9 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
-import { STATUS_HEX_COLORS, DEFAULT_COLOR } from "@agentcenter/utils";
-
-function capLabel(s: string) {
-  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
+import { STATUS_HEX_COLORS, DEFAULT_COLOR, humanizeLabel } from "@agentcenter/utils";
 
 interface StatusPillProps {
   status: string;
@@ -20,7 +16,7 @@ export function StatusPill({ status, size = "sm" }: StatusPillProps) {
           { color, fontSize: size === "sm" ? 11 : 13 },
         ]}
       >
-        {capLabel(status)}
+        {humanizeLabel(status)}
       </Text>
     </View>
   );

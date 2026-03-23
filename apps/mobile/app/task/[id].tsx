@@ -29,7 +29,7 @@ import {
   ON_NEW_MESSAGE,
 } from "@agentcenter/graphql-client";
 import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION, APPROVE_TASK, REJECT_TASK, SAVE_TASK_AS_TEMPLATE } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, TASK_STATUSES, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, TASK_STATUSES, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatRelativeTime, formatDate, humanizeLabel } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 import { MentionInput } from "../../src/components/MentionInput";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
@@ -122,30 +122,7 @@ const KIND_ICONS: Record<string, string> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
-function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function statusLabel(s: string) {
-  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 // ── Reject Modal ──────────────────────────────────────────────────────────────
 
@@ -336,7 +313,7 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
           activeOpacity={0.7}
         >
           <Text style={[styles.badgeText, { color: statusColor }]}>
-            {statusLabel(task.status)}
+            {humanizeLabel(task.status)}
           </Text>
         </TouchableOpacity>
         {task.priority && (
@@ -426,7 +403,7 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
               <View style={{ flex: 1 }}>
                 <Text style={styles.assigneeName}>{a.profile.displayName}</Text>
                 {a.profile.agent && (
-                  <Text style={styles.assigneeStatus}>{statusLabel(a.profile.agent.status)}</Text>
+                  <Text style={styles.assigneeStatus}>{humanizeLabel(a.profile.agent.status)}</Text>
                 )}
               </View>
             </View>
@@ -644,7 +621,7 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
                 <View style={styles.messageBubble}>
                   <View style={styles.messageHeader}>
                     <Text style={styles.messageSender}>{item.fromProfile.displayName}</Text>
-                    <Text style={styles.messageTime}>{formatTime(item.createdAt)}</Text>
+                    <Text style={styles.messageTime}>{formatRelativeTime(item.createdAt)}</Text>
                   </View>
                   <Text style={styles.messageContent}>{item.content}</Text>
                 </View>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Server, Plus, Loader2, Globe, Cpu, Clock, Search } from "lucide-react";
 import { CreateVMDialog } from "../components/cloud/CreateVMDialog";
 import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout } from "../components/ui";
+import { formatUptime } from "@agentcenter/utils";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 
 interface CloudVMAgent {
@@ -44,13 +45,6 @@ const STATUS_BADGE_VARIANT: Record<
   error: { label: "Error", variant: "red" },
   destroying: { label: "Destroying", variant: "orange" },
 };
-
-function formatUptime(seconds: number): string {
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400)
-    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
-  return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
-}
 
 export function CloudPage() {
   const [vms, setVMs] = useState<CloudVM[]>([]);

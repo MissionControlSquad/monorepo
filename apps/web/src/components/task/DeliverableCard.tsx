@@ -7,7 +7,7 @@ import { useHighlightedHtml } from "../../lib/useHighlight";
 import { Badge, Button } from "../ui";
 import { MentionText } from "../common/MarkdownWithMentions";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
-import { getAssetUrl } from "@agentcenter/utils";
+import { getAssetUrl, formatFileSize } from "@agentcenter/utils";
 import type { Deliverable, Agent } from "@agentcenter/types";
 
 interface DeliverableCardProps {
@@ -22,12 +22,6 @@ const KIND_CONFIG = {
   file: { label: "File", variant: "orange" as const, icon: File },
   link: { label: "Link", variant: "green" as const, icon: Link },
 };
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function stripMarkdown(text: string): string {
   return text

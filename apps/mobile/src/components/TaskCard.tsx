@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { StatusPill } from "./StatusPill";
 import { PriorityBadge } from "./PriorityBadge";
 import { useTheme } from "../hooks/useTheme";
+import { formatDueDate } from "@agentcenter/utils";
 
 interface TaskCardTask {
   id: string;
@@ -17,17 +18,6 @@ interface TaskCardTask {
 interface TaskCardProps {
   task: TaskCardTask;
   onPress: () => void;
-}
-
-function fmtDueDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diff = d.getTime() - now.getTime();
-  const days = Math.ceil(diff / 86400000);
-  if (days < 0) return `${Math.abs(days)}d overdue`;
-  if (days === 0) return "Due today";
-  if (days === 1) return "Due tomorrow";
-  return `Due in ${days}d`;
 }
 
 export function TaskCard({ task, onPress }: TaskCardProps) {
@@ -72,7 +62,7 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, justifyContent: "flex-end" }}>
           {task.dueDate && (
             <Text style={{ fontSize: 11, color: isOverdue ? colors.danger : colors.textMuted, fontWeight: isOverdue ? "600" : "400" }}>
-              {fmtDueDate(task.dueDate)}
+              {formatDueDate(task.dueDate)}
             </Text>
           )}
           {(task.assignees ?? []).length > 0 && (

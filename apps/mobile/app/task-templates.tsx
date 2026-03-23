@@ -21,6 +21,7 @@ import {
   UPDATE_TASK_TEMPLATE,
   DELETE_TASK_TEMPLATE,
 } from "@agentcenter/graphql-client";
+import { formatDate } from "@agentcenter/utils";
 import { useTheme } from "../src/hooks/useTheme";
 import { EmptyState } from "../src/components/EmptyState";
 
@@ -46,9 +47,7 @@ function parseSubtasks(raw: string): SubtaskDef[] {
   }
 }
 
-function fmtDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
+
 
 // ── Template Form Modal ───────────────────────────────────────────────────────
 
@@ -290,7 +289,7 @@ export default function TaskTemplatesScreen() {
                 <Text style={{ flex: 1, fontSize: 15, fontWeight: "700", color: colors.text }} numberOfLines={1}>
                   {item.name}
                 </Text>
-                <Text style={{ fontSize: 11, color: colors.textMuted }}>{fmtDate(item.updatedAt)}</Text>
+                <Text style={{ fontSize: 11, color: colors.textMuted }}>{formatDate(item.updatedAt)}</Text>
               </View>
 
               {item.description ? (

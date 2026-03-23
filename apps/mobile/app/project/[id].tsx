@@ -36,7 +36,7 @@ import {
   DELETE_PROJECT_DOC,
   PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, formatDate } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -114,13 +114,6 @@ interface DocRevision {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 // ── Tab constants ─────────────────────────────────────────────────────────────
 
@@ -183,7 +176,7 @@ function OverviewTab({ project, onRefresh }: { project: Project; onRefresh: () =
         >
           <Text style={styles.statusBadgeText}>{project.status}</Text>
         </View>
-        <Text style={styles.metaText}>Created {fmtDate(project.createdAt)}</Text>
+        <Text style={styles.metaText}>Created {formatDate(project.createdAt)}</Text>
       </View>
 
       {/* Edit / View name + description */}
@@ -1030,7 +1023,7 @@ function DocsTab({ projectId }: { projectId: string }) {
                     </Text>
                   ) : null}
                   <Text style={styles.docCardDate}>
-                    Updated {fmtDate(item.updatedAt)}
+                    Updated {formatDate(item.updatedAt)}
                   </Text>
                 </View>
               </View>

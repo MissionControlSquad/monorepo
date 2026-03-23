@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import { useState, useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { AGENTS_QUERY, SET_AGENT_ACTIVATION } from "@agentcenter/graphql-client";
-import { DEFAULT_COLOR, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
+import { DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, humanizeLabel } from "@agentcenter/utils";
 
 interface Agent {
   id: string;
@@ -66,7 +66,7 @@ function getStatusColor(agent: Agent): string {
 
 function getStatusLabel(agent: Agent): string {
   if (agent.isOnVacation) return "On Vacation";
-  if (agent.detailedStatus) return agent.detailedStatus.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  if (agent.detailedStatus) return humanizeLabel(agent.detailedStatus);
   return agent.status.charAt(0).toUpperCase() + agent.status.slice(1);
 }
 

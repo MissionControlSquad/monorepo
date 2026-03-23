@@ -26,6 +26,7 @@ import {
   PROJECTS_QUERY,
   PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
+import { formatDate } from "@agentcenter/utils";
 import { useTheme } from "../src/hooks/useTheme";
 import { EmptyState } from "../src/components/EmptyState";
 import { StatusPill } from "../src/components/StatusPill";
@@ -57,10 +58,7 @@ const FREQUENCIES = [
 
 const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 
-function fmtDate(dateStr: string | null): string {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
+
 
 function parseFreqLabel(config: unknown): string {
   try {
@@ -583,12 +581,12 @@ export default function RecurringTasksScreen() {
               <StatusPill status={item.isActive ? "active" : "paused"} />
               {item.nextDueAt && (
                 <Text style={{ fontSize: 11, color: colors.textMuted }}>
-                  Next: {fmtDate(item.nextDueAt)}
+                  Next: {formatDate(item.nextDueAt)}
                 </Text>
               )}
               {item.lastGeneratedAt && (
                 <Text style={{ fontSize: 11, color: colors.textMuted }}>
-                  Last: {fmtDate(item.lastGeneratedAt)}
+                  Last: {formatDate(item.lastGeneratedAt)}
                 </Text>
               )}
               {item.tags.length > 0 && (

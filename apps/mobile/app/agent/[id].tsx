@@ -33,7 +33,7 @@ import {
   SET_AGENT_VACATION,
   SET_AGENT_ACTIVATION,
 } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatDate, humanizeLabel } from "@agentcenter/utils";
 import { getStoredCookie } from "../../src/api/session";
 import { useAuth } from "../../src/context/AuthContext";
 
@@ -99,7 +99,6 @@ const ACTION_ICONS: Record<string, string> = {
 
 type Tab = "overview" | "tasks" | "deliverables" | "queue" | "activity" | "history" | "setup";
 
-function capLabel(s: string) { return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
 function isOnline(hb: string | null) { return !!hb && new Date(hb).getTime() > Date.now() - 2 * 60 * 1000; }
 function getDotColor(agent: Agent): string {
   if (agent.detailedStatus && STATUS_HEX_COLORS[agent.detailedStatus]) return STATUS_HEX_COLORS[agent.detailedStatus];
@@ -113,7 +112,6 @@ function fmtTime(dateStr: string) {
   if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
-function fmtDate(s: string) { return new Date(s).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); }
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
@@ -247,7 +245,7 @@ export default function AgentDetailScreen() {
             ) : (
               <View style={[styles.badge, { backgroundColor: (online ? dotColor : "#6b7280") + "22" }]}>
                 <Text style={[styles.badgeText, { color: online ? dotColor : "#6b7280" }]}>
-                  {online ? (agent.detailedStatus ? capLabel(agent.detailedStatus) : capLabel(agent.status)) : "Offline"}
+                  {online ? (agent.detailedStatus ? humanizeLabel(agent.detailedStatus) : humanizeLabel(agent.status)) : "Offline"}
                 </Text>
               </View>
             )}
@@ -459,8 +457,8 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
 
       <View style={styles.infoCard}>
         <InfoRow label="Username" value={`@${agent.username}`} />
-        <InfoRow label="Level" value={capLabel(agent.level)} />
-        {agent.hostingType && <InfoRow label="Hosting" value={capLabel(agent.hostingType)} />}
+        <InfoRow label="Level" value={humanizeLabel(agent.level)} />
+        {agent.hostingType && <InfoRow label="Hosting" value={humanizeLabel(agent.hostingType)} />}
         {agent.workspacePath && <InfoRow label="Workspace" value={agent.workspacePath} mono />}
         {agent.apiKeyPrefix && (
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" }}>
@@ -511,8 +509,8 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
             </View>
           </View>
         )}
-        {agent.setupStatus && <InfoRow label="Setup" value={capLabel(agent.setupStatus)} />}
-        <InfoRow label="Joined" value={fmtDate(agent.createdAt)} />
+        {agent.setupStatus && <InfoRow label="Setup" value={humanizeLabel(agent.setupStatus)} />}
+        <InfoRow label="Joined" value={formatDate(agent.createdAt)} />
         {agent.lastHeartbeat && (
           <InfoRow label="Last Seen" value={fmtTime(agent.lastHeartbeat)} />
         )}
@@ -529,7 +527,7 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
             <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
           </View>
           <InfoRow label="Name" value={agent.cloudVm.name} />
-          <InfoRow label="Status" value={capLabel(agent.cloudVm.status)} />
+          <InfoRow label="Status" value={humanizeLabel(agent.cloudVm.status)} />
           {agent.cloudVm.ipv4 && <InfoRow label="IP" value={agent.cloudVm.ipv4} mono />}
         </TouchableOpacity>
       )}
@@ -585,7 +583,7 @@ function QueueTab({
     const options = ["pending", "in_progress", "completed", "cancelled", "blocked"]
       .filter((s) => s !== item.status)
       .map((s) => ({
-        text: capLabel(s),
+        text: humanizeLabel(s),
         onPress: async () => {
           await updateItemStatus({ id: item.id, status: s });
           onRefresh();
@@ -689,7 +687,7 @@ function QueueCard({ item, onStatusChange, onDelete, onTaskPress }: {
     <View style={styles.queueCard}>
       <View style={styles.queueCardTop}>
         <TouchableOpacity style={[styles.badge, { backgroundColor: color + "22" }]} onPress={onStatusChange} activeOpacity={0.7}>
-          <Text style={[styles.badgeText, { color }]}>{capLabel(item.status)}</Text>
+          <Text style={[styles.badgeText, { color }]}>{humanizeLabel(item.status)}</Text>
         </TouchableOpacity>
         {item.priority && (
           <View style={[styles.badge, { backgroundColor: (PRIORITY_HEX_COLORS[item.priority] ?? DEFAULT_COLOR) + "22" }]}>
@@ -779,7 +777,7 @@ function AgentTasksTab({
             </View>
             <Text style={styles.taskTitle} numberOfLines={2}>{item.title}</Text>
             {item.dueDate && (
-              <Text style={styles.taskDue}>Due {fmtDate(item.dueDate)}</Text>
+              <Text style={styles.taskDue}>Due {formatDate(item.dueDate)}</Text>
             )}
           </TouchableOpacity>
         );
@@ -854,7 +852,7 @@ function AgentDeliverablesTab({
                 #{item.task.taskNumber} {item.task.title}
               </Text>
             )}
-            <Text style={styles.deliverableDate}>{fmtDate(item.createdAt)}</Text>
+            <Text style={styles.deliverableDate}>{formatDate(item.createdAt)}</Text>
           </TouchableOpacity>
         );
       }}
@@ -886,7 +884,7 @@ function ActivityTab({ actions, fetching, onRefresh, router }: {
             <View style={styles.activityBody}>
               <View style={styles.activityHeader}>
                 <View style={styles.actionTypeBadge}>
-                  <Text style={styles.actionTypeText}>{capLabel(item.actionType)}</Text>
+                  <Text style={styles.actionTypeText}>{humanizeLabel(item.actionType)}</Text>
                 </View>
                 <Text style={styles.activityTime}>{fmtTime(item.timestamp)}</Text>
               </View>
@@ -921,11 +919,11 @@ function HistoryTab({ history, fetching, onRefresh }: {
         <View style={styles.historyCard}>
           <View style={styles.historyRow}>
             <Text style={styles.historyFrom}>
-              {item.fromDetailedStatus ? capLabel(item.fromDetailedStatus) : item.fromStatus ? capLabel(item.fromStatus) : "—"}
+              {item.fromDetailedStatus ? humanizeLabel(item.fromDetailedStatus) : item.fromStatus ? humanizeLabel(item.fromStatus) : "—"}
             </Text>
             <Ionicons name="arrow-forward" size={12} color="#9ca3af" />
             <Text style={styles.historyTo}>
-              {item.toDetailedStatus ? capLabel(item.toDetailedStatus) : capLabel(item.toStatus)}
+              {item.toDetailedStatus ? humanizeLabel(item.toDetailedStatus) : humanizeLabel(item.toStatus)}
             </Text>
           </View>
           {item.statusMessage && <Text style={styles.historyMessage} numberOfLines={2}>{item.statusMessage}</Text>}

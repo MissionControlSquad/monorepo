@@ -11,7 +11,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNotifications } from "../src/context/NotificationCountContext";
-import { NOTIFICATION_TYPE_HEX_COLORS, DEFAULT_COLOR } from "@agentcenter/utils";
+import { NOTIFICATION_TYPE_HEX_COLORS, DEFAULT_COLOR, formatRelativeTime } from "@agentcenter/utils";
 
 // ── Types & constants ─────────────────────────────────────────────────────────
 
@@ -29,22 +29,6 @@ const TYPE_ICONS: Record<string, IoniconName> = {
   task_assigned: "person-add",
 };
 
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
@@ -156,7 +140,7 @@ export default function NotificationsScreen() {
                     {item.body}
                   </Text>
                 ) : null}
-                <Text style={styles.time}>{formatTime(item.createdAt)}</Text>
+                <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
               </View>
 
               {/* Unread dot */}
