@@ -61,6 +61,7 @@ model Task {
   @@index([blockedByTaskId])
   @@index([projectId])
   @@index([projectId, status])
+  @@index([projectId, createdAt])
   @@index([deletedAt])
   @@index([status, deletedAt])
   @@map("tasks")
