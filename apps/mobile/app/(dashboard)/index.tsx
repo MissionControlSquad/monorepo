@@ -13,8 +13,10 @@ import { useQuery } from "urql";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
 import { TaskCard } from "../../src/components/TaskCard";
+import { KanbanBoard } from "../../src/components/KanbanBoard";
 
 interface TaskAssignee {
   id: string;
@@ -35,6 +37,7 @@ interface Task {
 }
 
 type StatusFilter = "all" | "inbox" | "in_progress" | "review" | "done" | "blocked";
+type ViewMode = "list" | "kanban";
 
 const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },
@@ -50,6 +53,7 @@ const PAGE_SIZE = 30;
 export default function TaskListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState(PAGE_SIZE);
@@ -62,7 +66,6 @@ export default function TaskListScreen() {
 
   const { data, fetching, error } = result;
   const allTasks = data?.tasks ?? [];
-  // If we got back exactly `limit` items there may be more
   const hasMore = allTasks.length === limit;
   const filteredByStatus = filter === "all" ? allTasks : allTasks.filter((t) => t.status === filter);
   const tasks = search.trim()
@@ -94,7 +97,7 @@ export default function TaskListScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Search bar */}
+      {/* Search bar + view toggle */}
       <View style={styles.searchBar}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
@@ -106,72 +109,91 @@ export default function TaskListScreen() {
           clearButtonMode="while-editing"
           returnKeyType="search"
         />
+        <TouchableOpacity
+          onPress={() => setViewMode((m) => (m === "list" ? "kanban" : "list"))}
+          style={styles.viewToggle}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons
+            name={viewMode === "list" ? "grid-outline" : "list-outline"}
+            size={20}
+            color="#6b7280"
+          />
+        </TouchableOpacity>
       </View>
 
-      {/* Status filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-        directionalLockEnabled={true}
-        style={styles.filterBar}
-        contentContainerStyle={styles.filterContent}
-      >
-        {FILTERS.map((f) => {
-          const count = f.key === "all" ? allTasks.length : allTasks.filter((t) => t.status === f.key).length;
-          return (
-            <TouchableOpacity
-              key={f.key}
-              style={[styles.chip, filter === f.key && styles.chipActive]}
-              onPress={() => setFilter(f.key)}
-            >
-              <Text style={[styles.chipText, filter === f.key && styles.chipTextActive]}>
-                {f.label} ({count})
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {viewMode === "kanban" ? (
+        /* ── Kanban view ── */
+        <KanbanBoard bottomPadding={60} />
+      ) : (
+        /* ── List view ── */
+        <>
+          {/* Status filter chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            directionalLockEnabled={true}
+            style={styles.filterBar}
+            contentContainerStyle={styles.filterContent}
+          >
+            {FILTERS.map((f) => {
+              const count = f.key === "all" ? allTasks.length : allTasks.filter((t) => t.status === f.key).length;
+              return (
+                <TouchableOpacity
+                  key={f.key}
+                  style={[styles.chip, filter === f.key && styles.chipActive]}
+                  onPress={() => setFilter(f.key)}
+                >
+                  <Text style={[styles.chipText, filter === f.key && styles.chipTextActive]}>
+                    {f.label} ({count})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
 
-      <FlatList
-        data={tasks}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={[
-          styles.listContent,
-          tasks.length === 0 && styles.emptyContainer,
-        ]}
-        refreshControl={
-          <RefreshControl
-            refreshing={fetching && allTasks.length > 0}
-            onRefresh={() => {
-              setLimit(PAGE_SIZE);
-              reexecute({ requestPolicy: "network-only" });
+          <FlatList
+            data={tasks}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={[
+              styles.listContent,
+              tasks.length === 0 && styles.emptyContainer,
+            ]}
+            refreshControl={
+              <RefreshControl
+                refreshing={fetching && allTasks.length > 0}
+                onRefresh={() => {
+                  setLimit(PAGE_SIZE);
+                  reexecute({ requestPolicy: "network-only" });
+                }}
+                tintColor="#2563eb"
+              />
+            }
+            onEndReached={() => {
+              if (hasMore && !fetching) setLimit((l) => l + PAGE_SIZE);
             }}
-            tintColor="#2563eb"
+            onEndReachedThreshold={0.3}
+            ListFooterComponent={
+              fetching && allTasks.length > 0 ? (
+                <ActivityIndicator color="#2563eb" style={{ marginVertical: 16 }} />
+              ) : null
+            }
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                {filter === "all" ? "No tasks yet" : `No ${filter.replace("_", " ")} tasks`}
+              </Text>
+            }
+            renderItem={({ item }) => (
+              <TaskCard
+                task={item}
+                onPress={() => router.push(`/task/${item.id}`)}
+              />
+            )}
           />
-        }
-        onEndReached={() => {
-          if (hasMore && !fetching) setLimit((l) => l + PAGE_SIZE);
-        }}
-        onEndReachedThreshold={0.3}
-        ListFooterComponent={
-          fetching && allTasks.length > 0 ? (
-            <ActivityIndicator color="#2563eb" style={{ marginVertical: 16 }} />
-          ) : null
-        }
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>
-            {filter === "all" ? "No tasks yet" : `No ${filter.replace("_", " ")} tasks`}
-          </Text>
-        }
-        renderItem={({ item }) => (
-          <TaskCard
-            task={item}
-            onPress={() => router.push(`/task/${item.id}`)}
-          />
-        )}
-      />
+        </>
+      )}
 
       {/* FAB — Create task */}
       <TouchableOpacity
@@ -219,6 +241,9 @@ const styles = StyleSheet.create({
     color: "#111827",
     paddingVertical: 6,
     paddingHorizontal: 4,
+  },
+  viewToggle: {
+    padding: 4,
   },
 
   fab: {
