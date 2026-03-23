@@ -694,21 +694,41 @@ function HistoryTab({ history, fetching, onRefresh }: {
 
 // ── Setup Tab ────────────────────────────────────────────────────────────────
 
-interface AgentSetup {
-  configFiles: { path: string; content: string }[];
-  cronCommand: string | null;
+interface AgentSetupData {
+  agent: {
+    id: string;
+    name: string;
+    role: string;
+    setupStatus: string;
+    apiKeyPrefix: string | null;
+    hostingType: string;
+    cloudVmId: string | null;
+  };
+  configFiles: { filename: string; content: string }[];
+  bootstrapMessage: string;
+  cronSchedule: string;
+  cronCommand: string;
+  workspacePath: string;
+  cloudVms: { id: string; name?: string | null; serverName?: string | null; ipv4: string | null; region: string; serverType: string }[];
 }
+
+type SetupMode = "auto" | "manual";
 
 function SetupTab({ agentId }: { agentId: string }) {
   const { serverUrl } = useAuth();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [setup, setSetup] = useState<AgentSetup | null>(null);
+  const [setup, setSetup] = useState<AgentSetupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [mode, setMode] = useState<SetupMode>("auto");
+  const [regenerating, setRegenerating] = useState(false);
+  const [newApiKey, setNewApiKey] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchSetup = () => {
     if (!serverUrl) return;
+    setLoading(true);
     const cookie = getStoredCookie();
     fetch(`${serverUrl}/api/agents/${agentId}/setup`, {
       credentials: "include",
@@ -718,10 +738,59 @@ function SetupTab({ agentId }: { agentId: string }) {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then((data: AgentSetup) => setSetup(data))
+      .then((data: AgentSetupData) => setSetup(data))
       .catch(() => setError("Failed to load setup instructions"))
       .finally(() => setLoading(false));
-  }, [agentId, serverUrl]);
+  };
+
+  useEffect(() => { fetchSetup(); }, [agentId, serverUrl]);
+
+  const handleRegenerateKey = async () => {
+    Alert.alert(
+      "Regenerate API Key",
+      "The current key will stop working immediately. A new key will be generated and embedded in the config files below.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Regenerate",
+          style: "destructive",
+          onPress: async () => {
+            if (!serverUrl || !setup) return;
+            setRegenerating(true);
+            try {
+              const cookie = getStoredCookie();
+              const res = await fetch(`${serverUrl}/api/agents/${agentId}/regenerate-key`, {
+                method: "POST",
+                credentials: "include",
+                headers: cookie ? { Cookie: `mc_session=${cookie}` } : {},
+              });
+              const data = await res.json() as { apiKey?: string; error?: string };
+              if (!res.ok) {
+                Alert.alert("Error", data.error ?? "Failed to regenerate");
+              } else {
+                const key = data.apiKey ?? "";
+                setNewApiKey(key);
+                // Patch config files and bootstrap message with the real key
+                setSetup((prev) => {
+                  if (!prev) return prev;
+                  const patch = (s: string) => s.replaceAll("$API_KEY", key);
+                  return {
+                    ...prev,
+                    bootstrapMessage: patch(prev.bootstrapMessage),
+                    configFiles: prev.configFiles.map((f) => ({ ...f, content: patch(f.content) })),
+                  };
+                });
+              }
+            } catch {
+              Alert.alert("Error", "Failed to regenerate API key");
+            } finally {
+              setRegenerating(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   if (loading) return <View style={styles.center}><ActivityIndicator color="#2563eb" /></View>;
   if (error) return <View style={styles.center}><Text style={styles.errorText}>{error}</Text></View>;
@@ -730,45 +799,190 @@ function SetupTab({ agentId }: { agentId: string }) {
   return (
     <ScrollView
       contentContainerStyle={[styles.tabContent, { paddingBottom: insets.bottom + 16 }]}
+      keyboardShouldPersistTaps="handled"
     >
-      {/* Cron command */}
-      {setup.cronCommand && (
+      {/* Mode toggle */}
+      <View style={styles.modeToggle}>
+        {(["auto", "manual"] as SetupMode[]).map((m) => (
+          <TouchableOpacity
+            key={m}
+            style={[styles.modeBtn, mode === m && styles.modeBtnActive]}
+            onPress={() => setMode(m)}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={m === "auto" ? "send-outline" : "construct-outline"}
+              size={14}
+              color={mode === m ? "#2563eb" : "#6b7280"}
+            />
+            <Text style={[styles.modeBtnText, mode === m && styles.modeBtnTextActive]}>
+              {m === "auto" ? "Auto Setup" : "Manual Setup"}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Security warning */}
+      <View style={styles.warningBox}>
+        <Ionicons name="shield-outline" size={16} color="#dc2626" />
+        <Text style={styles.warningText}>
+          These credentials grant full access to your system. Do not share publicly.
+        </Text>
+      </View>
+
+      {/* API Key section */}
+      {newApiKey ? (
+        <View style={styles.newKeyBox}>
+          <View style={styles.newKeyHeader}>
+            <Ionicons name="warning-outline" size={16} color="#d97706" />
+            <Text style={styles.newKeyTitle}>New API Key — Save now!</Text>
+          </View>
+          <Text style={styles.newKeyHint}>This key will only be shown once. It's embedded in the configs below.</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator>
+            <Text style={styles.newKeyText} selectable>{newApiKey}</Text>
+          </ScrollView>
+        </View>
+      ) : (
         <View style={styles.setupCard}>
-          <Text style={styles.setupCardTitle}>Cron Command</Text>
-          <Text style={styles.setupHint}>Add this to your crontab to start the agent</Text>
-          <View style={styles.codeBlock}>
-            <Text style={styles.codeText} selectable>{setup.cronCommand}</Text>
+          <View style={styles.setupCardRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.setupCardTitle}>API Key</Text>
+              <Text style={styles.setupHint}>
+                {setup.agent.apiKeyPrefix
+                  ? `Current key: ${setup.agent.apiKeyPrefix}…`
+                  : "No API key configured yet"}
+              </Text>
+              {!setup.agent.apiKeyPrefix && (
+                <Text style={[styles.setupHint, { color: "#d97706" }]}>
+                  Config files use $API_KEY placeholder. Regenerate to embed the real key.
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.regenBtn, regenerating && { opacity: 0.5 }]}
+              onPress={handleRegenerateKey}
+              disabled={regenerating}
+              activeOpacity={0.7}
+            >
+              {regenerating ? (
+                <ActivityIndicator size="small" color="#dc2626" />
+              ) : (
+                <Ionicons name="key-outline" size={14} color="#dc2626" />
+              )}
+              <Text style={styles.regenBtnText}>
+                {regenerating ? "Regenerating…" : "Regenerate"}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
 
-      {/* Config files */}
-      {setup.configFiles.length > 0 && (
-        <View style={styles.setupCard}>
-          <Text style={styles.setupCardTitle}>Config Files ({setup.configFiles.length})</Text>
-          <Text style={styles.setupHint}>Create these files on the agent's host machine</Text>
-          {setup.configFiles.map((file) => (
-            <View key={file.path} style={styles.configFileBlock}>
-              <TouchableOpacity
-                style={styles.configFileHeader}
-                onPress={() => setExpanded(expanded === file.path ? null : file.path)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.configFilePath} numberOfLines={1}>{file.path}</Text>
-                <Ionicons
-                  name={expanded === file.path ? "chevron-up" : "chevron-down"}
-                  size={16}
-                  color="#6b7280"
-                />
-              </TouchableOpacity>
-              {expanded === file.path && (
-                <ScrollView horizontal showsHorizontalScrollIndicator style={styles.configFileContent}>
-                  <Text style={styles.codeText} selectable>{file.content}</Text>
-                </ScrollView>
-              )}
+      {/* ── Auto mode: bootstrap message ── */}
+      {mode === "auto" && (
+        <>
+          <View style={styles.infoBox}>
+            <Ionicons name="chatbubble-outline" size={15} color="#2563eb" />
+            <Text style={styles.infoBoxText}>
+              Copy the message below and send it to your agent via any connected channel (WhatsApp, Slack, Discord, etc.)
+            </Text>
+          </View>
+
+          {setup.bootstrapMessage ? (
+            <View style={styles.setupCard}>
+              <View style={styles.setupCardRow}>
+                <Text style={styles.setupCardTitle}>Bootstrap Message</Text>
+                <TouchableOpacity
+                  onPress={() => Alert.alert("Copied", "Bootstrap message copied (use Share/Copy for actual clipboard)")}
+                  style={styles.copyBtn}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="copy-outline" size={14} color="#2563eb" />
+                  <Text style={styles.copyBtnText}>Copy</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                <Text style={styles.codeText} selectable>{setup.bootstrapMessage}</Text>
+              </ScrollView>
             </View>
-          ))}
-        </View>
+          ) : null}
+        </>
+      )}
+
+      {/* ── Manual mode: workspace + config files + cron ── */}
+      {mode === "manual" && (
+        <>
+          {/* Workspace path */}
+          {setup.workspacePath && (
+            <View style={styles.setupCard}>
+              <Text style={styles.setupCardTitle}>1. Create Workspace</Text>
+              <View style={styles.codeBlock}>
+                <Text style={styles.codeText} selectable>mkdir -p {setup.workspacePath}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Config files */}
+          {setup.configFiles.length > 0 && (
+            <View style={styles.setupCard}>
+              <Text style={styles.setupCardTitle}>2. Config Files ({setup.configFiles.length})</Text>
+              <Text style={styles.setupHint}>
+                Extract to{" "}
+                <Text style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}>
+                  {setup.workspacePath}/
+                </Text>
+              </Text>
+              {setup.configFiles.map((file) => (
+                <View key={file.filename} style={styles.configFileBlock}>
+                  <TouchableOpacity
+                    style={styles.configFileHeader}
+                    onPress={() => setExpanded(expanded === file.filename ? null : file.filename)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.configFilePath} numberOfLines={1}>{file.filename}</Text>
+                    <Ionicons
+                      name={expanded === file.filename ? "chevron-up" : "chevron-down"}
+                      size={16}
+                      color="#6b7280"
+                    />
+                  </TouchableOpacity>
+                  {expanded === file.filename && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator style={styles.configFileContent} nestedScrollEnabled>
+                      <Text style={styles.codeText} selectable>{file.content}</Text>
+                    </ScrollView>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Cron command */}
+          {setup.cronCommand && (
+            <View style={styles.setupCard}>
+              <Text style={styles.setupCardTitle}>3. Heartbeat Cron</Text>
+              <Text style={styles.setupHint}>Add this to your crontab to keep the agent running</Text>
+              <View style={styles.codeBlock}>
+                <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled>
+                  <Text style={styles.codeText} selectable>{setup.cronCommand}</Text>
+                </ScrollView>
+              </View>
+            </View>
+          )}
+        </>
+      )}
+
+      {/* Cloud VMs shortcut */}
+      {setup.cloudVms.length > 0 && (
+        <TouchableOpacity
+          style={styles.cloudVmsBtn}
+          onPress={() => router.push("/cloud")}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="server-outline" size={16} color="#2563eb" />
+          <Text style={styles.cloudVmsBtnText}>
+            {setup.cloudVms.length} Cloud VM{setup.cloudVms.length !== 1 ? "s" : ""} available — Deploy to VM
+          </Text>
+          <Ionicons name="arrow-forward" size={14} color="#2563eb" />
+        </TouchableOpacity>
       )}
     </ScrollView>
   );
@@ -918,4 +1132,109 @@ const styles = StyleSheet.create({
   },
   configFilePath: { fontSize: 12, color: "#374151", fontWeight: "500", flex: 1 },
   configFileContent: { backgroundColor: "#1e293b", maxHeight: 200 },
+
+  // Enhanced setup tab
+  modeToggle: {
+    flexDirection: "row",
+    backgroundColor: "#f3f4f6",
+    borderRadius: 10,
+    padding: 4,
+    gap: 4,
+  },
+  modeBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  modeBtnActive: { backgroundColor: "#fff" },
+  modeBtnText: { fontSize: 12, fontWeight: "500", color: "#6b7280" },
+  modeBtnTextActive: { color: "#2563eb", fontWeight: "600" },
+
+  warningBox: {
+    flexDirection: "row",
+    gap: 8,
+    backgroundColor: "#fef2f2",
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+  },
+  warningText: { flex: 1, fontSize: 12, color: "#dc2626", lineHeight: 17 },
+
+  newKeyBox: {
+    backgroundColor: "#fffbeb",
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    gap: 8,
+  },
+  newKeyHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  newKeyTitle: { fontSize: 13, fontWeight: "700", color: "#d97706" },
+  newKeyHint: { fontSize: 12, color: "#92400e" },
+  newKeyText: {
+    fontSize: 12,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    color: "#111827",
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+  },
+
+  setupCardRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  regenBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#fef2f2",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    flexShrink: 0,
+  },
+  regenBtnText: { fontSize: 12, color: "#dc2626", fontWeight: "600" },
+
+  infoBox: {
+    flexDirection: "row",
+    gap: 8,
+    backgroundColor: "#eff6ff",
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+  },
+  infoBoxText: { flex: 1, fontSize: 12, color: "#1d4ed8", lineHeight: 17 },
+
+  copyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: "#eff6ff",
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+  },
+  copyBtnText: { fontSize: 12, color: "#2563eb", fontWeight: "600" },
+
+  cloudVmsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#eff6ff",
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+  },
+  cloudVmsBtnText: { flex: 1, fontSize: 13, color: "#2563eb", fontWeight: "500" },
 });
