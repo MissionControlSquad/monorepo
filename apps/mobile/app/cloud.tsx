@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../src/context/AuthContext";
 import { getStoredCookie } from "../src/api/session";
+import { STATUS_HEX_COLORS } from "@agentcenter/utils";
 
 interface CloudVMAgent {
   id: string;
@@ -39,20 +40,6 @@ interface CloudVM {
   agents: CloudVMAgent[];
   createdAt: string;
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  provisioning: "#2563eb",
-  waiting_for_ssh: "#2563eb",
-  installing_deps: "#7c3aed",
-  installing_openclaw: "#7c3aed",
-  configuring: "#7c3aed",
-  starting_service: "#7c3aed",
-  running: "#16a34a",
-  stopped: "#6b7280",
-  error: "#dc2626",
-  destroying: "#d97706",
-  destroyed: "#6b7280",
-};
 
 const STATUS_LABELS: Record<string, string> = {
   provisioning: "Provisioning",
@@ -278,7 +265,7 @@ const cmStyles = StyleSheet.create({
 // ── VM Card ───────────────────────────────────────────────────────────────────
 
 function VMCard({ vm, onPress }: { vm: CloudVM; onPress: () => void }) {
-  const statusColor = STATUS_COLORS[vm.status] ?? "#6b7280";
+  const statusColor = STATUS_HEX_COLORS[vm.status] ?? "#6b7280";
   const statusLabel = STATUS_LABELS[vm.status] ?? vm.status;
   const displayName = vm.name || vm.serverName || vm.id.slice(0, 8);
 

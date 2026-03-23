@@ -19,16 +19,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "urql";
 import { CREATE_TASK_FROM_DASHBOARD, PROFILES_QUERY, TASKS_QUERY, TASK_TEMPLATES_QUERY, INSTANTIATE_TEMPLATE } from "@agentcenter/graphql-client";
 import { Avatar } from "../../src/components/Avatar";
+import { PRIORITY_HEX_COLORS } from "@agentcenter/utils";
 
 const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 type Priority = (typeof PRIORITIES)[number];
-
-const PRIORITY_COLORS: Record<string, string> = {
-  low: "#6b7280",
-  medium: "#d97706",
-  high: "#dc2626",
-  urgent: "#7c3aed",
-};
 
 interface Profile {
   id: string;
@@ -272,8 +266,8 @@ export default function CreateTaskScreen() {
                 style={[
                   styles.priorityChip,
                   priority === p && {
-                    backgroundColor: PRIORITY_COLORS[p] + "18",
-                    borderColor: PRIORITY_COLORS[p],
+                    backgroundColor: PRIORITY_HEX_COLORS[p] + "18",
+                    borderColor: PRIORITY_HEX_COLORS[p],
                   },
                 ]}
                 onPress={() => setPriority(p)}
@@ -283,7 +277,7 @@ export default function CreateTaskScreen() {
                   style={[
                     styles.priorityChipText,
                     { textTransform: "capitalize" },
-                    priority === p && { color: PRIORITY_COLORS[p], fontWeight: "600" },
+                    priority === p && { color: PRIORITY_HEX_COLORS[p], fontWeight: "600" },
                   ]}
                 >
                   {p}

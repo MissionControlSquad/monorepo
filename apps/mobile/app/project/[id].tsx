@@ -36,6 +36,7 @@ import {
   DELETE_PROJECT_DOC,
   PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -112,27 +113,6 @@ interface DocRevision {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<string, string> = {
-  active: "#16a34a",
-  archived: "#6b7280",
-  paused: "#d97706",
-};
-
-const TASK_STATUS_COLORS: Record<string, string> = {
-  inbox: "#6b7280",
-  assigned: "#2563eb",
-  in_progress: "#d97706",
-  review: "#7c3aed",
-  done: "#16a34a",
-  blocked: "#dc2626",
-};
-
-const PRIORITY_COLORS: Record<string, string> = {
-  critical: "#dc2626",
-  high: "#d97706",
-  medium: "#2563eb",
-  low: "#6b7280",
-};
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -198,7 +178,7 @@ function OverviewTab({ project, onRefresh }: { project: Project; onRefresh: () =
         <View
           style={[
             styles.statusBadge,
-            { backgroundColor: STATUS_COLORS[project.status] ?? "#6b7280" },
+            { backgroundColor: STATUS_HEX_COLORS[project.status] ?? "#6b7280" },
           ]}
         >
           <Text style={styles.statusBadgeText}>{project.status}</Text>
@@ -401,7 +381,7 @@ function TasksTab({ projectId }: { projectId: string }) {
                   <View
                     style={[
                       styles.priorityDot,
-                      { backgroundColor: PRIORITY_COLORS[item.priority] ?? "#6b7280" },
+                      { backgroundColor: PRIORITY_HEX_COLORS[item.priority] ?? "#6b7280" },
                     ]}
                   />
                 )}
@@ -413,13 +393,13 @@ function TasksTab({ projectId }: { projectId: string }) {
                 <View
                   style={[
                     styles.statusPill,
-                    { backgroundColor: (TASK_STATUS_COLORS[item.status] ?? "#6b7280") + "20" },
+                    { backgroundColor: (TASK_STATUS_HEX_COLORS[item.status] ?? "#6b7280") + "20" },
                   ]}
                 >
                   <Text
                     style={[
                       styles.statusPillText,
-                      { color: TASK_STATUS_COLORS[item.status] ?? "#6b7280" },
+                      { color: TASK_STATUS_HEX_COLORS[item.status] ?? "#6b7280" },
                     ]}
                   >
                     {item.status.replace("_", " ")}

@@ -25,16 +25,10 @@ import {
 } from "@agentcenter/graphql-client";
 import { Avatar } from "../../src/components/Avatar";
 import { useTheme } from "../../src/hooks/useTheme";
+import { PRIORITY_HEX_COLORS } from "@agentcenter/utils";
 
 const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 type Priority = (typeof PRIORITIES)[number];
-
-const PRIORITY_COLORS: Record<string, string> = {
-  low: "#6b7280",
-  medium: "#d97706",
-  high: "#dc2626",
-  urgent: "#7c3aed",
-};
 
 interface Profile {
   id: string;
@@ -268,11 +262,11 @@ export default function EditTaskScreen() {
                   key={p}
                   style={{
                     borderWidth: 1,
-                    borderColor: active ? PRIORITY_COLORS[p] : colors.border,
+                    borderColor: active ? PRIORITY_HEX_COLORS[p] : colors.border,
                     borderRadius: 8,
                     paddingHorizontal: 12,
                     paddingVertical: 6,
-                    backgroundColor: active ? PRIORITY_COLORS[p] + "18" : colors.inputBg,
+                    backgroundColor: active ? PRIORITY_HEX_COLORS[p] + "18" : colors.inputBg,
                   }}
                   onPress={() => setPriority(p)}
                   activeOpacity={0.7}
@@ -280,7 +274,7 @@ export default function EditTaskScreen() {
                   <Text style={{
                     fontSize: 13,
                     textTransform: "capitalize",
-                    color: active ? PRIORITY_COLORS[p] : colors.textSecondary,
+                    color: active ? PRIORITY_HEX_COLORS[p] : colors.textSecondary,
                     fontWeight: active ? "600" : "400",
                   }}>
                     {p}

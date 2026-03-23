@@ -13,6 +13,7 @@ import { useQuery } from "urql";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { PROJECTS_QUERY } from "@agentcenter/graphql-client";
+import { STATUS_HEX_COLORS } from "@agentcenter/utils";
 
 interface ProjectMember {
   id: string;
@@ -37,12 +38,6 @@ interface Project {
 }
 
 type StatusFilter = "all" | "active" | "archived";
-
-const STATUS_COLORS: Record<string, string> = {
-  active: "#16a34a",
-  archived: "#6b7280",
-  paused: "#d97706",
-};
 
 function memberEmojis(members: ProjectMember[]): string {
   const agents = members.filter((m) => m.profile.agentId != null);
@@ -194,7 +189,7 @@ export default function ProjectsScreen() {
                   <View
                     style={[
                       styles.statusBadge,
-                      { backgroundColor: STATUS_COLORS[item.status] ?? "#6b7280" },
+                      { backgroundColor: STATUS_HEX_COLORS[item.status] ?? "#6b7280" },
                     ]}
                   >
                     <Text style={styles.statusBadgeText}>{item.status}</Text>

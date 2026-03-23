@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "urql";
 import { GLOBAL_SEARCH_QUERY, TASK_BY_NUMBER_QUERY } from "@agentcenter/graphql-client";
+import { STATUS_HEX_COLORS } from "@agentcenter/utils";
 import { useTheme } from "../src/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -44,14 +45,6 @@ interface DeliverableResult {
   taskId: string;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  inbox: "#6b7280",
-  assigned: "#d97706",
-  in_progress: "#2563eb",
-  review: "#7c3aed",
-  done: "#16a34a",
-  blocked: "#dc2626",
-};
 
 function parseJSON<T>(raw: string | undefined | null): T[] {
   if (!raw) return [];
@@ -226,7 +219,7 @@ export default function SearchScreen() {
           renderItem={({ item, section }) => {
             if (section.type === "task") {
               const t = item as TaskResult;
-              const statusColor = STATUS_COLORS[t.status] ?? colors.textMuted;
+              const statusColor = STATUS_HEX_COLORS[t.status] ?? colors.textMuted;
               return (
                 <TouchableOpacity
                   style={{

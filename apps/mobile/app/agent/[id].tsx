@@ -33,6 +33,7 @@ import {
   SET_AGENT_VACATION,
   SET_AGENT_ACTIVATION,
 } from "@agentcenter/graphql-client";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS } from "@agentcenter/utils";
 import { getStoredCookie } from "../../src/api/session";
 import { useAuth } from "../../src/context/AuthContext";
 
@@ -89,17 +90,6 @@ interface AgentDeliverable {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<string, string> = { active: "#16a34a", idle: "#6b7280", blocked: "#dc2626" };
-const DETAILED_STATUS_COLORS: Record<string, string> = {
-  thinking: "#7c3aed", coding: "#2563eb", reviewing: "#4f46e5",
-  researching: "#d97706", deploying: "#ea580c", testing: "#0891b2",
-  writing: "#059669", waiting_review: "#d97706", waiting_input: "#d97706",
-  waiting_dependency: "#d97706",
-};
-const QUEUE_STATUS_COLORS: Record<string, string> = {
-  pending: "#6b7280", in_progress: "#d97706", completed: "#16a34a", cancelled: "#dc2626", blocked: "#7c3aed",
-};
-const PRIORITY_COLORS: Record<string, string> = { low: "#6b7280", medium: "#d97706", high: "#dc2626", urgent: "#7c3aed" };
 const ACTION_ICONS: Record<string, string> = {
   thinking: "💭", coding: "💻", searching: "🔍", testing: "🧪", reviewing: "👀",
   deploying: "🚀", writing: "✍️", reading: "📖", executing: "⚡", planning: "📋",
@@ -112,8 +102,8 @@ type Tab = "overview" | "tasks" | "deliverables" | "queue" | "activity" | "histo
 function capLabel(s: string) { return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
 function isOnline(hb: string | null) { return !!hb && new Date(hb).getTime() > Date.now() - 2 * 60 * 1000; }
 function getDotColor(agent: Agent): string {
-  if (agent.detailedStatus && DETAILED_STATUS_COLORS[agent.detailedStatus]) return DETAILED_STATUS_COLORS[agent.detailedStatus];
-  return STATUS_COLORS[agent.status] ?? "#6b7280";
+  if (agent.detailedStatus && STATUS_HEX_COLORS[agent.detailedStatus]) return STATUS_HEX_COLORS[agent.detailedStatus];
+  return STATUS_HEX_COLORS[agent.status] ?? "#6b7280";
 }
 function fmtDuration(ms: number) { const h = Math.floor(ms / 3600000); const m = Math.floor((ms % 3600000) / 60000); return h > 0 ? `${h}h ${m}m` : `${m}m`; }
 function fmtTime(dateStr: string) {
@@ -694,7 +684,7 @@ function QueueTab({
 function QueueCard({ item, onStatusChange, onDelete, onTaskPress }: {
   item: QueueItem; onStatusChange: () => void; onDelete: () => void; onTaskPress?: () => void;
 }) {
-  const color = QUEUE_STATUS_COLORS[item.status] ?? "#6b7280";
+  const color = STATUS_HEX_COLORS[item.status] ?? "#6b7280";
   return (
     <View style={styles.queueCard}>
       <View style={styles.queueCardTop}>
@@ -702,8 +692,8 @@ function QueueCard({ item, onStatusChange, onDelete, onTaskPress }: {
           <Text style={[styles.badgeText, { color }]}>{capLabel(item.status)}</Text>
         </TouchableOpacity>
         {item.priority && (
-          <View style={[styles.badge, { backgroundColor: (PRIORITY_COLORS[item.priority] ?? "#6b7280") + "22" }]}>
-            <Text style={[styles.badgeText, { color: PRIORITY_COLORS[item.priority] ?? "#6b7280" }]}>{item.priority}</Text>
+          <View style={[styles.badge, { backgroundColor: (PRIORITY_HEX_COLORS[item.priority] ?? "#6b7280") + "22" }]}>
+            <Text style={[styles.badgeText, { color: PRIORITY_HEX_COLORS[item.priority] ?? "#6b7280" }]}>{item.priority}</Text>
           </View>
         )}
         <View style={{ flex: 1 }} />
@@ -725,13 +715,6 @@ function QueueCard({ item, onStatusChange, onDelete, onTaskPress }: {
 
 // ── Agent Tasks Tab ───────────────────────────────────────────────────────────
 
-const TASK_STATUS_COLORS: Record<string, string> = {
-  inbox: "#6b7280", assigned: "#2563eb", in_progress: "#d97706",
-  review: "#7c3aed", done: "#16a34a", blocked: "#dc2626",
-};
-const TASK_PRIORITY_COLORS: Record<string, string> = {
-  low: "#6b7280", medium: "#d97706", high: "#dc2626", urgent: "#7c3aed",
-};
 
 function AgentTasksTab({
   agentId,
@@ -775,8 +758,8 @@ function AgentTasksTab({
         <RefreshControl refreshing={fetching && allTasks.length > 0} onRefresh={onRefresh} tintColor="#2563eb" />
       }
       renderItem={({ item }) => {
-        const statusColor = TASK_STATUS_COLORS[item.status] ?? "#6b7280";
-        const priorityColor = item.priority ? (TASK_PRIORITY_COLORS[item.priority] ?? "#6b7280") : null;
+        const statusColor = STATUS_HEX_COLORS[item.status] ?? "#6b7280";
+        const priorityColor = item.priority ? (PRIORITY_HEX_COLORS[item.priority] ?? "#6b7280") : null;
         return (
           <TouchableOpacity
             style={styles.taskRow}

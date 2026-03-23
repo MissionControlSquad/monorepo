@@ -126,3 +126,54 @@ export const COLUMN_EMPTY_STATES: Record<string, { message: string; hint: string
 
 // Heartbeat timeout: 2 minutes
 export const HEARTBEAT_TIMEOUT_MS = 2 * 60 * 1000;
+
+// Platform-agnostic hex colors for status values (usable by mobile, charts, Electron)
+export const STATUS_HEX_COLORS: Record<string, string> = {
+  // Task statuses
+  inbox: "#6b7280",
+  assigned: "#2563eb",
+  in_progress: "#d97706",
+  review: "#7c3aed",
+  done: "#16a34a",
+  blocked: "#dc2626",
+  // Agent statuses
+  active: "#16a34a",
+  idle: "#6b7280",
+  offline: "#9ca3af",
+  deactivated: "#9ca3af",
+  // Detailed agent statuses
+  thinking: "#7c3aed",
+  coding: "#2563eb",
+  reviewing: "#4f46e5",
+  researching: "#d97706",
+  deploying: "#ea580c",
+  testing: "#0891b2",
+  writing: "#059669",
+  waiting_review: "#d97706",
+  waiting_input: "#d97706",
+  waiting_dependency: "#d97706",
+  // Project statuses
+  archived: "#9ca3af",
+  paused: "#d97706",
+  // Queue statuses
+  pending: "#6b7280",
+  completed: "#16a34a",
+  failed: "#dc2626",
+  cancelled: "#9ca3af",
+};
+
+// Platform-agnostic hex colors for priority values
+export const PRIORITY_HEX_COLORS: Record<string, string> = {
+  low: "#6b7280",
+  medium: "#d97706",
+  high: "#dc2626",
+  urgent: "#7c3aed",
+};
+
+// Text icons for priority (no icon library required)
+export const PRIORITY_ICONS: Record<string, string> = {
+  low: "↓",
+  medium: "→",
+  high: "↑",
+  urgent: "⚡",
+};

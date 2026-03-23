@@ -29,6 +29,7 @@ import {
   ON_NEW_MESSAGE,
 } from "@agentcenter/graphql-client";
 import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION, APPROVE_TASK, REJECT_TASK, SAVE_TASK_AS_TEMPLATE } from "@agentcenter/graphql-client";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, TASK_STATUSES } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 import { MentionInput } from "../../src/components/MentionInput";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
@@ -111,23 +112,6 @@ interface Deliverable {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const TASK_STATUSES = ["inbox", "assigned", "in_progress", "review", "done", "blocked"];
-
-const STATUS_COLORS: Record<string, string> = {
-  inbox: "#6b7280",
-  assigned: "#2563eb",
-  in_progress: "#d97706",
-  review: "#7c3aed",
-  done: "#16a34a",
-  blocked: "#dc2626",
-};
-
-const PRIORITY_COLORS: Record<string, string> = {
-  low: "#6b7280",
-  medium: "#d97706",
-  high: "#dc2626",
-  urgent: "#7c3aed",
-};
 
 const KIND_ICONS: Record<string, string> = {
   markdown: "📄",
@@ -299,7 +283,7 @@ function fmtDuration(ms: number): string {
 
 function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; onStatusChange: () => void; onProjectAssign: (projectId: string) => void }) {
   const router = useRouter();
-  const statusColor = STATUS_COLORS[task.status] ?? "#6b7280";
+  const statusColor = STATUS_HEX_COLORS[task.status] ?? "#6b7280";
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const [projectsResult] = useQuery<{ projects: { id: string; name: string; status: string }[] }>({
@@ -359,13 +343,13 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
           <View
             style={[
               styles.badge,
-              { backgroundColor: (PRIORITY_COLORS[task.priority] ?? "#6b7280") + "22" },
+              { backgroundColor: (PRIORITY_HEX_COLORS[task.priority] ?? "#6b7280") + "22" },
             ]}
           >
             <Text
               style={[
                 styles.badgeText,
-                { color: PRIORITY_COLORS[task.priority] ?? "#6b7280", textTransform: "capitalize" },
+                { color: PRIORITY_HEX_COLORS[task.priority] ?? "#6b7280", textTransform: "capitalize" },
               ]}
             >
               {task.priority}
@@ -406,13 +390,13 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
             <View
               style={[
                 styles.miniPill,
-                { backgroundColor: (STATUS_COLORS[task.blockedByTask.status] ?? "#6b7280") + "22" },
+                { backgroundColor: (STATUS_HEX_COLORS[task.blockedByTask.status] ?? "#6b7280") + "22" },
               ]}
             >
               <Text
                 style={[
                   styles.miniPillText,
-                  { color: STATUS_COLORS[task.blockedByTask.status] ?? "#6b7280" },
+                  { color: STATUS_HEX_COLORS[task.blockedByTask.status] ?? "#6b7280" },
                 ]}
               >
                 {task.blockedByTask.status.replace("_", " ")}
@@ -467,7 +451,7 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
                 <View
                   style={[
                     styles.subtaskDot,
-                    { backgroundColor: STATUS_COLORS[ct.status] ?? "#6b7280" },
+                    { backgroundColor: STATUS_HEX_COLORS[ct.status] ?? "#6b7280" },
                   ]}
                 />
                 <Text style={styles.subtaskNum}>#{ct.taskNumber}</Text>
@@ -796,7 +780,7 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
       {childGroups.map((group) => (
         <View key={group.task.id}>
           <View style={styles.childGroupHeader}>
-            <View style={[styles.subtaskDot, { backgroundColor: STATUS_COLORS[group.task.status] ?? "#6b7280" }]} />
+            <View style={[styles.subtaskDot, { backgroundColor: STATUS_HEX_COLORS[group.task.status] ?? "#6b7280" }]} />
             <Text style={styles.childGroupTitle} numberOfLines={1}>
               #{group.task.taskNumber} {group.task.title}
             </Text>
@@ -1051,9 +1035,9 @@ export default function TaskDetailScreen() {
       undefined,
       [
         ...TASK_STATUSES.map((s) => ({
-          text: statusLabel(s),
+          text: s.label,
           onPress: async () => {
-            const res = await executeUpdate({ id: task.id, status: s });
+            const res = await executeUpdate({ id: task.id, status: s.id });
             if (res.error) Alert.alert("Error", "Failed to update status");
             else reexecute({ requestPolicy: "network-only" });
           },

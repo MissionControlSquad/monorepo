@@ -1,25 +1,12 @@
 import { View, Text } from "react-native";
-
-const PRIORITY_COLORS: Record<string, string> = {
-  low: "#6b7280",
-  medium: "#d97706",
-  high: "#dc2626",
-  urgent: "#7c3aed",
-};
-
-const PRIORITY_ICONS: Record<string, string> = {
-  low: "↓",
-  medium: "→",
-  high: "↑",
-  urgent: "⚡",
-};
+import { PRIORITY_HEX_COLORS, PRIORITY_ICONS } from "@agentcenter/utils";
 
 interface PriorityBadgeProps {
   priority: string;
 }
 
 export function PriorityBadge({ priority }: PriorityBadgeProps) {
-  const color = PRIORITY_COLORS[priority] ?? "#6b7280";
+  const color = PRIORITY_HEX_COLORS[priority] ?? "#6b7280";
   const icon = PRIORITY_ICONS[priority] ?? "·";
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>

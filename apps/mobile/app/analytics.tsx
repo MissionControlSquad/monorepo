@@ -20,6 +20,7 @@ import {
   AGENT_WORKLOAD_DISTRIBUTION_QUERY,
   ACTIVITY_TREND_QUERY,
 } from "@agentcenter/graphql-client";
+import { STATUS_HEX_COLORS } from "@agentcenter/utils";
 import { useTheme } from "../src/hooks/useTheme";
 
 // --------------- types ---------------
@@ -78,14 +79,6 @@ interface WorkloadEntry {
 }
 
 // --------------- helpers ---------------
-const STATUS_COLORS: Record<string, string> = {
-  inbox: "#6b7280",
-  assigned: "#2563eb",
-  inProgress: "#d97706",
-  review: "#7c3aed",
-  done: "#16a34a",
-  blocked: "#dc2626",
-};
 
 function fmtMs(ms: number): string {
   if (!ms || ms <= 0) return "—";
@@ -422,7 +415,7 @@ export default function AnalyticsScreen() {
                 label={key}
                 count={status[key]}
                 total={status.total}
-                color={STATUS_COLORS[key]}
+                color={STATUS_HEX_COLORS[key]}
                 colors={colors}
               />
             ))}

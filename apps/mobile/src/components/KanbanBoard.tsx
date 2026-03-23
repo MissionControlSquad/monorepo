@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import { useQuery, useMutation, useClient } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KANBAN_BOARD_QUERY, LOAD_MORE_COLUMN_QUERY, UPDATE_TASK } from "@agentcenter/graphql-client";
+import { PRIORITY_HEX_COLORS } from "@agentcenter/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,13 +53,6 @@ const PRIORITY_ICONS: Record<string, string> = {
   urgent: "⚡",
 };
 
-const PRIORITY_COLORS: Record<string, string> = {
-  low: "#6b7280",
-  medium: "#d97706",
-  high: "#dc2626",
-  urgent: "#7c3aed",
-};
-
 const COLUMN_WIDTH = 220;
 
 // ── Kanban Task Card ──────────────────────────────────────────────────────────
@@ -72,7 +66,7 @@ function KanbanTaskCard({
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  const priorityColor = task.priority ? (PRIORITY_COLORS[task.priority] ?? "#6b7280") : null;
+  const priorityColor = task.priority ? (PRIORITY_HEX_COLORS[task.priority] ?? "#6b7280") : null;
   const priorityIcon = task.priority ? (PRIORITY_ICONS[task.priority] ?? "") : null;
 
   return (
