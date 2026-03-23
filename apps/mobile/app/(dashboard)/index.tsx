@@ -45,20 +45,25 @@ const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "blocked", label: "Blocked" },
 ];
 
+const PAGE_SIZE = 30;
+
 export default function TaskListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
   const [result, reexecute] = useQuery<{ tasks: Task[] }>({
     query: TASKS_QUERY,
-    variables: { limit: 200 },
+    variables: { limit },
     requestPolicy: "cache-and-network",
   });
 
   const { data, fetching, error } = result;
   const allTasks = data?.tasks ?? [];
+  // If we got back exactly `limit` items there may be more
+  const hasMore = allTasks.length === limit;
   const filteredByStatus = filter === "all" ? allTasks : allTasks.filter((t) => t.status === filter);
   const tasks = search.trim()
     ? filteredByStatus.filter(
@@ -132,7 +137,6 @@ export default function TaskListScreen() {
       <FlatList
         data={tasks}
         keyExtractor={(item) => item.id}
-        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[
           styles.listContent,
           tasks.length === 0 && styles.emptyContainer,
@@ -140,9 +144,21 @@ export default function TaskListScreen() {
         refreshControl={
           <RefreshControl
             refreshing={fetching && allTasks.length > 0}
-            onRefresh={() => reexecute({ requestPolicy: "network-only" })}
+            onRefresh={() => {
+              setLimit(PAGE_SIZE);
+              reexecute({ requestPolicy: "network-only" });
+            }}
             tintColor="#2563eb"
           />
+        }
+        onEndReached={() => {
+          if (hasMore && !fetching) setLimit((l) => l + PAGE_SIZE);
+        }}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={
+          fetching && allTasks.length > 0 ? (
+            <ActivityIndicator color="#2563eb" style={{ marginVertical: 16 }} />
+          ) : null
         }
         ListEmptyComponent={
           <Text style={styles.emptyText}>
