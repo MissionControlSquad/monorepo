@@ -15,11 +15,7 @@ import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AGENT_EDIT_QUERY, UPDATE_AGENT_PROFILE } from "@agentcenter/graphql-client";
-
-const EMOJI_PRESETS = [
-  "🤖","🦾","🧠","⚡","🎯","🔧","🚀","🌟","🦊","🐉",
-  "🐺","🦁","🐻","🦅","🦋","🌊","🔥","💎","🛡️","⚔️",
-];
+import { AGENT_EMOJI_PRESETS } from "@agentcenter/utils";
 
 export default function EditAgentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -134,7 +130,7 @@ export default function EditAgentScreen() {
           <View style={styles.field}>
             <Text style={styles.label}>Emoji</Text>
             <View style={styles.emojiGrid}>
-              {EMOJI_PRESETS.map((e) => (
+              {AGENT_EMOJI_PRESETS.map((e) => (
                 <TouchableOpacity
                   key={e}
                   style={[styles.emojiBtn, emoji === e && styles.emojiBtnActive]}

@@ -22,12 +22,7 @@ import {
 } from "lucide-react";
 import { Button, Badge, Card } from "@/components/ui";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
-import { FLAG_KEYS } from "@agentcenter/utils";
-
-interface ConfigFile {
-  filename: string;
-  content: string;
-}
+import { FLAG_KEYS, type AgentAgentConfigFile } from "@agentcenter/utils";
 
 interface CloudVMAgent {
   id: string;
@@ -56,7 +51,7 @@ interface SetupData {
     hostingType: string;
     cloudVmId: string | null;
   };
-  configFiles: ConfigFile[];
+  configFiles: AgentConfigFile[];
   bootstrapMessage: string;
   cronSchedule: string;
   cronCommand: string;
@@ -194,7 +189,7 @@ function crc32(data: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-function DownloadZipButton({ files, zipName }: { files: ConfigFile[]; zipName: string }) {
+function DownloadZipButton({ files, zipName }: { files: AgentConfigFile[]; zipName: string }) {
   return (
     <Button
       onClick={() => {

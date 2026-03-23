@@ -24,6 +24,12 @@ import {
   CATEGORY_ORDER,
   CATEGORY_LABELS,
   type WizardTemplate,
+  type SetupMode,
+  type AgentConfigFile,
+  type AgentSetupResult,
+  AGENT_LEVEL_KEYS,
+  AGENT_EMOJI_PRESETS,
+  SETUP_MODE_LABELS,
 } from "@agentcenter/utils";
 import {
   AGENTS_FOR_DELEGATE_QUERY,
@@ -33,32 +39,7 @@ import {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Step = "template" | "preview" | "details" | "setup";
-type SetupMode = "auto" | "manual" | "delegate" | "cloud";
-
-const LEVELS = ["intern", "specialist", "lead"] as const;
-type Level = (typeof LEVELS)[number];
-
-interface ConfigFile {
-  filename: string;
-  content: string;
-}
-
-interface CreateResult {
-  agent: { id: string; name: string; role: string; level: string };
-  apiKey: string;
-  configFiles: ConfigFile[];
-  bootstrapMessage: string;
-  cronSchedule: string;
-  cronCommand: string;
-  workspacePath: string;
-  openclawAgentConfig: { id: string; name: string; workspace: string };
-  mcUrl: string;
-}
-
-const EMOJI_PRESETS = [
-  "🤖","🦾","🧠","⚡","🎯","🔧","🚀","🌟","🦊","🐉",
-  "🐺","🦁","🐻","🦅","🦋","🌊","🔥","💎","🛡️","⚔️",
-];
+type Level = (typeof AGENT_LEVEL_KEYS)[number];
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
@@ -82,7 +63,7 @@ export default function CreateAgentScreen() {
   const [workspacePath, setWorkspacePath] = useState("");
 
   // Setup state
-  const [result, setResult] = useState<CreateResult | null>(null);
+  const [result, setResult] = useState<AgentSetupResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [setupMode, setSetupMode] = useState<SetupMode>("auto");
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
@@ -139,7 +120,7 @@ export default function CreateAgentScreen() {
     setRole(t.role ?? "");
     setEmoji(t.emoji ?? "🤖");
     setPersonality(t.personality ?? "");
-    const lvl = LEVELS.includes(t.level as Level) ? (t.level as Level) : "specialist";
+    const lvl = AGENT_LEVEL_KEYS.includes(t.level as Level) ? (t.level as Level) : "specialist";
     setLevel(lvl);
     setStep("details");
   }
@@ -172,7 +153,7 @@ export default function CreateAgentScreen() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `Failed to create agent (${res.status})`);
-      setResult(data as CreateResult);
+      setResult(data as AgentSetupResult);
       setStep("setup");
     } catch (err) {
       Alert.alert("Error", (err as Error).message);
@@ -553,7 +534,7 @@ export default function CreateAgentScreen() {
             <View style={styles.field}>
               <Text style={styles.label}>Emoji</Text>
               <View style={styles.emojiGrid}>
-                {EMOJI_PRESETS.map((e) => (
+                {AGENT_EMOJI_PRESETS.map((e) => (
                   <TouchableOpacity
                     key={e}
                     style={[styles.emojiBtn, emoji === e && styles.emojiBtnActive]}
@@ -570,7 +551,7 @@ export default function CreateAgentScreen() {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Level</Text>
             <View style={styles.chipRow}>
-              {LEVELS.map((l) => (
+              {AGENT_LEVEL_KEYS.map((l) => (
                 <TouchableOpacity
                   key={l}
                   style={[styles.chip, level === l && styles.chipActive]}
@@ -655,12 +636,6 @@ export default function CreateAgentScreen() {
             contentContainerStyle={styles.modeTabs}
           >
             {(["auto", "manual", "delegate", "cloud"] as SetupMode[]).map((m) => {
-              const labels: Record<SetupMode, string> = {
-                auto: "Auto Setup",
-                manual: "Manual Setup",
-                delegate: "Delegate",
-                cloud: "Deploy to Cloud",
-              };
               const icons: Record<SetupMode, keyof typeof Ionicons.glyphMap> = {
                 auto: "send-outline",
                 manual: "construct-outline",
@@ -707,7 +682,7 @@ export default function CreateAgentScreen() {
                     color={setupMode === m ? "#2563eb" : "#6b7280"}
                   />
                   <Text style={[styles.modeTabText, setupMode === m && styles.modeTabTextActive]}>
-                    {labels[m]}
+                    {SETUP_MODE_LABELS[m]}
                   </Text>
                 </TouchableOpacity>
               );
