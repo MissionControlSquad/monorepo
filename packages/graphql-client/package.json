@@ -28,6 +28,6 @@
   },
   "peerDependencies": {
     "graphql": "^16.0.0",
-    "urql": ">=4.0.0"
+    "urql": ">=5.0.0"
   }
 }

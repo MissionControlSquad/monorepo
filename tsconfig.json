@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/types" },
+    { "path": "packages/utils" },
+    { "path": "packages/database" },
+    { "path": "packages/graphql-client" },
+    { "path": "packages/graphql-client-config" }
+  ]
+}

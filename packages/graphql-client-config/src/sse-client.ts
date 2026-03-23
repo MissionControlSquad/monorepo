@@ -44,13 +44,11 @@ export function createSSEForwarder(options: SSEClientOptions) {
       };
 
       fetch(url, {
+        ...fetchOpts,
         method: "POST",
         headers,
         body: JSON.stringify({ query: operation.query, variables: operation.variables }),
         signal: controller.signal,
-        ...fetchOpts,
-        // Override headers since we merged above
-        headers,
       })
         .then(async (res) => {
           if (!res.ok || !res.body) {
