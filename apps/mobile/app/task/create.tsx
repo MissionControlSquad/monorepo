@@ -17,7 +17,7 @@ import { useState } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "urql";
-import { CREATE_TASK_FROM_DASHBOARD, PROFILES_QUERY, TASKS_QUERY, TASK_TEMPLATES_QUERY } from "@agentcenter/graphql-client";
+import { CREATE_TASK_FROM_DASHBOARD, PROFILES_QUERY, TASKS_QUERY, TASK_TEMPLATES_QUERY, INSTANTIATE_TEMPLATE } from "@agentcenter/graphql-client";
 import { Avatar } from "../../src/components/Avatar";
 
 const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
@@ -88,6 +88,7 @@ export default function CreateTaskScreen() {
   });
 
   const [, createTask] = useMutation(CREATE_TASK_FROM_DASHBOARD);
+  const [{ fetching: instantiating }, instantiateTemplate] = useMutation(INSTANTIATE_TEMPLATE);
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
@@ -166,14 +167,7 @@ export default function CreateTaskScreen() {
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
                 renderItem={({ item }) => (
-                  <Pressable
-                    style={styles.profileRow}
-                    onPress={() => {
-                      setTitle(item.name);
-                      if (item.description) setDescription(item.description);
-                      setTemplatePickerOpen(false);
-                    }}
-                  >
+                  <View style={styles.profileRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.profileName}>{item.name}</Text>
                       {item.description ? (
@@ -182,8 +176,48 @@ export default function CreateTaskScreen() {
                         </Text>
                       ) : null}
                     </View>
-                    <Text style={{ color: "#2563eb", fontSize: 13, fontWeight: "600" }}>Use</Text>
-                  </Pressable>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setTitle(item.name);
+                          if (item.description) setDescription(item.description);
+                          setTemplatePickerOpen(false);
+                        }}
+                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: "#bfdbfe" }}
+                      >
+                        <Text style={{ color: "#2563eb", fontSize: 12, fontWeight: "600" }}>Pre-fill</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        disabled={instantiating}
+                        onPress={async () => {
+                          const res = await instantiateTemplate({
+                            templateId: item.id,
+                            projectId: projectId ?? undefined,
+                          });
+                          if (res.error) {
+                            Alert.alert("Error", "Failed to create from template");
+                            return;
+                          }
+                          const raw = res.data?.instantiateTemplate;
+                          const result = typeof raw === "string" ? JSON.parse(raw) : raw;
+                          const parentId = result?.parentTaskId;
+                          setTemplatePickerOpen(false);
+                          if (parentId) {
+                            router.replace(`/task/${parentId}` as Parameters<typeof router.replace>[0]);
+                          } else {
+                            router.back();
+                          }
+                        }}
+                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: "#2563eb" }}
+                      >
+                        {instantiating ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>Create</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 )}
               />
             )}

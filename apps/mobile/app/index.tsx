@@ -1,5 +1,5 @@
 import { Redirect, useRouter } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Alert, View } from "react-native";
 import { useAuth } from "../src/context/AuthContext";
 import { getStoredCookie } from "../src/api/session";
 import { useEffect, useState } from "react";
@@ -7,19 +7,37 @@ import { useEffect, useState } from "react";
 export default function Index() {
   const { isLoading, isSignedIn, serverUrl } = useAuth();
   const router = useRouter();
-  const [checkingOnboarding, setCheckingOnboarding] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     if (!isSignedIn || !serverUrl || isLoading) return;
 
-    // Check if onboarding is needed
-    setCheckingOnboarding(true);
+    setChecking(true);
     const cookie = getStoredCookie();
     const headers: Record<string, string> = {};
     if (cookie) headers.Cookie = `mc_session=${cookie}`;
 
-    fetch(`${serverUrl}/api/onboarding`, { credentials: "include", headers })
+    // Check license first, then onboarding
+    fetch(`${serverUrl}/api/license`, { credentials: "include", headers })
       .then((r) => r.json())
+      .then((license: { status?: string }) => {
+        const status = license.status ?? "active";
+        if (status === "none" || status === "expired") {
+          router.replace("/(dashboard)");
+          Alert.alert(
+            status === "none" ? "License Required" : "License Expired",
+            status === "none"
+              ? "This server has no active license. Please activate a license in Settings."
+              : "Your license has expired. Please renew it in Settings.",
+            [{ text: "Go to Settings", onPress: () => router.push("/settings" as Parameters<typeof router.push>[0]) }],
+          );
+          return Promise.reject("license-gate");
+        }
+      })
+      .then(() =>
+        fetch(`${serverUrl}/api/onboarding`, { credentials: "include", headers })
+          .then((r) => r.json())
+      )
       .then((data: { completed?: boolean; categoryId?: string | null }) => {
         if (data.completed === false) {
           const params = data.categoryId ? `?resumeCategory=${data.categoryId}` : "";
@@ -28,14 +46,16 @@ export default function Index() {
           router.replace("/(dashboard)");
         }
       })
-      .catch(() => {
-        // On error, go to dashboard
-        router.replace("/(dashboard)");
+      .catch((err) => {
+        if (err !== "license-gate") {
+          // On unexpected error, go to dashboard
+          router.replace("/(dashboard)");
+        }
       })
-      .finally(() => setCheckingOnboarding(false));
+      .finally(() => setChecking(false));
   }, [isSignedIn, serverUrl, isLoading]);
 
-  if (isLoading || checkingOnboarding) {
+  if (isLoading || checking) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color="#2563eb" />

@@ -12,13 +12,13 @@ import {
   Modal,
   ScrollView,
 } from "react-native";
-import { useLocalSearchParams, useNavigation } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useQuery, useMutation, useSubscription } from "urql";
 import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, CHANNEL_PINNED_MESSAGES_QUERY, ON_NEW_CHANNEL_MESSAGE, PROFILES_QUERY, SEARCH_CHANNEL_MESSAGES_QUERY } from "@agentcenter/graphql-client";
-import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_CHANNEL_MESSAGE_REACTION, UPDATE_CHANNEL_MESSAGE, DELETE_CHANNEL_MESSAGE, PIN_CHANNEL_MESSAGE, UNPIN_CHANNEL_MESSAGE, ADD_CHANNEL_MEMBER, REMOVE_CHANNEL_MEMBER, JOIN_CHANNEL, LEAVE_CHANNEL } from "@agentcenter/graphql-client";
+import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_CHANNEL_MESSAGE_REACTION, UPDATE_CHANNEL_MESSAGE, DELETE_CHANNEL_MESSAGE, PIN_CHANNEL_MESSAGE, UNPIN_CHANNEL_MESSAGE, ADD_CHANNEL_MEMBER, REMOVE_CHANNEL_MEMBER, JOIN_CHANNEL, LEAVE_CHANNEL, DELETE_CHANNEL } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 import { MentionInput } from "../../src/components/MentionInput";
 
@@ -69,6 +69,7 @@ interface Channel {
   id: string;
   name: string;
   visibility: string;
+  createdByProfileId: string;
   members: { id: string; profileId: string; profile: { id: string; kind: string; displayName: string; username?: string | null } }[];
 }
 
@@ -88,6 +89,7 @@ function formatTime(dateStr: string): string {
 export default function ChannelDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
+  const router = useRouter();
   const { profileId } = useAuth();
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
@@ -136,6 +138,7 @@ export default function ChannelDetailScreen() {
   const [, executeRemoveMember] = useMutation(REMOVE_CHANNEL_MEMBER);
   const [, executeJoin] = useMutation(JOIN_CHANNEL);
   const [, executeLeave] = useMutation(LEAVE_CHANNEL);
+  const [, executeDeleteChannel] = useMutation(DELETE_CHANNEL);
 
   const [profilesResult] = useQuery<{ profiles: ProfileOption[] }>({
     query: PROFILES_QUERY,
@@ -536,6 +539,39 @@ export default function ChannelDetailScreen() {
               <Text style={{ color: "#2563eb", fontWeight: "600", fontSize: 14 }}>+ Add Member</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Delete channel — only for creator */}
+          {channel?.createdByProfileId === profileId && (
+            <TouchableOpacity
+              style={{ marginHorizontal: 16, marginTop: 10, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: "#fecaca", backgroundColor: "#fef2f2", alignItems: "center" }}
+              onPress={() => {
+                if (!profileId) return;
+                Alert.alert(
+                  "Delete Channel",
+                  `Permanently delete #${channel.name} and all its messages? This cannot be undone.`,
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Delete",
+                      style: "destructive",
+                      onPress: async () => {
+                        const res = await executeDeleteChannel({ channelId: id, profileId });
+                        if (res.error) {
+                          Alert.alert("Error", "Failed to delete channel");
+                        } else {
+                          setMembersOpen(false);
+                          router.replace("/(dashboard)/channels" as Parameters<typeof router.replace>[0]);
+                        }
+                      },
+                    },
+                  ],
+                );
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ color: "#dc2626", fontWeight: "600", fontSize: 14 }}>Delete Channel</Text>
+            </TouchableOpacity>
+          )}
 
           <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
             {(channel?.members ?? []).map((m) => (
