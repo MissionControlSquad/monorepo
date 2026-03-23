@@ -18,8 +18,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   RECURRING_TASKS_QUERY,
   CREATE_RECURRING_TASK,
+  UPDATE_RECURRING_TASK,
   PAUSE_RECURRING_TASK,
   RESUME_RECURRING_TASK,
+  TRIGGER_RECURRING_TASK,
   DELETE_RECURRING_TASK,
 } from "@agentcenter/graphql-client";
 import { useTheme } from "../src/hooks/useTheme";
@@ -55,8 +57,7 @@ const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 
 function fmtDate(dateStr: string | null): string {
   if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function parseFreqLabel(config: unknown): string {
@@ -67,7 +68,7 @@ function parseFreqLabel(config: unknown): string {
     };
     if (c.frequency === "daily") return "Daily";
     if (c.frequency === "weekly") {
-      const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const dayNames = (c.daysOfWeek ?? []).map((d) => days[d]).join(", ");
       return c.interval ? `Every ${c.interval}w · ${dayNames}` : `Weekly · ${dayNames}`;
     }
@@ -79,72 +80,120 @@ function parseFreqLabel(config: unknown): string {
   }
 }
 
-// ── Create modal ──────────────────────────────────────────────────────────────
+function freqIndexFromConfig(config: unknown): number {
+  try {
+    const str = typeof config === "string" ? config : JSON.stringify(config);
+    const idx = FREQUENCIES.findIndex((f) => f.value === str);
+    return idx >= 0 ? idx : 0;
+  } catch {
+    return 0;
+  }
+}
 
-function CreateRecurringTaskModal({ visible, onClose, onCreated }: {
+// ── Shared Form Modal ──────────────────────────────────────────────────────────
+
+function RecurringTaskFormModal({
+  visible,
+  onClose,
+  onSave,
+  initialValues,
+  title: modalTitle,
+  saveLabel,
+}: {
   visible: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  onSave: (values: {
+    title: string;
+    description: string;
+    recurrenceConfig: string;
+    priority: string | null;
+    tags: string[];
+  }) => Promise<void>;
+  initialValues?: Partial<RecurringTask>;
+  title: string;
+  saveLabel: string;
 }) {
   const { colors } = useTheme();
-  const { profileId } = useAuth();
   const insets = useSafeAreaInsets();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<string | null>(null);
-  const [freqIdx, setFreqIdx] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [taskTitle, setTaskTitle] = useState(initialValues?.title ?? "");
+  const [description, setDescription] = useState(initialValues?.description ?? "");
+  const [priority, setPriority] = useState<string | null>(initialValues?.priority ?? null);
+  const [freqIdx, setFreqIdx] = useState(
+    initialValues?.recurrenceConfig ? freqIndexFromConfig(initialValues.recurrenceConfig) : 0
+  );
+  const [tagsInput, setTagsInput] = useState((initialValues?.tags ?? []).join(", "));
+  const [saving, setSaving] = useState(false);
 
-  const [, createTask] = useMutation(CREATE_RECURRING_TASK);
+  // Reset when modal opens
+  const handleOpen = () => {
+    setTaskTitle(initialValues?.title ?? "");
+    setDescription(initialValues?.description ?? "");
+    setPriority(initialValues?.priority ?? null);
+    setFreqIdx(initialValues?.recurrenceConfig ? freqIndexFromConfig(initialValues.recurrenceConfig) : 0);
+    setTagsInput((initialValues?.tags ?? []).join(", "));
+  };
 
-  async function handleCreate() {
-    if (!title.trim()) {
+  const handleSave = async () => {
+    if (!taskTitle.trim()) {
       Alert.alert("Missing title", "Please enter a title.");
       return;
     }
-    setLoading(true);
-    const res = await createTask({
-      title: title.trim(),
+    setSaving(true);
+    const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+    await onSave({
+      title: taskTitle.trim(),
       description: description.trim(),
       recurrenceConfig: FREQUENCIES[freqIdx].value,
-      priority: priority ?? undefined,
-      createdByProfileId: profileId ?? undefined,
+      priority: priority ?? null,
+      tags,
     });
-    setLoading(false);
-    if (res.error) {
-      Alert.alert("Error", res.error.message ?? "Failed to create");
-    } else {
-      setTitle("");
-      setDescription("");
-      setPriority(null);
-      setFreqIdx(0);
-      onCreated();
-    }
-  }
+    setSaving(false);
+  };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+      onShow={handleOpen}
+    >
+      <KeyboardAvoidingView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
         {/* Header */}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+        <View style={{
+          flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+          padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border,
+        }}>
           <TouchableOpacity onPress={onClose}>
             <Text style={{ fontSize: 16, color: colors.textSecondary }}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={{ fontSize: 17, fontWeight: "700", color: colors.text }}>New Recurring Task</Text>
-          <TouchableOpacity onPress={handleCreate} disabled={loading}>
-            {loading ? <ActivityIndicator color={colors.accent} /> : <Text style={{ fontSize: 16, fontWeight: "700", color: colors.accent }}>Create</Text>}
+          <Text style={{ fontSize: 17, fontWeight: "700", color: colors.text }}>{modalTitle}</Text>
+          <TouchableOpacity onPress={handleSave} disabled={saving}>
+            {saving
+              ? <ActivityIndicator color={colors.accent} />
+              : <Text style={{ fontSize: 16, fontWeight: "700", color: colors.accent }}>{saveLabel}</Text>}
           </TouchableOpacity>
         </View>
-        <ScrollView contentContainerStyle={{ padding: 16, gap: 18, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
+
+        <ScrollView
+          contentContainerStyle={{ padding: 16, gap: 18, paddingBottom: insets.bottom + 24 }}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Title */}
           <View style={{ gap: 6 }}>
             <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Title *</Text>
             <TextInput
-              style={{ backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.text }}
+              style={{
+                backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
+                borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.text,
+              }}
               placeholder="Task title…"
               placeholderTextColor={colors.placeholder}
-              value={title}
-              onChangeText={setTitle}
+              value={taskTitle}
+              onChangeText={setTaskTitle}
               autoFocus
             />
           </View>
@@ -153,7 +202,11 @@ function CreateRecurringTaskModal({ visible, onClose, onCreated }: {
           <View style={{ gap: 6 }}>
             <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Description</Text>
             <TextInput
-              style={{ backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.text, minHeight: 80, textAlignVertical: "top" }}
+              style={{
+                backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
+                borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12,
+                fontSize: 15, color: colors.text, minHeight: 80, textAlignVertical: "top",
+              }}
               placeholder="What should happen each time…"
               placeholderTextColor={colors.placeholder}
               value={description}
@@ -171,10 +224,7 @@ function CreateRecurringTaskModal({ visible, onClose, onCreated }: {
                   key={f.label}
                   onPress={() => setFreqIdx(i)}
                   style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 7,
-                    borderRadius: 8,
-                    borderWidth: 1.5,
+                    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1.5,
                     borderColor: freqIdx === i ? colors.accent : colors.border,
                     backgroundColor: freqIdx === i ? colors.accentSurface : colors.inputBg,
                   }}
@@ -191,16 +241,13 @@ function CreateRecurringTaskModal({ visible, onClose, onCreated }: {
           {/* Priority */}
           <View style={{ gap: 8 }}>
             <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Priority</Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {[null, ...PRIORITIES].map((p) => (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {([null, ...PRIORITIES] as (string | null)[]).map((p) => (
                 <TouchableOpacity
                   key={p ?? "none"}
                   onPress={() => setPriority(p)}
                   style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 8,
-                    borderWidth: 1,
+                    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1,
                     borderColor: priority === p ? colors.accent : colors.border,
                     backgroundColor: priority === p ? colors.accentSurface : colors.inputBg,
                   }}
@@ -213,6 +260,22 @@ function CreateRecurringTaskModal({ visible, onClose, onCreated }: {
               ))}
             </View>
           </View>
+
+          {/* Tags */}
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Tags</Text>
+            <TextInput
+              style={{
+                backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
+                borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.text,
+              }}
+              placeholder="bug, backend, api (comma-separated)"
+              placeholderTextColor={colors.placeholder}
+              value={tagsInput}
+              onChangeText={setTagsInput}
+              returnKeyType="done"
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
@@ -223,8 +286,10 @@ function CreateRecurringTaskModal({ visible, onClose, onCreated }: {
 
 export default function RecurringTasksScreen() {
   const { colors } = useTheme();
+  const { profileId } = useAuth();
   const insets = useSafeAreaInsets();
   const [createOpen, setCreateOpen] = useState(false);
+  const [editTask, setEditTask] = useState<RecurringTask | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
 
   const [result, reexecute] = useQuery<{ recurringTasks: RecurringTask[] }>({
@@ -233,21 +298,50 @@ export default function RecurringTasksScreen() {
     requestPolicy: "cache-and-network",
   });
 
+  const [, createTask] = useMutation(CREATE_RECURRING_TASK);
+  const [, updateTask] = useMutation(UPDATE_RECURRING_TASK);
   const [, pauseTask] = useMutation(PAUSE_RECURRING_TASK);
   const [, resumeTask] = useMutation(RESUME_RECURRING_TASK);
+  const [, triggerTask] = useMutation(TRIGGER_RECURRING_TASK);
   const [, deleteTask] = useMutation(DELETE_RECURRING_TASK);
 
   const tasks = result.data?.recurringTasks ?? [];
 
+  const refresh = () => reexecute({ requestPolicy: "network-only" });
+
   function handleActions(task: RecurringTask) {
     Alert.alert(task.title, undefined, [
+      {
+        text: "✏️ Edit",
+        onPress: () => setEditTask(task),
+      },
+      {
+        text: "⚡ Generate Now",
+        onPress: () => {
+          Alert.alert(
+            "Generate Task Now",
+            "This will immediately create a task from this recurring blueprint.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Generate",
+                onPress: async () => {
+                  const res = await triggerTask({ id: task.id });
+                  if (res.error) Alert.alert("Error", res.error.message ?? "Failed to trigger");
+                  else { Alert.alert("Done", "Task generated successfully"); refresh(); }
+                },
+              },
+            ]
+          );
+        },
+      },
       {
         text: task.isActive ? "⏸ Pause" : "▶ Resume",
         onPress: async () => {
           const fn = task.isActive ? pauseTask : resumeTask;
           const res = await fn({ id: task.id });
           if (res.error) Alert.alert("Error", res.error.message ?? "Failed");
-          else reexecute({ requestPolicy: "network-only" });
+          else refresh();
         },
       },
       {
@@ -262,7 +356,7 @@ export default function RecurringTasksScreen() {
               onPress: async () => {
                 const res = await deleteTask({ id: task.id });
                 if (res.error) Alert.alert("Error", res.error.message ?? "Failed");
-                else reexecute({ requestPolicy: "network-only" });
+                else refresh();
               },
             },
           ]);
@@ -282,7 +376,7 @@ export default function RecurringTasksScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Filter toggle */}
+      {/* Filter + Create toolbar */}
       <View style={{ flexDirection: "row", padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
         <TouchableOpacity
           onPress={() => setIncludeInactive(false)}
@@ -315,7 +409,7 @@ export default function RecurringTasksScreen() {
         refreshControl={
           <RefreshControl
             refreshing={result.fetching && tasks.length > 0}
-            onRefresh={() => reexecute({ requestPolicy: "network-only" })}
+            onRefresh={refresh}
             tintColor={colors.accent}
           />
         }
@@ -329,12 +423,8 @@ export default function RecurringTasksScreen() {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={{
-              backgroundColor: colors.card,
-              borderRadius: 12,
-              padding: 14,
-              borderWidth: 1,
-              borderColor: colors.border,
-              gap: 8,
+              backgroundColor: colors.card, borderRadius: 12, padding: 14,
+              borderWidth: 1, borderColor: colors.border, gap: 8,
               opacity: item.isActive ? 1 : 0.6,
             }}
             onPress={() => handleActions(item)}
@@ -342,13 +432,18 @@ export default function RecurringTasksScreen() {
           >
             {/* Header */}
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={{ fontSize: 16, }}>
-                {item.isActive ? "🔄" : "⏸"}
-              </Text>
+              <Text style={{ fontSize: 16 }}>{item.isActive ? "🔄" : "⏸"}</Text>
               {item.priority && <PriorityBadge priority={item.priority} />}
               <Text style={{ fontSize: 12, color: colors.textMuted, marginLeft: "auto" }}>
                 {parseFreqLabel(item.recurrenceConfig)}
               </Text>
+              {/* Edit shortcut */}
+              <TouchableOpacity
+                onPress={() => setEditTask(item)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={{ fontSize: 13, color: colors.accent }}>✏️</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Title */}
@@ -371,6 +466,11 @@ export default function RecurringTasksScreen() {
                   Next: {fmtDate(item.nextDueAt)}
                 </Text>
               )}
+              {item.lastGeneratedAt && (
+                <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                  Last: {fmtDate(item.lastGeneratedAt)}
+                </Text>
+              )}
               {item.tags.length > 0 && (
                 <Text style={{ fontSize: 11, color: colors.textMuted }}>
                   {item.tags.join(", ")}
@@ -381,12 +481,42 @@ export default function RecurringTasksScreen() {
         )}
       />
 
-      <CreateRecurringTaskModal
+      {/* Create Modal */}
+      <RecurringTaskFormModal
         visible={createOpen}
+        title="New Recurring Task"
+        saveLabel="Create"
         onClose={() => setCreateOpen(false)}
-        onCreated={() => {
-          setCreateOpen(false);
-          reexecute({ requestPolicy: "network-only" });
+        onSave={async (values) => {
+          const res = await createTask({
+            ...values,
+            createdByProfileId: profileId ?? undefined,
+          });
+          if (res.error) {
+            Alert.alert("Error", res.error.message ?? "Failed to create");
+          } else {
+            setCreateOpen(false);
+            refresh();
+          }
+        }}
+      />
+
+      {/* Edit Modal */}
+      <RecurringTaskFormModal
+        visible={editTask !== null}
+        title="Edit Recurring Task"
+        saveLabel="Save"
+        initialValues={editTask ?? undefined}
+        onClose={() => setEditTask(null)}
+        onSave={async (values) => {
+          if (!editTask) return;
+          const res = await updateTask({ id: editTask.id, ...values });
+          if (res.error) {
+            Alert.alert("Error", res.error.message ?? "Failed to update");
+          } else {
+            setEditTask(null);
+            refresh();
+          }
         }}
       />
     </View>

@@ -10,6 +10,7 @@ import {
   Platform,
   TextInput,
   Modal,
+  RefreshControl,
 } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useQuery, useMutation, useSubscription, gql } from "urql";
@@ -26,6 +27,8 @@ import {
   UPDATE_QUEUE_ITEM_STATUS,
   DELETE_QUEUE_ITEM,
   ON_AGENT_STATUS_CHANGE,
+  TASKS_BY_STATUS_FOR_AGENT_QUERY,
+  DELIVERABLES_BY_AGENT_QUERY,
 } from "@agentcenter/graphql-client";
 import { getStoredCookie } from "../../src/api/session";
 import { useAuth } from "../../src/context/AuthContext";
@@ -87,6 +90,18 @@ interface StatusHistory {
   statusMessage: string | null; timestamp: string;
 }
 
+interface AgentTask {
+  id: string; title: string; taskNumber: number; status: string;
+  priority: string | null; dueDate: string | null;
+  assignees: { profile: { displayName: string } }[];
+}
+
+interface AgentDeliverable {
+  id: string; title: string; kind: string; version: number;
+  createdAt: string; language: string | null; fileName: string | null;
+  task: { id: string; title: string; taskNumber: number } | null;
+}
+
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = { active: "#16a34a", idle: "#6b7280", blocked: "#dc2626" };
@@ -107,7 +122,7 @@ const ACTION_ICONS: Record<string, string> = {
   command: "⚙️", analysis: "🔬", research: "🧪",
 };
 
-type Tab = "overview" | "queue" | "activity" | "history" | "setup";
+type Tab = "overview" | "tasks" | "deliverables" | "queue" | "activity" | "history" | "setup";
 
 function capLabel(s: string) { return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
 function isOnline(hb: string | null) { return !!hb && new Date(hb).getTime() > Date.now() - 2 * 60 * 1000; }
@@ -150,6 +165,14 @@ export default function AgentDetailScreen() {
   const [historyResult, reexecuteHistory] = useQuery<{ agentStatusHistory: StatusHistory[] }>({
     query: AGENT_STATUS_HISTORY_QUERY, variables: { agentId: id, limit: 50 },
     requestPolicy: "cache-and-network", pause: activeTab !== "history",
+  });
+  const [tasksResult, reexecuteTasks] = useQuery<{ tasksByStatusForAgent: Record<string, AgentTask[]> }>({
+    query: TASKS_BY_STATUS_FOR_AGENT_QUERY, variables: { agentId: id },
+    requestPolicy: "cache-and-network", pause: activeTab !== "tasks",
+  });
+  const [deliverablesResult, reexecuteDeliverables] = useQuery<{ deliverablesByAgent: AgentDeliverable[] }>({
+    query: DELIVERABLES_BY_AGENT_QUERY, variables: { agentId: id },
+    requestPolicy: "cache-and-network", pause: activeTab !== "deliverables",
   });
 
   const [, setVacation] = useMutation(SET_AGENT_VACATION);
@@ -295,8 +318,14 @@ export default function AgentDetailScreen() {
       )}
 
       {/* Tab bar */}
-      <View style={styles.tabBar}>
-        {(["overview", "queue", "activity", "history", ...(agent.setupStatus === "pending_setup" ? ["setup"] : [])] as Tab[]).map((tab) => (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabBar}
+        contentContainerStyle={styles.tabBarContent}
+        bounces={false}
+      >
+        {(["overview", "tasks", "deliverables", "queue", "activity", "history", ...(agent.setupStatus === "pending_setup" ? ["setup"] : [])] as Tab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
@@ -308,9 +337,27 @@ export default function AgentDetailScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {activeTab === "overview" && <OverviewTab agent={agent} router={router} onRefresh={() => reexecuteAgent({ requestPolicy: "network-only" })} />}
+      {activeTab === "tasks" && (
+        <AgentTasksTab
+          agentId={id}
+          data={tasksResult.data?.tasksByStatusForAgent}
+          fetching={tasksResult.fetching}
+          onRefresh={() => reexecuteTasks({ requestPolicy: "network-only" })}
+          router={router}
+        />
+      )}
+      {activeTab === "deliverables" && (
+        <AgentDeliverablesTab
+          agentId={id}
+          deliverables={deliverablesResult.data?.deliverablesByAgent ?? []}
+          fetching={deliverablesResult.fetching}
+          onRefresh={() => reexecuteDeliverables({ requestPolicy: "network-only" })}
+          router={router}
+        />
+      )}
       {activeTab === "queue" && (
         <QueueTab
           agentId={id}
@@ -615,6 +662,162 @@ function QueueCard({ item, onStatusChange, onDelete, onTaskPress }: {
       )}
       <Text style={styles.queueTime}>{fmtTime(item.createdAt)}</Text>
     </View>
+  );
+}
+
+// ── Agent Tasks Tab ───────────────────────────────────────────────────────────
+
+const TASK_STATUS_COLORS: Record<string, string> = {
+  inbox: "#6b7280", assigned: "#2563eb", in_progress: "#d97706",
+  review: "#7c3aed", done: "#16a34a", blocked: "#dc2626",
+};
+const TASK_PRIORITY_COLORS: Record<string, string> = {
+  low: "#6b7280", medium: "#d97706", high: "#dc2626", urgent: "#7c3aed",
+};
+
+function AgentTasksTab({
+  agentId,
+  data,
+  fetching,
+  onRefresh,
+  router,
+}: {
+  agentId: string;
+  data: Record<string, AgentTask[]> | undefined;
+  fetching: boolean;
+  onRefresh: () => void;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const insets = useSafeAreaInsets();
+
+  // Flatten all tasks from all status buckets
+  const allTasks: AgentTask[] = data
+    ? Object.values(data).flat().filter((t): t is AgentTask => !!t && typeof t === "object" && "id" in t)
+    : [];
+
+  if (fetching && allTasks.length === 0) {
+    return <View style={styles.center}><ActivityIndicator color="#2563eb" /></View>;
+  }
+
+  if (allTasks.length === 0) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.emptyText}>No tasks assigned</Text>
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      data={allTasks}
+      keyExtractor={(t) => t.id}
+      contentContainerStyle={[styles.tabContent, { paddingBottom: insets.bottom + 16 }]}
+      contentInsetAdjustmentBehavior="automatic"
+      refreshControl={
+        <RefreshControl refreshing={fetching && allTasks.length > 0} onRefresh={onRefresh} tintColor="#2563eb" />
+      }
+      renderItem={({ item }) => {
+        const statusColor = TASK_STATUS_COLORS[item.status] ?? "#6b7280";
+        const priorityColor = item.priority ? (TASK_PRIORITY_COLORS[item.priority] ?? "#6b7280") : null;
+        return (
+          <TouchableOpacity
+            style={styles.taskRow}
+            onPress={() => router.push(`/task/${item.id}`)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.taskRowHeader}>
+              <Text style={styles.taskNumber}>#{item.taskNumber}</Text>
+              <View style={[styles.statusPill, { backgroundColor: statusColor + "18" }]}>
+                <Text style={[styles.statusPillText, { color: statusColor }]}>
+                  {item.status.replace("_", " ")}
+                </Text>
+              </View>
+              {priorityColor && (
+                <View style={[styles.priorityDot, { backgroundColor: priorityColor }]} />
+              )}
+            </View>
+            <Text style={styles.taskTitle} numberOfLines={2}>{item.title}</Text>
+            {item.dueDate && (
+              <Text style={styles.taskDue}>Due {fmtDate(item.dueDate)}</Text>
+            )}
+          </TouchableOpacity>
+        );
+      }}
+    />
+  );
+}
+
+// ── Agent Deliverables Tab ────────────────────────────────────────────────────
+
+const KIND_ICONS: Record<string, string> = {
+  markdown: "📄", code: "💻", link: "🔗", file: "📎",
+};
+const KIND_COLORS: Record<string, string> = {
+  markdown: "#2563eb", code: "#7c3aed", link: "#059669", file: "#d97706",
+};
+
+function AgentDeliverablesTab({
+  agentId,
+  deliverables,
+  fetching,
+  onRefresh,
+  router,
+}: {
+  agentId: string;
+  deliverables: AgentDeliverable[];
+  fetching: boolean;
+  onRefresh: () => void;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const insets = useSafeAreaInsets();
+
+  if (fetching && deliverables.length === 0) {
+    return <View style={styles.center}><ActivityIndicator color="#2563eb" /></View>;
+  }
+
+  if (deliverables.length === 0) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.emptyText}>No deliverables yet</Text>
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      data={deliverables}
+      keyExtractor={(d) => d.id}
+      contentContainerStyle={[styles.tabContent, { paddingBottom: insets.bottom + 16 }]}
+      contentInsetAdjustmentBehavior="automatic"
+      refreshControl={
+        <RefreshControl refreshing={fetching && deliverables.length > 0} onRefresh={onRefresh} tintColor="#2563eb" />
+      }
+      renderItem={({ item }) => {
+        const kindColor = KIND_COLORS[item.kind] ?? "#6b7280";
+        const kindIcon = KIND_ICONS[item.kind] ?? "📄";
+        return (
+          <TouchableOpacity
+            style={styles.deliverableRow}
+            onPress={() => router.push(`/deliverable/${item.id}`)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.deliverableKindBadge, { backgroundColor: kindColor + "18" }]}>
+              <Text style={styles.deliverableKindIcon}>{kindIcon}</Text>
+              <Text style={[styles.deliverableKindText, { color: kindColor }]}>
+                {item.kind} · v{item.version}
+              </Text>
+            </View>
+            <Text style={styles.deliverableTitle} numberOfLines={2}>{item.title}</Text>
+            {item.task && (
+              <Text style={styles.deliverableTask} numberOfLines={1}>
+                #{item.task.taskNumber} {item.task.title}
+              </Text>
+            )}
+            <Text style={styles.deliverableDate}>{fmtDate(item.createdAt)}</Text>
+          </TouchableOpacity>
+        );
+      }}
+    />
   );
 }
 
@@ -1023,13 +1226,42 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 16, fontWeight: "700", color: "#111827" },
   statLabel: { fontSize: 10, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.3 },
 
-  tabBar: { flexDirection: "row", backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb", minHeight: 46 },
-  tabItem: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 13, borderBottomWidth: 2, borderBottomColor: "transparent" },
+  tabBar: { backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb", minHeight: 46 },
+  tabBarContent: { flexDirection: "row", alignItems: "stretch" },
+  tabItem: { alignItems: "center", justifyContent: "center", paddingVertical: 13, paddingHorizontal: 14, borderBottomWidth: 2, borderBottomColor: "transparent" },
   tabItemActive: { borderBottomColor: "#2563eb" },
   tabText: { fontSize: 13, color: "#6b7280", fontWeight: "500" },
   tabTextActive: { color: "#2563eb", fontWeight: "600" },
 
   tabContent: { padding: 16, gap: 12 },
+
+  // Agent Tasks tab
+  taskRow: {
+    backgroundColor: "#fff", borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: "#e5e7eb", gap: 6,
+  },
+  taskRowHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  taskNumber: { fontSize: 11, color: "#9ca3af", fontWeight: "500" },
+  statusPill: { borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2 },
+  statusPillText: { fontSize: 11, fontWeight: "600", textTransform: "capitalize" },
+  priorityDot: { width: 7, height: 7, borderRadius: 3.5 },
+  taskTitle: { fontSize: 14, fontWeight: "600", color: "#111827", lineHeight: 19 },
+  taskDue: { fontSize: 11, color: "#9ca3af" },
+
+  // Agent Deliverables tab
+  deliverableRow: {
+    backgroundColor: "#fff", borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: "#e5e7eb", gap: 6,
+  },
+  deliverableKindBadge: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start",
+  },
+  deliverableKindIcon: { fontSize: 12 },
+  deliverableKindText: { fontSize: 11, fontWeight: "600", textTransform: "capitalize" },
+  deliverableTitle: { fontSize: 14, fontWeight: "600", color: "#111827", lineHeight: 19 },
+  deliverableTask: { fontSize: 12, color: "#6b7280" },
+  deliverableDate: { fontSize: 11, color: "#9ca3af" },
   listContent: { padding: 16, gap: 10 },
 
   currentTaskCard: {
