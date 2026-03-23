@@ -8,10 +8,11 @@ import {
   Alert,
   RefreshControl,
 } from "react-native";
+import { useState } from "react";
 import { useRouter } from "expo-router";
-import { useQuery, useMutation } from "urql";
+import { useQuery, useMutation, useClient } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { KANBAN_BOARD_QUERY, UPDATE_TASK } from "@agentcenter/graphql-client";
+import { KANBAN_BOARD_QUERY, LOAD_MORE_COLUMN_QUERY, UPDATE_TASK } from "@agentcenter/graphql-client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -110,11 +111,17 @@ function Column({
   tasks,
   onTaskPress,
   onTaskMove,
+  hasMore,
+  loadingMore,
+  onLoadMore,
 }: {
   col: (typeof KANBAN_COLUMNS)[number];
   tasks: KanbanTask[];
   onTaskPress: (id: string) => void;
   onTaskMove: (task: KanbanTask) => void;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
 }) {
   return (
     <View style={styles.column}>
@@ -144,6 +151,20 @@ function Column({
             />
           ))
         )}
+        {hasMore && (
+          <TouchableOpacity
+            style={[styles.loadMoreBtn, { borderColor: col.color + "44" }]}
+            onPress={onLoadMore}
+            disabled={loadingMore}
+            activeOpacity={0.7}
+          >
+            {loadingMore ? (
+              <ActivityIndicator size="small" color={col.color} />
+            ) : (
+              <Text style={[styles.loadMoreText, { color: col.color }]}>Load more</Text>
+            )}
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </View>
   );
@@ -168,6 +189,8 @@ interface KanbanBoardProps {
   priorities?: string[];
 }
 
+const KANBAN_PAGE_SIZE = 50;
+
 export function KanbanBoard({
   projectId,
   bottomPadding = 0,
@@ -179,6 +202,10 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const client = useClient();
+
+  const [extraTasks, setExtraTasksMap] = useState<Partial<Record<keyof KanbanBoardData, KanbanTask[]>>>({});
+  const [loadingColumns, setLoadingColumns] = useState<Partial<Record<keyof KanbanBoardData, boolean>>>({});
 
   const [result, reexecute] = useQuery<KanbanBoardData>({
     query: KANBAN_BOARD_QUERY,
@@ -218,6 +245,33 @@ export function KanbanBoard({
     if (res.error) Alert.alert("Error", "Failed to move task");
   }
 
+  async function loadMoreForColumn(colKey: keyof KanbanBoardData) {
+    const currentBase = data?.[colKey] ?? [];
+    const currentExtra = extraTasks[colKey] ?? [];
+    const offset = currentBase.length + currentExtra.length;
+    setLoadingColumns((prev) => ({ ...prev, [colKey]: true }));
+    try {
+      const res = await client.query(LOAD_MORE_COLUMN_QUERY, {
+        status: colKey,
+        limit: KANBAN_PAGE_SIZE,
+        offset,
+        projectId: projectId ?? null,
+        blockedOnly: blockedOnly || undefined,
+        topLevelOnly: topLevelOnly || undefined,
+        unassignedOnly: unassignedOnly || undefined,
+        dueDateFilter: dueDateFilter || undefined,
+        priorities: priorities?.length ? priorities : undefined,
+      }).toPromise();
+      const newTasks: KanbanTask[] = res.data?.tasksByStatus ?? [];
+      setExtraTasksMap((prev) => ({
+        ...prev,
+        [colKey]: [...(prev[colKey] ?? []), ...newTasks],
+      }));
+    } finally {
+      setLoadingColumns((prev) => ({ ...prev, [colKey]: false }));
+    }
+  }
+
   if (fetching && !hasData) {
     return (
       <View style={styles.center}>
@@ -249,20 +303,33 @@ export function KanbanBoard({
         refreshControl={
           <RefreshControl
             refreshing={fetching && hasData}
-            onRefresh={() => reexecute({ requestPolicy: "network-only" })}
+            onRefresh={() => {
+              setExtraTasksMap({});
+              reexecute({ requestPolicy: "network-only" });
+            }}
             tintColor="#2563eb"
           />
         }
       >
-        {KANBAN_COLUMNS.map((col) => (
-          <Column
-            key={col.key}
-            col={col}
-            tasks={data?.[col.key] ?? []}
-            onTaskPress={(id) => router.push(`/task/${id}`)}
-            onTaskMove={moveTask}
-          />
-        ))}
+        {KANBAN_COLUMNS.map((col) => {
+          const baseTasks = data?.[col.key] ?? [];
+          const extras = extraTasks[col.key] ?? [];
+          const allTasks = [...baseTasks, ...extras];
+          const hasMore = baseTasks.length + extras.length > 0 &&
+            (baseTasks.length + extras.length) % KANBAN_PAGE_SIZE === 0;
+          return (
+            <Column
+              key={col.key}
+              col={col}
+              tasks={allTasks}
+              onTaskPress={(id) => router.push(`/task/${id}`)}
+              onTaskMove={moveTask}
+              hasMore={hasMore}
+              loadingMore={loadingColumns[col.key] ?? false}
+              onLoadMore={() => loadMoreForColumn(col.key)}
+            />
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -316,6 +383,15 @@ const styles = StyleSheet.create({
 
   emptyColumn: { paddingVertical: 24, alignItems: "center" },
   emptyColumnText: { fontSize: 12, color: "#d1d5db" },
+
+  loadMoreBtn: {
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignItems: "center",
+    marginTop: 2,
+  },
+  loadMoreText: { fontSize: 12, fontWeight: "600" },
 
   taskCard: {
     backgroundColor: "#fff",

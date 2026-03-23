@@ -7,11 +7,11 @@ import {
   ActivityIndicator,
   SectionList,
 } from "react-native";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "urql";
-import { GLOBAL_SEARCH_QUERY } from "@agentcenter/graphql-client";
+import { GLOBAL_SEARCH_QUERY, TASK_BY_NUMBER_QUERY } from "@agentcenter/graphql-client";
 import { useTheme } from "../src/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -71,10 +71,21 @@ export default function SearchScreen() {
   const [submittedQuery, setSubmittedQuery] = useState("");
   const inputRef = useRef<TextInput>(null);
 
+  // Detect #number pattern for direct task navigation
+  const taskNumberMatch = submittedQuery.trim().match(/^#(\d+)$/);
+  const taskNumber = taskNumberMatch ? parseInt(taskNumberMatch[1], 10) : null;
+
+  const [taskByNumberResult] = useQuery<{ taskByNumber: { id: string } | null }>({
+    query: TASK_BY_NUMBER_QUERY,
+    variables: { taskNumber: taskNumber ?? 0 },
+    pause: taskNumber === null,
+    requestPolicy: "cache-and-network",
+  });
+
   const [result] = useQuery<{ globalSearch: SearchResults }>({
     query: GLOBAL_SEARCH_QUERY,
     variables: { searchText: submittedQuery, limit: 30 },
-    pause: submittedQuery.trim().length < 2,
+    pause: submittedQuery.trim().length < 2 || taskNumber !== null,
     requestPolicy: "cache-and-network",
   });
 
@@ -85,6 +96,14 @@ export default function SearchScreen() {
   const totalCount = tasks.length + messages.length + deliverables.length;
   const hasResults = totalCount > 0;
   const searched = submittedQuery.trim().length >= 2;
+
+  // Auto-navigate when #number resolves to a task
+  const resolvedTaskId = taskByNumberResult.data?.taskByNumber?.id;
+  useEffect(() => {
+    if (resolvedTaskId) {
+      router.push(`/task/${resolvedTaskId}`);
+    }
+  }, [resolvedTaskId]);
 
   function handleSubmit() {
     const q = query.trim();
@@ -163,14 +182,20 @@ export default function SearchScreen() {
       </View>
 
       {/* Results */}
-      {result.fetching ? (
+      {(result.fetching || taskByNumberResult.fetching) ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
           <ActivityIndicator size="large" color={colors.accent} />
+        </View>
+      ) : taskNumber !== null && !resolvedTaskId && !taskByNumberResult.fetching ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 8 }}>
+          <Ionicons name="file-tray-outline" size={48} color={colors.border} />
+          <Text style={{ fontSize: 15, color: colors.textMuted }}>Task #{taskNumber} not found</Text>
         </View>
       ) : !searched ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 8 }}>
           <Ionicons name="search-outline" size={48} color={colors.border} />
-          <Text style={{ fontSize: 15, color: colors.textMuted }}>Type at least 2 characters to search</Text>
+          <Text style={{ fontSize: 15, color: colors.textMuted }}>Search tasks, messages, deliverables</Text>
+          <Text style={{ fontSize: 13, color: colors.textMuted }}>Tip: type #42 to jump to a task by number</Text>
         </View>
       ) : !hasResults ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 8 }}>

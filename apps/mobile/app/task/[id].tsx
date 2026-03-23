@@ -20,6 +20,7 @@ import {
   TASK_QUERY,
   MESSAGES_BY_TASK_QUERY,
   DELIVERABLES_BY_TASK_QUERY,
+  DELIVERABLES_BY_CHILD_TASKS_QUERY,
   CHILD_TASKS_QUERY,
   TASK_WORK_SUMMARY_QUERY,
   ON_TASK_UPDATED,
@@ -695,6 +696,11 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
   );
 }
 
+interface ChildTaskDeliverableGroup {
+  task: { id: string; title: string; taskNumber: number; status: string };
+  deliverables: (Deliverable & { profile: { displayName: string } })[];
+}
+
 function DeliverablesTab({ taskId }: { taskId: string }) {
   const router = useRouter();
 
@@ -704,7 +710,16 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
     requestPolicy: "cache-and-network",
   });
 
+  const [childResult] = useQuery<{ deliverablesByChildTasks: ChildTaskDeliverableGroup[] }>({
+    query: DELIVERABLES_BY_CHILD_TASKS_QUERY,
+    variables: { parentTaskId: taskId },
+    requestPolicy: "cache-and-network",
+  });
+
   const deliverables = result.data?.deliverablesByTask ?? [];
+  const childGroups = (childResult.data?.deliverablesByChildTasks ?? []).filter(
+    (g) => g.deliverables.length > 0,
+  );
 
   if (result.fetching && deliverables.length === 0) {
     return (
@@ -714,7 +729,7 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
     );
   }
 
-  if (deliverables.length === 0) {
+  if (deliverables.length === 0 && childGroups.length === 0) {
     return (
       <View style={styles.center}>
         <Text style={styles.emptyText}>No deliverables yet</Text>
@@ -723,9 +738,7 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.tabContent}
-    >
+    <ScrollView contentContainerStyle={styles.tabContent}>
       {deliverables.map((d) => (
         <TouchableOpacity
           key={d.id}
@@ -747,6 +760,37 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
           </View>
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
+      ))}
+
+      {childGroups.map((group) => (
+        <View key={group.task.id}>
+          <View style={styles.childGroupHeader}>
+            <View style={[styles.subtaskDot, { backgroundColor: STATUS_COLORS[group.task.status] ?? "#6b7280" }]} />
+            <Text style={styles.childGroupTitle} numberOfLines={1}>
+              #{group.task.taskNumber} {group.task.title}
+            </Text>
+          </View>
+          {group.deliverables.map((d) => (
+            <TouchableOpacity
+              key={d.id}
+              style={[styles.deliverableCard, { marginLeft: 12 }]}
+              onPress={() => router.push(`/deliverable/${d.id}`)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.deliverableIcon}>
+                <Text style={{ fontSize: 20 }}>{KIND_ICONS[d.kind] ?? "📄"}</Text>
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.deliverableTitle} numberOfLines={1}>{d.title}</Text>
+                <Text style={styles.deliverableMeta}>
+                  {d.kind} · v{d.version} · {d.profile.displayName}
+                </Text>
+                <Text style={styles.deliverableTime}>{formatDate(d.createdAt)}</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       ))}
     </ScrollView>
   );
@@ -1132,6 +1176,15 @@ const styles = StyleSheet.create({
   miniPillText: { fontSize: 10, fontWeight: "600", textTransform: "capitalize" },
 
   // Subtasks
+  childGroupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginTop: 8,
+  },
+  childGroupTitle: { fontSize: 13, fontWeight: "600", color: "#374151", flex: 1 },
   subtaskRow: {
     flexDirection: "row",
     alignItems: "center",
