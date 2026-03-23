@@ -45,20 +45,24 @@ function channelIcon(channel: Channel): string {
   return "#";
 }
 
+const PAGE_SIZE = 50;
+
 export default function ChannelsScreen() {
   const router = useRouter();
   const { profileId } = useAuth();
   const [search, setSearch] = useState("");
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
   const [result, reexecute] = useQuery<{ channels: Channel[] }>({
     query: CHANNELS_QUERY,
-    variables: { profileId: profileId ?? undefined, limit: 100 },
+    variables: { profileId: profileId ?? undefined, limit },
     requestPolicy: "cache-and-network",
     pause: !profileId,
   });
 
   const { data, fetching, error } = result;
   const allChannels = data?.channels ?? [];
+  const hasMore = allChannels.length === limit;
   const channels = search.trim()
     ? allChannels.filter((c) =>
         channelDisplayName(c, profileId).toLowerCase().includes(search.toLowerCase()) ||
@@ -104,14 +108,25 @@ export default function ChannelsScreen() {
       <FlatList
         data={channels}
         keyExtractor={(item) => item.id}
-        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={channels.length === 0 ? styles.emptyContainer : styles.listContent}
         refreshControl={
           <RefreshControl
-            refreshing={fetching && allChannels.length === 0}
-            onRefresh={() => reexecute({ requestPolicy: "network-only" })}
+            refreshing={fetching && allChannels.length > 0}
+            onRefresh={() => {
+              setLimit(PAGE_SIZE);
+              reexecute({ requestPolicy: "network-only" });
+            }}
             tintColor="#2563eb"
           />
+        }
+        onEndReached={() => {
+          if (hasMore && !fetching && !search.trim()) setLimit((l) => l + PAGE_SIZE);
+        }}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={
+          fetching && allChannels.length > 0 ? (
+            <ActivityIndicator color="#2563eb" style={{ marginVertical: 16 }} />
+          ) : null
         }
         ListEmptyComponent={
           <Text style={styles.emptyText}>

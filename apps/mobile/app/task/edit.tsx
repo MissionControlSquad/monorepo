@@ -81,7 +81,7 @@ export default function EditTaskScreen() {
   const [taskResult] = useQuery<{ task: Task | null }>({
     query: TASK_QUERY,
     variables: { id },
-    requestPolicy: "cache-and-network",
+    requestPolicy: "cache-first",
   });
 
   const task = taskResult.data?.task;

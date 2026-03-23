@@ -170,7 +170,6 @@ export default function AgentsScreen() {
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
-        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={filtered.length === 0 ? styles.emptyContainer : styles.listContent}
         refreshControl={
           <RefreshControl refreshing={fetching} onRefresh={() => reexecute({ requestPolicy: "network-only" })} tintColor="#2563eb" />

@@ -35,7 +35,7 @@ interface RecurringTask {
   status: string;
   priority: string | null;
   tags: string[];
-  recurrenceConfig: string;
+  recurrenceConfig: unknown;
   isActive: boolean;
   timezone: string | null;
   nextDueAt: string | null;
@@ -59,9 +59,12 @@ function fmtDate(dateStr: string | null): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function parseFreqLabel(config: string): string {
+function parseFreqLabel(config: unknown): string {
   try {
-    const c = JSON.parse(config) as { frequency?: string; interval?: number; daysOfWeek?: number[]; dayOfMonth?: number };
+    const c = (typeof config === "string" ? JSON.parse(config) : config) as {
+      frequency?: string; interval?: number; daysOfWeek?: number[]; dayOfMonth?: number;
+      time?: string; type?: string;
+    };
     if (c.frequency === "daily") return "Daily";
     if (c.frequency === "weekly") {
       const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -69,9 +72,10 @@ function parseFreqLabel(config: string): string {
       return c.interval ? `Every ${c.interval}w · ${dayNames}` : `Weekly · ${dayNames}`;
     }
     if (c.frequency === "monthly") return `Monthly · day ${c.dayOfMonth ?? 1}`;
-    return config;
+    if (c.type) return c.type;
+    return typeof config === "string" ? config : JSON.stringify(config);
   } catch {
-    return config;
+    return typeof config === "string" ? config : "—";
   }
 }
 

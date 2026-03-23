@@ -39,7 +39,7 @@ interface Activity {
   message: string;
   metadata: Record<string, unknown> | null;
   createdAt: string;
-  profile: ActivityProfile;
+  profile: ActivityProfile | null;
   task: ActivityTask | null;
 }
 
@@ -220,11 +220,11 @@ export default function ActivityScreen() {
                 <View style={styles.activityHeader}>
                   <View style={[styles.avatar, { borderColor: color }]}>
                     <Text style={[styles.avatarText, { color }]}>
-                      {item.profile.displayName.charAt(0).toUpperCase()}
+                      {item.profile?.displayName?.charAt(0)?.toUpperCase() ?? "?"}
                     </Text>
                   </View>
                   <Text style={styles.actorName} numberOfLines={1}>
-                    {item.profile.displayName}
+                    {item.profile?.displayName ?? "Unknown"}
                   </Text>
                   <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
                 </View>
