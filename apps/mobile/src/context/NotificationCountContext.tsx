@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback } from "react";
 import { useAuth } from "./AuthContext";
 import { NOTIFICATION_POLL_INTERVAL_MS } from "@agentcenter/utils";
+import { usePollingInterval } from "@agentcenter/hooks";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -44,7 +45,6 @@ export function NotificationCountProvider({ children }: { children: React.ReactN
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     if (!serverUrl || !isSignedIn) return;
@@ -93,14 +93,11 @@ export function NotificationCountProvider({ children }: { children: React.ReactN
   }, [serverUrl]);
 
   // Initial fetch + polling
-  useEffect(() => {
-    if (!isSignedIn || !serverUrl) return;
-    fetchNotifications();
-    intervalRef.current = setInterval(fetchNotifications, NOTIFICATION_POLL_INTERVAL_MS);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [isSignedIn, serverUrl, fetchNotifications]);
+  const reexecute = usePollingInterval(
+    fetchNotifications,
+    NOTIFICATION_POLL_INTERVAL_MS,
+    isSignedIn && !!serverUrl,
+  );
 
   const unreadCount = notifications.filter((n) => !n.readAt).length;
 

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "../ui";
 import { NotificationDropdown } from "./NotificationDropdown";
+import { usePollingInterval } from "@agentcenter/hooks";
 
 export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -22,11 +23,7 @@ export function NotificationBell() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchCount();
-    const interval = setInterval(fetchCount, 30_000);
-    return () => clearInterval(interval);
-  }, [fetchCount]);
+  usePollingInterval(fetchCount, 30_000);
 
   // Close dropdown on outside click
   useEffect(() => {

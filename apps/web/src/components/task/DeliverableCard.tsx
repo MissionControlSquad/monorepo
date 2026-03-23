@@ -7,7 +7,7 @@ import { useHighlightedHtml } from "../../lib/useHighlight";
 import { Badge, Button } from "../ui";
 import { MentionText } from "../common/MarkdownWithMentions";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
-import { getAssetUrl, formatFileSize } from "@agentcenter/utils";
+import { getAssetUrl, formatFileSize, stripMarkdown } from "@agentcenter/utils";
 import type { Deliverable, Agent } from "@agentcenter/types";
 
 interface DeliverableCardProps {
@@ -22,21 +22,6 @@ const KIND_CONFIG = {
   file: { label: "File", variant: "orange" as const, icon: File },
   link: { label: "Link", variant: "green" as const, icon: Link },
 };
-
-function stripMarkdown(text: string): string {
-  return text
-    .replace(/#{1,6}\s+/g, "")
-    .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/\*(.+?)\*/g, "$1")
-    .replace(/`{1,3}[^`]*`{1,3}/g, "")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
-    .replace(/^[-*+]\s+/gm, "")
-    .replace(/^\d+\.\s+/gm, "")
-    .replace(/^>\s+/gm, "")
-    .replace(/\n{2,}/g, " ")
-    .trim();
-}
 
 function CodePreview({ content, language }: { content: string; language?: string }) {
   const snippet = content.split("\n").slice(0, 4).join("\n");

@@ -77,6 +77,25 @@ export function formatFileSize(bytes: number | null | undefined): string {
 }
 
 /**
+ * Strips common Markdown syntax from a string, leaving plain text.
+ * Useful for generating preview snippets from markdown content.
+ */
+export function stripMarkdown(text: string): string {
+  return text
+    .replace(/#{1,6}\s+/g, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/`{1,3}[^`]*`{1,3}/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/^[-*+]\s+/gm, "")
+    .replace(/^\d+\.\s+/gm, "")
+    .replace(/^>\s+/gm, "")
+    .replace(/\n{2,}/g, " ")
+    .trim();
+}
+
+/**
  * "in_progress" → "In Progress", "squad_lead" → "Squad Lead"
  * Replaces underscores with spaces and title-cases each word.
  */
