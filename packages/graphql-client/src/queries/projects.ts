@@ -1,4 +1,5 @@
 import { gql } from "urql";
+import { PROFILE_WITH_AGENT_FIELDS } from "../fragments";
 
 export const PROJECTS_QUERY = gql`
   query Projects {
@@ -16,16 +17,7 @@ export const PROJECTS_QUERY = gql`
         profileId
         joinedAt
         profile {
-          id
-          displayName
-          username
-          avatarUrl
-          agentId
-          agent {
-            id
-            name
-            identityEmoji
-          }
+          ${PROFILE_WITH_AGENT_FIELDS}
         }
       }
     }
@@ -48,15 +40,8 @@ export const PROJECT_QUERY = gql`
         profileId
         joinedAt
         profile {
-          id
-          displayName
-          username
-          avatarUrl
-          agentId
+          ${PROFILE_WITH_AGENT_FIELDS}
           agent {
-            id
-            name
-            identityEmoji
             role
             status
           }

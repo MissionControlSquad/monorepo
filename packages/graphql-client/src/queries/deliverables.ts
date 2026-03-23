@@ -1,4 +1,5 @@
 import { gql } from "urql";
+import { PROFILE_FIELDS } from "../fragments";
 
 export const DELIVERABLES_BY_TASK_QUERY = gql`
   query DeliverablesByTask($taskId: String!) {
@@ -19,10 +20,7 @@ export const DELIVERABLES_BY_TASK_QUERY = gql`
       version
       createdAt
       profile {
-        id
-        displayName
-        username
-        avatarUrl
+        ${PROFILE_FIELDS}
       }
     }
   }
@@ -75,10 +73,7 @@ export const DELIVERABLE_QUERY = gql`
       version
       createdAt
       profile {
-        id
-        displayName
-        username
-        avatarUrl
+        ${PROFILE_FIELDS}
       }
       task {
         id
@@ -109,10 +104,7 @@ export const DELIVERABLE_WITH_CONTEXT_QUERY = gql`
       version
       createdAt
       profile {
-        id
-        displayName
-        username
-        avatarUrl
+        ${PROFILE_FIELDS}
       }
       task {
         id
@@ -150,10 +142,7 @@ export const DELIVERABLE_VERSIONS_QUERY = gql`
       editedByProfileId
       createdAt
       editedByProfile {
-        id
-        displayName
-        username
-        avatarUrl
+        ${PROFILE_FIELDS}
       }
     }
   }

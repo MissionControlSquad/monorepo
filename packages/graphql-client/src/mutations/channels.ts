@@ -1,4 +1,5 @@
 import { gql } from "urql";
+import { PROFILE_FIELDS, PROFILE_MINIMAL_FIELDS, PROFILE_WITH_KIND_FIELDS } from "../fragments";
 
 const CHANNEL_MESSAGE_FRAGMENT = `
   id
@@ -9,16 +10,10 @@ const CHANNEL_MESSAGE_FRAGMENT = `
   pinnedAt
   pinnedByProfileId
   pinnedByProfile {
-    id
-    displayName
-    username
+    ${PROFILE_MINIMAL_FIELDS}
   }
   fromProfile {
-    id
-    kind
-    displayName
-    username
-    avatarUrl
+    ${PROFILE_WITH_KIND_FIELDS}
   }
   attachments {
     id
@@ -37,9 +32,7 @@ const CHANNEL_MESSAGE_FRAGMENT = `
     id
     profileId
     profile {
-      id
-      displayName
-      username
+      ${PROFILE_MINIMAL_FIELDS}
     }
   }
   reactions {
@@ -47,9 +40,7 @@ const CHANNEL_MESSAGE_FRAGMENT = `
     profileId
     emoji
     profile {
-      id
-      displayName
-      username
+      ${PROFILE_MINIMAL_FIELDS}
     }
   }
 `;
@@ -83,9 +74,7 @@ export const CREATE_CHANNEL = gql`
         profileId
         role
         profile {
-          id
-          displayName
-          username
+          ${PROFILE_MINIMAL_FIELDS}
         }
       }
     }
@@ -103,10 +92,7 @@ export const START_CONVERSATION = gql`
         id
         profileId
         profile {
-          id
-          displayName
-          username
-          avatarUrl
+          ${PROFILE_FIELDS}
         }
       }
     }
@@ -127,9 +113,7 @@ export const JOIN_CHANNEL = gql`
         slug
       }
       profile {
-        id
-        displayName
-        username
+        ${PROFILE_MINIMAL_FIELDS}
       }
     }
   }
@@ -147,9 +131,7 @@ export const ADD_CHANNEL_MEMBER = gql`
       profileId
       role
       profile {
-        id
-        displayName
-        username
+        ${PROFILE_MINIMAL_FIELDS}
       }
     }
   }
@@ -202,9 +184,7 @@ export const TOGGLE_CHANNEL_MESSAGE_REACTION = gql`
         profileId
         emoji
         profile {
-          id
-          displayName
-          username
+          ${PROFILE_MINIMAL_FIELDS}
         }
       }
     }

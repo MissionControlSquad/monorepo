@@ -33,6 +33,8 @@ export type ProfileKind = "human" | "agent";
 
 export type SetupStatus = "pending_setup" | "active" | "deactivated";
 
+export type AgentLevel = "intern" | "specialist" | "lead";
+
 export type QueueItemStatus = "pending" | "in_progress" | "completed" | "blocked" | "skipped";
 
 export type QueueItemType =
@@ -125,7 +127,7 @@ export interface Agent {
   currentTask?: string | null;
   avatar?: string | null;
   identityEmoji?: string | null;
-  level?: number | null;
+  level?: AgentLevel | null;
   username?: string | null;
   lastHeartbeat?: string | null;
   setupStatus: SetupStatus;
@@ -138,6 +140,7 @@ export interface Agent {
   cloudVmId?: string | null;
   personality?: string | null;
   workspacePath?: string | null;
+  /** Search result alias — some GraphQL queries return `_id` instead of `id`. */
   _id?: string;
   createdBy?: string | null;
   createdAt?: string;
@@ -238,7 +241,7 @@ export interface Channel {
 export interface MessageAttachment {
   id: string;
   messageId: string;
-  documentId?: string | null;
+  documentId: string;
   document?: {
     id: string;
     title?: string | null;

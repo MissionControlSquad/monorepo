@@ -1,4 +1,5 @@
 import { gql } from "urql";
+import { PROFILE_FIELDS, PROFILE_WITH_AGENT_FIELDS } from "../fragments";
 
 export const TASKS_PENDING_REVIEW_QUERY = gql`
   query TasksPendingReview($agentId: String!, $projectId: String) {
@@ -19,16 +20,7 @@ export const TASKS_PENDING_REVIEW_QUERY = gql`
         id
         profileId
         profile {
-          id
-          displayName
-          username
-          avatarUrl
-          agentId
-          agent {
-            id
-            name
-            identityEmoji
-          }
+          ${PROFILE_WITH_AGENT_FIELDS}
         }
       }
       documents {
@@ -43,10 +35,7 @@ export const TASKS_PENDING_REVIEW_QUERY = gql`
         fromProfileId
         createdAt
         fromProfile {
-          id
-          displayName
-          username
-          avatarUrl
+          ${PROFILE_FIELDS}
         }
       }
     }
