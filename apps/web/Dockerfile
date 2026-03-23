@@ -67,6 +67,9 @@ COPY --from=build /app/apps/web/public ./apps/web/public
 COPY --from=build /app/packages/database/prisma ./prisma
 # Copy Prisma config (needed by migrate deploy to resolve schema/migration paths)
 COPY --from=build /app/packages/database/prisma.config.ts ./prisma.config.ts
+# Prisma resolves migrations relative to the schema directory (prisma/schema/),
+# but our migrations live at prisma/migrations/. Symlink so Prisma finds them.
+RUN ln -s /app/prisma/migrations /app/prisma/schema/migrations
 
 # Copy agent templates (read at runtime by agent-config-generator)
 COPY --from=build /app/apps/web/src/server/agent-templates ./apps/web/src/server/agent-templates
