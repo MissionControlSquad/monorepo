@@ -13,20 +13,14 @@ import { pubsub, PubSubEvent } from "@/server/pubsub";
 import { ensureAgentProfile } from "@/server/agent-profile";
 import type { z } from "zod/v4";
 import type { createAgentSchema } from "../../_lib/validation";
+import type { AgentConfigFile, AgentSetupResult } from "@agentcenter/utils";
 
 type CreateAgentInput = z.infer<typeof createAgentSchema>;
 
-export interface CreateAgentResult {
+export type CreateAgentResult = Omit<AgentSetupResult, "agent"> & {
   agent: Record<string, unknown>;
-  apiKey: string;
-  configFiles: { filename: string; content: string }[];
-  bootstrapMessage: string;
-  cronSchedule: string;
-  cronCommand: string;
-  workspacePath: string;
-  openclawAgentConfig: { id: string; name: string; workspace: string };
-  mcUrl: string;
-}
+};
+export type { AgentConfigFile };
 
 /**
  * Shared logic to create a single agent.

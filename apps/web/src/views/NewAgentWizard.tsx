@@ -58,32 +58,8 @@ import {
   CATEGORY_LABELS,
   type WizardTemplate as Template,
 } from "../lib/agent-wizard-templates";
+import { type SetupMode, type AgentConfigFile, type AgentSetupResult } from "@agentcenter/utils";
 import { createZipBlob } from "../lib/createZipBlob";
-
-interface ConfigFile {
-  filename: string;
-  content: string;
-}
-
-interface CreateResult {
-  agent: {
-    id: string;
-    name?: string;
-    role?: string;
-    level?: string;
-    [key: string]: unknown;
-  };
-  apiKey: string;
-  configFiles: ConfigFile[];
-  bootstrapMessage: string;
-  cronSchedule: string;
-  cronCommand: string;
-  workspacePath: string;
-  openclawAgentConfig: { id: string; name: string; workspace: string };
-  mcUrl: string;
-}
-
-type SetupMode = "auto" | "manual" | "delegate" | "cloud";
 
 type Step = "template" | "details" | "setup";
 
@@ -109,7 +85,7 @@ function DownloadButton({ filename, content }: { filename: string; content: stri
   );
 }
 
-function DownloadZipButton({ files, zipName }: { files: ConfigFile[]; zipName: string }) {
+function DownloadZipButton({ files, zipName }: { files: AgentConfigFile[]; zipName: string }) {
   return (
     <Button
       icon={<Archive className="w-4 h-4" />}
@@ -157,7 +133,7 @@ export function NewAgentWizard() {
   const [step, setStep] = useState<Step>("template");
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [result, setResult] = useState<CreateResult | null>(null);
+  const [result, setResult] = useState<AgentSetupResult | null>(null);
   const [agentsResult] = useQuery({ query: AGENTS_QUERY });
   const squadLeads =
     agentsResult.data?.agents?.filter(

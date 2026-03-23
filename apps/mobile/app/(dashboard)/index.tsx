@@ -6,13 +6,17 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
+  TextInput,
 } from "react-native";
 import { useQuery } from "urql";
-import { useRouter, useNavigation } from "expo-router";
-import { useEffect } from "react";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
-import type { TaskStatus, Priority } from "../../src/types";
+import { TaskCard } from "../../src/components/TaskCard";
+import { KanbanBoard } from "../../src/components/KanbanBoard";
 
 interface TaskAssignee {
   id: string;
@@ -23,61 +27,131 @@ interface TaskAssignee {
 interface Task {
   id: string;
   title: string;
-  status: TaskStatus;
-  priority: Priority | null;
+  status: string;
+  priority: string | null;
   taskNumber: number;
   dueDate: string | null;
   tags: string[];
+  parentTaskId: string | null;
+  blockedByTaskId: string | null;
   assignees: TaskAssignee[];
+  project: { id: string; name: string } | null;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  inbox: "#6b7280",
-  assigned: "#2563eb",
-  in_progress: "#d97706",
-  review: "#7c3aed",
-  done: "#16a34a",
-  blocked: "#dc2626",
-};
+type StatusFilter = "all" | "inbox" | "assigned" | "in_progress" | "review" | "done" | "blocked";
+type ViewMode = "list" | "kanban";
+type DueDateFilter = "" | "overdue" | "today" | "this_week" | "no_due_date";
+type PriorityFilter = "" | "low" | "medium" | "high" | "urgent";
 
-const PRIORITY_COLORS: Record<string, string> = {
-  low: "#6b7280",
-  medium: "#d97706",
-  high: "#dc2626",
-  urgent: "#7c3aed",
-};
+const PRIORITY_OPTIONS: { key: PriorityFilter; label: string }[] = [
+  { key: "", label: "Any" },
+  { key: "low", label: "Low" },
+  { key: "medium", label: "Medium" },
+  { key: "high", label: "High" },
+  { key: "urgent", label: "Urgent" },
+];
 
-function statusLabel(status: string): string {
-  return status.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "inbox", label: "Inbox" },
+  { key: "assigned", label: "Assigned" },
+  { key: "in_progress", label: "In Progress" },
+  { key: "review", label: "Review" },
+  { key: "done", label: "Done" },
+  { key: "blocked", label: "Blocked" },
+];
+
+const DUE_DATE_OPTIONS: { key: DueDateFilter; label: string }[] = [
+  { key: "", label: "Any date" },
+  { key: "overdue", label: "Overdue" },
+  { key: "today", label: "Due today" },
+  { key: "this_week", label: "This week" },
+  { key: "no_due_date", label: "No due date" },
+];
+
+const PAGE_SIZE = 30;
+
+function isOverdue(dueDate: string | null): boolean {
+  if (!dueDate) return false;
+  return new Date(dueDate) < new Date(new Date().toDateString());
+}
+
+function isDueToday(dueDate: string | null): boolean {
+  if (!dueDate) return false;
+  const today = new Date().toDateString();
+  return new Date(dueDate).toDateString() === today;
+}
+
+function isDueThisWeek(dueDate: string | null): boolean {
+  if (!dueDate) return false;
+  const now = new Date();
+  const d = new Date(dueDate);
+  const weekEnd = new Date(now);
+  weekEnd.setDate(now.getDate() + (7 - now.getDay()));
+  return d >= new Date(now.toDateString()) && d <= weekEnd;
+}
+
+function applyDueDateFilter(tasks: Task[], filter: DueDateFilter): Task[] {
+  if (!filter) return tasks;
+  switch (filter) {
+    case "overdue": return tasks.filter((t) => isOverdue(t.dueDate));
+    case "today": return tasks.filter((t) => isDueToday(t.dueDate));
+    case "this_week": return tasks.filter((t) => isDueThisWeek(t.dueDate));
+    case "no_due_date": return tasks.filter((t) => !t.dueDate);
+    default: return tasks;
+  }
 }
 
 export default function TaskListScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [filter, setFilter] = useState<StatusFilter>("all");
+  const [search, setSearch] = useState("");
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity
-          onPress={() => router.push("/task/create")}
-          style={{ marginRight: 16 }}
-        >
-          <Ionicons name="add" size={26} color="#2563eb" />
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation, router]);
+  // Advanced filters
+  const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("");
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("");
+  const [blockedOnly, setBlockedOnly] = useState(false);
+  const [topLevelOnly, setTopLevelOnly] = useState(false);
+  const [unassignedOnly, setUnassignedOnly] = useState(false);
+
+  const activeFilterCount = [
+    dueDateFilter !== "",
+    priorityFilter !== "",
+    blockedOnly,
+    topLevelOnly,
+    unassignedOnly,
+  ].filter(Boolean).length;
 
   const [result, reexecute] = useQuery<{ tasks: Task[] }>({
     query: TASKS_QUERY,
-    variables: { limit: 100 },
+    variables: { limit },
     requestPolicy: "cache-and-network",
   });
 
   const { data, fetching, error } = result;
-  const tasks = data?.tasks ?? [];
+  const allTasks = data?.tasks ?? [];
+  const hasMore = allTasks.length === limit;
 
-  if (fetching && tasks.length === 0) {
+  // Apply filters
+  let tasks = filter === "all" ? allTasks : allTasks.filter((t) => t.status === filter);
+  if (priorityFilter) tasks = tasks.filter((t) => t.priority === priorityFilter);
+  if (blockedOnly) tasks = tasks.filter((t) => t.blockedByTaskId != null);
+  if (topLevelOnly) tasks = tasks.filter((t) => t.parentTaskId == null);
+  if (unassignedOnly) tasks = tasks.filter((t) => t.assignees.length === 0);
+  tasks = applyDueDateFilter(tasks, dueDateFilter);
+  if (search.trim()) {
+    tasks = tasks.filter(
+      (t) =>
+        t.title.toLowerCase().includes(search.toLowerCase()) ||
+        String(t.taskNumber).includes(search)
+    );
+  }
+
+  if (fetching && allTasks.length === 0) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#2563eb" />
@@ -85,7 +159,7 @@ export default function TaskListScreen() {
     );
   }
 
-  if (error && tasks.length === 0) {
+  if (error && allTasks.length === 0) {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>Failed to load tasks</Text>
@@ -98,158 +172,314 @@ export default function TaskListScreen() {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={tasks}
-        keyExtractor={(item) => item.id}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={fetching}
-            onRefresh={() => reexecute({ requestPolicy: "network-only" })}
-            tintColor="#2563eb"
+      {/* Search bar + view toggle */}
+      <View style={styles.searchBar}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search tasks…"
+          placeholderTextColor="#9ca3af"
+          value={search}
+          onChangeText={setSearch}
+          clearButtonMode="while-editing"
+          returnKeyType="search"
+        />
+        <TouchableOpacity
+          onPress={() => setFiltersOpen((v) => !v)}
+          style={[styles.viewToggle, filtersOpen && styles.viewToggleActive]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="options-outline" size={20} color={filtersOpen ? "#2563eb" : "#6b7280"} />
+          {activeFilterCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setViewMode((m) => (m === "list" ? "kanban" : "list"))}
+          style={styles.viewToggle}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons
+            name={viewMode === "list" ? "grid-outline" : "list-outline"}
+            size={20}
+            color="#6b7280"
           />
-        }
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>No tasks yet</Text>
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => router.push(`/task/${item.id}`)}
-            activeOpacity={0.7}
+        </TouchableOpacity>
+      </View>
+
+      {/* Advanced filter panel */}
+      {filtersOpen && (
+        <View style={styles.filterPanel}>
+          {/* Due date */}
+          <Text style={styles.filterSectionLabel}>Due Date</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterRow}
           >
-            <View style={styles.cardHeader}>
-              <Text style={styles.taskNumber}>#{item.taskNumber}</Text>
-              {item.priority && (
-                <View
-                  style={[
-                    styles.priorityBadge,
-                    { backgroundColor: PRIORITY_COLORS[item.priority] + "22" },
-                  ]}
-                >
-                  <Text
-                    style={[styles.priorityText, { color: PRIORITY_COLORS[item.priority] }]}
-                  >
-                    {item.priority}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Text style={styles.taskTitle} numberOfLines={2}>
-              {item.title}
-            </Text>
-            <View style={styles.cardFooter}>
-              <View
-                style={[
-                  styles.statusBadge,
-                  { backgroundColor: STATUS_COLORS[item.status] + "22" },
-                ]}
+            {DUE_DATE_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.filterChip, dueDateFilter === opt.key && styles.filterChipActive]}
+                onPress={() => setDueDateFilter(dueDateFilter === opt.key ? "" : opt.key)}
+                activeOpacity={0.7}
               >
-                <Text style={[styles.statusText, { color: STATUS_COLORS[item.status] }]}>
-                  {statusLabel(item.status)}
+                <Text style={[styles.filterChipText, dueDateFilter === opt.key && styles.filterChipTextActive]}>
+                  {opt.label}
                 </Text>
-              </View>
-              {item.assignees.length > 0 && (
-                <Text style={styles.assignees} numberOfLines={1}>
-                  {item.assignees.map((a) => a.profile.displayName).join(", ")}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Priority filter */}
+          <Text style={styles.filterSectionLabel}>Priority</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterRow}
+          >
+            {PRIORITY_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.filterChip, priorityFilter === opt.key && styles.filterChipActive]}
+                onPress={() => setPriorityFilter(priorityFilter === opt.key ? "" : opt.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.filterChipText, priorityFilter === opt.key && styles.filterChipTextActive]}>
+                  {opt.label}
                 </Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        )}
-      />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Toggle filters */}
+          <Text style={styles.filterSectionLabel}>More Filters</Text>
+          <View style={styles.filterRow}>
+            <TouchableOpacity
+              style={[styles.filterChip, blockedOnly && styles.filterChipActive]}
+              onPress={() => setBlockedOnly((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterChipText, blockedOnly && styles.filterChipTextActive]}>
+                Blocked only
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, topLevelOnly && styles.filterChipActive]}
+              onPress={() => setTopLevelOnly((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterChipText, topLevelOnly && styles.filterChipTextActive]}>
+                Top-level only
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, unassignedOnly && styles.filterChipActive]}
+              onPress={() => setUnassignedOnly((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterChipText, unassignedOnly && styles.filterChipTextActive]}>
+                Unassigned only
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {activeFilterCount > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setDueDateFilter("");
+                setPriorityFilter("");
+                setBlockedOnly(false);
+                setTopLevelOnly(false);
+                setUnassignedOnly(false);
+              }}
+              style={styles.clearFiltersBtn}
+            >
+              <Text style={styles.clearFiltersBtnText}>Clear all filters</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {viewMode === "kanban" ? (
+        /* ── Kanban view ── */
+        <KanbanBoard
+          bottomPadding={60}
+          blockedOnly={blockedOnly || undefined}
+          topLevelOnly={topLevelOnly || undefined}
+          unassignedOnly={unassignedOnly || undefined}
+          dueDateFilter={dueDateFilter || undefined}
+          priorities={priorityFilter ? [priorityFilter] : undefined}
+        />
+      ) : (
+        /* ── List view ── */
+        <>
+          {/* Status filter chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            directionalLockEnabled={true}
+            style={styles.filterBar}
+            contentContainerStyle={styles.filterContent}
+          >
+            {FILTERS.map((f) => {
+              const count = f.key === "all" ? allTasks.length : allTasks.filter((t) => t.status === f.key).length;
+              return (
+                <TouchableOpacity
+                  key={f.key}
+                  style={[styles.chip, filter === f.key && styles.chipActive]}
+                  onPress={() => setFilter(f.key)}
+                >
+                  <Text style={[styles.chipText, filter === f.key && styles.chipTextActive]}>
+                    {f.label} ({count})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <FlatList
+            data={tasks}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={[
+              styles.listContent,
+              tasks.length === 0 && styles.emptyContainer,
+            ]}
+            refreshControl={
+              <RefreshControl
+                refreshing={fetching && allTasks.length > 0}
+                onRefresh={() => {
+                  setLimit(PAGE_SIZE);
+                  reexecute({ requestPolicy: "network-only" });
+                }}
+                tintColor="#2563eb"
+              />
+            }
+            onEndReached={() => {
+              if (hasMore && !fetching) setLimit((l) => l + PAGE_SIZE);
+            }}
+            onEndReachedThreshold={0.3}
+            ListFooterComponent={
+              fetching && allTasks.length > 0 ? (
+                <ActivityIndicator color="#2563eb" style={{ marginVertical: 16 }} />
+              ) : null
+            }
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                {activeFilterCount > 0 || filter !== "all"
+                  ? "No tasks match the current filters"
+                  : "No tasks yet"}
+              </Text>
+            }
+            renderItem={({ item }) => (
+              <TaskCard
+                task={item}
+                onPress={() => router.push(`/task/${item.id}`)}
+              />
+            )}
+          />
+        </>
+      )}
+
+      {/* FAB — Create task */}
+      <TouchableOpacity
+        style={[styles.fab, { bottom: insets.bottom + 20 }]}
+        onPress={() => router.push("/task/create")}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.fabIcon}>+</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f9fafb",
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
+  container: { flex: 1, backgroundColor: "#f9fafb" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#f9fafb", gap: 12 },
+  errorText: { color: "#dc2626", fontSize: 16 },
+  retryText: { color: "#2563eb", fontSize: 14, fontWeight: "600" },
+
+  filterBar: { height: 52, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  filterContent: { paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#f3f4f6" },
+  chipActive: { backgroundColor: "#dbeafe" },
+  chipText: { fontSize: 13, color: "#6b7280", fontWeight: "500" },
+  chipTextActive: { color: "#2563eb", fontWeight: "600" },
+
+  listContent: { padding: 16, gap: 10, paddingBottom: 90 },
+  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  emptyText: { color: "#9ca3af", fontSize: 16 },
+
+  searchBar: {
+    flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f9fafb",
-    gap: 12,
-  },
-  listContent: {
-    padding: 16,
-    gap: 10,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyText: {
-    color: "#9ca3af",
-    fontSize: 16,
-  },
-  errorText: {
-    color: "#dc2626",
-    fontSize: 16,
-  },
-  retryText: {
-    color: "#2563eb",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  card: {
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     gap: 8,
   },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  taskNumber: {
-    fontSize: 12,
-    color: "#9ca3af",
-    fontWeight: "500",
-  },
-  priorityBadge: {
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  priorityText: {
-    fontSize: 11,
-    fontWeight: "600",
-    textTransform: "capitalize",
-  },
-  taskTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#111827",
-    lineHeight: 20,
-  },
-  cardFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  statusBadge: {
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  assignees: {
-    fontSize: 12,
-    color: "#6b7280",
+  searchIcon: { fontSize: 14 },
+  searchInput: {
     flex: 1,
-    textAlign: "right",
+    fontSize: 15,
+    color: "#111827",
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
+  viewToggle: { padding: 4, position: "relative" },
+  viewToggleActive: { backgroundColor: "#eff6ff", borderRadius: 8 },
+
+  filterBadge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#2563eb",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterBadgeText: { fontSize: 9, color: "#fff", fontWeight: "700" },
+
+  filterPanel: {
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  filterSectionLabel: { fontSize: 11, fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.5 },
+  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: "#f3f4f6", borderWidth: 1, borderColor: "#e5e7eb" },
+  filterChipActive: { backgroundColor: "#dbeafe", borderColor: "#93c5fd" },
+  filterChipText: { fontSize: 12, color: "#6b7280", fontWeight: "500" },
+  filterChipTextActive: { color: "#2563eb", fontWeight: "600" },
+  clearFiltersBtn: { alignSelf: "flex-start", marginTop: 2 },
+  clearFiltersBtnText: { fontSize: 12, color: "#dc2626", fontWeight: "600" },
+
+  fab: {
+    position: "absolute",
+    right: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#2563eb",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  fabIcon: { fontSize: 28, color: "#fff", lineHeight: 32 },
 });

@@ -1,26 +1,30 @@
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { TouchableOpacity } from "react-native";
+import { TouchableOpacity, View } from "react-native";
 import { useDrawer } from "../../src/context/DrawerContext";
+import { useTheme } from "../../src/hooks/useTheme";
+import { NotificationBell } from "../../src/components/NotificationBell";
 
 export default function DashboardLayout() {
   const { openDrawer } = useDrawer();
+  const router = useRouter();
+  const { colors } = useTheme();
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#2563eb",
-        tabBarInactiveTintColor: "#9ca3af",
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          borderTopColor: "#e5e7eb",
-          backgroundColor: "#fff",
+          borderTopColor: colors.border,
+          backgroundColor: colors.tabBar,
         },
-        headerStyle: { backgroundColor: "#fff" },
-        headerTitleStyle: { fontWeight: "600", color: "#111827" },
+        headerStyle: { backgroundColor: colors.headerBg },
+        headerTitleStyle: { fontWeight: "600", color: colors.text },
         headerShadowVisible: false,
         headerRight: () => (
           <TouchableOpacity onPress={openDrawer} style={{ marginRight: 16 }}>
-            <Ionicons name="person-circle-outline" size={26} color="#6b7280" />
+            <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
           </TouchableOpacity>
         ),
       }}
@@ -33,6 +37,20 @@ export default function DashboardLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="checkmark-circle-outline" size={size} color={color} />
           ),
+          headerRight: () => (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+              <TouchableOpacity onPress={() => router.push("/search")} style={{ padding: 8 }}>
+                <Ionicons name="search-outline" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+              <NotificationBell
+                onPress={() => router.push("/notifications")}
+                color={colors.textSecondary}
+              />
+              <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
+                <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
@@ -42,6 +60,16 @@ export default function DashboardLayout() {
           tabBarLabel: "Agents",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
+          ),
+          headerRight: () => (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+              <TouchableOpacity onPress={() => router.push("/agent/create")} style={{ padding: 8 }}>
+                <Ionicons name="add" size={26} color={colors.accent} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
+                <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />
@@ -53,6 +81,16 @@ export default function DashboardLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubble-outline" size={size} color={color} />
           ),
+          headerRight: () => (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+              <TouchableOpacity onPress={() => router.push("/channels/create")} style={{ padding: 8 }}>
+                <Ionicons name="add" size={26} color={colors.accent} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
+                <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
@@ -62,6 +100,16 @@ export default function DashboardLayout() {
           tabBarLabel: "Projects",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="folder-outline" size={size} color={color} />
+          ),
+          headerRight: () => (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+              <TouchableOpacity onPress={() => router.push("/project/create")} style={{ padding: 8 }}>
+                <Ionicons name="add" size={26} color={colors.accent} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
+                <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />

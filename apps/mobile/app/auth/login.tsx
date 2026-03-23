@@ -14,22 +14,31 @@ import { useRouter } from "expo-router";
 import { login } from "../../src/api/auth";
 import { useAuth } from "../../src/context/AuthContext";
 
+type Mode = "url" | "login" | "setup";
+
 export default function LoginScreen() {
+  const [mode, setMode] = useState<Mode>("url");
   const [serverUrl, setServerUrl] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { onLogin } = useAuth();
 
-  const handleLogin = async () => {
-    if (!serverUrl.trim() || !username.trim() || !password.trim()) {
-      Alert.alert("Missing fields", "Please enter your server URL, username, and password.");
+  const handleForgotPassword = () => {
+    router.push({
+      pathname: "/auth/reset-password",
+      params: serverUrl.trim() ? { serverUrl: serverUrl.trim() } : {},
+    });
+  };
+
+  const handleConnect = async () => {
+    const url = serverUrl.trim();
+    if (!url) {
+      Alert.alert("Missing field", "Please enter your server URL.");
       return;
     }
-
-    // Basic URL validation
-    const url = serverUrl.trim();
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       Alert.alert("Invalid URL", "Server URL must start with http:// or https://");
       return;
@@ -37,6 +46,60 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
+      const res = await fetch(`${url}/api/auth/status`);
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const data = await res.json();
+      setMode(data.setupComplete === false ? "setup" : "login");
+    } catch {
+      Alert.alert("Connection failed", "Could not connect to the server. Check the URL and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetup = async () => {
+    if (!username.trim() || !password.trim() || !confirmPassword.trim()) {
+      Alert.alert("Missing fields", "Please fill in all fields.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert("Password mismatch", "Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const url = serverUrl.trim();
+      const res = await fetch(`${url}/api/auth/setup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim(), password }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Setup failed");
+      }
+      // After setup, log in automatically
+      const { profileId } = await login(url, username.trim(), password);
+      onLogin(url, profileId);
+      router.replace("/(dashboard)");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Setup failed";
+      Alert.alert("Setup failed", msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!username.trim() || !password.trim()) {
+      Alert.alert("Missing fields", "Please enter your username and password.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const url = serverUrl.trim();
       const { profileId } = await login(url, username.trim(), password);
       onLogin(url, profileId);
       router.replace("/(dashboard)");
@@ -57,9 +120,10 @@ export default function LoginScreen() {
         <Text style={styles.logo}>AgentCenter</Text>
         <Text style={styles.subtitle}>Mission Control</Text>
 
+        {/* Server URL — always visible, editable only in url mode */}
         <Text style={styles.label}>Server URL</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, mode !== "url" && styles.inputLocked]}
           placeholder="https://your-instance.com"
           placeholderTextColor="#9ca3af"
           value={serverUrl}
@@ -67,44 +131,143 @@ export default function LoginScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
-          editable={!loading}
+          editable={mode === "url" && !loading}
         />
 
-        <Text style={styles.label}>Username</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Username"
-          placeholderTextColor="#9ca3af"
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!loading}
-        />
+        {mode === "url" && (
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleConnect}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Connect</Text>
+            )}
+          </TouchableOpacity>
+        )}
 
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#9ca3af"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          editable={!loading}
-        />
+        {mode === "setup" && (
+          <>
+            <Text style={styles.setupHeading}>Create Admin Account</Text>
+            <Text style={styles.setupDescription}>
+              This server has not been set up yet. Create the first admin account to get started.
+            </Text>
 
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleLogin}
-          disabled={loading}
-          activeOpacity={0.8}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
+            <Text style={styles.label}>Username</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Username"
+              placeholderTextColor="#9ca3af"
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!loading}
+            />
+
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#9ca3af"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              editable={!loading}
+            />
+
+            <Text style={styles.label}>Confirm Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              placeholderTextColor="#9ca3af"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              editable={!loading}
+            />
+
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleSetup}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Create Account</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => { setMode("url"); setUsername(""); setPassword(""); setConfirmPassword(""); }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.backText}>← Change server</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {mode === "login" && (
+          <>
+            <Text style={styles.label}>Username</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Username"
+              placeholderTextColor="#9ca3af"
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!loading}
+            />
+
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#9ca3af"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              editable={!loading}
+            />
+
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Sign In</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.forgotBtn}
+              onPress={handleForgotPassword}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => { setMode("url"); setUsername(""); setPassword(""); }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.backText}>← Change server</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -134,6 +297,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 32,
   },
+  setupHeading: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#111827",
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  setupDescription: {
+    fontSize: 13,
+    color: "#6b7280",
+    lineHeight: 18,
+    marginBottom: 16,
+  },
   label: {
     fontSize: 13,
     fontWeight: "500",
@@ -152,6 +328,10 @@ const styles = StyleSheet.create({
     color: "#111827",
     marginBottom: 12,
   },
+  inputLocked: {
+    backgroundColor: "#f3f4f6",
+    color: "#6b7280",
+  },
   button: {
     backgroundColor: "#2563eb",
     borderRadius: 10,
@@ -166,5 +346,23 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  forgotBtn: {
+    alignItems: "center",
+    marginTop: 16,
+    paddingVertical: 6,
+  },
+  forgotText: {
+    color: "#6b7280",
+    fontSize: 14,
+  },
+  backBtn: {
+    alignItems: "center",
+    marginTop: 8,
+    paddingVertical: 6,
+  },
+  backText: {
+    color: "#6b7280",
+    fontSize: 13,
   },
 });
