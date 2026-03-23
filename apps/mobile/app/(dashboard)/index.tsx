@@ -38,7 +38,7 @@ interface Task {
   project: { id: string; name: string } | null;
 }
 
-type StatusFilter = "all" | "inbox" | "in_progress" | "review" | "done" | "blocked";
+type StatusFilter = "all" | "inbox" | "assigned" | "in_progress" | "review" | "done" | "blocked";
 type ViewMode = "list" | "kanban";
 type DueDateFilter = "" | "overdue" | "today" | "this_week" | "no_due_date";
 type PriorityFilter = "" | "low" | "medium" | "high" | "urgent";
@@ -54,6 +54,7 @@ const PRIORITY_OPTIONS: { key: PriorityFilter; label: string }[] = [
 const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "inbox", label: "Inbox" },
+  { key: "assigned", label: "Assigned" },
   { key: "in_progress", label: "In Progress" },
   { key: "review", label: "Review" },
   { key: "done", label: "Done" },

@@ -326,7 +326,7 @@ export default function AgentDetailScreen() {
         contentContainerStyle={styles.tabBarContent}
         bounces={false}
       >
-        {(["overview", "tasks", "deliverables", "queue", "activity", "history", ...(agent.setupStatus === "pending_setup" ? ["setup"] : [])] as Tab[]).map((tab) => (
+        {(["overview", "tasks", "deliverables", "queue", "activity", "history", ...(agent.setupStatus !== "deactivated" ? ["setup"] : [])] as Tab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
@@ -409,10 +409,11 @@ function UpgradeBanner({ agentId, serverUrl }: { agentId: string; serverUrl: str
     if (!serverUrl) return;
     setRequesting(true);
     try {
-      const cookie = await getStoredCookie();
+      const cookie = getStoredCookie();
       const res = await fetch(`${serverUrl}/api/agents/${agentId}/request-config-upgrade`, {
         method: "POST",
-        headers: cookie ? { Cookie: cookie } : {},
+        credentials: "include",
+        headers: cookie ? { Cookie: `mc_session=${cookie}` } : {},
       });
       if (res.ok) {
         setRequested(true);
