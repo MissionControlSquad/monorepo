@@ -21,6 +21,7 @@ import {
   UPDATE_TASK,
   PROFILES_QUERY,
   TASKS_QUERY,
+  PROJECTS_QUERY,
 } from "@agentcenter/graphql-client";
 import { Avatar } from "../../src/components/Avatar";
 import { useTheme } from "../../src/hooks/useTheme";
@@ -71,6 +72,11 @@ interface TaskOption {
   status: string;
 }
 
+interface ProjectOption {
+  id: string;
+  name: string;
+}
+
 export default function EditTaskScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -100,10 +106,14 @@ export default function EditTaskScreen() {
   const [tagInput, setTagInput] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [blockedByTaskId, setBlockedByTaskId] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [parentTaskId, setParentTaskId] = useState<string | null>(null);
 
   const [assigneeModalOpen, setAssigneeModalOpen] = useState(false);
   const [taskPickerOpen, setTaskPickerOpen] = useState(false);
   const [taskPickerSearch, setTaskPickerSearch] = useState("");
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [parentTaskPickerOpen, setParentTaskPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [profilesResult] = useQuery<{ profiles: Profile[] }>({
@@ -115,7 +125,13 @@ export default function EditTaskScreen() {
   const [tasksResult] = useQuery<{ tasks: TaskOption[] }>({
     query: TASKS_QUERY,
     variables: { limit: 200 },
-    pause: !taskPickerOpen,
+    pause: !taskPickerOpen && !parentTaskPickerOpen,
+  });
+
+  const [projectsResult] = useQuery<{ projects: ProjectOption[] }>({
+    query: PROJECTS_QUERY,
+    pause: !projectPickerOpen,
+    requestPolicy: "cache-and-network",
   });
 
   const [, updateTask] = useMutation(UPDATE_TASK);
@@ -129,6 +145,8 @@ export default function EditTaskScreen() {
       setTags(task.tags ?? []);
       setSelectedIds(task.assignees.map((a) => a.profileId));
       setBlockedByTaskId(task.blockedByTaskId ?? null);
+      setProjectId(task.projectId ?? null);
+      setParentTaskId(task.parentTaskId ?? null);
       setInitialized(true);
     }
   }, [task, initialized]);
@@ -152,6 +170,8 @@ export default function EditTaskScreen() {
       assigneeIds: selectedIds,
       tags: finalTags.length > 0 ? finalTags : [],
       blockedByTaskId: blockedByTaskId ?? undefined,
+      projectId: projectId ?? undefined,
+      parentTaskId: parentTaskId ?? undefined,
       dueDate: dueDate.trim() ? new Date(dueDate.trim()).toISOString() : undefined,
     });
     setSaving(false);
@@ -358,6 +378,52 @@ export default function EditTaskScreen() {
           />
         </View>
 
+        {/* Project */}
+        <View style={{ gap: 6 }}>
+          <Text style={labelStyle}>Project</Text>
+          <TouchableOpacity
+            style={[inputStyle, { minHeight: 44, justifyContent: "center" }]}
+            onPress={() => setProjectPickerOpen(true)}
+            activeOpacity={0.7}
+          >
+            {projectId ? (
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ fontSize: 15, color: colors.text }}>
+                  {projectsResult.data?.projects.find((p) => p.id === projectId)?.name ?? "Loading..."}
+                </Text>
+                <TouchableOpacity onPress={(e) => { e.stopPropagation(); setProjectId(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 16 }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <Text style={{ color: colors.placeholder, fontSize: 15 }}>No project</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Parent Task */}
+        <View style={{ gap: 6 }}>
+          <Text style={labelStyle}>Parent Task</Text>
+          <TouchableOpacity
+            style={[inputStyle, { minHeight: 44, justifyContent: "center" }]}
+            onPress={() => setParentTaskPickerOpen(true)}
+            activeOpacity={0.7}
+          >
+            {parentTaskId ? (
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ fontSize: 15, color: colors.text }}>
+                  {(() => { const t = tasksResult.data?.tasks.find((x) => x.id === parentTaskId); return t ? `#${t.taskNumber} ${t.title}` : parentTaskId; })()}
+                </Text>
+                <TouchableOpacity onPress={(e) => { e.stopPropagation(); setParentTaskId(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 16 }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <Text style={{ color: colors.placeholder, fontSize: 15 }}>None (top-level task)</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Blocked By */}
         <View style={{ gap: 6 }}>
           <Text style={labelStyle}>Blocked By</Text>
@@ -455,6 +521,119 @@ export default function EditTaskScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 15, fontWeight: "500", color: colors.text }}>{item.displayName}</Text>
                       <Text style={{ fontSize: 12, color: colors.textMuted }}>@{item.username}</Text>
+                    </View>
+                    {selected && <Text style={{ fontSize: 18, color: colors.accent, fontWeight: "700" }}>✓</Text>}
+                  </Pressable>
+                );
+              }}
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* Project Picker Modal */}
+      <Modal
+        visible={projectPickerOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setProjectPickerOpen(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
+            <Text style={{ fontSize: 17, fontWeight: "600", color: colors.text }}>Select Project</Text>
+            <TouchableOpacity onPress={() => setProjectPickerOpen(false)}>
+              <Text style={{ fontSize: 16, fontWeight: "600", color: colors.accent }}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          {projectsResult.fetching ? (
+            <ActivityIndicator style={{ marginTop: 32 }} color={colors.accent} />
+          ) : (
+            <FlatList
+              data={projectsResult.data?.projects ?? []}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+              ListHeaderComponent={
+                <Pressable
+                  style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 12, backgroundColor: projectId === null ? colors.accentSurface : colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                  onPress={() => { setProjectId(null); setProjectPickerOpen(false); }}
+                >
+                  <Text style={{ fontSize: 15, color: projectId === null ? colors.accent : colors.textSecondary, fontStyle: "italic" }}>No project</Text>
+                  {projectId === null && <Text style={{ fontSize: 18, color: colors.accent, fontWeight: "700", marginLeft: "auto" }}>✓</Text>}
+                </Pressable>
+              }
+              renderItem={({ item }) => {
+                const selected = projectId === item.id;
+                return (
+                  <Pressable
+                    style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 12, backgroundColor: selected ? colors.accentSurface : colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                    onPress={() => { setProjectId(item.id); setProjectPickerOpen(false); }}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: "500", color: colors.text, flex: 1 }}>{item.name}</Text>
+                    {selected && <Text style={{ fontSize: 18, color: colors.accent, fontWeight: "700" }}>✓</Text>}
+                  </Pressable>
+                );
+              }}
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* Parent Task Picker Modal */}
+      <Modal
+        visible={parentTaskPickerOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setParentTaskPickerOpen(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
+            <Text style={{ fontSize: 17, fontWeight: "600", color: colors.text }}>Select Parent Task</Text>
+            <TouchableOpacity onPress={() => setParentTaskPickerOpen(false)}>
+              <Text style={{ fontSize: 16, fontWeight: "600", color: colors.accent }}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <TextInput
+              style={inputStyle}
+              placeholder="Search tasks…"
+              placeholderTextColor={colors.placeholder}
+              value={taskPickerSearch}
+              onChangeText={setTaskPickerSearch}
+              autoFocus
+            />
+          </View>
+          {tasksResult.fetching ? (
+            <ActivityIndicator style={{ marginTop: 32 }} color={colors.accent} />
+          ) : (
+            <FlatList
+              data={(tasksResult.data?.tasks ?? []).filter(
+                (t) =>
+                  t.id !== id &&
+                  (taskPickerSearch.trim() === "" ||
+                    t.title.toLowerCase().includes(taskPickerSearch.toLowerCase()) ||
+                    String(t.taskNumber).includes(taskPickerSearch))
+              )}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+              ListHeaderComponent={
+                <Pressable
+                  style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 12, backgroundColor: parentTaskId === null ? colors.accentSurface : colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                  onPress={() => { setParentTaskId(null); setParentTaskPickerOpen(false); }}
+                >
+                  <Text style={{ fontSize: 15, color: parentTaskId === null ? colors.accent : colors.textSecondary, fontStyle: "italic" }}>None (top-level task)</Text>
+                  {parentTaskId === null && <Text style={{ fontSize: 18, color: colors.accent, fontWeight: "700", marginLeft: "auto" }}>✓</Text>}
+                </Pressable>
+              }
+              renderItem={({ item }) => {
+                const selected = parentTaskId === item.id;
+                return (
+                  <Pressable
+                    style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 12, backgroundColor: selected ? colors.accentSurface : colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                    onPress={() => { setParentTaskId(item.id); setParentTaskPickerOpen(false); }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: "500", color: colors.text }}>#{item.taskNumber} {item.title}</Text>
+                      <Text style={{ fontSize: 12, color: colors.textMuted }}>{item.status.replace("_", " ")}</Text>
                     </View>
                     {selected && <Text style={{ fontSize: 18, color: colors.accent, fontWeight: "700" }}>✓</Text>}
                   </Pressable>

@@ -32,12 +32,24 @@ interface Task {
   taskNumber: number;
   dueDate: string | null;
   tags: string[];
+  parentTaskId: string | null;
+  blockedByTaskId: string | null;
   assignees: TaskAssignee[];
   project: { id: string; name: string } | null;
 }
 
 type StatusFilter = "all" | "inbox" | "in_progress" | "review" | "done" | "blocked";
 type ViewMode = "list" | "kanban";
+type DueDateFilter = "" | "overdue" | "today" | "this_week" | "no_due_date";
+type PriorityFilter = "" | "low" | "medium" | "high" | "urgent";
+
+const PRIORITY_OPTIONS: { key: PriorityFilter; label: string }[] = [
+  { key: "", label: "Any" },
+  { key: "low", label: "Low" },
+  { key: "medium", label: "Medium" },
+  { key: "high", label: "High" },
+  { key: "urgent", label: "Urgent" },
+];
 
 const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },
@@ -48,7 +60,46 @@ const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "blocked", label: "Blocked" },
 ];
 
+const DUE_DATE_OPTIONS: { key: DueDateFilter; label: string }[] = [
+  { key: "", label: "Any date" },
+  { key: "overdue", label: "Overdue" },
+  { key: "today", label: "Due today" },
+  { key: "this_week", label: "This week" },
+  { key: "no_due_date", label: "No due date" },
+];
+
 const PAGE_SIZE = 30;
+
+function isOverdue(dueDate: string | null): boolean {
+  if (!dueDate) return false;
+  return new Date(dueDate) < new Date(new Date().toDateString());
+}
+
+function isDueToday(dueDate: string | null): boolean {
+  if (!dueDate) return false;
+  const today = new Date().toDateString();
+  return new Date(dueDate).toDateString() === today;
+}
+
+function isDueThisWeek(dueDate: string | null): boolean {
+  if (!dueDate) return false;
+  const now = new Date();
+  const d = new Date(dueDate);
+  const weekEnd = new Date(now);
+  weekEnd.setDate(now.getDate() + (7 - now.getDay()));
+  return d >= new Date(now.toDateString()) && d <= weekEnd;
+}
+
+function applyDueDateFilter(tasks: Task[], filter: DueDateFilter): Task[] {
+  if (!filter) return tasks;
+  switch (filter) {
+    case "overdue": return tasks.filter((t) => isOverdue(t.dueDate));
+    case "today": return tasks.filter((t) => isDueToday(t.dueDate));
+    case "this_week": return tasks.filter((t) => isDueThisWeek(t.dueDate));
+    case "no_due_date": return tasks.filter((t) => !t.dueDate);
+    default: return tasks;
+  }
+}
 
 export default function TaskListScreen() {
   const router = useRouter();
@@ -57,6 +108,22 @@ export default function TaskListScreen() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState(PAGE_SIZE);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Advanced filters
+  const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("");
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("");
+  const [blockedOnly, setBlockedOnly] = useState(false);
+  const [topLevelOnly, setTopLevelOnly] = useState(false);
+  const [unassignedOnly, setUnassignedOnly] = useState(false);
+
+  const activeFilterCount = [
+    dueDateFilter !== "",
+    priorityFilter !== "",
+    blockedOnly,
+    topLevelOnly,
+    unassignedOnly,
+  ].filter(Boolean).length;
 
   const [result, reexecute] = useQuery<{ tasks: Task[] }>({
     query: TASKS_QUERY,
@@ -67,14 +134,21 @@ export default function TaskListScreen() {
   const { data, fetching, error } = result;
   const allTasks = data?.tasks ?? [];
   const hasMore = allTasks.length === limit;
-  const filteredByStatus = filter === "all" ? allTasks : allTasks.filter((t) => t.status === filter);
-  const tasks = search.trim()
-    ? filteredByStatus.filter(
-        (t) =>
-          t.title.toLowerCase().includes(search.toLowerCase()) ||
-          String(t.taskNumber).includes(search)
-      )
-    : filteredByStatus;
+
+  // Apply filters
+  let tasks = filter === "all" ? allTasks : allTasks.filter((t) => t.status === filter);
+  if (priorityFilter) tasks = tasks.filter((t) => t.priority === priorityFilter);
+  if (blockedOnly) tasks = tasks.filter((t) => t.blockedByTaskId != null);
+  if (topLevelOnly) tasks = tasks.filter((t) => t.parentTaskId == null);
+  if (unassignedOnly) tasks = tasks.filter((t) => t.assignees.length === 0);
+  tasks = applyDueDateFilter(tasks, dueDateFilter);
+  if (search.trim()) {
+    tasks = tasks.filter(
+      (t) =>
+        t.title.toLowerCase().includes(search.toLowerCase()) ||
+        String(t.taskNumber).includes(search)
+    );
+  }
 
   if (fetching && allTasks.length === 0) {
     return (
@@ -110,6 +184,18 @@ export default function TaskListScreen() {
           returnKeyType="search"
         />
         <TouchableOpacity
+          onPress={() => setFiltersOpen((v) => !v)}
+          style={[styles.viewToggle, filtersOpen && styles.viewToggleActive]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="options-outline" size={20} color={filtersOpen ? "#2563eb" : "#6b7280"} />
+          {activeFilterCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
           onPress={() => setViewMode((m) => (m === "list" ? "kanban" : "list"))}
           style={styles.viewToggle}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -122,9 +208,110 @@ export default function TaskListScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Advanced filter panel */}
+      {filtersOpen && (
+        <View style={styles.filterPanel}>
+          {/* Due date */}
+          <Text style={styles.filterSectionLabel}>Due Date</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterRow}
+          >
+            {DUE_DATE_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.filterChip, dueDateFilter === opt.key && styles.filterChipActive]}
+                onPress={() => setDueDateFilter(dueDateFilter === opt.key ? "" : opt.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.filterChipText, dueDateFilter === opt.key && styles.filterChipTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Priority filter */}
+          <Text style={styles.filterSectionLabel}>Priority</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterRow}
+          >
+            {PRIORITY_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.filterChip, priorityFilter === opt.key && styles.filterChipActive]}
+                onPress={() => setPriorityFilter(priorityFilter === opt.key ? "" : opt.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.filterChipText, priorityFilter === opt.key && styles.filterChipTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Toggle filters */}
+          <Text style={styles.filterSectionLabel}>More Filters</Text>
+          <View style={styles.filterRow}>
+            <TouchableOpacity
+              style={[styles.filterChip, blockedOnly && styles.filterChipActive]}
+              onPress={() => setBlockedOnly((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterChipText, blockedOnly && styles.filterChipTextActive]}>
+                Blocked only
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, topLevelOnly && styles.filterChipActive]}
+              onPress={() => setTopLevelOnly((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterChipText, topLevelOnly && styles.filterChipTextActive]}>
+                Top-level only
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, unassignedOnly && styles.filterChipActive]}
+              onPress={() => setUnassignedOnly((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterChipText, unassignedOnly && styles.filterChipTextActive]}>
+                Unassigned only
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {activeFilterCount > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setDueDateFilter("");
+                setPriorityFilter("");
+                setBlockedOnly(false);
+                setTopLevelOnly(false);
+                setUnassignedOnly(false);
+              }}
+              style={styles.clearFiltersBtn}
+            >
+              <Text style={styles.clearFiltersBtnText}>Clear all filters</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       {viewMode === "kanban" ? (
         /* ── Kanban view ── */
-        <KanbanBoard bottomPadding={60} />
+        <KanbanBoard
+          bottomPadding={60}
+          blockedOnly={blockedOnly || undefined}
+          topLevelOnly={topLevelOnly || undefined}
+          unassignedOnly={unassignedOnly || undefined}
+          dueDateFilter={dueDateFilter || undefined}
+          priorities={priorityFilter ? [priorityFilter] : undefined}
+        />
       ) : (
         /* ── List view ── */
         <>
@@ -182,7 +369,9 @@ export default function TaskListScreen() {
             }
             ListEmptyComponent={
               <Text style={styles.emptyText}>
-                {filter === "all" ? "No tasks yet" : `No ${filter.replace("_", " ")} tasks`}
+                {activeFilterCount > 0 || filter !== "all"
+                  ? "No tasks match the current filters"
+                  : "No tasks yet"}
               </Text>
             }
             renderItem={({ item }) => (
@@ -242,9 +431,39 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 4,
   },
-  viewToggle: {
-    padding: 4,
+  viewToggle: { padding: 4, position: "relative" },
+  viewToggleActive: { backgroundColor: "#eff6ff", borderRadius: 8 },
+
+  filterBadge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#2563eb",
+    justifyContent: "center",
+    alignItems: "center",
   },
+  filterBadgeText: { fontSize: 9, color: "#fff", fontWeight: "700" },
+
+  filterPanel: {
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  filterSectionLabel: { fontSize: 11, fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.5 },
+  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: "#f3f4f6", borderWidth: 1, borderColor: "#e5e7eb" },
+  filterChipActive: { backgroundColor: "#dbeafe", borderColor: "#93c5fd" },
+  filterChipText: { fontSize: 12, color: "#6b7280", fontWeight: "500" },
+  filterChipTextActive: { color: "#2563eb", fontWeight: "600" },
+  clearFiltersBtn: { alignSelf: "flex-start", marginTop: 2 },
+  clearFiltersBtnText: { fontSize: 12, color: "#dc2626", fontWeight: "600" },
 
   fab: {
     position: "absolute",

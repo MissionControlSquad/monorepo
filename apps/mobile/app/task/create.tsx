@@ -63,7 +63,9 @@ export default function CreateTaskScreen() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [blockedByTaskId, setBlockedByTaskId] = useState<string | null>(null);
+  const [parentTaskId, setParentTaskId] = useState<string | null>(null);
   const [taskPickerOpen, setTaskPickerOpen] = useState(false);
+  const [parentTaskPickerOpen, setParentTaskPickerOpen] = useState(false);
   const [taskPickerSearch, setTaskPickerSearch] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
@@ -77,7 +79,7 @@ export default function CreateTaskScreen() {
   const [tasksResult] = useQuery<{ tasks: TaskOption[] }>({
     query: TASKS_QUERY,
     variables: { limit: 200 },
-    pause: !taskPickerOpen,
+    pause: !taskPickerOpen && !parentTaskPickerOpen,
   });
 
   const [templatesResult] = useQuery<{ taskTemplates: TaskTemplate[] }>({
@@ -106,6 +108,7 @@ export default function CreateTaskScreen() {
       assigneeIds: selectedIds,
       tags: finalTags.length > 0 ? finalTags : undefined,
       projectId: projectId ?? undefined,
+      parentTaskId: parentTaskId ?? undefined,
       blockedByTaskId: blockedByTaskId ?? undefined,
       dueDate: dueDate.trim() ? new Date(dueDate.trim()).toISOString() : undefined,
     });
@@ -342,6 +345,37 @@ export default function CreateTaskScreen() {
           />
         </View>
 
+        {/* Parent Task */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Parent Task</Text>
+          <TouchableOpacity
+            style={styles.assigneeSelector}
+            onPress={() => setParentTaskPickerOpen(true)}
+            activeOpacity={0.7}
+          >
+            {parentTaskId ? (
+              (() => {
+                const t = tasksResult.data?.tasks.find((x) => x.id === parentTaskId);
+                return (
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text style={{ fontSize: 15, color: "#111827" }}>
+                      {t ? `#${t.taskNumber} ${t.title}` : parentTaskId}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={(e) => { e.stopPropagation(); setParentTaskId(null); }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={{ color: "#6b7280", fontSize: 16 }}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })()
+            ) : (
+              <Text style={styles.assigneePlaceholder}>None (top-level task)</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Blocked By */}
         <View style={styles.field}>
           <Text style={styles.label}>Blocked By</Text>
@@ -416,6 +450,77 @@ export default function CreateTaskScreen() {
                       onPress={() => {
                         setBlockedByTaskId(selected ? null : item.id);
                         setTaskPickerOpen(false);
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.profileName}>
+                          #{item.taskNumber} {item.title}
+                        </Text>
+                        <Text style={styles.profileUsername}>{item.status.replace("_", " ")}</Text>
+                      </View>
+                      {selected && <Text style={styles.checkmark}>✓</Text>}
+                    </Pressable>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </Modal>
+
+        {/* Parent Task picker modal */}
+        <Modal
+          visible={parentTaskPickerOpen}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setParentTaskPickerOpen(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Parent Task</Text>
+              <TouchableOpacity onPress={() => setParentTaskPickerOpen(false)}>
+                <Text style={styles.modalDone}>Done</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" }}>
+              <TextInput
+                style={[styles.input, { marginBottom: 0 }]}
+                placeholder="Search tasks…"
+                placeholderTextColor="#9ca3af"
+                value={taskPickerSearch}
+                onChangeText={setTaskPickerSearch}
+                autoFocus
+              />
+            </View>
+            {tasksResult.fetching ? (
+              <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
+            ) : (
+              <FlatList
+                data={(tasksResult.data?.tasks ?? []).filter((t) =>
+                  taskPickerSearch.trim() === "" ||
+                  t.title.toLowerCase().includes(taskPickerSearch.toLowerCase()) ||
+                  String(t.taskNumber).includes(taskPickerSearch)
+                )}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+                ListHeaderComponent={
+                  <Pressable
+                    style={[styles.profileRow, parentTaskId === null && styles.profileRowSelected]}
+                    onPress={() => { setParentTaskId(null); setParentTaskPickerOpen(false); }}
+                  >
+                    <Text style={[styles.profileName, { fontStyle: "italic", color: "#6b7280" }]}>
+                      None (top-level task)
+                    </Text>
+                    {parentTaskId === null && <Text style={styles.checkmark}>✓</Text>}
+                  </Pressable>
+                }
+                renderItem={({ item }) => {
+                  const selected = parentTaskId === item.id;
+                  return (
+                    <Pressable
+                      style={[styles.profileRow, selected && styles.profileRowSelected]}
+                      onPress={() => {
+                        setParentTaskId(item.id);
+                        setParentTaskPickerOpen(false);
                       }}
                     >
                       <View style={{ flex: 1 }}>

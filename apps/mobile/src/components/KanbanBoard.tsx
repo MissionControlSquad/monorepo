@@ -156,15 +156,40 @@ interface KanbanBoardProps {
   projectId?: string;
   /** Extra bottom padding (e.g. for FAB). */
   bottomPadding?: number;
+  /** Server-side filter: only blocked tasks. */
+  blockedOnly?: boolean;
+  /** Server-side filter: only top-level tasks (no parent). */
+  topLevelOnly?: boolean;
+  /** Server-side filter: only tasks with no assignees. */
+  unassignedOnly?: boolean;
+  /** Server-side due-date filter: "overdue" | "today" | "this_week" | "no_due_date" */
+  dueDateFilter?: string;
+  /** Server-side priority filter: array of priority strings. */
+  priorities?: string[];
 }
 
-export function KanbanBoard({ projectId, bottomPadding = 0 }: KanbanBoardProps) {
+export function KanbanBoard({
+  projectId,
+  bottomPadding = 0,
+  blockedOnly,
+  topLevelOnly,
+  unassignedOnly,
+  dueDateFilter,
+  priorities,
+}: KanbanBoardProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const [result, reexecute] = useQuery<KanbanBoardData>({
     query: KANBAN_BOARD_QUERY,
-    variables: { projectId: projectId ?? null },
+    variables: {
+      projectId: projectId ?? null,
+      blockedOnly: blockedOnly || undefined,
+      topLevelOnly: topLevelOnly || undefined,
+      unassignedOnly: unassignedOnly || undefined,
+      dueDateFilter: dueDateFilter || undefined,
+      priorities: priorities?.length ? priorities : undefined,
+    },
     requestPolicy: "cache-and-network",
   });
 
