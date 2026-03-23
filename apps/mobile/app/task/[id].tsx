@@ -18,6 +18,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   TASK_QUERY,
+  AGENTS_QUERY,
   MESSAGES_BY_TASK_QUERY,
   DELIVERABLES_BY_TASK_QUERY,
   DELIVERABLES_BY_CHILD_TASKS_QUERY,
@@ -966,6 +967,13 @@ export default function TaskDetailScreen() {
   const { data, fetching, error } = result;
   const task = data?.task;
 
+  const [agentsResult] = useQuery<{ agents: { id: string; name: string; identityEmoji: string; currentTaskId: string | null }[] }>({
+    query: AGENTS_QUERY,
+    requestPolicy: "cache-and-network",
+    pause: !task,
+  });
+  const workingAgents = (agentsResult.data?.agents ?? []).filter((a) => a.currentTaskId === id);
+
   const handleMoreActions = (taskId: string) => {
     Alert.alert("Task Actions", undefined, [
       {
@@ -1050,6 +1058,15 @@ export default function TaskDetailScreen() {
         active={activeTab}
         onPress={setActiveTab}
       />
+      {workingAgents.length > 0 && (
+        <View style={styles.workingAgentsBar}>
+          <Text style={styles.workingAgentsBolt}>⚡</Text>
+          <Text style={styles.workingAgentsText} numberOfLines={1}>
+            {workingAgents.map((a) => `${a.identityEmoji ?? "🤖"} ${a.name}`).join("  ·  ")}
+          </Text>
+          <Text style={styles.workingAgentsLabel}> working</Text>
+        </View>
+      )}
       <View style={{ flex: 1 }}>
         {activeTab === 0 && (
           <OverviewTab task={task} onStatusChange={handleStatusChange} />
@@ -1368,6 +1385,21 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#d1d5db",
   },
+
+  // Working agents bar
+  workingAgentsBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#fffbeb",
+    borderBottomWidth: 1,
+    borderBottomColor: "#fde68a",
+    gap: 4,
+  },
+  workingAgentsBolt: { fontSize: 12 },
+  workingAgentsText: { fontSize: 12, color: "#92400e", flex: 1, fontWeight: "500" },
+  workingAgentsLabel: { fontSize: 12, color: "#92400e", fontWeight: "600" },
 
   // Approve/Reject bar
   approveRejectBar: {

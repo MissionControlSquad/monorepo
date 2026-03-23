@@ -39,7 +39,8 @@ import {
   CHILD_TASKS_QUERY,
   TASKS_QUERY,
 } from "../../lib/graphql/queries";
-import { UPDATE_TASK, SAVE_TASK_AS_TEMPLATE } from "../../lib/graphql/mutations";
+import { UPDATE_TASK, SAVE_TASK_AS_TEMPLATE, APPROVE_TASK, REJECT_TASK, REQUEST_CLARIFICATION } from "../../lib/graphql/mutations";
+import { useAppContext } from "../context/AppContext";
 import { TaskComments } from "./TaskComments";
 import { TaskDeliverables } from "./TaskDeliverables";
 import { ChildTaskDeliverables } from "./ChildTaskDeliverables";
@@ -102,8 +103,59 @@ export function TaskDetailModal({
   const taskId = (task as TaskDetail & { _id?: string })?._id ?? task?.id;
   const taskProjectId = task?.projectId;
 
+  const { currentUserProfile } = useAppContext();
   const [, executeUpdateTask] = useMutation(UPDATE_TASK);
   const [, executeSaveAsTemplate] = useMutation(SAVE_TASK_AS_TEMPLATE);
+  const [, executeApproveTask] = useMutation(APPROVE_TASK);
+  const [, executeRejectTask] = useMutation(REJECT_TASK);
+  const [, executeRequestClarification] = useMutation(REQUEST_CLARIFICATION);
+
+  // Approval UI state
+  const [approvalLoading, setApprovalLoading] = useState<"approve" | "reject" | "clarify" | null>(null);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectChanges, setRejectChanges] = useState("");
+  const [showClarifyDialog, setShowClarifyDialog] = useState(false);
+  const [clarifyQuestions, setClarifyQuestions] = useState("");
+
+  async function handleApproveTask(comment?: string) {
+    if (!currentUserProfile?.id || !taskId) return;
+    setApprovalLoading("approve");
+    try {
+      const res = await executeApproveTask({ reviewerId: currentUserProfile.id, taskId, approvalComment: comment || undefined });
+      if (res.error) toast.error(res.error.message ?? "Failed to approve task");
+    } finally {
+      setApprovalLoading(null);
+    }
+  }
+
+  async function handleRejectTask() {
+    if (!currentUserProfile?.id || !taskId || !rejectReason.trim()) return;
+    const changes = rejectChanges.split("\n").map((c) => c.trim()).filter(Boolean);
+    setApprovalLoading("reject");
+    setShowRejectDialog(false);
+    try {
+      const res = await executeRejectTask({ reviewerId: currentUserProfile.id, taskId, rejectionReason: rejectReason, changesNeeded: changes });
+      if (res.error) toast.error(res.error.message ?? "Failed to reject task");
+      else { setRejectReason(""); setRejectChanges(""); }
+    } finally {
+      setApprovalLoading(null);
+    }
+  }
+
+  async function handleClarifyTask() {
+    if (!currentUserProfile?.id || !taskId || !clarifyQuestions.trim()) return;
+    const questions = clarifyQuestions.split("\n").map((q) => q.trim()).filter(Boolean);
+    setApprovalLoading("clarify");
+    setShowClarifyDialog(false);
+    try {
+      const res = await executeRequestClarification({ reviewerId: currentUserProfile.id, taskId, questions });
+      if (res.error) toast.error(res.error.message ?? "Failed to request clarification");
+      else setClarifyQuestions("");
+    } finally {
+      setApprovalLoading(null);
+    }
+  }
 
   const [agentsResult] = useQuery({ query: AGENTS_QUERY });
   const agents = agentsResult.data?.agents;
@@ -413,7 +465,7 @@ export function TaskDetailModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="p-0 gap-0 w-full h-full max-w-none sm:max-w-none max-h-none rounded-none bg-background shadow-2xl flex flex-col"
+        className="p-0 gap-0 w-full h-full max-w-none sm:max-w-none max-h-none rounded-none bg-background shadow-2xl flex flex-col relative"
       >
         {/* ===== TOP BAR ===== */}
         <div className="shrink-0 px-3 py-2 sm:px-6 sm:py-3 border-b border-border flex flex-col gap-1">
@@ -1204,6 +1256,97 @@ export function TaskDetailModal({
             </div>
           </div>
         </div>
+
+        {/* ===== REVIEW APPROVAL BAR ===== */}
+        {task.status === "review" && (
+          <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-t border-amber-200 bg-amber-50">
+            <span className="text-xs font-semibold text-amber-700 mr-auto">Awaiting Review</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowClarifyDialog(true)}
+              disabled={approvalLoading !== null}
+              className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 border border-violet-200"
+            >
+              {approvalLoading === "clarify" ? <span className="animate-spin">⟳</span> : "? Clarify"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowRejectDialog(true)}
+              disabled={approvalLoading !== null}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200"
+            >
+              {approvalLoading === "reject" ? <span className="animate-spin">⟳</span> : "✕ Reject"}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleApproveTask()}
+              disabled={approvalLoading !== null}
+            >
+              {approvalLoading === "approve" ? <span className="animate-spin">⟳</span> : "✓ Approve"}
+            </Button>
+          </div>
+        )}
+
+        {/* Reject Dialog */}
+        {showRejectDialog && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowRejectDialog(false)}>
+            <div className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-base font-semibold text-foreground">Reject Task</h2>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Rejection Reason *</label>
+                <textarea
+                  className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                  rows={3}
+                  placeholder="Why is this being rejected?"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Changes Needed (one per line)</label>
+                <textarea
+                  className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                  rows={3}
+                  placeholder="List changes needed, one per line"
+                  value={rejectChanges}
+                  onChange={(e) => setRejectChanges(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => { setShowRejectDialog(false); setRejectReason(""); setRejectChanges(""); }}>Cancel</Button>
+                <Button variant="danger" size="sm" onClick={handleRejectTask} disabled={!rejectReason.trim()}>Reject Task</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Clarify Dialog */}
+        {showClarifyDialog && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowClarifyDialog(false)}>
+            <div className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-base font-semibold text-foreground">Request Clarification</h2>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Questions (one per line)</label>
+                <textarea
+                  className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                  rows={4}
+                  placeholder="What questions do you have? One question per line."
+                  value={clarifyQuestions}
+                  onChange={(e) => setClarifyQuestions(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => { setShowClarifyDialog(false); setClarifyQuestions(""); }}>Cancel</Button>
+                <Button variant="primary" size="sm" onClick={handleClarifyTask} disabled={!clarifyQuestions.trim()}>Send Questions</Button>
+              </div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
