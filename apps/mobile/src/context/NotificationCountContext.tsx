@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import { useAuth } from "./AuthContext";
+import { NOTIFICATION_POLL_INTERVAL_MS } from "@agentcenter/utils";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -34,8 +35,6 @@ const NotificationContext = createContext<NotificationContextValue>({
   markOneRead: () => {},
   markAllRead: () => {},
 });
-
-const POLL_INTERVAL_MS = 30_000;
 
 // ── Provider ───────────────────────────────────────────────────────────────────
 
@@ -97,7 +96,7 @@ export function NotificationCountProvider({ children }: { children: React.ReactN
   useEffect(() => {
     if (!isSignedIn || !serverUrl) return;
     fetchNotifications();
-    intervalRef.current = setInterval(fetchNotifications, POLL_INTERVAL_MS);
+    intervalRef.current = setInterval(fetchNotifications, NOTIFICATION_POLL_INTERVAL_MS);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };

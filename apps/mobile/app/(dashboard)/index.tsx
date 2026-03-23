@@ -15,6 +15,7 @@ import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
+import { PAGE_SIZE_DEFAULT } from "@agentcenter/utils";
 import { TaskCard } from "../../src/components/TaskCard";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
 
@@ -69,8 +70,6 @@ const DUE_DATE_OPTIONS: { key: DueDateFilter; label: string }[] = [
   { key: "no_due_date", label: "No due date" },
 ];
 
-const PAGE_SIZE = 30;
-
 function isOverdue(dueDate: string | null): boolean {
   if (!dueDate) return false;
   return new Date(dueDate) < new Date(new Date().toDateString());
@@ -108,7 +107,7 @@ export default function TaskListScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
-  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [limit, setLimit] = useState(PAGE_SIZE_DEFAULT);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Advanced filters
@@ -353,14 +352,14 @@ export default function TaskListScreen() {
               <RefreshControl
                 refreshing={fetching && allTasks.length > 0}
                 onRefresh={() => {
-                  setLimit(PAGE_SIZE);
+                  setLimit(PAGE_SIZE_DEFAULT);
                   reexecute({ requestPolicy: "network-only" });
                 }}
                 tintColor="#2563eb"
               />
             }
             onEndReached={() => {
-              if (hasMore && !fetching) setLimit((l) => l + PAGE_SIZE);
+              if (hasMore && !fetching) setLimit((l) => l + PAGE_SIZE_DEFAULT);
             }}
             onEndReachedThreshold={0.3}
             ListFooterComponent={

@@ -16,6 +16,7 @@ import { useMutation, useQuery } from "urql";
 import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CREATE_PROJECT, PROFILES_QUERY } from "@agentcenter/graphql-client";
+import { DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 import { Ionicons } from "@expo/vector-icons";
 
 interface Profile {
@@ -120,7 +121,7 @@ export default function CreateProjectScreen() {
               {profiles.map((profile) => {
                 const selected = selectedProfileIds.includes(profile.id);
                 const isAgent = profile.agentId != null;
-                const emoji = isAgent ? (profile.agent?.identityEmoji ?? "🤖") : "👤";
+                const emoji = isAgent ? (profile.agent?.identityEmoji ?? DEFAULT_AGENT_EMOJI) : "👤";
                 return (
                   <TouchableOpacity
                     key={profile.id}

@@ -11,6 +11,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNotifications } from "../src/context/NotificationCountContext";
+import { NOTIFICATION_TYPE_HEX_COLORS, DEFAULT_COLOR } from "@agentcenter/utils";
 
 // ── Types & constants ─────────────────────────────────────────────────────────
 
@@ -28,17 +29,6 @@ const TYPE_ICONS: Record<string, IoniconName> = {
   task_assigned: "person-add",
 };
 
-const TYPE_COLORS: Record<string, string> = {
-  task_done: "#16a34a",
-  task_needs_review: "#d97706",
-  task_clarification_requested: "#2563eb",
-  task_approved: "#16a34a",
-  task_rejected: "#dc2626",
-  new_comment: "#6b7280",
-  mention: "#2563eb",
-  deliverable_submitted: "#7c3aed",
-  task_assigned: "#2563eb",
-};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -127,7 +117,7 @@ export default function NotificationsScreen() {
       renderItem={({ item }) => {
         const isUnread = !item.readAt;
         const iconName: IoniconName = TYPE_ICONS[item.type] ?? "alert-circle";
-        const iconColor = TYPE_COLORS[item.type] ?? "#6b7280";
+        const iconColor = NOTIFICATION_TYPE_HEX_COLORS[item.type] ?? DEFAULT_COLOR;
 
         return (
           <TouchableOpacity

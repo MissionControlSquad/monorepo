@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { useState, useCallback, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ACTIVITIES_CONNECTION_QUERY, ACTIVITY_CREATED_SUBSCRIPTION } from "@agentcenter/graphql-client";
+import { ACTIVITY_TYPE_HEX_COLORS, DEFAULT_COLOR, PAGE_SIZE_DEFAULT } from "@agentcenter/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -50,23 +51,8 @@ interface ActivitiesConnection {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const TYPE_COLORS: Record<string, string> = {
-  task_created: "#2563eb",
-  task_updated: "#d97706",
-  task_completed: "#16a34a",
-  task_rejected: "#dc2626",
-  task_approved: "#16a34a",
-  task_assigned: "#7c3aed",
-  task_unassigned: "#6b7280",
-  agent_status_changed: "#0891b2",
-  message_sent: "#6b7280",
-  deliverable_created: "#2563eb",
-  project_created: "#d97706",
-  project_updated: "#6b7280",
-};
-
 function getColor(type: string) {
-  return TYPE_COLORS[type] ?? "#6b7280";
+  return ACTIVITY_TYPE_HEX_COLORS[type] ?? DEFAULT_COLOR;
 }
 
 function formatTime(iso: string): string {
@@ -83,7 +69,6 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-const PAGE_SIZE = 30;
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -98,7 +83,7 @@ export default function ActivityScreen() {
 
   const [result, reexecute] = useQuery<{ activitiesConnection: ActivitiesConnection }>({
     query: ACTIVITIES_CONNECTION_QUERY,
-    variables: { first: PAGE_SIZE, after },
+    variables: { first: PAGE_SIZE_DEFAULT, after },
     requestPolicy: "cache-and-network",
   });
 

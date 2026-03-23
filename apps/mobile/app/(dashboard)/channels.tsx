@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CHANNELS_QUERY, PROFILES_QUERY, START_CONVERSATION } from "@agentcenter/graphql-client";
+import { PAGE_SIZE_CHANNELS, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 
 interface ChannelMember {
@@ -48,14 +49,12 @@ function channelIcon(channel: Channel): string {
   return "#";
 }
 
-const PAGE_SIZE = 50;
-
 export default function ChannelsScreen() {
   const router = useRouter();
   const { profileId } = useAuth();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
-  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [limit, setLimit] = useState(PAGE_SIZE_CHANNELS);
   const [dmPickerOpen, setDmPickerOpen] = useState(false);
   const [dmSearch, setDmSearch] = useState("");
 
@@ -182,7 +181,7 @@ export default function ChannelsScreen() {
                   }}
                 >
                   <View style={styles.dmAvatar}>
-                    <Text style={styles.dmAvatarText}>{item.kind === "agent" ? "🤖" : item.displayName.charAt(0).toUpperCase()}</Text>
+                    <Text style={styles.dmAvatarText}>{item.kind === "agent" ? DEFAULT_AGENT_EMOJI : item.displayName.charAt(0).toUpperCase()}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.dmName}>{item.displayName}</Text>
@@ -204,14 +203,14 @@ export default function ChannelsScreen() {
           <RefreshControl
             refreshing={fetching && allChannels.length > 0}
             onRefresh={() => {
-              setLimit(PAGE_SIZE);
+              setLimit(PAGE_SIZE_CHANNELS);
               reexecute({ requestPolicy: "network-only" });
             }}
             tintColor="#2563eb"
           />
         }
         onEndReached={() => {
-          if (hasMore && !fetching && !search.trim()) setLimit((l) => l + PAGE_SIZE);
+          if (hasMore && !fetching && !search.trim()) setLimit((l) => l + PAGE_SIZE_CHANNELS);
         }}
         onEndReachedThreshold={0.3}
         ListFooterComponent={

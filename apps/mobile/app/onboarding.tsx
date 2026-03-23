@@ -20,6 +20,8 @@ import {
   ONBOARDING_TEMPLATES,
   getAgentName,
   type OnboardingUseCase,
+  DEFAULT_AGENT_EMOJI,
+  DEFAULT_AGENT_LEVEL,
 } from "@agentcenter/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -58,10 +60,10 @@ function buildDraftAgents(templateIds: readonly string[]): DraftAgent[] {
     const tmpl = ONBOARDING_TEMPLATES[tid] ?? {
       id: tid,
       name: tid,
-      emoji: "🤖",
+      emoji: DEFAULT_AGENT_EMOJI,
       role: tid,
       personality: "",
-      level: "specialist",
+      level: DEFAULT_AGENT_LEVEL,
     };
     const agentName = getAgentName(tmpl.id, tmpl.name);
     return {
@@ -271,9 +273,9 @@ export default function OnboardingScreen() {
                 name: "New Agent",
                 username: "new-agent",
                 role: "",
-                emoji: "🤖",
+                emoji: DEFAULT_AGENT_EMOJI,
                 personality: "",
-                level: "specialist",
+                level: DEFAULT_AGENT_LEVEL,
               },
             ])
           }

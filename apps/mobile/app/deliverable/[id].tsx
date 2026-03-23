@@ -17,6 +17,7 @@ import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useQuery } from "urql";
 import { useEffect, useState } from "react";
 import { DELIVERABLE_QUERY, DELIVERABLE_VERSIONS_QUERY } from "@agentcenter/graphql-client";
+import { DEFAULT_COLOR } from "@agentcenter/utils";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -348,7 +349,7 @@ function VersionPreviewModal({
 
   if (!version) return null;
 
-  const kindColor = KIND_COLORS[version.kind] ?? "#6b7280";
+  const kindColor = KIND_COLORS[version.kind] ?? DEFAULT_COLOR;
 
   return (
     <Modal
@@ -492,7 +493,7 @@ export default function DeliverableScreen() {
     );
   }
 
-  const kindColor = KIND_COLORS[d.kind] ?? "#6b7280";
+  const kindColor = KIND_COLORS[d.kind] ?? DEFAULT_COLOR;
 
   return (
     <>

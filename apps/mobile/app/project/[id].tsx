@@ -36,7 +36,7 @@ import {
   DELETE_PROJECT_DOC,
   PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -178,7 +178,7 @@ function OverviewTab({ project, onRefresh }: { project: Project; onRefresh: () =
         <View
           style={[
             styles.statusBadge,
-            { backgroundColor: STATUS_HEX_COLORS[project.status] ?? "#6b7280" },
+            { backgroundColor: STATUS_HEX_COLORS[project.status] ?? DEFAULT_COLOR },
           ]}
         >
           <Text style={styles.statusBadgeText}>{project.status}</Text>
@@ -381,7 +381,7 @@ function TasksTab({ projectId }: { projectId: string }) {
                   <View
                     style={[
                       styles.priorityDot,
-                      { backgroundColor: PRIORITY_HEX_COLORS[item.priority] ?? "#6b7280" },
+                      { backgroundColor: PRIORITY_HEX_COLORS[item.priority] ?? DEFAULT_COLOR },
                     ]}
                   />
                 )}
@@ -393,13 +393,13 @@ function TasksTab({ projectId }: { projectId: string }) {
                 <View
                   style={[
                     styles.statusPill,
-                    { backgroundColor: (TASK_STATUS_HEX_COLORS[item.status] ?? "#6b7280") + "20" },
+                    { backgroundColor: (STATUS_HEX_COLORS[item.status] ?? DEFAULT_COLOR) + "20" },
                   ]}
                 >
                   <Text
                     style={[
                       styles.statusPillText,
-                      { color: TASK_STATUS_HEX_COLORS[item.status] ?? "#6b7280" },
+                      { color: STATUS_HEX_COLORS[item.status] ?? DEFAULT_COLOR },
                     ]}
                   >
                     {item.status.replace("_", " ")}

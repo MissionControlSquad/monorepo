@@ -33,7 +33,7 @@ import {
   SET_AGENT_VACATION,
   SET_AGENT_ACTIVATION,
 } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 import { getStoredCookie } from "../../src/api/session";
 import { useAuth } from "../../src/context/AuthContext";
 
@@ -103,7 +103,7 @@ function capLabel(s: string) { return s.replace(/_/g, " ").replace(/\b\w/g, (c) 
 function isOnline(hb: string | null) { return !!hb && new Date(hb).getTime() > Date.now() - 2 * 60 * 1000; }
 function getDotColor(agent: Agent): string {
   if (agent.detailedStatus && STATUS_HEX_COLORS[agent.detailedStatus]) return STATUS_HEX_COLORS[agent.detailedStatus];
-  return STATUS_HEX_COLORS[agent.status] ?? "#6b7280";
+  return STATUS_HEX_COLORS[agent.status] ?? DEFAULT_COLOR;
 }
 function fmtDuration(ms: number) { const h = Math.floor(ms / 3600000); const m = Math.floor((ms % 3600000) / 60000); return h > 0 ? `${h}h ${m}m` : `${m}m`; }
 function fmtTime(dateStr: string) {
@@ -233,7 +233,7 @@ export default function AgentDetailScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.emojiWrapper}>
-          <Text style={styles.emoji}>{agent.identityEmoji ?? "🤖"}</Text>
+          <Text style={styles.emoji}>{agent.identityEmoji ?? DEFAULT_AGENT_EMOJI}</Text>
           <View style={[styles.onlineDot, { backgroundColor: online ? dotColor : "#d1d5db" }]} />
         </View>
         <View style={styles.headerInfo}>
@@ -684,7 +684,7 @@ function QueueTab({
 function QueueCard({ item, onStatusChange, onDelete, onTaskPress }: {
   item: QueueItem; onStatusChange: () => void; onDelete: () => void; onTaskPress?: () => void;
 }) {
-  const color = STATUS_HEX_COLORS[item.status] ?? "#6b7280";
+  const color = STATUS_HEX_COLORS[item.status] ?? DEFAULT_COLOR;
   return (
     <View style={styles.queueCard}>
       <View style={styles.queueCardTop}>
@@ -692,8 +692,8 @@ function QueueCard({ item, onStatusChange, onDelete, onTaskPress }: {
           <Text style={[styles.badgeText, { color }]}>{capLabel(item.status)}</Text>
         </TouchableOpacity>
         {item.priority && (
-          <View style={[styles.badge, { backgroundColor: (PRIORITY_HEX_COLORS[item.priority] ?? "#6b7280") + "22" }]}>
-            <Text style={[styles.badgeText, { color: PRIORITY_HEX_COLORS[item.priority] ?? "#6b7280" }]}>{item.priority}</Text>
+          <View style={[styles.badge, { backgroundColor: (PRIORITY_HEX_COLORS[item.priority] ?? DEFAULT_COLOR) + "22" }]}>
+            <Text style={[styles.badgeText, { color: PRIORITY_HEX_COLORS[item.priority] ?? DEFAULT_COLOR }]}>{item.priority}</Text>
           </View>
         )}
         <View style={{ flex: 1 }} />
@@ -758,8 +758,8 @@ function AgentTasksTab({
         <RefreshControl refreshing={fetching && allTasks.length > 0} onRefresh={onRefresh} tintColor="#2563eb" />
       }
       renderItem={({ item }) => {
-        const statusColor = STATUS_HEX_COLORS[item.status] ?? "#6b7280";
-        const priorityColor = item.priority ? (PRIORITY_HEX_COLORS[item.priority] ?? "#6b7280") : null;
+        const statusColor = STATUS_HEX_COLORS[item.status] ?? DEFAULT_COLOR;
+        const priorityColor = item.priority ? (PRIORITY_HEX_COLORS[item.priority] ?? DEFAULT_COLOR) : null;
         return (
           <TouchableOpacity
             style={styles.taskRow}
@@ -834,7 +834,7 @@ function AgentDeliverablesTab({
         <RefreshControl refreshing={fetching && deliverables.length > 0} onRefresh={onRefresh} tintColor="#2563eb" />
       }
       renderItem={({ item }) => {
-        const kindColor = KIND_COLORS[item.kind] ?? "#6b7280";
+        const kindColor = KIND_COLORS[item.kind] ?? DEFAULT_COLOR;
         const kindIcon = KIND_ICONS[item.kind] ?? "📄";
         return (
           <TouchableOpacity

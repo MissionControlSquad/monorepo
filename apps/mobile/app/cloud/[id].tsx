@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../src/context/AuthContext";
 import { getStoredCookie } from "../../src/api/session";
-import { STATUS_HEX_COLORS } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 
 interface VMAgent {
   id: string;
@@ -326,7 +326,7 @@ export default function CloudVMDetailScreen() {
     );
   }
 
-  const statusColor = STATUS_HEX_COLORS[vm.status] ?? "#6b7280";
+  const statusColor = STATUS_HEX_COLORS[vm.status] ?? DEFAULT_COLOR;
   const statusLabel = STATUS_LABELS[vm.status] ?? vm.status;
   const displayName = vm.name || vm.serverName || vm.id.slice(0, 8);
   const isRunning = vm.status === "running";
@@ -494,7 +494,7 @@ export default function CloudVMDetailScreen() {
           <View style={styles.agentsCard}>
             <Text style={styles.cardTitle}>Agents ({vm.agents.length})</Text>
             {vm.agents.map((agent) => {
-              const agentStatusColor = AGENT_STATUS_HEX_COLORS[agent.status] ?? "#6b7280";
+              const agentStatusColor = STATUS_HEX_COLORS[agent.status] ?? DEFAULT_COLOR;
               return (
                 <TouchableOpacity
                   key={agent.id}
@@ -503,7 +503,7 @@ export default function CloudVMDetailScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={styles.agentEmoji}>
-                    <Text style={styles.agentEmojiText}>{agent.identityEmoji || "🤖"}</Text>
+                    <Text style={styles.agentEmojiText}>{agent.identityEmoji || DEFAULT_AGENT_EMOJI}</Text>
                   </View>
                   <View style={styles.agentInfo}>
                     <Text style={styles.agentName}>{agent.name}</Text>

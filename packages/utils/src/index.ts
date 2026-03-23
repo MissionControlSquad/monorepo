@@ -14,3 +14,4 @@ export * from "./onboarding-agent-names";
 export * from "./onboarding-templates";
 export * from "./agent-wizard-templates";
 export * from "./agent-creation";
+export * from "./defaults";

@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { useQuery, useMutation, useClient } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KANBAN_BOARD_QUERY, LOAD_MORE_COLUMN_QUERY, UPDATE_TASK } from "@agentcenter/graphql-client";
-import { PRIORITY_HEX_COLORS } from "@agentcenter/utils";
+import { PRIORITY_HEX_COLORS, PAGE_SIZE_KANBAN, DEFAULT_COLOR } from "@agentcenter/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -66,7 +66,7 @@ function KanbanTaskCard({
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  const priorityColor = task.priority ? (PRIORITY_HEX_COLORS[task.priority] ?? "#6b7280") : null;
+  const priorityColor = task.priority ? (PRIORITY_HEX_COLORS[task.priority] ?? DEFAULT_COLOR) : null;
   const priorityIcon = task.priority ? (PRIORITY_ICONS[task.priority] ?? "") : null;
 
   return (
@@ -183,8 +183,6 @@ interface KanbanBoardProps {
   priorities?: string[];
 }
 
-const KANBAN_PAGE_SIZE = 50;
-
 export function KanbanBoard({
   projectId,
   bottomPadding = 0,
@@ -247,7 +245,7 @@ export function KanbanBoard({
     try {
       const res = await client.query(LOAD_MORE_COLUMN_QUERY, {
         status: colKey,
-        limit: KANBAN_PAGE_SIZE,
+        limit: PAGE_SIZE_KANBAN,
         offset,
         projectId: projectId ?? null,
         blockedOnly: blockedOnly || undefined,
@@ -310,7 +308,7 @@ export function KanbanBoard({
           const extras = extraTasks[col.key] ?? [];
           const allTasks = [...baseTasks, ...extras];
           const hasMore = baseTasks.length + extras.length > 0 &&
-            (baseTasks.length + extras.length) % KANBAN_PAGE_SIZE === 0;
+            (baseTasks.length + extras.length) % PAGE_SIZE_KANBAN === 0;
           return (
             <Column
               key={col.key}

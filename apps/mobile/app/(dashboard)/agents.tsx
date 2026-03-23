@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { useState, useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { AGENTS_QUERY, SET_AGENT_ACTIVATION } from "@agentcenter/graphql-client";
+import { DEFAULT_COLOR, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 
 interface Agent {
   id: string;
@@ -60,7 +61,7 @@ function getStatusColor(agent: Agent): string {
   if (agent.detailedStatus && DETAILED_STATUS_COLOR[agent.detailedStatus]) {
     return DETAILED_STATUS_COLOR[agent.detailedStatus];
   }
-  return STATUS_COLOR[agent.status] ?? "#6b7280";
+  return STATUS_COLOR[agent.status] ?? DEFAULT_COLOR;
 }
 
 function getStatusLabel(agent: Agent): string {
@@ -203,7 +204,7 @@ export default function AgentsScreen() {
             >
               <View style={styles.cardLeft}>
                 <View style={styles.emojiContainer}>
-                  <Text style={styles.emoji}>{item.identityEmoji ?? "🤖"}</Text>
+                  <Text style={styles.emoji}>{item.identityEmoji ?? DEFAULT_AGENT_EMOJI}</Text>
                   <View style={[styles.statusDot, { backgroundColor: online ? statusColor : "#d1d5db" }]} />
                 </View>
                 <View style={styles.info}>

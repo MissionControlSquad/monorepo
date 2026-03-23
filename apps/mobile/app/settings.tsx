@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { CHANGE_PASSWORD, SET_SYSTEM_SHUTDOWN, SYSTEM_SETTINGS_QUERY } from "@agentcenter/graphql-client";
 import { useAuth } from "../src/context/AuthContext";
+import { DEFAULT_COLOR } from "@agentcenter/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -245,11 +246,11 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
     active: "#16a34a",
     grace: "#d97706",
     expired: "#dc2626",
-    none: "#6b7280",
+    none: DEFAULT_COLOR,
   };
 
   const status = license?.status ?? "none";
-  const color = statusColor[status] ?? "#6b7280";
+  const color = statusColor[status] ?? DEFAULT_COLOR;
 
   return (
     <View style={styles.card}>

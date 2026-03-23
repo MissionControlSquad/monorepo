@@ -29,7 +29,7 @@ import {
   ON_NEW_MESSAGE,
 } from "@agentcenter/graphql-client";
 import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION, APPROVE_TASK, REJECT_TASK, SAVE_TASK_AS_TEMPLATE } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, TASK_STATUSES } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, TASK_STATUSES, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 import { MentionInput } from "../../src/components/MentionInput";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
@@ -283,7 +283,7 @@ function fmtDuration(ms: number): string {
 
 function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; onStatusChange: () => void; onProjectAssign: (projectId: string) => void }) {
   const router = useRouter();
-  const statusColor = STATUS_HEX_COLORS[task.status] ?? "#6b7280";
+  const statusColor = STATUS_HEX_COLORS[task.status] ?? DEFAULT_COLOR;
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const [projectsResult] = useQuery<{ projects: { id: string; name: string; status: string }[] }>({
@@ -343,13 +343,13 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
           <View
             style={[
               styles.badge,
-              { backgroundColor: (PRIORITY_HEX_COLORS[task.priority] ?? "#6b7280") + "22" },
+              { backgroundColor: (PRIORITY_HEX_COLORS[task.priority] ?? DEFAULT_COLOR) + "22" },
             ]}
           >
             <Text
               style={[
                 styles.badgeText,
-                { color: PRIORITY_HEX_COLORS[task.priority] ?? "#6b7280", textTransform: "capitalize" },
+                { color: PRIORITY_HEX_COLORS[task.priority] ?? DEFAULT_COLOR, textTransform: "capitalize" },
               ]}
             >
               {task.priority}
@@ -390,13 +390,13 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
             <View
               style={[
                 styles.miniPill,
-                { backgroundColor: (STATUS_HEX_COLORS[task.blockedByTask.status] ?? "#6b7280") + "22" },
+                { backgroundColor: (STATUS_HEX_COLORS[task.blockedByTask.status] ?? DEFAULT_COLOR) + "22" },
               ]}
             >
               <Text
                 style={[
                   styles.miniPillText,
-                  { color: STATUS_HEX_COLORS[task.blockedByTask.status] ?? "#6b7280" },
+                  { color: STATUS_HEX_COLORS[task.blockedByTask.status] ?? DEFAULT_COLOR },
                 ]}
               >
                 {task.blockedByTask.status.replace("_", " ")}
@@ -451,7 +451,7 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
                 <View
                   style={[
                     styles.subtaskDot,
-                    { backgroundColor: STATUS_HEX_COLORS[ct.status] ?? "#6b7280" },
+                    { backgroundColor: STATUS_HEX_COLORS[ct.status] ?? DEFAULT_COLOR },
                   ]}
                 />
                 <Text style={styles.subtaskNum}>#{ct.taskNumber}</Text>
@@ -780,7 +780,7 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
       {childGroups.map((group) => (
         <View key={group.task.id}>
           <View style={styles.childGroupHeader}>
-            <View style={[styles.subtaskDot, { backgroundColor: STATUS_HEX_COLORS[group.task.status] ?? "#6b7280" }]} />
+            <View style={[styles.subtaskDot, { backgroundColor: STATUS_HEX_COLORS[group.task.status] ?? DEFAULT_COLOR }]} />
             <Text style={styles.childGroupTitle} numberOfLines={1}>
               #{group.task.taskNumber} {group.task.title}
             </Text>
@@ -1076,7 +1076,7 @@ export default function TaskDetailScreen() {
         <View style={styles.workingAgentsBar}>
           <Text style={styles.workingAgentsBolt}>⚡</Text>
           <Text style={styles.workingAgentsText} numberOfLines={1}>
-            {workingAgents.map((a) => `${a.identityEmoji ?? "🤖"} ${a.name}`).join("  ·  ")}
+            {workingAgents.map((a) => `${a.identityEmoji ?? DEFAULT_AGENT_EMOJI} ${a.name}`).join("  ·  ")}
           </Text>
           <Text style={styles.workingAgentsLabel}> working</Text>
         </View>

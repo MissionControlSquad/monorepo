@@ -13,7 +13,7 @@ import { useQuery } from "urql";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { PROJECTS_QUERY } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, DEFAULT_COLOR } from "@agentcenter/utils";
 
 interface ProjectMember {
   id: string;
@@ -189,7 +189,7 @@ export default function ProjectsScreen() {
                   <View
                     style={[
                       styles.statusBadge,
-                      { backgroundColor: STATUS_HEX_COLORS[item.status] ?? "#6b7280" },
+                      { backgroundColor: STATUS_HEX_COLORS[item.status] ?? DEFAULT_COLOR },
                     ]}
                   >
                     <Text style={styles.statusBadgeText}>{item.status}</Text>

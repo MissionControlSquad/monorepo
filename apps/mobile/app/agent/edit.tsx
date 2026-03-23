@@ -15,7 +15,7 @@ import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AGENT_EDIT_QUERY, UPDATE_AGENT_PROFILE } from "@agentcenter/graphql-client";
-import { AGENT_EMOJI_PRESETS } from "@agentcenter/utils";
+import { AGENT_EMOJI_PRESETS, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 
 export default function EditAgentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,7 +25,7 @@ export default function EditAgentScreen() {
 
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
-  const [emoji, setEmoji] = useState("🤖");
+  const [emoji, setEmoji] = useState(DEFAULT_AGENT_EMOJI);
   const [personality, setPersonality] = useState("");
   const [dirty, setDirty] = useState(false);
 
@@ -44,7 +44,7 @@ export default function EditAgentScreen() {
       navigation.setOptions({ title: `Edit ${agent.name}` });
       setName(agent.name ?? "");
       setRole(agent.role ?? "");
-      setEmoji(agent.identityEmoji ?? "🤖");
+      setEmoji(agent.identityEmoji ?? DEFAULT_AGENT_EMOJI);
       setPersonality(agent.personality ?? "");
     }
   }, [agent, navigation]);

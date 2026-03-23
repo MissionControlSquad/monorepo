@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../src/context/AuthContext";
 import { getStoredCookie } from "../src/api/session";
-import { STATUS_HEX_COLORS } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 
 interface CloudVMAgent {
   id: string;
@@ -265,7 +265,7 @@ const cmStyles = StyleSheet.create({
 // ── VM Card ───────────────────────────────────────────────────────────────────
 
 function VMCard({ vm, onPress }: { vm: CloudVM; onPress: () => void }) {
-  const statusColor = STATUS_HEX_COLORS[vm.status] ?? "#6b7280";
+  const statusColor = STATUS_HEX_COLORS[vm.status] ?? DEFAULT_COLOR;
   const statusLabel = STATUS_LABELS[vm.status] ?? vm.status;
   const displayName = vm.name || vm.serverName || vm.id.slice(0, 8);
 
@@ -310,7 +310,7 @@ function VMCard({ vm, onPress }: { vm: CloudVM; onPress: () => void }) {
         <View style={styles.agentsRow}>
           {vm.agents.slice(0, 5).map((a) => (
             <View key={a.id} style={styles.agentChip}>
-              <Text style={styles.agentEmoji}>{a.identityEmoji || "🤖"}</Text>
+              <Text style={styles.agentEmoji}>{a.identityEmoji || DEFAULT_AGENT_EMOJI}</Text>
             </View>
           ))}
           {vm.agents.length > 5 && (

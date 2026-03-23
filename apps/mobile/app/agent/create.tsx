@@ -30,6 +30,10 @@ import {
   AGENT_LEVEL_KEYS,
   AGENT_EMOJI_PRESETS,
   SETUP_MODE_LABELS,
+  DEFAULT_AGENT_EMOJI,
+  DEFAULT_AGENT_LEVEL,
+  DEFAULT_SETUP_MODE,
+  SQUAD_LEAD_ROLE,
 } from "@agentcenter/utils";
 import {
   AGENTS_FOR_DELEGATE_QUERY,
@@ -57,15 +61,15 @@ export default function CreateAgentScreen() {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [role, setRole] = useState("");
-  const [emoji, setEmoji] = useState("🤖");
-  const [level, setLevel] = useState<Level>("specialist");
+  const [emoji, setEmoji] = useState(DEFAULT_AGENT_EMOJI);
+  const [level, setLevel] = useState<Level>(DEFAULT_AGENT_LEVEL);
   const [personality, setPersonality] = useState("");
   const [workspacePath, setWorkspacePath] = useState("");
 
   // Setup state
   const [result, setResult] = useState<AgentSetupResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [setupMode, setSetupMode] = useState<SetupMode>("auto");
+  const [setupMode, setSetupMode] = useState<SetupMode>(DEFAULT_SETUP_MODE);
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [delegateStatus, setDelegateStatus] = useState<"idle" | "creating" | "done">("idle");
   const [delegateTaskNumber, setDelegateTaskNumber] = useState<number | null>(null);
@@ -82,7 +86,7 @@ export default function CreateAgentScreen() {
   const squadLeads = useMemo(() =>
     (agentsResult.data?.agents ?? []).filter(
       (a: { role?: string; setupStatus?: string }) =>
-        a.role === "Squad Lead" && a.setupStatus !== "deactivated",
+        a.role === SQUAD_LEAD_ROLE && a.setupStatus !== "deactivated",
     ),
     [agentsResult.data],
   );
@@ -118,7 +122,7 @@ export default function CreateAgentScreen() {
   function applyTemplate(t: WizardTemplate) {
     setSelectedTemplate(t);
     setRole(t.role ?? "");
-    setEmoji(t.emoji ?? "🤖");
+    setEmoji(t.emoji ?? DEFAULT_AGENT_EMOJI);
     setPersonality(t.personality ?? "");
     const lvl = AGENT_LEVEL_KEYS.includes(t.level as Level) ? (t.level as Level) : "specialist";
     setLevel(lvl);
@@ -382,9 +386,9 @@ export default function CreateAgentScreen() {
               onPress={() => {
                 setSelectedTemplate(null);
                 setRole("");
-                setEmoji("🤖");
+                setEmoji(DEFAULT_AGENT_EMOJI);
                 setPersonality("");
-                setLevel("specialist");
+                setLevel(DEFAULT_AGENT_LEVEL);
                 setStep("details");
               }}
               activeOpacity={0.8}
@@ -886,7 +890,7 @@ export default function CreateAgentScreen() {
                     </View>
                     <View style={styles.summaryRow}>
                       <Text style={styles.summaryLabel}>Assigned to</Text>
-                      <Text style={styles.summaryValue}>{squadLeads[0]?.name ?? "Squad Lead"}</Text>
+                      <Text style={styles.summaryValue}>{squadLeads[0]?.name ?? SQUAD_LEAD_ROLE}</Text>
                     </View>
                   </View>
 
@@ -911,7 +915,7 @@ export default function CreateAgentScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.doneBoxTitle}>Task #{delegateTaskNumber} Created</Text>
                     <Text style={styles.doneBoxText}>
-                      Assigned to {squadLeads[0]?.name ?? "Squad Lead"}. Setup will happen on next wake-up.
+                      Assigned to {squadLeads[0]?.name ?? SQUAD_LEAD_ROLE}. Setup will happen on next wake-up.
                     </Text>
                   </View>
                 </View>

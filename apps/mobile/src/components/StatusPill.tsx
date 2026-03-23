@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
-import { STATUS_HEX_COLORS } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, DEFAULT_COLOR } from "@agentcenter/utils";
 
 function capLabel(s: string) {
   return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -11,7 +11,7 @@ interface StatusPillProps {
 }
 
 export function StatusPill({ status, size = "sm" }: StatusPillProps) {
-  const color = STATUS_HEX_COLORS[status] ?? "#6b7280";
+  const color = STATUS_HEX_COLORS[status] ?? DEFAULT_COLOR;
   return (
     <View style={[styles.pill, { backgroundColor: color + "22" }]}>
       <Text
