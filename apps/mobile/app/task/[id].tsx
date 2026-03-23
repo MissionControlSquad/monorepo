@@ -999,7 +999,7 @@ export default function TaskDetailScreen() {
 
   const [agentsResult] = useQuery<{ agents: { id: string; name: string; identityEmoji: string; currentTaskId: string | null }[] }>({
     query: AGENTS_QUERY,
-    requestPolicy: "cache-and-network",
+    requestPolicy: "cache-only",
     pause: !task,
   });
   const workingAgents = (agentsResult.data?.agents ?? []).filter((a) => a.currentTaskId === id);

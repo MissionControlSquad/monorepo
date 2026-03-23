@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useQuery } from "urql";
 import { useRouter } from "expo-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
@@ -126,14 +126,10 @@ export default function TaskListScreen() {
     unassignedOnly,
   ].filter(Boolean).length;
 
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
-
   const [result, reexecute] = useQuery<{ tasks: Task[] }>({
     query: TASKS_QUERY,
     variables: { limit },
     requestPolicy: "cache-and-network",
-    pause: !mounted,
   });
 
   const { data, fetching, error } = result;
