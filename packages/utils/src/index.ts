@@ -18,3 +18,4 @@ export * from "./defaults";
 export * from "./format";
 export * from "./browser";
 export * from "./network";
+export * from "./zip";
