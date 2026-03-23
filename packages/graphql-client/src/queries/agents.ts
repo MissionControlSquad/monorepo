@@ -1,4 +1,5 @@
 import { gql } from "urql";
+import { PROFILE_FIELDS } from "../fragments";
 
 export const AGENTS_QUERY = gql`
   query Agents {
@@ -28,10 +29,7 @@ export const AGENTS_QUERY = gql`
       createdAt
       updatedAt
       profile {
-        id
-        displayName
-        username
-        avatarUrl
+        ${PROFILE_FIELDS}
       }
     }
   }

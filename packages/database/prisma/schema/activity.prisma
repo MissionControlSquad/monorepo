@@ -31,5 +31,6 @@ model Activity {
   @@index([profileId])
   @@index([taskId])
   @@index([projectId])
+  @@index([projectId, createdAt])
   @@map("activities")
 }

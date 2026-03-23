@@ -1,4 +1,5 @@
 import { gql } from "urql";
+import { PROFILE_FIELDS, PROFILE_MINIMAL_FIELDS, PROFILE_WITH_KIND_FIELDS } from "../fragments";
 
 const CHANNEL_FIELDS = `
   id
@@ -11,11 +12,7 @@ const CHANNEL_FIELDS = `
   createdAt
   updatedAt
   createdByProfile {
-    id
-    kind
-    displayName
-    username
-    avatarUrl
+    ${PROFILE_WITH_KIND_FIELDS}
   }
   project {
     id
@@ -54,16 +51,10 @@ const CHANNEL_MESSAGE_FIELDS = `
   pinnedAt
   pinnedByProfileId
   pinnedByProfile {
-    id
-    displayName
-    username
+    ${PROFILE_MINIMAL_FIELDS}
   }
   fromProfile {
-    id
-    kind
-    displayName
-    username
-    avatarUrl
+    ${PROFILE_WITH_KIND_FIELDS}
   }
   attachments {
     id
@@ -83,10 +74,7 @@ const CHANNEL_MESSAGE_FIELDS = `
     id
     profileId
     profile {
-      id
-      displayName
-      username
-      avatarUrl
+      ${PROFILE_FIELDS}
     }
   }
   reactions {
@@ -95,9 +83,7 @@ const CHANNEL_MESSAGE_FIELDS = `
     profileId
     emoji
     profile {
-      id
-      displayName
-      username
+      ${PROFILE_MINIMAL_FIELDS}
     }
   }
 `;

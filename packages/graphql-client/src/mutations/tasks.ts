@@ -1,4 +1,5 @@
 import { gql } from "urql";
+import { PROFILE_WITH_AGENT_FIELDS } from "../fragments";
 
 export const CREATE_TASK = gql`
   mutation CreateTask(
@@ -41,16 +42,7 @@ export const CREATE_TASK = gql`
         id
         profileId
         profile {
-          id
-          displayName
-          username
-          avatarUrl
-          agentId
-          agent {
-            id
-            name
-            identityEmoji
-          }
+          ${PROFILE_WITH_AGENT_FIELDS}
         }
       }
     }
@@ -96,16 +88,7 @@ export const CREATE_TASK_FROM_DASHBOARD = gql`
         id
         profileId
         profile {
-          id
-          displayName
-          username
-          avatarUrl
-          agentId
-          agent {
-            id
-            name
-            identityEmoji
-          }
+          ${PROFILE_WITH_AGENT_FIELDS}
         }
       }
     }
@@ -157,16 +140,7 @@ export const UPDATE_TASK = gql`
         id
         profileId
         profile {
-          id
-          displayName
-          username
-          avatarUrl
-          agentId
-          agent {
-            id
-            name
-            identityEmoji
-          }
+          ${PROFILE_WITH_AGENT_FIELDS}
         }
       }
     }

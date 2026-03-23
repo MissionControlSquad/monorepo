@@ -92,6 +92,7 @@ model UserNotification {
   @@unique([dedupKey, channel])
   @@index([userId, status])
   @@index([userId, createdAt])
+  @@index([userId, status, createdAt])
   @@index([status, nextRetryAt])
   @@map("user_notifications")
 }

@@ -1,4 +1,5 @@
 import { gql } from "urql";
+import { PROFILE_WITH_KIND_FIELDS } from "../fragments";
 
 export const CREATE_PROJECT = gql`
   mutation CreateProject(
@@ -23,11 +24,7 @@ export const CREATE_PROJECT = gql`
         id
         profileId
         profile {
-          id
-          kind
-          displayName
-          username
-          avatarUrl
+          ${PROFILE_WITH_KIND_FIELDS}
         }
       }
     }

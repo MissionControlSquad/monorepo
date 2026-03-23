@@ -1,4 +1,5 @@
 import { gql } from "urql";
+import { PROFILE_MINIMAL_FIELDS } from "../fragments";
 
 export const TOGGLE_MESSAGE_REACTION = gql`
   mutation ToggleMessageReaction($messageId: String!, $profileId: String!, $emoji: String!) {
@@ -9,9 +10,7 @@ export const TOGGLE_MESSAGE_REACTION = gql`
         profileId
         emoji
         profile {
-          id
-          displayName
-          username
+          ${PROFILE_MINIMAL_FIELDS}
         }
       }
     }

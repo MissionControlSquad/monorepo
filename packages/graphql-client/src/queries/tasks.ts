@@ -1,4 +1,5 @@
 import { gql } from "urql";
+import { PROFILE_FIELDS, PROFILE_WITH_AGENT_STATUS_FIELDS } from "../fragments";
 
 // ── Shared field fragments ──────────────────────────────────
 
@@ -7,20 +8,7 @@ const ASSIGNEE_FIELDS = `
     id
     profileId
     profile {
-      id
-      displayName
-      username
-      avatarUrl
-      agentId
-      agent {
-        id
-        name
-        identityEmoji
-        lastHeartbeat
-        status
-        detailedStatus
-        currentTaskId
-      }
+      ${PROFILE_WITH_AGENT_STATUS_FIELDS}
     }
   }
 `;
@@ -31,20 +19,7 @@ const ASSIGNEE_FIELDS_WITH_ASSIGNED_AT = `
     profileId
     assignedAt
     profile {
-      id
-      displayName
-      username
-      avatarUrl
-      agentId
-      agent {
-        id
-        name
-        identityEmoji
-        lastHeartbeat
-        status
-        detailedStatus
-        currentTaskId
-      }
+      ${PROFILE_WITH_AGENT_STATUS_FIELDS}
     }
   }
 `;
@@ -102,10 +77,7 @@ const TASK_DETAIL_FIELDS = `
   projectId
   blockedByTaskId
   createdByProfile {
-    id
-    displayName
-    username
-    avatarUrl
+    ${PROFILE_FIELDS}
   }
   parentTask {
     id

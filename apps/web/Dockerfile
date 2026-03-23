@@ -39,6 +39,9 @@ WORKDIR /app/apps/web
 ENV NEXT_PHASE=phase-production-build
 RUN npm run build
 
+# Bundle custom server (adds WebSocket support for GraphQL subscriptions)
+RUN npm run build:server
+
 # ── Stage 3: Production runner ─────────────────────────────────────
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -54,6 +57,7 @@ LABEL org.opencontainers.image.licenses="Proprietary"
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV DATA_DIR=/app/data
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
@@ -62,6 +66,9 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build /app/apps/web/public ./apps/web/public
+
+# Copy bundled custom server (WebSocket support for GraphQL subscriptions)
+COPY --from=build /app/apps/web/server.cjs ./apps/web/server.cjs
 
 # Copy Prisma schema + migrations for runtime migrate deploy
 COPY --from=build /app/packages/database/prisma ./prisma

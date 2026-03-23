@@ -18,6 +18,7 @@ model Message {
   userNotifications UserNotification[]
 
   @@index([taskId])
+  @@index([taskId, createdAt])
   @@index([fromProfileId])
   @@index([createdAt])
   @@index([projectId])

@@ -139,6 +139,12 @@ export function requiresAdminAuth(pathname: string): boolean {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Skip middleware for WebSocket upgrade requests (graphql-ws subscriptions).
+  // Auth is handled by the custom server's WS context instead.
+  if (request.headers.get("upgrade")?.toLowerCase() === "websocket") {
+    return NextResponse.next();
+  }
+
   // --- Request Correlation ID ---
   const requestId = crypto.randomUUID();
   const requestHeaders = new Headers(request.headers);

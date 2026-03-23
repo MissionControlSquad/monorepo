@@ -67,6 +67,7 @@ model ChannelMessage {
   reactions       ChannelMessageReaction[]
 
   @@index([channelId])
+  @@index([channelId, createdAt])
   @@index([fromProfileId])
   @@index([createdAt])
   @@index([channelId, pinnedAt])

@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useCallback, useEffect, lazy, Suspense } from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";
 import { Header } from "./Header";
 import { IconRail } from "./sidebar/IconRail";
-import { ActivityFeed } from "./ActivityFeed";
+import { ActivityDrawer } from "./ActivityDrawer";
 import { ProfileSidebar } from "./ProfileSidebar";
 import { useProfileSidebar } from "../context/ProfileSidebarContext";
 import { useAgentDetail } from "../context/AgentDetailContext";
@@ -17,6 +16,7 @@ import { ProjectDetailDialog } from "../project/ProjectDetailDialog";
 import { ErrorBoundary, PanelErrorFallback } from "../common/ErrorBoundary";
 import { useTaskNavigation } from "../../hooks/useTaskNavigation";
 import { useAgentStatus } from "../context/AgentStatusContext";
+import { useOnboarding } from "../../hooks/useOnboarding";
 import type { Agent } from "@agentcenter/types";
 import { Button } from "../ui";
 import { KeyboardShortcutsOverlay } from "../common/KeyboardShortcutsOverlay";
@@ -31,10 +31,11 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, modal }: AppShellProps) {
-  const router = useRouter();
   const openTask = useTaskNavigation();
   const { agents } = useAgentStatus();
   useGoShortcuts();
+
+  const { loading, needsOnboarding } = useOnboarding(agents);
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
@@ -49,9 +50,6 @@ export function AppShell({ children, modal }: AppShellProps) {
   const { openProjectId, closeProject } = useProjectDetail();
 
   const pathname = usePathname();
-
-  // ── Onboarding gate: fetch persisted onboarding status ──
-  const [onboardingDone, setOnboardingDone] = useState<boolean | undefined>(undefined);
 
   useEffect(() => setMounted(true), []);
 
@@ -76,29 +74,6 @@ export function AppShell({ children, modal }: AppShellProps) {
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
-
-  // Fetch onboarding status once on mount
-  useEffect(() => {
-    fetch("/api/onboarding")
-      .then((r) => r.json())
-      .then((d) => setOnboardingDone(d.completed ?? false))
-      .catch(() => setOnboardingDone(true)); // fail-open so the app isn't permanently locked
-  }, []);
-
-  // Derive whether we need to redirect to onboarding
-  // If agents already exist, onboarding is effectively done regardless of the DB flag
-  const hasAgents = agents !== undefined && agents.length > 0;
-  const isOnboardingOrAgentRoute =
-    pathname === "/onboarding" || pathname === "/agents" || pathname?.startsWith("/agents/");
-  const needsOnboarding =
-    onboardingDone !== undefined && !onboardingDone && !hasAgents && !isOnboardingOrAgentRoute;
-
-  // Redirect to onboarding if not completed
-  useEffect(() => {
-    if (needsOnboarding) {
-      router.push("/onboarding");
-    }
-  }, [needsOnboarding, router]);
 
   const handleNotificationClick = useCallback(
     (taskId: string) => {
@@ -141,19 +116,7 @@ export function AppShell({ children, modal }: AppShellProps) {
 
   // ── Early returns (all hooks are above) ──
 
-  // Show loader while agents or onboarding status are being fetched
-  if (agents === undefined || onboardingDone === undefined) {
-    return (
-      <div className="min-h-screen bg-muted flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-border border-t-primary rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (needsOnboarding) {
+  if (loading || needsOnboarding) {
     return (
       <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -165,8 +128,8 @@ export function AppShell({ children, modal }: AppShellProps) {
   }
 
   // Show a "waiting" banner when all agents are pending_setup (none active yet)
-  const hasActiveAgent = agents.some((a: Agent) => a.setupStatus === "active");
-  const hasPendingAgent = agents.some((a: Agent) => a.setupStatus === "pending_setup");
+  const hasActiveAgent = agents!.some((a: Agent) => a.setupStatus === "active");
+  const hasPendingAgent = agents!.some((a: Agent) => a.setupStatus === "pending_setup");
   const showWaitingBanner = hasPendingAgent && !hasActiveAgent;
 
   const isOnboarding = pathname === "/onboarding";
@@ -236,40 +199,13 @@ export function AppShell({ children, modal }: AppShellProps) {
       </div>
 
       {/* Activity feed — portal sheet */}
-      {mounted &&
-        createPortal(
-          <>
-            {activityOpen && (
-              <div
-                key="activity-backdrop"
-                className="fixed inset-0 bg-black/30 z-40"
-                onClick={handleCloseActivity}
-              />
-            )}
-            <aside
-              key="activity-drawer"
-              className={`
-                fixed inset-y-0 right-0 z-50 w-full sm:w-96 bg-background border-l border-border shadow-xl
-                flex flex-col
-                transition-transform duration-200 ease-in-out
-                ${activityOpen ? "translate-x-0" : "translate-x-full"}
-              `}
-            >
-              <ErrorBoundary
-                fallback={({ resetErrorBoundary, error }) => (
-                  <PanelErrorFallback
-                    label="Activity feed"
-                    error={error}
-                    onRetry={resetErrorBoundary}
-                  />
-                )}
-              >
-                <ActivityFeed onTaskClick={handleNotificationClick} onClose={handleCloseActivity} />
-              </ErrorBoundary>
-            </aside>
-          </>,
-          document.body,
-        )}
+      {mounted && (
+        <ActivityDrawer
+          open={activityOpen}
+          onClose={handleCloseActivity}
+          onTaskClick={handleNotificationClick}
+        />
+      )}
 
       {modal}
 

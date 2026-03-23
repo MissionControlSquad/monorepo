@@ -16,6 +16,8 @@ out/
 dist/
 *.local
 tsconfig.tsbuildinfo
+# Bundled custom server (built by esbuild)
+apps/web/server.cjs
 
 # Editor directories and files
 .vscode/*
