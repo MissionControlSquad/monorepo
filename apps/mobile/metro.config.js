@@ -15,6 +15,7 @@ const config = mergeConfig(expoConfig, {
     path.resolve(monorepoRoot, "packages/utils"),
     path.resolve(monorepoRoot, "packages/config"),
     path.resolve(monorepoRoot, "packages/graphql-client"),
+    path.resolve(monorepoRoot, "packages/hooks"),
   ],
   resolver: {
     blockList: [
@@ -33,6 +34,7 @@ const config = mergeConfig(expoConfig, {
       "@agentcenter/utils": path.resolve(monorepoRoot, "packages/utils"),
       "@agentcenter/config": path.resolve(monorepoRoot, "packages/config"),
       "@agentcenter/graphql-client": path.resolve(monorepoRoot, "packages/graphql-client"),
+      "@agentcenter/hooks": path.resolve(monorepoRoot, "packages/hooks"),
       // Force single urql instance (root node_modules v4)
       "urql": path.resolve(monorepoRoot, "node_modules/urql"),
       "graphql": path.resolve(monorepoRoot, "node_modules/graphql"),
