@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/shadcn/select";
 import type { Activity as ActivityType } from "@agentcenter/types";
+import { appendDeduped, prependDeduped } from "@agentcenter/utils";
 
 const PAGE_SIZE = 30;
 
@@ -62,9 +63,7 @@ export function ActivityFeed({ onTaskClick, onClose }: ActivityFeedProps) {
         return connection.activities;
       }
       // Subsequent pages — append, dedup by id
-      const existingIds = new Set(prev.map((a: ActivityType) => a.id));
-      const newItems = connection.activities.filter((a: ActivityType) => !existingIds.has(a.id));
-      return [...prev, ...newItems];
+      return appendDeduped(prev, connection.activities);
     });
   }, [result.data?.activitiesConnection, cursor]);
 
@@ -77,10 +76,7 @@ export function ActivityFeed({ onTaskClick, onClose }: ActivityFeedProps) {
   useEffect(() => {
     const newActivity = subResult.data?.activityCreated;
     if (!newActivity) return;
-    setAllActivities((prev) => {
-      if (prev.some((a: ActivityType) => a.id === newActivity.id)) return prev;
-      return [newActivity, ...prev];
-    });
+    setAllActivities((prev) => prependDeduped(prev, [newActivity]));
   }, [subResult.data?.activityCreated]);
 
   const [selectedProfileId, setSelectedProfileId] = useState<string>("");

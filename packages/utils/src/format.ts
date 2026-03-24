@@ -169,3 +169,25 @@ export function matchesDueDateFilter(
       return true;
   }
 }
+
+/**
+ * Merges `incoming` items into `existing`, skipping any whose `id` is already
+ * present. Returns `[...existing, ...newOnly]`.
+ */
+export function appendDeduped<T extends { id: string }>(existing: T[], incoming: T[]): T[] {
+  if (incoming.length === 0) return existing;
+  const ids = new Set(existing.map((item) => item.id));
+  const newOnly = incoming.filter((item) => !ids.has(item.id));
+  return newOnly.length === 0 ? existing : [...existing, ...newOnly];
+}
+
+/**
+ * Prepends `incoming` items to `existing`, skipping any whose `id` is already
+ * present. Returns `[...newOnly, ...existing]`.
+ */
+export function prependDeduped<T extends { id: string }>(existing: T[], incoming: T[]): T[] {
+  if (incoming.length === 0) return existing;
+  const ids = new Set(existing.map((item) => item.id));
+  const newOnly = incoming.filter((item) => !ids.has(item.id));
+  return newOnly.length === 0 ? existing : [...newOnly, ...existing];
+}

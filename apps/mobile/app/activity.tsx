@@ -12,7 +12,7 @@ import { useRouter } from "expo-router";
 import { useState, useCallback, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ACTIVITIES_CONNECTION_QUERY, ACTIVITY_CREATED_SUBSCRIPTION } from "@agentcenter/graphql-client";
-import { ACTIVITY_TYPE_HEX_COLORS, DEFAULT_COLOR, PAGE_SIZE_DEFAULT, formatRelativeTime } from "@agentcenter/utils";
+import { ACTIVITY_TYPE_HEX_COLORS, DEFAULT_COLOR, PAGE_SIZE_DEFAULT, formatRelativeTime, appendDeduped, prependDeduped } from "@agentcenter/utils";
 import type { Activity } from "@agentcenter/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -64,15 +64,8 @@ export default function ActivityScreen() {
 
   // Merge live (real-time) items on top, then paginated items below
   const displayed: Activity[] = (() => {
-    const base: Activity[] = (() => {
-      if (pageFetched.length === 0) return accumulated;
-      const ids = new Set(accumulated.map((a) => a.id));
-      const newOnes = pageFetched.filter((a) => !ids.has(a.id));
-      return [...accumulated, ...newOnes];
-    })();
-    const baseIds = new Set(base.map((a) => a.id));
-    const newLive = liveItems.filter((a) => !baseIds.has(a.id));
-    return [...newLive, ...base];
+    const base = pageFetched.length === 0 ? accumulated : appendDeduped(accumulated, pageFetched);
+    return prependDeduped(base, liveItems);
   })();
 
   function handleRefresh() {
@@ -88,11 +81,7 @@ export default function ActivityScreen() {
     const last = pageFetched[pageFetched.length - 1];
     if (!last) return;
     // Commit current page into accumulated before advancing cursor
-    setAccumulated((prev) => {
-      const ids = new Set(prev.map((a) => a.id));
-      const newOnes = pageFetched.filter((a) => !ids.has(a.id));
-      return [...prev, ...newOnes];
-    });
+    setAccumulated((prev) => appendDeduped(prev, pageFetched));
     setAfter(last.id);
   }, [hasMore, loadingMore, fetching, pageFetched]);
 
