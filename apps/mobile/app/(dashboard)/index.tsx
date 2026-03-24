@@ -15,7 +15,7 @@ import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
-import { PAGE_SIZE_DEFAULT } from "@agentcenter/utils";
+import { PAGE_SIZE_DEFAULT, PRIORITY_FILTER_OPTIONS } from "@agentcenter/utils";
 import { TaskCard } from "../../src/components/TaskCard";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
 
@@ -44,13 +44,7 @@ type ViewMode = "list" | "kanban";
 type DueDateFilter = "" | "overdue" | "today" | "this_week" | "no_due_date";
 type PriorityFilter = "" | "low" | "medium" | "high" | "urgent";
 
-const PRIORITY_OPTIONS: { key: PriorityFilter; label: string }[] = [
-  { key: "", label: "Any" },
-  { key: "low", label: "Low" },
-  { key: "medium", label: "Medium" },
-  { key: "high", label: "High" },
-  { key: "urgent", label: "Urgent" },
-];
+const PRIORITY_OPTIONS = PRIORITY_FILTER_OPTIONS as { key: PriorityFilter; label: string }[];
 
 const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },

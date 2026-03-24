@@ -29,7 +29,7 @@ import {
   ON_NEW_MESSAGE,
 } from "@agentcenter/graphql-client";
 import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION, APPROVE_TASK, REJECT_TASK, SAVE_TASK_AS_TEMPLATE } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, TASK_STATUSES, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatRelativeTime, formatDate, humanizeLabel } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, TASK_STATUSES, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatRelativeTime, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 import { MentionInput } from "../../src/components/MentionInput";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
@@ -113,12 +113,7 @@ interface Deliverable {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 
-const KIND_ICONS: Record<string, string> = {
-  markdown: "📄",
-  code: "💻",
-  link: "🔗",
-  file: "📎",
-};
+const KIND_ICONS = DELIVERABLE_KIND_ICONS;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

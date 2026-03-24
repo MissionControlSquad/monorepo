@@ -33,7 +33,7 @@ import {
   SET_AGENT_VACATION,
   SET_AGENT_ACTIVATION,
 } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatDate, humanizeLabel } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS } from "@agentcenter/utils";
 import { getStoredCookie } from "../../src/api/session";
 import { useAuth } from "../../src/context/AuthContext";
 
@@ -788,12 +788,8 @@ function AgentTasksTab({
 
 // ── Agent Deliverables Tab ────────────────────────────────────────────────────
 
-const KIND_ICONS: Record<string, string> = {
-  markdown: "📄", code: "💻", link: "🔗", file: "📎",
-};
-const KIND_COLORS: Record<string, string> = {
-  markdown: "#2563eb", code: "#7c3aed", link: "#059669", file: "#d97706",
-};
+const KIND_ICONS = DELIVERABLE_KIND_ICONS;
+const KIND_COLORS = DELIVERABLE_KIND_HEX_COLORS;
 
 function AgentDeliverablesTab({
   agentId,

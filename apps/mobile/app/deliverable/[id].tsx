@@ -17,7 +17,7 @@ import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useQuery } from "urql";
 import { useEffect, useState } from "react";
 import { DELIVERABLE_QUERY, DELIVERABLE_VERSIONS_QUERY } from "@agentcenter/graphql-client";
-import { DEFAULT_COLOR, formatDateWithTime, formatDate, formatFileSize } from "@agentcenter/utils";
+import { DEFAULT_COLOR, formatDateWithTime, formatDate, formatFileSize, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS } from "@agentcenter/utils";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -52,19 +52,8 @@ interface DeliverableVersion {
   editedByProfile: { id: string; displayName: string; username: string } | null;
 }
 
-const KIND_COLORS: Record<string, string> = {
-  markdown: "#2563eb",
-  code: "#7c3aed",
-  link: "#059669",
-  file: "#d97706",
-};
-
-const KIND_ICONS: Record<string, string> = {
-  markdown: "📄",
-  code: "💻",
-  link: "🔗",
-  file: "📎",
-};
+const KIND_COLORS = DELIVERABLE_KIND_HEX_COLORS;
+const KIND_ICONS = DELIVERABLE_KIND_ICONS;
 
 const IMAGE_MIMES = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/svg+xml"];
 

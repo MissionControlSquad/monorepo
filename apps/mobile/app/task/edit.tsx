@@ -25,10 +25,10 @@ import {
 } from "@agentcenter/graphql-client";
 import { Avatar } from "../../src/components/Avatar";
 import { useTheme } from "../../src/hooks/useTheme";
-import { PRIORITY_HEX_COLORS } from "@agentcenter/utils";
+import { PRIORITY_HEX_COLORS, PRIORITY_VALUES } from "@agentcenter/utils";
+import type { Priority } from "@agentcenter/types";
 
-const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
-type Priority = (typeof PRIORITIES)[number];
+const PRIORITIES = PRIORITY_VALUES;
 
 interface Profile {
   id: string;

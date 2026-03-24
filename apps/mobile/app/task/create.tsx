@@ -19,10 +19,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "urql";
 import { CREATE_TASK_FROM_DASHBOARD, PROFILES_QUERY, TASKS_QUERY, TASK_TEMPLATES_QUERY, INSTANTIATE_TEMPLATE } from "@agentcenter/graphql-client";
 import { Avatar } from "../../src/components/Avatar";
-import { PRIORITY_HEX_COLORS } from "@agentcenter/utils";
+import { PRIORITY_HEX_COLORS, PRIORITY_VALUES } from "@agentcenter/utils";
+import type { Priority } from "@agentcenter/types";
 
-const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
-type Priority = (typeof PRIORITIES)[number];
+const PRIORITIES = PRIORITY_VALUES;
 
 interface Profile {
   id: string;

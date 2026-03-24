@@ -177,3 +177,31 @@ export const PRIORITY_ICONS: Record<string, string> = {
   high: "↑",
   urgent: "⚡",
 };
+
+// Ordered list of priority values (low → urgent)
+export const PRIORITY_VALUES = ["low", "medium", "high", "urgent"] as const;
+
+// Filter options for priority (includes empty string as "Any")
+export const PRIORITY_FILTER_OPTIONS: { key: string; label: string }[] = [
+  { key: "", label: "Any" },
+  { key: "low", label: "Low" },
+  { key: "medium", label: "Medium" },
+  { key: "high", label: "High" },
+  { key: "urgent", label: "Urgent" },
+];
+
+// Hex colors for deliverable kind values (usable by mobile, charts, Electron)
+export const DELIVERABLE_KIND_HEX_COLORS: Record<string, string> = {
+  markdown: "#2563eb",
+  code: "#7c3aed",
+  link: "#059669",
+  file: "#d97706",
+};
+
+// Emoji icons for deliverable kind values (no icon library required)
+export const DELIVERABLE_KIND_ICONS: Record<string, string> = {
+  markdown: "📄",
+  code: "💻",
+  link: "🔗",
+  file: "📎",
+};

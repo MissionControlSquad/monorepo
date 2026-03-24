@@ -26,7 +26,7 @@ import {
   PROJECTS_QUERY,
   PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
-import { formatDate } from "@agentcenter/utils";
+import { formatDate, PRIORITY_VALUES } from "@agentcenter/utils";
 import { useTheme } from "../src/hooks/useTheme";
 import { EmptyState } from "../src/components/EmptyState";
 import { StatusPill } from "../src/components/StatusPill";
@@ -56,7 +56,7 @@ const FREQUENCIES = [
   { label: "Monthly (1st)", value: '{"frequency":"monthly","dayOfMonth":1}' },
 ] as const;
 
-const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
+const PRIORITIES = PRIORITY_VALUES;
 
 
 
