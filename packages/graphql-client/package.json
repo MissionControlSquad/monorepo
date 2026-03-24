@@ -12,7 +12,8 @@
     "./mutations/profile": "./src/mutations/profile.ts",
     "./mutations/recurring-tasks": "./src/mutations/recurring-tasks.ts",
     "./mutations/system": "./src/mutations/system.ts",
-    "./mutations/tasks": "./src/mutations/tasks.ts"
+    "./mutations/tasks": "./src/mutations/tasks.ts",
+    "./hooks": "./src/hooks/index.ts"
   },
   "files": ["src"],
   "scripts": {
@@ -28,6 +29,7 @@
   },
   "peerDependencies": {
     "graphql": "^16.0.0",
+    "react": ">=18.0.0",
     "urql": ">=5.0.0"
   }
 }
