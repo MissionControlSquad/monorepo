@@ -15,7 +15,7 @@ import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
-import { PAGE_SIZE_DEFAULT, PRIORITY_FILTER_OPTIONS } from "@agentcenter/utils";
+import { PAGE_SIZE_DEFAULT, PRIORITY_FILTER_OPTIONS, matchesDueDateFilter } from "@agentcenter/utils";
 import { TaskCard } from "../../src/components/TaskCard";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
 
@@ -64,36 +64,6 @@ const DUE_DATE_OPTIONS: { key: DueDateFilter; label: string }[] = [
   { key: "no_due_date", label: "No due date" },
 ];
 
-function isOverdue(dueDate: string | null): boolean {
-  if (!dueDate) return false;
-  return new Date(dueDate) < new Date(new Date().toDateString());
-}
-
-function isDueToday(dueDate: string | null): boolean {
-  if (!dueDate) return false;
-  const today = new Date().toDateString();
-  return new Date(dueDate).toDateString() === today;
-}
-
-function isDueThisWeek(dueDate: string | null): boolean {
-  if (!dueDate) return false;
-  const now = new Date();
-  const d = new Date(dueDate);
-  const weekEnd = new Date(now);
-  weekEnd.setDate(now.getDate() + (7 - now.getDay()));
-  return d >= new Date(now.toDateString()) && d <= weekEnd;
-}
-
-function applyDueDateFilter(tasks: Task[], filter: DueDateFilter): Task[] {
-  if (!filter) return tasks;
-  switch (filter) {
-    case "overdue": return tasks.filter((t) => isOverdue(t.dueDate));
-    case "today": return tasks.filter((t) => isDueToday(t.dueDate));
-    case "this_week": return tasks.filter((t) => isDueThisWeek(t.dueDate));
-    case "no_due_date": return tasks.filter((t) => !t.dueDate);
-    default: return tasks;
-  }
-}
 
 export default function TaskListScreen() {
   const router = useRouter();
@@ -135,7 +105,7 @@ export default function TaskListScreen() {
   if (blockedOnly) tasks = tasks.filter((t) => t.blockedByTaskId != null);
   if (topLevelOnly) tasks = tasks.filter((t) => t.parentTaskId == null);
   if (unassignedOnly) tasks = tasks.filter((t) => t.assignees.length === 0);
-  tasks = applyDueDateFilter(tasks, dueDateFilter);
+  tasks = tasks.filter((t) => matchesDueDateFilter(t.dueDate, dueDateFilter));
   if (search.trim()) {
     tasks = tasks.filter(
       (t) =>

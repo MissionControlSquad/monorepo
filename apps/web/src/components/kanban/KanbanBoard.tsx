@@ -20,6 +20,7 @@ import { Columns3, LayoutList } from "lucide-react";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { Card } from "../ui";
 import type { TaskCard as TaskCardType, TaskAssignee } from "@agentcenter/types";
+import { matchesDueDateFilter } from "@agentcenter/utils";
 
 const DndBoardWrapper = lazy(() => import("./DndBoardWrapper"));
 
@@ -40,36 +41,6 @@ const EMPTY_FILTERS: FilterState = {
   blockedOnly: false,
   topLevelOnly: false,
 };
-
-function matchesDueDateFilter(
-  dueDate: string | null | undefined,
-  filter: FilterState["dueDateFilter"],
-): boolean {
-  if (!filter) return true;
-  if (filter === "no_due_date") return !dueDate;
-  if (!dueDate) return false;
-
-  const now = new Date();
-  const due = new Date(dueDate);
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfToday = new Date(startOfToday.getTime() + 86400000 - 1);
-
-  switch (filter) {
-    case "overdue":
-      return due < startOfToday;
-    case "today":
-      return due >= startOfToday && due <= endOfToday;
-    case "this_week": {
-      const dayOfWeek = now.getDay();
-      const startOfWeek = new Date(startOfToday);
-      startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek);
-      const endOfWeek = new Date(startOfWeek.getTime() + 7 * 86400000 - 1);
-      return due >= startOfWeek && due <= endOfWeek;
-    }
-    default:
-      return true;
-  }
-}
 
 /** Page size for "load more" when user scrolls to bottom (same as initial 50). */
 const KANBAN_PAGE_SIZE = 50;

@@ -132,3 +132,40 @@ export function generateInitials(displayName: string): string {
       .toUpperCase() || "?"
   );
 }
+
+/** Due date filter values shared across web and mobile. */
+export type DueDateFilter = "" | "overdue" | "today" | "this_week" | "no_due_date";
+
+/**
+ * Returns true if the given due date matches the filter.
+ * Pass `""` or `null`/`undefined` to disable filtering (always returns true).
+ */
+export function matchesDueDateFilter(
+  dueDate: string | null | undefined,
+  filter: DueDateFilter | null | undefined,
+): boolean {
+  if (!filter) return true;
+  if (filter === "no_due_date") return !dueDate;
+  if (!dueDate) return false;
+
+  const now = new Date();
+  const due = new Date(dueDate);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfToday = new Date(startOfToday.getTime() + 86400000 - 1);
+
+  switch (filter) {
+    case "overdue":
+      return due < startOfToday;
+    case "today":
+      return due >= startOfToday && due <= endOfToday;
+    case "this_week": {
+      const dayOfWeek = now.getDay();
+      const startOfWeek = new Date(startOfToday);
+      startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek);
+      const endOfWeek = new Date(startOfWeek.getTime() + 7 * 86400000 - 1);
+      return due >= startOfWeek && due <= endOfWeek;
+    }
+    default:
+      return true;
+  }
+}

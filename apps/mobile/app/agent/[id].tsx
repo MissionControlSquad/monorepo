@@ -33,7 +33,7 @@ import {
   SET_AGENT_VACATION,
   SET_AGENT_ACTIVATION,
 } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS, formatRelativeTime, isAgentOnline } from "@agentcenter/utils";
 import { getStoredCookie } from "../../src/api/session";
 import { useAuth } from "../../src/context/AuthContext";
 
@@ -99,19 +99,11 @@ const ACTION_ICONS: Record<string, string> = {
 
 type Tab = "overview" | "tasks" | "deliverables" | "queue" | "activity" | "history" | "setup";
 
-function isOnline(hb: string | null) { return !!hb && new Date(hb).getTime() > Date.now() - 2 * 60 * 1000; }
 function getDotColor(agent: Agent): string {
   if (agent.detailedStatus && STATUS_HEX_COLORS[agent.detailedStatus]) return STATUS_HEX_COLORS[agent.detailedStatus];
   return STATUS_HEX_COLORS[agent.status] ?? DEFAULT_COLOR;
 }
 function fmtDuration(ms: number) { const h = Math.floor(ms / 3600000); const m = Math.floor((ms % 3600000) / 60000); return h > 0 ? `${h}h ${m}m` : `${m}m`; }
-function fmtTime(dateStr: string) {
-  const d = new Date(dateStr); const now = Date.now(); const diff = now - d.getTime();
-  if (diff < 60000) return "just now";
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
@@ -188,7 +180,7 @@ export default function AgentDetailScreen() {
     return <View style={styles.center}><Text style={styles.errorText}>Agent not found</Text></View>;
   }
 
-  const online = isOnline(agent.lastHeartbeat);
+  const online = isAgentOnline(agent.lastHeartbeat);
   const dotColor = getDotColor(agent);
   const isDeactivated = agent.setupStatus === "deactivated";
 
@@ -512,7 +504,7 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
         {agent.setupStatus && <InfoRow label="Setup" value={humanizeLabel(agent.setupStatus)} />}
         <InfoRow label="Joined" value={formatDate(agent.createdAt)} />
         {agent.lastHeartbeat && (
-          <InfoRow label="Last Seen" value={fmtTime(agent.lastHeartbeat)} />
+          <InfoRow label="Last Seen" value={formatRelativeTime(agent.lastHeartbeat)} />
         )}
       </View>
 
@@ -706,7 +698,7 @@ function QueueCard({ item, onStatusChange, onDelete, onTaskPress }: {
           <Text style={styles.relatedTask}>→ #{item.relatedTask.taskNumber} {item.relatedTask.title}</Text>
         </TouchableOpacity>
       )}
-      <Text style={styles.queueTime}>{fmtTime(item.createdAt)}</Text>
+      <Text style={styles.queueTime}>{formatRelativeTime(item.createdAt)}</Text>
     </View>
   );
 }
@@ -882,7 +874,7 @@ function ActivityTab({ actions, fetching, onRefresh, router }: {
                 <View style={styles.actionTypeBadge}>
                   <Text style={styles.actionTypeText}>{humanizeLabel(item.actionType)}</Text>
                 </View>
-                <Text style={styles.activityTime}>{fmtTime(item.timestamp)}</Text>
+                <Text style={styles.activityTime}>{formatRelativeTime(item.timestamp)}</Text>
               </View>
               <Text style={styles.activityDesc}>{item.description}</Text>
               {item.task && (
@@ -923,7 +915,7 @@ function HistoryTab({ history, fetching, onRefresh }: {
             </Text>
           </View>
           {item.statusMessage && <Text style={styles.historyMessage} numberOfLines={2}>{item.statusMessage}</Text>}
-          <Text style={styles.historyTime}>{fmtTime(item.timestamp)}</Text>
+          <Text style={styles.historyTime}>{formatRelativeTime(item.timestamp)}</Text>
         </View>
       )}
     />
