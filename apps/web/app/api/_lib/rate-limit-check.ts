@@ -36,7 +36,7 @@ export async function checkRateLimit(
   const ip = getClientIp(request.headers);
   const check = await limiter.checkAsync(ip);
   if (!check.allowed) {
-    return errorResponse("Too many requests. Try again later.", 429);
+    return errorResponse("Too many requests. Try again later.", 429, "RATE_LIMITED");
   }
   return null;
 }

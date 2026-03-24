@@ -3,13 +3,19 @@ import { createCloudVM } from "@/server/services/cloud-vm";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
 import { validateBody, createCloudVMSchema } from "../_lib/validation";
 import { apiLimiters, checkRateLimit } from "../_lib/rate-limit-check";
+import { resolveSession } from "../_lib/resolve-session";
 
 /**
  * GET /api/cloud-vms
  * List all VMs (excludes destroyed).
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    await resolveSession(request);
+
+    const limited = await checkRateLimit(apiLimiters.cloudVms, request);
+    if (limited) return limited;
+
     const vms = await listCloudVMs();
 
     return successResponse({ vms });

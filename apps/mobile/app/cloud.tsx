@@ -18,7 +18,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../src/context/AuthContext";
-import { getStoredCookie } from "../src/api/session";
+import { makeRequest, ApiError } from "../src/api/request";
 import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatUptime, formatCost, CLOUD_VM_STATUS_LABELS, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
 
 interface CloudVMAgent {
@@ -70,22 +70,10 @@ function CreateVMModal({ visible, onClose, onCreated }: {
 
     setCreating(true);
     try {
-      const cookie = getStoredCookie();
-      const res = await fetch(`${serverUrl}/api/cloud-vms`, {
+      await makeRequest(serverUrl, "/api/cloud-vms", {
         method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}),
-        },
         body: JSON.stringify({ name: name.trim(), serverType, region }),
       });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as any).error || `HTTP ${res.status}`);
-      }
-
       onCreated();
       onClose();
       setName("");
@@ -306,6 +294,7 @@ export default function CloudVMsScreen() {
   const [vms, setVMs] = useState<CloudVM[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -314,17 +303,11 @@ export default function CloudVMsScreen() {
     if (!serverUrl) return;
     if (!silent) setLoading(true);
     try {
-      const cookie = getStoredCookie();
-      const res = await fetch(`${serverUrl}/api/cloud-vms`, {
-        credentials: "include",
-        headers: cookie ? { Cookie: `mc_session=${cookie}` } : {},
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setVMs(data.vms || []);
-      }
-    } catch {
-      // ignore
+      const data = await makeRequest<{ vms: CloudVM[] }>(serverUrl, "/api/cloud-vms");
+      setVMs(data.vms ?? []);
+      setFetchError(null);
+    } catch (err) {
+      if (!silent) setFetchError((err as Error).message || "Failed to load VMs");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -388,6 +371,14 @@ export default function CloudVMsScreen() {
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#2563eb" />
         </View>
+      ) : fetchError ? (
+        <View style={styles.center}>
+          <Ionicons name="cloud-offline-outline" size={40} color="#dc2626" />
+          <Text style={styles.errorText}>{fetchError}</Text>
+          <TouchableOpacity onPress={() => fetchVMs()} style={styles.retryBtn}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={filtered}
@@ -443,7 +434,10 @@ export default function CloudVMsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f9fafb" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12, padding: 24 },
+  errorText: { fontSize: 15, color: "#dc2626", textAlign: "center" },
+  retryBtn: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: "#2563eb", borderRadius: 8 },
+  retryText: { color: "#fff", fontWeight: "600", fontSize: 14 },
 
   searchBar: {
     flexDirection: "row",

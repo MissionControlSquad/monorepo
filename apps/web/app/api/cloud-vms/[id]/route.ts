@@ -1,13 +1,15 @@
 import { findCloudVMById, findCloudVMRaw, updateCloudVM } from "@agentcenter/database";
 import { destroyCloudVM } from "@/server/services/cloud-vm";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { resolveSession } from "../../_lib/resolve-session";
 
 /**
  * GET /api/cloud-vms/[id]
  * Get VM details with assigned agents.
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    await resolveSession(request);
     const { id } = await params;
 
     const vm = await findCloudVMById(id);

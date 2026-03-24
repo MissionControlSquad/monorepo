@@ -16,7 +16,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../src/context/AuthContext";
-import { getStoredCookie } from "../../src/api/session";
+import { makeRequest } from "../../src/api/request";
 import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatUptime, formatCost, formatDate, CLOUD_VM_STATUS_LABELS, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
 
 interface VMAgent {
@@ -147,30 +147,18 @@ export default function CloudVMDetailScreen() {
   const [showRename, setShowRename] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const doRequest = useCallback(async (path: string, opts: RequestInit = {}) => {
+  const doRequest = useCallback(<T = unknown>(path: string, opts: Parameters<typeof makeRequest>[2] = {}) => {
     if (!serverUrl) throw new Error("No server URL");
-    const cookie = getStoredCookie();
-    return fetch(`${serverUrl}${path}`, {
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}),
-        ...(opts.headers || {}),
-      },
-      ...opts,
-    });
+    return makeRequest<T>(serverUrl, path, opts);
   }, [serverUrl]);
 
   const fetchVM = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await doRequest(`/api/cloud-vms/${id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setVM(data);
-      }
+      const data = await doRequest<CloudVM>(`/api/cloud-vms/${id}`);
+      setVM(data);
     } catch {
-      // ignore
+      // silent failure on background polls; initial load shows loading state
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -179,13 +167,10 @@ export default function CloudVMDetailScreen() {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const res = await doRequest(`/api/cloud-vms/${id}/logs?limit=50`);
-      if (res.ok) {
-        const data = await res.json();
-        setLogs(data.logs || []);
-      }
+      const data = await doRequest<{ logs: VMLog[] }>(`/api/cloud-vms/${id}/logs?limit=50`);
+      setLogs(data.logs ?? []);
     } catch {
-      // ignore
+      // ignore — logs are supplementary
     }
   }, [id, doRequest]);
 
@@ -220,14 +205,10 @@ export default function CloudVMDetailScreen() {
   const handleAction = async (action: string, method = "POST", body?: object) => {
     setActionLoading(action);
     try {
-      const res = await doRequest(`/api/cloud-vms/${id}/${action}`, {
+      await doRequest(`/api/cloud-vms/${id}/${action}`, {
         method,
         body: body ? JSON.stringify(body) : undefined,
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as any).error || `HTTP ${res.status}`);
-      }
       await fetchVM(true);
     } catch (err) {
       Alert.alert("Error", (err as Error).message || "Action failed");
@@ -248,11 +229,7 @@ export default function CloudVMDetailScreen() {
           onPress: async () => {
             setActionLoading("destroy");
             try {
-              const res = await doRequest(`/api/cloud-vms/${id}`, { method: "DELETE" });
-              if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                throw new Error((data as any).error || "Failed to destroy VM");
-              }
+              await doRequest(`/api/cloud-vms/${id}`, { method: "DELETE" });
               router.back();
             } catch (err) {
               Alert.alert("Error", (err as Error).message || "Failed to destroy VM");
@@ -266,11 +243,10 @@ export default function CloudVMDetailScreen() {
 
   const handleRename = async (newName: string) => {
     try {
-      const res = await doRequest(`/api/cloud-vms/${id}`, {
+      await doRequest(`/api/cloud-vms/${id}`, {
         method: "PATCH",
         body: JSON.stringify({ name: newName }),
       });
-      if (!res.ok) throw new Error("Failed to rename");
       await fetchVM(true);
     } catch (err) {
       Alert.alert("Error", (err as Error).message || "Failed to rename VM");

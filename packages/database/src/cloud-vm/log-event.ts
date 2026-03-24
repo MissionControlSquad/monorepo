@@ -13,3 +13,15 @@ export async function logCloudVMEvent(
 ): Promise<void> {
   await prisma.cloudVMLog.create({ data: { vmId, message, level } });
 }
+
+export async function getCloudVMLogs(
+  vmId: string,
+  limit = 50,
+): Promise<{ id: string; message: string; level: string; createdAt: Date }[]> {
+  return prisma.cloudVMLog.findMany({
+    where: { vmId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: { id: true, message: true, level: true, createdAt: true },
+  });
+}
