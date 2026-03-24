@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, startTransition, ReactNode } from "react";
 import { type Client } from "urql";
 import {
   loadSession,
@@ -47,7 +47,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsSignedIn(true);
           setProfileId(storedProfile);
           setServerUrl(storedUrl);
-          setUrqlClient(createUrqlClient(storedUrl));
+          startTransition(() => {
+            setUrqlClient(createUrqlClient(storedUrl));
+          });
         }
       })
       .catch(() => {})
@@ -59,7 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfileId(pid);
     setServerUrl(url);
     // Pass URL directly — don't rely on getStoredServerUrl() which may lag
-    setUrqlClient(createUrqlClient(url));
+    startTransition(() => {
+      setUrqlClient(createUrqlClient(url));
+    });
   };
 
   const onLogout = async () => {
@@ -67,7 +71,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsSignedIn(false);
     setProfileId(null);
     setServerUrl(null);
-    setUrqlClient(createUrqlClient());
+    startTransition(() => {
+      setUrqlClient(createUrqlClient());
+    });
   };
 
   return (
