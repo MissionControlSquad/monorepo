@@ -11,6 +11,10 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@agentcenter/utils": "*",
+    "@agentcenter/types": "*"
+  },
   "devDependencies": {
     "typescript": "^5.3.3"
   },

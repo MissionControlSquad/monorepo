@@ -1,23 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "../ui";
 import { NotificationDropdown } from "./NotificationDropdown";
-import { usePollingInterval } from "@agentcenter/hooks";
-import { fetchUnreadNotificationCount } from "@agentcenter/utils";
+import { useNotificationsContext } from "@agentcenter/hooks";
 
 export function NotificationBell() {
-  const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const fetchCount = useCallback(async () => {
-    const count = await fetchUnreadNotificationCount("");
-    setUnreadCount(count);
-  }, []);
-
-  usePollingInterval(fetchCount, 30_000);
+  const { notifications, unreadCount, markOneRead, markAllRead } = useNotificationsContext();
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -31,20 +24,12 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [isOpen]);
 
-  const handleOpen = useCallback(() => {
-    setIsOpen((v) => !v);
-  }, []);
-
-  const handleRead = useCallback(() => {
-    setUnreadCount(0);
-  }, []);
-
   return (
     <div ref={ref} className="relative">
       <Button
         variant="ghost"
         size="icon-sm"
-        onClick={handleOpen}
+        onClick={() => setIsOpen((v) => !v)}
         aria-label="Notifications"
         className="text-muted-foreground hover:text-foreground hover:bg-muted relative"
       >
@@ -57,7 +42,12 @@ export function NotificationBell() {
       </Button>
 
       {isOpen && (
-        <NotificationDropdown onClose={() => setIsOpen(false)} onMarkAllRead={handleRead} />
+        <NotificationDropdown
+          notifications={notifications}
+          onClose={() => setIsOpen(false)}
+          onMarkOneRead={markOneRead}
+          onMarkAllRead={markAllRead}
+        />
       )}
     </div>
   );
