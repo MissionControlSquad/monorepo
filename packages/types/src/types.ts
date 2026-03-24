@@ -457,7 +457,7 @@ export interface WorkSummary {
 export interface FeatureFlag {
   key: string;
   enabled: boolean;
-  managedBy: "system" | "user";
+  managedBy: string | null;
   description: string | null;
 }
 

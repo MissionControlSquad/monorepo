@@ -4,3 +4,5 @@ export * from "./usePollingInterval";
 export * from "./useNotifications";
 export * from "./NotificationContext";
 export * from "./createPanelContext";
+export * from "./FeatureFlagContext";
+export * from "./AgentStatusContext";

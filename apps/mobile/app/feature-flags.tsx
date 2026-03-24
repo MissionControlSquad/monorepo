@@ -12,13 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FEATURE_FLAGS_QUERY, UPDATE_FEATURE_FLAG } from "@agentcenter/graphql-client";
 import { useTheme } from "../src/hooks/useTheme";
 import { EmptyState } from "../src/components/EmptyState";
-
-interface FeatureFlag {
-  key: string;
-  enabled: boolean;
-  managedBy: string | null;
-  description: string | null;
-}
+import type { FeatureFlag } from "@agentcenter/types";
 
 export default function FeatureFlagsScreen() {
   const { colors } = useTheme();

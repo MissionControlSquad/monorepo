@@ -14,34 +14,13 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { PROJECTS_QUERY } from "@agentcenter/graphql-client";
 import { STATUS_HEX_COLORS, DEFAULT_COLOR } from "@agentcenter/utils";
-
-interface ProjectMember {
-  id: string;
-  profileId: string;
-  profile: {
-    id: string;
-    displayName: string;
-    username: string;
-    avatarUrl: string | null;
-    agentId: string | null;
-    agent?: { id: string; name: string; identityEmoji: string | null } | null;
-  };
-}
-
-interface Project {
-  id: string;
-  name: string;
-  description: string | null;
-  status: string;
-  createdAt: string;
-  members: ProjectMember[];
-}
+import type { Project, ProjectMember } from "@agentcenter/types";
 
 type StatusFilter = "all" | "active" | "archived";
 
 function memberEmojis(members: ProjectMember[]): string {
-  const agents = members.filter((m) => m.profile.agentId != null);
-  const humans = members.filter((m) => m.profile.agentId == null);
+  const agents = members.filter((m) => m.profile?.agentId != null);
+  const humans = members.filter((m) => m.profile?.agentId == null);
   const parts: string[] = [];
   if (agents.length > 0) parts.push(`🤖 ${agents.length}`);
   if (humans.length > 0) parts.push(`👤 ${humans.length}`);
@@ -189,7 +168,7 @@ export default function ProjectsScreen() {
                   <View
                     style={[
                       styles.statusBadge,
-                      { backgroundColor: STATUS_HEX_COLORS[item.status] ?? DEFAULT_COLOR },
+                      { backgroundColor: STATUS_HEX_COLORS[item.status ?? ""] ?? DEFAULT_COLOR },
                     ]}
                   >
                     <Text style={styles.statusBadgeText}>{item.status}</Text>
@@ -202,8 +181,8 @@ export default function ProjectsScreen() {
                 ) : null}
               </View>
             </View>
-            {item.members.length > 0 && (
-              <Text style={styles.members}>{memberEmojis(item.members)}</Text>
+            {(item.members ?? []).length > 0 && (
+              <Text style={styles.members}>{memberEmojis(item.members ?? [])}</Text>
             )}
           </TouchableOpacity>
         )}

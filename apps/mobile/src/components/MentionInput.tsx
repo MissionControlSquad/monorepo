@@ -43,7 +43,7 @@ export function MentionInput({
         if (!mentionQuery) return true;
         const q = mentionQuery.toLowerCase();
         return (
-          p.username.toLowerCase().startsWith(q) ||
+          p.username?.toLowerCase().startsWith(q) ||
           p.displayName.toLowerCase().includes(q)
         );
       }).slice(0, 6)
@@ -96,7 +96,7 @@ export function MentionInput({
                   borderBottomWidth: 1,
                   borderBottomColor: colors.borderAlt,
                 }}
-                onPress={() => handleSelect(item.username)}
+                onPress={() => item.username && handleSelect(item.username)}
                 activeOpacity={0.7}
               >
                 <View

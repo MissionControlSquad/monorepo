@@ -13,36 +13,9 @@ import { useState, useCallback, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ACTIVITIES_CONNECTION_QUERY, ACTIVITY_CREATED_SUBSCRIPTION } from "@agentcenter/graphql-client";
 import { ACTIVITY_TYPE_HEX_COLORS, DEFAULT_COLOR, PAGE_SIZE_DEFAULT, formatRelativeTime } from "@agentcenter/utils";
+import type { Activity } from "@agentcenter/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-interface ActivityProfile {
-  id: string;
-  displayName: string;
-  username: string;
-  avatarUrl: string | null;
-  agentId: string | null;
-}
-
-interface ActivityTask {
-  id: string;
-  title: string;
-  taskNumber: number;
-  status: string;
-}
-
-interface Activity {
-  id: string;
-  type: string;
-  profileId: string;
-  taskId: string | null;
-  projectId: string | null;
-  message: string;
-  metadata: Record<string, unknown> | null;
-  createdAt: string;
-  profile: ActivityProfile | null;
-  task: ActivityTask | null;
-}
 
 interface ActivitiesConnection {
   activities: Activity[];
