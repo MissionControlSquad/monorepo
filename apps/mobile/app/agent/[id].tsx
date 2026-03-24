@@ -33,7 +33,7 @@ import {
   SET_AGENT_VACATION,
   SET_AGENT_ACTIVATION,
 } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS, formatRelativeTime, isAgentOnline } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS, formatRelativeTime, isAgentOnline, formatDuration, getAgentStatusColor } from "@agentcenter/utils";
 import { getStoredCookie } from "../../src/api/session";
 import { useAuth } from "../../src/context/AuthContext";
 
@@ -99,11 +99,6 @@ const ACTION_ICONS: Record<string, string> = {
 
 type Tab = "overview" | "tasks" | "deliverables" | "queue" | "activity" | "history" | "setup";
 
-function getDotColor(agent: Agent): string {
-  if (agent.detailedStatus && STATUS_HEX_COLORS[agent.detailedStatus]) return STATUS_HEX_COLORS[agent.detailedStatus];
-  return STATUS_HEX_COLORS[agent.status] ?? DEFAULT_COLOR;
-}
-function fmtDuration(ms: number) { const h = Math.floor(ms / 3600000); const m = Math.floor((ms % 3600000) / 60000); return h > 0 ? `${h}h ${m}m` : `${m}m`; }
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
@@ -181,7 +176,7 @@ export default function AgentDetailScreen() {
   }
 
   const online = isAgentOnline(agent.lastHeartbeat);
-  const dotColor = getDotColor(agent);
+  const dotColor = getAgentStatusColor(agent);
   const isDeactivated = agent.setupStatus === "deactivated";
 
   const handleVacationToggle = () => {
@@ -278,7 +273,7 @@ export default function AgentDetailScreen() {
           <StatCard label="Assigned" value={stats.tasksAssigned} />
           <StatCard label="Completed" value={stats.tasksCompleted} />
           <StatCard label="Deliverables" value={stats.deliverablesCount} />
-          <StatCard label="Work Time" value={fmtDuration(stats.totalWorkTimeMs)} isText />
+          <StatCard label="Work Time" value={formatDuration(stats.totalWorkTimeMs)} isText />
         </View>
       )}
 

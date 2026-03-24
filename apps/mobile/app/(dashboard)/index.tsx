@@ -15,7 +15,8 @@ import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
-import { PAGE_SIZE_DEFAULT, PRIORITY_FILTER_OPTIONS, matchesDueDateFilter } from "@agentcenter/utils";
+import { PAGE_SIZE_DEFAULT, PRIORITY_FILTER_OPTIONS, DUE_DATE_FILTER_OPTIONS, matchesDueDateFilter } from "@agentcenter/utils";
+import type { DueDateFilter } from "@agentcenter/utils";
 import { TaskCard } from "../../src/components/TaskCard";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
 
@@ -41,10 +42,10 @@ interface Task {
 
 type StatusFilter = "all" | "inbox" | "assigned" | "in_progress" | "review" | "done" | "blocked";
 type ViewMode = "list" | "kanban";
-type DueDateFilter = "" | "overdue" | "today" | "this_week" | "no_due_date";
 type PriorityFilter = "" | "low" | "medium" | "high" | "urgent";
 
 const PRIORITY_OPTIONS = PRIORITY_FILTER_OPTIONS as { key: PriorityFilter; label: string }[];
+const DUE_DATE_OPTIONS = DUE_DATE_FILTER_OPTIONS as { key: DueDateFilter; label: string }[];
 
 const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },
@@ -54,14 +55,6 @@ const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "review", label: "Review" },
   { key: "done", label: "Done" },
   { key: "blocked", label: "Blocked" },
-];
-
-const DUE_DATE_OPTIONS: { key: DueDateFilter; label: string }[] = [
-  { key: "", label: "Any date" },
-  { key: "overdue", label: "Overdue" },
-  { key: "today", label: "Due today" },
-  { key: "this_week", label: "This week" },
-  { key: "no_due_date", label: "No due date" },
 ];
 
 

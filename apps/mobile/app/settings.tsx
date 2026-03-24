@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { CHANGE_PASSWORD, SET_SYSTEM_SHUTDOWN, SYSTEM_SETTINGS_QUERY } from "@agentcenter/graphql-client";
 import { useAuth } from "../src/context/AuthContext";
-import { DEFAULT_COLOR } from "@agentcenter/utils";
+import { DEFAULT_COLOR, formatDate } from "@agentcenter/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -36,14 +36,6 @@ function limitLabel(n: number): string {
   return n === -1 ? "Unlimited" : String(n);
 }
 
-function formatExpiry(dateStr: string | null): string {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString(undefined, {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -285,7 +277,7 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
           <View style={styles.licenseGrid}>
             <LicenseGridItem label="Organization" value={license.org ?? "—"} />
             <LicenseGridItem label="Plan" value={license.plan ?? "—"} />
-            <LicenseGridItem label="Expires" value={formatExpiry(license.expiresAt)} />
+            <LicenseGridItem label="Expires" value={formatDate(license.expiresAt)} />
             <LicenseGridItem
               label="Limits"
               value={`${limitLabel(license.maxAgents)} agents / ${limitLabel(license.maxProjects)} projects / ${limitLabel(license.maxSeats)} seats`}

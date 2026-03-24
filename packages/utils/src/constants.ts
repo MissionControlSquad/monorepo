@@ -205,3 +205,11 @@ export const DELIVERABLE_KIND_ICONS: Record<string, string> = {
   link: "🔗",
   file: "📎",
 };
+
+export const DUE_DATE_FILTER_OPTIONS: { key: string; label: string }[] = [
+  { key: "", label: "Any date" },
+  { key: "overdue", label: "Overdue" },
+  { key: "today", label: "Due today" },
+  { key: "this_week", label: "This week" },
+  { key: "no_due_date", label: "No due date" },
+];

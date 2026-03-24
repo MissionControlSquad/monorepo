@@ -10,19 +10,12 @@ import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
-import { PRIORITY_FILTER_OPTIONS } from "@agentcenter/utils";
+import { PRIORITY_FILTER_OPTIONS, DUE_DATE_FILTER_OPTIONS } from "@agentcenter/utils";
+import type { DueDateFilter } from "@agentcenter/utils";
 
-type DueDateFilter = "" | "overdue" | "today" | "this_week" | "no_due_date";
 type PriorityFilter = "" | "low" | "medium" | "high" | "urgent";
 
-const DUE_DATE_OPTIONS: { key: DueDateFilter; label: string }[] = [
-  { key: "", label: "Any date" },
-  { key: "overdue", label: "Overdue" },
-  { key: "today", label: "Due today" },
-  { key: "this_week", label: "This week" },
-  { key: "no_due_date", label: "No due date" },
-];
-
+const DUE_DATE_OPTIONS = DUE_DATE_FILTER_OPTIONS as { key: DueDateFilter; label: string }[];
 const PRIORITY_OPTIONS = PRIORITY_FILTER_OPTIONS as { key: PriorityFilter; label: string }[];
 
 export default function KanbanScreen() {

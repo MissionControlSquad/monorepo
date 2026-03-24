@@ -29,7 +29,7 @@ import {
   ON_NEW_MESSAGE,
 } from "@agentcenter/graphql-client";
 import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION, APPROVE_TASK, REJECT_TASK, SAVE_TASK_AS_TEMPLATE } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, TASK_STATUSES, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatRelativeTime, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, TASK_STATUSES, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatRelativeTime, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS, formatDuration } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 import { MentionInput } from "../../src/components/MentionInput";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
@@ -245,13 +245,6 @@ interface WorkSummary {
   agentBreakdown: { agentId: string; agentName: string; totalMs: number }[];
 }
 
-function fmtDuration(ms: number): string {
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m`;
-  return "<1m";
-}
 
 function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; onStatusChange: () => void; onProjectAssign: (projectId: string) => void }) {
   const router = useRouter();
@@ -485,12 +478,12 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
             )}
           </View>
           <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", marginTop: 4 }}>
-            {fmtDuration(workSummary.totalWorkTimeMs)}
+            {formatDuration(workSummary.totalWorkTimeMs)}
           </Text>
           {workSummary.agentBreakdown.map((ab) => (
             <View key={ab.agentId} style={styles.detailRow}>
               <Text style={styles.detailKey} numberOfLines={1}>{ab.agentName}</Text>
-              <Text style={styles.detailValue}>{fmtDuration(ab.totalMs)}</Text>
+              <Text style={styles.detailValue}>{formatDuration(ab.totalMs)}</Text>
             </View>
           ))}
         </View>

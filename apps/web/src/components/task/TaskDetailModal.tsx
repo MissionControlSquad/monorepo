@@ -39,7 +39,13 @@ import {
   CHILD_TASKS_QUERY,
   TASKS_QUERY,
 } from "../../lib/graphql/queries";
-import { UPDATE_TASK, SAVE_TASK_AS_TEMPLATE, APPROVE_TASK, REJECT_TASK, REQUEST_CLARIFICATION } from "../../lib/graphql/mutations";
+import {
+  UPDATE_TASK,
+  SAVE_TASK_AS_TEMPLATE,
+  APPROVE_TASK,
+  REJECT_TASK,
+  REQUEST_CLARIFICATION,
+} from "../../lib/graphql/mutations";
 import { useAppContext } from "../context/AppContext";
 import { TaskComments } from "./TaskComments";
 import { TaskDeliverables } from "./TaskDeliverables";
@@ -48,6 +54,7 @@ import { ErrorBoundary, PanelErrorFallback } from "../common/ErrorBoundary";
 import { MarkdownWithMentions } from "../common/MarkdownWithMentions";
 import { MarkdownEditor } from "../common/MarkdownEditor";
 import { HEARTBEAT_TIMEOUT_MS } from "../../lib/constants";
+import { formatDuration } from "@agentcenter/utils";
 import { format } from "date-fns";
 import { TimeAgo } from "../common/TimeAgo";
 import { CopyButton } from "../common/CopyButton";
@@ -85,13 +92,6 @@ interface TaskDetailModalProps {
   onOpenTask?: (taskIdentifier: number | string, options?: { replace?: boolean }) => void;
 }
 
-function formatWorkTime(ms: number): string {
-  const hours = Math.floor(ms / 3600000);
-  const minutes = Math.floor((ms % 3600000) / 60000);
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-}
-
 export function TaskDetailModal({
   task,
   isOpen,
@@ -111,7 +111,9 @@ export function TaskDetailModal({
   const [, executeRequestClarification] = useMutation(REQUEST_CLARIFICATION);
 
   // Approval UI state
-  const [approvalLoading, setApprovalLoading] = useState<"approve" | "reject" | "clarify" | null>(null);
+  const [approvalLoading, setApprovalLoading] = useState<"approve" | "reject" | "clarify" | null>(
+    null,
+  );
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectChanges, setRejectChanges] = useState("");
@@ -122,7 +124,11 @@ export function TaskDetailModal({
     if (!currentUserProfile?.id || !taskId) return;
     setApprovalLoading("approve");
     try {
-      const res = await executeApproveTask({ reviewerId: currentUserProfile.id, taskId, approvalComment: comment || undefined });
+      const res = await executeApproveTask({
+        reviewerId: currentUserProfile.id,
+        taskId,
+        approvalComment: comment || undefined,
+      });
       if (res.error) toast.error(res.error.message ?? "Failed to approve task");
     } finally {
       setApprovalLoading(null);
@@ -131,13 +137,24 @@ export function TaskDetailModal({
 
   async function handleRejectTask() {
     if (!currentUserProfile?.id || !taskId || !rejectReason.trim()) return;
-    const changes = rejectChanges.split("\n").map((c) => c.trim()).filter(Boolean);
+    const changes = rejectChanges
+      .split("\n")
+      .map((c) => c.trim())
+      .filter(Boolean);
     setApprovalLoading("reject");
     setShowRejectDialog(false);
     try {
-      const res = await executeRejectTask({ reviewerId: currentUserProfile.id, taskId, rejectionReason: rejectReason, changesNeeded: changes });
+      const res = await executeRejectTask({
+        reviewerId: currentUserProfile.id,
+        taskId,
+        rejectionReason: rejectReason,
+        changesNeeded: changes,
+      });
       if (res.error) toast.error(res.error.message ?? "Failed to reject task");
-      else { setRejectReason(""); setRejectChanges(""); }
+      else {
+        setRejectReason("");
+        setRejectChanges("");
+      }
     } finally {
       setApprovalLoading(null);
     }
@@ -145,11 +162,18 @@ export function TaskDetailModal({
 
   async function handleClarifyTask() {
     if (!currentUserProfile?.id || !taskId || !clarifyQuestions.trim()) return;
-    const questions = clarifyQuestions.split("\n").map((q) => q.trim()).filter(Boolean);
+    const questions = clarifyQuestions
+      .split("\n")
+      .map((q) => q.trim())
+      .filter(Boolean);
     setApprovalLoading("clarify");
     setShowClarifyDialog(false);
     try {
-      const res = await executeRequestClarification({ reviewerId: currentUserProfile.id, taskId, questions });
+      const res = await executeRequestClarification({
+        reviewerId: currentUserProfile.id,
+        taskId,
+        questions,
+      });
       if (res.error) toast.error(res.error.message ?? "Failed to request clarification");
       else setClarifyQuestions("");
     } finally {
@@ -1169,7 +1193,7 @@ export function TaskDetailModal({
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Total time</span>
                         <span className="text-sm font-medium text-foreground">
-                          {formatWorkTime(workSummary.totalWorkTimeMs)}
+                          {formatDuration(workSummary.totalWorkTimeMs)}
                         </span>
                       </div>
                       {workSummary.agentBreakdown?.map(
@@ -1183,7 +1207,7 @@ export function TaskDetailModal({
                               {entry.agentName ?? "Unknown"}
                             </span>
                             <span className="text-xs font-medium text-foreground">
-                              {formatWorkTime(entry.totalMs)}
+                              {formatDuration(entry.totalMs)}
                             </span>
                           </div>
                         ),
@@ -1268,7 +1292,11 @@ export function TaskDetailModal({
               disabled={approvalLoading !== null}
               className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 border border-violet-200"
             >
-              {approvalLoading === "clarify" ? <span className="animate-spin">⟳</span> : "? Clarify"}
+              {approvalLoading === "clarify" ? (
+                <span className="animate-spin">⟳</span>
+              ) : (
+                "? Clarify"
+              )}
             </Button>
             <Button
               variant="ghost"
@@ -1285,18 +1313,30 @@ export function TaskDetailModal({
               onClick={() => handleApproveTask()}
               disabled={approvalLoading !== null}
             >
-              {approvalLoading === "approve" ? <span className="animate-spin">⟳</span> : "✓ Approve"}
+              {approvalLoading === "approve" ? (
+                <span className="animate-spin">⟳</span>
+              ) : (
+                "✓ Approve"
+              )}
             </Button>
           </div>
         )}
 
         {/* Reject Dialog */}
         {showRejectDialog && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowRejectDialog(false)}>
-            <div className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="absolute inset-0 z-50 flex items-center justify-center bg-black/40"
+            onClick={() => setShowRejectDialog(false)}
+          >
+            <div
+              className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 flex flex-col gap-4"
+              onClick={(e) => e.stopPropagation()}
+            >
               <h2 className="text-base font-semibold text-foreground">Reject Task</h2>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Rejection Reason *</label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Rejection Reason *
+                </label>
                 <textarea
                   className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
                   rows={3}
@@ -1307,7 +1347,9 @@ export function TaskDetailModal({
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Changes Needed (one per line)</label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Changes Needed (one per line)
+                </label>
                 <textarea
                   className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
                   rows={3}
@@ -1317,8 +1359,25 @@ export function TaskDetailModal({
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => { setShowRejectDialog(false); setRejectReason(""); setRejectChanges(""); }}>Cancel</Button>
-                <Button variant="danger" size="sm" onClick={handleRejectTask} disabled={!rejectReason.trim()}>Reject Task</Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowRejectDialog(false);
+                    setRejectReason("");
+                    setRejectChanges("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={handleRejectTask}
+                  disabled={!rejectReason.trim()}
+                >
+                  Reject Task
+                </Button>
               </div>
             </div>
           </div>
@@ -1326,11 +1385,19 @@ export function TaskDetailModal({
 
         {/* Clarify Dialog */}
         {showClarifyDialog && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowClarifyDialog(false)}>
-            <div className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="absolute inset-0 z-50 flex items-center justify-center bg-black/40"
+            onClick={() => setShowClarifyDialog(false)}
+          >
+            <div
+              className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 flex flex-col gap-4"
+              onClick={(e) => e.stopPropagation()}
+            >
               <h2 className="text-base font-semibold text-foreground">Request Clarification</h2>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Questions (one per line)</label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Questions (one per line)
+                </label>
                 <textarea
                   className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
                   rows={4}
@@ -1341,8 +1408,24 @@ export function TaskDetailModal({
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => { setShowClarifyDialog(false); setClarifyQuestions(""); }}>Cancel</Button>
-                <Button variant="primary" size="sm" onClick={handleClarifyTask} disabled={!clarifyQuestions.trim()}>Send Questions</Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowClarifyDialog(false);
+                    setClarifyQuestions("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleClarifyTask}
+                  disabled={!clarifyQuestions.trim()}
+                >
+                  Send Questions
+                </Button>
               </div>
             </div>
           </div>
