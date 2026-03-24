@@ -90,6 +90,9 @@ RUN mkdir -p /prisma-cli && cd /prisma-cli && \
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
+# Copy full next package (standalone output omits compiled/webpack which server.cjs needs)
+COPY --from=build /app/node_modules/next ./node_modules/next
+
 # Create cache + data directories writable by nextjs user
 RUN mkdir -p apps/web/.next/cache data && chown -R nextjs:nodejs apps/web/.next/cache data
 
