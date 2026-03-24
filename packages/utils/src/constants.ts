@@ -181,6 +181,9 @@ export const PRIORITY_ICONS: Record<string, string> = {
 // Ordered list of priority values (low → urgent)
 export const PRIORITY_VALUES = ["low", "medium", "high", "urgent"] as const;
 
+// Priority filter type: empty string means "any priority"
+export type PriorityFilter = "" | "low" | "medium" | "high" | "urgent";
+
 // Filter options for priority (includes empty string as "Any")
 export const PRIORITY_FILTER_OPTIONS: { key: string; label: string }[] = [
   { key: "", label: "Any" },
@@ -212,4 +215,30 @@ export const DUE_DATE_FILTER_OPTIONS: { key: string; label: string }[] = [
   { key: "today", label: "Due today" },
   { key: "this_week", label: "This week" },
   { key: "no_due_date", label: "No due date" },
+];
+
+// Cloud VM status labels
+export const CLOUD_VM_STATUS_LABELS: Record<string, string> = {
+  provisioning: "Provisioning",
+  waiting_for_ssh: "Waiting for SSH",
+  installing_deps: "Installing Deps",
+  installing_openclaw: "Installing OpenClaw",
+  configuring: "Configuring",
+  starting_service: "Starting Service",
+  running: "Running",
+  stopped: "Stopped",
+  error: "Error",
+  destroying: "Destroying",
+  destroyed: "Destroyed",
+};
+
+// Cloud VM statuses that indicate an in-progress transition
+export const CLOUD_VM_TRANSITIONAL_STATUSES: string[] = [
+  "provisioning",
+  "waiting_for_ssh",
+  "installing_deps",
+  "installing_openclaw",
+  "configuring",
+  "starting_service",
+  "destroying",
 ];

@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../src/context/AuthContext";
 import { getStoredCookie } from "../../src/api/session";
-import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatUptime, formatCost, formatDate } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatUptime, formatCost, formatDate, CLOUD_VM_STATUS_LABELS, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
 
 interface VMAgent {
   id: string;
@@ -54,19 +54,8 @@ interface VMLog {
   createdAt: string;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  provisioning: "Provisioning",
-  waiting_for_ssh: "Waiting for SSH",
-  installing_deps: "Installing Deps",
-  installing_openclaw: "Installing OpenClaw",
-  configuring: "Configuring",
-  starting_service: "Starting Service",
-  running: "Running",
-  stopped: "Stopped",
-  error: "Error",
-  destroying: "Destroying",
-  destroyed: "Destroyed",
-};
+const STATUS_LABELS = CLOUD_VM_STATUS_LABELS;
+const TRANSITIONAL = CLOUD_VM_TRANSITIONAL_STATUSES;
 
 const AGENT_STATUS_COLORS: Record<string, string> = {
   online: "#16a34a",
@@ -74,11 +63,6 @@ const AGENT_STATUS_COLORS: Record<string, string> = {
   offline: "#6b7280",
   error: "#dc2626",
 };
-
-const TRANSITIONAL = [
-  "provisioning", "waiting_for_ssh", "installing_deps",
-  "installing_openclaw", "configuring", "starting_service", "destroying",
-];
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
