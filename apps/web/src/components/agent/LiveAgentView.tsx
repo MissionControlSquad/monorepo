@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, memo } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/shadcn/dialog";
+import { ProfileAvatar } from "../ui/ProfileAvatar";
 import {
   X,
   Eye,
@@ -111,12 +112,15 @@ const LiveAgentViewContent = memo(function LiveAgentViewContent({
   return (
     <>
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 sm:px-6 py-3 sm:py-4 text-white">
+      <div className="bg-linear-to-r from-indigo-500 to-purple-600 px-4 sm:px-6 py-3 sm:py-4 text-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3 min-w-0">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-background bg-opacity-20 flex items-center justify-center text-white text-base sm:text-lg font-bold shrink-0">
-              {currentAgent.avatar || currentAgent.name?.[0]}
-            </div>
+            <ProfileAvatar
+              src={currentAgent.avatar}
+              name={currentAgent.name}
+              emoji={currentAgent.identityEmoji}
+              size="lg"
+            />
             <div className="min-w-0">
               <DialogTitle className="text-lg sm:text-xl font-semibold truncate">
                 {currentAgent.name} - Live View

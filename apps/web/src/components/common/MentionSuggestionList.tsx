@@ -1,6 +1,7 @@
 "use client";
 
 import React, { forwardRef, useCallback, useLayoutEffect, useRef as useInternalRef } from "react";
+import { ProfileAvatar } from "../ui/ProfileAvatar";
 
 /** Shared UI for @mention suggestion dropdowns (composer, search filter, etc.). */
 export type MentionSuggestionListVariant = "above" | "below";
@@ -188,15 +189,7 @@ export function renderProfileSuggestion(
   const isAgent = profile.kind === "agent";
   return (
     <>
-      <span
-        className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs overflow-hidden ${isAgent ? "bg-violet-100 text-violet-700" : "bg-muted"}`}
-      >
-        {profile.avatarUrl ? (
-          <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover" />
-        ) : (
-          (profile.displayName?.[0] ?? "?")
-        )}
-      </span>
+      <ProfileAvatar src={profile.avatarUrl} name={profile.displayName} size="sm" />
       <span className="font-medium truncate">{profile.displayName ?? "?"}</span>
       {profile.username && (
         <span className="text-muted-foreground truncate">@{profile.username}</span>
@@ -229,18 +222,9 @@ export function renderAgentSuggestion(
   const displayName = agent.profile?.displayName ?? agent.name;
   const username = agent.username ?? agent.profile?.username;
   const avatar = agent.profile?.avatarUrl ?? agent.avatar;
-  const initial = displayName?.[0] ?? "?";
   return (
     <>
-      <span className="shrink-0 w-6 h-6 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-xs font-medium overflow-hidden">
-        {agent.identityEmoji ? (
-          <span title={agent.name}>{agent.identityEmoji}</span>
-        ) : avatar ? (
-          <img src={avatar} alt="" className="w-full h-full object-cover" />
-        ) : (
-          initial
-        )}
-      </span>
+      <ProfileAvatar src={avatar} name={displayName} emoji={agent.identityEmoji} size="sm" />
       <span className="font-medium truncate">{displayName}</span>
       {username && <span className="text-muted-foreground truncate">@{username}</span>}
     </>

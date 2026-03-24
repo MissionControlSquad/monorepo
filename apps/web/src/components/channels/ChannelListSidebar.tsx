@@ -253,13 +253,7 @@ export function ChannelListSidebar() {
                             : "text-foreground hover:bg-muted hover:text-foreground"
                         }`}
                       >
-                        <span className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground shrink-0 overflow-hidden">
-                          {otherAvatar ? (
-                            <img src={otherAvatar} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            (otherName[0] ?? "?")
-                          )}
-                        </span>
+                        <ProfileAvatar src={otherAvatar} name={otherName} size="md" />
                         <span className="truncate flex-1 min-w-0">{otherName}</span>
                         {(ch.unreadCount ?? 0) > 0 && (
                           <span className="shrink-0 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-indigo-600 text-white text-xs font-medium flex items-center justify-center">
