@@ -19,7 +19,7 @@ mac:
     - target: dmg
       arch:
         - universal
-  icon: build/icon.icns
+  # icon: build/icon.icns  — add a real 512x512 .icns before releasing
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
