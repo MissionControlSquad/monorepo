@@ -88,6 +88,11 @@ export interface ProfileWithAgent extends ProfileRef {
   } | null;
 }
 
+/** Profile with user account (used in "me" queries). */
+export interface ProfileWithUser extends ProfileRef {
+  user: { id: string; email: string } | null;
+}
+
 /** Profile with kind + agent (channel members). */
 export interface ChannelProfileRef extends ProfileWithKind {
   agent?: {

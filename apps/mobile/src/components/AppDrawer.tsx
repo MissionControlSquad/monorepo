@@ -19,14 +19,7 @@ import { ME_DRAWER_QUERY } from "@agentcenter/graphql-client";
 import { getStoredServerUrl } from "../api/session";
 import { useTheme } from "../hooks/useTheme";
 import { useNotificationCount } from "../hooks/useNotificationCount";
-
-interface Profile {
-  id: string;
-  displayName: string;
-  username: string | null;
-  avatarUrl: string | null;
-  user: { id: string; email: string } | null;
-}
+import type { ProfileWithUser as Profile } from "@agentcenter/types";
 
 const DRAWER_WIDTH = 280;
 

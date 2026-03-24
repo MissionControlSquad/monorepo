@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { useQuery, useMutation, useClient } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KANBAN_BOARD_QUERY, LOAD_MORE_COLUMN_QUERY, UPDATE_TASK } from "@agentcenter/graphql-client";
-import { PRIORITY_HEX_COLORS, PAGE_SIZE_KANBAN, DEFAULT_COLOR } from "@agentcenter/utils";
+import { PRIORITY_HEX_COLORS, STATUS_HEX_COLORS, TASK_STATUSES, PRIORITY_ICONS, PAGE_SIZE_KANBAN, DEFAULT_COLOR } from "@agentcenter/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -37,21 +37,11 @@ interface KanbanBoardData {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const KANBAN_COLUMNS: { key: keyof KanbanBoardData; label: string; color: string }[] = [
-  { key: "inbox", label: "Inbox", color: "#6b7280" },
-  { key: "assigned", label: "Assigned", color: "#2563eb" },
-  { key: "in_progress", label: "In Progress", color: "#d97706" },
-  { key: "review", label: "Review", color: "#7c3aed" },
-  { key: "done", label: "Done", color: "#16a34a" },
-  { key: "blocked", label: "Blocked", color: "#dc2626" },
-];
-
-const PRIORITY_ICONS: Record<string, string> = {
-  low: "↓",
-  medium: "→",
-  high: "↑",
-  urgent: "⚡",
-};
+const KANBAN_COLUMNS = TASK_STATUSES.map((s) => ({
+  key: s.id as keyof KanbanBoardData,
+  label: s.label,
+  color: STATUS_HEX_COLORS[s.id] ?? DEFAULT_COLOR,
+}));
 
 const COLUMN_WIDTH = 220;
 

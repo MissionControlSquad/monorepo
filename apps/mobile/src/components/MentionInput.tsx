@@ -11,14 +11,7 @@ import { useState, useCallback } from "react";
 import { PROFILES_QUERY } from "@agentcenter/graphql-client";
 import { useTheme } from "../hooks/useTheme";
 import { getMentionQuery, insertMentionHandle } from "@agentcenter/utils";
-
-interface Profile {
-  id: string;
-  displayName: string;
-  username: string;
-  avatarUrl: string | null;
-  agent: { identityEmoji: string | null } | null;
-}
+import type { ProfileWithAgent as Profile } from "@agentcenter/types";
 
 interface MentionInputProps extends Omit<TextInputProps, "value" | "onChangeText"> {
   value: string;
