@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Button, Badge, Card } from "@/components/ui";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
-import { FLAG_KEYS, type AgentAgentConfigFile } from "@agentcenter/utils";
+import { FLAG_KEYS, type AgentConfigFile } from "@agentcenter/utils";
 
 interface CloudVMAgent {
   id: string;
