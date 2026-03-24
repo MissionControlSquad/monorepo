@@ -1,27 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback } from "react";
+import { createPanelContext } from "@agentcenter/hooks";
 
-interface ProjectDetailContextType {
-  openProjectId: string | null;
-  openProject: (projectId: string) => void;
-  closeProject: () => void;
-}
+const { Provider: ProjectDetailProvider, usePanel } = createPanelContext("ProjectDetail");
 
-const ProjectDetailContext = createContext<ProjectDetailContextType | undefined>(undefined);
-
-export function ProjectDetailProvider({ children }: { children: React.ReactNode }) {
-  const [openProjectId, setOpenProjectId] = useState<string | null>(null);
-  const openProject = useCallback((projectId: string) => setOpenProjectId(projectId), []);
-  const closeProject = useCallback(() => setOpenProjectId(null), []);
-  const value = { openProjectId, openProject, closeProject };
-  return <ProjectDetailContext.Provider value={value}>{children}</ProjectDetailContext.Provider>;
-}
+export { ProjectDetailProvider };
 
 export function useProjectDetail() {
-  const ctx = useContext(ProjectDetailContext);
-  if (!ctx) {
-    throw new Error("useProjectDetail must be used within ProjectDetailProvider");
-  }
-  return ctx;
+  const { openId, open, close } = usePanel();
+  return { openProjectId: openId, openProject: open, closeProject: close };
 }

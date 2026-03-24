@@ -3,3 +3,4 @@ export * from "./useDebounce";
 export * from "./usePollingInterval";
 export * from "./useNotifications";
 export * from "./NotificationContext";
+export * from "./createPanelContext";
