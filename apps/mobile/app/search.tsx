@@ -164,6 +164,11 @@ export default function SearchScreen() {
           <Text className="text-base text-gray-400 dark:text-slate-500">Search tasks, messages, deliverables</Text>
           <Text className="text-sm text-gray-400 dark:text-slate-500">Tip: type #42 to jump to a task by number</Text>
         </View>
+      ) : result.error ? (
+        <View className="flex-1 justify-center items-center gap-2">
+          <Ionicons name="cloud-offline-outline" size={48} color="#d1d5db" />
+          <Text className="text-base text-red-500 dark:text-red-400 text-center px-6">Search failed. Check your connection.</Text>
+        </View>
       ) : !hasResults ? (
         <View className="flex-1 justify-center items-center gap-2">
           <Ionicons name="file-tray-outline" size={48} color="#d1d5db" />

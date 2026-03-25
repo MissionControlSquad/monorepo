@@ -1,5 +1,9 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
+import dotenv from "dotenv";
+
+// Load .env.test so integration tests use the test database
+dotenv.config({ path: path.resolve(__dirname, ".env.test") });
 
 export default defineConfig({
   test: {

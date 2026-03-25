@@ -248,7 +248,7 @@ export default function ChannelDetailScreen() {
     <KeyboardAvoidingView
       className="flex-1 bg-gray-50 dark:bg-slate-900"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 88 + insets.bottom : 0}
+      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 44 : 0}
     >
       {/* Search bar */}
       {searchOpen && (

@@ -21,15 +21,22 @@ interface NotificationCountProviderProps {
   serverUrl: string;
   /** When false, polling is paused and fetches are skipped. */
   isSignedIn: boolean;
+  /**
+   * React Native only: callback returning the current session cookie value.
+   * React Native's fetch ignores `credentials:"include"`, so the cookie must
+   * be injected as an explicit header. On web/Electron, omit this.
+   */
+  getCookie?: () => string | null;
   children: React.ReactNode;
 }
 
 export function NotificationCountProvider({
   serverUrl,
   isSignedIn,
+  getCookie,
   children,
 }: NotificationCountProviderProps) {
-  const value = useNotifications(serverUrl, isSignedIn && !!serverUrl);
+  const value = useNotifications(serverUrl, isSignedIn && !!serverUrl, getCookie);
   return (
     <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>
   );

@@ -9,13 +9,18 @@ import {
   useNotificationsContext,
 } from "@agentcenter/hooks";
 import { useAuth } from "./AuthContext";
+import { getStoredCookie } from "../api/session";
 
 export { useNotificationCount, useNotificationsContext as useNotifications };
 
 export function NotificationCountProvider({ children }: { children: React.ReactNode }) {
   const { serverUrl, isSignedIn } = useAuth();
   return (
-    <SharedNotificationCountProvider serverUrl={serverUrl ?? ""} isSignedIn={isSignedIn}>
+    <SharedNotificationCountProvider
+      serverUrl={serverUrl ?? ""}
+      isSignedIn={isSignedIn}
+      getCookie={getStoredCookie}
+    >
       {children}
     </SharedNotificationCountProvider>
   );
