@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@agentcenter/config": "*",
+    "@agentcenter/tailwind-config": "*",
     "@agentcenter/graphql-client": "*",
     "@agentcenter/hooks": "*",
     "@agentcenter/types": "*",

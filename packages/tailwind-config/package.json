@@ -1,0 +1,20 @@
+{
+  "name": "@agentcenter/tailwind-config",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./native.js",
+    "./native": "./native.js",
+    "./tokens": "./src/tokens.js",
+    "./globals.css": "./globals.css"
+  },
+  "files": ["native.js", "src/tokens.js", "globals.css"],
+  "peerDependencies": {
+    "tailwindcss": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "nativewind": {
+      "optional": true
+    }
+  }
+}
