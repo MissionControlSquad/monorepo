@@ -14,13 +14,6 @@ import { GLOBAL_SEARCH_QUERY, TASK_BY_NUMBER_QUERY } from "@agentcenter/graphql-
 import { STATUS_HEX_COLORS } from "@agentcenter/utils";
 import { Ionicons } from "@expo/vector-icons";
 
-// The server returns JSON-encoded arrays in these fields
-interface SearchResults {
-  tasks: string;      // JSON: Array<{ id, title, taskNumber, status, priority }>
-  messages: string;   // JSON: Array<{ id, content, taskId, channelId }>
-  deliverables: string; // JSON: Array<{ id, title, type, taskId }>
-}
-
 interface TaskResult {
   id: string;
   title: string;
@@ -43,15 +36,10 @@ interface DeliverableResult {
   taskId: string;
 }
 
-
-function parseJSON<T>(raw: string | undefined | null): T[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
-  } catch {
-    return [];
-  }
+interface SearchResults {
+  tasks: TaskResult[];
+  messages: MessageResult[];
+  deliverables: DeliverableResult[];
 }
 
 export default function SearchScreen() {
@@ -79,9 +67,9 @@ export default function SearchScreen() {
     requestPolicy: "cache-and-network",
   });
 
-  const tasks = parseJSON<TaskResult>(result.data?.globalSearch.tasks);
-  const messages = parseJSON<MessageResult>(result.data?.globalSearch.messages);
-  const deliverables = parseJSON<DeliverableResult>(result.data?.globalSearch.deliverables);
+  const tasks = result.data?.globalSearch.tasks ?? [];
+  const messages = result.data?.globalSearch.messages ?? [];
+  const deliverables = result.data?.globalSearch.deliverables ?? [];
 
   const totalCount = tasks.length + messages.length + deliverables.length;
   const hasResults = totalCount > 0;
