@@ -1136,7 +1136,7 @@ export default function ProjectDetailScreen() {
       navigation.setOptions({
         title: project.name,
         headerRight: () => (
-          <TouchableOpacity onPress={handleMoreActions} style={{ padding: 8, marginRight: 8 }}>
+          <TouchableOpacity onPress={handleMoreActions} style={{ padding: 8 }}>
             <Ionicons name="ellipsis-horizontal" size={22} color={colors.icon} />
           </TouchableOpacity>
         ),
