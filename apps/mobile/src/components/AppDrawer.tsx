@@ -19,6 +19,7 @@ import { ME_DRAWER_QUERY } from "@agentcenter/graphql-client";
 import { getStoredServerUrl } from "../api/session";
 import { useTheme } from "../hooks/useTheme";
 import { useNotificationCount } from "../hooks/useNotificationCount";
+import { generateInitials } from "@agentcenter/utils";
 import type { ProfileWithUser as Profile } from "@agentcenter/types";
 
 const DRAWER_WIDTH = 280;
@@ -29,7 +30,7 @@ export function AppDrawer() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
   const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -92,24 +93,23 @@ export function AppDrawer() {
     }, 150);
   };
 
-  const initials = profile?.displayName?.[0]?.toUpperCase() ?? "?";
+  const initials = generateInitials(profile?.displayName ?? "");
 
   return (
-    <View style={{ ...{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 } }} pointerEvents="box-none">
+    <View className="absolute inset-0" pointerEvents="box-none">
       {/* Backdrop */}
-      <Animated.View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.35)", opacity }}>
-        <Pressable style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} onPress={closeDrawer} />
+      <Animated.View
+        className="absolute inset-0 bg-black/35"
+        style={{ opacity }}
+      >
+        <Pressable className="absolute inset-0" onPress={closeDrawer} />
       </Animated.View>
 
       {/* Drawer panel */}
       <Animated.View
+        className="absolute top-0 bottom-0 right-0 bg-white dark:bg-slate-900"
         style={{
-          position: "absolute",
-          top: 0,
-          bottom: 0,
-          right: 0,
           width: Math.min(DRAWER_WIDTH, screenWidth * 0.78),
-          backgroundColor: colors.background,
           shadowColor: colors.shadow,
           shadowOffset: { width: -3, height: 0 },
           shadowOpacity: 0.15,
@@ -122,7 +122,7 @@ export function AppDrawer() {
       >
         {/* Close button */}
         <TouchableOpacity
-          style={{ alignSelf: "flex-end", padding: 12, marginRight: 4 }}
+          className="self-end p-3 mr-1"
           onPress={closeDrawer}
           activeOpacity={0.7}
         >
@@ -130,7 +130,7 @@ export function AppDrawer() {
         </TouchableOpacity>
 
         {/* Profile section */}
-        <View style={{ alignItems: "center", paddingHorizontal: 20, paddingBottom: 20, gap: 4 }}>
+        <View className="items-center px-5 pb-5 gap-1">
           {profile?.avatarUrl ? (
             <Image
               source={{
@@ -138,68 +138,58 @@ export function AppDrawer() {
                   ? profile.avatarUrl
                   : `${getStoredServerUrl() ?? ""}${profile.avatarUrl}`,
               }}
-              style={{ width: 72, height: 72, borderRadius: 36, marginBottom: 8 }}
+              className="w-[72px] h-[72px] rounded-full mb-2"
             />
           ) : (
-            <View
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: 36,
-                backgroundColor: colors.accentSurface,
-                justifyContent: "center",
-                alignItems: "center",
-                marginBottom: 8,
-              }}
-            >
-              <Text style={{ fontSize: 28, fontWeight: "700", color: colors.accent }}>
+            <View className="w-[72px] h-[72px] rounded-full bg-blue-100 dark:bg-blue-900/30 justify-center items-center mb-2">
+              <Text className="text-[28px] font-bold text-blue-600 dark:text-blue-300">
                 {initials}
               </Text>
             </View>
           )}
-          <Text style={{ fontSize: 17, fontWeight: "700", color: colors.text }} numberOfLines={1}>
+          <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100" numberOfLines={1}>
             {profile?.displayName ?? "…"}
           </Text>
           {profile?.username ? (
-            <Text style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
+            <Text className="text-[13px] text-gray-500 dark:text-slate-400" numberOfLines={1}>
               @{profile.username}
             </Text>
           ) : null}
           {profile?.user?.email ? (
-            <Text style={{ fontSize: 12, color: colors.textMuted }} numberOfLines={1}>
+            <Text className="text-[12px] text-gray-400 dark:text-slate-500" numberOfLines={1}>
               {profile.user.email}
             </Text>
           ) : null}
         </View>
 
         {/* Divider */}
-        <View style={{ height: 1, backgroundColor: colors.divider }} />
+        <View className="h-px bg-gray-100 dark:bg-slate-800" />
 
         {/* Navigation items */}
-        <View style={{ paddingVertical: 8 }}>
-          <DrawerItem icon="search-outline" label="Search" onPress={() => navigate("/search")} colors={colors} />
-          <DrawerItem icon="person-outline" label="Profile" onPress={() => navigate("/profile")} colors={colors} />
-          <DrawerItem icon="pulse-outline" label="Activity Feed" onPress={() => navigate("/activity")} colors={colors} />
-          <DrawerItem icon="bar-chart-outline" label="Analytics" onPress={() => navigate("/analytics")} colors={colors} />
-          <DrawerItem icon="repeat-outline" label="Recurring Tasks" onPress={() => navigate("/recurring-tasks")} colors={colors} />
-          <DrawerItem icon="document-text-outline" label="Task Templates" onPress={() => navigate("/task-templates")} colors={colors} />
-          <DrawerItem icon="notifications-outline" label="Notifications" onPress={() => navigate("/notifications")} colors={colors} badge={notificationCount > 0 ? (notificationCount > 99 ? "99+" : String(notificationCount)) : undefined} />
-          <DrawerItem icon="server-outline" label="Cloud VMs" onPress={() => navigate("/cloud")} colors={colors} />
-          <DrawerItem icon="toggle-outline" label="Feature Flags" onPress={() => navigate("/feature-flags")} colors={colors} />
-          <DrawerItem icon="settings-outline" label="Settings" onPress={() => navigate("/settings")} colors={colors} />
+        <View className="py-2">
+          <DrawerItem icon="search-outline" label="Search" onPress={() => navigate("/search")} isDark={isDark} />
+          <DrawerItem icon="person-outline" label="Profile" onPress={() => navigate("/profile")} isDark={isDark} />
+          <DrawerItem icon="pulse-outline" label="Activity Feed" onPress={() => navigate("/activity")} isDark={isDark} />
+          <DrawerItem icon="bar-chart-outline" label="Analytics" onPress={() => navigate("/analytics")} isDark={isDark} />
+          <DrawerItem icon="repeat-outline" label="Recurring Tasks" onPress={() => navigate("/recurring-tasks")} isDark={isDark} />
+          <DrawerItem icon="document-text-outline" label="Task Templates" onPress={() => navigate("/task-templates")} isDark={isDark} />
+          <DrawerItem icon="notifications-outline" label="Notifications" onPress={() => navigate("/notifications")} isDark={isDark} badge={notificationCount > 0 ? (notificationCount > 99 ? "99+" : String(notificationCount)) : undefined} />
+          <DrawerItem icon="server-outline" label="Cloud VMs" onPress={() => navigate("/cloud")} isDark={isDark} />
+          <DrawerItem icon="toggle-outline" label="Feature Flags" onPress={() => navigate("/feature-flags")} isDark={isDark} />
+          <DrawerItem icon="settings-outline" label="Settings" onPress={() => navigate("/settings")} isDark={isDark} />
         </View>
 
         {/* Divider */}
-        <View style={{ height: 1, backgroundColor: colors.divider }} />
+        <View className="h-px bg-gray-100 dark:bg-slate-800" />
 
         {/* Sign out */}
         <TouchableOpacity
-          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 14, marginTop: "auto" }}
+          className="flex-row items-center gap-3 px-5 py-3.5 mt-auto"
           onPress={handleLogout}
           activeOpacity={0.7}
         >
-          <Ionicons name="log-out-outline" size={20} color={colors.danger} />
-          <Text style={{ fontSize: 15, fontWeight: "600", color: colors.danger }}>Sign Out</Text>
+          <Ionicons name="log-out-outline" size={20} color={isDark ? "#f87171" : "#dc2626"} />
+          <Text className="text-[15px] font-semibold text-red-600 dark:text-red-400">Sign Out</Text>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -210,40 +200,36 @@ function DrawerItem({
   icon,
   label,
   onPress,
-  colors,
+  isDark,
   badge,
 }: {
   icon: React.ComponentProps<typeof Ionicons>["name"];
   label: string;
   onPress: () => void;
-  colors: ReturnType<typeof useTheme>["colors"];
+  isDark: boolean;
   badge?: string;
 }) {
   return (
     <TouchableOpacity
-      style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 14 }}
+      className="flex-row items-center gap-3 px-5 py-3.5"
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 8,
-          backgroundColor: colors.navIconBg,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Ionicons name={icon} size={20} color={colors.icon} />
+      <View className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-700 justify-center items-center">
+        <Ionicons name={icon} size={20} color={isDark ? "#cbd5e1" : "#374151"} />
       </View>
-      <Text style={{ fontSize: 15, fontWeight: "500", color: colors.text }}>{label}</Text>
+      <Text className="text-[15px] font-medium text-gray-900 dark:text-slate-100">{label}</Text>
       {badge ? (
-        <View style={{ marginLeft: "auto", marginRight: 4, backgroundColor: "#dc2626", borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, minWidth: 20, alignItems: "center" }}>
-          <Text style={{ fontSize: 11, color: "#fff", fontWeight: "700" }}>{badge}</Text>
+        <View className="ml-auto mr-1 bg-red-600 rounded-[10px] px-1.5 py-0.5 min-w-[20px] items-center">
+          <Text className="text-[11px] text-white font-bold">{badge}</Text>
         </View>
       ) : (
-        <Ionicons name="chevron-forward" size={16} color={colors.border} style={{ marginLeft: "auto" }} />
+        <Ionicons
+          name="chevron-forward"
+          size={16}
+          color={isDark ? "#334155" : "#e5e7eb"}
+          style={{ marginLeft: "auto" }}
+        />
       )}
     </TouchableOpacity>
   );

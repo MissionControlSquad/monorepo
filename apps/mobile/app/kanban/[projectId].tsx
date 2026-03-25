@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  StyleSheet,
 } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,6 +14,26 @@ import type { DueDateFilter, PriorityFilter } from "@agentcenter/utils";
 
 const DUE_DATE_OPTIONS = DUE_DATE_FILTER_OPTIONS as { key: DueDateFilter; label: string }[];
 const PRIORITY_OPTIONS = PRIORITY_FILTER_OPTIONS as { key: PriorityFilter; label: string }[];
+
+const FilterChip = ({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) => (
+  <TouchableOpacity
+    className={`px-3 py-1.5 rounded-full border ${active ? "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700" : "bg-gray-100 dark:bg-slate-700 border-gray-200 dark:border-slate-600"}`}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
+    <Text className={`text-[12px] ${active ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
 
 export default function KanbanScreen() {
   const { projectId } = useLocalSearchParams<{ projectId: string }>();
@@ -43,13 +62,13 @@ export default function KanbanScreen() {
       headerRight: () => (
         <TouchableOpacity
           onPress={() => setFiltersOpen((v) => !v)}
-          style={{ marginRight: 16, padding: 4, position: "relative" }}
+          className="mr-4 p-1 relative"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name="options-outline" size={22} color={filtersOpen ? "#2563eb" : "#374151"} />
           {activeFilterCount > 0 && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            <View className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-600 justify-center items-center">
+              <Text className="text-[9px] text-white font-bold">{activeFilterCount}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -58,82 +77,43 @@ export default function KanbanScreen() {
   }, [navigation, filtersOpen, activeFilterCount]);
 
   return (
-    <View style={{ flex: 1 }}>
+    <View className="flex-1">
       {filtersOpen && (
-        <View style={styles.filterPanel}>
-          <Text style={styles.filterSectionLabel}>Due Date</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterRow}
-          >
+        <View className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3.5 pt-2.5 pb-3 gap-2">
+          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Due Date</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
             {DUE_DATE_OPTIONS.map((opt) => (
-              <TouchableOpacity
+              <FilterChip
                 key={opt.key}
-                style={[styles.filterChip, dueDateFilter === opt.key && styles.filterChipActive]}
+                label={opt.label}
+                active={dueDateFilter === opt.key}
                 onPress={() => setDueDateFilter(dueDateFilter === opt.key ? "" : opt.key)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.filterChipText, dueDateFilter === opt.key && styles.filterChipTextActive]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
 
-          <Text style={styles.filterSectionLabel}>Priority</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterRow}
-          >
+          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Priority</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
             {PRIORITY_OPTIONS.map((opt) => (
-              <TouchableOpacity
+              <FilterChip
                 key={opt.key}
-                style={[styles.filterChip, priorityFilter === opt.key && styles.filterChipActive]}
+                label={opt.label}
+                active={priorityFilter === opt.key}
                 onPress={() => setPriorityFilter(priorityFilter === opt.key ? "" : opt.key)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.filterChipText, priorityFilter === opt.key && styles.filterChipTextActive]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
 
-          <Text style={styles.filterSectionLabel}>More Filters</Text>
-          <View style={styles.filterRow}>
-            <TouchableOpacity
-              style={[styles.filterChip, blockedOnly && styles.filterChipActive]}
-              onPress={() => setBlockedOnly((v) => !v)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterChipText, blockedOnly && styles.filterChipTextActive]}>
-                Blocked only
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.filterChip, topLevelOnly && styles.filterChipActive]}
-              onPress={() => setTopLevelOnly((v) => !v)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterChipText, topLevelOnly && styles.filterChipTextActive]}>
-                Top-level only
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.filterChip, unassignedOnly && styles.filterChipActive]}
-              onPress={() => setUnassignedOnly((v) => !v)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterChipText, unassignedOnly && styles.filterChipTextActive]}>
-                Unassigned only
-              </Text>
-            </TouchableOpacity>
+          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">More Filters</Text>
+          <View className="flex-row flex-wrap gap-2">
+            <FilterChip label="Blocked only" active={blockedOnly} onPress={() => setBlockedOnly((v) => !v)} />
+            <FilterChip label="Top-level only" active={topLevelOnly} onPress={() => setTopLevelOnly((v) => !v)} />
+            <FilterChip label="Unassigned only" active={unassignedOnly} onPress={() => setUnassignedOnly((v) => !v)} />
           </View>
 
           {activeFilterCount > 0 && (
             <TouchableOpacity
+              className="self-start mt-0.5"
               onPress={() => {
                 setDueDateFilter("");
                 setPriorityFilter("");
@@ -141,9 +121,8 @@ export default function KanbanScreen() {
                 setTopLevelOnly(false);
                 setUnassignedOnly(false);
               }}
-              style={styles.clearFiltersBtn}
             >
-              <Text style={styles.clearFiltersBtnText}>Clear all filters</Text>
+              <Text className="text-[12px] text-red-600 dark:text-red-400 font-semibold">Clear all filters</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -160,7 +139,15 @@ export default function KanbanScreen() {
 
       {/* FAB */}
       <TouchableOpacity
-        style={[styles.fab, { bottom: insets.bottom + 20 }]}
+        className="absolute right-5 w-[52px] h-[52px] rounded-full bg-blue-600 justify-center items-center"
+        style={{
+          bottom: insets.bottom + 20,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.25,
+          shadowRadius: 8,
+          elevation: 8,
+        }}
         onPress={() => router.push(`/task/create?projectId=${projectId}` as Parameters<typeof router.push>[0])}
         activeOpacity={0.85}
       >
@@ -169,63 +156,3 @@ export default function KanbanScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  filterPanel: {
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 12,
-    gap: 8,
-  },
-  filterSectionLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#9ca3af",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: "#f3f4f6",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  filterChipActive: { backgroundColor: "#dbeafe", borderColor: "#93c5fd" },
-  filterChipText: { fontSize: 12, color: "#6b7280", fontWeight: "500" },
-  filterChipTextActive: { color: "#2563eb", fontWeight: "600" },
-  clearFiltersBtn: { alignSelf: "flex-start", marginTop: 2 },
-  clearFiltersBtnText: { fontSize: 12, color: "#dc2626", fontWeight: "600" },
-  filterBadge: {
-    position: "absolute",
-    top: -2,
-    right: -2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#2563eb",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  filterBadgeText: { fontSize: 9, color: "#fff", fontWeight: "700" },
-  fab: {
-    position: "absolute",
-    right: 20,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#2563eb",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-});

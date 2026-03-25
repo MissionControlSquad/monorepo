@@ -3,7 +3,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
@@ -112,17 +111,23 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      className="flex-1 bg-gray-50 dark:bg-slate-900"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={styles.inner}>
-        <Text style={styles.logo}>AgentCenter</Text>
-        <Text style={styles.subtitle}>Mission Control</Text>
+      <View className="flex-1 justify-center px-6 pb-10">
+        <Text className="text-[30px] font-bold text-gray-900 dark:text-slate-100 text-center mb-1">
+          AgentCenter
+        </Text>
+        <Text className="text-sm text-gray-500 dark:text-slate-400 text-center mb-8">
+          Mission Control
+        </Text>
 
         {/* Server URL — always visible, editable only in url mode */}
-        <Text style={styles.label}>Server URL</Text>
+        <Text className="text-[13px] font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">
+          Server URL
+        </Text>
         <TextInput
-          style={[styles.input, mode !== "url" && styles.inputLocked]}
+          className={`bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-[10px] px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3 ${mode !== "url" ? "bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400" : ""}`}
           placeholder="https://your-instance.com"
           placeholderTextColor="#9ca3af"
           value={serverUrl}
@@ -135,7 +140,7 @@ export default function LoginScreen() {
 
         {mode === "url" && (
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+            className={`bg-blue-600 dark:bg-blue-500 rounded-[10px] py-3.5 items-center mt-2 ${loading ? "opacity-60" : ""}`}
             onPress={handleConnect}
             disabled={loading}
             activeOpacity={0.8}
@@ -143,21 +148,23 @@ export default function LoginScreen() {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Connect</Text>
+              <Text className="text-white text-base font-semibold">Connect</Text>
             )}
           </TouchableOpacity>
         )}
 
         {mode === "setup" && (
           <>
-            <Text style={styles.setupHeading}>Create Admin Account</Text>
-            <Text style={styles.setupDescription}>
+            <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100 mt-4 mb-1">
+              Create Admin Account
+            </Text>
+            <Text className="text-[13px] text-gray-500 dark:text-slate-400 leading-[18px] mb-4">
               This server has not been set up yet. Create the first admin account to get started.
             </Text>
 
-            <Text style={styles.label}>Username</Text>
+            <Text className="text-[13px] font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Username</Text>
             <TextInput
-              style={styles.input}
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-[10px] px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
               placeholder="Username"
               placeholderTextColor="#9ca3af"
               value={username}
@@ -167,9 +174,9 @@ export default function LoginScreen() {
               editable={!loading}
             />
 
-            <Text style={styles.label}>Password</Text>
+            <Text className="text-[13px] font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Password</Text>
             <TextInput
-              style={styles.input}
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-[10px] px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
               placeholder="Password"
               placeholderTextColor="#9ca3af"
               value={password}
@@ -178,9 +185,9 @@ export default function LoginScreen() {
               editable={!loading}
             />
 
-            <Text style={styles.label}>Confirm Password</Text>
+            <Text className="text-[13px] font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Confirm Password</Text>
             <TextInput
-              style={styles.input}
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-[10px] px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
               placeholder="Confirm Password"
               placeholderTextColor="#9ca3af"
               value={confirmPassword}
@@ -190,7 +197,7 @@ export default function LoginScreen() {
             />
 
             <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
+              className={`bg-blue-600 dark:bg-blue-500 rounded-[10px] py-3.5 items-center mt-2 ${loading ? "opacity-60" : ""}`}
               onPress={handleSetup}
               disabled={loading}
               activeOpacity={0.8}
@@ -198,25 +205,25 @@ export default function LoginScreen() {
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Create Account</Text>
+                <Text className="text-white text-base font-semibold">Create Account</Text>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.backBtn}
+              className="items-center mt-4 py-1.5"
               onPress={() => { setMode("url"); setUsername(""); setPassword(""); setConfirmPassword(""); }}
               activeOpacity={0.7}
             >
-              <Text style={styles.backText}>← Change server</Text>
+              <Text className="text-gray-500 dark:text-slate-400 text-[13px]">← Change server</Text>
             </TouchableOpacity>
           </>
         )}
 
         {mode === "login" && (
           <>
-            <Text style={styles.label}>Username</Text>
+            <Text className="text-[13px] font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Username</Text>
             <TextInput
-              style={styles.input}
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-[10px] px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
               placeholder="Username"
               placeholderTextColor="#9ca3af"
               value={username}
@@ -226,9 +233,9 @@ export default function LoginScreen() {
               editable={!loading}
             />
 
-            <Text style={styles.label}>Password</Text>
+            <Text className="text-[13px] font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Password</Text>
             <TextInput
-              style={styles.input}
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-[10px] px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
               placeholder="Password"
               placeholderTextColor="#9ca3af"
               value={password}
@@ -238,7 +245,7 @@ export default function LoginScreen() {
             />
 
             <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
+              className={`bg-blue-600 dark:bg-blue-500 rounded-[10px] py-3.5 items-center mt-2 ${loading ? "opacity-60" : ""}`}
               onPress={handleLogin}
               disabled={loading}
               activeOpacity={0.8}
@@ -246,24 +253,24 @@ export default function LoginScreen() {
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Sign In</Text>
+                <Text className="text-white text-base font-semibold">Sign In</Text>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.forgotBtn}
+              className="items-center mt-4 py-1.5"
               onPress={handleForgotPassword}
               activeOpacity={0.7}
             >
-              <Text style={styles.forgotText}>Forgot password?</Text>
+              <Text className="text-gray-500 dark:text-slate-400 text-sm">Forgot password?</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.backBtn}
+              className="items-center mt-2 py-1.5"
               onPress={() => { setMode("url"); setUsername(""); setPassword(""); }}
               activeOpacity={0.7}
             >
-              <Text style={styles.backText}>← Change server</Text>
+              <Text className="text-gray-500 dark:text-slate-400 text-[13px]">← Change server</Text>
             </TouchableOpacity>
           </>
         )}
@@ -271,97 +278,3 @@ export default function LoginScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f9fafb",
-  },
-  inner: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  logo: {
-    fontSize: 30,
-    fontWeight: "bold",
-    color: "#111827",
-    textAlign: "center",
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#6b7280",
-    textAlign: "center",
-    marginBottom: 32,
-  },
-  setupHeading: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#111827",
-    marginTop: 16,
-    marginBottom: 4,
-  },
-  setupDescription: {
-    fontSize: 13,
-    color: "#6b7280",
-    lineHeight: 18,
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#374151",
-    marginBottom: 4,
-    marginTop: 4,
-  },
-  input: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: "#111827",
-    marginBottom: 12,
-  },
-  inputLocked: {
-    backgroundColor: "#f3f4f6",
-    color: "#6b7280",
-  },
-  button: {
-    backgroundColor: "#2563eb",
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  forgotBtn: {
-    alignItems: "center",
-    marginTop: 16,
-    paddingVertical: 6,
-  },
-  forgotText: {
-    color: "#6b7280",
-    fontSize: 14,
-  },
-  backBtn: {
-    alignItems: "center",
-    marginTop: 8,
-    paddingVertical: 6,
-  },
-  backText: {
-    color: "#6b7280",
-    fontSize: 13,
-  },
-});

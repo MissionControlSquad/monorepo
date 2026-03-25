@@ -28,7 +28,7 @@ function RootLayoutNav() {
   // While restoring session show a neutral splash
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
         <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
@@ -61,7 +61,7 @@ function RootLayoutNav() {
   return (
     <Provider value={urqlClient}>
       <NotificationCountProvider>
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View className="flex-1 bg-white dark:bg-slate-900">
         <OfflineBanner />
         <Stack
           screenOptions={{

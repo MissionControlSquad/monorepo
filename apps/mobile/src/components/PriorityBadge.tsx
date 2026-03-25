@@ -9,9 +9,9 @@ export function PriorityBadge({ priority }: PriorityBadgeProps) {
   const color = PRIORITY_HEX_COLORS[priority] ?? DEFAULT_COLOR;
   const icon = PRIORITY_ICONS[priority] ?? "·";
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+    <View className="flex-row items-center gap-0.5">
       <Text style={{ color, fontSize: 11, fontWeight: "700" }}>{icon}</Text>
-      <Text style={{ color, fontSize: 11, fontWeight: "600", textTransform: "capitalize" }}>
+      <Text style={{ color, fontSize: 11, fontWeight: "600" }} className="capitalize">
         {priority}
       </Text>
     </View>

@@ -23,7 +23,7 @@ export default function DashboardLayout() {
         headerTitleStyle: { fontWeight: "600", color: colors.text },
         headerShadowVisible: false,
         headerRight: () => (
-          <TouchableOpacity onPress={openDrawer} style={{ marginRight: 16 }}>
+          <TouchableOpacity onPress={openDrawer} className="mr-4">
             <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
           </TouchableOpacity>
         ),
@@ -38,15 +38,15 @@ export default function DashboardLayout() {
             <Ionicons name="checkmark-circle-outline" size={size} color={color} />
           ),
           headerRight: () => (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
-              <TouchableOpacity onPress={() => router.push("/search")} style={{ padding: 8 }}>
+            <View className="flex-row items-center gap-1 mr-2">
+              <TouchableOpacity onPress={() => router.push("/search")} className="p-2">
                 <Ionicons name="search-outline" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
               <NotificationBell
                 onPress={() => router.push("/notifications")}
                 color={colors.textSecondary}
               />
-              <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
+              <TouchableOpacity onPress={openDrawer} className="p-2">
                 <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -62,11 +62,11 @@ export default function DashboardLayout() {
             <Ionicons name="people-outline" size={size} color={color} />
           ),
           headerRight: () => (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
-              <TouchableOpacity onPress={() => router.push("/agent/create")} style={{ padding: 8 }}>
+            <View className="flex-row items-center gap-1 mr-2">
+              <TouchableOpacity onPress={() => router.push("/agent/create")} className="p-2">
                 <Ionicons name="add" size={26} color={colors.accent} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
+              <TouchableOpacity onPress={openDrawer} className="p-2">
                 <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -82,11 +82,11 @@ export default function DashboardLayout() {
             <Ionicons name="chatbubble-outline" size={size} color={color} />
           ),
           headerRight: () => (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
-              <TouchableOpacity onPress={() => router.push("/channels/create")} style={{ padding: 8 }}>
+            <View className="flex-row items-center gap-1 mr-2">
+              <TouchableOpacity onPress={() => router.push("/channels/create")} className="p-2">
                 <Ionicons name="add" size={26} color={colors.accent} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
+              <TouchableOpacity onPress={openDrawer} className="p-2">
                 <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -102,11 +102,11 @@ export default function DashboardLayout() {
             <Ionicons name="folder-outline" size={size} color={color} />
           ),
           headerRight: () => (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
-              <TouchableOpacity onPress={() => router.push("/project/create")} style={{ padding: 8 }}>
+            <View className="flex-row items-center gap-1 mr-2">
+              <TouchableOpacity onPress={() => router.push("/project/create")} className="p-2">
                 <Ionicons name="add" size={26} color={colors.accent} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={openDrawer} style={{ padding: 8 }}>
+              <TouchableOpacity onPress={openDrawer} className="p-2">
                 <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>

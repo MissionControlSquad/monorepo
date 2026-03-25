@@ -45,17 +45,17 @@ export default function FeatureFlagsScreen() {
 
   if (result.fetching && flags.length === 0) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
+      <View className="flex-1 justify-center items-center bg-white dark:bg-slate-900">
         <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View className="flex-1 bg-white dark:bg-slate-900">
       {result.error && !result.data && (
-        <View style={{ padding: 16, backgroundColor: colors.danger + "18", margin: 16, borderRadius: 10 }}>
-          <Text style={{ color: colors.danger, fontSize: 14 }}>{result.error.message}</Text>
+        <View className="m-4 p-4 bg-red-50 dark:bg-red-950/30 rounded-[10px]">
+          <Text className="text-red-600 dark:text-red-400 text-sm">{result.error.message}</Text>
         </View>
       )}
       <FlatList
@@ -79,29 +79,18 @@ export default function FeatureFlagsScreen() {
         renderItem={({ item }) => {
           const isManaged = !!item.managedBy && item.managedBy !== "admin";
           return (
-            <View
-              style={{
-                backgroundColor: colors.card,
-                borderRadius: 12,
-                padding: 14,
-                borderWidth: 1,
-                borderColor: colors.border,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>
+            <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 flex-row items-center gap-3">
+              <View className="flex-1 gap-0.5">
+                <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">
                   {item.key}
                 </Text>
                 {item.description ? (
-                  <Text style={{ fontSize: 12, color: colors.textSecondary }} numberOfLines={2}>
+                  <Text className="text-[12px] text-gray-500 dark:text-slate-400" numberOfLines={2}>
                     {item.description}
                   </Text>
                 ) : null}
                 {item.managedBy ? (
-                  <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
+                  <Text className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
                     Managed by: {item.managedBy}
                   </Text>
                 ) : null}

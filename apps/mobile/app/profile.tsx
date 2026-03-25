@@ -3,7 +3,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -172,7 +171,7 @@ export default function ProfileScreen() {
 
   if (result.fetching && !profile) {
     return (
-      <View style={styles.center}>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
         <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
@@ -182,32 +181,35 @@ export default function ProfileScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#f9fafb" }}
+      className="flex-1 bg-gray-50 dark:bg-slate-900"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
       >
         {/* Avatar card */}
-        <View style={styles.card}>
-          <View style={styles.avatarRow}>
+        <View className="bg-white dark:bg-slate-800 rounded-[14px] p-4 border border-gray-200 dark:border-slate-700 gap-3">
+          <View className="flex-row items-center gap-3.5">
             {/* Avatar */}
             <TouchableOpacity
-              style={styles.avatarContainer}
+              className="w-16 h-16 rounded-full overflow-hidden shrink-0"
               onPress={handlePickAvatar}
               disabled={uploading}
               activeOpacity={0.8}
             >
               {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+                <Image source={{ uri: avatarUrl }} className="w-16 h-16" />
               ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarInitials}>{initials}</Text>
+                <View className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 justify-center items-center">
+                  <Text className="text-2xl font-bold text-blue-600 dark:text-blue-400">{initials}</Text>
                 </View>
               )}
-              <View style={styles.avatarOverlay}>
+              <View
+                className="absolute bottom-0 left-0 right-0 h-6 justify-center items-center"
+                style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+              >
                 {uploading ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
@@ -217,19 +219,19 @@ export default function ProfileScreen() {
             </TouchableOpacity>
 
             {/* Identity info */}
-            <View style={styles.identityInfo}>
-              <Text style={styles.identityName} numberOfLines={1}>
+            <View className="flex-1 gap-[3px]">
+              <Text className="text-base font-bold text-gray-900 dark:text-slate-100" numberOfLines={1}>
                 {displayName || "Your Name"}
               </Text>
               {profile?.username ? (
-                <Text style={styles.identityUsername} numberOfLines={1}>
+                <Text className="text-[13px] text-gray-500 dark:text-slate-400" numberOfLines={1}>
                   @{profile.username}
                 </Text>
               ) : null}
               {profile?.user?.email ? (
-                <View style={styles.emailRow}>
+                <View className="flex-row items-center gap-1 mt-0.5">
                   <Ionicons name="mail-outline" size={12} color="#9ca3af" />
-                  <Text style={styles.identityEmail} numberOfLines={1}>
+                  <Text className="text-[12px] text-gray-400 dark:text-slate-500 flex-1" numberOfLines={1}>
                     {profile.user.email}
                   </Text>
                 </View>
@@ -238,18 +240,18 @@ export default function ProfileScreen() {
           </View>
 
           {/* Avatar hint / remove */}
-          <View style={styles.avatarHintRow}>
+          <View className="flex-row items-center justify-between gap-2">
             {uploading ? (
-              <Text style={styles.avatarHint}>Uploading avatar…</Text>
+              <Text className="text-[11px] text-gray-400 dark:text-slate-500">Uploading avatar…</Text>
             ) : (
               <>
-                <Text style={styles.avatarHint}>
+                <Text className="text-[11px] text-gray-400 dark:text-slate-500 flex-1">
                   Tap avatar to upload (PNG, JPEG, GIF, WebP · max 5 MB)
                 </Text>
                 {avatarUrl ? (
-                  <TouchableOpacity onPress={handleRemoveAvatar} style={styles.removeBtn}>
+                  <TouchableOpacity onPress={handleRemoveAvatar} className="flex-row items-center gap-[3px] shrink-0">
                     <Ionicons name="trash-outline" size={12} color="#9ca3af" />
-                    <Text style={styles.removeBtnText}>Remove</Text>
+                    <Text className="text-[11px] text-gray-400 dark:text-slate-500">Remove</Text>
                   </TouchableOpacity>
                 ) : null}
               </>
@@ -258,23 +260,23 @@ export default function ProfileScreen() {
         </View>
 
         {/* Profile info form */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardIconWrap}>
+        <View className="bg-white dark:bg-slate-800 rounded-[14px] p-4 border border-gray-200 dark:border-slate-700 gap-3">
+          <View className="flex-row items-center gap-3">
+            <View className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-slate-700 justify-center items-center">
               <Ionicons name="person-outline" size={20} color="#6b7280" />
             </View>
             <View>
-              <Text style={styles.cardTitle}>Profile Information</Text>
-              <Text style={styles.cardSubtitle}>Update your display name and bio</Text>
+              <Text className="text-[15px] font-bold text-gray-900 dark:text-slate-100">Profile Information</Text>
+              <Text className="text-[12px] text-gray-500 dark:text-slate-400 mt-px">Update your display name and bio</Text>
             </View>
           </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>
-              Display Name <Text style={styles.required}>*</Text>
+          <View className="gap-1.5">
+            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">
+              Display Name <Text className="text-red-600 dark:text-red-400">*</Text>
             </Text>
             <TextInput
-              style={styles.input}
+              className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
               value={displayName}
               onChangeText={(v) => { setDisplayName(v); setDirty(true); }}
               placeholder="Your display name"
@@ -283,10 +285,11 @@ export default function ProfileScreen() {
             />
           </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Bio</Text>
+          <View className="gap-1.5">
+            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Bio</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+              style={{ minHeight: 96 }}
               value={bio}
               onChangeText={(v) => { setBio(v); setDirty(true); }}
               placeholder="Tell us about yourself…"
@@ -295,11 +298,11 @@ export default function ProfileScreen() {
               numberOfLines={4}
               textAlignVertical="top"
             />
-            <Text style={styles.hint}>A short description visible to others</Text>
+            <Text className="text-[11px] text-gray-400 dark:text-slate-500">A short description visible to others</Text>
           </View>
 
           <TouchableOpacity
-            style={[styles.saveBtn, (!dirty || saving) && styles.saveBtnDisabled]}
+            className={`bg-blue-600 rounded-[10px] py-[13px] items-center mt-1 ${(!dirty || saving) ? "opacity-45" : ""}`}
             onPress={handleSave}
             disabled={!dirty || saving}
             activeOpacity={0.8}
@@ -307,248 +310,39 @@ export default function ProfileScreen() {
             {saving ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text style={styles.saveBtnText}>Save Changes</Text>
+              <Text className="text-white text-[15px] font-semibold">Save Changes</Text>
             )}
           </TouchableOpacity>
         </View>
 
         {/* Account section */}
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Account</Text>
+        <View className="bg-white dark:bg-slate-800 rounded-[14px] p-4 border border-gray-200 dark:border-slate-700 gap-3">
+          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Account</Text>
 
           {profile?.user?.email ? (
-            <View style={styles.accountRow}>
+            <View className="flex-row items-center gap-2.5 py-1">
               <Ionicons name="mail-outline" size={16} color="#6b7280" />
-              <Text style={styles.accountValue}>{profile.user.email}</Text>
+              <Text className="text-[14px] text-gray-700 dark:text-slate-300">{profile.user.email}</Text>
             </View>
           ) : null}
 
           {profile?.username ? (
-            <View style={styles.accountRow}>
+            <View className="flex-row items-center gap-2.5 py-1">
               <Ionicons name="at-outline" size={16} color="#6b7280" />
-              <Text style={styles.accountValue}>{profile.username}</Text>
+              <Text className="text-[14px] text-gray-700 dark:text-slate-300">{profile.username}</Text>
             </View>
           ) : null}
 
           <TouchableOpacity
-            style={styles.signOutBtn}
+            className="flex-row items-center gap-2 py-2.5 mt-1 border-t border-gray-100 dark:border-slate-700"
             onPress={handleLogout}
             activeOpacity={0.7}
           >
             <Ionicons name="log-out-outline" size={16} color="#dc2626" />
-            <Text style={styles.signOutText}>Sign Out</Text>
+            <Text className="text-[15px] font-semibold text-red-600 dark:text-red-400">Sign Out</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-  },
-  content: {
-    padding: 16,
-    gap: 12,
-  },
-
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 12,
-  },
-
-  // Avatar
-  avatarRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  avatarContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    overflow: "hidden",
-    flexShrink: 0,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-  },
-  avatarPlaceholder: {
-    width: 64,
-    height: 64,
-    backgroundColor: "#dbeafe",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarInitials: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#2563eb",
-  },
-  avatarOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 24,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  identityInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  identityName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  identityUsername: {
-    fontSize: 13,
-    color: "#6b7280",
-  },
-  emailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 2,
-  },
-  identityEmail: {
-    fontSize: 12,
-    color: "#9ca3af",
-    flex: 1,
-  },
-  avatarHintRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  avatarHint: {
-    fontSize: 11,
-    color: "#9ca3af",
-    flex: 1,
-  },
-  removeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    flexShrink: 0,
-  },
-  removeBtnText: {
-    fontSize: 11,
-    color: "#9ca3af",
-  },
-
-  // Form
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  cardIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  cardSubtitle: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 1,
-  },
-  field: {
-    gap: 6,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  required: {
-    color: "#dc2626",
-  },
-  input: {
-    backgroundColor: "#f9fafb",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 15,
-    color: "#111827",
-  },
-  textArea: {
-    minHeight: 96,
-    paddingTop: 11,
-  },
-  hint: {
-    fontSize: 11,
-    color: "#9ca3af",
-  },
-  saveBtn: {
-    backgroundColor: "#2563eb",
-    borderRadius: 10,
-    paddingVertical: 13,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  saveBtnDisabled: {
-    opacity: 0.45,
-  },
-  saveBtnText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-
-  // Account section
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#9ca3af",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  accountRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 4,
-  },
-  accountValue: {
-    fontSize: 14,
-    color: "#374151",
-  },
-  signOutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 10,
-    marginTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: "#f3f4f6",
-  },
-  signOutText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#dc2626",
-  },
-});

@@ -3,7 +3,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -91,7 +90,6 @@ export default function CreateTaskScreen() {
       return;
     }
     setLoading(true);
-    // Commit any pending tag input on submit
     const finalTags = tagInput.trim()
       ? [...tags, tagInput.trim()]
       : tags;
@@ -118,21 +116,21 @@ export default function CreateTaskScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#f9fafb" }}
+      className="flex-1 bg-gray-50 dark:bg-slate-900"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
+        contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: insets.bottom + 20 }}
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
       >
         {/* Template picker */}
         <TouchableOpacity
-          style={styles.templateBtn}
+          className="flex-row items-center justify-center border border-gray-200 dark:border-slate-600 rounded-[10px] py-2.5 bg-white dark:bg-slate-800"
           onPress={() => setTemplatePickerOpen(true)}
           activeOpacity={0.7}
         >
-          <Text style={styles.templateBtnText}>📋 Use Template</Text>
+          <Text className="text-[14px] text-gray-700 dark:text-slate-300 font-medium">📋 Use Template</Text>
         </TouchableOpacity>
 
         {/* Template picker modal */}
@@ -142,18 +140,18 @@ export default function CreateTaskScreen() {
           presentationStyle="pageSheet"
           onRequestClose={() => setTemplatePickerOpen(false)}
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Task Templates</Text>
+          <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+            <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <Text className="text-[17px] font-semibold text-gray-900 dark:text-slate-100">Task Templates</Text>
               <TouchableOpacity onPress={() => setTemplatePickerOpen(false)}>
-                <Text style={styles.modalDone}>Close</Text>
+                <Text className="text-base font-semibold text-blue-600 dark:text-blue-400">Close</Text>
               </TouchableOpacity>
             </View>
             {templatesResult.fetching ? (
               <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
             ) : (templatesResult.data?.taskTemplates ?? []).length === 0 ? (
-              <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 8 }}>
-                <Text style={{ fontSize: 15, color: "#9ca3af" }}>No templates available</Text>
+              <View className="flex-1 justify-center items-center gap-2">
+                <Text className="text-[15px] text-gray-400 dark:text-slate-500">No templates available</Text>
               </View>
             ) : (
               <FlatList
@@ -161,25 +159,25 @@ export default function CreateTaskScreen() {
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
                 renderItem={({ item }) => (
-                  <View style={styles.profileRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.profileName}>{item.name}</Text>
+                  <View className="flex-row items-center p-3.5 gap-3 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700">
+                    <View className="flex-1">
+                      <Text className="text-[15px] font-medium text-gray-900 dark:text-slate-100">{item.name}</Text>
                       {item.description ? (
-                        <Text style={styles.profileUsername} numberOfLines={2}>
+                        <Text className="text-[12px] text-gray-400 dark:text-slate-500 mt-px" numberOfLines={2}>
                           {item.description}
                         </Text>
                       ) : null}
                     </View>
-                    <View style={{ flexDirection: "row", gap: 8 }}>
+                    <View className="flex-row gap-2">
                       <TouchableOpacity
                         onPress={() => {
                           setTitle(item.name);
                           if (item.description) setDescription(item.description);
                           setTemplatePickerOpen(false);
                         }}
-                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: "#bfdbfe" }}
+                        className="px-2 py-1 rounded-[6px] border border-blue-200 dark:border-blue-700"
                       >
-                        <Text style={{ color: "#2563eb", fontSize: 12, fontWeight: "600" }}>Pre-fill</Text>
+                        <Text className="text-blue-600 dark:text-blue-400 text-[12px] font-semibold">Pre-fill</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         disabled={instantiating}
@@ -202,12 +200,12 @@ export default function CreateTaskScreen() {
                             router.back();
                           }
                         }}
-                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: "#2563eb" }}
+                        className="px-2 py-1 rounded-[6px] bg-blue-600"
                       >
                         {instantiating ? (
                           <ActivityIndicator size="small" color="#fff" />
                         ) : (
-                          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>Create</Text>
+                          <Text className="text-white text-[12px] font-semibold">Create</Text>
                         )}
                       </TouchableOpacity>
                     </View>
@@ -219,10 +217,10 @@ export default function CreateTaskScreen() {
         </Modal>
 
         {/* Title */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Title *</Text>
+        <View className="gap-1.5">
+          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Title *</Text>
           <TextInput
-            style={styles.input}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 text-[15px] text-gray-900 dark:text-slate-100"
             placeholder="What needs to be done?"
             placeholderTextColor="#9ca3af"
             value={title}
@@ -233,10 +231,11 @@ export default function CreateTaskScreen() {
         </View>
 
         {/* Description */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Description</Text>
+        <View className="gap-1.5">
+          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Description</Text>
           <TextInput
-            style={[styles.input, styles.textArea]}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 text-[15px] text-gray-900 dark:text-slate-100"
+            style={{ minHeight: 100 }}
             placeholder="Add more context…"
             placeholderTextColor="#9ca3af"
             value={description}
@@ -248,37 +247,32 @@ export default function CreateTaskScreen() {
         </View>
 
         {/* Priority */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Priority</Text>
-          <View style={styles.priorityRow}>
+        <View className="gap-1.5">
+          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Priority</Text>
+          <View className="flex-row flex-wrap gap-2">
             <TouchableOpacity
-              style={[styles.priorityChip, priority === null && styles.priorityChipActive]}
+              className={`border rounded-lg px-3 py-1.5 bg-white dark:bg-slate-800 ${priority === null ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30" : "border-gray-200 dark:border-slate-600"}`}
               onPress={() => setPriority(null)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.priorityChipText, priority === null && { color: "#2563eb" }]}>
+              <Text className={`text-[13px] ${priority === null ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}>
                 None
               </Text>
             </TouchableOpacity>
             {PRIORITIES.map((p) => (
               <TouchableOpacity
                 key={p}
-                style={[
-                  styles.priorityChip,
-                  priority === p && {
-                    backgroundColor: PRIORITY_HEX_COLORS[p] + "18",
-                    borderColor: PRIORITY_HEX_COLORS[p],
-                  },
-                ]}
+                className="border rounded-lg px-3 py-1.5 bg-white dark:bg-slate-800"
+                style={priority === p ? {
+                  backgroundColor: PRIORITY_HEX_COLORS[p] + "18",
+                  borderColor: PRIORITY_HEX_COLORS[p],
+                } : { borderColor: "#e5e7eb" }}
                 onPress={() => setPriority(p)}
                 activeOpacity={0.7}
               >
                 <Text
-                  style={[
-                    styles.priorityChipText,
-                    { textTransform: "capitalize" },
-                    priority === p && { color: PRIORITY_HEX_COLORS[p], fontWeight: "600" },
-                  ]}
+                  className="text-[13px] capitalize"
+                  style={priority === p ? { color: PRIORITY_HEX_COLORS[p], fontWeight: "600" } : { color: "#6b7280" }}
                 >
                   {p}
                 </Text>
@@ -288,10 +282,10 @@ export default function CreateTaskScreen() {
         </View>
 
         {/* Due Date */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Due Date</Text>
+        <View className="gap-1.5">
+          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Due Date</Text>
           <TextInput
-            style={styles.input}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 text-[15px] text-gray-900 dark:text-slate-100"
             placeholder="YYYY-MM-DD"
             placeholderTextColor="#9ca3af"
             value={dueDate}
@@ -302,22 +296,22 @@ export default function CreateTaskScreen() {
         </View>
 
         {/* Assignees */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Assignees</Text>
+        <View className="gap-1.5">
+          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Assignees</Text>
           <TouchableOpacity
-            style={styles.assigneeSelector}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 min-h-[44px] justify-center"
             onPress={() => setAssigneeModalOpen(true)}
             activeOpacity={0.7}
           >
             {selectedIds.length === 0 ? (
-              <Text style={styles.assigneePlaceholder}>Tap to assign…</Text>
+              <Text className="text-gray-400 dark:text-slate-500 text-[15px]">Tap to assign…</Text>
             ) : (
-              <View style={styles.assigneeChips}>
+              <View className="flex-row flex-wrap gap-1.5">
                 {selectedIds.map((id) => {
                   const p = profilesResult.data?.profiles.find((x) => x.id === id);
                   return (
-                    <View key={id} style={styles.assigneeChip}>
-                      <Text style={styles.assigneeChipText}>
+                    <View key={id} className="bg-blue-100 dark:bg-blue-900/30 rounded-full px-2.5 py-1">
+                      <Text className="text-[13px] text-blue-700 dark:text-blue-300 font-medium">
                         {p?.agent?.identityEmoji ?? ""} {p?.displayName ?? id}
                       </Text>
                     </View>
@@ -329,24 +323,24 @@ export default function CreateTaskScreen() {
         </View>
 
         {/* Tags */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Tags</Text>
+        <View className="gap-1.5">
+          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Tags</Text>
           {tags.length > 0 && (
-            <View style={styles.assigneeChips}>
+            <View className="flex-row flex-wrap gap-1.5">
               {tags.map((tag) => (
                 <TouchableOpacity
                   key={tag}
-                  style={styles.tagChip}
+                  className="bg-gray-100 dark:bg-slate-700 rounded-full px-2.5 py-1 border border-gray-200 dark:border-slate-600"
                   onPress={() => setTags((prev) => prev.filter((t) => t !== tag))}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.tagChipText}>{tag} ✕</Text>
+                  <Text className="text-[13px] text-gray-700 dark:text-slate-300 font-medium">{tag} ✕</Text>
                 </TouchableOpacity>
               ))}
             </View>
           )}
           <TextInput
-            style={styles.input}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 text-[15px] text-gray-900 dark:text-slate-100"
             placeholder="Type a tag and press space or comma…"
             placeholderTextColor="#9ca3af"
             value={tagInput}
@@ -374,10 +368,10 @@ export default function CreateTaskScreen() {
         </View>
 
         {/* Parent Task */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Parent Task</Text>
+        <View className="gap-1.5">
+          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Parent Task</Text>
           <TouchableOpacity
-            style={styles.assigneeSelector}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 min-h-[44px] justify-center"
             onPress={() => setParentTaskPickerOpen(true)}
             activeOpacity={0.7}
           >
@@ -385,30 +379,30 @@ export default function CreateTaskScreen() {
               (() => {
                 const t = tasksResult.data?.tasks.find((x) => x.id === parentTaskId);
                 return (
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={{ fontSize: 15, color: "#111827" }}>
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-[15px] text-gray-900 dark:text-slate-100">
                       {t ? `#${t.taskNumber} ${t.title}` : parentTaskId}
                     </Text>
                     <TouchableOpacity
                       onPress={(e) => { e.stopPropagation(); setParentTaskId(null); }}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Text style={{ color: "#6b7280", fontSize: 16 }}>✕</Text>
+                      <Text className="text-gray-500 dark:text-slate-400 text-base">✕</Text>
                     </TouchableOpacity>
                   </View>
                 );
               })()
             ) : (
-              <Text style={styles.assigneePlaceholder}>None (top-level task)</Text>
+              <Text className="text-gray-400 dark:text-slate-500 text-[15px]">None (top-level task)</Text>
             )}
           </TouchableOpacity>
         </View>
 
         {/* Blocked By */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Blocked By</Text>
+        <View className="gap-1.5">
+          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Blocked By</Text>
           <TouchableOpacity
-            style={styles.assigneeSelector}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 min-h-[44px] justify-center"
             onPress={() => setTaskPickerOpen(true)}
             activeOpacity={0.7}
           >
@@ -416,21 +410,21 @@ export default function CreateTaskScreen() {
               (() => {
                 const t = tasksResult.data?.tasks.find((x) => x.id === blockedByTaskId);
                 return (
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={{ fontSize: 15, color: "#111827" }}>
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-[15px] text-gray-900 dark:text-slate-100">
                       {t ? `#${t.taskNumber} ${t.title}` : blockedByTaskId}
                     </Text>
                     <TouchableOpacity
                       onPress={(e) => { e.stopPropagation(); setBlockedByTaskId(null); }}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Text style={{ color: "#6b7280", fontSize: 16 }}>✕</Text>
+                      <Text className="text-gray-500 dark:text-slate-400 text-base">✕</Text>
                     </TouchableOpacity>
                   </View>
                 );
               })()
             ) : (
-              <Text style={styles.assigneePlaceholder}>Select blocking task…</Text>
+              <Text className="text-gray-400 dark:text-slate-500 text-[15px]">Select blocking task…</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -442,16 +436,16 @@ export default function CreateTaskScreen() {
           presentationStyle="pageSheet"
           onRequestClose={() => setTaskPickerOpen(false)}
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Blocked By Task</Text>
+          <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+            <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <Text className="text-[17px] font-semibold text-gray-900 dark:text-slate-100">Blocked By Task</Text>
               <TouchableOpacity onPress={() => setTaskPickerOpen(false)}>
-                <Text style={styles.modalDone}>Done</Text>
+                <Text className="text-base font-semibold text-blue-600 dark:text-blue-400">Done</Text>
               </TouchableOpacity>
             </View>
-            <View style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" }}>
+            <View className="px-3.5 py-2.5 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
               <TextInput
-                style={[styles.input, { marginBottom: 0 }]}
+                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-2.5 text-[15px] text-gray-900 dark:text-slate-100"
                 placeholder="Search tasks…"
                 placeholderTextColor="#9ca3af"
                 value={taskPickerSearch}
@@ -474,19 +468,19 @@ export default function CreateTaskScreen() {
                   const selected = blockedByTaskId === item.id;
                   return (
                     <Pressable
-                      style={[styles.profileRow, selected && styles.profileRowSelected]}
+                      className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
                       onPress={() => {
                         setBlockedByTaskId(selected ? null : item.id);
                         setTaskPickerOpen(false);
                       }}
                     >
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.profileName}>
+                      <View className="flex-1">
+                        <Text className="text-[15px] font-medium text-gray-900 dark:text-slate-100">
                           #{item.taskNumber} {item.title}
                         </Text>
-                        <Text style={styles.profileUsername}>{item.status.replace("_", " ")}</Text>
+                        <Text className="text-[12px] text-gray-400 dark:text-slate-500 mt-px">{item.status.replace("_", " ")}</Text>
                       </View>
-                      {selected && <Text style={styles.checkmark}>✓</Text>}
+                      {selected && <Text className="text-[18px] text-blue-600 dark:text-blue-400 font-bold">✓</Text>}
                     </Pressable>
                   );
                 }}
@@ -502,16 +496,16 @@ export default function CreateTaskScreen() {
           presentationStyle="pageSheet"
           onRequestClose={() => setParentTaskPickerOpen(false)}
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Parent Task</Text>
+          <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+            <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <Text className="text-[17px] font-semibold text-gray-900 dark:text-slate-100">Select Parent Task</Text>
               <TouchableOpacity onPress={() => setParentTaskPickerOpen(false)}>
-                <Text style={styles.modalDone}>Done</Text>
+                <Text className="text-base font-semibold text-blue-600 dark:text-blue-400">Done</Text>
               </TouchableOpacity>
             </View>
-            <View style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" }}>
+            <View className="px-3.5 py-2.5 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
               <TextInput
-                style={[styles.input, { marginBottom: 0 }]}
+                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-2.5 text-[15px] text-gray-900 dark:text-slate-100"
                 placeholder="Search tasks…"
                 placeholderTextColor="#9ca3af"
                 value={taskPickerSearch}
@@ -532,32 +526,32 @@ export default function CreateTaskScreen() {
                 contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
                 ListHeaderComponent={
                   <Pressable
-                    style={[styles.profileRow, parentTaskId === null && styles.profileRowSelected]}
+                    className={`flex-row items-center p-3.5 border-b border-gray-100 dark:border-slate-700 ${parentTaskId === null ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
                     onPress={() => { setParentTaskId(null); setParentTaskPickerOpen(false); }}
                   >
-                    <Text style={[styles.profileName, { fontStyle: "italic", color: "#6b7280" }]}>
+                    <Text className="text-[15px] font-medium italic text-gray-500 dark:text-slate-400">
                       None (top-level task)
                     </Text>
-                    {parentTaskId === null && <Text style={styles.checkmark}>✓</Text>}
+                    {parentTaskId === null && <Text className="text-[18px] text-blue-600 dark:text-blue-400 font-bold ml-auto">✓</Text>}
                   </Pressable>
                 }
                 renderItem={({ item }) => {
                   const selected = parentTaskId === item.id;
                   return (
                     <Pressable
-                      style={[styles.profileRow, selected && styles.profileRowSelected]}
+                      className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
                       onPress={() => {
                         setParentTaskId(item.id);
                         setParentTaskPickerOpen(false);
                       }}
                     >
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.profileName}>
+                      <View className="flex-1">
+                        <Text className="text-[15px] font-medium text-gray-900 dark:text-slate-100">
                           #{item.taskNumber} {item.title}
                         </Text>
-                        <Text style={styles.profileUsername}>{item.status.replace("_", " ")}</Text>
+                        <Text className="text-[12px] text-gray-400 dark:text-slate-500 mt-px">{item.status.replace("_", " ")}</Text>
                       </View>
-                      {selected && <Text style={styles.checkmark}>✓</Text>}
+                      {selected && <Text className="text-[18px] text-blue-600 dark:text-blue-400 font-bold">✓</Text>}
                     </Pressable>
                   );
                 }}
@@ -573,11 +567,11 @@ export default function CreateTaskScreen() {
           presentationStyle="pageSheet"
           onRequestClose={() => setAssigneeModalOpen(false)}
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Assignees</Text>
+          <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+            <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <Text className="text-[17px] font-semibold text-gray-900 dark:text-slate-100">Select Assignees</Text>
               <TouchableOpacity onPress={() => setAssigneeModalOpen(false)}>
-                <Text style={styles.modalDone}>Done</Text>
+                <Text className="text-base font-semibold text-blue-600 dark:text-blue-400">Done</Text>
               </TouchableOpacity>
             </View>
             {profilesResult.fetching ? (
@@ -591,7 +585,7 @@ export default function CreateTaskScreen() {
                   const selected = selectedIds.includes(item.id);
                   return (
                     <Pressable
-                      style={[styles.profileRow, selected && styles.profileRowSelected]}
+                      className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
                       onPress={() =>
                         setSelectedIds((prev) =>
                           selected ? prev.filter((id) => id !== item.id) : [...prev, item.id]
@@ -604,11 +598,11 @@ export default function CreateTaskScreen() {
                         emoji={item.agent?.identityEmoji}
                         size={36}
                       />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.profileName}>{item.displayName}</Text>
-                        <Text style={styles.profileUsername}>@{item.username}</Text>
+                      <View className="flex-1">
+                        <Text className="text-[15px] font-medium text-gray-900 dark:text-slate-100">{item.displayName}</Text>
+                        <Text className="text-[12px] text-gray-400 dark:text-slate-500 mt-px">@{item.username}</Text>
                       </View>
-                      {selected && <Text style={styles.checkmark}>✓</Text>}
+                      {selected && <Text className="text-[18px] text-blue-600 dark:text-blue-400 font-bold">✓</Text>}
                     </Pressable>
                   );
                 }}
@@ -619,7 +613,7 @@ export default function CreateTaskScreen() {
 
         {/* Submit */}
         <TouchableOpacity
-          style={[styles.createBtn, (!title.trim() || loading) && styles.createBtnDisabled]}
+          className={`bg-blue-600 rounded-[12px] py-3.5 items-center mt-1 ${(!title.trim() || loading) ? "opacity-50" : ""}`}
           onPress={handleCreate}
           disabled={!title.trim() || loading}
           activeOpacity={0.8}
@@ -627,193 +621,14 @@ export default function CreateTaskScreen() {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.createBtnText}>Create Task</Text>
+            <Text className="text-white text-base font-semibold">Create Task</Text>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
-          <Text style={styles.cancelBtnText}>Cancel</Text>
+        <TouchableOpacity className="items-center py-2" onPress={() => router.back()}>
+          <Text className="text-[15px] text-gray-500 dark:text-slate-400">Cancel</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    padding: 20,
-    gap: 20,
-  },
-  field: { gap: 6 },
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  input: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: "#111827",
-  },
-  textArea: {
-    minHeight: 100,
-    paddingTop: 12,
-  },
-  priorityRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  priorityChip: {
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: "#fff",
-  },
-  priorityChipActive: {
-    borderColor: "#2563eb",
-    backgroundColor: "#eff6ff",
-  },
-  priorityChipText: {
-    fontSize: 13,
-    color: "#6b7280",
-  },
-  createBtn: {
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  createBtnDisabled: {
-    opacity: 0.5,
-  },
-  createBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  cancelBtn: {
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  cancelBtnText: {
-    fontSize: 15,
-    color: "#6b7280",
-  },
-  templateBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    paddingVertical: 10,
-    backgroundColor: "#fff",
-  },
-  templateBtnText: {
-    fontSize: 14,
-    color: "#374151",
-    fontWeight: "500",
-  },
-  assigneeSelector: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  assigneePlaceholder: {
-    color: "#9ca3af",
-    fontSize: 15,
-  },
-  assigneeChips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  assigneeChip: {
-    backgroundColor: "#dbeafe",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  assigneeChipText: {
-    fontSize: 13,
-    color: "#1d4ed8",
-    fontWeight: "500",
-  },
-  tagChip: {
-    backgroundColor: "#f3f4f6",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  tagChipText: {
-    fontSize: 13,
-    color: "#374151",
-    fontWeight: "500",
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "#f9fafb",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    backgroundColor: "#fff",
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  modalDone: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2563eb",
-  },
-  profileRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    gap: 12,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  profileRowSelected: {
-    backgroundColor: "#eff6ff",
-  },
-  profileName: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: "#111827",
-  },
-  profileUsername: {
-    fontSize: 12,
-    color: "#9ca3af",
-    marginTop: 1,
-  },
-  checkmark: {
-    fontSize: 18,
-    color: "#2563eb",
-    fontWeight: "700",
-  },
-});

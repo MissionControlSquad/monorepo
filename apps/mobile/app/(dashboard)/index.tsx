@@ -3,7 +3,6 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   RefreshControl,
   ScrollView,
@@ -56,6 +55,25 @@ const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "blocked", label: "Blocked" },
 ];
 
+const FilterChip = ({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) => (
+  <TouchableOpacity
+    className={`px-3 py-1.5 rounded-full border ${active ? "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700" : "bg-gray-100 dark:bg-slate-700 border-gray-200 dark:border-slate-600"}`}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
+    <Text className={`text-[12px] ${active ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
 
 export default function TaskListScreen() {
   const router = useRouter();
@@ -108,7 +126,7 @@ export default function TaskListScreen() {
 
   if (fetching && allTasks.length === 0) {
     return (
-      <View style={styles.center}>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900 gap-3">
         <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
@@ -116,22 +134,22 @@ export default function TaskListScreen() {
 
   if (error && allTasks.length === 0) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Failed to load tasks</Text>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900 gap-3">
+        <Text className="text-red-600 dark:text-red-400 text-base">Failed to load tasks</Text>
         <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
-          <Text style={styles.retryText}>Retry</Text>
+          <Text className="text-blue-600 dark:text-blue-400 text-sm font-semibold">Retry</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900">
       {/* Search bar + view toggle */}
-      <View style={styles.searchBar}>
-        <Text style={styles.searchIcon}>🔍</Text>
+      <View className="flex-row items-center bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-3 py-2 gap-2">
+        <Text className="text-sm">🔍</Text>
         <TextInput
-          style={styles.searchInput}
+          className="flex-1 text-[15px] text-gray-900 dark:text-slate-100 py-1.5 px-1"
           placeholder="Search tasks…"
           placeholderTextColor="#9ca3af"
           value={search}
@@ -141,19 +159,19 @@ export default function TaskListScreen() {
         />
         <TouchableOpacity
           onPress={() => setFiltersOpen((v) => !v)}
-          style={[styles.viewToggle, filtersOpen && styles.viewToggleActive]}
+          className={`p-1 relative ${filtersOpen ? "bg-blue-50 dark:bg-blue-900/20 rounded-lg" : ""}`}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name="options-outline" size={20} color={filtersOpen ? "#2563eb" : "#6b7280"} />
           {activeFilterCount > 0 && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            <View className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-blue-600 justify-center items-center">
+              <Text className="text-[9px] text-white font-bold">{activeFilterCount}</Text>
             </View>
           )}
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setViewMode((m) => (m === "list" ? "kanban" : "list"))}
-          style={styles.viewToggle}
+          className="p-1"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons
@@ -166,83 +184,41 @@ export default function TaskListScreen() {
 
       {/* Advanced filter panel */}
       {filtersOpen && (
-        <View style={styles.filterPanel}>
-          {/* Due date */}
-          <Text style={styles.filterSectionLabel}>Due Date</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterRow}
-          >
+        <View className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3.5 pt-2.5 pb-3 gap-2">
+          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Due Date</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
             {DUE_DATE_OPTIONS.map((opt) => (
-              <TouchableOpacity
+              <FilterChip
                 key={opt.key}
-                style={[styles.filterChip, dueDateFilter === opt.key && styles.filterChipActive]}
+                label={opt.label}
+                active={dueDateFilter === opt.key}
                 onPress={() => setDueDateFilter(dueDateFilter === opt.key ? "" : opt.key)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.filterChipText, dueDateFilter === opt.key && styles.filterChipTextActive]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
 
-          {/* Priority filter */}
-          <Text style={styles.filterSectionLabel}>Priority</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterRow}
-          >
+          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Priority</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
             {PRIORITY_OPTIONS.map((opt) => (
-              <TouchableOpacity
+              <FilterChip
                 key={opt.key}
-                style={[styles.filterChip, priorityFilter === opt.key && styles.filterChipActive]}
+                label={opt.label}
+                active={priorityFilter === opt.key}
                 onPress={() => setPriorityFilter(priorityFilter === opt.key ? "" : opt.key)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.filterChipText, priorityFilter === opt.key && styles.filterChipTextActive]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
 
-          {/* Toggle filters */}
-          <Text style={styles.filterSectionLabel}>More Filters</Text>
-          <View style={styles.filterRow}>
-            <TouchableOpacity
-              style={[styles.filterChip, blockedOnly && styles.filterChipActive]}
-              onPress={() => setBlockedOnly((v) => !v)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterChipText, blockedOnly && styles.filterChipTextActive]}>
-                Blocked only
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.filterChip, topLevelOnly && styles.filterChipActive]}
-              onPress={() => setTopLevelOnly((v) => !v)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterChipText, topLevelOnly && styles.filterChipTextActive]}>
-                Top-level only
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.filterChip, unassignedOnly && styles.filterChipActive]}
-              onPress={() => setUnassignedOnly((v) => !v)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterChipText, unassignedOnly && styles.filterChipTextActive]}>
-                Unassigned only
-              </Text>
-            </TouchableOpacity>
+          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">More Filters</Text>
+          <View className="flex-row flex-wrap gap-2">
+            <FilterChip label="Blocked only" active={blockedOnly} onPress={() => setBlockedOnly((v) => !v)} />
+            <FilterChip label="Top-level only" active={topLevelOnly} onPress={() => setTopLevelOnly((v) => !v)} />
+            <FilterChip label="Unassigned only" active={unassignedOnly} onPress={() => setUnassignedOnly((v) => !v)} />
           </View>
 
           {activeFilterCount > 0 && (
             <TouchableOpacity
+              className="self-start mt-0.5"
               onPress={() => {
                 setDueDateFilter("");
                 setPriorityFilter("");
@@ -250,9 +226,8 @@ export default function TaskListScreen() {
                 setTopLevelOnly(false);
                 setUnassignedOnly(false);
               }}
-              style={styles.clearFiltersBtn}
             >
-              <Text style={styles.clearFiltersBtnText}>Clear all filters</Text>
+              <Text className="text-[12px] text-red-600 dark:text-red-400 font-semibold">Clear all filters</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -278,18 +253,18 @@ export default function TaskListScreen() {
             showsVerticalScrollIndicator={false}
             bounces={false}
             directionalLockEnabled={true}
-            style={styles.filterBar}
-            contentContainerStyle={styles.filterContent}
+            className="h-[52px] bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
+            contentContainerStyle={{ paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 }}
           >
             {FILTERS.map((f) => {
               const count = f.key === "all" ? allTasks.length : allTasks.filter((t) => t.status === f.key).length;
               return (
                 <TouchableOpacity
                   key={f.key}
-                  style={[styles.chip, filter === f.key && styles.chipActive]}
+                  className={`px-3.5 py-2 rounded-full ${filter === f.key ? "bg-blue-100 dark:bg-blue-900/30" : "bg-gray-100 dark:bg-slate-700"}`}
                   onPress={() => setFilter(f.key)}
                 >
-                  <Text style={[styles.chipText, filter === f.key && styles.chipTextActive]}>
+                  <Text className={`text-[13px] ${filter === f.key ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
                     {f.label} ({count})
                   </Text>
                 </TouchableOpacity>
@@ -301,8 +276,8 @@ export default function TaskListScreen() {
             data={tasks}
             keyExtractor={(item) => item.id}
             contentContainerStyle={[
-              styles.listContent,
-              tasks.length === 0 && styles.emptyContainer,
+              { padding: 16, gap: 10, paddingBottom: 90 },
+              tasks.length === 0 && { flex: 1, justifyContent: "center", alignItems: "center" },
             ]}
             refreshControl={
               <RefreshControl
@@ -324,7 +299,7 @@ export default function TaskListScreen() {
               ) : null
             }
             ListEmptyComponent={
-              <Text style={styles.emptyText}>
+              <Text className="text-gray-400 dark:text-slate-500 text-base">
                 {activeFilterCount > 0 || filter !== "all"
                   ? "No tasks match the current filters"
                   : "No tasks yet"}
@@ -342,99 +317,20 @@ export default function TaskListScreen() {
 
       {/* FAB — Create task */}
       <TouchableOpacity
-        style={[styles.fab, { bottom: insets.bottom + 20 }]}
+        className="absolute right-5 w-[52px] h-[52px] rounded-full bg-blue-600 justify-center items-center"
+        style={{
+          bottom: insets.bottom + 20,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.2,
+          shadowRadius: 6,
+          elevation: 6,
+        }}
         onPress={() => router.push("/task/create")}
         activeOpacity={0.85}
       >
-        <Text style={styles.fabIcon}>+</Text>
+        <Text className="text-[28px] text-white leading-8">+</Text>
       </TouchableOpacity>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9fafb" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#f9fafb", gap: 12 },
-  errorText: { color: "#dc2626", fontSize: 16 },
-  retryText: { color: "#2563eb", fontSize: 14, fontWeight: "600" },
-
-  filterBar: { height: 52, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
-  filterContent: { paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#f3f4f6" },
-  chipActive: { backgroundColor: "#dbeafe" },
-  chipText: { fontSize: 13, color: "#6b7280", fontWeight: "500" },
-  chipTextActive: { color: "#2563eb", fontWeight: "600" },
-
-  listContent: { padding: 16, gap: 10, paddingBottom: 90 },
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { color: "#9ca3af", fontSize: 16 },
-
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  searchIcon: { fontSize: 14 },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: "#111827",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-  },
-  viewToggle: { padding: 4, position: "relative" },
-  viewToggleActive: { backgroundColor: "#eff6ff", borderRadius: 8 },
-
-  filterBadge: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#2563eb",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  filterBadgeText: { fontSize: 9, color: "#fff", fontWeight: "700" },
-
-  filterPanel: {
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 12,
-    gap: 8,
-  },
-  filterSectionLabel: { fontSize: 11, fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.5 },
-  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: "#f3f4f6", borderWidth: 1, borderColor: "#e5e7eb" },
-  filterChipActive: { backgroundColor: "#dbeafe", borderColor: "#93c5fd" },
-  filterChipText: { fontSize: 12, color: "#6b7280", fontWeight: "500" },
-  filterChipTextActive: { color: "#2563eb", fontWeight: "600" },
-  clearFiltersBtn: { alignSelf: "flex-start", marginTop: 2 },
-  clearFiltersBtnText: { fontSize: 12, color: "#dc2626", fontWeight: "600" },
-
-  fab: {
-    position: "absolute",
-    right: 20,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#2563eb",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  fabIcon: { fontSize: 28, color: "#fff", lineHeight: 32 },
-});

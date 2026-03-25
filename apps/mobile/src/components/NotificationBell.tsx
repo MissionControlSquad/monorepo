@@ -11,25 +11,12 @@ export function NotificationBell({ onPress, color }: NotificationBellProps) {
   const count = useNotificationCount();
 
   return (
-    <TouchableOpacity onPress={onPress} style={{ padding: 8 }}>
+    <TouchableOpacity onPress={onPress} className="p-2">
       <View>
         <Ionicons name="notifications-outline" size={24} color={color} />
         {count > 0 && (
-          <View
-            style={{
-              position: "absolute",
-              top: -2,
-              right: -2,
-              minWidth: 16,
-              height: 16,
-              borderRadius: 8,
-              backgroundColor: "#dc2626",
-              justifyContent: "center",
-              alignItems: "center",
-              paddingHorizontal: 3,
-            }}
-          >
-            <Text style={{ fontSize: 9, color: "#fff", fontWeight: "700" }}>
+          <View className="absolute -top-0.5 -right-0.5 min-w-4 h-4 rounded-full bg-red-600 justify-center items-center px-[3px]">
+            <Text className="text-[9px] text-white font-bold">
               {count > 99 ? "99+" : String(count)}
             </Text>
           </View>

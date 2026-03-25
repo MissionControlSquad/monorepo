@@ -2,7 +2,6 @@ import {
   View,
   Text,
   ScrollView,
-  StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
   Linking,
@@ -11,7 +10,6 @@ import {
   useWindowDimensions,
   Modal,
   FlatList,
-  Pressable,
 } from "react-native";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useQuery } from "urql";
@@ -80,71 +78,76 @@ function DeliverableContent({
 }) {
   if (kind === "link" && url) {
     return (
-      <View style={styles.contentCard}>
-        <Text style={styles.sectionLabel}>URL</Text>
+      <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">URL</Text>
         <TouchableOpacity onPress={() => Linking.openURL(url)} activeOpacity={0.7}>
-          <Text style={styles.linkText}>{url}</Text>
+          <Text className="text-[14px] text-blue-600 dark:text-blue-400 underline">{url}</Text>
         </TouchableOpacity>
       </View>
     );
   }
   if (kind === "code" && content) {
     return (
-      <View style={styles.contentCard}>
-        <Text style={styles.sectionLabel}>
+      <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">
           Code{language ? ` · ${language}` : ""}
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator>
-          <Text style={styles.codeText}>{content}</Text>
+          <Text
+            className="text-[13px] text-indigo-900 dark:text-indigo-200 bg-violet-50 dark:bg-slate-900 p-3 rounded-lg leading-5"
+            style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
+          >
+            {content}
+          </Text>
         </ScrollView>
       </View>
     );
   }
   if (kind === "markdown" && content) {
     return (
-      <View style={styles.contentCard}>
-        <Text style={styles.sectionLabel}>Content</Text>
+      <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Content</Text>
         <SimpleMarkdown content={content} />
       </View>
     );
   }
   if (kind === "file" && url && isImageMime(mimeType)) {
     return (
-      <View style={styles.contentCard}>
-        <Text style={styles.sectionLabel}>Preview</Text>
+      <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Preview</Text>
         <Image
           source={{ uri: url }}
           style={{ width: width - 64, height: (width - 64) * 0.6, borderRadius: 8 }}
           resizeMode="contain"
         />
         <TouchableOpacity
-          style={[styles.downloadBtn, { marginTop: 8 }]}
+          className="bg-blue-600 rounded-[10px] py-3 items-center mt-2"
           onPress={() => Linking.openURL(url)}
           activeOpacity={0.7}
         >
-          <Text style={styles.downloadBtnText}>📥 Open Full Image</Text>
+          <Text className="text-white text-[15px] font-semibold">📥 Open Full Image</Text>
         </TouchableOpacity>
       </View>
     );
   }
   if (url) {
     return (
-      <View style={styles.contentCard}>
+      <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700">
         <TouchableOpacity
-          style={styles.downloadBtn}
+          className="bg-blue-600 rounded-[10px] py-3 items-center"
           onPress={() => Linking.openURL(url)}
           activeOpacity={0.7}
         >
-          <Text style={styles.downloadBtnText}>📥 Open / Download File</Text>
+          <Text className="text-white text-[15px] font-semibold">📥 Open / Download File</Text>
         </TouchableOpacity>
       </View>
     );
   }
   if (content) {
     return (
-      <View style={styles.contentCard}>
-        <Text style={styles.sectionLabel}>Content</Text>
-        <Text style={styles.markdownText}>{content}</Text>
+      <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Content</Text>
+        <Text className="text-[15px] text-gray-700 dark:text-slate-300 leading-6">{content}</Text>
       </View>
     );
   }
@@ -185,37 +188,37 @@ function VersionHistoryModal({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <View style={[vhStyles.container, { paddingTop: insets.top || 16 }]}>
-        <View style={vhStyles.header}>
-          <Text style={vhStyles.title}>Version History</Text>
+      <View className="flex-1 bg-gray-50 dark:bg-slate-900" style={{ paddingTop: insets.top || 16 }}>
+        <View className="flex-row justify-between items-center px-4 py-3.5 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
+          <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">Version History</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Text style={vhStyles.closeBtn}>Done</Text>
+            <Text className="text-base text-blue-600 dark:text-blue-400 font-semibold">Done</Text>
           </TouchableOpacity>
         </View>
 
         {fetching && versions.length === 0 ? (
-          <View style={vhStyles.center}>
+          <View className="flex-1 justify-center items-center">
             <ActivityIndicator size="large" color="#2563eb" />
           </View>
         ) : error && versions.length === 0 ? (
-          <View style={vhStyles.center}>
-            <Text style={vhStyles.errorText}>Failed to load versions</Text>
+          <View className="flex-1 justify-center items-center">
+            <Text className="text-red-600 dark:text-red-400 text-[15px]">Failed to load versions</Text>
           </View>
         ) : versions.length === 0 ? (
-          <View style={vhStyles.center}>
-            <Text style={vhStyles.emptyText}>No version history yet</Text>
+          <View className="flex-1 justify-center items-center">
+            <Text className="text-gray-400 dark:text-slate-500 text-[15px]">No version history yet</Text>
           </View>
         ) : (
           <FlatList
             data={versions}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={[vhStyles.list, { paddingBottom: insets.bottom + 16 }]}
-            ItemSeparatorComponent={() => <View style={vhStyles.separator} />}
+            contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 16 }}
+            ItemSeparatorComponent={() => <View className="h-px bg-gray-100 dark:bg-slate-700" />}
             renderItem={({ item }) => {
               const isCurrent = item.version === currentVersion;
               return (
                 <TouchableOpacity
-                  style={vhStyles.versionRow}
+                  className="bg-white dark:bg-slate-800 px-4 py-3.5 flex-row items-center justify-between"
                   onPress={() => {
                     onSelectVersion(item);
                     onClose();
@@ -223,25 +226,25 @@ function VersionHistoryModal({
                   activeOpacity={0.7}
                   disabled={isCurrent}
                 >
-                  <View style={vhStyles.versionLeft}>
-                    <View style={vhStyles.versionNumRow}>
-                      <Text style={vhStyles.versionNum}>v{item.version}</Text>
+                  <View className="flex-1 gap-0.5">
+                    <View className="flex-row items-center gap-2">
+                      <Text className="text-[15px] font-bold text-gray-900 dark:text-slate-100">v{item.version}</Text>
                       {isCurrent && (
-                        <View style={vhStyles.currentBadge}>
-                          <Text style={vhStyles.currentBadgeText}>Current</Text>
+                        <View className="bg-blue-100 dark:bg-blue-900/30 rounded-[6px] px-1.5 py-0.5">
+                          <Text className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold">Current</Text>
                         </View>
                       )}
                     </View>
-                    <Text style={vhStyles.versionDate}>{formatDate(item.createdAt)}</Text>
+                    <Text className="text-[12px] text-gray-500 dark:text-slate-400">{formatDate(item.createdAt)}</Text>
                     {item.editedByProfile && (
-                      <Text style={vhStyles.versionAuthor}>by {item.editedByProfile.displayName}</Text>
+                      <Text className="text-[12px] text-gray-400 dark:text-slate-500">by {item.editedByProfile.displayName}</Text>
                     )}
-                    {item.title !== undefined && item.title && (
-                      <Text style={vhStyles.versionTitle} numberOfLines={1}>{item.title}</Text>
+                    {item.title && (
+                      <Text className="text-[13px] text-gray-700 dark:text-slate-300 mt-0.5" numberOfLines={1}>{item.title}</Text>
                     )}
                   </View>
                   {!isCurrent && (
-                    <Text style={vhStyles.viewBtn}>View →</Text>
+                    <Text className="text-[14px] text-blue-600 dark:text-blue-400 font-semibold ml-3">View →</Text>
                   )}
                 </TouchableOpacity>
               );
@@ -252,50 +255,6 @@ function VersionHistoryModal({
     </Modal>
   );
 }
-
-const vhStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9fafb" },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-  },
-  title: { fontSize: 17, fontWeight: "700", color: "#111827" },
-  closeBtn: { fontSize: 16, color: "#2563eb", fontWeight: "600" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  errorText: { color: "#dc2626", fontSize: 15 },
-  emptyText: { color: "#9ca3af", fontSize: 15 },
-  list: { padding: 16, gap: 0 },
-  separator: { height: 1, backgroundColor: "#f3f4f6" },
-  versionRow: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderRadius: 0,
-  },
-  versionLeft: { flex: 1, gap: 2 },
-  versionNumRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  versionNum: { fontSize: 15, fontWeight: "700", color: "#111827" },
-  currentBadge: {
-    backgroundColor: "#dbeafe",
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  currentBadgeText: { fontSize: 11, color: "#2563eb", fontWeight: "600" },
-  versionDate: { fontSize: 12, color: "#6b7280" },
-  versionAuthor: { fontSize: 12, color: "#9ca3af" },
-  versionTitle: { fontSize: 13, color: "#374151", marginTop: 2 },
-  viewBtn: { fontSize: 14, color: "#2563eb", fontWeight: "600", marginLeft: 12 },
-});
 
 // ── Version Preview Modal ─────────────────────────────────────────────────────
 
@@ -322,32 +281,35 @@ function VersionPreviewModal({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <View style={[vpStyles.container, { paddingTop: insets.top || 16 }]}>
-        <View style={vpStyles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={vpStyles.title} numberOfLines={1}>{version.title}</Text>
-            <Text style={vpStyles.subtitle}>Version {version.version} · {formatDate(version.createdAt)}</Text>
+      <View className="flex-1 bg-gray-50 dark:bg-slate-900" style={{ paddingTop: insets.top || 16 }}>
+        <View className="flex-row justify-between items-start px-4 py-3.5 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 gap-3">
+          <View className="flex-1">
+            <Text className="text-base font-bold text-gray-900 dark:text-slate-100" numberOfLines={1}>{version.title}</Text>
+            <Text className="text-[12px] text-gray-500 dark:text-slate-400 mt-0.5">Version {version.version} · {formatDate(version.createdAt)}</Text>
           </View>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Text style={vpStyles.closeBtn}>Done</Text>
+            <Text className="text-base text-blue-600 dark:text-blue-400 font-semibold pt-0.5">Done</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView
-          contentContainerStyle={[vpStyles.content, { paddingBottom: insets.bottom + 16 }]}
+          contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 16 }}
           contentInsetAdjustmentBehavior="automatic"
         >
-          <View style={[vpStyles.kindBadge, { backgroundColor: kindColor + "18" }]}>
-            <Text style={vpStyles.kindIcon}>{KIND_ICONS[version.kind] ?? "📄"}</Text>
-            <Text style={[vpStyles.kindText, { color: kindColor }]}>
+          <View
+            className="flex-row items-center gap-1.5 rounded-lg px-2.5 py-[5px] self-start"
+            style={{ backgroundColor: kindColor + "18" }}
+          >
+            <Text className="text-[14px]">{KIND_ICONS[version.kind] ?? "📄"}</Text>
+            <Text className="text-[13px] font-semibold capitalize" style={{ color: kindColor }}>
               {version.kind} · v{version.version}
             </Text>
           </View>
 
           {version.editedByProfile && (
-            <View style={vpStyles.metaRow}>
-              <Text style={vpStyles.metaKey}>Edited by</Text>
-              <Text style={vpStyles.metaValue}>{version.editedByProfile.displayName}</Text>
+            <View className="flex-row justify-between bg-white dark:bg-slate-800 rounded-[10px] p-3 border border-gray-200 dark:border-slate-700">
+              <Text className="text-[13px] text-gray-500 dark:text-slate-400">Edited by</Text>
+              <Text className="text-[13px] text-gray-900 dark:text-slate-100 font-medium">{version.editedByProfile.displayName}</Text>
             </View>
           )}
 
@@ -364,47 +326,6 @@ function VersionPreviewModal({
     </Modal>
   );
 }
-
-const vpStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9fafb" },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    gap: 12,
-  },
-  title: { fontSize: 16, fontWeight: "700", color: "#111827" },
-  subtitle: { fontSize: 12, color: "#6b7280", marginTop: 2 },
-  closeBtn: { fontSize: 16, color: "#2563eb", fontWeight: "600", paddingTop: 2 },
-  content: { padding: 16, gap: 12 },
-  kindBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    alignSelf: "flex-start",
-  },
-  kindIcon: { fontSize: 14 },
-  kindText: { fontSize: 13, fontWeight: "600", textTransform: "capitalize" },
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  metaKey: { fontSize: 13, color: "#6b7280" },
-  metaValue: { fontSize: 13, color: "#111827", fontWeight: "500" },
-});
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
@@ -443,7 +364,7 @@ export default function DeliverableScreen() {
 
   if (fetching && !d) {
     return (
-      <View style={styles.center}>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
         <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
@@ -451,8 +372,8 @@ export default function DeliverableScreen() {
 
   if (error || !d) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Deliverable not found</Text>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
+        <Text className="text-base text-red-600 dark:text-red-400">Deliverable not found</Text>
       </View>
     );
   }
@@ -461,21 +382,28 @@ export default function DeliverableScreen() {
 
   return (
     <>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={[styles.kindBadge, { backgroundColor: kindColor + "18" }]}>
-            <Text style={styles.kindIcon}>{KIND_ICONS[d.kind] ?? "📄"}</Text>
-            <Text style={[styles.kindText, { color: kindColor }]}>
+      <ScrollView
+        className="flex-1 bg-gray-50 dark:bg-slate-900"
+        contentContainerStyle={{ padding: 16, gap: 12 }}
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        {/* Kind badge */}
+        <View className="flex-row items-center">
+          <View
+            className="flex-row items-center gap-1.5 rounded-lg px-2.5 py-[5px]"
+            style={{ backgroundColor: kindColor + "18" }}
+          >
+            <Text className="text-[14px]">{KIND_ICONS[d.kind] ?? "📄"}</Text>
+            <Text className="text-[13px] font-semibold capitalize" style={{ color: kindColor }}>
               {d.kind} · v{d.version}
             </Text>
           </View>
         </View>
 
-        <Text style={styles.title}>{d.title}</Text>
+        <Text className="text-[20px] font-bold text-gray-900 dark:text-slate-100 leading-7">{d.title}</Text>
 
         {/* Meta */}
-        <View style={styles.metaCard}>
+        <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
           <MetaRow label="Author" value={d.profile.displayName} />
           <MetaRow label="Created" value={formatDateWithTime(d.createdAt)} />
           {d.task && (
@@ -488,13 +416,13 @@ export default function DeliverableScreen() {
 
         {/* Version History Button */}
         <TouchableOpacity
-          style={styles.historyBtn}
+          className="flex-row items-center gap-2 bg-white dark:bg-slate-800 rounded-[12px] p-3.5 border border-gray-200 dark:border-slate-700"
           onPress={() => setShowVersionHistory(true)}
           activeOpacity={0.7}
         >
-          <Text style={styles.historyBtnIcon}>🕐</Text>
-          <Text style={styles.historyBtnText}>Version History</Text>
-          <Text style={styles.historyBtnChevron}>›</Text>
+          <Text className="text-base">🕐</Text>
+          <Text className="flex-1 text-[14px] text-gray-700 dark:text-slate-300 font-medium">Version History</Text>
+          <Text className="text-[18px] text-gray-400 dark:text-slate-500">›</Text>
         </TouchableOpacity>
 
         {/* Content */}
@@ -527,116 +455,9 @@ export default function DeliverableScreen() {
 
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.metaRow}>
-      <Text style={styles.metaKey}>{label}</Text>
-      <Text style={styles.metaValue} numberOfLines={2}>{value}</Text>
+    <View className="flex-row justify-between gap-3">
+      <Text className="text-[13px] text-gray-500 dark:text-slate-400 w-20">{label}</Text>
+      <Text className="text-[13px] text-gray-900 dark:text-slate-100 flex-1 text-right" numberOfLines={2}>{value}</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9fafb" },
-  content: { padding: 16, gap: 12 },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-  },
-  errorText: { color: "#dc2626", fontSize: 16 },
-
-  header: { flexDirection: "row", alignItems: "center" },
-  kindBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  kindIcon: { fontSize: 14 },
-  kindText: { fontSize: 13, fontWeight: "600", textTransform: "capitalize" },
-
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#111827",
-    lineHeight: 28,
-  },
-
-  metaCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 10,
-  },
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  metaKey: { fontSize: 13, color: "#6b7280", width: 80 },
-  metaValue: { fontSize: 13, color: "#111827", flex: 1, textAlign: "right" },
-
-  historyBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 8,
-  },
-  historyBtnIcon: { fontSize: 16 },
-  historyBtnText: { flex: 1, fontSize: 14, color: "#374151", fontWeight: "500" },
-  historyBtnChevron: { fontSize: 18, color: "#9ca3af" },
-
-  contentCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 10,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#9ca3af",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  markdownText: {
-    fontSize: 15,
-    color: "#374151",
-    lineHeight: 24,
-  },
-  codeText: {
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-    fontSize: 13,
-    color: "#1e1b4b",
-    lineHeight: 20,
-    backgroundColor: "#f5f3ff",
-    padding: 12,
-    borderRadius: 8,
-  },
-  linkText: {
-    fontSize: 14,
-    color: "#2563eb",
-    textDecorationLine: "underline",
-  },
-  downloadBtn: {
-    backgroundColor: "#2563eb",
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  downloadBtnText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-});
