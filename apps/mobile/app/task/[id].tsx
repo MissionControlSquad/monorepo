@@ -212,6 +212,184 @@ function RejectModal({
   );
 }
 
+// ── Clarify Modal ─────────────────────────────────────────────────────────────
+
+function ClarifyModal({
+  visible,
+  onClose,
+  onConfirm,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: (questions: string[]) => void;
+}) {
+  const [questionText, setQuestionText] = useState("");
+  const [questions, setQuestions] = useState<string[]>([]);
+
+  function addQuestion() {
+    const t = questionText.trim();
+    if (!t) return;
+    setQuestions((q) => [...q, t]);
+    setQuestionText("");
+  }
+
+  function removeQuestion(i: number) {
+    setQuestions((q) => q.filter((_, idx) => idx !== i));
+  }
+
+  function handleConfirm() {
+    if (questions.length === 0 && !questionText.trim()) {
+      Alert.alert("Error", "Add at least one question");
+      return;
+    }
+    const all = questionText.trim()
+      ? [...questions, questionText.trim()]
+      : questions;
+    onConfirm(all);
+    setQuestionText("");
+    setQuestions([]);
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Request Clarification</Text>
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+              <Text style={{ fontSize: 22, color: "#374151" }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
+            <View style={{ gap: 6 }}>
+              <Text style={styles.rejectLabel}>Questions</Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TextInput
+                  style={[styles.rejectInput, { flex: 1 }]}
+                  value={questionText}
+                  onChangeText={setQuestionText}
+                  placeholder="Add a question"
+                  returnKeyType="done"
+                  onSubmitEditing={addQuestion}
+                />
+                <TouchableOpacity style={styles.addChangeBtn} onPress={addQuestion}>
+                  <Text style={styles.addChangeBtnText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+              {questions.map((q, i) => (
+                <View key={i} style={styles.changeItem}>
+                  <Text style={styles.changeText} numberOfLines={2}>• {q}</Text>
+                  <TouchableOpacity onPress={() => removeQuestion(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={{ color: "#dc2626", fontSize: 16 }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={[styles.rejectConfirmBtn, { backgroundColor: "#7c3aed" }]}
+              onPress={handleConfirm}
+            >
+              <Text style={styles.rejectConfirmBtnText}>Send Questions</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ── Approve Modal ─────────────────────────────────────────────────────────────
+
+function ApproveModal({
+  visible,
+  onClose,
+  onConfirm,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: (comment: string, childTasks: Array<{ title: string; description?: string }>) => void;
+}) {
+  const [comment, setComment] = useState("");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [childTasks, setChildTasks] = useState<Array<{ title: string }>>([]);
+
+  function addChildTask() {
+    const t = taskTitle.trim();
+    if (!t) return;
+    setChildTasks((c) => [...c, { title: t }]);
+    setTaskTitle("");
+  }
+
+  function removeChildTask(i: number) {
+    setChildTasks((c) => c.filter((_, idx) => idx !== i));
+  }
+
+  function handleConfirm() {
+    onConfirm(comment.trim(), childTasks);
+    setComment("");
+    setTaskTitle("");
+    setChildTasks([]);
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Approve Task</Text>
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+              <Text style={{ fontSize: 22, color: "#374151" }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
+            <View style={{ gap: 6 }}>
+              <Text style={styles.rejectLabel}>Approval Comment (optional)</Text>
+              <TextInput
+                style={[styles.rejectInput, { height: 72 }]}
+                value={comment}
+                onChangeText={setComment}
+                placeholder="Great work! The task looks good."
+                multiline
+                textAlignVertical="top"
+              />
+            </View>
+            <View style={{ gap: 6 }}>
+              <Text style={styles.rejectLabel}>Spawn Follow-up Tasks (optional)</Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TextInput
+                  style={[styles.rejectInput, { flex: 1 }]}
+                  value={taskTitle}
+                  onChangeText={setTaskTitle}
+                  placeholder="Follow-up task title"
+                  returnKeyType="done"
+                  onSubmitEditing={addChildTask}
+                />
+                <TouchableOpacity style={styles.addChangeBtn} onPress={addChildTask}>
+                  <Text style={styles.addChangeBtnText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+              {childTasks.map((ct, i) => (
+                <View key={i} style={styles.changeItem}>
+                  <Text style={styles.changeText} numberOfLines={1}>• {ct.title}</Text>
+                  <TouchableOpacity onPress={() => removeChildTask(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={{ color: "#dc2626", fontSize: 16 }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={[styles.rejectConfirmBtn, { backgroundColor: "#16a34a" }]}
+              onPress={handleConfirm}
+            >
+              <Text style={styles.rejectConfirmBtnText}>✓ Approve Task</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function TabBar({
@@ -788,40 +966,26 @@ function ApproveRejectBar({
   const { profileId } = useAuth();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState<"approve" | "reject" | "clarify" | null>(null);
+  const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showClarifyModal, setShowClarifyModal] = useState(false);
   const [, requestClarification] = useMutation(REQUEST_CLARIFICATION);
   const [, approveTask] = useMutation(APPROVE_TASK);
   const [, rejectTask] = useMutation(REJECT_TASK);
 
-  async function handleApprove() {
-    Alert.alert("Approve Task", "Add an optional approval comment?", [
-      {
-        text: "Approve without comment",
-        onPress: () => doApprove(""),
-      },
-      {
-        text: "Add Comment",
-        onPress: () => {
-          Alert.prompt(
-            "Approval Comment",
-            "Optional comment",
-            (comment) => doApprove(comment ?? ""),
-            "plain-text"
-          );
-        },
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
-  }
-
-  async function doApprove(comment: string) {
+  async function doApprove(
+    comment: string,
+    childTasks: Array<{ title: string; description?: string }>,
+  ) {
     if (!profileId) return;
+    setShowApproveModal(false);
     setLoading("approve");
     try {
       const res = await approveTask({
         reviewerId: profileId,
         taskId: task.id,
         approvalComment: comment || undefined,
+        childTasks: childTasks.length ? JSON.stringify(childTasks) : undefined,
       });
       if (res.error) Alert.alert("Error", res.error.message ?? "Failed to approve");
       else onDone();
@@ -830,25 +994,23 @@ function ApproveRejectBar({
     }
   }
 
-  async function handleClarify() {
-    Alert.prompt("Request Clarification", "What questions do you have? (separate multiple with newlines)", async (input) => {
-      if (!input?.trim() || !profileId) return;
-      const questions = input.split("\n").map((q) => q.trim()).filter(Boolean);
-      setLoading("clarify");
-      try {
-        const res = await requestClarification({ reviewerId: profileId, taskId: task.id, questions });
-        if (res.error) Alert.alert("Error", res.error.message ?? "Failed to request clarification");
-        else onDone();
-      } finally {
-        setLoading(null);
-      }
-    }, "plain-text");
+  async function doClarify(questions: string[]) {
+    if (!profileId) return;
+    setShowClarifyModal(false);
+    setLoading("clarify");
+    try {
+      const res = await requestClarification({ reviewerId: profileId, taskId: task.id, questions });
+      if (res.error) Alert.alert("Error", res.error.message ?? "Failed to request clarification");
+      else onDone();
+    } finally {
+      setLoading(null);
+    }
   }
 
   async function doReject(reason: string, changes: string[]) {
     if (!profileId) return;
-    setLoading("reject");
     setShowRejectModal(false);
+    setLoading("reject");
     try {
       const res = await rejectTask({
         reviewerId: profileId,
@@ -875,7 +1037,7 @@ function ApproveRejectBar({
         <View style={styles.approveRejectBtns}>
           <TouchableOpacity
             style={[styles.clarifyBtn, loading !== null && { opacity: 0.6 }]}
-            onPress={handleClarify}
+            onPress={() => setShowClarifyModal(true)}
             disabled={loading !== null}
           >
             {loading === "clarify" ? (
@@ -897,7 +1059,7 @@ function ApproveRejectBar({
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.approveBtn, loading !== null && { opacity: 0.6 }]}
-            onPress={handleApprove}
+            onPress={() => setShowApproveModal(true)}
             disabled={loading !== null}
           >
             {loading === "approve" ? (
@@ -908,10 +1070,20 @@ function ApproveRejectBar({
           </TouchableOpacity>
         </View>
       </View>
+      <ApproveModal
+        visible={showApproveModal}
+        onClose={() => setShowApproveModal(false)}
+        onConfirm={doApprove}
+      />
       <RejectModal
         visible={showRejectModal}
         onClose={() => setShowRejectModal(false)}
         onConfirm={doReject}
+      />
+      <ClarifyModal
+        visible={showClarifyModal}
+        onClose={() => setShowClarifyModal(false)}
+        onConfirm={doClarify}
       />
     </>
   );
