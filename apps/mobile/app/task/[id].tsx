@@ -18,6 +18,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   TASK_QUERY,
+  TASK_BY_NUMBER_QUERY,
   AGENTS_FOR_TASK_QUERY,
   PROJECTS_QUERY,
   MESSAGES_BY_TASK_QUERY,
@@ -1094,9 +1095,30 @@ export default function TaskDetailScreen() {
   const { profileId } = useAuth();
   const { colors } = useTheme();
 
+  // Notifications use task numbers (e.g. /task/42). Detect and resolve to db id.
+  const taskNumber = /^\d+$/.test(id ?? "") ? parseInt(id, 10) : null;
+
+  const [byNumberResult] = useQuery<{ taskByNumber: { id: string } | null }>({
+    query: TASK_BY_NUMBER_QUERY,
+    variables: { taskNumber: taskNumber ?? 0 },
+    pause: taskNumber === null,
+    requestPolicy: "cache-and-network",
+  });
+
+  // Once resolved, redirect to the canonical id route
+  useEffect(() => {
+    if (taskNumber !== null && byNumberResult.data) {
+      const resolvedId = byNumberResult.data.taskByNumber?.id;
+      if (resolvedId) {
+        router.replace(`/task/${resolvedId}` as Parameters<typeof router.replace>[0]);
+      }
+    }
+  }, [byNumberResult.data, taskNumber]);
+
   const [result, reexecute] = useQuery<{ task: Task | null }>({
     query: TASK_QUERY,
     variables: { id },
+    pause: taskNumber !== null, // wait for redirect when numeric
     requestPolicy: "cache-and-network",
   });
 
@@ -1179,6 +1201,24 @@ export default function TaskDetailScreen() {
       ]
     );
   };
+
+  // Numeric id — still resolving via taskByNumber
+  if (taskNumber !== null && byNumberResult.fetching) {
+    return (
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
+        <ActivityIndicator size="large" color="#2563eb" />
+      </View>
+    );
+  }
+
+  // Numeric id resolved but task doesn't exist
+  if (taskNumber !== null && byNumberResult.data && !byNumberResult.data.taskByNumber) {
+    return (
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
+        <Text className="text-red-600 text-base">Task not found</Text>
+      </View>
+    );
+  }
 
   if (fetching && !task) {
     return (

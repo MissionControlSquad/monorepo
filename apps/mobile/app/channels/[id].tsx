@@ -89,6 +89,7 @@ export default function ChannelDetailScreen() {
   const [profileSearch, setProfileSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [msgLimit, setMsgLimit] = useState(50);
   const listRef = useRef<FlatList>(null);
 
   const [channelResult, reexecuteChannel] = useQuery<{ channel: Channel | null }>({
@@ -99,7 +100,7 @@ export default function ChannelDetailScreen() {
 
   const [messagesResult, reexecute] = useQuery<{ channelMessages: Message[] }>({
     query: CHANNEL_MESSAGES_QUERY,
-    variables: { channelId: id, limit: 100 },
+    variables: { channelId: id, limit: msgLimit },
     requestPolicy: "cache-and-network",
   });
 
@@ -166,6 +167,8 @@ export default function ChannelDetailScreen() {
   useEffect(() => {
     if (channel) {
       navigation.setOptions({
+        headerBackTitle: "",
+        headerBackTitleVisible: false,
         title: channel.visibility === "dm"
           ? (channel.members.find((m) => m.profileId !== profileId)?.profile.displayName ?? channel.name)
           : channel.name,
@@ -276,6 +279,17 @@ export default function ChannelDetailScreen() {
         inverted
         contentContainerStyle={{ paddingVertical: 12 }}
         showsVerticalScrollIndicator={false}
+        onEndReached={() => {
+          if (!searchOpen && !fetching && baseMessages.length >= msgLimit) {
+            setMsgLimit((l) => l + 50);
+          }
+        }}
+        onEndReachedThreshold={0.3}
+        ListHeaderComponent={
+          !searchOpen && fetching && baseMessages.length > 0 ? (
+            <ActivityIndicator size="small" color="#2563eb" style={{ paddingVertical: 12 }} />
+          ) : null
+        }
         ListFooterComponent={
           pinnedMessages.length > 0 ? (
             <TouchableOpacity

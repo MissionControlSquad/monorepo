@@ -20,5 +20,6 @@ export function useHeaderOptions() {
     headerShadowVisible: false,
     /** Hide "Back" label on iOS — show chevron only */
     headerBackTitle: "",
+    headerBackTitleVisible: false,
   };
 }
