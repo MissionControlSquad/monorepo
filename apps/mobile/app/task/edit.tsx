@@ -107,22 +107,24 @@ export default function EditTaskScreen() {
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [parentTaskPickerOpen, setParentTaskPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [profilesResult] = useQuery<{ profiles: Profile[] }>({
     query: PROFILES_QUERY,
     variables: { limit: 100 },
-    pause: !assigneeModalOpen,
+    pause: !mounted || !assigneeModalOpen,
   });
 
   const [tasksResult] = useQuery<{ tasks: TaskOption[] }>({
     query: TASKS_QUERY,
     variables: { limit: 200 },
-    pause: !taskPickerOpen && !parentTaskPickerOpen,
+    pause: !mounted || (!taskPickerOpen && !parentTaskPickerOpen),
   });
 
   const [projectsResult] = useQuery<{ projects: ProjectOption[] }>({
     query: PROJECTS_QUERY,
-    pause: !projectPickerOpen || !!task?.projectId,
+    pause: !mounted || !projectPickerOpen || !!task?.projectId,
     requestPolicy: "cache-first",
   });
 

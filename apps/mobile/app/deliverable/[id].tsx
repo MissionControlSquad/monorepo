@@ -341,10 +341,14 @@ export default function DeliverableScreen() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [previewVersion, setPreviewVersion] = useState<DeliverableVersion | null>(null);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [result] = useQuery<{ deliverable: Deliverable | null }>({
     query: DELIVERABLE_QUERY,
     variables: { id },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const { data, fetching, error } = result;

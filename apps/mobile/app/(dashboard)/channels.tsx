@@ -95,24 +95,27 @@ export default function ChannelsScreen() {
   const [{ fetching: startingDm }, executeStartConversation] = useMutation(START_CONVERSATION);
   const [, executeCreateChannel] = useMutation(CREATE_CHANNEL);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [result, reexecute] = useQuery<{ channels: Channel[] }>({
     query: CHANNELS_QUERY,
     variables: { profileId: profileId ?? undefined, limit },
     requestPolicy: "cache-and-network",
-    pause: !profileId,
+    pause: !mounted || !profileId,
   });
 
   const [dmsResult, reexecuteDms] = useQuery<{ channels: Channel[] }>({
     query: CHANNELS_QUERY,
     variables: { profileId: profileId ?? undefined, visibility: "dm", limit: 100 },
     requestPolicy: "cache-and-network",
-    pause: !profileId,
+    pause: !mounted || !profileId,
   });
 
   const [profilesResult] = useQuery<{ profiles: { id: string; displayName: string; username: string; avatarUrl: string | null; kind: string }[] }>({
     query: PROFILES_QUERY,
     variables: { limit: 200 },
-    pause: !dmPickerOpen,
+    pause: !mounted || !dmPickerOpen,
   });
 
   async function handleCreateChannel() {

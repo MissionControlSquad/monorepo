@@ -108,32 +108,36 @@ export default function AgentDetailScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const { colors } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [agentResult, reexecuteAgent] = useQuery<{ agent: Agent | null }>({
     query: AGENT_QUERY, variables: { id }, requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
   const [statsResult] = useQuery<{ agentProfileStats: AgentStats | null }>({
     query: AGENT_PROFILE_STATS_QUERY, variables: { agentId: id }, requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
   const [queueResult, reexecuteQueue] = useQuery<{ agentQueueByAgent: QueueItem[] }>({
     query: AGENT_QUEUE_BY_AGENT_QUERY, variables: { agentId: id },
-    requestPolicy: "cache-and-network", pause: activeTab !== "queue",
+    requestPolicy: "cache-and-network", pause: !mounted || activeTab !== "queue",
   });
   const [activityResult, reexecuteActivity] = useQuery<{ agentActionsByAgent: AgentAction[] }>({
     query: AGENT_ACTIONS_BY_AGENT_QUERY, variables: { agentId: id, limit: 60 },
-    requestPolicy: "cache-and-network", pause: activeTab !== "activity",
+    requestPolicy: "cache-and-network", pause: !mounted || activeTab !== "activity",
   });
   const [historyResult, reexecuteHistory] = useQuery<{ agentStatusHistory: StatusHistory[] }>({
     query: AGENT_STATUS_HISTORY_QUERY, variables: { agentId: id, limit: 50 },
-    requestPolicy: "cache-and-network", pause: activeTab !== "history",
+    requestPolicy: "cache-and-network", pause: !mounted || activeTab !== "history",
   });
   const [tasksResult, reexecuteTasks] = useQuery<{ tasksByStatusForAgent: Record<string, AgentTask[]> }>({
     query: TASKS_BY_STATUS_FOR_AGENT_QUERY, variables: { agentId: id },
-    requestPolicy: "cache-and-network", pause: activeTab !== "tasks",
+    requestPolicy: "cache-and-network", pause: !mounted || activeTab !== "tasks",
   });
   const [deliverablesResult, reexecuteDeliverables] = useQuery<{ deliverablesByAgent: AgentDeliverable[] }>({
     query: DELIVERABLES_BY_AGENT_QUERY, variables: { agentId: id },
-    requestPolicy: "cache-and-network", pause: activeTab !== "deliverables",
+    requestPolicy: "cache-and-network", pause: !mounted || activeTab !== "deliverables",
   });
 
   const [, setVacation] = useMutation(SET_AGENT_VACATION);

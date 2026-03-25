@@ -7,7 +7,7 @@ import {
 } from "react-native";
 import { useQuery, useSubscription } from "urql";
 import { useRouter } from "expo-router";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SearchBar } from "../src/components/SearchBar";
 import { ScreenLoading } from "../src/components/ScreenLoading";
@@ -41,11 +41,14 @@ export default function ActivityScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [liveItems, setLiveItems] = useState<Activity[]>([]);
   const seenIds = useRef(new Set<string>());
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ activitiesConnection: ActivitiesConnection }>({
     query: ACTIVITIES_CONNECTION_QUERY,
     variables: { first: PAGE_SIZE_DEFAULT, after },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   useSubscription(

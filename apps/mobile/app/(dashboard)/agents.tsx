@@ -41,9 +41,13 @@ export default function AgentsScreen() {
   const [filter, setFilter] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [result, reexecute] = useQuery<{ agents: Agent[] }>({
     query: AGENTS_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [, setActivation] = useMutation(SET_AGENT_ACTIVATION);

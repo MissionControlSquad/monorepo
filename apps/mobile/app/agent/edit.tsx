@@ -30,10 +30,14 @@ export default function EditAgentScreen() {
   const [personality, setPersonality] = useState("");
   const [dirty, setDirty] = useState(false);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [result] = useQuery({
     query: AGENT_EDIT_QUERY,
     variables: { id },
     requestPolicy: "network-only",
+    pause: !mounted,
   });
 
   const [{ fetching: saving }, updateProfile] = useMutation(UPDATE_AGENT_PROFILE);

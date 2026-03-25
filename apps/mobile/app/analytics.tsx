@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenLoading } from "../src/components/ScreenLoading";
@@ -261,48 +261,58 @@ export default function AnalyticsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const vars = { days };
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [statusResult, refetchStatus] = useQuery<{ taskStatusCounts: TaskStatusCounts }>({
     query: TASK_STATUS_COUNTS_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [cycleResult, refetchCycle] = useQuery<{ taskCycleTimes: CycleTimes }>({
     query: TASK_CYCLE_TIMES_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [productivityResult, refetchProductivity] = useQuery<{ agentProductivity: AgentProductivity[] }>({
     query: AGENT_PRODUCTIVITY_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [trendResult, refetchTrend] = useQuery<{ taskCompletionTrend: TrendPoint[] }>({
     query: TASK_COMPLETION_TREND_QUERY,
     variables: vars,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [reviewResult, refetchReview] = useQuery<{ reviewMetrics: ReviewMetrics }>({
     query: REVIEW_METRICS_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [heatmapResult, refetchHeatmap] = useQuery<{ agentActivityHeatmap: HeatmapCell[] }>({
     query: AGENT_ACTIVITY_HEATMAP_QUERY,
     variables: { days: 30 },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [workloadResult, refetchWorkload] = useQuery<{ agentWorkloadDistribution: WorkloadEntry[] }>({
     query: AGENT_WORKLOAD_DISTRIBUTION_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [activityTrendResult, refetchActivityTrend] = useQuery<{ activityTrend: TrendPoint[] }>({
     query: ACTIVITY_TREND_QUERY,
     variables: vars,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const onRefresh = useCallback(() => {

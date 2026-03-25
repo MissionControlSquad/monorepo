@@ -49,9 +49,13 @@ export default function ProjectsScreen() {
     });
   }, [navigation, colors.accent]);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [result, reexecute] = useQuery<{ projects: Project[] }>({
     query: PROJECTS_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const { data, fetching, error } = result;

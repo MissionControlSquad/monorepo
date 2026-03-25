@@ -12,7 +12,7 @@ import {
   FlatList,
   Pressable,
 } from "react-native";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "urql";
@@ -75,28 +75,30 @@ export default function CreateTaskScreen() {
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projectId ?? null);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [profilesResult] = useQuery<{ profiles: Profile[] }>({
     query: PROFILES_QUERY,
     variables: { limit: 100 },
-    pause: !assigneeModalOpen,
+    pause: !mounted || !assigneeModalOpen,
   });
 
   const [tasksResult] = useQuery<{ tasks: TaskOption[] }>({
     query: TASKS_QUERY,
     variables: { limit: 200 },
-    pause: !taskPickerOpen && !parentTaskPickerOpen,
+    pause: !mounted || (!taskPickerOpen && !parentTaskPickerOpen),
   });
 
   const [templatesResult] = useQuery<{ taskTemplates: TaskTemplate[] }>({
     query: TASK_TEMPLATES_QUERY,
-    pause: !templatePickerOpen,
+    pause: !mounted || !templatePickerOpen,
   });
 
   const [projectsResult] = useQuery<{ projects: Project[] }>({
     query: PROJECTS_QUERY,
     requestPolicy: "cache-first",
-    pause: !projectPickerOpen && !selectedProjectId,
+    pause: !mounted || (!projectPickerOpen && !selectedProjectId),
   });
 
   const [, createTask] = useMutation(CREATE_TASK_FROM_DASHBOARD);

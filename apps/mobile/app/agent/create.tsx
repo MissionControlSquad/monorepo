@@ -11,7 +11,7 @@ import {
   Platform,
   Clipboard,
 } from "react-native";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -82,7 +82,10 @@ export default function CreateAgentScreen() {
   const [cloudDeploying, setCloudDeploying] = useState(false);
   const [selectedVmId, setSelectedVmId] = useState<string>("");
 
-  const [agentsResult] = useQuery({ query: AGENTS_FOR_DELEGATE_QUERY });
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  const [agentsResult] = useQuery({ query: AGENTS_FOR_DELEGATE_QUERY, pause: !mounted });
   const squadLeads = useMemo(() =>
     (agentsResult.data?.agents ?? []).filter(
       (a: { role?: string; setupStatus?: string }) =>

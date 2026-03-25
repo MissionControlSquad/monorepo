@@ -54,17 +54,20 @@ export default function SearchScreen() {
   const taskNumberMatch = submittedQuery.trim().match(/^#(\d+)$/);
   const taskNumber = taskNumberMatch ? parseInt(taskNumberMatch[1], 10) : null;
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [taskByNumberResult] = useQuery<{ taskByNumber: { id: string } | null }>({
     query: TASK_BY_NUMBER_QUERY,
     variables: { taskNumber: taskNumber ?? 0 },
-    pause: taskNumber === null,
+    pause: !mounted || taskNumber === null,
     requestPolicy: "cache-and-network",
   });
 
   const [result] = useQuery<{ globalSearch: SearchResults }>({
     query: GLOBAL_SEARCH_QUERY,
     variables: { searchText: submittedQuery, limit: 30 },
-    pause: submittedQuery.trim().length < 2 || taskNumber !== null,
+    pause: !mounted || submittedQuery.trim().length < 2 || taskNumber !== null,
     requestPolicy: "cache-and-network",
   });
 

@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -372,10 +372,14 @@ export default function RecurringTasksScreen() {
   const [includeInactive, setIncludeInactive] = useState(false);
   const [search, setSearch] = useState("");
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [result, reexecute] = useQuery<{ recurringTasks: RecurringTask[] }>({
     query: RECURRING_TASKS_QUERY,
     variables: { includeInactive },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [, createTask] = useMutation(CREATE_RECURRING_TASK);

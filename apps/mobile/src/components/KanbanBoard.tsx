@@ -7,7 +7,7 @@ import {
   Alert,
   RefreshControl,
 } from "react-native";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useClient } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -199,6 +199,9 @@ export function KanbanBoard({
   const [extraTasks, setExtraTasksMap] = useState<Partial<Record<keyof KanbanBoardData, KanbanTask[]>>>({});
   const [loadingColumns, setLoadingColumns] = useState<Partial<Record<keyof KanbanBoardData, boolean>>>({});
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [result, reexecute] = useQuery<KanbanBoardData>({
     query: KANBAN_BOARD_QUERY,
     variables: {
@@ -210,6 +213,7 @@ export function KanbanBoard({
       priorities: priorities?.length ? priorities : undefined,
     },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [, updateTask] = useMutation(UPDATE_TASK);

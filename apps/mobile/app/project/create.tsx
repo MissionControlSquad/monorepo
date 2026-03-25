@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "urql";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CREATE_PROJECT, PROFILES_QUERY } from "@agentcenter/graphql-client";
 import { DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
@@ -36,11 +36,14 @@ export default function CreateProjectScreen() {
   const [selectedProfileIds, setSelectedProfileIds] = useState<string[]>([]);
   const [, createProject] = useMutation(CREATE_PROJECT);
   const [saving, setSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [profilesResult] = useQuery<{ profiles: Profile[] }>({
     query: PROFILES_QUERY,
     variables: { limit: 200 },
-    requestPolicy: "cache-and-network",
+    requestPolicy: "cache-first",
+    pause: !mounted,
   });
 
   const profiles = profilesResult.data?.profiles ?? [];

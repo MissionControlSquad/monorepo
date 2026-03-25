@@ -212,9 +212,13 @@ export default function TaskTemplatesScreen() {
   const [editing, setEditing] = useState<TaskTemplate | null>(null);
   const [search, setSearch] = useState("");
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [result, reexecute] = useQuery<{ taskTemplates: TaskTemplate[] }>({
     query: TASK_TEMPLATES_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [, deleteTemplate] = useMutation(DELETE_TASK_TEMPLATE);

@@ -291,11 +291,14 @@ function TasksTab({ projectId }: { projectId: string }) {
   const { colors } = useTheme();
   const [filter, setFilter] = useState<TaskFilter>("all");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ tasksByProject: Task[] }>({
     query: TASKS_BY_PROJECT_QUERY,
     variables: { projectId },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const { data, fetching, error } = result;
@@ -953,11 +956,14 @@ function DocsTab({ projectId }: { projectId: string }) {
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [showAddDoc, setShowAddDoc] = useState(false);
   const [, deleteDoc] = useMutation(DELETE_PROJECT_DOC);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ projectDocsByProject: ProjectDoc[] }>({
     query: PROJECT_DOCS_BY_PROJECT_QUERY,
     variables: { projectId },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const { data, fetching, error } = result;
@@ -1068,11 +1074,14 @@ export default function ProjectDetailScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const { colors } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ project: Project }>({
     query: PROJECT_QUERY,
     variables: { id },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [, archiveProject] = useMutation(ARCHIVE_PROJECT);

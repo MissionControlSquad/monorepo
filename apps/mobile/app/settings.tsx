@@ -333,9 +333,13 @@ function LicenseGridItem({ label, value }: { label: string; value: string }) {
 // ── System Shutdown ───────────────────────────────────────────────────────────
 
 function SystemShutdownSection() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [result, reexecute] = useQuery<{ systemSettings: { shutdownActive: boolean } | null }>({
     query: SYSTEM_SETTINGS_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [{ fetching }, setShutdown] = useMutation(SET_SYSTEM_SHUTDOWN);

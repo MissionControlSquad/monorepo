@@ -92,29 +92,34 @@ export default function ChannelDetailScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [msgLimit, setMsgLimit] = useState(50);
   const listRef = useRef<FlatList>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [channelResult, reexecuteChannel] = useQuery<{ channel: Channel | null }>({
     query: CHANNEL_QUERY,
     variables: { id },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [messagesResult, reexecute] = useQuery<{ channelMessages: Message[] }>({
     query: CHANNEL_MESSAGES_QUERY,
     variables: { channelId: id, limit: msgLimit },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [pinnedResult] = useQuery<{ channelPinnedMessages: Message[] }>({
     query: CHANNEL_PINNED_MESSAGES_QUERY,
     variables: { channelId: id, limit: 50 },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [searchResult] = useQuery<{ searchChannelMessages: Message[] }>({
     query: SEARCH_CHANNEL_MESSAGES_QUERY,
     variables: { channelId: id, query: searchQuery.trim(), limit: 50 },
-    pause: !searchOpen || searchQuery.trim().length < 2,
+    pause: !mounted || !searchOpen || searchQuery.trim().length < 2,
     requestPolicy: "cache-and-network",
   });
 
@@ -133,7 +138,7 @@ export default function ChannelDetailScreen() {
 
   const [profilesResult] = useQuery<{ profiles: ProfileOption[] }>({
     query: PROFILES_QUERY,
-    pause: !addMemberOpen,
+    pause: !mounted || !addMemberOpen,
     requestPolicy: "cache-and-network",
   });
 

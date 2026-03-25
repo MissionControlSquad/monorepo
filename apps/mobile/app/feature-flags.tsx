@@ -7,7 +7,7 @@ import {
   Alert,
   useColorScheme,
 } from "react-native";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FEATURE_FLAGS_QUERY, UPDATE_FEATURE_FLAG } from "@agentcenter/graphql-client";
@@ -20,10 +20,13 @@ export default function FeatureFlagsScreen() {
   const insets = useSafeAreaInsets();
   const isDark = useColorScheme() === "dark";
   const [search, setSearch] = useState("");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ featureFlags: FeatureFlag[] }>({
     query: FEATURE_FLAGS_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [, updateFlag] = useMutation(UPDATE_FEATURE_FLAG);

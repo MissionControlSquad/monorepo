@@ -41,10 +41,13 @@ export default function ProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ me: Profile | null }>({
     query: ME_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [{ fetching: saving }, updateProfile] = useMutation(UPDATE_MY_PROFILE);
