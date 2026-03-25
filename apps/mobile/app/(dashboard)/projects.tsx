@@ -3,50 +3,26 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
   RefreshControl,
-  ScrollView,
-  TextInput,
 } from "react-native";
 import { useQuery } from "urql";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useRouter, useNavigation } from "expo-router";
+import { useState, useEffect } from "react";
 import { PROJECTS_QUERY } from "@agentcenter/graphql-client";
-
-interface ProjectMember {
-  id: string;
-  profileId: string;
-  profile: {
-    id: string;
-    displayName: string;
-    username: string;
-    avatarUrl: string | null;
-    agentId: string | null;
-    agent?: { id: string; name: string; identityEmoji: string | null } | null;
-  };
-}
-
-interface Project {
-  id: string;
-  name: string;
-  description: string | null;
-  status: string;
-  createdAt: string;
-  members: ProjectMember[];
-}
+import { STATUS_HEX_COLORS, DEFAULT_COLOR } from "@agentcenter/utils";
+import type { Project, ProjectMember } from "@agentcenter/types";
+import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../../src/hooks/useTheme";
+import { SearchBar } from "../../src/components/SearchBar";
+import { ScreenLoading } from "../../src/components/ScreenLoading";
+import { ScreenError } from "../../src/components/ScreenError";
+import { TabFilterStrip } from "../../src/components/TabFilterStrip";
 
 type StatusFilter = "all" | "active" | "archived";
 
-const STATUS_COLORS: Record<string, string> = {
-  active: "#16a34a",
-  archived: "#6b7280",
-  paused: "#d97706",
-};
-
 function memberEmojis(members: ProjectMember[]): string {
-  const agents = members.filter((m) => m.profile.agentId != null);
-  const humans = members.filter((m) => m.profile.agentId == null);
+  const agents = members.filter((m) => m.profile?.agentId != null);
+  const humans = members.filter((m) => m.profile?.agentId == null);
   const parts: string[] = [];
   if (agents.length > 0) parts.push(`🤖 ${agents.length}`);
   if (humans.length > 0) parts.push(`👤 ${humans.length}`);
@@ -55,12 +31,31 @@ function memberEmojis(members: ProjectMember[]): string {
 
 export default function ProjectsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { colors } = useTheme();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => router.push("/project/create")}
+          style={{ padding: 8 }}
+        >
+          <Ionicons name="add" size={26} color={colors.accent} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors.accent]);
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ projects: Project[] }>({
     query: PROJECTS_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const { data, fetching, error } = result;
@@ -82,87 +77,32 @@ export default function ProjectsScreen() {
     { key: "archived", label: "Archived" },
   ];
 
-  if (fetching && allProjects.length === 0) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
-
-  if (error && allProjects.length === 0) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Failed to load projects</Text>
-        <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (fetching && allProjects.length === 0) return <ScreenLoading />;
+  if (error && allProjects.length === 0) return <ScreenError message="Failed to load projects" onRetry={() => reexecute({ requestPolicy: "network-only" })} />;
 
   return (
-    <View style={styles.container}>
-      {/* Search */}
-      <View style={styles.searchBar}>
-        <Text style={styles.searchIcon}>🔍</Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search projects…"
-          placeholderTextColor="#9ca3af"
-          value={search}
-          onChangeText={setSearch}
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-        />
-        <TouchableOpacity
-          onPress={() => router.push("/project/create")}
-          style={styles.createBtn}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.createBtnText}>+</Text>
-        </TouchableOpacity>
-      </View>
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search projects…"
+      />
 
       {/* Status filter */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-        directionalLockEnabled={true}
-        style={styles.filterBar}
-        contentContainerStyle={styles.filterContent}
-      >
-        {filters.map((f) => {
-          const count =
-            f.key === "all"
-              ? allProjects.length
-              : allProjects.filter((p) => p.status === f.key).length;
-          return (
-            <TouchableOpacity
-              key={f.key}
-              style={[styles.filterChip, statusFilter === f.key && styles.filterChipActive]}
-              onPress={() => setStatusFilter(f.key)}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  statusFilter === f.key && styles.filterChipTextActive,
-                ]}
-              >
-                {f.label} ({count})
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      <TabFilterStrip
+        filters={filters}
+        activeKey={statusFilter}
+        onSelect={setStatusFilter}
+        getCount={(key) => key === "all" ? allProjects.length : allProjects.filter((p) => p.status === key).length}
+      />
 
       <FlatList
         data={projects}
         keyExtractor={(item) => item.id}
         contentContainerStyle={
-          projects.length === 0 ? styles.emptyContainer : styles.listContent
+          projects.length === 0
+            ? { flex: 1, justifyContent: "center", alignItems: "center" }
+            : { padding: 16, gap: 10 }
         }
         refreshControl={
           <RefreshControl
@@ -172,43 +112,43 @@ export default function ProjectsScreen() {
           />
         }
         ListEmptyComponent={
-          <Text style={styles.emptyText}>
+          <Text className="text-gray-400 dark:text-slate-500 text-base">
             {search ? "No matching projects" : "No projects"}
           </Text>
         }
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={styles.card}
+            className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5"
             activeOpacity={0.7}
             onPress={() => router.push(`/project/${item.id}`)}
           >
-            <View style={styles.cardHeader}>
-              <View style={styles.iconContainer}>
-                <Text style={styles.iconText}>📁</Text>
+            <View className="flex-row items-start gap-3">
+              <View className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 justify-center items-center">
+                <Text className="text-xl">📁</Text>
               </View>
-              <View style={styles.info}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.projectName} numberOfLines={1}>
+              <View className="flex-1 gap-1">
+                <View className="flex-row items-center justify-between gap-2">
+                  <Text className="text-base font-semibold text-gray-900 dark:text-slate-100 flex-1" numberOfLines={1}>
                     {item.name}
                   </Text>
                   <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: STATUS_COLORS[item.status] ?? "#6b7280" },
-                    ]}
+                    className="px-2 py-0.5 rounded-lg"
+                    style={{ backgroundColor: STATUS_HEX_COLORS[item.status ?? ""] ?? DEFAULT_COLOR }}
                   >
-                    <Text style={styles.statusBadgeText}>{item.status}</Text>
+                    <Text className="text-white text-xs font-semibold">{item.status}</Text>
                   </View>
                 </View>
                 {item.description ? (
-                  <Text style={styles.description} numberOfLines={2}>
+                  <Text className="text-sm text-gray-500 dark:text-slate-400 leading-5" numberOfLines={2}>
                     {item.description}
                   </Text>
                 ) : null}
               </View>
             </View>
-            {item.members.length > 0 && (
-              <Text style={styles.members}>{memberEmojis(item.members)}</Text>
+            {(item.members ?? []).length > 0 && (
+              <Text className="text-xs text-gray-400 dark:text-slate-500">
+                {memberEmojis(item.members ?? [])}
+              </Text>
             )}
           </TouchableOpacity>
         )}
@@ -216,87 +156,3 @@ export default function ProjectsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9fafb" },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-    gap: 12,
-  },
-  filterBar: {
-    height: 52,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  filterContent: { paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#f3f4f6",
-  },
-  filterChipActive: { backgroundColor: "#dbeafe" },
-  filterChipText: { fontSize: 13, color: "#6b7280", fontWeight: "500" },
-  filterChipTextActive: { color: "#2563eb", fontWeight: "600" },
-  listContent: { padding: 16, gap: 10 },
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { color: "#9ca3af", fontSize: 16 },
-  errorText: { color: "#dc2626", fontSize: 16 },
-  retryText: { color: "#2563eb", fontSize: 14, fontWeight: "600" },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 10,
-  },
-  cardHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: "#eff6ff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  iconText: { fontSize: 20 },
-  info: { flex: 1, gap: 4 },
-  nameRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  projectName: { fontSize: 15, fontWeight: "600", color: "#111827", flex: 1 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
-  statusBadgeText: { color: "#fff", fontSize: 11, fontWeight: "600" },
-  description: { fontSize: 13, color: "#6b7280", lineHeight: 18 },
-  members: { fontSize: 12, color: "#9ca3af" },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  searchIcon: { fontSize: 14 },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: "#111827",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-  },
-  createBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#2563eb",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  createBtnText: { fontSize: 20, color: "#fff", lineHeight: 24, fontWeight: "400" },
-});

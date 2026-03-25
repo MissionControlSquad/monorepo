@@ -3,35 +3,43 @@ import {
   Text,
   Switch,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
   Alert,
+  useColorScheme,
 } from "react-native";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FEATURE_FLAGS_QUERY, UPDATE_FEATURE_FLAG } from "@agentcenter/graphql-client";
-import { useTheme } from "../src/hooks/useTheme";
 import { EmptyState } from "../src/components/EmptyState";
-
-interface FeatureFlag {
-  key: string;
-  enabled: boolean;
-  managedBy: string | null;
-  description: string | null;
-}
+import type { FeatureFlag } from "@agentcenter/types";
+import { SearchBar } from "../src/components/SearchBar";
+import { ScreenLoading } from "../src/components/ScreenLoading";
 
 export default function FeatureFlagsScreen() {
-  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const isDark = useColorScheme() === "dark";
+  const [search, setSearch] = useState("");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ featureFlags: FeatureFlag[] }>({
     query: FEATURE_FLAGS_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [, updateFlag] = useMutation(UPDATE_FEATURE_FLAG);
 
-  const flags = result.data?.featureFlags ?? [];
+  const allFlags = result.data?.featureFlags ?? [];
+  const q = search.trim().toLowerCase();
+  const flags = q
+    ? allFlags.filter(
+        (f) =>
+          f.key.toLowerCase().includes(q) ||
+          (f.description ?? "").toLowerCase().includes(q),
+      )
+    : allFlags;
 
   async function handleToggle(flag: FeatureFlag) {
     if (flag.managedBy && flag.managedBy !== "admin") {
@@ -49,19 +57,18 @@ export default function FeatureFlagsScreen() {
     }
   }
 
-  if (result.fetching && flags.length === 0) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.accent} />
-      </View>
-    );
-  }
+  if (result.fetching && flags.length === 0) return <ScreenLoading />;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View className="flex-1 bg-white dark:bg-slate-900">
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search flags…"
+      />
       {result.error && !result.data && (
-        <View style={{ padding: 16, backgroundColor: colors.danger + "18", margin: 16, borderRadius: 10 }}>
-          <Text style={{ color: colors.danger, fontSize: 14 }}>{result.error.message}</Text>
+        <View className="m-4 p-4 bg-red-50 dark:bg-red-950/30 rounded-xl">
+          <Text className="text-red-600 dark:text-red-400 text-sm">{result.error.message}</Text>
         </View>
       )}
       <FlatList
@@ -73,7 +80,7 @@ export default function FeatureFlagsScreen() {
           <RefreshControl
             refreshing={result.fetching && flags.length > 0}
             onRefresh={() => reexecute({ requestPolicy: "network-only" })}
-            tintColor={colors.accent}
+            tintColor="#2563eb"
           />
         }
         ListEmptyComponent={
@@ -85,29 +92,18 @@ export default function FeatureFlagsScreen() {
         renderItem={({ item }) => {
           const isManaged = !!item.managedBy && item.managedBy !== "admin";
           return (
-            <View
-              style={{
-                backgroundColor: colors.card,
-                borderRadius: 12,
-                padding: 14,
-                borderWidth: 1,
-                borderColor: colors.border,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>
+            <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 flex-row items-center gap-3">
+              <View className="flex-1 gap-0.5">
+                <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">
                   {item.key}
                 </Text>
                 {item.description ? (
-                  <Text style={{ fontSize: 12, color: colors.textSecondary }} numberOfLines={2}>
+                  <Text className="text-xs text-gray-500 dark:text-slate-400" numberOfLines={2}>
                     {item.description}
                   </Text>
                 ) : null}
                 {item.managedBy ? (
-                  <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
                     Managed by: {item.managedBy}
                   </Text>
                 ) : null}
@@ -116,9 +112,9 @@ export default function FeatureFlagsScreen() {
                 value={item.enabled}
                 onValueChange={() => handleToggle(item)}
                 disabled={isManaged}
-                trackColor={{ false: colors.border, true: colors.accent + "80" }}
-                thumbColor={item.enabled ? colors.accent : colors.textMuted}
-                ios_backgroundColor={colors.border}
+                trackColor={{ false: isDark ? "#334155" : "#e5e7eb", true: "#2563eb80" }}
+                thumbColor={item.enabled ? "#2563eb" : isDark ? "#64748b" : "#9ca3af"}
+                ios_backgroundColor={isDark ? "#334155" : "#e5e7eb"}
               />
             </View>
           );

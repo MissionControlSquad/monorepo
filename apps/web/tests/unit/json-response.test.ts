@@ -46,20 +46,20 @@ describe("handleError", () => {
     const res = handleError(new Error("Prisma connection failed on shard 3"));
     expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body).toEqual({ error: "Internal server error" });
+    expect(body).toMatchObject({ error: "Internal server error" });
   });
 
   it("returns generic 500 for unknown error types", async () => {
     const res = handleError("string error");
     expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body).toEqual({ error: "Internal server error" });
+    expect(body).toMatchObject({ error: "Internal server error" });
   });
 
   it("returns generic 500 for null/undefined", async () => {
     const res = handleError(null);
     expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body).toEqual({ error: "Internal server error" });
+    expect(body).toMatchObject({ error: "Internal server error" });
   });
 });

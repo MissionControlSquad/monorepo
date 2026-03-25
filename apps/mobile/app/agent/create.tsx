@@ -3,7 +3,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
   FlatList,
   ActivityIndicator,
@@ -12,7 +11,7 @@ import {
   Platform,
   Clipboard,
 } from "react-native";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,11 +29,16 @@ import {
   AGENT_LEVEL_KEYS,
   AGENT_EMOJI_PRESETS,
   SETUP_MODE_LABELS,
+  DEFAULT_AGENT_EMOJI,
+  DEFAULT_AGENT_LEVEL,
+  DEFAULT_SETUP_MODE,
+  SQUAD_LEAD_ROLE,
 } from "@agentcenter/utils";
 import {
   AGENTS_FOR_DELEGATE_QUERY,
   CREATE_TASK_FROM_DASHBOARD,
 } from "@agentcenter/graphql-client";
+import { FilterChip } from "../../src/components/FilterChip";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -57,15 +61,15 @@ export default function CreateAgentScreen() {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [role, setRole] = useState("");
-  const [emoji, setEmoji] = useState("🤖");
-  const [level, setLevel] = useState<Level>("specialist");
+  const [emoji, setEmoji] = useState(DEFAULT_AGENT_EMOJI);
+  const [level, setLevel] = useState<Level>(DEFAULT_AGENT_LEVEL);
   const [personality, setPersonality] = useState("");
   const [workspacePath, setWorkspacePath] = useState("");
 
   // Setup state
   const [result, setResult] = useState<AgentSetupResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [setupMode, setSetupMode] = useState<SetupMode>("auto");
+  const [setupMode, setSetupMode] = useState<SetupMode>(DEFAULT_SETUP_MODE);
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [delegateStatus, setDelegateStatus] = useState<"idle" | "creating" | "done">("idle");
   const [delegateTaskNumber, setDelegateTaskNumber] = useState<number | null>(null);
@@ -78,11 +82,14 @@ export default function CreateAgentScreen() {
   const [cloudDeploying, setCloudDeploying] = useState(false);
   const [selectedVmId, setSelectedVmId] = useState<string>("");
 
-  const [agentsResult] = useQuery({ query: AGENTS_FOR_DELEGATE_QUERY });
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  const [agentsResult] = useQuery({ query: AGENTS_FOR_DELEGATE_QUERY, pause: !mounted });
   const squadLeads = useMemo(() =>
     (agentsResult.data?.agents ?? []).filter(
       (a: { role?: string; setupStatus?: string }) =>
-        a.role === "Squad Lead" && a.setupStatus !== "deactivated",
+        a.role === SQUAD_LEAD_ROLE && a.setupStatus !== "deactivated",
     ),
     [agentsResult.data],
   );
@@ -118,7 +125,7 @@ export default function CreateAgentScreen() {
   function applyTemplate(t: WizardTemplate) {
     setSelectedTemplate(t);
     setRole(t.role ?? "");
-    setEmoji(t.emoji ?? "🤖");
+    setEmoji(t.emoji ?? DEFAULT_AGENT_EMOJI);
     setPersonality(t.personality ?? "");
     const lvl = AGENT_LEVEL_KEYS.includes(t.level as Level) ? (t.level as Level) : "specialist";
     setLevel(lvl);
@@ -245,11 +252,13 @@ export default function CreateAgentScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#f9fafb" }}
+      className="flex-1 bg-gray-50 dark:bg-slate-900"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View
+        className="flex-row items-center px-3 py-2.5 bg-gray-50 dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 gap-2"
+      >
         <TouchableOpacity
           onPress={() => {
             if (step === "preview") setStep("template");
@@ -257,13 +266,13 @@ export default function CreateAgentScreen() {
             else if (step === "setup") router.push("/(dashboard)/agents" as never);
             else router.back();
           }}
-          style={styles.backBtn}
+          className="w-10 h-10 justify-center"
         >
           <Ionicons name="chevron-back" size={22} color="#374151" />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Create Agent</Text>
-          <Text style={styles.headerSub}>
+        <View className="flex-1">
+          <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">Create Agent</Text>
+          <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">
             {step === "template" && "Choose a template"}
             {step === "preview" && "Template details"}
             {step === "details" && "Configure your agent"}
@@ -273,21 +282,29 @@ export default function CreateAgentScreen() {
       </View>
 
       {/* Step indicators */}
-      <View style={styles.stepRow}>
+      <View className="flex-row items-center justify-center py-3 bg-gray-50 dark:bg-slate-900">
         {[0, 1, 2].map((i) => (
-          <View key={i} style={styles.stepIndicatorItem}>
-            {i > 0 && <View style={styles.stepLine} />}
+          <View key={i} className="flex-row items-center">
+            {i > 0 && <View className="w-8 h-px bg-gray-200 dark:bg-slate-700" />}
             <View
-              style={[
-                styles.stepDot,
-                stepIndex === i && styles.stepDotActive,
-                stepIndex > i && styles.stepDotDone,
-              ]}
+              className={[
+                "w-7 h-7 rounded-full justify-center items-center border-[1.5px]",
+                stepIndex === i
+                  ? "bg-blue-600 border-blue-600"
+                  : stepIndex > i
+                  ? "bg-green-600 border-green-600"
+                  : "bg-gray-100 dark:bg-slate-700 border-gray-200 dark:border-slate-600",
+              ].join(" ")}
             >
               {stepIndex > i ? (
                 <Ionicons name="checkmark" size={12} color="#fff" />
               ) : (
-                <Text style={[styles.stepDotText, stepIndex === i && { color: "#fff" }]}>
+                <Text
+                  className={[
+                    "text-xs font-semibold",
+                    stepIndex === i ? "text-white" : "text-gray-400 dark:text-slate-500",
+                  ].join(" ")}
+                >
                   {i + 1}
                 </Text>
               )}
@@ -298,11 +315,11 @@ export default function CreateAgentScreen() {
 
       {/* ── Step 1: Template List ── */}
       {step === "template" && (
-        <View style={{ flex: 1 }}>
-          <View style={styles.searchContainer}>
+        <View className="flex-1">
+          <View className="flex-row items-center bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 px-3 py-2.5 mx-4 mt-3 mb-2">
             <Ionicons name="search-outline" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
             <TextInput
-              style={styles.searchInput}
+              className="flex-1 text-sm text-gray-900 dark:text-slate-100"
               value={search}
               onChangeText={setSearch}
               placeholder="Search templates…"
@@ -321,47 +338,41 @@ export default function CreateAgentScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryChips}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8, flexDirection: "row" }}
           >
-            <TouchableOpacity
-              style={[styles.chip, categoryFilter === "all" && styles.chipActive]}
+            <FilterChip
+              label="All"
+              active={categoryFilter === "all"}
               onPress={() => setCategoryFilter("all")}
-            >
-              <Text style={[styles.chipText, categoryFilter === "all" && styles.chipTextActive]}>
-                All
-              </Text>
-            </TouchableOpacity>
+            />
             {categories.map((c) => (
-              <TouchableOpacity
+              <FilterChip
                 key={c}
-                style={[styles.chip, categoryFilter === c && styles.chipActive]}
+                label={CATEGORY_LABELS[c] ?? c}
+                active={categoryFilter === c}
                 onPress={() => setCategoryFilter(c)}
-              >
-                <Text style={[styles.chipText, categoryFilter === c && styles.chipTextActive]}>
-                  {CATEGORY_LABELS[c] ?? c}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
 
           <FlatList
             data={filteredTemplates}
             keyExtractor={(t) => t.id}
-            contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, gap: 8, paddingBottom: insets.bottom + 80 }}
             renderItem={({ item: t }) => (
               <TouchableOpacity
-                style={styles.templateCard}
+                className="flex-row items-center bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-3"
                 onPress={() => {
                   setSelectedTemplate(t);
                   setStep("preview");
                 }}
                 activeOpacity={0.75}
               >
-                <Text style={styles.templateEmoji}>{t.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.templateName}>{t.name}</Text>
-                  <Text style={styles.templateDesc} numberOfLines={2}>{t.description}</Text>
-                  <Text style={styles.templateCategory}>
+                <Text className="text-2xl w-9 text-center">{t.emoji}</Text>
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">{t.name}</Text>
+                  <Text className="text-xs text-gray-500 dark:text-slate-400 leading-4 mt-0.5" numberOfLines={2}>{t.description}</Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1 uppercase">
                     {CATEGORY_LABELS[t.category] ?? t.category}
                   </Text>
                 </View>
@@ -369,27 +380,30 @@ export default function CreateAgentScreen() {
               </TouchableOpacity>
             )}
             ListEmptyComponent={
-              <View style={styles.empty}>
-                <Text style={styles.emptyText}>No templates found</Text>
+              <View className="items-center pt-10">
+                <Text className="text-sm text-gray-400 dark:text-slate-500">No templates found</Text>
               </View>
             }
           />
 
           {/* Start from scratch */}
-          <View style={[styles.floatingFooter, { paddingBottom: insets.bottom + 12 }]}>
+          <View
+            className="absolute bottom-0 left-0 right-0 bg-gray-50 dark:bg-slate-900 px-4 pt-3 border-t border-gray-200 dark:border-slate-700"
+            style={{ paddingBottom: insets.bottom + 12 }}
+          >
             <TouchableOpacity
-              style={styles.secondaryBtn}
+              className="border border-gray-200 dark:border-slate-700 rounded-xl py-3.5 items-center bg-white dark:bg-slate-800"
               onPress={() => {
                 setSelectedTemplate(null);
                 setRole("");
-                setEmoji("🤖");
+                setEmoji(DEFAULT_AGENT_EMOJI);
                 setPersonality("");
-                setLevel("specialist");
+                setLevel(DEFAULT_AGENT_LEVEL);
                 setStep("details");
               }}
               activeOpacity={0.8}
             >
-              <Text style={styles.secondaryBtnText}>Start from Scratch</Text>
+              <Text className="text-base text-gray-700 dark:text-slate-300 font-medium">Start from Scratch</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -398,47 +412,47 @@ export default function CreateAgentScreen() {
       {/* ── Step 1.5: Template Preview ── */}
       {step === "preview" && selectedTemplate && (
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+          contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: insets.bottom + 24 }}
           contentInsetAdjustmentBehavior="automatic"
         >
-          <View style={styles.previewHeader}>
-            <Text style={styles.previewEmoji}>{selectedTemplate.emoji}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.previewName}>{selectedTemplate.name}</Text>
-              <Text style={styles.previewRole}>{selectedTemplate.role}</Text>
+          <View className="flex-row items-start gap-3.5">
+            <Text className="text-5xl">{selectedTemplate.emoji}</Text>
+            <View className="flex-1">
+              <Text className="text-xl font-extrabold text-gray-900 dark:text-slate-100">{selectedTemplate.name}</Text>
+              <Text className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">{selectedTemplate.role}</Text>
             </View>
-            <View style={styles.levelBadge}>
-              <Text style={styles.levelBadgeText}>
+            <View className="bg-blue-50 dark:bg-blue-900/20 rounded-md px-2 py-1 self-start">
+              <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">
                 {selectedTemplate.level.charAt(0).toUpperCase() + selectedTemplate.level.slice(1)}
               </Text>
             </View>
           </View>
 
-          <View style={styles.categoryTag}>
-            <Text style={styles.categoryTagText}>
+          <View className="self-start bg-gray-100 dark:bg-slate-700 rounded-md px-2 py-1">
+            <Text className="text-xs text-gray-500 dark:text-slate-400 font-medium">
               {CATEGORY_LABELS[selectedTemplate.category] ?? selectedTemplate.category}
             </Text>
           </View>
 
           {/* Description */}
-          <Text style={styles.previewDesc}>{selectedTemplate.description}</Text>
+          <Text className="text-sm text-gray-700 dark:text-slate-300 leading-5">{selectedTemplate.description}</Text>
 
           {/* Behavior */}
           {selectedTemplate.personality ? (
-            <View style={styles.behaviorBox}>
-              <Text style={styles.sectionLabel}>Behavior</Text>
-              <Text style={styles.behaviorText}>{selectedTemplate.personality}</Text>
+            <View className="bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-1.5">
+              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.8px] mb-1">Behavior</Text>
+              <Text className="text-sm text-gray-700 dark:text-slate-300 leading-5">{selectedTemplate.personality}</Text>
             </View>
           ) : null}
 
           {/* Skills */}
           {selectedTemplate.skills.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Pre-loaded Skills</Text>
+            <View className="gap-2">
+              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.8px] mb-1">Pre-loaded Skills</Text>
               {selectedTemplate.skills.map((s, i) => (
-                <View key={i} style={styles.skillRow}>
-                  <View style={styles.skillDot} />
-                  <Text style={styles.skillText}>{s}</Text>
+                <View key={i} className="flex-row items-start gap-2">
+                  <View className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                  <Text className="text-sm text-gray-700 dark:text-slate-300 flex-1 leading-5">{s}</Text>
                 </View>
               ))}
             </View>
@@ -446,12 +460,12 @@ export default function CreateAgentScreen() {
 
           {/* Capabilities */}
           {selectedTemplate.capabilities.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Capabilities</Text>
-              <View style={styles.capabilityWrap}>
+            <View className="gap-2">
+              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.8px] mb-1">Capabilities</Text>
+              <View className="flex-row flex-wrap gap-2">
                 {selectedTemplate.capabilities.map((c, i) => (
-                  <View key={i} style={styles.capBadge}>
-                    <Text style={styles.capBadgeText}>{c}</Text>
+                  <View key={i} className="bg-gray-50 dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 px-2.5 py-1">
+                    <Text className="text-xs text-gray-700 dark:text-slate-300">{c}</Text>
                   </View>
                 ))}
               </View>
@@ -459,11 +473,11 @@ export default function CreateAgentScreen() {
           )}
 
           <TouchableOpacity
-            style={styles.primaryBtn}
+            className="bg-blue-600 rounded-xl py-3.5 items-center"
             onPress={() => applyTemplate(selectedTemplate)}
             activeOpacity={0.8}
           >
-            <Text style={styles.primaryBtnText}>Use This Template</Text>
+            <Text className="text-white text-base font-semibold">Use This Template</Text>
           </TouchableOpacity>
         </ScrollView>
       )}
@@ -471,27 +485,27 @@ export default function CreateAgentScreen() {
       {/* ── Step 2: Details ── */}
       {step === "details" && (
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+          contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: insets.bottom + 24 }}
           contentInsetAdjustmentBehavior="automatic"
           keyboardShouldPersistTaps="handled"
         >
           {selectedTemplate && (
-            <View style={styles.templatePill}>
-              <Text style={styles.templatePillEmoji}>{selectedTemplate.emoji}</Text>
-              <Text style={styles.templatePillText}>{selectedTemplate.name}</Text>
+            <View className="flex-row items-center bg-blue-50 dark:bg-blue-900/20 rounded-xl p-2.5 gap-2 border border-blue-200 dark:border-blue-800">
+              <Text className="text-lg">{selectedTemplate.emoji}</Text>
+              <Text className="flex-1 text-sm font-semibold text-blue-700 dark:text-blue-300">{selectedTemplate.name}</Text>
               <TouchableOpacity onPress={() => setStep("preview")}>
-                <Text style={styles.templatePillChange}>Change</Text>
+                <Text className="text-xs text-blue-600 dark:text-blue-400 font-medium">Change</Text>
               </TouchableOpacity>
             </View>
           )}
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Identity</Text>
+          <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
+            <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">Identity</Text>
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Name <Text style={styles.required}>*</Text></Text>
+            <View className="gap-1.5">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Name <Text className="text-red-600 dark:text-red-400">*</Text></Text>
               <TextInput
-                style={styles.input}
+                className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 value={name}
                 onChangeText={setName}
                 placeholder="e.g. Nova, Rex, Luna"
@@ -500,12 +514,12 @@ export default function CreateAgentScreen() {
               />
             </View>
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Username <Text style={styles.optional}>(optional)</Text></Text>
-              <View style={styles.usernameRow}>
-                <Text style={styles.usernameAt}>@</Text>
+            <View className="gap-1.5">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Username <Text className="text-gray-400 dark:text-slate-500 font-normal">(optional)</Text></Text>
+              <View className="flex-row items-center gap-1">
+                <Text className="text-base text-gray-500 dark:text-slate-400 font-medium">@</Text>
                 <TextInput
-                  style={[styles.input, { flex: 1 }]}
+                  className="flex-1 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                   value={username}
                   onChangeText={(t) => setUsername(t.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
                   placeholder={
@@ -520,10 +534,10 @@ export default function CreateAgentScreen() {
               </View>
             </View>
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Role <Text style={styles.required}>*</Text></Text>
+            <View className="gap-1.5">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Role <Text className="text-red-600 dark:text-red-400">*</Text></Text>
               <TextInput
-                style={styles.input}
+                className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 value={role}
                 onChangeText={setRole}
                 placeholder="e.g. Research Specialist"
@@ -531,34 +545,51 @@ export default function CreateAgentScreen() {
               />
             </View>
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Emoji</Text>
-              <View style={styles.emojiGrid}>
+            <View className="gap-1.5">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Emoji</Text>
+              <View className="flex-row flex-wrap gap-2">
                 {AGENT_EMOJI_PRESETS.map((e) => (
                   <TouchableOpacity
                     key={e}
-                    style={[styles.emojiBtn, emoji === e && styles.emojiBtnActive]}
+                    className={[
+                      "w-11 h-11 rounded-xl border-[1.5px] justify-center items-center",
+                      emoji === e
+                        ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900",
+                    ].join(" ")}
                     onPress={() => setEmoji(e)}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.emojiChar}>{e}</Text>
+                    <Text className="text-xl">{e}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Level</Text>
-            <View style={styles.chipRow}>
+          <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
+            <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">Level</Text>
+            <View className="flex-row gap-2 flex-wrap">
               {AGENT_LEVEL_KEYS.map((l) => (
                 <TouchableOpacity
                   key={l}
-                  style={[styles.chip, level === l && styles.chipActive]}
+                  className={[
+                    "border rounded-lg px-3.5 py-2",
+                    level === l
+                      ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800",
+                  ].join(" ")}
                   onPress={() => setLevel(l)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.chipText, level === l && styles.chipTextActive]}>
+                  <Text
+                    className={[
+                      "text-sm font-medium",
+                      level === l
+                        ? "text-blue-600 dark:text-blue-400 font-semibold"
+                        : "text-gray-500 dark:text-slate-400",
+                    ].join(" ")}
+                  >
                     {l.charAt(0).toUpperCase() + l.slice(1)}
                   </Text>
                 </TouchableOpacity>
@@ -566,13 +597,13 @@ export default function CreateAgentScreen() {
             </View>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Instructions / Personality</Text>
-            <Text style={styles.hint}>
+          <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
+            <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">Instructions / Personality</Text>
+            <Text className="text-xs text-gray-400 dark:text-slate-500">
               Behavior guidelines, expertise, and working style. Describe how this agent should act.
             </Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100 min-h-28"
               value={personality}
               onChangeText={setPersonality}
               placeholder="Agent personality and behavior guidelines…"
@@ -583,11 +614,11 @@ export default function CreateAgentScreen() {
             />
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Workspace Path <Text style={styles.optional}>(optional)</Text></Text>
-            <Text style={styles.hint}>Leave blank to use the default OpenClaw workspace path.</Text>
+          <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
+            <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">Workspace Path <Text className="text-gray-400 dark:text-slate-500 font-normal">(optional)</Text></Text>
+            <Text className="text-xs text-gray-400 dark:text-slate-500">Leave blank to use the default OpenClaw workspace path.</Text>
             <TextInput
-              style={styles.input}
+              className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               value={workspacePath}
               onChangeText={setWorkspacePath}
               placeholder={`~/.openclaw/agents/${name ? name.toLowerCase().replace(/[^a-z0-9]+/g, "-") : "agent-name"}/workspace`}
@@ -598,7 +629,10 @@ export default function CreateAgentScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.primaryBtn, (!name.trim() || !role.trim() || loading) && styles.primaryBtnDisabled]}
+            className={[
+              "bg-blue-600 rounded-xl py-3.5 items-center",
+              (!name.trim() || !role.trim() || loading) ? "opacity-45" : "",
+            ].join(" ")}
             onPress={handleCreate}
             disabled={!name.trim() || !role.trim() || loading}
             activeOpacity={0.8}
@@ -606,7 +640,7 @@ export default function CreateAgentScreen() {
             {loading ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text style={styles.primaryBtnText}>Create Agent</Text>
+              <Text className="text-white text-base font-semibold">Create Agent</Text>
             )}
           </TouchableOpacity>
         </ScrollView>
@@ -615,15 +649,15 @@ export default function CreateAgentScreen() {
       {/* ── Step 3: Setup ── */}
       {step === "setup" && result && (
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
+          contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: insets.bottom + 32 }}
           contentInsetAdjustmentBehavior="automatic"
         >
           {/* Security warning */}
-          <View style={styles.dangerBox}>
+          <View className="flex-row gap-3 border-[1.5px] border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/20 rounded-xl p-3.5 items-start">
             <Ionicons name="shield-outline" size={20} color="#dc2626" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.dangerBoxTitle}>Sensitive Credentials</Text>
-              <Text style={styles.dangerBoxText}>
+            <View className="flex-1">
+              <Text className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">Sensitive Credentials</Text>
+              <Text className="text-xs text-red-500 leading-5">
                 The content below contains your API key. Do not share publicly or commit to version control.
               </Text>
             </View>
@@ -633,7 +667,7 @@ export default function CreateAgentScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.modeTabs}
+            contentContainerStyle={{ paddingVertical: 4, gap: 6, flexDirection: "row" }}
           >
             {(["auto", "manual", "delegate", "cloud"] as SetupMode[]).map((m) => {
               const icons: Record<SetupMode, keyof typeof Ionicons.glyphMap> = {
@@ -646,11 +680,13 @@ export default function CreateAgentScreen() {
               return (
                 <TouchableOpacity
                   key={m}
-                  style={[
-                    styles.modeTab,
-                    setupMode === m && styles.modeTabActive,
-                    disabled && { opacity: 0.4 },
-                  ]}
+                  className={[
+                    "flex-row items-center gap-1 px-3 py-2 rounded-lg border",
+                    setupMode === m
+                      ? "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800",
+                    disabled ? "opacity-40" : "",
+                  ].join(" ")}
                   onPress={async () => {
                     if (disabled) return;
                     setSetupMode(m);
@@ -681,7 +717,14 @@ export default function CreateAgentScreen() {
                     size={15}
                     color={setupMode === m ? "#2563eb" : "#6b7280"}
                   />
-                  <Text style={[styles.modeTabText, setupMode === m && styles.modeTabTextActive]}>
+                  <Text
+                    className={[
+                      "text-xs font-medium",
+                      setupMode === m
+                        ? "text-blue-600 dark:text-blue-400 font-semibold"
+                        : "text-gray-500 dark:text-slate-400",
+                    ].join(" ")}
+                  >
                     {SETUP_MODE_LABELS[m]}
                   </Text>
                 </TouchableOpacity>
@@ -692,46 +735,54 @@ export default function CreateAgentScreen() {
           {/* ── AUTO MODE ── */}
           {setupMode === "auto" && (
             <>
-              <View style={styles.infoBox}>
+              <View className="flex-row gap-3 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3.5 items-start">
                 <Ionicons name="chatbubble-ellipses-outline" size={18} color="#2563eb" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.infoBoxTitle}>Send to Your Connected Channel</Text>
-                  <Text style={styles.infoBoxText}>
+                <View className="flex-1">
+                  <Text className="text-sm font-bold text-blue-700 dark:text-blue-300 mb-1">Send to Your Connected Channel</Text>
+                  <Text className="text-xs text-blue-500 leading-5">
                     Copy the bootstrap message and send it via WhatsApp, Slack, Discord, or Telegram. The agent will read it and configure itself automatically.
                   </Text>
                 </View>
               </View>
 
-              <View style={styles.codeSection}>
-                <View style={styles.codeSectionHeader}>
-                  <Text style={styles.codeSectionTitle}>Bootstrap Message</Text>
+              <View className="gap-2">
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">Bootstrap Message</Text>
                   <TouchableOpacity
                     onPress={() => copyText(result.bootstrapMessage, "Bootstrap message")}
-                    style={styles.copyBtn}
+                    className="flex-row items-center gap-1"
                   >
                     <Ionicons name="copy-outline" size={14} color="#2563eb" />
-                    <Text style={styles.copyBtnText}>Copy</Text>
+                    <Text className="text-xs text-blue-600 dark:text-blue-400 font-medium">Copy</Text>
                   </TouchableOpacity>
                 </View>
                 <ScrollView
                   horizontal
-                  style={styles.codeBox}
+                  className="bg-gray-800 rounded-xl p-3 max-h-48"
                   contentContainerStyle={{ minWidth: "100%" }}
                 >
-                  <Text style={styles.codeText} selectable>{result.bootstrapMessage}</Text>
+                  <Text
+                    className="text-xs text-emerald-100 leading-5"
+                    style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
+                    selectable
+                  >
+                    {result.bootstrapMessage}
+                  </Text>
                 </ScrollView>
               </View>
 
-              <View style={styles.stepsBox}>
-                <Text style={styles.stepsTitle}>Steps</Text>
+              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 gap-3">
+                <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">Steps</Text>
                 {[
                   "Copy the bootstrap message above",
                   "Send it to your agent via any connected channel (WhatsApp, Slack, Discord, etc.)",
                   "Agent will appear in the dashboard on next heartbeat",
                 ].map((s, i) => (
-                  <View key={i} style={styles.stepItem}>
-                    <View style={styles.stepBubble}><Text style={styles.stepBubbleText}>{i + 1}</Text></View>
-                    <Text style={styles.stepItemText}>{s}</Text>
+                  <View key={i} className="flex-row gap-2.5 items-start">
+                    <View className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/20 justify-center items-center shrink-0 mt-px">
+                      <Text className="text-xs font-bold text-blue-600 dark:text-blue-400">{i + 1}</Text>
+                    </View>
+                    <Text className="text-sm text-gray-700 dark:text-slate-300 flex-1 leading-5">{s}</Text>
                   </View>
                 ))}
               </View>
@@ -742,18 +793,23 @@ export default function CreateAgentScreen() {
           {setupMode === "manual" && (
             <>
               {/* API Key */}
-              <View style={styles.warningBox}>
+              <View className="flex-row gap-3 border-[1.5px] border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/10 rounded-xl p-3.5 items-start">
                 <Ionicons name="warning-outline" size={18} color="#d97706" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.warningBoxTitle}>API Key — Save this now!</Text>
-                  <Text style={styles.warningBoxText}>
+                <View className="flex-1">
+                  <Text className="text-sm font-bold text-amber-600 mb-1">API Key — Save this now!</Text>
+                  <Text className="text-xs text-amber-800 leading-5 mb-2">
                     This key will only be shown once. It is already embedded in the config files.
                   </Text>
-                  <View style={styles.apiKeyRow}>
-                    <Text style={styles.apiKeyText} selectable numberOfLines={apiKeyVisible ? undefined : 1}>
+                  <View className="flex-row items-center gap-1.5 bg-white dark:bg-slate-800 rounded-lg p-2.5 border border-amber-200 dark:border-amber-700">
+                    <Text
+                      className="flex-1 text-sm text-gray-900 dark:text-slate-100"
+                      style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
+                      selectable
+                      numberOfLines={apiKeyVisible ? undefined : 1}
+                    >
                       {apiKeyVisible ? result.apiKey : "••••••••••••••••••••••••••••••••"}
                     </Text>
-                    <TouchableOpacity onPress={() => setApiKeyVisible((v) => !v)} style={styles.iconBtn}>
+                    <TouchableOpacity onPress={() => setApiKeyVisible((v) => !v)} className="p-1">
                       <Ionicons
                         name={apiKeyVisible ? "eye-off-outline" : "eye-outline"}
                         size={17}
@@ -762,7 +818,7 @@ export default function CreateAgentScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => copyText(result.apiKey, "API key")}
-                      style={styles.iconBtn}
+                      className="p-1"
                     >
                       <Ionicons name="copy-outline" size={17} color="#2563eb" />
                     </TouchableOpacity>
@@ -771,64 +827,75 @@ export default function CreateAgentScreen() {
               </View>
 
               {/* 1. OpenClaw config */}
-              <View style={styles.setupStep}>
-                <View style={styles.setupStepHeader}>
+              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-2.5">
+                <View className="flex-row items-center gap-1.5">
                   <Ionicons name="terminal-outline" size={16} color="#374151" />
-                  <Text style={styles.setupStepTitle}>1. Register Agent in OpenClaw</Text>
+                  <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">1. Register Agent in OpenClaw</Text>
                 </View>
-                <Text style={styles.setupStepHint}>
-                  Add this to <Text style={styles.mono}>agents.list</Text> in{" "}
-                  <Text style={styles.mono}>~/.openclaw/openclaw.json</Text>:
+                <Text className="text-xs text-gray-500 dark:text-slate-400 leading-5">
+                  Add this to{" "}
+                  <Text style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }} className="text-xs">agents.list</Text>
+                  {" "}in{" "}
+                  <Text style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }} className="text-xs">~/.openclaw/openclaw.json</Text>:
                 </Text>
-                <View style={styles.codeBlock}>
-                  <Text style={styles.codeGreen} selectable>
+                <View className="bg-gray-800 rounded-lg p-3">
+                  <Text
+                    className="text-xs text-green-400 leading-5"
+                    style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
+                    selectable
+                  >
                     {JSON.stringify(result.openclawAgentConfig, null, 2)}
                   </Text>
                 </View>
                 <TouchableOpacity
-                  style={styles.copyRow}
+                  className="flex-row items-center gap-1"
                   onPress={() => copyText(JSON.stringify(result.openclawAgentConfig, null, 2), "Agent config")}
                 >
                   <Ionicons name="copy-outline" size={13} color="#2563eb" />
-                  <Text style={styles.copyRowText}>Copy config</Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-400 font-medium">Copy config</Text>
                 </TouchableOpacity>
               </View>
 
               {/* 2. Workspace */}
-              <View style={styles.setupStep}>
-                <View style={styles.setupStepHeader}>
+              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-2.5">
+                <View className="flex-row items-center gap-1.5">
                   <Ionicons name="folder-outline" size={16} color="#374151" />
-                  <Text style={styles.setupStepTitle}>2. Create Workspace</Text>
+                  <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">2. Create Workspace</Text>
                 </View>
-                <View style={styles.codeBlock}>
-                  <Text style={styles.codeGreen} selectable>{`mkdir -p ${result.workspacePath}`}</Text>
+                <View className="bg-gray-800 rounded-lg p-3">
+                  <Text
+                    className="text-xs text-green-400 leading-5"
+                    style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
+                    selectable
+                  >{`mkdir -p ${result.workspacePath}`}</Text>
                 </View>
                 <TouchableOpacity
-                  style={styles.copyRow}
+                  className="flex-row items-center gap-1"
                   onPress={() => copyText(`mkdir -p ${result.workspacePath}`, "mkdir command")}
                 >
                   <Ionicons name="copy-outline" size={13} color="#2563eb" />
-                  <Text style={styles.copyRowText}>Copy command</Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-400 font-medium">Copy command</Text>
                 </TouchableOpacity>
               </View>
 
               {/* 3. Config files */}
-              <View style={styles.setupStep}>
-                <Text style={styles.setupStepTitle}>3. Config Files</Text>
-                <Text style={styles.setupStepHint}>
-                  Copy each file to <Text style={styles.mono}>{result.workspacePath}/</Text>
+              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-2.5">
+                <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">3. Config Files</Text>
+                <Text className="text-xs text-gray-500 dark:text-slate-400 leading-5">
+                  Copy each file to{" "}
+                  <Text style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }} className="text-xs">{result.workspacePath}/</Text>
                 </Text>
                 {result.configFiles.map((file) => (
-                  <View key={file.filename} style={styles.configFileCard}>
-                    <View style={styles.configFileHeader}>
+                  <View key={file.filename} className="border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                    <View className="flex-row items-center gap-2 px-3 py-2.5 bg-gray-50 dark:bg-slate-900">
                       <Ionicons name="document-text-outline" size={14} color="#374151" />
-                      <Text style={styles.configFileName}>{file.filename}</Text>
+                      <Text className="flex-1 text-sm font-medium text-gray-700 dark:text-slate-300">{file.filename}</Text>
                       <TouchableOpacity
                         onPress={() => copyText(file.content, file.filename)}
-                        style={styles.configFileCopy}
+                        className="flex-row items-center gap-1"
                       >
                         <Ionicons name="copy-outline" size={13} color="#2563eb" />
-                        <Text style={styles.copyRowText}>Copy</Text>
+                        <Text className="text-xs text-blue-600 dark:text-blue-400 font-medium">Copy</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -836,20 +903,24 @@ export default function CreateAgentScreen() {
               </View>
 
               {/* 4. Cron */}
-              <View style={styles.setupStep}>
-                <View style={styles.setupStepHeader}>
+              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-2.5">
+                <View className="flex-row items-center gap-1.5">
                   <Ionicons name="terminal-outline" size={16} color="#374151" />
-                  <Text style={styles.setupStepTitle}>4. Add Heartbeat Cron</Text>
+                  <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">4. Add Heartbeat Cron</Text>
                 </View>
-                <View style={styles.codeBlock}>
-                  <Text style={styles.codeGreen} selectable>{result.cronCommand}</Text>
+                <View className="bg-gray-800 rounded-lg p-3">
+                  <Text
+                    className="text-xs text-green-400 leading-5"
+                    style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
+                    selectable
+                  >{result.cronCommand}</Text>
                 </View>
                 <TouchableOpacity
-                  style={styles.copyRow}
+                  className="flex-row items-center gap-1"
                   onPress={() => copyText(result.cronCommand, "Cron command")}
                 >
                   <Ionicons name="copy-outline" size={13} color="#2563eb" />
-                  <Text style={styles.copyRowText}>Copy cron command</Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-400 font-medium">Copy cron command</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -858,11 +929,11 @@ export default function CreateAgentScreen() {
           {/* ── DELEGATE MODE ── */}
           {setupMode === "delegate" && (
             <>
-              <View style={styles.successBox}>
+              <View className="flex-row gap-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 rounded-xl p-3.5 items-start">
                 <Ionicons name="hardware-chip-outline" size={18} color="#16a34a" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.successBoxTitle}>Delegate Setup to Squad Lead</Text>
-                  <Text style={styles.successBoxText}>
+                <View className="flex-1">
+                  <Text className="text-sm font-bold text-green-700 dark:text-green-400 mb-1">Delegate Setup to Squad Lead</Text>
+                  <Text className="text-xs text-green-600 dark:text-green-500 leading-5">
                     A high-priority task will be created and assigned to your Squad Lead. It will bootstrap the workspace and set up the heartbeat cron on next wake-up.
                   </Text>
                 </View>
@@ -870,28 +941,31 @@ export default function CreateAgentScreen() {
 
               {delegateStatus !== "done" && (
                 <>
-                  <View style={styles.summaryCard}>
-                    <Text style={styles.summaryTitle}>Task will include</Text>
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Name</Text>
-                      <Text style={styles.summaryValue}>{result.agent.name}</Text>
+                  <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-2">
+                    <Text className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Task will include</Text>
+                    <View className="flex-row gap-2">
+                      <Text className="text-sm text-gray-500 dark:text-slate-400 w-20">Name</Text>
+                      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1">{result.agent.name}</Text>
                     </View>
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Role</Text>
-                      <Text style={styles.summaryValue}>{result.agent.role}</Text>
+                    <View className="flex-row gap-2">
+                      <Text className="text-sm text-gray-500 dark:text-slate-400 w-20">Role</Text>
+                      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1">{result.agent.role}</Text>
                     </View>
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Level</Text>
-                      <Text style={styles.summaryValue}>{result.agent.level}</Text>
+                    <View className="flex-row gap-2">
+                      <Text className="text-sm text-gray-500 dark:text-slate-400 w-20">Level</Text>
+                      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1">{result.agent.level}</Text>
                     </View>
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Assigned to</Text>
-                      <Text style={styles.summaryValue}>{squadLeads[0]?.name ?? "Squad Lead"}</Text>
+                    <View className="flex-row gap-2">
+                      <Text className="text-sm text-gray-500 dark:text-slate-400 w-20">Assigned to</Text>
+                      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1">{squadLeads[0]?.name ?? SQUAD_LEAD_ROLE}</Text>
                     </View>
                   </View>
 
                   <TouchableOpacity
-                    style={[styles.primaryBtn, delegateStatus === "creating" && styles.primaryBtnDisabled]}
+                    className={[
+                      "bg-blue-600 rounded-xl py-3.5 items-center",
+                      delegateStatus === "creating" ? "opacity-45" : "",
+                    ].join(" ")}
                     onPress={handleDelegate}
                     disabled={delegateStatus === "creating"}
                     activeOpacity={0.8}
@@ -899,19 +973,19 @@ export default function CreateAgentScreen() {
                     {delegateStatus === "creating" ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <Text style={styles.primaryBtnText}>Create Setup Task</Text>
+                      <Text className="text-white text-base font-semibold">Create Setup Task</Text>
                     )}
                   </TouchableOpacity>
                 </>
               )}
 
               {delegateStatus === "done" && delegateTaskNumber !== null && (
-                <View style={styles.doneBox}>
+                <View className="flex-row gap-3 border-[1.5px] border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 rounded-xl p-3.5 items-start">
                   <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.doneBoxTitle}>Task #{delegateTaskNumber} Created</Text>
-                    <Text style={styles.doneBoxText}>
-                      Assigned to {squadLeads[0]?.name ?? "Squad Lead"}. Setup will happen on next wake-up.
+                  <View className="flex-1">
+                    <Text className="text-sm font-bold text-green-700 dark:text-green-400 mb-0.5">Task #{delegateTaskNumber} Created</Text>
+                    <Text className="text-xs text-green-600 dark:text-green-500 leading-5">
+                      Assigned to {squadLeads[0]?.name ?? SQUAD_LEAD_ROLE}. Setup will happen on next wake-up.
                     </Text>
                   </View>
                 </View>
@@ -922,66 +996,71 @@ export default function CreateAgentScreen() {
           {/* ── CLOUD MODE ── */}
           {setupMode === "cloud" && (
             <>
-              <View style={[styles.infoBox, { borderColor: "#e9d5ff", backgroundColor: "#faf5ff" }]}>
+              <View
+                className="flex-row gap-3 rounded-xl p-3.5 items-start border"
+                style={{ borderColor: "#e9d5ff", backgroundColor: "#faf5ff" }}
+              >
                 <Ionicons name="cloud-outline" size={18} color="#9333ea" />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.infoBoxTitle, { color: "#6b21a8" }]}>Host on Cloud VM</Text>
-                  <Text style={[styles.infoBoxText, { color: "#7c3aed" }]}>
+                <View className="flex-1">
+                  <Text className="text-sm font-bold mb-1" style={{ color: "#6b21a8" }}>Host on Cloud VM</Text>
+                  <Text className="text-xs leading-5" style={{ color: "#7c3aed" }}>
                     Deploy this agent to one of your cloud VMs. The VM will automatically set up and start the agent.
                   </Text>
                 </View>
               </View>
 
               {cloudVmId ? (
-                <View style={styles.doneBox}>
+                <View className="flex-row gap-3 border-[1.5px] border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 rounded-xl p-3.5 items-start">
                   <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.doneBoxTitle}>Agent Deployed</Text>
-                    <Text style={styles.doneBoxText}>
+                  <View className="flex-1">
+                    <Text className="text-sm font-bold text-green-700 dark:text-green-400 mb-0.5">Agent Deployed</Text>
+                    <Text className="text-xs text-green-600 dark:text-green-500 leading-5">
                       The VM is setting up your agent. You'll see it come online once it sends its first heartbeat.
                     </Text>
                   </View>
                 </View>
               ) : cloudVmsLoading ? (
-                <View style={styles.loadingRow}>
+                <View className="flex-row items-center gap-2.5 py-4">
                   <ActivityIndicator size="small" color="#9333ea" />
-                  <Text style={styles.loadingText}>Loading VMs…</Text>
+                  <Text className="text-sm text-purple-600">Loading VMs…</Text>
                 </View>
               ) : cloudVms.length === 0 ? (
-                <View style={styles.emptyVms}>
+                <View className="items-center py-6 gap-2">
                   <Ionicons name="server-outline" size={32} color="#d1d5db" />
-                  <Text style={styles.emptyVmsText}>No running VMs with LLM configured</Text>
-                  <Text style={styles.emptyVmsHint}>
+                  <Text className="text-sm text-gray-700 dark:text-slate-300 font-medium">No running VMs with LLM configured</Text>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500 text-center">
                     Create and configure a VM on the Cloud page first
                   </Text>
                 </View>
               ) : (
                 <>
-                  <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Select a VM</Text>
+                  <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
+                    <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">Select a VM</Text>
                     {cloudVms.map((vm) => (
                       <TouchableOpacity
                         key={vm.id}
-                        style={[
-                          styles.vmCard,
-                          selectedVmId === vm.id && styles.vmCardActive,
-                        ]}
+                        className={[
+                          "flex-row items-center border rounded-xl p-3 gap-2.5",
+                          selectedVmId === vm.id
+                            ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
+                            : "border-gray-200 dark:border-slate-700",
+                        ].join(" ")}
                         onPress={() => setSelectedVmId(vm.id)}
                         activeOpacity={0.75}
                       >
-                        <View style={styles.vmCardCheck}>
+                        <View className="w-6">
                           {selectedVmId === vm.id && (
                             <Ionicons name="checkmark-circle" size={18} color="#2563eb" />
                           )}
                           {selectedVmId !== vm.id && (
-                            <View style={styles.vmCardEmptyCheck} />
+                            <View className="w-5 h-5 rounded-full border-[1.5px] border-gray-300 dark:border-slate-500" />
                           )}
                         </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.vmName}>
+                        <View className="flex-1">
+                          <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">
                             {vm.name || vm.serverName || vm.id.slice(0, 8)}
                           </Text>
-                          <Text style={styles.vmMeta}>
+                          <Text className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
                             {vm.serverType} / {vm.region}
                             {vm.ipv4 ? ` · ${vm.ipv4}` : ""}
                           </Text>
@@ -991,7 +1070,10 @@ export default function CreateAgentScreen() {
                   </View>
                   {selectedVmId && (
                     <TouchableOpacity
-                      style={[styles.primaryBtn, cloudDeploying && styles.primaryBtnDisabled]}
+                      className={[
+                        "bg-blue-600 rounded-xl py-3.5 items-center",
+                        cloudDeploying ? "opacity-45" : "",
+                      ].join(" ")}
                       onPress={handleCloudDeploy}
                       disabled={cloudDeploying}
                       activeOpacity={0.8}
@@ -999,7 +1081,7 @@ export default function CreateAgentScreen() {
                       {cloudDeploying ? (
                         <ActivityIndicator color="#fff" size="small" />
                       ) : (
-                        <Text style={styles.primaryBtnText}>Deploy to VM</Text>
+                        <Text className="text-white text-base font-semibold">Deploy to VM</Text>
                       )}
                     </TouchableOpacity>
                   )}
@@ -1010,448 +1092,21 @@ export default function CreateAgentScreen() {
 
           {/* Done */}
           <TouchableOpacity
-            style={styles.secondaryBtn}
+            className="border border-gray-200 dark:border-slate-700 rounded-xl py-3.5 items-center bg-white dark:bg-slate-800"
             onPress={() => router.push(`/agent/${result.agent.id}` as never)}
             activeOpacity={0.8}
           >
-            <Text style={styles.secondaryBtnText}>View Agent Profile</Text>
+            <Text className="text-base text-gray-700 dark:text-slate-300 font-medium">View Agent Profile</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.ghostBtn}
+            className="items-center py-2.5"
             onPress={() => router.push("/(dashboard)/agents" as never)}
             activeOpacity={0.7}
           >
-            <Text style={styles.ghostBtnText}>Back to Agents</Text>
+            <Text className="text-sm text-gray-400 dark:text-slate-500">Back to Agents</Text>
           </TouchableOpacity>
         </ScrollView>
       )}
     </KeyboardAvoidingView>
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  // Header
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-    backgroundColor: "#f9fafb",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-    gap: 8,
-  },
-  backBtn: { width: 40, height: 40, justifyContent: "center" },
-  headerTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
-  headerSub: { fontSize: 12, color: "#9ca3af", marginTop: 1 },
-
-  // Step indicators
-  stepRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    backgroundColor: "#f9fafb",
-    gap: 0,
-  },
-  stepIndicatorItem: { flexDirection: "row", alignItems: "center" },
-  stepLine: { width: 32, height: 1, backgroundColor: "#e5e7eb" },
-  stepDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#e5e7eb",
-  },
-  stepDotActive: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  stepDotDone: { backgroundColor: "#16a34a", borderColor: "#16a34a" },
-  stepDotText: { fontSize: 12, fontWeight: "600", color: "#9ca3af" },
-
-  // Template list
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  searchInput: { flex: 1, fontSize: 14, color: "#111827" },
-  categoryChips: { paddingHorizontal: 16, paddingBottom: 10, gap: 8, flexDirection: "row" },
-  listContent: { paddingHorizontal: 16, paddingTop: 4, gap: 8 },
-  templateCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 12,
-  },
-  templateEmoji: { fontSize: 24, width: 34, textAlign: "center" },
-  templateName: { fontSize: 14, fontWeight: "600", color: "#111827" },
-  templateDesc: { fontSize: 12, color: "#6b7280", lineHeight: 17, marginTop: 2 },
-  templateCategory: { fontSize: 10, color: "#2563eb", fontWeight: "600", marginTop: 3, textTransform: "uppercase" },
-  empty: { alignItems: "center", paddingTop: 40 },
-  emptyText: { fontSize: 14, color: "#9ca3af" },
-  floatingFooter: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#f9fafb",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-  },
-
-  // Template preview
-  content: { padding: 16, gap: 14 },
-  previewHeader: { flexDirection: "row", alignItems: "flex-start", gap: 14 },
-  previewEmoji: { fontSize: 44 },
-  previewName: { fontSize: 20, fontWeight: "800", color: "#111827" },
-  previewRole: { fontSize: 13, color: "#6b7280", marginTop: 2 },
-  levelBadge: {
-    backgroundColor: "#eff6ff",
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    alignSelf: "flex-start",
-  },
-  levelBadgeText: { fontSize: 11, color: "#2563eb", fontWeight: "600" },
-  categoryTag: {
-    alignSelf: "flex-start",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  categoryTagText: { fontSize: 11, color: "#6b7280", fontWeight: "500" },
-  previewDesc: { fontSize: 14, color: "#374151", lineHeight: 21 },
-  behaviorBox: {
-    backgroundColor: "#f9fafb",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    padding: 14,
-    gap: 6,
-  },
-  sectionLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#9ca3af",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginBottom: 4,
-  },
-  behaviorText: { fontSize: 13, color: "#374151", lineHeight: 20 },
-  section: { gap: 8 },
-  skillRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  skillDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#60a5fa", marginTop: 6, flexShrink: 0 },
-  skillText: { fontSize: 13, color: "#374151", flex: 1, lineHeight: 19 },
-  capabilityWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  capBadge: {
-    backgroundColor: "#f9fafb",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  capBadgeText: { fontSize: 12, color: "#374151" },
-
-  // Details form
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 12,
-  },
-  cardTitle: { fontSize: 14, fontWeight: "700", color: "#111827" },
-  field: { gap: 6 },
-  label: { fontSize: 13, fontWeight: "600", color: "#374151" },
-  required: { color: "#dc2626" },
-  optional: { color: "#9ca3af", fontWeight: "400" },
-  hint: { fontSize: 12, color: "#9ca3af" },
-  input: {
-    backgroundColor: "#f9fafb",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 15,
-    color: "#111827",
-  },
-  textArea: { minHeight: 110, paddingTop: 11 },
-  usernameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  usernameAt: { fontSize: 15, color: "#6b7280", fontWeight: "500" },
-  emojiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  emojiBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: "#e5e7eb",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-  },
-  emojiBtnActive: { borderColor: "#2563eb", backgroundColor: "#eff6ff" },
-  emojiChar: { fontSize: 22 },
-  chipRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  chip: {
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: "#fff",
-  },
-  chipActive: { borderColor: "#2563eb", backgroundColor: "#eff6ff" },
-  chipText: { fontSize: 13, color: "#6b7280", fontWeight: "500" },
-  chipTextActive: { color: "#2563eb", fontWeight: "600" },
-  templatePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#eff6ff",
-    borderRadius: 10,
-    padding: 10,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-  },
-  templatePillEmoji: { fontSize: 18 },
-  templatePillText: { flex: 1, fontSize: 13, fontWeight: "600", color: "#1d4ed8" },
-  templatePillChange: { fontSize: 12, color: "#2563eb", fontWeight: "500" },
-
-  // Buttons
-  primaryBtn: {
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  primaryBtnDisabled: { opacity: 0.45 },
-  primaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  secondaryBtn: {
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: "center",
-    backgroundColor: "#fff",
-  },
-  secondaryBtnText: { fontSize: 15, color: "#374151", fontWeight: "500" },
-  ghostBtn: { alignItems: "center", paddingVertical: 10 },
-  ghostBtnText: { fontSize: 14, color: "#9ca3af" },
-
-  // Setup step
-  dangerBox: {
-    flexDirection: "row",
-    gap: 12,
-    borderWidth: 1.5,
-    borderColor: "#fca5a5",
-    backgroundColor: "#fff1f2",
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "flex-start",
-  },
-  dangerBoxTitle: { fontSize: 14, fontWeight: "700", color: "#dc2626", marginBottom: 3 },
-  dangerBoxText: { fontSize: 12, color: "#ef4444", lineHeight: 18 },
-
-  modeTabs: { paddingVertical: 4, gap: 6, flexDirection: "row" },
-  modeTab: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
-  },
-  modeTabActive: { borderColor: "#bfdbfe", backgroundColor: "#eff6ff" },
-  modeTabText: { fontSize: 12, fontWeight: "500", color: "#6b7280" },
-  modeTabTextActive: { color: "#2563eb", fontWeight: "600" },
-
-  infoBox: {
-    flexDirection: "row",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    backgroundColor: "#eff6ff",
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "flex-start",
-  },
-  infoBoxTitle: { fontSize: 13, fontWeight: "700", color: "#1d4ed8", marginBottom: 3 },
-  infoBoxText: { fontSize: 12, color: "#3b82f6", lineHeight: 18 },
-
-  warningBox: {
-    flexDirection: "row",
-    gap: 12,
-    borderWidth: 1.5,
-    borderColor: "#fde68a",
-    backgroundColor: "#fffbeb",
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "flex-start",
-  },
-  warningBoxTitle: { fontSize: 13, fontWeight: "700", color: "#d97706", marginBottom: 3 },
-  warningBoxText: { fontSize: 12, color: "#92400e", lineHeight: 18, marginBottom: 8 },
-  apiKeyRow: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#fff", borderRadius: 8, padding: 10, borderWidth: 1, borderColor: "#fde68a" },
-  apiKeyText: { flex: 1, fontSize: 13, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", color: "#111827" },
-  iconBtn: { padding: 4 },
-
-  codeSection: { gap: 8 },
-  codeSectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  codeSectionTitle: { fontSize: 14, fontWeight: "600", color: "#111827" },
-  copyBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
-  copyBtnText: { fontSize: 12, color: "#2563eb", fontWeight: "500" },
-  codeBox: {
-    backgroundColor: "#1f2937",
-    borderRadius: 10,
-    padding: 12,
-    maxHeight: 200,
-  },
-  codeText: {
-    fontSize: 11,
-    color: "#d1fae5",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-    lineHeight: 18,
-  },
-
-  stepsBox: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    padding: 16,
-    gap: 12,
-  },
-  stepsTitle: { fontSize: 14, fontWeight: "700", color: "#111827" },
-  stepItem: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
-  stepBubble: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#eff6ff", justifyContent: "center", alignItems: "center", flexShrink: 0, marginTop: 1 },
-  stepBubbleText: { fontSize: 11, fontWeight: "700", color: "#2563eb" },
-  stepItemText: { fontSize: 13, color: "#374151", flex: 1, lineHeight: 19 },
-
-  setupStep: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    padding: 14,
-    gap: 10,
-  },
-  setupStepHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
-  setupStepTitle: { fontSize: 14, fontWeight: "700", color: "#111827" },
-  setupStepHint: { fontSize: 12, color: "#6b7280", lineHeight: 18 },
-  codeBlock: {
-    backgroundColor: "#1f2937",
-    borderRadius: 8,
-    padding: 12,
-  },
-  codeGreen: {
-    fontSize: 11,
-    color: "#4ade80",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-    lineHeight: 18,
-  },
-  copyRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  copyRowText: { fontSize: 12, color: "#2563eb", fontWeight: "500" },
-  configFileCard: {
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  configFileHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#f9fafb",
-  },
-  configFileName: { flex: 1, fontSize: 13, fontWeight: "500", color: "#374151" },
-  configFileCopy: { flexDirection: "row", alignItems: "center", gap: 4 },
-
-  successBox: {
-    flexDirection: "row",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "#bbf7d0",
-    backgroundColor: "#f0fdf4",
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "flex-start",
-  },
-  successBoxTitle: { fontSize: 13, fontWeight: "700", color: "#15803d", marginBottom: 3 },
-  successBoxText: { fontSize: 12, color: "#16a34a", lineHeight: 18 },
-
-  summaryCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    padding: 14,
-    gap: 8,
-  },
-  summaryTitle: { fontSize: 13, fontWeight: "700", color: "#374151", marginBottom: 4 },
-  summaryRow: { flexDirection: "row", gap: 8 },
-  summaryLabel: { fontSize: 13, color: "#6b7280", width: 80 },
-  summaryValue: { fontSize: 13, fontWeight: "600", color: "#111827", flex: 1 },
-
-  doneBox: {
-    flexDirection: "row",
-    gap: 12,
-    borderWidth: 1.5,
-    borderColor: "#bbf7d0",
-    backgroundColor: "#f0fdf4",
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "flex-start",
-  },
-  doneBoxTitle: { fontSize: 14, fontWeight: "700", color: "#15803d", marginBottom: 2 },
-  doneBoxText: { fontSize: 12, color: "#16a34a", lineHeight: 18 },
-
-  loadingRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 16 },
-  loadingText: { fontSize: 13, color: "#9333ea" },
-
-  emptyVms: { alignItems: "center", paddingVertical: 24, gap: 8 },
-  emptyVmsText: { fontSize: 14, color: "#374151", fontWeight: "500" },
-  emptyVmsHint: { fontSize: 12, color: "#9ca3af", textAlign: "center" },
-
-  vmCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    padding: 12,
-    gap: 10,
-  },
-  vmCardActive: { borderColor: "#2563eb", backgroundColor: "#eff6ff" },
-  vmCardCheck: { width: 22 },
-  vmCardEmptyCheck: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: "#d1d5db" },
-  vmName: { fontSize: 14, fontWeight: "600", color: "#111827" },
-  vmMeta: { fontSize: 12, color: "#6b7280", marginTop: 2 },
-
-  mono: { fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", fontSize: 12 },
-});

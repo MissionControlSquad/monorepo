@@ -5,11 +5,14 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "tsc -p tsconfig.json && electron .",
-    "build": "tsc -p tsconfig.json && electron-builder --mac",
+    "build": "tsc -p tsconfig.json",
+    "package:mac": "tsc -p tsconfig.json && electron-builder --mac",
+    "package:win": "tsc -p tsconfig.json && electron-builder --win",
+    "package:linux": "tsc -p tsconfig.json && electron-builder --linux",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
-    "electron": "^35.1.2",
+    "electron": "35.7.5",
     "electron-builder": "^26.0.12",
     "electron-store": "^8.2.0",
     "electron-updater": "^6.6.2",

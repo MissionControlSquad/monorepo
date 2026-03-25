@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle,
@@ -15,16 +15,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { PushPermissionBanner } from "./PushPermissionBanner";
-
-interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  body: string;
-  url: string | null;
-  readAt: string | null;
-  createdAt: string;
-}
+import type { NotificationItem } from "@agentcenter/types";
 
 const TYPE_ICONS: Record<string, typeof CheckCircle> = {
   task_done: CheckCircle,
@@ -51,51 +42,39 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 interface NotificationDropdownProps {
+  notifications: NotificationItem[];
   onClose: () => void;
+  onMarkOneRead: (id: string) => void;
   onMarkAllRead: () => void;
 }
 
-export function NotificationDropdown({ onClose, onMarkAllRead }: NotificationDropdownProps) {
+export function NotificationDropdown({
+  notifications,
+  onClose,
+  onMarkOneRead,
+  onMarkAllRead,
+}: NotificationDropdownProps) {
   const router = useRouter();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch("/api/user-notifications?limit=20")
-      .then((r) => r.json())
-      .then((data) => {
-        setNotifications(data.notifications ?? []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
 
   const handleClick = useCallback(
-    async (n: Notification) => {
-      // Mark as read
+    async (n: NotificationItem) => {
       if (!n.readAt) {
-        fetch(`/api/user-notifications/${n.id}/read`, { method: "PATCH" }).catch(() => {});
+        onMarkOneRead(n.id);
       }
       if (n.url) {
         router.push(n.url);
       }
       onClose();
     },
-    [router, onClose],
+    [router, onClose, onMarkOneRead],
   );
-
-  const handleMarkAllRead = useCallback(async () => {
-    await fetch("/api/user-notifications/read-all", { method: "PATCH" }).catch(() => {});
-    setNotifications((prev) => prev.map((n) => ({ ...n, readAt: new Date().toISOString() })));
-    onMarkAllRead();
-  }, [onMarkAllRead]);
 
   return (
     <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-background border border-border rounded-lg shadow-xl z-50 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
         <button
-          onClick={handleMarkAllRead}
+          onClick={onMarkAllRead}
           className="text-xs text-primary hover:text-primary/80 font-medium"
         >
           Mark all read
@@ -105,11 +84,7 @@ export function NotificationDropdown({ onClose, onMarkAllRead }: NotificationDro
       <PushPermissionBanner />
 
       <div className="max-h-96 overflow-y-auto">
-        {loading && (
-          <div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
-        )}
-
-        {!loading && notifications.length === 0 && (
+        {notifications.length === 0 && (
           <div className="py-8 text-center">
             <AlertCircle className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">No notifications yet</p>

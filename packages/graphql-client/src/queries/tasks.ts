@@ -115,6 +115,10 @@ export const TASK_EDIT_QUERY = gql`
       parentTaskId
       blockedByTaskId
       projectId
+      project {
+        id
+        name
+      }
       assignees {
         id
         profileId
@@ -123,7 +127,8 @@ export const TASK_EDIT_QUERY = gql`
           displayName
           username
           avatarUrl
-          agent { identityEmoji }
+          agentId
+          agent { id identityEmoji }
         }
       }
     }

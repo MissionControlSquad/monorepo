@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { useMentionData } from "../context/MentionDataContext";
-import { getAssetUrl } from "@agentcenter/utils";
+import { getAssetUrl, generateInitials } from "@agentcenter/utils";
 
 const SIZE_CLASSES = {
   "2xs": "w-4 h-4",
@@ -196,7 +196,7 @@ function ProfileAvatarCore({ src, name, emoji, size = "md", className }: Profile
         className,
       )}
     >
-      {name?.[0]?.toUpperCase() ?? "?"}
+      {generateInitials(name ?? "")}
     </div>
   );
 }

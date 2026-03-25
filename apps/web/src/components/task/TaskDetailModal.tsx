@@ -54,6 +54,7 @@ import { ErrorBoundary, PanelErrorFallback } from "../common/ErrorBoundary";
 import { MarkdownWithMentions } from "../common/MarkdownWithMentions";
 import { MarkdownEditor } from "../common/MarkdownEditor";
 import { HEARTBEAT_TIMEOUT_MS } from "../../lib/constants";
+import { formatDuration } from "@agentcenter/utils";
 import { format } from "date-fns";
 import { TimeAgo } from "../common/TimeAgo";
 import { CopyButton } from "../common/CopyButton";
@@ -91,13 +92,6 @@ interface TaskDetailModalProps {
   onOpenTask?: (taskIdentifier: number | string, options?: { replace?: boolean }) => void;
 }
 
-function formatWorkTime(ms: number): string {
-  const hours = Math.floor(ms / 3600000);
-  const minutes = Math.floor((ms % 3600000) / 60000);
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-}
-
 export function TaskDetailModal({
   task,
   isOpen,
@@ -120,22 +114,46 @@ export function TaskDetailModal({
   const [approvalLoading, setApprovalLoading] = useState<"approve" | "reject" | "clarify" | null>(
     null,
   );
+  const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [approveComment, setApproveComment] = useState("");
+  const [approveChildTasks, setApproveChildTasks] = useState<
+    Array<{ title: string; description: string }>
+  >([]);
+  const [childTaskInput, setChildTaskInput] = useState("");
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectChanges, setRejectChanges] = useState("");
   const [showClarifyDialog, setShowClarifyDialog] = useState(false);
   const [clarifyQuestions, setClarifyQuestions] = useState("");
 
-  async function handleApproveTask(comment?: string) {
+  function addChildTask() {
+    const title = childTaskInput.trim();
+    if (!title) return;
+    setApproveChildTasks((c) => [...c, { title, description: "" }]);
+    setChildTaskInput("");
+  }
+
+  function removeChildTask(i: number) {
+    setApproveChildTasks((c) => c.filter((_, idx) => idx !== i));
+  }
+
+  async function handleApproveTask() {
     if (!currentUserProfile?.id || !taskId) return;
+    setShowApproveDialog(false);
     setApprovalLoading("approve");
     try {
       const res = await executeApproveTask({
         reviewerId: currentUserProfile.id,
         taskId,
-        approvalComment: comment || undefined,
+        approvalComment: approveComment.trim() || undefined,
+        childTasks: approveChildTasks.length ? JSON.stringify(approveChildTasks) : undefined,
       });
       if (res.error) toast.error(res.error.message ?? "Failed to approve task");
+      else {
+        setApproveComment("");
+        setApproveChildTasks([]);
+        setChildTaskInput("");
+      }
     } finally {
       setApprovalLoading(null);
     }
@@ -1200,7 +1218,7 @@ export function TaskDetailModal({
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Total time</span>
                         <span className="text-sm font-medium text-foreground">
-                          {formatWorkTime(workSummary.totalWorkTimeMs)}
+                          {formatDuration(workSummary.totalWorkTimeMs)}
                         </span>
                       </div>
                       {workSummary.agentBreakdown?.map(
@@ -1214,7 +1232,7 @@ export function TaskDetailModal({
                               {entry.agentName ?? "Unknown"}
                             </span>
                             <span className="text-xs font-medium text-foreground">
-                              {formatWorkTime(entry.totalMs)}
+                              {formatDuration(entry.totalMs)}
                             </span>
                           </div>
                         ),
@@ -1317,7 +1335,7 @@ export function TaskDetailModal({
             <Button
               variant="primary"
               size="sm"
-              onClick={() => handleApproveTask()}
+              onClick={() => setShowApproveDialog(true)}
               disabled={approvalLoading !== null}
             >
               {approvalLoading === "approve" ? (
@@ -1432,6 +1450,99 @@ export function TaskDetailModal({
                   disabled={!clarifyQuestions.trim()}
                 >
                   Send Questions
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Approve Dialog */}
+        {showApproveDialog && (
+          <div
+            className="absolute inset-0 z-50 flex items-center justify-center bg-black/40"
+            onClick={() => setShowApproveDialog(false)}
+          >
+            <div
+              className="bg-background rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 flex flex-col gap-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-base font-semibold text-foreground">Approve Task</h2>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Approval Comment (optional)
+                </label>
+                <textarea
+                  className="w-full rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                  rows={3}
+                  placeholder="Great work! Leave a comment for the team..."
+                  value={approveComment}
+                  onChange={(e) => setApproveComment(e.target.value)}
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Spawn Child Tasks (optional)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="New task title..."
+                    value={childTaskInput}
+                    onChange={(e) => setChildTaskInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addChildTask();
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={addChildTask}
+                    disabled={!childTaskInput.trim()}
+                  >
+                    Add
+                  </Button>
+                </div>
+                {approveChildTasks.length > 0 && (
+                  <ul className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
+                    {approveChildTasks.map((ct, i) => (
+                      <li
+                        key={i}
+                        className="flex items-center gap-2 rounded-lg bg-muted/60 px-3 py-1.5"
+                      >
+                        <span className="flex-1 text-sm text-foreground truncate">{ct.title}</span>
+                        <button
+                          onClick={() => removeChildTask(i)}
+                          className="text-muted-foreground hover:text-destructive text-xs shrink-0"
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowApproveDialog(false);
+                    setApproveComment("");
+                    setApproveChildTasks([]);
+                    setChildTaskInput("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button variant="primary" size="sm" onClick={handleApproveTask}>
+                  Approve Task
                 </Button>
               </div>
             </div>

@@ -6,13 +6,13 @@ import { verifySessionToken, COOKIE_NAME, type SessionPayload } from "@/server/a
  */
 export async function resolveSession(request: Request): Promise<SessionPayload> {
   const cookie = request.headers.get("cookie");
-  if (!cookie) throw { error: "Not authenticated", status: 401 };
+  if (!cookie) throw { error: "Not authenticated", status: 401, code: "UNAUTHENTICATED" };
 
   const match = cookie.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-  if (!match) throw { error: "Not authenticated", status: 401 };
+  if (!match) throw { error: "Not authenticated", status: 401, code: "UNAUTHENTICATED" };
 
   const session = await verifySessionToken(match[1].trim());
-  if (!session) throw { error: "Invalid or expired session", status: 401 };
+  if (!session) throw { error: "Invalid or expired session", status: 401, code: "SESSION_EXPIRED" };
 
   return session;
 }

@@ -15,7 +15,9 @@
   },
   "dependencies": {
     "@agentcenter/config": "*",
+    "@agentcenter/tailwind-config": "*",
     "@agentcenter/graphql-client": "*",
+    "@agentcenter/hooks": "*",
     "@agentcenter/types": "*",
     "@agentcenter/utils": "*",
     "@expo/vector-icons": "^15.0.3",

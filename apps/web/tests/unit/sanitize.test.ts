@@ -68,8 +68,9 @@ describe("parseChildTasks", () => {
     expect(() => parseChildTasks([{ description: "D" }])).toThrow("title is required");
   });
 
-  it("throws on missing description", () => {
-    expect(() => parseChildTasks([{ title: "T" }])).toThrow("description is required");
+  it("allows missing description", () => {
+    const result = parseChildTasks([{ title: "T" }]);
+    expect(result[0].description).toBeUndefined();
   });
 
   it("throws on non-object array element", () => {

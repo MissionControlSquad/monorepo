@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { shouldIgnoreKeyboardShortcut } from "@agentcenter/utils";
 
 /**
  * Registers "G then letter" navigation shortcuts (vim-style go-to).
@@ -14,12 +15,7 @@ export function useGoShortcuts() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
-        return;
-      }
-
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (shouldIgnoreKeyboardShortcut(e)) return;
 
       if (!pendingG.current && e.key === "g") {
         pendingG.current = true;

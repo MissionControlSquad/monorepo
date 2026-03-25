@@ -1,12 +1,8 @@
 @import "tailwindcss";
+@import "@agentcenter/tailwind-config/globals.css";
 
-/* AgentCenter design alignment (agentcenter.cloud): slate/neutral surfaces, indigo accent */
+/* shadcn/ui + app-specific overrides */
 @theme {
-  /* Project brand colors */
-  --color-brand: #4f46e5;
-  --color-brand-hover: #4338ca;
-  --color-brand-muted: #eef2ff;
-  --font-sans: "Inter", system-ui, sans-serif;
 
   /* shadcn/ui theme - radius */
   --radius: 0.625rem;

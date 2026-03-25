@@ -3,45 +3,21 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
   RefreshControl,
 } from "react-native";
 import { useQuery, useSubscription } from "urql";
 import { useRouter } from "expo-router";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SearchBar } from "../src/components/SearchBar";
+import { ScreenLoading } from "../src/components/ScreenLoading";
+import { ScreenError } from "../src/components/ScreenError";
+import { ListFooterLoading } from "../src/components/ListFooterLoading";
 import { ACTIVITIES_CONNECTION_QUERY, ACTIVITY_CREATED_SUBSCRIPTION } from "@agentcenter/graphql-client";
+import { ACTIVITY_TYPE_HEX_COLORS, DEFAULT_COLOR, PAGE_SIZE_DEFAULT, formatRelativeTime, appendDeduped, prependDeduped } from "@agentcenter/utils";
+import type { Activity } from "@agentcenter/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-interface ActivityProfile {
-  id: string;
-  displayName: string;
-  username: string;
-  avatarUrl: string | null;
-  agentId: string | null;
-}
-
-interface ActivityTask {
-  id: string;
-  title: string;
-  taskNumber: number;
-  status: string;
-}
-
-interface Activity {
-  id: string;
-  type: string;
-  profileId: string;
-  taskId: string | null;
-  projectId: string | null;
-  message: string;
-  metadata: Record<string, unknown> | null;
-  createdAt: string;
-  profile: ActivityProfile | null;
-  task: ActivityTask | null;
-}
 
 interface ActivitiesConnection {
   activities: Activity[];
@@ -50,56 +26,29 @@ interface ActivitiesConnection {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const TYPE_COLORS: Record<string, string> = {
-  task_created: "#2563eb",
-  task_updated: "#d97706",
-  task_completed: "#16a34a",
-  task_rejected: "#dc2626",
-  task_approved: "#16a34a",
-  task_assigned: "#7c3aed",
-  task_unassigned: "#6b7280",
-  agent_status_changed: "#0891b2",
-  message_sent: "#6b7280",
-  deliverable_created: "#2563eb",
-  project_created: "#d97706",
-  project_updated: "#6b7280",
-};
-
 function getColor(type: string) {
-  return TYPE_COLORS[type] ?? "#6b7280";
+  return ACTIVITY_TYPE_HEX_COLORS[type] ?? DEFAULT_COLOR;
 }
-
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-const PAGE_SIZE = 30;
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function ActivityScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [search, setSearch] = useState("");
   const [after, setAfter] = useState<string | undefined>(undefined);
   const [accumulated, setAccumulated] = useState<Activity[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [liveItems, setLiveItems] = useState<Activity[]>([]);
   const seenIds = useRef(new Set<string>());
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ activitiesConnection: ActivitiesConnection }>({
     query: ACTIVITIES_CONNECTION_QUERY,
-    variables: { first: PAGE_SIZE, after },
+    variables: { first: PAGE_SIZE_DEFAULT, after },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   useSubscription(
@@ -120,17 +69,18 @@ export default function ActivityScreen() {
   const hasMore = connection?.hasMore ?? false;
 
   // Merge live (real-time) items on top, then paginated items below
-  const displayed: Activity[] = (() => {
-    const base: Activity[] = (() => {
-      if (pageFetched.length === 0) return accumulated;
-      const ids = new Set(accumulated.map((a) => a.id));
-      const newOnes = pageFetched.filter((a) => !ids.has(a.id));
-      return [...accumulated, ...newOnes];
-    })();
-    const baseIds = new Set(base.map((a) => a.id));
-    const newLive = liveItems.filter((a) => !baseIds.has(a.id));
-    return [...newLive, ...base];
+  const allDisplayed: Activity[] = (() => {
+    const base = pageFetched.length === 0 ? accumulated : appendDeduped(accumulated, pageFetched);
+    return prependDeduped(base, liveItems);
   })();
+  const q = search.trim().toLowerCase();
+  const displayed = q
+    ? allDisplayed.filter(
+        (a) =>
+          a.type.toLowerCase().includes(q) ||
+          (a.message ?? "").toLowerCase().includes(q),
+      )
+    : allDisplayed;
 
   function handleRefresh() {
     setAfter(undefined);
@@ -145,42 +95,27 @@ export default function ActivityScreen() {
     const last = pageFetched[pageFetched.length - 1];
     if (!last) return;
     // Commit current page into accumulated before advancing cursor
-    setAccumulated((prev) => {
-      const ids = new Set(prev.map((a) => a.id));
-      const newOnes = pageFetched.filter((a) => !ids.has(a.id));
-      return [...prev, ...newOnes];
-    });
+    setAccumulated((prev) => appendDeduped(prev, pageFetched));
     setAfter(last.id);
   }, [hasMore, loadingMore, fetching, pageFetched]);
 
-  if (fetching && displayed.length === 0) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
-
-  if (error && displayed.length === 0) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Failed to load activity</Text>
-        <TouchableOpacity onPress={handleRefresh}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (fetching && displayed.length === 0) return <ScreenLoading />;
+  if (error && displayed.length === 0) return <ScreenError message="Failed to load activity" onRetry={handleRefresh} />;
 
   return (
+    <View className="flex-1">
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search activity…"
+      />
     <FlatList
       data={displayed}
       keyExtractor={(item) => item.id}
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={[
-        styles.listContent,
-        { paddingBottom: insets.bottom + 16 },
-        displayed.length === 0 && styles.emptyContainer,
+        { padding: 16, gap: 0, paddingBottom: insets.bottom + 16 },
+        displayed.length === 0 && { flex: 1, justifyContent: "center", alignItems: "center" },
       ]}
       refreshControl={
         <RefreshControl
@@ -190,24 +125,10 @@ export default function ActivityScreen() {
         />
       }
       ListEmptyComponent={
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No activity yet</Text>
-        </View>
+        <Text className="text-gray-400 dark:text-slate-500 text-base">No activity yet</Text>
       }
       ListFooterComponent={
-        hasMore ? (
-          <TouchableOpacity
-            style={styles.loadMoreBtn}
-            onPress={handleLoadMore}
-            disabled={fetching}
-          >
-            {fetching ? (
-              <ActivityIndicator size="small" color="#2563eb" />
-            ) : (
-              <Text style={styles.loadMoreText}>Load more</Text>
-            )}
-          </TouchableOpacity>
-        ) : null
+        <ListFooterLoading hasMore={hasMore} fetching={fetching} onLoadMore={handleLoadMore} />
       }
       renderItem={({ item, index }) => {
         const color = getColor(item.type);
@@ -220,7 +141,7 @@ export default function ActivityScreen() {
         return (
           <>
             {showDate && (
-              <Text style={styles.dateDivider}>
+              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide mt-5 mb-2 ml-7">
                 {new Date(item.createdAt).toLocaleDateString("en-US", {
                   weekday: "long",
                   month: "short",
@@ -228,39 +149,42 @@ export default function ActivityScreen() {
                 })}
               </Text>
             )}
-            <View style={styles.activityRow}>
+            <View className="flex-row gap-3 mb-1">
               {/* Timeline line + dot */}
-              <View style={styles.timelineCol}>
-                <View style={[styles.dot, { backgroundColor: color }]} />
-                <View style={styles.line} />
+              <View className="w-4 items-center pt-1">
+                <View className="w-2.5 h-2.5 rounded-full mt-1" style={{ backgroundColor: color }} />
+                <View className="flex-1 w-px bg-gray-200 dark:bg-slate-700 mt-1" style={{ minHeight: 20 }} />
               </View>
 
               {/* Content */}
-              <View style={styles.contentCol}>
+              <View className="flex-1 pb-4 gap-1.5">
                 {/* Header: avatar + name + time */}
-                <View style={styles.activityHeader}>
-                  <View style={[styles.avatar, { borderColor: color }]}>
-                    <Text style={[styles.avatarText, { color }]}>
+                <View className="flex-row items-center gap-2">
+                  <View
+                    className="w-7 h-7 rounded-full bg-gray-100 dark:bg-slate-700 border-[1.5px] justify-center items-center"
+                    style={{ borderColor: color }}
+                  >
+                    <Text className="text-xs font-bold" style={{ color }}>
                       {item.profile?.displayName?.charAt(0)?.toUpperCase() ?? "?"}
                     </Text>
                   </View>
-                  <Text style={styles.actorName} numberOfLines={1}>
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1" numberOfLines={1}>
                     {item.profile?.displayName ?? "Unknown"}
                   </Text>
-                  <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500">{formatRelativeTime(item.createdAt)}</Text>
                 </View>
 
                 {/* Message */}
-                <Text style={styles.activityMessage}>{item.message}</Text>
+                <Text className="text-sm text-gray-700 dark:text-slate-300 leading-5">{item.message}</Text>
 
                 {/* Task link */}
                 {item.task && (
                   <TouchableOpacity
-                    style={styles.taskLink}
+                    className="px-2.5 py-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-800 self-start"
                     onPress={() => router.push(`/task/${item.task!.id}`)}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.taskLinkText}>
+                    <Text className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                       #{item.task.taskNumber} · {item.task.title}
                     </Text>
                   </TouchableOpacity>
@@ -271,118 +195,6 @@ export default function ActivityScreen() {
         );
       }}
     />
+    </View>
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
-  errorText: { color: "#dc2626", fontSize: 16 },
-  retryText: { color: "#2563eb", fontSize: 14, fontWeight: "600" },
-  listContent: { padding: 16, gap: 0 },
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyState: { alignItems: "center" },
-  emptyText: { color: "#9ca3af", fontSize: 16 },
-
-  dateDivider: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#9ca3af",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginTop: 20,
-    marginBottom: 8,
-    marginLeft: 28,
-  },
-
-  activityRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 4,
-  },
-
-  // Timeline
-  timelineCol: {
-    width: 16,
-    alignItems: "center",
-    paddingTop: 4,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 4,
-  },
-  line: {
-    flex: 1,
-    width: 1,
-    backgroundColor: "#e5e7eb",
-    marginTop: 4,
-    minHeight: 20,
-  },
-
-  // Content
-  contentCol: {
-    flex: 1,
-    paddingBottom: 16,
-    gap: 6,
-  },
-  activityHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  avatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "#f3f4f6",
-    borderWidth: 1.5,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  actorName: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#111827",
-    flex: 1,
-  },
-  timeText: {
-    fontSize: 11,
-    color: "#9ca3af",
-  },
-  activityMessage: {
-    fontSize: 14,
-    color: "#374151",
-    lineHeight: 20,
-  },
-  taskLink: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: "#eff6ff",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    alignSelf: "flex-start",
-  },
-  taskLinkText: {
-    fontSize: 12,
-    color: "#2563eb",
-    fontWeight: "500",
-  },
-  loadMoreBtn: {
-    marginTop: 12,
-    padding: 12,
-    alignItems: "center",
-  },
-  loadMoreText: {
-    color: "#2563eb",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-});

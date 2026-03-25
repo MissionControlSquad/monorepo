@@ -28,7 +28,13 @@ import {
   ChevronDown,
   Box,
 } from "lucide-react";
-import { LLM_PROVIDERS, LLM_PROVIDERS_MAP, PROVIDER_COLORS } from "@agentcenter/utils";
+import {
+  LLM_PROVIDERS,
+  LLM_PROVIDERS_MAP,
+  PROVIDER_COLORS,
+  formatUptime,
+  formatCost,
+} from "@agentcenter/utils";
 import { toast } from "sonner";
 import { Breadcrumbs, Button, Badge, Card, ConfirmDialog, Input } from "../components/ui";
 
@@ -106,17 +112,6 @@ const STEP_LABELS: Record<string, string> = {
   start_daemon: "Starting OpenClaw daemon...",
   retrying: "Retrying provisioning...",
 };
-
-function formatUptime(seconds: number): string {
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400)
-    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
-  return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
-}
-
-function formatCost(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 interface CloudVMDetailPageProps {
   vmId: string;

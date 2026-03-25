@@ -1,17 +1,12 @@
 import { registerRootComponent } from "expo";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text } from "react-native";
 
 function App() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>AgentCenter is loading...</Text>
+    <View className="flex-1 justify-center items-center bg-white">
+      <Text className="text-xl text-gray-900">AgentCenter is loading...</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" },
-  text: { fontSize: 20, color: "#111" },
-});
 
 registerRootComponent(App);

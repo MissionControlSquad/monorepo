@@ -3,24 +3,17 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
   SectionList,
+  ActivityIndicator,
 } from "react-native";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "urql";
 import { GLOBAL_SEARCH_QUERY, TASK_BY_NUMBER_QUERY } from "@agentcenter/graphql-client";
-import { useTheme } from "../src/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
-
-// The server returns JSON-encoded arrays in these fields
-interface SearchResults {
-  tasks: string;      // JSON: Array<{ id, title, taskNumber, status, priority }>
-  messages: string;   // JSON: Array<{ id, content, taskId, channelId }>
-  deliverables: string; // JSON: Array<{ id, title, type, taskId }>
-}
+import { StatusPill } from "../src/components/StatusPill";
+import { SectionLabel } from "../src/components/SectionLabel";
 
 interface TaskResult {
   id: string;
@@ -44,27 +37,13 @@ interface DeliverableResult {
   taskId: string;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  inbox: "#6b7280",
-  assigned: "#d97706",
-  in_progress: "#2563eb",
-  review: "#7c3aed",
-  done: "#16a34a",
-  blocked: "#dc2626",
-};
-
-function parseJSON<T>(raw: string | undefined | null): T[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
-  } catch {
-    return [];
-  }
+interface SearchResults {
+  tasks: TaskResult[];
+  messages: MessageResult[];
+  deliverables: DeliverableResult[];
 }
 
 export default function SearchScreen() {
-  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -75,23 +54,26 @@ export default function SearchScreen() {
   const taskNumberMatch = submittedQuery.trim().match(/^#(\d+)$/);
   const taskNumber = taskNumberMatch ? parseInt(taskNumberMatch[1], 10) : null;
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [taskByNumberResult] = useQuery<{ taskByNumber: { id: string } | null }>({
     query: TASK_BY_NUMBER_QUERY,
     variables: { taskNumber: taskNumber ?? 0 },
-    pause: taskNumber === null,
+    pause: !mounted || taskNumber === null,
     requestPolicy: "cache-and-network",
   });
 
   const [result] = useQuery<{ globalSearch: SearchResults }>({
     query: GLOBAL_SEARCH_QUERY,
     variables: { searchText: submittedQuery, limit: 30 },
-    pause: submittedQuery.trim().length < 2 || taskNumber !== null,
+    pause: !mounted || submittedQuery.trim().length < 2 || taskNumber !== null,
     requestPolicy: "cache-and-network",
   });
 
-  const tasks = parseJSON<TaskResult>(result.data?.globalSearch.tasks);
-  const messages = parseJSON<MessageResult>(result.data?.globalSearch.messages);
-  const deliverables = parseJSON<DeliverableResult>(result.data?.globalSearch.deliverables);
+  const tasks = result.data?.globalSearch.tasks ?? [];
+  const messages = result.data?.globalSearch.messages ?? [];
+  const deliverables = result.data?.globalSearch.deliverables ?? [];
 
   const totalCount = tasks.length + messages.length + deliverables.length;
   const hasResults = totalCount > 0;
@@ -129,39 +111,16 @@ export default function SearchScreen() {
   ];
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View className="flex-1 bg-white dark:bg-slate-900">
       {/* Search bar */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          paddingHorizontal: 16,
-          paddingTop: 12,
-          paddingBottom: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-          gap: 10,
-        }}
-      >
-        <View
-          style={{
-            flex: 1,
-            flexDirection: "row",
-            alignItems: "center",
-            backgroundColor: colors.inputBg,
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 12,
-            paddingHorizontal: 12,
-            gap: 8,
-          }}
-        >
-          <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
+      <View className="flex-row items-center bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-4 py-3 gap-2.5">
+        <View className="flex-1 flex-row items-center bg-gray-100 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3 gap-2">
+          <Ionicons name="search-outline" size={18} color="#9ca3af" />
           <TextInput
             ref={inputRef}
-            style={{ flex: 1, fontSize: 15, color: colors.text, paddingVertical: 10 }}
+            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-2.5"
             placeholder="Search tasks, messages, deliverables…"
-            placeholderTextColor={colors.placeholder}
+            placeholderTextColor="#9ca3af"
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={handleSubmit}
@@ -172,35 +131,40 @@ export default function SearchScreen() {
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={handleClear} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+              <Ionicons name="close-circle" size={18} color="#9ca3af" />
             </TouchableOpacity>
           )}
         </View>
         <TouchableOpacity onPress={handleSubmit} activeOpacity={0.7}>
-          <Text style={{ color: colors.accent, fontSize: 15, fontWeight: "600" }}>Search</Text>
+          <Text className="text-blue-600 dark:text-blue-400 text-base font-semibold">Search</Text>
         </TouchableOpacity>
       </View>
 
       {/* Results */}
       {(result.fetching || taskByNumberResult.fetching) ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <ActivityIndicator size="large" color={colors.accent} />
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color="#2563eb" />
         </View>
       ) : taskNumber !== null && !resolvedTaskId && !taskByNumberResult.fetching ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 8 }}>
-          <Ionicons name="file-tray-outline" size={48} color={colors.border} />
-          <Text style={{ fontSize: 15, color: colors.textMuted }}>Task #{taskNumber} not found</Text>
+        <View className="flex-1 justify-center items-center gap-2">
+          <Ionicons name="file-tray-outline" size={48} color="#d1d5db" />
+          <Text className="text-base text-gray-400 dark:text-slate-500">Task #{taskNumber} not found</Text>
         </View>
       ) : !searched ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 8 }}>
-          <Ionicons name="search-outline" size={48} color={colors.border} />
-          <Text style={{ fontSize: 15, color: colors.textMuted }}>Search tasks, messages, deliverables</Text>
-          <Text style={{ fontSize: 13, color: colors.textMuted }}>Tip: type #42 to jump to a task by number</Text>
+        <View className="flex-1 justify-center items-center gap-2">
+          <Ionicons name="search-outline" size={48} color="#d1d5db" />
+          <Text className="text-base text-gray-400 dark:text-slate-500">Search tasks, messages, deliverables</Text>
+          <Text className="text-sm text-gray-400 dark:text-slate-500">Tip: type #42 to jump to a task by number</Text>
+        </View>
+      ) : result.error ? (
+        <View className="flex-1 justify-center items-center gap-2">
+          <Ionicons name="cloud-offline-outline" size={48} color="#d1d5db" />
+          <Text className="text-base text-red-500 dark:text-red-400 text-center px-6">Search failed. Check your connection.</Text>
         </View>
       ) : !hasResults ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 8 }}>
-          <Ionicons name="file-tray-outline" size={48} color={colors.border} />
-          <Text style={{ fontSize: 15, color: colors.textMuted }}>No results for "{submittedQuery}"</Text>
+        <View className="flex-1 justify-center items-center gap-2">
+          <Ionicons name="file-tray-outline" size={48} color="#d1d5db" />
+          <Text className="text-base text-gray-400 dark:text-slate-500">No results for "{submittedQuery}"</Text>
         </View>
       ) : (
         <SectionList
@@ -210,52 +174,29 @@ export default function SearchScreen() {
           contentInsetAdjustmentBehavior="automatic"
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section }) => (
-            <View
-              style={{
-                paddingHorizontal: 16,
-                paddingTop: 16,
-                paddingBottom: 6,
-                backgroundColor: colors.background,
-              }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: "700", color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                {section.title}
-              </Text>
+            <View className="px-4 pt-4 pb-1.5 bg-white dark:bg-slate-900">
+              <SectionLabel>{section.title}</SectionLabel>
             </View>
           )}
           renderItem={({ item, section }) => {
             if (section.type === "task") {
               const t = item as TaskResult;
-              const statusColor = STATUS_COLORS[t.status] ?? colors.textMuted;
               return (
                 <TouchableOpacity
-                  style={{
-                    backgroundColor: colors.card,
-                    marginHorizontal: 16,
-                    marginBottom: 8,
-                    borderRadius: 10,
-                    padding: 14,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    gap: 4,
-                  }}
+                  className="bg-white dark:bg-slate-800 mx-4 mb-2 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-1"
                   onPress={() => router.push(`/task/${t.id}` as Parameters<typeof router.push>[0])}
                   activeOpacity={0.7}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <Text style={{ fontSize: 11, color: colors.textMuted, fontVariant: ["tabular-nums"] }}>
+                  <View className="flex-row items-center gap-2">
+                    <Text className="text-xs text-gray-400 dark:text-slate-500" style={{ fontVariant: ["tabular-nums"] }}>
                       #{t.taskNumber}
                     </Text>
-                    <View style={{ backgroundColor: statusColor + "20", borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
-                      <Text style={{ fontSize: 10, color: statusColor, fontWeight: "600", textTransform: "uppercase" }}>
-                        {t.status.replace("_", " ")}
-                      </Text>
-                    </View>
+                    <StatusPill status={t.status} />
                     {t.priority && (
-                      <Text style={{ fontSize: 11, color: colors.textMuted, textTransform: "capitalize" }}>{t.priority}</Text>
+                      <Text className="text-xs text-gray-400 dark:text-slate-500 capitalize">{t.priority}</Text>
                     )}
                   </View>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.text }} numberOfLines={2}>
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100" numberOfLines={2}>
                     {t.title}
                   </Text>
                 </TouchableOpacity>
@@ -271,27 +212,18 @@ export default function SearchScreen() {
                 : null;
               return (
                 <TouchableOpacity
-                  style={{
-                    backgroundColor: colors.card,
-                    marginHorizontal: 16,
-                    marginBottom: 8,
-                    borderRadius: 10,
-                    padding: 14,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    gap: 4,
-                  }}
+                  className="bg-white dark:bg-slate-800 mx-4 mb-2 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-1"
                   onPress={() => dest && router.push(dest as Parameters<typeof router.push>[0])}
                   activeOpacity={0.7}
                   disabled={!dest}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Ionicons name="chatbubble-outline" size={13} color={colors.textMuted} />
-                    <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                  <View className="flex-row items-center gap-1.5">
+                    <Ionicons name="chatbubble-outline" size={13} color="#9ca3af" />
+                    <Text className="text-xs text-gray-400 dark:text-slate-500">
                       {m.taskId ? "Task message" : "Channel message"}
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 14, color: colors.text }} numberOfLines={3}>
+                  <Text className="text-sm text-gray-900 dark:text-slate-100" numberOfLines={3}>
                     {m.content}
                   </Text>
                 </TouchableOpacity>
@@ -302,24 +234,15 @@ export default function SearchScreen() {
               const d = item as DeliverableResult;
               return (
                 <TouchableOpacity
-                  style={{
-                    backgroundColor: colors.card,
-                    marginHorizontal: 16,
-                    marginBottom: 8,
-                    borderRadius: 10,
-                    padding: 14,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    gap: 4,
-                  }}
+                  className="bg-white dark:bg-slate-800 mx-4 mb-2 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-1"
                   onPress={() => router.push(`/deliverable/${d.id}` as Parameters<typeof router.push>[0])}
                   activeOpacity={0.7}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Ionicons name="attach-outline" size={13} color={colors.textMuted} />
-                    <Text style={{ fontSize: 11, color: colors.textMuted, textTransform: "capitalize" }}>{d.type}</Text>
+                  <View className="flex-row items-center gap-1.5">
+                    <Ionicons name="attach-outline" size={13} color="#9ca3af" />
+                    <Text className="text-xs text-gray-400 dark:text-slate-500 capitalize">{d.type}</Text>
                   </View>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.text }} numberOfLines={2}>
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100" numberOfLines={2}>
                     {d.title}
                   </Text>
                 </TouchableOpacity>

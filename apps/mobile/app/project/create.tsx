@@ -3,20 +3,21 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  FlatList,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "urql";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CREATE_PROJECT, PROFILES_QUERY } from "@agentcenter/graphql-client";
+import { DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 import { Ionicons } from "@expo/vector-icons";
+import { FormField } from "../../src/components/FormField";
+import { ActionButton } from "../../src/components/ActionButton";
 
 interface Profile {
   id: string;
@@ -35,11 +36,14 @@ export default function CreateProjectScreen() {
   const [selectedProfileIds, setSelectedProfileIds] = useState<string[]>([]);
   const [, createProject] = useMutation(CREATE_PROJECT);
   const [saving, setSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [profilesResult] = useQuery<{ profiles: Profile[] }>({
     query: PROFILES_QUERY,
     variables: { limit: 200 },
-    requestPolicy: "cache-and-network",
+    requestPolicy: "cache-first",
+    pause: !mounted,
   });
 
   const profiles = profilesResult.data?.profiles ?? [];
@@ -72,29 +76,28 @@ export default function CreateProjectScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ flex: 1 }}
+      className="flex-1 bg-gray-50 dark:bg-slate-900"
     >
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: insets.bottom + 24 }}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.field}>
-          <Text style={styles.label}>Project Name *</Text>
+        <FormField label="Project Name" required>
           <TextInput
-            style={styles.input}
+            className="border border-gray-300 dark:border-slate-600 rounded-xl p-3 text-base text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
             value={name}
             onChangeText={setName}
             placeholder="e.g. Q2 Marketing Campaign"
             placeholderTextColor="#9ca3af"
             autoFocus
           />
-        </View>
+        </FormField>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Description</Text>
+        <FormField label="Description">
           <TextInput
-            style={[styles.input, styles.multiline]}
+            className="border border-gray-300 dark:border-slate-600 rounded-xl p-3 text-base text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+            style={{ height: 100 }}
             value={description}
             onChangeText={setDescription}
             placeholder="What is this project about?"
@@ -103,39 +106,41 @@ export default function CreateProjectScreen() {
             numberOfLines={4}
             textAlignVertical="top"
           />
-        </View>
+        </FormField>
 
         {/* Members */}
-        <View style={styles.field}>
-          <View style={styles.membersHeader}>
-            <Text style={styles.label}>Members</Text>
+        <View className="gap-1.5">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Members</Text>
             {selectedProfileIds.length > 0 && (
-              <Text style={styles.memberCount}>{selectedProfileIds.length} selected</Text>
+              <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">{selectedProfileIds.length} selected</Text>
             )}
           </View>
           {profilesResult.fetching && profiles.length === 0 ? (
             <ActivityIndicator size="small" color="#2563eb" style={{ marginTop: 8 }} />
           ) : (
-            <View style={styles.membersList}>
+            <View className="border border-gray-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 overflow-hidden">
               {profiles.map((profile) => {
                 const selected = selectedProfileIds.includes(profile.id);
                 const isAgent = profile.agentId != null;
-                const emoji = isAgent ? (profile.agent?.identityEmoji ?? "🤖") : "👤";
+                const emoji = isAgent ? (profile.agent?.identityEmoji ?? DEFAULT_AGENT_EMOJI) : "👤";
                 return (
                   <TouchableOpacity
                     key={profile.id}
-                    style={[styles.memberRow, selected && styles.memberRowSelected]}
+                    className={`flex-row items-center px-3 py-2.5 gap-2.5 border-b border-gray-100 dark:border-slate-700 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
                     onPress={() => toggleProfile(profile.id)}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.memberEmoji}>{emoji}</Text>
-                    <View style={styles.memberInfo}>
-                      <Text style={styles.memberName} numberOfLines={1}>
+                    <Text className="text-lg w-7 text-center">{emoji}</Text>
+                    <View className="flex-1 gap-px">
+                      <Text className="text-sm font-medium text-gray-900 dark:text-slate-100" numberOfLines={1}>
                         {profile.displayName}
                       </Text>
-                      <Text style={styles.memberUsername}>@{profile.username}</Text>
+                      <Text className="text-xs text-gray-400 dark:text-slate-500">@{profile.username}</Text>
                     </View>
-                    <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
+                    <View className={`w-6 h-6 rounded-full border-2 justify-center items-center ${
+                      selected ? "bg-blue-600 border-blue-600" : "border-gray-300 dark:border-slate-500"
+                    }`}>
                       {selected && (
                         <Ionicons name="checkmark" size={14} color="#fff" />
                       )}
@@ -147,75 +152,8 @@ export default function CreateProjectScreen() {
           )}
         </View>
 
-        <TouchableOpacity
-          style={[styles.createBtn, saving && { opacity: 0.6 }]}
-          onPress={handleCreate}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.createBtnText}>Create Project</Text>
-          )}
-        </TouchableOpacity>
+        <ActionButton label="Create Project" onPress={handleCreate} loading={saving} disabled={!name.trim()} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { padding: 20, gap: 20 },
-  field: { gap: 6 },
-  label: { fontSize: 13, fontWeight: "600", color: "#374151" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    color: "#111827",
-    backgroundColor: "#fff",
-  },
-  multiline: { height: 100 },
-  membersHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  memberCount: { fontSize: 12, color: "#2563eb", fontWeight: "600" },
-  membersList: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    overflow: "hidden",
-  },
-  memberRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  memberRowSelected: { backgroundColor: "#eff6ff" },
-  memberEmoji: { fontSize: 18, width: 28, textAlign: "center" },
-  memberInfo: { flex: 1, gap: 1 },
-  memberName: { fontSize: 14, fontWeight: "500", color: "#111827" },
-  memberUsername: { fontSize: 12, color: "#9ca3af" },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: "#d1d5db",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  checkboxSelected: { backgroundColor: "#2563eb", borderColor: "#2563eb" },
-  createBtn: {
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  createBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-});

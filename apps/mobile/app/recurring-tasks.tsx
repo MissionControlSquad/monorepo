@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -26,11 +26,16 @@ import {
   PROJECTS_QUERY,
   PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
-import { useTheme } from "../src/hooks/useTheme";
+import { formatDate, PRIORITY_VALUES } from "@agentcenter/utils";
 import { EmptyState } from "../src/components/EmptyState";
+import { FormField } from "../src/components/FormField";
 import { StatusPill } from "../src/components/StatusPill";
 import { PriorityBadge } from "../src/components/PriorityBadge";
+import { FilterChip } from "../src/components/FilterChip";
 import { useAuth } from "../src/context/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
+import { SearchBar } from "../src/components/SearchBar";
+import { ScreenLoading } from "../src/components/ScreenLoading";
 
 interface RecurringTask {
   id: string;
@@ -55,12 +60,7 @@ const FREQUENCIES = [
   { label: "Monthly (1st)", value: '{"frequency":"monthly","dayOfMonth":1}' },
 ] as const;
 
-const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
-
-function fmtDate(dateStr: string | null): string {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
+const PRIORITIES = PRIORITY_VALUES;
 
 function parseFreqLabel(config: unknown): string {
   try {
@@ -117,7 +117,6 @@ function RecurringTaskFormModal({
   title: string;
   saveLabel: string;
 }) {
-  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [taskTitle, setTaskTitle] = useState(initialValues?.title ?? "");
   const [description, setDescription] = useState(initialValues?.description ?? "");
@@ -224,22 +223,19 @@ function RecurringTaskFormModal({
       onShow={handleOpen}
     >
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: colors.background }}
+        className="flex-1 bg-gray-50 dark:bg-slate-900"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         {/* Header */}
-        <View style={{
-          flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-          padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border,
-        }}>
+        <View className="flex-row items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700">
           <TouchableOpacity onPress={onClose}>
-            <Text style={{ fontSize: 16, color: colors.textSecondary }}>Cancel</Text>
+            <Text className="text-base text-gray-500 dark:text-slate-400">Cancel</Text>
           </TouchableOpacity>
-          <Text style={{ fontSize: 17, fontWeight: "700", color: colors.text }}>{modalTitle}</Text>
+          <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">{modalTitle}</Text>
           <TouchableOpacity onPress={handleSave} disabled={saving}>
             {saving
-              ? <ActivityIndicator color={colors.accent} />
-              : <Text style={{ fontSize: 16, fontWeight: "700", color: colors.accent }}>{saveLabel}</Text>}
+              ? <ActivityIndicator color="#2563eb" />
+              : <Text className="text-base font-bold text-blue-600 dark:text-blue-400">{saveLabel}</Text>}
           </TouchableOpacity>
         </View>
 
@@ -248,111 +244,80 @@ function RecurringTaskFormModal({
           keyboardShouldPersistTaps="handled"
         >
           {/* Title */}
-          <View style={{ gap: 6 }}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Title *</Text>
+          <FormField label="Title" required>
             <TextInput
-              style={{
-                backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
-                borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.text,
-              }}
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               placeholder="Task title…"
-              placeholderTextColor={colors.placeholder}
+              placeholderTextColor="#9ca3af"
               value={taskTitle}
               onChangeText={setTaskTitle}
               autoFocus
             />
-          </View>
+          </FormField>
 
           {/* Description */}
-          <View style={{ gap: 6 }}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Description</Text>
+          <FormField label="Description">
             <TextInput
-              style={{
-                backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
-                borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12,
-                fontSize: 15, color: colors.text, minHeight: 80, textAlignVertical: "top",
-              }}
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
+              style={{ minHeight: 80, textAlignVertical: "top" }}
               placeholder="What should happen each time…"
-              placeholderTextColor={colors.placeholder}
+              placeholderTextColor="#9ca3af"
               value={description}
               onChangeText={setDescription}
               multiline
             />
-          </View>
+          </FormField>
 
           {/* Frequency */}
-          <View style={{ gap: 8 }}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Frequency</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          <View className="gap-2">
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Frequency</Text>
+            <View className="flex-row flex-wrap gap-2">
               {FREQUENCIES.map((f, i) => (
-                <TouchableOpacity
+                <FilterChip
                   key={f.label}
+                  label={f.label}
+                  active={freqIdx === i}
                   onPress={() => setFreqIdx(i)}
-                  style={{
-                    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1.5,
-                    borderColor: freqIdx === i ? colors.accent : colors.border,
-                    backgroundColor: freqIdx === i ? colors.accentSurface : colors.inputBg,
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: freqIdx === i ? colors.accent : colors.textSecondary }}>
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
+                />
               ))}
             </View>
           </View>
 
           {/* Priority */}
-          <View style={{ gap: 8 }}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Priority</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          <View className="gap-2">
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Priority</Text>
+            <View className="flex-row flex-wrap gap-2">
               {([null, ...PRIORITIES] as (string | null)[]).map((p) => (
-                <TouchableOpacity
+                <FilterChip
                   key={p ?? "none"}
+                  label={p ?? "None"}
+                  active={priority === p}
                   onPress={() => setPriority(p)}
-                  style={{
-                    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1,
-                    borderColor: priority === p ? colors.accent : colors.border,
-                    backgroundColor: priority === p ? colors.accentSurface : colors.inputBg,
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={{ fontSize: 12, color: priority === p ? colors.accent : colors.textSecondary, textTransform: "capitalize" }}>
-                    {p ?? "None"}
-                  </Text>
-                </TouchableOpacity>
+                />
               ))}
             </View>
           </View>
 
           {/* Time */}
-          <View style={{ gap: 6 }}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Time (HH:MM)</Text>
+          <FormField label="Time (HH:MM)">
             <TextInput
-              style={{
-                backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
-                borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.text,
-              }}
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               placeholder="09:00"
-              placeholderTextColor={colors.placeholder}
+              placeholderTextColor="#9ca3af"
               value={timeInput}
               onChangeText={setTimeInput}
               returnKeyType="done"
               keyboardType="numbers-and-punctuation"
             />
-          </View>
+          </FormField>
 
           {/* Tags */}
-          <View style={{ gap: 6 }}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Tags</Text>
+          <View className="gap-1.5">
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Tags</Text>
             <TextInput
-              style={{
-                backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
-                borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.text,
-              }}
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               placeholder="bug, backend, api (comma-separated)"
-              placeholderTextColor={colors.placeholder}
+              placeholderTextColor="#9ca3af"
               value={tagsInput}
               onChangeText={setTagsInput}
               returnKeyType="done"
@@ -360,40 +325,35 @@ function RecurringTaskFormModal({
           </View>
 
           {/* Project */}
-          <View style={{ gap: 6 }}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Project</Text>
+          <View className="gap-1.5">
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Project</Text>
             <TouchableOpacity
               onPress={pickProject}
-              style={{
-                backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
-                borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12,
-                flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-              }}
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 flex-row items-center justify-between"
               activeOpacity={0.7}
             >
-              <Text style={{ fontSize: 15, color: selectedProject ? colors.text : colors.placeholder }}>
+              <Text className={`text-base ${selectedProject ? "text-gray-900 dark:text-slate-100" : "text-gray-400 dark:text-slate-500"}`}>
                 {selectedProject ? selectedProject.name : "None"}
               </Text>
-              <Text style={{ fontSize: 12, color: colors.textMuted }}>▼</Text>
+              <Text className="text-xs text-gray-400 dark:text-slate-500">▼</Text>
             </TouchableOpacity>
           </View>
 
           {/* Assignees */}
-          <View style={{ gap: 6 }}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>Assignees</Text>
+          <View className="gap-1.5">
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Assignees</Text>
             <TouchableOpacity
               onPress={pickAssignees}
-              style={{
-                backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border,
-                borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12,
-                flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-              }}
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 flex-row items-center justify-between"
               activeOpacity={0.7}
             >
-              <Text style={{ fontSize: 15, color: selectedAssigneeNames ? colors.text : colors.placeholder }} numberOfLines={1}>
+              <Text
+                className={`text-base flex-1 ${selectedAssigneeNames ? "text-gray-900 dark:text-slate-100" : "text-gray-400 dark:text-slate-500"}`}
+                numberOfLines={1}
+              >
                 {selectedAssigneeNames || "None"}
               </Text>
-              <Text style={{ fontSize: 12, color: colors.textMuted }}>▼</Text>
+              <Text className="text-xs text-gray-400 dark:text-slate-500">▼</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -405,17 +365,21 @@ function RecurringTaskFormModal({
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function RecurringTasksScreen() {
-  const { colors } = useTheme();
   const { profileId } = useAuth();
   const insets = useSafeAreaInsets();
   const [createOpen, setCreateOpen] = useState(false);
   const [editTask, setEditTask] = useState<RecurringTask | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ recurringTasks: RecurringTask[] }>({
     query: RECURRING_TASKS_QUERY,
     variables: { includeInactive },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [, createTask] = useMutation(CREATE_RECURRING_TASK);
@@ -425,7 +389,16 @@ export default function RecurringTasksScreen() {
   const [, triggerTask] = useMutation(TRIGGER_RECURRING_TASK);
   const [, deleteTask] = useMutation(DELETE_RECURRING_TASK);
 
-  const tasks = result.data?.recurringTasks ?? [];
+  const allTasks = result.data?.recurringTasks ?? [];
+  const q = search.trim().toLowerCase();
+  const tasks = q
+    ? allTasks.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          (t.description ?? "").toLowerCase().includes(q) ||
+          t.tags.some((tag) => tag.toLowerCase().includes(q)),
+      )
+    : allTasks;
 
   const refresh = () => reexecute({ requestPolicy: "network-only" });
 
@@ -486,38 +459,38 @@ export default function RecurringTasksScreen() {
     ]);
   }
 
-  if (result.fetching && tasks.length === 0) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
-    );
-  }
+  if (result.fetching && tasks.length === 0) return <ScreenLoading />;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search recurring tasks…"
+      />
+
       {/* Filter + Create toolbar */}
-      <View style={{ flexDirection: "row", padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+      <View className="flex-row p-3 gap-2 border-b border-gray-200 dark:border-slate-700">
         <TouchableOpacity
           onPress={() => setIncludeInactive(false)}
-          style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: !includeInactive ? colors.accent : colors.surfaceAlt }}
+          className={`px-3 py-1.5 rounded-lg ${!includeInactive ? "bg-blue-600" : "bg-gray-100 dark:bg-slate-700"}`}
           activeOpacity={0.7}
         >
-          <Text style={{ fontSize: 13, fontWeight: "600", color: !includeInactive ? "#fff" : colors.textSecondary }}>Active</Text>
+          <Text className={`text-sm font-semibold ${!includeInactive ? "text-white" : "text-gray-700 dark:text-slate-300"}`}>Active</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setIncludeInactive(true)}
-          style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: includeInactive ? colors.accent : colors.surfaceAlt }}
+          className={`px-3 py-1.5 rounded-lg ${includeInactive ? "bg-blue-600" : "bg-gray-100 dark:bg-slate-700"}`}
           activeOpacity={0.7}
         >
-          <Text style={{ fontSize: 13, fontWeight: "600", color: includeInactive ? "#fff" : colors.textSecondary }}>All</Text>
+          <Text className={`text-sm font-semibold ${includeInactive ? "text-white" : "text-gray-700 dark:text-slate-300"}`}>All</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setCreateOpen(true)}
-          style={{ marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.accent }}
+          className="ml-auto px-3.5 py-1.5 rounded-lg bg-blue-600"
           activeOpacity={0.7}
         >
-          <Text style={{ fontSize: 13, fontWeight: "700", color: "#fff" }}>+ New</Text>
+          <Text className="text-sm font-bold text-white">+ New</Text>
         </TouchableOpacity>
       </View>
 
@@ -530,7 +503,7 @@ export default function RecurringTasksScreen() {
           <RefreshControl
             refreshing={result.fetching && tasks.length > 0}
             onRefresh={refresh}
-            tintColor={colors.accent}
+            tintColor="#2563eb"
           />
         }
         ListEmptyComponent={
@@ -542,19 +515,15 @@ export default function RecurringTasksScreen() {
         }
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={{
-              backgroundColor: colors.card, borderRadius: 12, padding: 14,
-              borderWidth: 1, borderColor: colors.border, gap: 8,
-              opacity: item.isActive ? 1 : 0.6,
-            }}
+            className={`bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2 ${item.isActive ? "" : "opacity-60"}`}
             onPress={() => handleActions(item)}
             activeOpacity={0.7}
           >
             {/* Header */}
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={{ fontSize: 16 }}>{item.isActive ? "🔄" : "⏸"}</Text>
+            <View className="flex-row items-center gap-2">
+              <Text className="text-base">{item.isActive ? "🔄" : "⏸"}</Text>
               {item.priority && <PriorityBadge priority={item.priority} />}
-              <Text style={{ fontSize: 12, color: colors.textMuted, marginLeft: "auto" }}>
+              <Text className="text-xs text-gray-400 dark:text-slate-500 ml-auto">
                 {parseFreqLabel(item.recurrenceConfig)}
               </Text>
               {/* Edit shortcut */}
@@ -562,37 +531,37 @@ export default function RecurringTasksScreen() {
                 onPress={() => setEditTask(item)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={{ fontSize: 13, color: colors.accent }}>✏️</Text>
+                <Text className="text-sm text-blue-600 dark:text-blue-400">✏️</Text>
               </TouchableOpacity>
             </View>
 
             {/* Title */}
-            <Text style={{ fontSize: 15, fontWeight: "600", color: colors.text, lineHeight: 21 }} numberOfLines={2}>
+            <Text className="text-base font-semibold text-gray-900 dark:text-slate-100 leading-tight" numberOfLines={2}>
               {item.title}
             </Text>
 
             {/* Description */}
             {item.description ? (
-              <Text style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={2}>
+              <Text className="text-sm text-gray-500 dark:text-slate-400" numberOfLines={2}>
                 {item.description}
               </Text>
             ) : null}
 
             {/* Footer */}
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <View className="flex-row items-center gap-2 flex-wrap">
               <StatusPill status={item.isActive ? "active" : "paused"} />
               {item.nextDueAt && (
-                <Text style={{ fontSize: 11, color: colors.textMuted }}>
-                  Next: {fmtDate(item.nextDueAt)}
+                <Text className="text-xs text-gray-400 dark:text-slate-500">
+                  Next: {formatDate(item.nextDueAt)}
                 </Text>
               )}
               {item.lastGeneratedAt && (
-                <Text style={{ fontSize: 11, color: colors.textMuted }}>
-                  Last: {fmtDate(item.lastGeneratedAt)}
+                <Text className="text-xs text-gray-400 dark:text-slate-500">
+                  Last: {formatDate(item.lastGeneratedAt)}
                 </Text>
               )}
               {item.tags.length > 0 && (
-                <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                <Text className="text-xs text-gray-400 dark:text-slate-500">
                   {item.tags.join(", ")}
                 </Text>
               )}

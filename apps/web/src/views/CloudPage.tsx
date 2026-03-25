@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { usePollingInterval, useSearch } from "@agentcenter/hooks";
 import Link from "next/link";
 import { Server, Plus, Loader2, Globe, Cpu, Clock, Search } from "lucide-react";
 import { CreateVMDialog } from "../components/cloud/CreateVMDialog";
 import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout } from "../components/ui";
+import { formatUptime, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 
 interface CloudVMAgent {
@@ -45,18 +47,10 @@ const STATUS_BADGE_VARIANT: Record<
   destroying: { label: "Destroying", variant: "orange" },
 };
 
-function formatUptime(seconds: number): string {
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400)
-    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
-  return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
-}
-
 export function CloudPage() {
   const [vms, setVMs] = useState<CloudVM[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [search, setSearch] = useState("");
 
   const fetchVMs = useCallback(async () => {
     try {
@@ -72,27 +66,19 @@ export function CloudPage() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchVMs();
-  }, [fetchVMs]);
+  const hasTransitional = vms.some((vm) => CLOUD_VM_TRANSITIONAL_STATUSES.includes(vm.status));
+  usePollingInterval(fetchVMs, 5000, hasTransitional);
 
-  // Poll while any VM is in a transitional state
-  useEffect(() => {
-    const hasTransitional = vms.some((vm) =>
-      [
-        "provisioning",
-        "waiting_for_ssh",
-        "installing_deps",
-        "installing_openclaw",
-        "configuring",
-        "starting_service",
-        "destroying",
-      ].includes(vm.status),
+  const { search, setSearch, filtered } = useSearch(vms, (vm, q) => {
+    const name = (vm.name || vm.serverName || vm.id).toLowerCase();
+    return (
+      name.includes(q) ||
+      (vm.ipv4 || "").includes(q) ||
+      vm.region.toLowerCase().includes(q) ||
+      vm.status.toLowerCase().includes(q) ||
+      vm.agents.some((a) => a.name.toLowerCase().includes(q))
     );
-    if (!hasTransitional) return;
-    const interval = setInterval(fetchVMs, 5000);
-    return () => clearInterval(interval);
-  }, [vms, fetchVMs]);
+  });
 
   if (loading) {
     return (
@@ -166,19 +152,6 @@ export function CloudPage() {
         </div>
 
         {(() => {
-          const q = search.toLowerCase();
-          const filtered = vms.filter((vm) => {
-            if (!search) return true;
-            const name = vm.name || vm.serverName || vm.id;
-            return (
-              name.toLowerCase().includes(q) ||
-              vm.ipv4?.toLowerCase().includes(q) ||
-              vm.region.toLowerCase().includes(q) ||
-              vm.status.toLowerCase().includes(q) ||
-              vm.agents.some((a) => a.name.toLowerCase().includes(q))
-            );
-          });
-
           if (filtered.length === 0) {
             return (
               <EmptyState

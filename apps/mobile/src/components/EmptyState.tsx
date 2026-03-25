@@ -1,6 +1,5 @@
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, useColorScheme } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "../hooks/useTheme";
 
 interface EmptyStateProps {
   icon?: React.ComponentProps<typeof Ionicons>["name"];
@@ -9,20 +8,20 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ icon = "cube-outline", message, action }: EmptyStateProps) {
-  const { colors } = useTheme();
+  const isDark = useColorScheme() === "dark";
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 12, padding: 32 }}>
-      <Ionicons name={icon} size={48} color={colors.iconMuted} />
-      <Text style={{ color: colors.textMuted, fontSize: 15, textAlign: "center", lineHeight: 22 }}>
+    <View className="flex-1 justify-center items-center gap-3 p-8">
+      <Ionicons name={icon} size={48} color={isDark ? "#64748b" : "#9ca3af"} />
+      <Text className="text-gray-400 dark:text-slate-500 text-base text-center leading-6">
         {message}
       </Text>
       {action && (
         <TouchableOpacity
-          style={{ backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4 }}
+          className="bg-blue-600 dark:bg-blue-500 rounded-lg px-4 py-2 mt-1"
           onPress={action.onPress}
         >
-          <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>{action.label}</Text>
+          <Text className="text-white font-semibold text-sm">{action.label}</Text>
         </TouchableOpacity>
       )}
     </View>

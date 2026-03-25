@@ -1,6 +1,10 @@
 /**
  * Session management: serverUrl + cookie + profileId stored in SecureStore.
  * The module-level variables allow the URQL client to read synchronously.
+ *
+ * `sessionReady` is a promise that resolves once `loadSession()` completes.
+ * Components that need the session should await this before making requests,
+ * preventing a race condition where fetch calls fire before SecureStore hydrates.
  */
 import * as SecureStore from "expo-secure-store";
 
@@ -11,6 +15,16 @@ const PROFILE_ID_KEY = "mc_profileId";
 let _serverUrl: string | null = null;
 let _cookie: string | null = null;
 let _profileId: string | null = null;
+let _sessionLoaded = false;
+
+let _resolveReady!: () => void;
+export const sessionReady: Promise<void> = new Promise((resolve) => {
+  _resolveReady = resolve;
+});
+
+export function isSessionLoaded(): boolean {
+  return _sessionLoaded;
+}
 
 export function getStoredServerUrl(): string | null {
   return _serverUrl;
@@ -28,6 +42,8 @@ export async function loadSession(): Promise<void> {
   _serverUrl = await SecureStore.getItemAsync(SERVER_URL_KEY);
   _cookie = await SecureStore.getItemAsync(COOKIE_KEY);
   _profileId = await SecureStore.getItemAsync(PROFILE_ID_KEY);
+  _sessionLoaded = true;
+  _resolveReady();
 }
 
 export async function saveSession(

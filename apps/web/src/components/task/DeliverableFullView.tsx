@@ -21,7 +21,7 @@ import { TimeAgo } from "../common/TimeAgo";
 import { Badge, Button } from "../ui";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { DELIVERABLE_VERSIONS_QUERY } from "../../lib/graphql/queries";
-import { getAssetUrl } from "@agentcenter/utils";
+import { getAssetUrl, formatFileSize } from "@agentcenter/utils";
 import type { Deliverable, Agent, DeliverableVersion } from "@agentcenter/types";
 
 interface DeliverableFullViewProps {
@@ -42,12 +42,6 @@ const KIND_CONFIG = {
   file: { label: "File", variant: "orange" as const },
   link: { label: "Link", variant: "green" as const },
 };
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function getVideoEmbedUrl(url: string): string | null {
   const ytMatch = url.match(

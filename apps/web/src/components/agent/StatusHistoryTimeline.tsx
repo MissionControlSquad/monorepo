@@ -4,19 +4,13 @@ import { useQuery } from "urql";
 import { AGENT_STATUS_HISTORY_QUERY } from "../../lib/graphql/queries";
 import { Clock } from "lucide-react";
 import { TimeAgo } from "../common/TimeAgo";
-import { STATUS_DOT_CLASSES, AGENT_DETAILED_STATUSES } from "../../lib/constants";
+import { STATUS_DOT_CLASSES } from "../../lib/constants";
+import { getAgentStatusLabel } from "@agentcenter/utils";
 import type { StatusHistoryEntry } from "@agentcenter/types";
 
 interface StatusHistoryTimelineProps {
   agentId: string;
   limit?: number;
-}
-
-function getStatusLabel(status: string, detailedStatus?: string): string {
-  if (detailedStatus && detailedStatus in AGENT_DETAILED_STATUSES) {
-    return AGENT_DETAILED_STATUSES[detailedStatus as keyof typeof AGENT_DETAILED_STATUSES].label;
-  }
-  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 export function StatusHistoryTimeline({ agentId, limit = 20 }: StatusHistoryTimelineProps) {
@@ -37,8 +31,14 @@ export function StatusHistoryTimeline({ agentId, limit = 20 }: StatusHistoryTime
       {history.map((entry, idx) => {
         const toDotKey = entry.toDetailedStatus || entry.toStatus;
         const dotClass = STATUS_DOT_CLASSES[toDotKey] || STATUS_DOT_CLASSES.idle;
-        const toLabel = getStatusLabel(entry.toStatus, entry.toDetailedStatus ?? undefined);
-        const fromLabel = getStatusLabel(entry.fromStatus, entry.fromDetailedStatus ?? undefined);
+        const toLabel = getAgentStatusLabel({
+          status: entry.toStatus,
+          detailedStatus: entry.toDetailedStatus,
+        });
+        const fromLabel = getAgentStatusLabel({
+          status: entry.fromStatus,
+          detailedStatus: entry.fromDetailedStatus,
+        });
         const isLast = idx === history.length - 1;
 
         return (

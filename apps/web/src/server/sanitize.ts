@@ -18,7 +18,7 @@ export function escapeHtml(str: string): string {
  */
 export function parseChildTasks(
   raw: unknown,
-): Array<{ title: string; description: string; priority?: string; assigneeIds?: string[] }> {
+): Array<{ title: string; description?: string; priority?: string; assigneeIds?: string[] }> {
   let parsed: unknown;
 
   if (typeof raw === "string") {
@@ -42,12 +42,12 @@ export function parseChildTasks(
     if (typeof item.title !== "string" || !item.title.trim()) {
       throw new Error(`childTasks[${i}].title is required`);
     }
-    if (typeof item.description !== "string" || !item.description.trim()) {
-      throw new Error(`childTasks[${i}].description is required`);
-    }
     return {
       title: item.title.trim(),
-      description: item.description.trim(),
+      description:
+        typeof item.description === "string" && item.description.trim()
+          ? item.description.trim()
+          : undefined,
       priority: typeof item.priority === "string" ? item.priority : undefined,
       assigneeIds: Array.isArray(item.assigneeIds)
         ? item.assigneeIds.filter((id: unknown) => typeof id === "string")

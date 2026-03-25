@@ -15,6 +15,7 @@ import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { MentionText } from "../common/MarkdownWithMentions";
 import { Badge } from "@/components/ui";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/shadcn/sheet";
+import { TASK_STATUSES } from "@agentcenter/utils";
 
 interface ProfileSidebarProps {
   onClose: () => void;
@@ -22,14 +23,7 @@ interface ProfileSidebarProps {
 }
 
 const RECENT_TASKS_LIMIT = 10;
-const STATUS_LABEL: Record<string, string> = {
-  inbox: "Inbox",
-  assigned: "Assigned",
-  in_progress: "In progress",
-  review: "Review",
-  done: "Done",
-  blocked: "Blocked",
-};
+const STATUS_LABEL = Object.fromEntries(TASK_STATUSES.map((s) => [s.id, s.label]));
 
 export function ProfileSidebar({ onClose, mounted }: ProfileSidebarProps) {
   const { openProfileId } = useProfileSidebar();

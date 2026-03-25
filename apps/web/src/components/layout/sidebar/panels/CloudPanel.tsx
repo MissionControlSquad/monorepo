@@ -7,6 +7,7 @@ import { Server, Plus } from "lucide-react";
 import { SidebarPanelHeader } from "../SidebarPanelHeader";
 import { SidebarSkeleton } from "../SidebarSkeleton";
 import { SidebarEmptyState } from "../SidebarEmptyState";
+import { CLOUD_VM_STATUS_LABELS } from "@agentcenter/utils";
 
 interface CloudVM {
   id: string;
@@ -29,17 +30,13 @@ const STATUS_COLORS: Record<string, { dot: string; text: string }> = {
   destroying: { dot: "bg-warning", text: "text-warning" },
 };
 
+// Sidebar uses abbreviated labels for compact display
 const STATUS_LABELS: Record<string, string> = {
-  provisioning: "Provisioning",
+  ...CLOUD_VM_STATUS_LABELS,
   waiting_for_ssh: "SSH...",
   installing_deps: "Installing",
   installing_openclaw: "Installing",
-  configuring: "Configuring",
   starting_service: "Starting",
-  running: "Running",
-  stopped: "Stopped",
-  error: "Error",
-  destroying: "Destroying",
 };
 
 export function CloudPanel() {

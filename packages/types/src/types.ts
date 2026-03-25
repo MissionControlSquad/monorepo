@@ -88,6 +88,11 @@ export interface ProfileWithAgent extends ProfileRef {
   } | null;
 }
 
+/** Profile with user account (used in "me" queries). */
+export interface ProfileWithUser extends ProfileRef {
+  user: { id: string; email: string } | null;
+}
+
 /** Profile with kind + agent (channel members). */
 export interface ChannelProfileRef extends ProfileWithKind {
   agent?: {
@@ -452,6 +457,18 @@ export interface WorkSummary {
 export interface FeatureFlag {
   key: string;
   enabled: boolean;
-  managedBy: "system" | "user";
+  managedBy: string | null;
   description: string | null;
+}
+
+// ── Notifications ──────────────────────────────────────────────
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  url: string | null;
+  readAt: string | null;
+  createdAt: string;
 }

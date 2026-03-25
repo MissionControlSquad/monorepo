@@ -3,20 +3,28 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   RefreshControl,
   ScrollView,
-  TextInput,
 } from "react-native";
 import { useQuery } from "urql";
-import { useRouter } from "expo-router";
-import { useState } from "react";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter, useNavigation } from "expo-router";
+import { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
+import { PAGE_SIZE_DEFAULT, PRIORITY_FILTER_OPTIONS, DUE_DATE_FILTER_OPTIONS, matchesDueDateFilter } from "@agentcenter/utils";
+import type { DueDateFilter, PriorityFilter } from "@agentcenter/utils";
 import { TaskCard } from "../../src/components/TaskCard";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
+import { useTheme } from "../../src/hooks/useTheme";
+import { NotificationBell } from "../../src/components/NotificationBell";
+import { SearchBar } from "../../src/components/SearchBar";
+import { ScreenLoading } from "../../src/components/ScreenLoading";
+import { ScreenError } from "../../src/components/ScreenError";
+import { FilterChip } from "../../src/components/FilterChip";
+import { FAB } from "../../src/components/FAB";
+import { SectionLabel } from "../../src/components/SectionLabel";
+import { TabFilterStrip } from "../../src/components/TabFilterStrip";
 
 interface TaskAssignee {
   id: string;
@@ -40,16 +48,9 @@ interface Task {
 
 type StatusFilter = "all" | "inbox" | "assigned" | "in_progress" | "review" | "done" | "blocked";
 type ViewMode = "list" | "kanban";
-type DueDateFilter = "" | "overdue" | "today" | "this_week" | "no_due_date";
-type PriorityFilter = "" | "low" | "medium" | "high" | "urgent";
 
-const PRIORITY_OPTIONS: { key: PriorityFilter; label: string }[] = [
-  { key: "", label: "Any" },
-  { key: "low", label: "Low" },
-  { key: "medium", label: "Medium" },
-  { key: "high", label: "High" },
-  { key: "urgent", label: "Urgent" },
-];
+const PRIORITY_OPTIONS = PRIORITY_FILTER_OPTIONS as { key: PriorityFilter; label: string }[];
+const DUE_DATE_OPTIONS = DUE_DATE_FILTER_OPTIONS as { key: DueDateFilter; label: string }[];
 
 const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },
@@ -61,54 +62,15 @@ const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "blocked", label: "Blocked" },
 ];
 
-const DUE_DATE_OPTIONS: { key: DueDateFilter; label: string }[] = [
-  { key: "", label: "Any date" },
-  { key: "overdue", label: "Overdue" },
-  { key: "today", label: "Due today" },
-  { key: "this_week", label: "This week" },
-  { key: "no_due_date", label: "No due date" },
-];
-
-const PAGE_SIZE = 30;
-
-function isOverdue(dueDate: string | null): boolean {
-  if (!dueDate) return false;
-  return new Date(dueDate) < new Date(new Date().toDateString());
-}
-
-function isDueToday(dueDate: string | null): boolean {
-  if (!dueDate) return false;
-  const today = new Date().toDateString();
-  return new Date(dueDate).toDateString() === today;
-}
-
-function isDueThisWeek(dueDate: string | null): boolean {
-  if (!dueDate) return false;
-  const now = new Date();
-  const d = new Date(dueDate);
-  const weekEnd = new Date(now);
-  weekEnd.setDate(now.getDate() + (7 - now.getDay()));
-  return d >= new Date(now.toDateString()) && d <= weekEnd;
-}
-
-function applyDueDateFilter(tasks: Task[], filter: DueDateFilter): Task[] {
-  if (!filter) return tasks;
-  switch (filter) {
-    case "overdue": return tasks.filter((t) => isOverdue(t.dueDate));
-    case "today": return tasks.filter((t) => isDueToday(t.dueDate));
-    case "this_week": return tasks.filter((t) => isDueThisWeek(t.dueDate));
-    case "no_due_date": return tasks.filter((t) => !t.dueDate);
-    default: return tasks;
-  }
-}
 
 export default function TaskListScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const { colors } = useTheme();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
-  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [limit, setLimit] = useState(PAGE_SIZE_DEFAULT);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Advanced filters
@@ -126,10 +88,30 @@ export default function TaskListScreen() {
     unassignedOnly,
   ].filter(Boolean).length;
 
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <TouchableOpacity onPress={() => router.push("/search")} style={{ padding: 8 }}>
+            <Ionicons name="search-outline" size={22} color={colors.icon} />
+          </TouchableOpacity>
+          <NotificationBell
+            onPress={() => router.push("/notifications")}
+            color={colors.icon}
+          />
+        </View>
+      ),
+    });
+  }, [navigation, colors.icon]);
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [result, reexecute] = useQuery<{ tasks: Task[] }>({
     query: TASKS_QUERY,
     variables: { limit },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const { data, fetching, error } = result;
@@ -142,7 +124,7 @@ export default function TaskListScreen() {
   if (blockedOnly) tasks = tasks.filter((t) => t.blockedByTaskId != null);
   if (topLevelOnly) tasks = tasks.filter((t) => t.parentTaskId == null);
   if (unassignedOnly) tasks = tasks.filter((t) => t.assignees.length === 0);
-  tasks = applyDueDateFilter(tasks, dueDateFilter);
+  tasks = tasks.filter((t) => matchesDueDateFilter(t.dueDate, dueDateFilter));
   if (search.trim()) {
     tasks = tasks.filter(
       (t) =>
@@ -151,143 +133,81 @@ export default function TaskListScreen() {
     );
   }
 
-  if (fetching && allTasks.length === 0) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
-
-  if (error && allTasks.length === 0) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Failed to load tasks</Text>
-        <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (fetching && allTasks.length === 0) return <ScreenLoading />;
+  if (error && allTasks.length === 0) return <ScreenError message="Failed to load tasks" onRetry={() => reexecute({ requestPolicy: "network-only" })} />;
 
   return (
-    <View style={styles.container}>
-      {/* Search bar + view toggle */}
-      <View style={styles.searchBar}>
-        <Text style={styles.searchIcon}>🔍</Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search tasks…"
-          placeholderTextColor="#9ca3af"
-          value={search}
-          onChangeText={setSearch}
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-        />
-        <TouchableOpacity
-          onPress={() => setFiltersOpen((v) => !v)}
-          style={[styles.viewToggle, filtersOpen && styles.viewToggleActive]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="options-outline" size={20} color={filtersOpen ? "#2563eb" : "#6b7280"} />
-          {activeFilterCount > 0 && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setViewMode((m) => (m === "list" ? "kanban" : "list"))}
-          style={styles.viewToggle}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons
-            name={viewMode === "list" ? "grid-outline" : "list-outline"}
-            size={20}
-            color="#6b7280"
-          />
-        </TouchableOpacity>
-      </View>
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search tasks…"
+        right={
+          <>
+            <TouchableOpacity
+              onPress={() => setFiltersOpen((v) => !v)}
+              className={`p-1 relative ${filtersOpen ? "bg-blue-50 dark:bg-blue-900/20 rounded-lg" : ""}`}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="options-outline" size={20} color={filtersOpen ? "#2563eb" : "#6b7280"} />
+              {activeFilterCount > 0 && (
+                <View className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-blue-600 justify-center items-center">
+                  <Text className="text-xs text-white font-bold">{activeFilterCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setViewMode((m) => (m === "list" ? "kanban" : "list"))}
+              className="p-1"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={viewMode === "list" ? "grid-outline" : "list-outline"}
+                size={20}
+                color="#6b7280"
+              />
+            </TouchableOpacity>
+          </>
+        }
+      />
 
       {/* Advanced filter panel */}
       {filtersOpen && (
-        <View style={styles.filterPanel}>
-          {/* Due date */}
-          <Text style={styles.filterSectionLabel}>Due Date</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterRow}
-          >
+        <View className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3.5 pt-2.5 pb-3 gap-2">
+          <SectionLabel>Due Date</SectionLabel>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false} bounces={false} directionalLockEnabled contentContainerStyle={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
             {DUE_DATE_OPTIONS.map((opt) => (
-              <TouchableOpacity
+              <FilterChip
                 key={opt.key}
-                style={[styles.filterChip, dueDateFilter === opt.key && styles.filterChipActive]}
+                label={opt.label}
+                active={dueDateFilter === opt.key}
                 onPress={() => setDueDateFilter(dueDateFilter === opt.key ? "" : opt.key)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.filterChipText, dueDateFilter === opt.key && styles.filterChipTextActive]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
 
-          {/* Priority filter */}
-          <Text style={styles.filterSectionLabel}>Priority</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterRow}
-          >
+          <SectionLabel>Priority</SectionLabel>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false} bounces={false} directionalLockEnabled contentContainerStyle={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
             {PRIORITY_OPTIONS.map((opt) => (
-              <TouchableOpacity
+              <FilterChip
                 key={opt.key}
-                style={[styles.filterChip, priorityFilter === opt.key && styles.filterChipActive]}
+                label={opt.label}
+                active={priorityFilter === opt.key}
                 onPress={() => setPriorityFilter(priorityFilter === opt.key ? "" : opt.key)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.filterChipText, priorityFilter === opt.key && styles.filterChipTextActive]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
 
-          {/* Toggle filters */}
-          <Text style={styles.filterSectionLabel}>More Filters</Text>
-          <View style={styles.filterRow}>
-            <TouchableOpacity
-              style={[styles.filterChip, blockedOnly && styles.filterChipActive]}
-              onPress={() => setBlockedOnly((v) => !v)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterChipText, blockedOnly && styles.filterChipTextActive]}>
-                Blocked only
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.filterChip, topLevelOnly && styles.filterChipActive]}
-              onPress={() => setTopLevelOnly((v) => !v)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterChipText, topLevelOnly && styles.filterChipTextActive]}>
-                Top-level only
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.filterChip, unassignedOnly && styles.filterChipActive]}
-              onPress={() => setUnassignedOnly((v) => !v)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterChipText, unassignedOnly && styles.filterChipTextActive]}>
-                Unassigned only
-              </Text>
-            </TouchableOpacity>
+          <SectionLabel>More Filters</SectionLabel>
+          <View className="flex-row flex-wrap gap-2">
+            <FilterChip label="Blocked only" active={blockedOnly} onPress={() => setBlockedOnly((v) => !v)} />
+            <FilterChip label="Top-level only" active={topLevelOnly} onPress={() => setTopLevelOnly((v) => !v)} />
+            <FilterChip label="Unassigned only" active={unassignedOnly} onPress={() => setUnassignedOnly((v) => !v)} />
           </View>
 
           {activeFilterCount > 0 && (
             <TouchableOpacity
+              className="self-start mt-0.5"
               onPress={() => {
                 setDueDateFilter("");
                 setPriorityFilter("");
@@ -295,9 +215,8 @@ export default function TaskListScreen() {
                 setTopLevelOnly(false);
                 setUnassignedOnly(false);
               }}
-              style={styles.clearFiltersBtn}
             >
-              <Text style={styles.clearFiltersBtnText}>Clear all filters</Text>
+              <Text className="text-xs text-red-600 dark:text-red-400 font-semibold">Clear all filters</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -317,50 +236,32 @@ export default function TaskListScreen() {
         /* ── List view ── */
         <>
           {/* Status filter chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
-            bounces={false}
-            directionalLockEnabled={true}
-            style={styles.filterBar}
-            contentContainerStyle={styles.filterContent}
-          >
-            {FILTERS.map((f) => {
-              const count = f.key === "all" ? allTasks.length : allTasks.filter((t) => t.status === f.key).length;
-              return (
-                <TouchableOpacity
-                  key={f.key}
-                  style={[styles.chip, filter === f.key && styles.chipActive]}
-                  onPress={() => setFilter(f.key)}
-                >
-                  <Text style={[styles.chipText, filter === f.key && styles.chipTextActive]}>
-                    {f.label} ({count})
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <TabFilterStrip
+            filters={FILTERS}
+            activeKey={filter}
+            onSelect={setFilter}
+            getCount={(key) => key === "all" ? allTasks.length : allTasks.filter((t) => t.status === key).length}
+          />
 
           <FlatList
             data={tasks}
             keyExtractor={(item) => item.id}
             contentContainerStyle={[
-              styles.listContent,
-              tasks.length === 0 && styles.emptyContainer,
+              { padding: 16, gap: 10, paddingBottom: 90 },
+              tasks.length === 0 && { flex: 1, justifyContent: "center", alignItems: "center" },
             ]}
             refreshControl={
               <RefreshControl
                 refreshing={fetching && allTasks.length > 0}
                 onRefresh={() => {
-                  setLimit(PAGE_SIZE);
+                  setLimit(PAGE_SIZE_DEFAULT);
                   reexecute({ requestPolicy: "network-only" });
                 }}
                 tintColor="#2563eb"
               />
             }
             onEndReached={() => {
-              if (hasMore && !fetching) setLimit((l) => l + PAGE_SIZE);
+              if (hasMore && !fetching) setLimit((l) => l + PAGE_SIZE_DEFAULT);
             }}
             onEndReachedThreshold={0.3}
             ListFooterComponent={
@@ -369,7 +270,7 @@ export default function TaskListScreen() {
               ) : null
             }
             ListEmptyComponent={
-              <Text style={styles.emptyText}>
+              <Text className="text-gray-400 dark:text-slate-500 text-base">
                 {activeFilterCount > 0 || filter !== "all"
                   ? "No tasks match the current filters"
                   : "No tasks yet"}
@@ -385,101 +286,7 @@ export default function TaskListScreen() {
         </>
       )}
 
-      {/* FAB — Create task */}
-      <TouchableOpacity
-        style={[styles.fab, { bottom: insets.bottom + 20 }]}
-        onPress={() => router.push("/task/create")}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.fabIcon}>+</Text>
-      </TouchableOpacity>
+      <FAB onPress={() => router.push("/task/create")} />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9fafb" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#f9fafb", gap: 12 },
-  errorText: { color: "#dc2626", fontSize: 16 },
-  retryText: { color: "#2563eb", fontSize: 14, fontWeight: "600" },
-
-  filterBar: { height: 52, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
-  filterContent: { paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#f3f4f6" },
-  chipActive: { backgroundColor: "#dbeafe" },
-  chipText: { fontSize: 13, color: "#6b7280", fontWeight: "500" },
-  chipTextActive: { color: "#2563eb", fontWeight: "600" },
-
-  listContent: { padding: 16, gap: 10, paddingBottom: 90 },
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { color: "#9ca3af", fontSize: 16 },
-
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  searchIcon: { fontSize: 14 },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: "#111827",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-  },
-  viewToggle: { padding: 4, position: "relative" },
-  viewToggleActive: { backgroundColor: "#eff6ff", borderRadius: 8 },
-
-  filterBadge: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#2563eb",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  filterBadgeText: { fontSize: 9, color: "#fff", fontWeight: "700" },
-
-  filterPanel: {
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 12,
-    gap: 8,
-  },
-  filterSectionLabel: { fontSize: 11, fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.5 },
-  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: "#f3f4f6", borderWidth: 1, borderColor: "#e5e7eb" },
-  filterChipActive: { backgroundColor: "#dbeafe", borderColor: "#93c5fd" },
-  filterChipText: { fontSize: 12, color: "#6b7280", fontWeight: "500" },
-  filterChipTextActive: { color: "#2563eb", fontWeight: "600" },
-  clearFiltersBtn: { alignSelf: "flex-start", marginTop: 2 },
-  clearFiltersBtnText: { fontSize: 12, color: "#dc2626", fontWeight: "600" },
-
-  fab: {
-    position: "absolute",
-    right: 20,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#2563eb",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  fabIcon: { fontSize: 28, color: "#fff", lineHeight: 32 },
-});

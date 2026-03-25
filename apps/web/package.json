@@ -24,9 +24,11 @@
   },
   "dependencies": {
     "@agentcenter/database": "*",
+    "@agentcenter/tailwind-config": "*",
     "@agentcenter/graphql-client": "*",
     "@agentcenter/graphql-server": "*",
     "@agentcenter/types": "*",
+    "@agentcenter/hooks": "*",
     "@agentcenter/utils": "*",
     "@aws-sdk/client-s3": "^3.986.0",
     "@aws-sdk/s3-request-presigner": "^3.986.0",

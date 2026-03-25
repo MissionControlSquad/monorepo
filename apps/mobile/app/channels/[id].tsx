@@ -4,7 +4,6 @@ import {
   FlatList,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -20,7 +19,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, CHANNEL_PINNED_MESSAGES_QUERY, ON_NEW_CHANNEL_MESSAGE, PROFILES_QUERY, SEARCH_CHANNEL_MESSAGES_QUERY } from "@agentcenter/graphql-client";
 import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_CHANNEL_MESSAGE_REACTION, UPDATE_CHANNEL_MESSAGE, DELETE_CHANNEL_MESSAGE, PIN_CHANNEL_MESSAGE, UNPIN_CHANNEL_MESSAGE, ADD_CHANNEL_MEMBER, REMOVE_CHANNEL_MEMBER, JOIN_CHANNEL, LEAVE_CHANNEL, DELETE_CHANNEL } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
+import { useTheme } from "../../src/hooks/useTheme";
+import { formatChatTime, appendDeduped } from "@agentcenter/utils";
 import { MentionInput } from "../../src/components/MentionInput";
+import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
 
 interface FromProfile {
   id: string;
@@ -73,25 +75,13 @@ interface Channel {
   members: { id: string; profileId: string; profile: { id: string; kind: string; displayName: string; username?: string | null } }[];
 }
 
-function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const isToday =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (isToday) {
-    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  }
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
 export default function ChannelDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
   const router = useRouter();
   const { profileId } = useAuth();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -100,30 +90,36 @@ export default function ChannelDetailScreen() {
   const [profileSearch, setProfileSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [msgLimit, setMsgLimit] = useState(50);
   const listRef = useRef<FlatList>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [channelResult, reexecuteChannel] = useQuery<{ channel: Channel | null }>({
     query: CHANNEL_QUERY,
     variables: { id },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [messagesResult, reexecute] = useQuery<{ channelMessages: Message[] }>({
     query: CHANNEL_MESSAGES_QUERY,
-    variables: { channelId: id, limit: 100 },
+    variables: { channelId: id, limit: msgLimit },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [pinnedResult] = useQuery<{ channelPinnedMessages: Message[] }>({
     query: CHANNEL_PINNED_MESSAGES_QUERY,
     variables: { channelId: id, limit: 50 },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [searchResult] = useQuery<{ searchChannelMessages: Message[] }>({
     query: SEARCH_CHANNEL_MESSAGES_QUERY,
     variables: { channelId: id, query: searchQuery.trim(), limit: 50 },
-    pause: !searchOpen || searchQuery.trim().length < 2,
+    pause: !mounted || !searchOpen || searchQuery.trim().length < 2,
     requestPolicy: "cache-and-network",
   });
 
@@ -142,7 +138,7 @@ export default function ChannelDetailScreen() {
 
   const [profilesResult] = useQuery<{ profiles: ProfileOption[] }>({
     query: PROFILES_QUERY,
-    pause: !addMemberOpen,
+    pause: !mounted || !addMemberOpen,
     requestPolicy: "cache-and-network",
   });
 
@@ -171,17 +167,19 @@ export default function ChannelDetailScreen() {
   const baseMessages = messagesResult.data?.channelMessages ?? [];
   // Merge subscription messages with fetched messages, deduplicate by id
   const liveMessages = subResult.data ?? [];
-  const allIds = new Set(baseMessages.map((m) => m.id));
-  const merged = [...baseMessages, ...liveMessages.filter((m: Message) => !allIds.has(m.id))];
-  const messages = merged;
+  const messages = appendDeduped(baseMessages, liveMessages);
   const { fetching, error } = messagesResult;
 
   useEffect(() => {
     if (channel) {
       navigation.setOptions({
-        title: channel.name,
+        headerBackTitle: "",
+        headerBackTitleVisible: false,
+        title: channel.visibility === "dm"
+          ? (channel.members.find((m) => m.profileId !== profileId)?.profile.displayName ?? channel.name)
+          : channel.name,
         headerRight: () => (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4}}>
             <TouchableOpacity
               onPress={() => {
                 setSearchOpen((v) => {
@@ -191,10 +189,10 @@ export default function ChannelDetailScreen() {
               }}
               style={{ padding: 8 }}
             >
-              <Ionicons name={searchOpen ? "close" : "search-outline"} size={20} color="#2563eb" />
+              <Ionicons name={searchOpen ? "close" : "search-outline"} size={20} color={colors.accent} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setMembersOpen(true)} style={{ padding: 8 }}>
-              <Ionicons name="people-outline" size={22} color="#2563eb" />
+              <Ionicons name="people-outline" size={22} color={colors.accent} />
             </TouchableOpacity>
           </View>
         ),
@@ -207,13 +205,6 @@ export default function ChannelDetailScreen() {
       executeMarkRead({ channelId: id, profileId });
     }
   }, [messages.length, id, profileId]);
-
-  // Auto-scroll when new messages arrive via subscription
-  useEffect(() => {
-    if (liveMessages.length > 0) {
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  }, [liveMessages.length]);
 
   const handleSend = async () => {
     const content = message.trim();
@@ -231,7 +222,6 @@ export default function ChannelDetailScreen() {
         setMessage(content);
       } else {
         reexecute({ requestPolicy: "network-only" });
-        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
       }
     } finally {
       setSending(false);
@@ -240,7 +230,7 @@ export default function ChannelDetailScreen() {
 
   if (fetching && messages.length === 0) {
     return (
-      <View style={styles.center}>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
         <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
@@ -248,29 +238,31 @@ export default function ChannelDetailScreen() {
 
   if (error && messages.length === 0) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Failed to load messages</Text>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
+        <Text className="text-red-600 text-base">Failed to load messages</Text>
       </View>
     );
   }
 
   const searchMessages = searchResult.data?.searchChannelMessages ?? [];
   const displayMessages = searchOpen && searchQuery.trim().length >= 2 ? searchMessages : messages;
+  // Inverted FlatList renders index 0 at visual bottom — so newest message goes first
+  const invertedMessages = [...displayMessages].reverse();
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 88 + insets.bottom : 0}
+      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 44 : 0}
     >
       {/* Search bar */}
       {searchOpen && (
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={16} color="#9ca3af" />
+        <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
+          <Ionicons name="search-outline" size={16} color={colors.textMuted} />
           <TextInput
-            style={styles.searchInput}
+            style={{ flex: 1, fontSize: 15, color: colors.text, paddingVertical: 4 }}
             placeholder="Search messages…"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus
@@ -280,53 +272,88 @@ export default function ChannelDetailScreen() {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons name="close-circle" size={16} color="#9ca3af" />
+              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           )}
-          {searchResult.fetching && <ActivityIndicator size="small" color="#2563eb" style={{ marginLeft: 4 }} />}
+          {searchResult.fetching && <ActivityIndicator size="small" color={colors.accent} style={{ marginLeft: 4 }} />}
         </View>
       )}
       <FlatList
         ref={searchOpen ? undefined : listRef}
-        data={displayMessages}
+        data={invertedMessages}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+        inverted
+        contentContainerStyle={{ paddingVertical: 12 }}
+        showsVerticalScrollIndicator={false}
+        onEndReached={() => {
+          if (!searchOpen && !fetching && baseMessages.length >= msgLimit) {
+            setMsgLimit((l) => l + 50);
+          }
+        }}
+        onEndReachedThreshold={0.3}
         ListHeaderComponent={
+          !searchOpen && fetching && baseMessages.length > 0 ? (
+            <ActivityIndicator size="small" color="#2563eb" style={{ paddingVertical: 12 }} />
+          ) : null
+        }
+        ListFooterComponent={
           pinnedMessages.length > 0 ? (
             <TouchableOpacity
-              style={styles.pinnedBanner}
+              style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: isDark ? "rgba(234,179,8,0.15)" : "#fefce8", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, marginHorizontal: 12, marginBottom: 8, borderWidth: 1, borderColor: isDark ? "rgba(234,179,8,0.3)" : "#fde68a" }}
               onPress={() => setPinnedOpen(true)}
               activeOpacity={0.8}
             >
-              <Text style={styles.pinnedBannerIcon}>📌</Text>
-              <Text style={styles.pinnedBannerText}>
+              <Text style={{ fontSize: 14 }}>📌</Text>
+              <Text style={{ flex: 1, fontSize: 13, fontWeight: "600", color: isDark ? "#fbbf24" : "#92400e" }}>
                 {pinnedMessages.length} pinned {pinnedMessages.length === 1 ? "message" : "messages"}
               </Text>
-              <Ionicons name="chevron-forward" size={14} color="#92400e" />
+              <Ionicons name="chevron-forward" size={14} color={isDark ? "#fbbf24" : "#92400e"} />
             </TouchableOpacity>
           ) : null
         }
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
+            <Text style={{ fontSize: 15, color: colors.textMuted, textAlign: "center" }}>
               {searchOpen && searchQuery.trim().length >= 2
                 ? "No messages match your search"
                 : searchOpen
                 ? "Type at least 2 characters to search"
-                : "No messages yet. Say hello!"}
+                : "No messages yet. Say hello! 👋"}
             </Text>
           </View>
         }
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const isMe = item.fromProfileId === profileId;
+
+          // In inverted data: index+1 = older (visual above), index-1 = newer (visual below)
+          const olderMsg = invertedMessages[index + 1];
+          const newerMsg = invertedMessages[index - 1];
+          const isTopOfGroup = !olderMsg || olderMsg.fromProfileId !== item.fromProfileId;
+          const isBottomOfGroup = !newerMsg || newerMsg.fromProfileId !== item.fromProfileId;
+
+          // Date separator: show when this message is on a different day than the one above it
+          const itemDay = item.createdAt.slice(0, 10); // "YYYY-MM-DD"
+          const olderDay = olderMsg?.createdAt.slice(0, 10);
+          const showDateSep = !olderMsg || itemDay !== olderDay;
+          let dateLabel = "";
+          if (showDateSep) {
+            const d = new Date(item.createdAt);
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            if (d.toDateString() === today.toDateString()) {
+              dateLabel = "Today";
+            } else if (d.toDateString() === yesterday.toDateString()) {
+              dateLabel = "Yesterday";
+            } else {
+              dateLabel = d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+            }
+          }
 
           // Group reactions by emoji
           const reactionGroups: Record<string, { emoji: string; count: number; iMine: boolean }> = {};
           for (const r of item.reactions ?? []) {
-            if (!reactionGroups[r.emoji]) {
-              reactionGroups[r.emoji] = { emoji: r.emoji, count: 0, iMine: false };
-            }
+            if (!reactionGroups[r.emoji]) reactionGroups[r.emoji] = { emoji: r.emoji, count: 0, iMine: false };
             reactionGroups[r.emoji].count++;
             if (r.profileId === profileId) reactionGroups[r.emoji].iMine = true;
           }
@@ -341,7 +368,7 @@ export default function ChannelDetailScreen() {
 
           function showMessageActions() {
             const isPinned = !!item.pinnedAt;
-            const baseActions: { text: string; onPress?: () => void; style?: "cancel" | "destructive" }[] = [
+            const actions: { text: string; onPress?: () => void; style?: "cancel" | "destructive" }[] = [
               {
                 text: isPinned ? "📌 Unpin" : "📌 Pin",
                 onPress: () => {
@@ -354,7 +381,7 @@ export default function ChannelDetailScreen() {
                 text: "😀 React",
                 onPress: () => {
                   Alert.alert("React", undefined, [
-                    ...["👍","❤️","😂","🎉","🔥","👀"].map((e) => ({
+                    ...["👍", "❤️", "😂", "🎉", "🔥", "👀"].map((e) => ({
                       text: e,
                       onPress: () => handleReact(e),
                     })),
@@ -364,7 +391,7 @@ export default function ChannelDetailScreen() {
               },
             ];
             if (isMe) {
-              baseActions.push({
+              actions.push({
                 text: "✏️ Edit",
                 onPress: () => {
                   Alert.prompt("Edit Message", undefined, (newContent) => {
@@ -375,7 +402,7 @@ export default function ChannelDetailScreen() {
                   }, "plain-text", item.content);
                 },
               });
-              baseActions.push({
+              actions.push({
                 text: "🗑️ Delete",
                 style: "destructive",
                 onPress: () => {
@@ -395,86 +422,121 @@ export default function ChannelDetailScreen() {
                 },
               });
             }
-            baseActions.push({ text: "Cancel", style: "cancel" });
-            Alert.alert("Message", undefined, baseActions);
+            actions.push({ text: "Cancel", style: "cancel" });
+            Alert.alert("Message", undefined, actions);
           }
 
+          // Bubble corner radius — flatten corner toward tail
+          const myBubbleRadius = { borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomLeftRadius: 18, borderBottomRightRadius: isBottomOfGroup ? 4 : 18 };
+          const theirBubbleRadius = { borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomLeftRadius: isBottomOfGroup ? 4 : 18, borderBottomRightRadius: 18 };
+
           return (
-            <View style={[styles.messageRow, isMe && styles.messageRowMe]}>
-              {!isMe && (
-                <View style={styles.avatarCircle}>
-                  <Text style={styles.avatarText}>
-                    {item.fromProfile.displayName.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.bubbleCol}>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onLongPress={showMessageActions}
-                  delayLongPress={350}
-                >
-                  <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-                    {!isMe && (
-                      <Text style={styles.senderName}>{item.fromProfile.displayName}</Text>
-                    )}
-                    <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
-                      {item.content}
-                    </Text>
-                    <Text style={[styles.timestamp, isMe && styles.timestampMe]}>
-                      {formatTime(item.createdAt)}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-                {(item.attachments ?? []).length > 0 && (
-                  <View style={styles.attachmentsRow}>
-                    {(item.attachments ?? []).map((a: Attachment) => {
-                      const mime = a.document.mimeType ?? "";
-                      const icon = mime.startsWith("image/") ? "🖼️"
-                        : mime.startsWith("video/") ? "🎬"
-                        : mime.startsWith("audio/") ? "🎵"
-                        : mime === "application/pdf" ? "📄"
-                        : "📎";
-                      const size = a.document.fileSize
-                        ? a.document.fileSize > 1_000_000
-                          ? `${(a.document.fileSize / 1_000_000).toFixed(1)} MB`
-                          : `${Math.round(a.document.fileSize / 1024)} KB`
-                        : null;
-                      return (
-                        <View key={a.id} style={styles.attachmentPill}>
-                          <Text style={styles.attachmentIcon}>{icon}</Text>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.attachmentName} numberOfLines={1}>
-                              {a.document.fileName || a.document.title}
-                            </Text>
-                            {size && <Text style={styles.attachmentSize}>{size}</Text>}
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-                {reactionList.length > 0 && (
-                  <View style={[styles.reactionsRow, isMe && styles.reactionsRowMe]}>
-                    {reactionList.map((r) => (
-                      <TouchableOpacity
-                        key={r.emoji}
-                        style={[styles.reactionPill, r.iMine && styles.reactionPillMine]}
-                        onPress={() => handleReact(r.emoji)}
-                      >
-                        <Text style={styles.reactionEmoji}>{r.emoji}</Text>
-                        <Text style={[styles.reactionCount, r.iMine && styles.reactionCountMine]}>
-                          {r.count}
+            <>
+            {showDateSep && (
+              <View style={{ flexDirection: "row", alignItems: "center", marginHorizontal: 12, marginVertical: 12, gap: 10 }}>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.textMuted, paddingHorizontal: 4 }}>{dateLabel}</Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              </View>
+            )}
+            <View style={{ paddingHorizontal: 12, marginBottom: isBottomOfGroup ? 8 : 2, marginTop: isTopOfGroup ? 6 : 0 }}>
+              <View style={{ flexDirection: "row", justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8 }}>
+                {/* Avatar slot — 32px wide so messages align even when avatar hidden */}
+                {!isMe && (
+                  <View style={{ width: 32, alignSelf: "flex-end", marginBottom: 2 }}>
+                    {isBottomOfGroup && (
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.accentSurface, justifyContent: "center", alignItems: "center" }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.accent }}>
+                          {item.fromProfile.displayName.charAt(0).toUpperCase()}
                         </Text>
-                      </TouchableOpacity>
-                    ))}
-                    <TouchableOpacity style={styles.addReactionBtn} onPress={showMessageActions}>
-                      <Text style={styles.addReactionText}>+</Text>
-                    </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 )}
+
+                {/* Bubble column */}
+                <View style={{ maxWidth: "75%" }}>
+                  {/* Sender name — only at top of group for others */}
+                  {!isMe && isTopOfGroup && (
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: colors.accent, marginBottom: 3, marginLeft: 2 }}>
+                      {item.fromProfile.displayName}
+                    </Text>
+                  )}
+
+                  <TouchableOpacity activeOpacity={0.85} onLongPress={showMessageActions} delayLongPress={350}>
+                    <View style={[
+                      { paddingHorizontal: 14, paddingVertical: 10 },
+                      isMe
+                        ? [{ backgroundColor: colors.accent }, myBubbleRadius]
+                        : [{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }, theirBubbleRadius],
+                    ]}>
+                      <SimpleMarkdown content={item.content} inverted={isMe} />
+                      {isBottomOfGroup && (
+                        <Text style={{ fontSize: 11, alignSelf: "flex-end", marginTop: 4, color: isMe ? "rgba(255,255,255,0.65)" : colors.textMuted }}>
+                          {formatChatTime(item.createdAt)}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Attachments */}
+                  {(item.attachments ?? []).length > 0 && (
+                    <View style={{ gap: 6, marginTop: 4 }}>
+                      {item.attachments.map((a: Attachment) => {
+                        const mime = a.document.mimeType ?? "";
+                        const icon = mime.startsWith("image/") ? "🖼️" : mime.startsWith("video/") ? "🎬" : mime.startsWith("audio/") ? "🎵" : mime === "application/pdf" ? "📄" : "📎";
+                        const size = a.document.fileSize
+                          ? a.document.fileSize > 1_000_000
+                            ? `${(a.document.fileSize / 1_000_000).toFixed(1)} MB`
+                            : `${Math.round(a.document.fileSize / 1024)} KB`
+                          : null;
+                        return (
+                          <View key={a.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surfaceAlt, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: colors.border }}>
+                            <Text style={{ fontSize: 16 }}>{icon}</Text>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: "500", color: colors.text }} numberOfLines={1}>
+                                {a.document.fileName || a.document.title}
+                              </Text>
+                              {size && <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 1 }}>{size}</Text>}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  {/* Reactions */}
+                  {reactionList.length > 0 && (
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4, justifyContent: isMe ? "flex-end" : "flex-start" }}>
+                      {reactionList.map((r) => (
+                        <TouchableOpacity
+                          key={r.emoji}
+                          style={[
+                            { flexDirection: "row", alignItems: "center", gap: 3, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
+                            r.iMine
+                              ? { backgroundColor: colors.accentSurface, borderColor: isDark ? colors.accent : "#93c5fd" }
+                              : { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+                          ]}
+                          onPress={() => handleReact(r.emoji)}
+                        >
+                          <Text style={{ fontSize: 13 }}>{r.emoji}</Text>
+                          <Text style={{ fontSize: 12, fontWeight: "600", color: r.iMine ? colors.accent : colors.textSecondary }}>
+                            {r.count}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                      <TouchableOpacity
+                        style={{ borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, backgroundColor: colors.surfaceAlt, borderColor: colors.border, justifyContent: "center", alignItems: "center" }}
+                        onPress={showMessageActions}
+                      >
+                        <Text style={{ fontSize: 13, color: colors.textMuted, fontWeight: "600" }}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
+            </>
           );
         }}
       />
@@ -485,9 +547,9 @@ export default function ChannelDetailScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setMembersOpen(false)}
       >
-        <View style={styles.membersModal}>
-          <View style={styles.membersHeader}>
-            <Text style={styles.membersTitle}>
+        <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+          <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">
               Members ({channel?.members.length ?? 0})
             </Text>
             <TouchableOpacity onPress={() => setMembersOpen(false)} style={{ padding: 4 }}>
@@ -496,31 +558,40 @@ export default function ChannelDetailScreen() {
           </View>
 
           {/* Join / Leave row */}
-          <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" }}>
-            {isMember ? (
+          <View className="flex-row gap-2.5 px-4 py-2.5 border-b border-gray-100 dark:border-slate-700">
+            {isMember && (channel?.visibility === "dm" || channel?.createdByProfileId !== profileId) ? (
               <TouchableOpacity
-                style={{ flex: 1, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: "#fecaca", backgroundColor: "#fef2f2", alignItems: "center" }}
+                className="flex-1 py-2.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 items-center"
                 onPress={() => {
                   if (!profileId) return;
-                  Alert.alert("Leave Channel", "You will no longer receive messages from this channel.", [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Leave",
-                      style: "destructive",
-                      onPress: async () => {
-                        await executeLeave({ channelId: id, profileId });
-                        reexecuteChannel({ requestPolicy: "network-only" });
+                  const isDm = channel?.visibility === "dm";
+                  Alert.alert(
+                    isDm ? "Leave Conversation" : "Leave Channel",
+                    isDm
+                      ? "You will leave this direct message conversation."
+                      : "You will no longer receive messages from this channel.",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Leave",
+                        style: "destructive",
+                        onPress: async () => {
+                          await executeLeave({ channelId: id, profileId });
+                          router.replace("/(dashboard)/channels" as Parameters<typeof router.replace>[0]);
+                        },
                       },
-                    },
-                  ]);
+                    ],
+                  );
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={{ color: "#dc2626", fontWeight: "600", fontSize: 14 }}>Leave Channel</Text>
+                <Text className="text-red-600 font-semibold text-sm">
+                  {channel?.visibility === "dm" ? "Leave Conversation" : "Leave Channel"}
+                </Text>
               </TouchableOpacity>
-            ) : (
+            ) : !isMember && channel?.visibility === "public" ? (
               <TouchableOpacity
-                style={{ flex: 1, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: "#bbf7d0", backgroundColor: "#f0fdf4", alignItems: "center" }}
+                className="flex-1 py-2.5 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 items-center"
                 onPress={async () => {
                   if (!profileId) return;
                   await executeJoin({ channelId: id, profileId });
@@ -528,22 +599,25 @@ export default function ChannelDetailScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={{ color: "#16a34a", fontWeight: "600", fontSize: 14 }}>Join Channel</Text>
+                <Text className="text-green-600 font-semibold text-sm">Join Channel</Text>
+              </TouchableOpacity>
+            ) : null}
+            {/* Add Member — private channels only, creator only */}
+            {channel?.visibility === "private" && channel?.createdByProfileId === profileId && (
+              <TouchableOpacity
+                className="flex-1 py-2.5 rounded-lg border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 items-center"
+                onPress={() => { setMembersOpen(false); setTimeout(() => setAddMemberOpen(true), 300); }}
+                activeOpacity={0.7}
+              >
+                <Text className="text-blue-600 font-semibold text-sm">+ Add Member</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              style={{ flex: 1, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: "#bfdbfe", backgroundColor: "#eff6ff", alignItems: "center" }}
-              onPress={() => { setMembersOpen(false); setTimeout(() => setAddMemberOpen(true), 300); }}
-              activeOpacity={0.7}
-            >
-              <Text style={{ color: "#2563eb", fontWeight: "600", fontSize: 14 }}>+ Add Member</Text>
-            </TouchableOpacity>
           </View>
 
-          {/* Delete channel — only for creator */}
-          {channel?.createdByProfileId === profileId && (
+          {/* Delete channel — non-DM, creator only */}
+          {channel?.visibility !== "dm" && channel?.createdByProfileId === profileId && (
             <TouchableOpacity
-              style={{ marginHorizontal: 16, marginTop: 10, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: "#fecaca", backgroundColor: "#fef2f2", alignItems: "center" }}
+              className="mx-4 mt-2.5 py-2.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 items-center"
               onPress={() => {
                 if (!profileId) return;
                 Alert.alert(
@@ -569,27 +643,27 @@ export default function ChannelDetailScreen() {
               }}
               activeOpacity={0.7}
             >
-              <Text style={{ color: "#dc2626", fontWeight: "600", fontSize: 14 }}>Delete Channel</Text>
+              <Text className="text-red-600 font-semibold text-sm">Delete Channel</Text>
             </TouchableOpacity>
           )}
 
           <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
             {(channel?.members ?? []).map((m) => (
-              <View key={m.id} style={styles.memberRow}>
-                <View style={styles.memberAvatar}>
-                  <Text style={styles.memberAvatarText}>
+              <View key={m.id} className="flex-row items-center p-3.5 gap-3 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700">
+                <View className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 justify-center items-center">
+                  <Text className="text-base font-bold text-blue-700 dark:text-blue-300">
                     {m.profile.displayName.charAt(0).toUpperCase()}
                   </Text>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.memberName}>{m.profile.displayName}</Text>
-                  <Text style={styles.memberMeta}>
+                <View className="flex-1">
+                  <Text className="text-base font-medium text-gray-900 dark:text-slate-100">{m.profile.displayName}</Text>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">
                     {m.profile.kind === "agent" ? "🤖 Agent" : "👤 Human"} · @{m.profile.username}
                   </Text>
                 </View>
                 {m.profileId === profileId ? (
-                  <Text style={styles.memberYou}>you</Text>
-                ) : (
+                  <Text className="text-xs text-blue-600 font-semibold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-xl">you</Text>
+                ) : channel?.visibility === "private" && channel?.createdByProfileId === profileId ? (
                   <TouchableOpacity
                     onPress={() => {
                       if (!profileId) return;
@@ -610,7 +684,7 @@ export default function ChannelDetailScreen() {
                   >
                     <Ionicons name="person-remove-outline" size={16} color="#9ca3af" />
                   </TouchableOpacity>
-                )}
+                ) : null}
               </View>
             ))}
           </ScrollView>
@@ -624,18 +698,18 @@ export default function ChannelDetailScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setAddMemberOpen(false)}
       >
-        <View style={styles.membersModal}>
-          <View style={styles.membersHeader}>
-            <Text style={styles.membersTitle}>Add Member</Text>
+        <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+          <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">Add Member</Text>
             <TouchableOpacity onPress={() => setAddMemberOpen(false)} style={{ padding: 4 }}>
               <Ionicons name="close" size={22} color="#374151" />
             </TouchableOpacity>
           </View>
-          <View style={{ paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" }}>
-            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#f3f4f6", borderRadius: 10, paddingHorizontal: 12, gap: 8 }}>
+          <View className="px-4 py-2.5 border-b border-gray-100 dark:border-slate-700">
+            <View className="flex-row items-center bg-gray-100 dark:bg-slate-700 rounded-xl px-3 gap-2">
               <Ionicons name="search-outline" size={16} color="#9ca3af" />
               <TextInput
-                style={{ flex: 1, fontSize: 14, color: "#111827", paddingVertical: 9 }}
+                className="flex-1 text-sm text-gray-900 dark:text-slate-100 py-2.5"
                 placeholder="Search by name or username…"
                 placeholderTextColor="#9ca3af"
                 value={profileSearch}
@@ -647,12 +721,12 @@ export default function ChannelDetailScreen() {
           </View>
           <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
             {profilesResult.fetching && filteredProfiles.length === 0 ? (
-              <View style={{ padding: 24, alignItems: "center" }}>
+              <View className="p-6 items-center">
                 <ActivityIndicator color="#2563eb" />
               </View>
             ) : filteredProfiles.length === 0 ? (
-              <View style={{ padding: 24, alignItems: "center" }}>
-                <Text style={{ color: "#9ca3af", fontSize: 14 }}>
+              <View className="p-6 items-center">
+                <Text className="text-gray-400 dark:text-slate-500 text-sm">
                   {profileSearch.trim() ? "No matching profiles" : "All profiles are already members"}
                 </Text>
               </View>
@@ -660,22 +734,27 @@ export default function ChannelDetailScreen() {
               filteredProfiles.map((p) => (
                 <TouchableOpacity
                   key={p.id}
-                  style={[styles.memberRow, { justifyContent: "space-between" }]}
+                  className="flex-row items-center justify-between p-3.5 gap-3 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
                   onPress={async () => {
                     if (!profileId) return;
-                    await executeAddMember({ channelId: id, profileId: p.id, addedByProfileId: profileId });
+                    const res = await executeAddMember({ channelId: id, profileId: p.id, addedByProfileId: profileId });
+                    if (res.error) {
+                      const msg = res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to add member";
+                      Alert.alert("Error", msg);
+                      return;
+                    }
                     reexecuteChannel({ requestPolicy: "network-only" });
                     setAddMemberOpen(false);
                     setProfileSearch("");
                   }}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.memberAvatar}>
-                    <Text style={styles.memberAvatarText}>{p.displayName.charAt(0).toUpperCase()}</Text>
+                  <View className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 justify-center items-center">
+                    <Text className="text-base font-bold text-blue-700 dark:text-blue-300">{p.displayName.charAt(0).toUpperCase()}</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.memberName}>{p.displayName}</Text>
-                    <Text style={styles.memberMeta}>
+                  <View className="flex-1">
+                    <Text className="text-base font-medium text-gray-900 dark:text-slate-100">{p.displayName}</Text>
+                    <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">
                       {p.kind === "agent" ? "🤖 Agent" : "👤 Human"}{p.username ? ` · @${p.username}` : ""}
                     </Text>
                   </View>
@@ -694,9 +773,9 @@ export default function ChannelDetailScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setPinnedOpen(false)}
       >
-        <View style={styles.membersModal}>
-          <View style={styles.membersHeader}>
-            <Text style={styles.membersTitle}>
+        <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+          <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">
               📌 Pinned Messages ({pinnedMessages.length})
             </Text>
             <TouchableOpacity onPress={() => setPinnedOpen(false)} style={{ padding: 4 }}>
@@ -705,345 +784,77 @@ export default function ChannelDetailScreen() {
           </View>
           <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}>
             {pinnedMessages.map((msg) => (
-              <View key={msg.id} style={styles.pinnedMessageCard}>
-                <View style={styles.pinnedMessageHeader}>
-                  <View style={styles.avatarCircle}>
-                    <Text style={styles.avatarText}>
+              <View key={msg.id} className="bg-white dark:bg-slate-800 rounded-xl p-3 gap-2 border border-gray-200 dark:border-slate-700">
+                <View className="flex-row items-center gap-2">
+                  <View className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 justify-center items-center">
+                    <Text className="text-blue-600 text-sm font-semibold">
                       {msg.fromProfile.displayName.charAt(0).toUpperCase()}
                     </Text>
                   </View>
-                  <Text style={styles.senderName}>{msg.fromProfile.displayName}</Text>
-                  <Text style={styles.timestamp}>{formatTime(msg.createdAt)}</Text>
+                  <Text className="text-xs font-semibold text-blue-600">{msg.fromProfile.displayName}</Text>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500">{formatChatTime(msg.createdAt)}</Text>
                 </View>
-                <Text style={styles.pinnedMessageContent}>{msg.content}</Text>
+                <Text className="text-sm text-gray-700 dark:text-slate-300 leading-5">{msg.content}</Text>
               </View>
             ))}
           </ScrollView>
         </View>
       </Modal>
 
-      <View style={[styles.inputBar, { paddingBottom: insets.bottom + 8 }]}>
-        <MentionInput
-          style={styles.input}
-          placeholder="Message..."
-          placeholderTextColor="#9ca3af"
-          value={message}
-          onChangeText={setMessage}
-          multiline
-          maxLength={2000}
-          editable={!sending}
-          suggestionsAbove
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, (!message.trim() || sending) && styles.sendButtonDisabled]}
-          onPress={handleSend}
-          disabled={!message.trim() || sending}
-          activeOpacity={0.8}
+      {isMember ? (
+        <View
+          className="flex-row items-end pt-3 px-3 gap-2.5 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700"
+          style={{ paddingBottom: insets.bottom + 8 }}
         >
-          {sending ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.sendIcon}>↑</Text>
+          <MentionInput
+            className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-2xl px-4 pt-2.5 pb-2.5 text-base text-gray-900 dark:text-slate-100 max-h-24"
+            placeholder="Message..."
+            placeholderTextColor="#9ca3af"
+            value={message}
+            onChangeText={setMessage}
+            multiline
+            maxLength={2000}
+            editable={!sending}
+            suggestionsAbove
+          />
+          <TouchableOpacity
+            className={`w-10 h-10 rounded-full justify-center items-center${(!message.trim() || sending) ? " bg-blue-300 dark:bg-blue-400" : " bg-blue-600"}`}
+            onPress={handleSend}
+            disabled={!message.trim() || sending}
+            activeOpacity={0.8}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text className="text-white text-lg font-bold">↑</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View
+          className="px-4 py-3 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 items-center gap-2"
+          style={{ paddingBottom: insets.bottom + 8 }}
+        >
+          <Text className="text-sm text-gray-500 dark:text-slate-400 text-center">
+            {channel?.visibility === "public"
+              ? "You're not a member. Join to post."
+              : "You're not a member of this private channel."}
+          </Text>
+          {channel?.visibility === "public" && (
+            <TouchableOpacity
+              className="px-6 py-2 bg-green-500 dark:bg-green-600 rounded-lg"
+              onPress={async () => {
+                if (!profileId) return;
+                await executeJoin({ channelId: id, profileId });
+                reexecuteChannel({ requestPolicy: "network-only" });
+              }}
+              activeOpacity={0.7}
+            >
+              <Text className="text-white font-semibold text-sm">Join Channel</Text>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
-      </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f9fafb",
-  },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f3f4f6",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: "#111827",
-    paddingVertical: 4,
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-  },
-  listContent: {
-    padding: 16,
-    gap: 12,
-    flexGrow: 1,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingTop: 60,
-  },
-  emptyText: {
-    color: "#9ca3af",
-    fontSize: 15,
-  },
-  errorText: {
-    color: "#dc2626",
-    fontSize: 16,
-  },
-  messageRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 8,
-    marginBottom: 4,
-  },
-  messageRowMe: {
-    justifyContent: "flex-end",
-  },
-  avatarCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#dbeafe",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarText: {
-    color: "#2563eb",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  bubble: {
-    maxWidth: "75%",
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 4,
-  },
-  bubbleThem: {
-    backgroundColor: "#fff",
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  bubbleMe: {
-    backgroundColor: "#2563eb",
-    borderBottomRightRadius: 4,
-  },
-  senderName: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#2563eb",
-    marginBottom: 2,
-  },
-  messageText: {
-    fontSize: 15,
-    color: "#111827",
-    lineHeight: 20,
-  },
-  messageTextMe: {
-    color: "#fff",
-  },
-  timestamp: {
-    fontSize: 11,
-    color: "#9ca3af",
-    alignSelf: "flex-end",
-  },
-  timestampMe: {
-    color: "rgba(255,255,255,0.7)",
-  },
-  inputBar: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingTop: 12,
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    gap: 10,
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-  },
-  input: {
-    flex: 1,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
-    fontSize: 15,
-    color: "#111827",
-    maxHeight: 100,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#2563eb",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sendButtonDisabled: {
-    backgroundColor: "#93c5fd",
-  },
-  sendIcon: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-
-  bubbleCol: { flexDirection: "column", gap: 4, maxWidth: "75%" },
-
-  reactionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-    paddingLeft: 2,
-  },
-  reactionsRowMe: { justifyContent: "flex-end", paddingLeft: 0, paddingRight: 2 },
-  reactionPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 12,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  reactionPillMine: {
-    backgroundColor: "#dbeafe",
-    borderColor: "#93c5fd",
-  },
-  reactionEmoji: { fontSize: 13 },
-  reactionCount: { fontSize: 11, color: "#6b7280", fontWeight: "600" },
-  reactionCountMine: { color: "#2563eb" },
-  // Pinned banner
-  pinnedBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#fef3c7",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "#fde68a",
-  },
-  pinnedBannerIcon: { fontSize: 14 },
-  pinnedBannerText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#92400e",
-  },
-
-  // Attachments
-  attachmentsRow: {
-    gap: 6,
-    marginTop: 2,
-  },
-  attachmentPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  attachmentIcon: { fontSize: 16 },
-  attachmentName: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: "#374151",
-  },
-  attachmentSize: {
-    fontSize: 11,
-    color: "#9ca3af",
-    marginTop: 1,
-  },
-
-  // Pinned message card
-  pinnedMessageCard: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  pinnedMessageHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  pinnedMessageContent: {
-    fontSize: 14,
-    color: "#374151",
-    lineHeight: 20,
-  },
-
-  addReactionBtn: {
-    backgroundColor: "#f3f4f6",
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  addReactionText: { fontSize: 13, color: "#9ca3af", fontWeight: "600" },
-
-  // Members modal
-  membersModal: { flex: 1, backgroundColor: "#f9fafb" },
-  membersHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    backgroundColor: "#fff",
-  },
-  membersTitle: { fontSize: 17, fontWeight: "600", color: "#111827" },
-  memberRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    gap: 12,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  memberAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#dbeafe",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  memberAvatarText: { fontSize: 16, fontWeight: "700", color: "#1d4ed8" },
-  memberName: { fontSize: 15, fontWeight: "500", color: "#111827" },
-  memberMeta: { fontSize: 12, color: "#9ca3af", marginTop: 1 },
-  memberYou: {
-    fontSize: 11,
-    color: "#2563eb",
-    fontWeight: "600",
-    backgroundColor: "#eff6ff",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-});

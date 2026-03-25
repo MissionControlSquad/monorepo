@@ -126,3 +126,119 @@ export const COLUMN_EMPTY_STATES: Record<string, { message: string; hint: string
 
 // Heartbeat timeout: 2 minutes
 export const HEARTBEAT_TIMEOUT_MS = 2 * 60 * 1000;
+
+// Platform-agnostic hex colors for status values (usable by mobile, charts, Electron)
+export const STATUS_HEX_COLORS: Record<string, string> = {
+  // Task statuses
+  inbox: "#6b7280",
+  assigned: "#2563eb",
+  in_progress: "#d97706",
+  review: "#7c3aed",
+  done: "#16a34a",
+  blocked: "#dc2626",
+  // Agent statuses
+  active: "#16a34a",
+  idle: "#6b7280",
+  offline: "#9ca3af",
+  deactivated: "#9ca3af",
+  // Detailed agent statuses
+  thinking: "#7c3aed",
+  coding: "#2563eb",
+  reviewing: "#4f46e5",
+  researching: "#d97706",
+  deploying: "#ea580c",
+  testing: "#0891b2",
+  writing: "#059669",
+  waiting_review: "#d97706",
+  waiting_input: "#d97706",
+  waiting_dependency: "#d97706",
+  // Project statuses
+  archived: "#9ca3af",
+  paused: "#d97706",
+  // Queue statuses
+  pending: "#6b7280",
+  completed: "#16a34a",
+  failed: "#dc2626",
+  cancelled: "#9ca3af",
+};
+
+// Platform-agnostic hex colors for priority values
+export const PRIORITY_HEX_COLORS: Record<string, string> = {
+  low: "#6b7280",
+  medium: "#d97706",
+  high: "#dc2626",
+  urgent: "#7c3aed",
+};
+
+// Text icons for priority (no icon library required)
+export const PRIORITY_ICONS: Record<string, string> = {
+  low: "↓",
+  medium: "→",
+  high: "↑",
+  urgent: "⚡",
+};
+
+// Ordered list of priority values (low → urgent)
+export const PRIORITY_VALUES = ["low", "medium", "high", "urgent"] as const;
+
+// Priority filter type: empty string means "any priority"
+export type PriorityFilter = "" | "low" | "medium" | "high" | "urgent";
+
+// Filter options for priority (includes empty string as "Any")
+export const PRIORITY_FILTER_OPTIONS: { key: string; label: string }[] = [
+  { key: "", label: "Any" },
+  { key: "low", label: "Low" },
+  { key: "medium", label: "Medium" },
+  { key: "high", label: "High" },
+  { key: "urgent", label: "Urgent" },
+];
+
+// Hex colors for deliverable kind values (usable by mobile, charts, Electron)
+export const DELIVERABLE_KIND_HEX_COLORS: Record<string, string> = {
+  markdown: "#2563eb",
+  code: "#7c3aed",
+  link: "#059669",
+  file: "#d97706",
+};
+
+// Emoji icons for deliverable kind values (no icon library required)
+export const DELIVERABLE_KIND_ICONS: Record<string, string> = {
+  markdown: "📄",
+  code: "💻",
+  link: "🔗",
+  file: "📎",
+};
+
+export const DUE_DATE_FILTER_OPTIONS: { key: string; label: string }[] = [
+  { key: "", label: "Any date" },
+  { key: "overdue", label: "Overdue" },
+  { key: "today", label: "Due today" },
+  { key: "this_week", label: "This week" },
+  { key: "no_due_date", label: "No due date" },
+];
+
+// Cloud VM status labels
+export const CLOUD_VM_STATUS_LABELS: Record<string, string> = {
+  provisioning: "Provisioning",
+  waiting_for_ssh: "Waiting for SSH",
+  installing_deps: "Installing Deps",
+  installing_openclaw: "Installing OpenClaw",
+  configuring: "Configuring",
+  starting_service: "Starting Service",
+  running: "Running",
+  stopped: "Stopped",
+  error: "Error",
+  destroying: "Destroying",
+  destroyed: "Destroyed",
+};
+
+// Cloud VM statuses that indicate an in-progress transition
+export const CLOUD_VM_TRANSITIONAL_STATUSES: string[] = [
+  "provisioning",
+  "waiting_for_ssh",
+  "installing_deps",
+  "installing_openclaw",
+  "configuring",
+  "starting_service",
+  "destroying",
+];

@@ -3,7 +3,6 @@ import {
   Text,
   ScrollView,
   FlatList,
-  StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
   Alert,
@@ -36,7 +35,10 @@ import {
   DELETE_PROJECT_DOC,
   PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
-import { useAuth } from "../../src/context/AuthContext";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, formatDate } from "@agentcenter/utils";
+import { useTheme } from "../../src/hooks/useTheme";
+import { TabFilterStrip } from "../../src/components/TabFilterStrip";
+import { KanbanBoard } from "../../src/components/KanbanBoard";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -112,35 +114,7 @@ interface DocRevision {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<string, string> = {
-  active: "#16a34a",
-  archived: "#6b7280",
-  paused: "#d97706",
-};
 
-const TASK_STATUS_COLORS: Record<string, string> = {
-  inbox: "#6b7280",
-  assigned: "#2563eb",
-  in_progress: "#d97706",
-  review: "#7c3aed",
-  done: "#16a34a",
-  blocked: "#dc2626",
-};
-
-const PRIORITY_COLORS: Record<string, string> = {
-  critical: "#dc2626",
-  high: "#d97706",
-  medium: "#2563eb",
-  low: "#6b7280",
-};
-
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 // ── Tab constants ─────────────────────────────────────────────────────────────
 
@@ -180,120 +154,125 @@ function OverviewTab({ project, onRefresh }: { project: Project; onRefresh: () =
 
   return (
     <ScrollView
-      contentContainerStyle={styles.tabContent}
+      contentContainerClassName="p-4 gap-3"
     >
       {/* Shutdown banner */}
       {project.shutdownActive && (
-        <View style={{ backgroundColor: "#fffbeb", borderRadius: 10, borderWidth: 1, borderColor: "#fde68a", padding: 12, flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <View className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-700 p-3 flex-row items-center gap-2.5">
           <Ionicons name="pause-circle-outline" size={20} color="#d97706" />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#92400e" }}>Project Paused</Text>
-            <Text style={{ fontSize: 12, color: "#b45309", marginTop: 2 }}>New task creation and agent work are blocked.</Text>
+          <View className="flex-1">
+            <Text className="text-xs font-bold text-yellow-800 dark:text-yellow-200">Project Paused</Text>
+            <Text className="text-xs text-yellow-700 dark:text-yellow-300 mt-0.5">New task creation and agent work are blocked.</Text>
           </View>
         </View>
       )}
 
       {/* Status + Created */}
-      <View style={styles.metaRow}>
+      <View className="flex-row items-center gap-3">
         <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: STATUS_COLORS[project.status] ?? "#6b7280" },
-          ]}
+          className="px-2.5 py-1 rounded-xl"
+          style={{ backgroundColor: STATUS_HEX_COLORS[project.status] ?? DEFAULT_COLOR }}
         >
-          <Text style={styles.statusBadgeText}>{project.status}</Text>
+          <Text className="text-white text-xs font-semibold">{project.status}</Text>
         </View>
-        <Text style={styles.metaText}>Created {fmtDate(project.createdAt)}</Text>
+        <Text className="text-gray-400 dark:text-slate-500 text-xs">Created {formatDate(project.createdAt)}</Text>
       </View>
 
       {/* Edit / View name + description */}
       {editMode ? (
-        <View style={styles.editCard}>
-          <Text style={styles.editLabel}>Name</Text>
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-blue-600">
+          <Text className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1.5">Name</Text>
           <TextInput
-            style={styles.editInput}
+            className="border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
             value={name}
             onChangeText={setName}
             placeholder="Project name"
           />
-          <Text style={[styles.editLabel, { marginTop: 12 }]}>Description</Text>
+          <Text className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1.5 mt-3">Description</Text>
           <TextInput
-            style={[styles.editInput, { height: 80 }]}
+            className="border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900 h-20"
             value={description}
             onChangeText={setDescription}
             placeholder="Description (optional)"
             multiline
             textAlignVertical="top"
           />
-          <View style={styles.editActions}>
+          <View className="flex-row gap-2 mt-3">
             <TouchableOpacity
-              style={styles.cancelBtn}
+              className="flex-1 p-2.5 rounded-lg border border-gray-300 dark:border-slate-600 items-center"
               onPress={() => {
                 setName(project.name);
                 setDescription(project.description ?? "");
                 setEditMode(false);
               }}
             >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <Text className="text-gray-700 dark:text-slate-300 font-semibold">Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.saveBtn, saving && { opacity: 0.6 }]}
+              className={`flex-1 p-2.5 rounded-lg bg-blue-600 items-center${saving ? " opacity-60" : ""}`}
               onPress={handleSave}
               disabled={saving}
             >
               {saving ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.saveBtnText}>Save</Text>
+                <Text className="text-white font-semibold">Save</Text>
               )}
             </TouchableOpacity>
           </View>
         </View>
       ) : (
-        <TouchableOpacity style={styles.nameCard} onPress={() => setEditMode(true)} activeOpacity={0.8}>
-          <View style={styles.nameCardHeader}>
-            <Text style={styles.projectNameLarge}>{project.name}</Text>
+        <TouchableOpacity
+          className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2"
+          onPress={() => setEditMode(true)}
+          activeOpacity={0.8}
+        >
+          <View className="flex-row justify-between items-start">
+            <Text className="text-lg font-bold text-gray-900 dark:text-slate-100 flex-1">{project.name}</Text>
             <Ionicons name="pencil-outline" size={16} color="#9ca3af" />
           </View>
           {project.description ? (
             <SimpleMarkdown content={project.description} />
           ) : (
-            <Text style={styles.noDescription}>Tap to add description</Text>
+            <Text className="text-xs text-gray-400 dark:text-slate-500 italic">Tap to add description</Text>
           )}
         </TouchableOpacity>
       )}
 
       {/* Stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{project.members.length}</Text>
-          <Text style={styles.statLabel}>Members</Text>
+      <View className="flex-row gap-2">
+        <View className="flex-1 bg-white dark:bg-slate-800 rounded-xl p-3.5 items-center border border-gray-200 dark:border-slate-700 gap-1">
+          <Text className="text-2xl font-bold text-gray-900 dark:text-slate-100">{project.members.length}</Text>
+          <Text className="text-xs text-gray-400 dark:text-slate-500">Members</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{agents.length}</Text>
-          <Text style={styles.statLabel}>Agents</Text>
+        <View className="flex-1 bg-white dark:bg-slate-800 rounded-xl p-3.5 items-center border border-gray-200 dark:border-slate-700 gap-1">
+          <Text className="text-2xl font-bold text-gray-900 dark:text-slate-100">{agents.length}</Text>
+          <Text className="text-xs text-gray-400 dark:text-slate-500">Agents</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{humans.length}</Text>
-          <Text style={styles.statLabel}>Humans</Text>
+        <View className="flex-1 bg-white dark:bg-slate-800 rounded-xl p-3.5 items-center border border-gray-200 dark:border-slate-700 gap-1">
+          <Text className="text-2xl font-bold text-gray-900 dark:text-slate-100">{humans.length}</Text>
+          <Text className="text-xs text-gray-400 dark:text-slate-500">Humans</Text>
         </View>
       </View>
 
       {/* Members strip */}
       {project.members.length > 0 && (
-        <View style={styles.memberStrip}>
-          <Text style={styles.sectionTitle}>Members</Text>
-          <View style={styles.avatarStrip}>
+        <View className="gap-2">
+          <Text className="text-xs font-semibold text-gray-700 dark:text-slate-300">Members</Text>
+          <View className="flex-row flex-wrap gap-1">
             {project.members.slice(0, 8).map((m) => (
-              <View key={m.id} style={styles.avatarCircle}>
-                <Text style={styles.avatarInitial}>
+              <View
+                key={m.id}
+                className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/40 justify-center items-center"
+              >
+                <Text className="text-sm font-semibold text-blue-700 dark:text-blue-300">
                   {m.profile.agent?.identityEmoji ?? m.profile.displayName.charAt(0).toUpperCase()}
                 </Text>
               </View>
             ))}
             {project.members.length > 8 && (
-              <View style={[styles.avatarCircle, styles.avatarMore]}>
-                <Text style={styles.avatarMoreText}>+{project.members.length - 8}</Text>
+              <View className="w-9 h-9 rounded-full bg-gray-100 dark:bg-slate-700 justify-center items-center">
+                <Text className="text-xs font-semibold text-gray-500 dark:text-slate-400">+{project.members.length - 8}</Text>
               </View>
             )}
           </View>
@@ -309,12 +288,17 @@ type TaskFilter = "all" | "in_progress" | "review" | "done";
 
 function TasksTab({ projectId }: { projectId: string }) {
   const router = useRouter();
+  const { colors } = useTheme();
   const [filter, setFilter] = useState<TaskFilter>("all");
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ tasksByProject: Task[] }>({
     query: TASKS_BY_PROJECT_QUERY,
     variables: { projectId },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const { data, fetching, error } = result;
@@ -330,103 +314,98 @@ function TasksTab({ projectId }: { projectId: string }) {
   ];
 
   return (
-    <View style={{ flex: 1 }}>
-      {/* Filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-        directionalLockEnabled={true}
-        style={styles.filterBar}
-        contentContainerStyle={styles.filterContent}
-      >
-        {filters.map((f) => (
-          <TouchableOpacity
-            key={f.key}
-            style={[styles.filterChip, filter === f.key && styles.filterChipActive]}
-            onPress={() => setFilter(f.key)}
-          >
-            <Text
-              style={[styles.filterChipText, filter === f.key && styles.filterChipTextActive]}
-            >
-              {f.label}
-              {f.key !== "all"
-                ? ` (${allTasks.filter((t) => t.status === f.key).length})`
-                : ` (${allTasks.length})`}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+    <View className="flex-1">
+      {/* Filter strip + view toggle */}
+      <View className="flex-row items-stretch">
+        {viewMode === "list" && (
+          <View style={{ flex: 1 }}>
+            <TabFilterStrip
+              filters={filters}
+              activeKey={filter}
+              onSelect={setFilter}
+              getCount={(key) => key === "all" ? allTasks.length : allTasks.filter((t) => t.status === key).length}
+            />
+          </View>
+        )}
+        {viewMode === "kanban" && <View style={{ flex: 1 }} />}
+        <TouchableOpacity
+          style={{ width: 42, height: 42 }}
+          className="bg-white dark:bg-slate-800 border-b border-l border-gray-100 dark:border-slate-700 justify-center items-center"
+          onPress={() => setViewMode((m) => m === "list" ? "kanban" : "list")}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={viewMode === "list" ? "grid-outline" : "list-outline"}
+            size={20}
+            color={colors.accent}
+          />
+        </TouchableOpacity>
+      </View>
 
-      {fetching && tasks.length === 0 ? (
-        <View style={styles.center}>
+      {viewMode === "kanban" ? (
+        <KanbanBoard projectId={projectId} />
+      ) : fetching && tasks.length === 0 ? (
+        <View className="flex-1 justify-center items-center gap-3">
           <ActivityIndicator size="large" color="#2563eb" />
         </View>
       ) : error && tasks.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>Failed to load tasks</Text>
+        <View className="flex-1 justify-center items-center gap-3">
+          <Text className="text-red-600 text-base">Failed to load tasks</Text>
           <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text className="text-blue-600 text-sm font-semibold">Retry</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={tasks}
           keyExtractor={(t) => t.id}
-          contentContainerStyle={[styles.tabContent, tasks.length === 0 && styles.emptyFlex]}
+          contentContainerClassName={`p-4 gap-3${tasks.length === 0 ? " flex-1 justify-center items-center" : ""}`}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No tasks</Text>
+            <View className="items-center gap-2">
+              <Text className="text-gray-400 dark:text-slate-500 text-base">No tasks</Text>
             </View>
           }
           ListFooterComponent={
             <TouchableOpacity
-              style={styles.addButton}
+              className="flex-row items-center gap-1.5 py-3 px-4 rounded-xl border border-blue-200 dark:border-blue-800 border-dashed bg-blue-50 dark:bg-blue-900/30 justify-center mt-1"
               onPress={() => router.push(`/task/create?projectId=${projectId}`)}
             >
               <Ionicons name="add" size={16} color="#2563eb" />
-              <Text style={styles.addButtonText}>New Task</Text>
+              <Text className="text-blue-600 font-semibold text-sm">New Task</Text>
             </TouchableOpacity>
           }
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={styles.taskCard}
+              className="bg-white dark:bg-slate-800 rounded-xl p-3 border border-gray-200 dark:border-slate-700 gap-1.5"
               onPress={() => router.push(`/task/${item.id}`)}
               activeOpacity={0.7}
             >
-              <View style={styles.taskCardHeader}>
-                <Text style={styles.taskNumber}>#{item.taskNumber}</Text>
+              <View className="flex-row items-center gap-2">
+                <Text className="text-xs text-gray-400 dark:text-slate-500 font-medium">#{item.taskNumber}</Text>
                 {item.priority && (
                   <View
-                    style={[
-                      styles.priorityDot,
-                      { backgroundColor: PRIORITY_COLORS[item.priority] ?? "#6b7280" },
-                    ]}
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: PRIORITY_HEX_COLORS[item.priority] ?? DEFAULT_COLOR }}
                   />
                 )}
               </View>
-              <Text style={styles.taskTitle} numberOfLines={2}>
+              <Text className="text-sm font-medium text-gray-900 dark:text-slate-100 leading-5" numberOfLines={2}>
                 {item.title}
               </Text>
-              <View style={styles.taskCardFooter}>
+              <View className="flex-row items-center justify-between">
                 <View
-                  style={[
-                    styles.statusPill,
-                    { backgroundColor: (TASK_STATUS_COLORS[item.status] ?? "#6b7280") + "20" },
-                  ]}
+                  className="px-2 py-0.5 rounded-lg"
+                  style={{ backgroundColor: (STATUS_HEX_COLORS[item.status] ?? DEFAULT_COLOR) + "20" }}
                 >
                   <Text
-                    style={[
-                      styles.statusPillText,
-                      { color: TASK_STATUS_COLORS[item.status] ?? "#6b7280" },
-                    ]}
+                    className="text-xs font-semibold capitalize"
+                    style={{ color: STATUS_HEX_COLORS[item.status] ?? DEFAULT_COLOR }}
                   >
                     {item.status.replace("_", " ")}
                   </Text>
                 </View>
                 {(item.assignees ?? []).length > 0 && (
-                  <Text style={styles.assigneeText}>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500">
                     {item.assignees![0].profile.displayName}
                     {item.assignees!.length > 1 ? ` +${item.assignees!.length - 1}` : ""}
                   </Text>
@@ -493,16 +472,16 @@ function AddMemberModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: "#f9fafb" }}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Add Member</Text>
-          <TouchableOpacity onPress={onClose} style={styles.modalClose}>
+      <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+        <View className="flex-row items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200 dark:border-slate-700">
+          <Text className="text-base font-bold text-gray-900 dark:text-slate-100 flex-1">Add Member</Text>
+          <TouchableOpacity onPress={onClose} className="p-1">
             <Ionicons name="close" size={22} color="#374151" />
           </TouchableOpacity>
         </View>
-        <View style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" }}>
+        <View className="px-4 py-2.5 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
           <TextInput
-            style={[styles.editInput, { marginBottom: 0 }]}
+            className="border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
             placeholder="Search profiles…"
             placeholderTextColor="#9ca3af"
             value={search}
@@ -518,26 +497,24 @@ function AddMemberModal({
             keyExtractor={(p) => p.id}
             contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
             ListEmptyComponent={
-              <View style={{ padding: 32, alignItems: "center" }}>
-                <Text style={{ color: "#9ca3af", fontSize: 15 }}>No profiles found</Text>
+              <View className="p-8 items-center">
+                <Text className="text-gray-400 dark:text-slate-500 text-base">No profiles found</Text>
               </View>
             }
             renderItem={({ item }) => (
               <Pressable
-                style={({ pressed }) => [
-                  styles.memberCard,
-                  pressed && { backgroundColor: "#f3f4f6" },
-                ]}
+                style={({ pressed }) => pressed ? { backgroundColor: "#f3f4f6" } : undefined}
+                className="bg-white dark:bg-slate-800 rounded-xl p-3 border border-gray-200 dark:border-slate-700 flex-row items-center gap-3"
                 onPress={() => handleAdd(item.id)}
               >
-                <View style={styles.memberAvatarLg}>
-                  <Text style={styles.memberAvatarText}>
+                <View className="w-11 h-11 rounded-full bg-blue-100 dark:bg-blue-900/40 justify-center items-center">
+                  <Text className="text-lg font-semibold text-blue-700 dark:text-blue-300">
                     {item.agent?.identityEmoji ?? item.displayName.charAt(0).toUpperCase()}
                   </Text>
                 </View>
-                <View style={styles.memberInfo}>
-                  <Text style={styles.memberName}>{item.displayName}</Text>
-                  <Text style={styles.memberUsername}>@{item.username}</Text>
+                <View className="flex-1 gap-0.5">
+                  <Text className="text-base font-semibold text-gray-900 dark:text-slate-100">{item.displayName}</Text>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500">@{item.username}</Text>
                 </View>
                 <Ionicons name="add-circle-outline" size={22} color="#2563eb" />
               </Pressable>
@@ -590,43 +567,39 @@ function MembersTab({
       <FlatList
         data={project.members}
         keyExtractor={(m) => m.id}
-        contentContainerStyle={[
-          styles.tabContent,
-          { paddingBottom: insets.bottom + 16 },
-          project.members.length === 0 && styles.emptyFlex,
-        ]}
+        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 16 }}
         ListHeaderComponent={
           <TouchableOpacity
-            style={styles.addMemberBtn}
+            className="flex-row items-center gap-2 bg-blue-50 dark:bg-blue-900/30 rounded-xl p-3 mb-2 border border-blue-200 dark:border-blue-800"
             onPress={() => setAddModalOpen(true)}
             activeOpacity={0.7}
           >
             <Ionicons name="person-add-outline" size={18} color="#2563eb" />
-            <Text style={styles.addMemberBtnText}>Add Member</Text>
+            <Text className="text-sm font-semibold text-blue-600">Add Member</Text>
           </TouchableOpacity>
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No members yet</Text>
+          <View className="items-center gap-2">
+            <Text className="text-gray-400 dark:text-slate-500 text-base">No members yet</Text>
           </View>
         }
         renderItem={({ item }) => (
-          <View style={styles.memberCard}>
-            <View style={styles.memberAvatarLg}>
-              <Text style={styles.memberAvatarText}>
+          <View className="bg-white dark:bg-slate-800 rounded-xl p-3 border border-gray-200 dark:border-slate-700 flex-row items-center gap-3">
+            <View className="w-11 h-11 rounded-full bg-blue-100 dark:bg-blue-900/40 justify-center items-center">
+              <Text className="text-lg font-semibold text-blue-700 dark:text-blue-300">
                 {item.profile.agent?.identityEmoji ??
                   item.profile.displayName.charAt(0).toUpperCase()}
               </Text>
             </View>
-            <View style={styles.memberInfo}>
-              <Text style={styles.memberName}>{item.profile.displayName}</Text>
-              <Text style={styles.memberUsername}>@{item.profile.username}</Text>
+            <View className="flex-1 gap-0.5">
+              <Text className="text-base font-semibold text-gray-900 dark:text-slate-100">{item.profile.displayName}</Text>
+              <Text className="text-xs text-gray-400 dark:text-slate-500">@{item.profile.username}</Text>
               {item.profile.agentId && item.profile.agent && (
-                <Text style={styles.memberRole}>{item.profile.agent.role}</Text>
+                <Text className="text-xs text-gray-500 dark:text-slate-400 capitalize">{item.profile.agent.role}</Text>
               )}
             </View>
             <TouchableOpacity
-              style={styles.removeBtn}
+              className="p-1"
               onPress={() => confirmRemove(item)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
@@ -681,95 +654,101 @@ function DocViewModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={onClose} style={styles.modalClose}>
+      <View className="flex-1 bg-white dark:bg-slate-800">
+        <View className="flex-row items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200 dark:border-slate-700">
+          <TouchableOpacity onPress={onClose} className="p-1">
             <Ionicons name="close" size={22} color="#374151" />
           </TouchableOpacity>
-          <Text style={[styles.modalTitle, { flex: 1, textAlign: "center" }]} numberOfLines={1}>
+          <Text className="text-base font-bold text-gray-900 dark:text-slate-100 flex-1 text-center" numberOfLines={1}>
             {selectedRevision ? `v${revisions.length - revisions.indexOf(selectedRevision)} — ${selectedRevision.title}` : (doc?.title ?? "Loading...")}
           </Text>
           {selectedRevision ? (
-            <TouchableOpacity onPress={() => setSelectedRevision(null)} style={styles.modalClose}>
-              <Text style={{ color: "#6b7280", fontSize: 14 }}>Back</Text>
+            <TouchableOpacity onPress={() => setSelectedRevision(null)} className="p-1">
+              <Text className="text-gray-500 dark:text-slate-400 text-sm">Back</Text>
             </TouchableOpacity>
           ) : showHistory ? (
-            <TouchableOpacity onPress={() => setShowHistory(false)} style={styles.modalClose}>
-              <Text style={{ color: "#6b7280", fontSize: 14 }}>Back</Text>
+            <TouchableOpacity onPress={() => setShowHistory(false)} className="p-1">
+              <Text className="text-gray-500 dark:text-slate-400 text-sm">Back</Text>
             </TouchableOpacity>
           ) : (
-            <View style={{ flexDirection: "row" }}>
-              <TouchableOpacity onPress={() => setShowHistory(true)} style={[styles.modalClose, { marginRight: 0 }]}>
+            <View className="flex-row">
+              <TouchableOpacity onPress={() => setShowHistory(true)} className="p-1">
                 <Ionicons name="time-outline" size={20} color="#6b7280" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowEdit(true)} style={styles.modalClose} disabled={!doc}>
-                <Text style={{ color: "#2563eb", fontSize: 15, fontWeight: "600" }}>Edit</Text>
+              <TouchableOpacity onPress={() => setShowEdit(true)} className="p-1" disabled={!doc}>
+                <Text className="text-blue-600 text-base font-semibold">Edit</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
         {selectedRevision ? (
-          <ScrollView contentContainerStyle={styles.docContent}>
-            <View style={{ backgroundColor: "#fffbeb", borderRadius: 8, padding: 10, marginBottom: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <ScrollView contentContainerClassName="p-4 gap-4">
+            <View className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-2.5 mb-3 flex-row items-center gap-2">
               <Ionicons name="information-circle-outline" size={16} color="#d97706" />
-              <Text style={{ fontSize: 12, color: "#92400e", flex: 1 }}>
+              <Text className="text-xs text-yellow-800 dark:text-yellow-200 flex-1">
                 Viewing past revision — {new Date(selectedRevision.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                 {selectedRevision.editedBy ? ` by ${selectedRevision.editedBy.identityEmoji ?? ""} ${selectedRevision.editedBy.name}` : ""}
               </Text>
             </View>
-            {selectedRevision.summary ? <Text style={styles.docSummary}>{selectedRevision.summary}</Text> : null}
-            <Text style={styles.docBody}>{selectedRevision.content}</Text>
+            {selectedRevision.summary ? (
+              <Text className="text-sm text-gray-500 dark:text-slate-400 italic leading-5 p-3 bg-gray-50 dark:bg-slate-900 rounded-lg">{selectedRevision.summary}</Text>
+            ) : null}
+            <Text className="text-sm text-gray-900 dark:text-slate-100 leading-6">{selectedRevision.content}</Text>
           </ScrollView>
         ) : showHistory ? (
           revisionsResult.fetching ? (
-            <View style={styles.center}><ActivityIndicator size="large" color="#2563eb" /></View>
+            <View className="flex-1 justify-center items-center gap-3">
+              <ActivityIndicator size="large" color="#2563eb" />
+            </View>
           ) : revisions.length === 0 ? (
-            <View style={styles.center}><Text style={styles.emptyText}>No revision history</Text></View>
+            <View className="flex-1 justify-center items-center gap-3">
+              <Text className="text-gray-400 dark:text-slate-500 text-base">No revision history</Text>
+            </View>
           ) : (
-            <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
+            <ScrollView contentContainerClassName="p-4 gap-2.5">
               {revisions.map((rev, idx) => (
                 <TouchableOpacity
                   key={rev.id}
-                  style={{ backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: "#e5e7eb", padding: 14, gap: 4 }}
+                  className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-1"
                   onPress={() => setSelectedRevision(rev)}
                   activeOpacity={0.75}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#111827" }}>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-xs font-bold text-gray-900 dark:text-slate-100">
                       Revision {revisions.length - idx}
-                      {idx === 0 && <Text style={{ color: "#16a34a", fontWeight: "600" }}> (Latest)</Text>}
+                      {idx === 0 && <Text className="text-green-600 font-semibold"> (Latest)</Text>}
                     </Text>
-                    <Text style={{ fontSize: 11, color: "#9ca3af" }}>
+                    <Text className="text-xs text-gray-400 dark:text-slate-500">
                       {new Date(rev.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                     </Text>
                   </View>
                   {rev.editedBy && (
-                    <Text style={{ fontSize: 12, color: "#6b7280" }}>
+                    <Text className="text-xs text-gray-500 dark:text-slate-400">
                       {rev.editedBy.identityEmoji ?? ""} {rev.editedBy.name}
                     </Text>
                   )}
                   {rev.editAction && (
-                    <Text style={{ fontSize: 11, color: "#9ca3af", fontStyle: "italic" }}>{rev.editAction}</Text>
+                    <Text className="text-xs text-gray-400 dark:text-slate-500 italic">{rev.editAction}</Text>
                   )}
                 </TouchableOpacity>
               ))}
             </ScrollView>
           )
         ) : result.fetching ? (
-          <View style={styles.center}>
+          <View className="flex-1 justify-center items-center gap-3">
             <ActivityIndicator size="large" color="#2563eb" />
           </View>
         ) : doc ? (
-          <ScrollView contentContainerStyle={styles.docContent}>
+          <ScrollView contentContainerClassName="p-4 gap-4">
             {doc.summary ? (
-              <Text style={styles.docSummary}>{doc.summary}</Text>
+              <Text className="text-sm text-gray-500 dark:text-slate-400 italic leading-5 p-3 bg-gray-50 dark:bg-slate-900 rounded-lg">{doc.summary}</Text>
             ) : null}
-            <Text style={styles.docBody}>{doc.content}</Text>
+            <Text className="text-sm text-gray-900 dark:text-slate-100 leading-6">{doc.content}</Text>
           </ScrollView>
         ) : (
-          <View style={styles.center}>
-            <Text style={styles.errorText}>Failed to load doc</Text>
+          <View className="flex-1 justify-center items-center gap-3">
+            <Text className="text-red-600 text-base">Failed to load doc</Text>
           </View>
         )}
       </View>
@@ -840,43 +819,43 @@ function EditDocModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={onClose} style={styles.modalClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
+        <View className="flex-1 bg-white dark:bg-slate-800">
+          <View className="flex-row items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200 dark:border-slate-700">
+            <TouchableOpacity onPress={onClose} className="p-1">
               <Ionicons name="close" size={22} color="#374151" />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { flex: 1, textAlign: "center" }]}>Edit Doc</Text>
-            <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.modalClose}>
+            <Text className="text-base font-bold text-gray-900 dark:text-slate-100 flex-1 text-center">Edit Doc</Text>
+            <TouchableOpacity onPress={handleSave} disabled={saving} className="p-1">
               {saving ? (
                 <ActivityIndicator size="small" color="#2563eb" />
               ) : (
-                <Text style={{ color: "#2563eb", fontSize: 15, fontWeight: "600" }}>Save</Text>
+                <Text className="text-blue-600 text-base font-semibold">Save</Text>
               )}
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={styles.tabContent} keyboardShouldPersistTaps="handled">
-            <Text style={styles.editLabel}>Title</Text>
+          <ScrollView contentContainerClassName="p-4 gap-3" keyboardShouldPersistTaps="handled">
+            <Text className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1.5">Title</Text>
             <TextInput
-              style={styles.editInput}
+              className="border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
               value={title}
               onChangeText={setTitle}
               placeholder="Document title"
               autoFocus
             />
-            <Text style={[styles.editLabel, { marginTop: 12 }]}>Summary</Text>
+            <Text className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1.5 mt-3">Summary</Text>
             <TextInput
-              style={styles.editInput}
+              className="border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
               value={summary}
               onChangeText={setSummary}
               placeholder="Brief summary…"
             />
-            <Text style={[styles.editLabel, { marginTop: 12 }]}>Content (Markdown)</Text>
+            <Text className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1.5 mt-3">Content (Markdown)</Text>
             <TextInput
-              style={[styles.editInput, { height: 240 }]}
+              className="border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900 h-60"
               value={content}
               onChangeText={setContent}
-              placeholder="# Heading&#10;&#10;Your content here..."
+              placeholder={"# Heading\n\nYour content here..."}
               multiline
               textAlignVertical="top"
             />
@@ -929,41 +908,41 @@ function AddDocModal({
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
+        className="flex-1"
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add Doc</Text>
-            <TouchableOpacity onPress={onClose} style={styles.modalClose}>
+        <View className="flex-1 bg-white dark:bg-slate-800">
+          <View className="flex-row items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200 dark:border-slate-700">
+            <Text className="text-base font-bold text-gray-900 dark:text-slate-100 flex-1">Add Doc</Text>
+            <TouchableOpacity onPress={onClose} className="p-1">
               <Ionicons name="close" size={22} color="#374151" />
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={styles.tabContent}>
-            <Text style={styles.editLabel}>Title</Text>
+          <ScrollView contentContainerClassName="p-4 gap-3">
+            <Text className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1.5">Title</Text>
             <TextInput
-              style={styles.editInput}
+              className="border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
               value={title}
               onChangeText={setTitle}
               placeholder="Document title"
             />
-            <Text style={[styles.editLabel, { marginTop: 12 }]}>Content (Markdown)</Text>
+            <Text className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1.5 mt-3">Content (Markdown)</Text>
             <TextInput
-              style={[styles.editInput, { height: 200 }]}
+              className="border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900 h-52"
               value={content}
               onChangeText={setContent}
-              placeholder="# Heading&#10;&#10;Your content here..."
+              placeholder={"# Heading\n\nYour content here..."}
               multiline
               textAlignVertical="top"
             />
             <TouchableOpacity
-              style={[styles.saveBtn, { marginTop: 16 }, saving && { opacity: 0.6 }]}
+              className={`flex-1 p-2.5 rounded-lg bg-blue-600 items-center mt-4${saving ? " opacity-60" : ""}`}
               onPress={handleCreate}
               disabled={saving}
             >
               {saving ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.saveBtnText}>Create Doc</Text>
+                <Text className="text-white font-semibold">Create Doc</Text>
               )}
             </TouchableOpacity>
           </ScrollView>
@@ -977,11 +956,14 @@ function DocsTab({ projectId }: { projectId: string }) {
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [showAddDoc, setShowAddDoc] = useState(false);
   const [, deleteDoc] = useMutation(DELETE_PROJECT_DOC);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ projectDocsByProject: ProjectDoc[] }>({
     query: PROJECT_DOCS_BY_PROJECT_QUERY,
     variables: { projectId },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const { data, fetching, error } = result;
@@ -1006,51 +988,54 @@ function DocsTab({ projectId }: { projectId: string }) {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View className="flex-1">
       {fetching && docs.length === 0 ? (
-        <View style={styles.center}>
+        <View className="flex-1 justify-center items-center gap-3">
           <ActivityIndicator size="large" color="#2563eb" />
         </View>
       ) : error && docs.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>Failed to load docs</Text>
+        <View className="flex-1 justify-center items-center gap-3">
+          <Text className="text-red-600 text-base">Failed to load docs</Text>
           <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text className="text-blue-600 text-sm font-semibold">Retry</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={docs}
           keyExtractor={(d) => d.id}
-          contentContainerStyle={[styles.tabContent, docs.length === 0 && styles.emptyFlex]}
+          contentContainerClassName={`p-4 gap-3${docs.length === 0 ? " flex-1 justify-center items-center" : ""}`}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No docs yet</Text>
+            <View className="items-center gap-2">
+              <Text className="text-gray-400 dark:text-slate-500 text-base">No docs yet</Text>
             </View>
           }
           ListFooterComponent={
-            <TouchableOpacity style={styles.addButton} onPress={() => setShowAddDoc(true)}>
+            <TouchableOpacity
+              className="flex-row items-center gap-1.5 py-3 px-4 rounded-xl border border-blue-200 dark:border-blue-800 border-dashed bg-blue-50 dark:bg-blue-900/30 justify-center mt-1"
+              onPress={() => setShowAddDoc(true)}
+            >
               <Ionicons name="add" size={16} color="#2563eb" />
-              <Text style={styles.addButtonText}>Add Doc</Text>
+              <Text className="text-blue-600 font-semibold text-sm">Add Doc</Text>
             </TouchableOpacity>
           }
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={styles.docCard}
+              className="bg-white dark:bg-slate-800 rounded-xl p-3 border border-gray-200 dark:border-slate-700 flex-row items-center gap-2"
               onPress={() => setSelectedDocId(item.id)}
               activeOpacity={0.7}
             >
-              <View style={styles.docCardContent}>
+              <View className="flex-1 flex-row gap-2.5 items-start">
                 <Ionicons name="document-text-outline" size={20} color="#6b7280" />
-                <View style={styles.docCardInfo}>
-                  <Text style={styles.docCardTitle}>{item.title}</Text>
+                <View className="flex-1 gap-0.5">
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">{item.title}</Text>
                   {item.summary ? (
-                    <Text style={styles.docCardSummary} numberOfLines={1}>
+                    <Text className="text-xs text-gray-500 dark:text-slate-400" numberOfLines={1}>
                       {item.summary}
                     </Text>
                   ) : null}
-                  <Text style={styles.docCardDate}>
-                    Updated {fmtDate(item.updatedAt)}
+                  <Text className="text-xs text-gray-400 dark:text-slate-500">
+                    Updated {formatDate(item.updatedAt)}
                   </Text>
                 </View>
               </View>
@@ -1088,11 +1073,15 @@ export default function ProjectDetailScreen() {
   const navigation = useNavigation();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const { colors } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [result, reexecute] = useQuery<{ project: Project }>({
     query: PROJECT_QUERY,
     variables: { id },
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [, archiveProject] = useMutation(ARCHIVE_PROJECT);
@@ -1156,17 +1145,9 @@ export default function ProjectDetailScreen() {
       navigation.setOptions({
         title: project.name,
         headerRight: () => (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
-            <TouchableOpacity
-              onPress={() => router.push(`/kanban/${project.id}`)}
-              style={{ padding: 8 }}
-            >
-              <Ionicons name="grid-outline" size={22} color="#2563eb" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleMoreActions} style={{ padding: 8 }}>
-              <Ionicons name="ellipsis-horizontal" size={22} color="#6b7280" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={handleMoreActions} style={{ padding: 8 }}>
+            <Ionicons name="ellipsis-horizontal" size={22} color={colors.icon} />
+          </TouchableOpacity>
         ),
       });
     }
@@ -1174,7 +1155,7 @@ export default function ProjectDetailScreen() {
 
   if (fetching && !project) {
     return (
-      <View style={styles.center}>
+      <View className="flex-1 justify-center items-center gap-3">
         <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
@@ -1182,10 +1163,10 @@ export default function ProjectDetailScreen() {
 
   if (error && !project) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Failed to load project</Text>
+      <View className="flex-1 justify-center items-center gap-3">
+        <Text className="text-red-600 text-base">Failed to load project</Text>
         <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
-          <Text style={styles.retryText}>Retry</Text>
+          <Text className="text-blue-600 text-sm font-semibold">Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -1201,17 +1182,17 @@ export default function ProjectDetailScreen() {
   ];
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900">
       {/* Tab bar */}
-      <View style={styles.tabBar}>
+      <View className="flex-row bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 min-h-12">
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.key}
-            style={[styles.tabButton, activeTab === tab.key && styles.tabButtonActive]}
+            className={`flex-1 py-3.5 items-center justify-center border-b-2${activeTab === tab.key ? " border-blue-600" : " border-transparent"}`}
             onPress={() => setActiveTab(tab.key)}
           >
             <Text
-              style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}
+              className={`text-xs font-medium${activeTab === tab.key ? " text-blue-600" : " text-gray-400 dark:text-slate-500"}`}
             >
               {tab.label}
             </Text>
@@ -1234,249 +1215,3 @@ export default function ProjectDetailScreen() {
     </View>
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9fafb" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
-  errorText: { color: "#dc2626", fontSize: 16 },
-  retryText: { color: "#2563eb", fontSize: 14, fontWeight: "600" },
-
-  // Tab bar
-  tabBar: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    minHeight: 46,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  tabButtonActive: { borderBottomColor: "#2563eb" },
-  tabLabel: { fontSize: 13, fontWeight: "500", color: "#9ca3af" },
-  tabLabelActive: { color: "#2563eb" },
-
-  // Common content padding
-  tabContent: { padding: 16, gap: 12 },
-  emptyFlex: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyState: { alignItems: "center", gap: 8 },
-  emptyText: { color: "#9ca3af", fontSize: 15 },
-
-  // Overview
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusBadgeText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  metaText: { color: "#9ca3af", fontSize: 13 },
-
-  nameCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 8,
-  },
-  nameCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  projectNameLarge: { fontSize: 18, fontWeight: "700", color: "#111827", flex: 1 },
-  descriptionLarge: { fontSize: 14, color: "#4b5563", lineHeight: 20 },
-  noDescription: { fontSize: 13, color: "#9ca3af", fontStyle: "italic" },
-
-  editCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#2563eb",
-  },
-  editLabel: { fontSize: 12, fontWeight: "600", color: "#374151", marginBottom: 6 },
-  editInput: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 15,
-    color: "#111827",
-    backgroundColor: "#f9fafb",
-  },
-  editActions: { flexDirection: "row", gap: 8, marginTop: 12 },
-  cancelBtn: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    alignItems: "center",
-  },
-  cancelBtnText: { color: "#374151", fontWeight: "600" },
-  saveBtn: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: "#2563eb",
-    alignItems: "center",
-  },
-  saveBtnText: { color: "#fff", fontWeight: "600" },
-
-  statsRow: { flexDirection: "row", gap: 8 },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 14,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 4,
-  },
-  statNumber: { fontSize: 22, fontWeight: "700", color: "#111827" },
-  statLabel: { fontSize: 12, color: "#9ca3af" },
-
-  memberStrip: { gap: 8 },
-  sectionTitle: { fontSize: 13, fontWeight: "600", color: "#374151" },
-  avatarStrip: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
-  avatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#dbeafe",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarInitial: { fontSize: 14, fontWeight: "600", color: "#1d4ed8" },
-  avatarMore: { backgroundColor: "#f3f4f6" },
-  avatarMoreText: { fontSize: 12, fontWeight: "600", color: "#6b7280" },
-
-  // Tasks tab
-  filterBar: { height: 52, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
-  filterContent: { paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#f3f4f6",
-  },
-  filterChipActive: { backgroundColor: "#dbeafe" },
-  filterChipText: { fontSize: 13, color: "#6b7280", fontWeight: "500" },
-  filterChipTextActive: { color: "#2563eb", fontWeight: "600" },
-
-  taskCard: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 6,
-  },
-  taskCardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  taskNumber: { fontSize: 12, color: "#9ca3af", fontWeight: "500" },
-  priorityDot: { width: 8, height: 8, borderRadius: 4 },
-  taskTitle: { fontSize: 14, fontWeight: "500", color: "#111827", lineHeight: 20 },
-  taskCardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  statusPillText: { fontSize: 11, fontWeight: "600", textTransform: "capitalize" },
-  assigneeText: { fontSize: 12, color: "#9ca3af" },
-
-  addButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    borderStyle: "dashed",
-    backgroundColor: "#eff6ff",
-    justifyContent: "center",
-    marginTop: 4,
-  },
-  addButtonText: { color: "#2563eb", fontWeight: "600", fontSize: 14 },
-
-  // Members tab
-  memberCard: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  memberAvatarLg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#dbeafe",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  memberAvatarText: { fontSize: 18, fontWeight: "600", color: "#1d4ed8" },
-  memberInfo: { flex: 1, gap: 2 },
-  memberName: { fontSize: 15, fontWeight: "600", color: "#111827" },
-  memberUsername: { fontSize: 12, color: "#9ca3af" },
-  memberRole: { fontSize: 12, color: "#6b7280", textTransform: "capitalize" },
-  removeBtn: { padding: 4 },
-  addMemberBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#eff6ff",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-  },
-  addMemberBtnText: { fontSize: 14, fontWeight: "600", color: "#2563eb" },
-
-  // Docs tab
-  docCard: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  docCardContent: { flex: 1, flexDirection: "row", gap: 10, alignItems: "flex-start" },
-  docCardInfo: { flex: 1, gap: 2 },
-  docCardTitle: { fontSize: 14, fontWeight: "600", color: "#111827" },
-  docCardSummary: { fontSize: 12, color: "#6b7280" },
-  docCardDate: { fontSize: 11, color: "#9ca3af" },
-
-  // Modal
-  modalContainer: { flex: 1, backgroundColor: "#fff" },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-  },
-  modalTitle: { fontSize: 16, fontWeight: "700", color: "#111827", flex: 1 },
-  modalClose: { padding: 4 },
-  docContent: { padding: 16, gap: 16 },
-  docSummary: {
-    fontSize: 14,
-    color: "#6b7280",
-    fontStyle: "italic",
-    lineHeight: 20,
-    padding: 12,
-    backgroundColor: "#f9fafb",
-    borderRadius: 8,
-  },
-  docBody: { fontSize: 14, color: "#111827", lineHeight: 22 },
-});

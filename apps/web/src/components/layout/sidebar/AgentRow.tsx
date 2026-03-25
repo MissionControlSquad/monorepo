@@ -24,6 +24,7 @@ import { useAgentStatus } from "../../context/AgentStatusContext";
 import { AGENT_DETAILED_STATUSES, type AgentDetailedStatus } from "../../../lib/constants";
 import { ProfileAvatar } from "../../ui/ProfileAvatar";
 import type { Agent, WorkSummary, StatusHistoryEntry } from "@agentcenter/types";
+import { formatDurationLong, formatDuration } from "@agentcenter/utils";
 
 export function useWorkTimer(taskId: string | undefined) {
   const [workSummaryResult] = useQuery({
@@ -55,14 +56,8 @@ export function useWorkTimer(taskId: string | undefined) {
   return elapsed;
 }
 
-export function formatElapsedTime(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  if (hours > 0) return `${hours}h ${minutes % 60}m`;
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-  return `${seconds}s`;
-}
+/** @deprecated use formatDurationLong from @agentcenter/utils */
+export const formatElapsedTime = formatDurationLong;
 
 const DETAILED_STATUS_ICONS: Record<string, any> = {
   thinking: Brain,
@@ -76,18 +71,6 @@ const DETAILED_STATUS_ICONS: Record<string, any> = {
   waiting_input: MessageCircle,
   waiting_dependency: LinkIcon,
 };
-
-function formatTransitionDuration(timestampMs: number): string {
-  const elapsed = Date.now() - timestampMs;
-  const seconds = Math.floor(elapsed / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-  if (days > 0) return `${days}d ${hours % 24}h`;
-  if (hours > 0) return `${hours}h ${minutes % 60}m`;
-  if (minutes > 0) return `${minutes}m`;
-  return `${seconds}s`;
-}
 
 export const AgentRow = memo(function AgentRow({
   agent,
@@ -120,13 +103,13 @@ export const AgentRow = memo(function AgentRow({
   } else if (!isOnline) {
     subtitle = `Offline - ${lastSeenFormatted}`;
   } else if (detailedConfig && transition?.timestamp) {
-    subtitle = `${detailedConfig.label} for ${formatTransitionDuration(new Date(transition.timestamp).getTime())}`;
+    subtitle = `${detailedConfig.label} for ${formatDuration(Date.now() - new Date(transition.timestamp).getTime())}`;
   } else if (detailedConfig) {
     subtitle = detailedConfig.label;
   } else if (transition?.timestamp) {
     const statusLabel =
       agent.status === "active" ? "Active" : agent.status === "idle" ? "Idle" : "Blocked";
-    subtitle = `${statusLabel} for ${formatTransitionDuration(new Date(transition.timestamp).getTime())}`;
+    subtitle = `${statusLabel} for ${formatDuration(Date.now() - new Date(transition.timestamp).getTime())}`;
   } else {
     subtitle = lastSeenFormatted;
   }
@@ -185,7 +168,7 @@ export const AgentRow = memo(function AgentRow({
               <span className="truncate">{agent.statusMessage || agent.currentTask}</span>
               {elapsed > 0 && (
                 <span className="ml-auto flex-shrink-0 font-mono text-warning">
-                  {formatElapsedTime(elapsed)}
+                  {formatDurationLong(elapsed)}
                 </span>
               )}
             </div>

@@ -3,13 +3,14 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { FormField } from "../src/components/FormField";
+import { ActionButton } from "../src/components/ActionButton";
 import { useEffect, useState } from "react";
 import { useNavigation } from "expo-router";
 import { useQuery, useMutation } from "urql";
@@ -17,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { CHANGE_PASSWORD, SET_SYSTEM_SHUTDOWN, SYSTEM_SETTINGS_QUERY } from "@agentcenter/graphql-client";
 import { useAuth } from "../src/context/AuthContext";
+import { DEFAULT_COLOR, formatDate } from "@agentcenter/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -35,14 +37,6 @@ function limitLabel(n: number): string {
   return n === -1 ? "Unlimited" : String(n);
 }
 
-function formatExpiry(dateStr: string | null): string {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString(undefined, {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -57,11 +51,11 @@ export default function SettingsScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#f9fafb" }}
+      className="flex-1 bg-gray-50 dark:bg-slate-900"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
       >
@@ -106,22 +100,21 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
   };
 
   return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardIconWrap}>
+    <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3.5">
+      <View className="flex-row items-start gap-3">
+        <View className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-slate-700 justify-center items-center shrink-0">
           <Ionicons name="lock-closed-outline" size={20} color="#6b7280" />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>Change Password</Text>
-          <Text style={styles.cardSubtitle}>All existing sessions will be revoked.</Text>
+        <View className="flex-1">
+          <Text className="text-base font-bold text-gray-900 dark:text-slate-100">Change Password</Text>
+          <Text className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">All existing sessions will be revoked.</Text>
         </View>
       </View>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Current Password</Text>
-        <View style={styles.inputRow}>
+      <FormField label="Current Password">
+        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
           <TextInput
-            style={styles.inputFlex}
+            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
             value={current}
             onChangeText={setCurrent}
             secureTextEntry={!showCurrent}
@@ -130,17 +123,16 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
             autoCorrect={false}
             autoCapitalize="none"
           />
-          <TouchableOpacity onPress={() => setShowCurrent(!showCurrent)} style={styles.eyeBtn}>
+          <TouchableOpacity onPress={() => setShowCurrent(!showCurrent)} className="p-1">
             <Ionicons name={showCurrent ? "eye-off-outline" : "eye-outline"} size={18} color="#9ca3af" />
           </TouchableOpacity>
         </View>
-      </View>
+      </FormField>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>New Password</Text>
-        <View style={styles.inputRow}>
+      <FormField label="New Password">
+        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
           <TextInput
-            style={styles.inputFlex}
+            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
             value={next}
             onChangeText={setNext}
             secureTextEntry={!showNext}
@@ -149,17 +141,16 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
             autoCorrect={false}
             autoCapitalize="none"
           />
-          <TouchableOpacity onPress={() => setShowNext(!showNext)} style={styles.eyeBtn}>
+          <TouchableOpacity onPress={() => setShowNext(!showNext)} className="p-1">
             <Ionicons name={showNext ? "eye-off-outline" : "eye-outline"} size={18} color="#9ca3af" />
           </TouchableOpacity>
         </View>
-      </View>
+      </FormField>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Confirm New Password</Text>
-        <View style={styles.inputRow}>
+      <FormField label="Confirm New Password">
+        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
           <TextInput
-            style={styles.inputFlex}
+            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
             value={confirm}
             onChangeText={setConfirm}
             secureTextEntry={!showConfirm}
@@ -168,24 +159,13 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
             autoCorrect={false}
             autoCapitalize="none"
           />
-          <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)} style={styles.eyeBtn}>
+          <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)} className="p-1">
             <Ionicons name={showConfirm ? "eye-off-outline" : "eye-outline"} size={18} color="#9ca3af" />
           </TouchableOpacity>
         </View>
-      </View>
+      </FormField>
 
-      <TouchableOpacity
-        style={[styles.primaryBtn, fetching && styles.primaryBtnDisabled]}
-        onPress={handleSubmit}
-        disabled={fetching}
-        activeOpacity={0.8}
-      >
-        {fetching ? (
-          <ActivityIndicator color="#fff" size="small" />
-        ) : (
-          <Text style={styles.primaryBtnText}>Change Password</Text>
-        )}
-      </TouchableOpacity>
+      <ActionButton label="Change Password" onPress={handleSubmit} loading={fetching} disabled={false} />
     </View>
   );
 }
@@ -245,46 +225,46 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
     active: "#16a34a",
     grace: "#d97706",
     expired: "#dc2626",
-    none: "#6b7280",
+    none: DEFAULT_COLOR,
   };
 
   const status = license?.status ?? "none";
-  const color = statusColor[status] ?? "#6b7280";
+  const color = statusColor[status] ?? DEFAULT_COLOR;
 
   return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardIconWrap}>
+    <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3.5">
+      <View className="flex-row items-start gap-3">
+        <View className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-slate-700 justify-center items-center shrink-0">
           <Ionicons name="key-outline" size={20} color="#6b7280" />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>License</Text>
-          <Text style={styles.cardSubtitle}>Your current license details</Text>
+        <View className="flex-1">
+          <Text className="text-base font-bold text-gray-900 dark:text-slate-100">License</Text>
+          <Text className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Your current license details</Text>
         </View>
         {!loading && license && (
-          <View style={[styles.statusBadge, { backgroundColor: color + "22" }]}>
-            <Text style={[styles.statusBadgeText, { color }]}>{status}</Text>
+          <View className="rounded-md px-2 py-1 self-center" style={{ backgroundColor: color + "22" }}>
+            <Text className="text-xs font-bold lowercase" style={{ color }}>{status}</Text>
           </View>
         )}
       </View>
 
       {loading && (
-        <View style={styles.loadingRow}>
+        <View className="flex-row items-center gap-2">
           <ActivityIndicator size="small" color="#2563eb" />
-          <Text style={styles.loadingText}>Loading license…</Text>
+          <Text className="text-sm text-gray-500 dark:text-slate-400">Loading license…</Text>
         </View>
       )}
 
       {error && !loading && (
-        <Text style={styles.errorText}>Failed to load license: {error}</Text>
+        <Text className="text-sm text-red-600 dark:text-red-400">Failed to load license: {error}</Text>
       )}
 
       {license && !loading && (
         <>
-          <View style={styles.licenseGrid}>
+          <View className="gap-3">
             <LicenseGridItem label="Organization" value={license.org ?? "—"} />
             <LicenseGridItem label="Plan" value={license.plan ?? "—"} />
-            <LicenseGridItem label="Expires" value={formatExpiry(license.expiresAt)} />
+            <LicenseGridItem label="Expires" value={formatDate(license.expiresAt)} />
             <LicenseGridItem
               label="Limits"
               value={`${limitLabel(license.maxAgents)} agents / ${limitLabel(license.maxProjects)} projects / ${limitLabel(license.maxSeats)} seats`}
@@ -292,12 +272,12 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
           </View>
 
           {license.features.length > 0 && (
-            <View style={styles.featuresSection}>
-              <Text style={styles.sectionLabel}>Licensed features</Text>
-              <View style={styles.featureTags}>
+            <View className="gap-2">
+              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 lowercase tracking-[0.3px]">Licensed features</Text>
+              <View className="flex-row flex-wrap gap-1.5">
                 {license.features.map((f) => (
-                  <View key={f} style={styles.featureTag}>
-                    <Text style={styles.featureTagText}>{f}</Text>
+                  <View key={f} className="bg-gray-100 dark:bg-slate-700 rounded-md px-2 py-1">
+                    <Text className="text-xs text-gray-700 dark:text-slate-300">{f}</Text>
                   </View>
                 ))}
               </View>
@@ -307,12 +287,12 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
       )}
 
       {/* Activate / update license */}
-      <View style={{ height: 1, backgroundColor: "#f3f4f6" }} />
-      <View style={styles.field}>
-        <Text style={styles.label}>{license?.status === "active" ? "Update License Key" : "Activate License"}</Text>
-        <View style={styles.inputRow}>
+      <View className="h-px bg-gray-100 dark:bg-slate-700" />
+      <View className="gap-1.5">
+        <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">{license?.status === "active" ? "Update License Key" : "Activate License"}</Text>
+        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
           <TextInput
-            style={styles.inputFlex}
+            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
             value={licenseKey}
             onChangeText={setLicenseKey}
             placeholder="Paste your license key…"
@@ -321,10 +301,10 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
             autoCapitalize="none"
           />
         </View>
-        {activateError ? <Text style={styles.errorText}>{activateError}</Text> : null}
+        {activateError ? <Text className="text-sm text-red-600 dark:text-red-400">{activateError}</Text> : null}
       </View>
       <TouchableOpacity
-        style={[styles.primaryBtn, (!licenseKey.trim() || activating) && styles.primaryBtnDisabled]}
+        className={`bg-blue-600 rounded-xl py-3.5 items-center ${(!licenseKey.trim() || activating) ? "opacity-50" : ""}`}
         onPress={handleActivate}
         disabled={!licenseKey.trim() || activating}
         activeOpacity={0.8}
@@ -332,7 +312,7 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
         {activating ? (
           <ActivityIndicator color="#fff" size="small" />
         ) : (
-          <Text style={styles.primaryBtnText}>
+          <Text className="text-white text-base font-semibold">
             {license?.status === "active" ? "Update License" : "Activate License"}
           </Text>
         )}
@@ -343,9 +323,9 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
 
 function LicenseGridItem({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.licenseGridItem}>
-      <Text style={styles.licenseLabel}>{label}</Text>
-      <Text style={styles.licenseValue}>{value}</Text>
+    <View className="flex-row gap-3">
+      <Text className="text-sm text-gray-500 dark:text-slate-400 w-24 shrink-0">{label}</Text>
+      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1">{value}</Text>
     </View>
   );
 }
@@ -353,9 +333,13 @@ function LicenseGridItem({ label, value }: { label: string; value: string }) {
 // ── System Shutdown ───────────────────────────────────────────────────────────
 
 function SystemShutdownSection() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [result, reexecute] = useQuery<{ systemSettings: { shutdownActive: boolean } | null }>({
     query: SYSTEM_SETTINGS_QUERY,
     requestPolicy: "cache-and-network",
+    pause: !mounted,
   });
 
   const [{ fetching }, setShutdown] = useMutation(SET_SYSTEM_SHUTDOWN);
@@ -387,45 +371,41 @@ function SystemShutdownSection() {
   };
 
   return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={[styles.cardIconWrap, active && { backgroundColor: "#fee2e2" }]}>
+    <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3.5">
+      <View className="flex-row items-start gap-3">
+        <View className={`w-9 h-9 rounded-lg justify-center items-center shrink-0 ${active ? "bg-red-100 dark:bg-red-950/30" : "bg-gray-100 dark:bg-slate-700"}`}>
           <Ionicons
             name="power-outline"
             size={20}
             color={active ? "#dc2626" : "#6b7280"}
           />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>System Shutdown</Text>
+        <View className="flex-1">
+          <Text className="text-base font-bold text-gray-900 dark:text-slate-100">System Shutdown</Text>
           {active && (
-            <View style={[styles.statusBadge, { backgroundColor: "#fee2e2", alignSelf: "flex-start", marginTop: 4 }]}>
-              <Text style={[styles.statusBadgeText, { color: "#dc2626" }]}>Active</Text>
+            <View className="bg-red-100 dark:bg-red-950/30 rounded-md px-2 py-1 self-start mt-1">
+              <Text className="text-xs font-bold text-red-600 dark:text-red-400">Active</Text>
             </View>
           )}
         </View>
       </View>
 
-      <View style={styles.shutdownEffects}>
+      <View className="gap-1.5">
         {[
           "Blocks all new task creation (dashboard & API)",
           "Prevents agents from picking up new work",
           "Stops recurring tasks from generating",
           "Does not affect tasks already in progress",
         ].map((line) => (
-          <View key={line} style={styles.bulletRow}>
-            <Text style={styles.bullet}>•</Text>
-            <Text style={styles.bulletText}>{line}</Text>
+          <View key={line} className="flex-row gap-2 items-start">
+            <Text className="text-sm text-gray-500 dark:text-slate-400 leading-5">•</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400 flex-1 leading-5">{line}</Text>
           </View>
         ))}
       </View>
 
       <TouchableOpacity
-        style={[
-          styles.primaryBtn,
-          active ? styles.shutdownBtnDeactivate : styles.shutdownBtnActivate,
-          fetching && styles.primaryBtnDisabled,
-        ]}
+        className={`rounded-xl py-3.5 items-center ${active ? "bg-green-600" : "bg-red-600"} ${fetching ? "opacity-50" : ""}`}
         onPress={handleToggle}
         disabled={fetching || result.fetching}
         activeOpacity={0.8}
@@ -433,7 +413,7 @@ function SystemShutdownSection() {
         {fetching ? (
           <ActivityIndicator color="#fff" size="small" />
         ) : (
-          <Text style={styles.primaryBtnText}>
+          <Text className="text-white text-base font-semibold">
             {active ? "Deactivate Shutdown" : "Activate Shutdown"}
           </Text>
         )}
@@ -441,184 +421,3 @@ function SystemShutdownSection() {
     </View>
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  content: {
-    padding: 16,
-    gap: 12,
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 14,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  cardIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-    flexShrink: 0,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  cardSubtitle: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 2,
-  },
-
-  // Form
-  field: {
-    gap: 6,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-  },
-  inputFlex: {
-    flex: 1,
-    fontSize: 15,
-    color: "#111827",
-    paddingVertical: 11,
-  },
-  eyeBtn: {
-    padding: 4,
-  },
-
-  primaryBtn: {
-    backgroundColor: "#2563eb",
-    borderRadius: 10,
-    paddingVertical: 13,
-    alignItems: "center",
-  },
-  primaryBtnDisabled: {
-    opacity: 0.5,
-  },
-  primaryBtnText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-
-  // License
-  statusBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    alignSelf: "center",
-  },
-  statusBadgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "lowercase",
-  },
-  loadingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: "#6b7280",
-  },
-  errorText: {
-    fontSize: 13,
-    color: "#dc2626",
-  },
-  licenseGrid: {
-    gap: 12,
-  },
-  licenseGridItem: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  licenseLabel: {
-    fontSize: 13,
-    color: "#6b7280",
-    width: 100,
-    flexShrink: 0,
-  },
-  licenseValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#111827",
-    flex: 1,
-  },
-  featuresSection: {
-    gap: 8,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#9ca3af",
-    textTransform: "lowercase",
-    letterSpacing: 0.3,
-  },
-  featureTags: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  featureTag: {
-    backgroundColor: "#f3f4f6",
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  featureTagText: {
-    fontSize: 12,
-    color: "#374151",
-  },
-
-  // Shutdown
-  shutdownEffects: {
-    gap: 6,
-  },
-  bulletRow: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "flex-start",
-  },
-  bullet: {
-    fontSize: 14,
-    color: "#6b7280",
-    lineHeight: 20,
-  },
-  bulletText: {
-    fontSize: 13,
-    color: "#6b7280",
-    flex: 1,
-    lineHeight: 20,
-  },
-  shutdownBtnActivate: {
-    backgroundColor: "#dc2626",
-  },
-  shutdownBtnDeactivate: {
-    backgroundColor: "#16a34a",
-  },
-});

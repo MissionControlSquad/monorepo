@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity } from "react-native";
 import { StatusPill } from "./StatusPill";
 import { PriorityBadge } from "./PriorityBadge";
-import { useTheme } from "../hooks/useTheme";
+import { formatDueDate } from "@agentcenter/utils";
 
 interface TaskCardTask {
   id: string;
@@ -19,64 +19,47 @@ interface TaskCardProps {
   onPress: () => void;
 }
 
-function fmtDueDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diff = d.getTime() - now.getTime();
-  const days = Math.ceil(diff / 86400000);
-  if (days < 0) return `${Math.abs(days)}d overdue`;
-  if (days === 0) return "Due today";
-  if (days === 1) return "Due tomorrow";
-  return `Due in ${days}d`;
-}
-
 export function TaskCard({ task, onPress }: TaskCardProps) {
-  const { colors } = useTheme();
   const isOverdue =
     task.dueDate != null && new Date(task.dueDate).getTime() < Date.now();
 
   return (
     <TouchableOpacity
-      style={{
-        backgroundColor: colors.card,
-        borderRadius: 12,
-        padding: 14,
-        borderWidth: 1,
-        borderColor: colors.border,
-        gap: 8,
-      }}
+      className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2"
       onPress={onPress}
       activeOpacity={0.7}
     >
       {/* Header row */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: "500" }}>
+      <View className="flex-row items-center gap-2 flex-wrap">
+        <Text className="text-xs text-gray-400 dark:text-slate-500 font-medium">
           #{task.taskNumber}
         </Text>
         {task.priority && <PriorityBadge priority={task.priority} />}
         {task.project && (
-          <Text style={{ fontSize: 11, color: colors.textSecondary, flex: 1 }} numberOfLines={1}>
+          <Text className="text-xs text-gray-500 dark:text-slate-400 flex-1" numberOfLines={1}>
             📁 {task.project.name}
           </Text>
         )}
       </View>
 
       {/* Title */}
-      <Text style={{ fontSize: 14, fontWeight: "600", color: colors.text, lineHeight: 20 }} numberOfLines={2}>
+      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 leading-5" numberOfLines={2}>
         {task.title}
       </Text>
 
       {/* Footer */}
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+      <View className="flex-row items-center justify-between gap-2">
         <StatusPill status={task.status} />
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, justifyContent: "flex-end" }}>
+        <View className="flex-row items-center gap-2 flex-1 justify-end">
           {task.dueDate && (
-            <Text style={{ fontSize: 11, color: isOverdue ? colors.danger : colors.textMuted, fontWeight: isOverdue ? "600" : "400" }}>
-              {fmtDueDate(task.dueDate)}
+            <Text
+              className={`text-xs ${isOverdue ? "text-red-600 dark:text-red-400 font-semibold" : "text-gray-400 dark:text-slate-500"}`}
+            >
+              {formatDueDate(task.dueDate)}
             </Text>
           )}
           {(task.assignees ?? []).length > 0 && (
-            <Text style={{ fontSize: 11, color: colors.textMuted, maxWidth: 100 }} numberOfLines={1}>
+            <Text className="text-xs text-gray-400 dark:text-slate-500 max-w-24" numberOfLines={1}>
               {task.assignees![0].profile.displayName}
               {task.assignees!.length > 1 ? ` +${task.assignees!.length - 1}` : ""}
             </Text>

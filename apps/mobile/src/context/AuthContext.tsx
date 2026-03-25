@@ -1,8 +1,7 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, startTransition, ReactNode, useCallback } from "react";
 import { type Client } from "urql";
 import {
   loadSession,
-  getStoredCookie,
   getStoredProfileId,
   getStoredServerUrl,
   clearSession,
@@ -36,7 +35,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [serverUrl, setServerUrl] = useState<string | null>(null);
   const [urqlClient, setUrqlClient] = useState<Client>(() => createUrqlClient());
 
+  // Defined with useCallback so it can be referenced in the urql client's
+  // onUnauthenticated callback without a stale closure.
+  const onLogout = useCallback(async () => {
+    await clearSession();
+    setIsSignedIn(false);
+    setProfileId(null);
+    setServerUrl(null);
+    startTransition(() => {
+      setUrqlClient(createUrqlClient());
+    });
+  }, []);
+
   useEffect(() => {
+    // Await loadSession() before creating the urql client so getStoredCookie()
+    // is populated and the first GraphQL request is authenticated.
     loadSession()
       .then(() => {
         const storedUrl = getStoredServerUrl();
@@ -47,27 +60,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsSignedIn(true);
           setProfileId(storedProfile);
           setServerUrl(storedUrl);
-          setUrqlClient(createUrqlClient(storedUrl));
+          startTransition(() => {
+            setUrqlClient(createUrqlClient(storedUrl, onLogout));
+          });
         }
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [onLogout]);
 
   const onLogin = (url: string, pid: string) => {
     setIsSignedIn(true);
     setProfileId(pid);
     setServerUrl(url);
     // Pass URL directly — don't rely on getStoredServerUrl() which may lag
-    setUrqlClient(createUrqlClient(url));
-  };
-
-  const onLogout = async () => {
-    await clearSession();
-    setIsSignedIn(false);
-    setProfileId(null);
-    setServerUrl(null);
-    setUrqlClient(createUrqlClient());
+    startTransition(() => {
+      setUrqlClient(createUrqlClient(url, onLogout));
+    });
   };
 
   return (

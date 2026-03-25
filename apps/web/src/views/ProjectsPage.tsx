@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearch } from "@agentcenter/hooks";
 import { useRouter } from "next/navigation";
 import { useQuery } from "urql";
 import { PROJECTS_QUERY } from "../lib/graphql/queries";
@@ -16,18 +17,18 @@ export function ProjectsPage() {
   const projects = projectsResult.data?.projects;
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [search, setSearch] = useState("");
 
-  const filtered = projects
-    ?.filter((p: Project) => {
-      if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
-      return true;
-    })
-    .sort((a: Project, b: Project) => {
-      const aWeight = a.status === "archived" ? 2 : a.shutdownActive ? 1 : 0;
-      const bWeight = b.status === "archived" ? 2 : b.shutdownActive ? 1 : 0;
-      return aWeight - bWeight;
-    });
+  const {
+    search,
+    setSearch,
+    filtered: searchFiltered,
+  } = useSearch(projects, (p: Project, q) => p.name.toLowerCase().includes(q));
+
+  const filtered = searchFiltered?.slice().sort((a: Project, b: Project) => {
+    const aWeight = a.status === "archived" ? 2 : a.shutdownActive ? 1 : 0;
+    const bWeight = b.status === "archived" ? 2 : b.shutdownActive ? 1 : 0;
+    return aWeight - bWeight;
+  });
 
   return (
     <PageLayout>
@@ -87,7 +88,7 @@ export function ProjectsPage() {
         />
       ) : (
         <div className="space-y-3">
-          {filtered?.map((project: { id: string; name: string; [key: string]: unknown }) => (
+          {filtered?.map((project) => (
             <ProjectCard
               key={project.id}
               project={project}

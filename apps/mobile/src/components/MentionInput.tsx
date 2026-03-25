@@ -9,31 +9,8 @@ import {
 import { useQuery } from "urql";
 import { useState, useCallback } from "react";
 import { PROFILES_QUERY } from "@agentcenter/graphql-client";
-import { useTheme } from "../hooks/useTheme";
-
-interface Profile {
-  id: string;
-  displayName: string;
-  username: string;
-  avatarUrl: string | null;
-  agent: { identityEmoji: string | null } | null;
-}
-
-/**
- * Detect if the user is currently typing a mention: text ending with @word
- * Returns the partial username being typed (after @), or null if not in mention mode.
- */
-function getMentionQuery(text: string): string | null {
-  const match = text.match(/@(\w*)$/);
-  return match ? match[1] : null;
-}
-
-/**
- * Replace the trailing @query with @username in the text.
- */
-function insertMention(text: string, username: string): string {
-  return text.replace(/@(\w*)$/, `@${username} `);
-}
+import { getMentionQuery, insertMentionHandle } from "@agentcenter/utils";
+import type { ProfileWithAgent as Profile } from "@agentcenter/types";
 
 interface MentionInputProps extends Omit<TextInputProps, "value" | "onChangeText"> {
   value: string;
@@ -49,7 +26,6 @@ export function MentionInput({
   style,
   ...rest
 }: MentionInputProps) {
-  const { colors } = useTheme();
   const mentionQuery = getMentionQuery(value);
   const isSearching = mentionQuery !== null;
 
@@ -65,7 +41,7 @@ export function MentionInput({
         if (!mentionQuery) return true;
         const q = mentionQuery.toLowerCase();
         return (
-          p.username.toLowerCase().startsWith(q) ||
+          p.username?.toLowerCase().startsWith(q) ||
           p.displayName.toLowerCase().includes(q)
         );
       }).slice(0, 6)
@@ -73,32 +49,24 @@ export function MentionInput({
 
   const handleSelect = useCallback(
     (username: string) => {
-      onChangeText(insertMention(value, username));
+      onChangeText(insertMentionHandle(value, username));
     },
     [value, onChangeText]
   );
 
   return (
-    <View style={{ flex: 1, position: "relative" }}>
+    <View className="flex-1 relative">
       {/* Suggestion list */}
       {suggestions.length > 0 && (
         <View
+          className="absolute left-0 right-0 bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden z-[100]"
           style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
             ...(suggestionsAbove ? { bottom: "100%", marginBottom: 6 } : { top: "100%", marginTop: 6 }),
-            backgroundColor: colors.card,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: colors.border,
-            shadowColor: colors.shadow,
+            shadowColor: "#000000",
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.08,
             shadowRadius: 8,
             elevation: 6,
-            zIndex: 100,
-            overflow: "hidden",
           }}
         >
           <FlatList
@@ -109,37 +77,20 @@ export function MentionInput({
             style={{ maxHeight: 180 }}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  gap: 10,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.borderAlt,
-                }}
-                onPress={() => handleSelect(item.username)}
+                className="flex-row items-center px-3 py-2 gap-2.5 border-b border-gray-100 dark:border-slate-700"
+                onPress={() => item.username && handleSelect(item.username)}
                 activeOpacity={0.7}
               >
-                <View
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 15,
-                    backgroundColor: colors.accentSurface,
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.accentText }}>
+                <View className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 justify-center items-center">
+                  <Text className="text-sm font-bold text-blue-700 dark:text-blue-300">
                     {item.agent?.identityEmoji ?? item.displayName.charAt(0).toUpperCase()}
                   </Text>
                 </View>
-                <View style={{ flex: 1, gap: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.text }}>
+                <View className="flex-1 gap-px">
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">
                     {item.displayName}
                   </Text>
-                  <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500">
                     @{item.username}
                   </Text>
                 </View>
