@@ -31,7 +31,8 @@ interface Profile {
   displayName: string;
   username: string;
   avatarUrl: string | null;
-  agent: { identityEmoji: string | null } | null;
+  agentId?: string | null;
+  agent: { id?: string; identityEmoji: string | null } | null;
 }
 
 interface TaskOption {
@@ -339,7 +340,7 @@ export default function CreateTaskScreen() {
             ) : (
               <View className="flex-row flex-wrap gap-1.5">
                 {selectedIds.map((id) => {
-                  const p = profilesResult.data?.profiles.find((x) => x.id === id);
+                  const p = profilesResult.data?.profiles.find((x) => (x.agentId ?? x.agent?.id ?? x.id) === id);
                   return (
                     <View key={id} className="bg-blue-100 dark:bg-blue-900/30 rounded-full px-2.5 py-1">
                       <Text className="text-sm text-blue-700 dark:text-blue-300 font-medium">
@@ -648,13 +649,14 @@ export default function CreateTaskScreen() {
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
                 renderItem={({ item }) => {
-                  const selected = selectedIds.includes(item.id);
+                  const agentKey = item.agentId ?? item.agent?.id ?? item.id;
+                  const selected = selectedIds.includes(agentKey);
                   return (
                     <Pressable
                       className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
                       onPress={() =>
                         setSelectedIds((prev) =>
-                          selected ? prev.filter((id) => id !== item.id) : [...prev, item.id]
+                          selected ? prev.filter((id) => id !== agentKey) : [...prev, agentKey]
                         )
                       }
                     >

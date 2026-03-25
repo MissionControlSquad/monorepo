@@ -38,7 +38,8 @@ interface Profile {
   displayName: string;
   username: string;
   avatarUrl: string | null;
-  agent: { identityEmoji: string | null } | null;
+  agentId?: string | null;
+  agent: { id?: string; identityEmoji: string | null } | null;
 }
 
 interface TaskAssignee {
@@ -134,7 +135,7 @@ export default function EditTaskScreen() {
       setPriority((task.priority as Priority) ?? null);
       setDueDate(task.dueDate ? task.dueDate.slice(0, 10) : "");
       setTags(task.tags ?? []);
-      setSelectedIds(task.assignees.map((a) => a.profileId));
+      setSelectedIds(task.assignees.map((a) => a.profile?.agentId ?? a.profile?.agent?.id ?? a.profileId));
       setBlockedByTaskId(task.blockedByTaskId ?? null);
       setProjectId(task.projectId ?? null);
       setParentTaskId(task.parentTaskId ?? null);
@@ -279,8 +280,8 @@ export default function EditTaskScreen() {
             ) : (
               <View className="flex-row flex-wrap gap-1.5">
                 {selectedIds.map((pid) => {
-                  const fromTask = task?.assignees.find((a) => a.profileId === pid)?.profile;
-                  const fromProfiles = profilesResult.data?.profiles.find((x) => x.id === pid);
+                  const fromTask = task?.assignees.find((a) => (a.profile?.agentId ?? a.profile?.agent?.id ?? a.profileId) === pid)?.profile;
+                  const fromProfiles = profilesResult.data?.profiles.find((x) => (x.agentId ?? x.agent?.id ?? x.id) === pid);
                   const p = fromTask ?? fromProfiles;
                   return (
                     <View key={pid} className="bg-blue-100 dark:bg-blue-900/30 rounded-full px-2.5 py-1">
@@ -432,13 +433,14 @@ export default function EditTaskScreen() {
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
               renderItem={({ item }) => {
-                const selected = selectedIds.includes(item.id);
+                const agentKey = item.agentId ?? item.agent?.id ?? item.id;
+                const selected = selectedIds.includes(agentKey);
                 return (
                   <Pressable
                     className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
                     onPress={() =>
                       setSelectedIds((prev) =>
-                        selected ? prev.filter((pid) => pid !== item.id) : [...prev, item.id]
+                        selected ? prev.filter((id) => id !== agentKey) : [...prev, agentKey]
                       )
                     }
                   >
