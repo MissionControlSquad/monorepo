@@ -785,11 +785,11 @@ export default function CreateAgentScreen() {
                 </View>
                 <ScrollView
                   horizontal
-                  className="bg-[#1f2937] rounded-[10px] p-3 max-h-[200px]"
+                  className="bg-gray-800 rounded-[10px] p-3 max-h-[200px]"
                   contentContainerStyle={{ minWidth: "100%" }}
                 >
                   <Text
-                    className="text-[11px] text-[#d1fae5] leading-[18px]"
+                    className="text-[11px] text-emerald-100 leading-[18px]"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >
@@ -865,9 +865,9 @@ export default function CreateAgentScreen() {
                   {" "}in{" "}
                   <Text style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }} className="text-xs">~/.openclaw/openclaw.json</Text>:
                 </Text>
-                <View className="bg-[#1f2937] rounded-lg p-3">
+                <View className="bg-gray-800 rounded-lg p-3">
                   <Text
-                    className="text-[11px] text-[#4ade80] leading-[18px]"
+                    className="text-[11px] text-green-400 leading-[18px]"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >
@@ -889,9 +889,9 @@ export default function CreateAgentScreen() {
                   <Ionicons name="folder-outline" size={16} color="#374151" />
                   <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">2. Create Workspace</Text>
                 </View>
-                <View className="bg-[#1f2937] rounded-lg p-3">
+                <View className="bg-gray-800 rounded-lg p-3">
                   <Text
-                    className="text-[11px] text-[#4ade80] leading-[18px]"
+                    className="text-[11px] text-green-400 leading-[18px]"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >{`mkdir -p ${result.workspacePath}`}</Text>
@@ -935,9 +935,9 @@ export default function CreateAgentScreen() {
                   <Ionicons name="terminal-outline" size={16} color="#374151" />
                   <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">4. Add Heartbeat Cron</Text>
                 </View>
-                <View className="bg-[#1f2937] rounded-lg p-3">
+                <View className="bg-gray-800 rounded-lg p-3">
                   <Text
-                    className="text-[11px] text-[#4ade80] leading-[18px]"
+                    className="text-[11px] text-green-400 leading-[18px]"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >{result.cronCommand}</Text>

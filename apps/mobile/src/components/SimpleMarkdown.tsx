@@ -17,17 +17,17 @@ export function SimpleMarkdown({ content }: { content: string }) {
   function flushCode(key: string) {
     if (codeLines.length > 0) {
       elements.push(
-        <View key={key} className="bg-[#1e1e2e] rounded-lg p-3 my-1 gap-1.5">
+        <View key={key} className="bg-slate-900 rounded-lg p-3 my-1 gap-1.5">
           {codeLang ? (
             <Text
-              className="uppercase tracking-wide text-[10px] text-[#7c7f93]"
+              className="uppercase tracking-wide text-[10px] text-slate-400"
               style={{ fontFamily: MONO, letterSpacing: 0.5 }}
             >
               {codeLang}
             </Text>
           ) : null}
           <Text
-            className="text-[#cdd6f4] text-[13px] leading-5"
+            className="text-slate-300 text-[13px] leading-5"
             style={{ fontFamily: MONO }}
             selectable
           >

@@ -457,7 +457,7 @@ export default function CloudVMDetailScreen() {
         </TouchableOpacity>
 
         {showLogs && (
-          <View className="bg-[#1e1e2e] rounded-[12px] p-3 gap-1.5">
+          <View className="bg-slate-900 rounded-[12px] p-3 gap-1.5">
             {logs.length === 0 ? (
               <Text className="text-gray-500 text-[13px] text-center py-4">No logs yet</Text>
             ) : (
