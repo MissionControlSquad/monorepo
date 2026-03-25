@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { filterAgentsBySetup } from "@agentcenter/utils";
 import Link from "next/link";
 import { useMutation } from "urql";
 import { SET_AGENT_ACTIVATION } from "../lib/graphql/mutations/agents";
@@ -26,11 +27,11 @@ import type { AgentDetailedStatus } from "../lib/constants";
 
 type AgentFromQuery = {
   id: string;
-  name?: string;
+  name: string;
   role?: string;
   status?: string;
   detailedStatus?: string;
-  setupStatus?: string;
+  setupStatus: string;
   currentTask?: string;
   upgradeAvailable?: boolean;
   hostingType?: string;
@@ -52,20 +53,10 @@ export function AgentsPage() {
     );
   }
 
-  const matchesSearch = (a: AgentFromQuery) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return a.name?.toLowerCase().includes(q) || a.role?.toLowerCase().includes(q);
-  };
-
-  const activeAgents =
-    agents?.filter((a: AgentFromQuery) => a.setupStatus === "active" && matchesSearch(a)) ?? [];
-  const pendingAgents =
-    agents?.filter((a: AgentFromQuery) => a.setupStatus === "pending_setup" && matchesSearch(a)) ??
-    [];
-  const deactivatedAgents =
-    agents?.filter((a: AgentFromQuery) => a.setupStatus === "deactivated" && matchesSearch(a)) ??
-    [];
+  const agentList = agents ?? ([] as AgentFromQuery[]);
+  const activeAgents = filterAgentsBySetup(agentList, "active", search);
+  const pendingAgents = filterAgentsBySetup(agentList, "pending", search);
+  const deactivatedAgents = filterAgentsBySetup(agentList, "deactivated", search);
   const isEmpty = agents && agents.length === 0;
   const visibleCount = activeAgents.length + pendingAgents.length;
 
