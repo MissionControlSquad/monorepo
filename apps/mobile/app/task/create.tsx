@@ -16,7 +16,7 @@ import { useState } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "urql";
-import { CREATE_TASK_FROM_DASHBOARD, PROFILES_QUERY, TASKS_QUERY, TASK_TEMPLATES_QUERY, INSTANTIATE_TEMPLATE } from "@agentcenter/graphql-client";
+import { CREATE_TASK_FROM_DASHBOARD, PROFILES_QUERY, PROJECTS_QUERY, TASKS_QUERY, TASK_TEMPLATES_QUERY, INSTANTIATE_TEMPLATE } from "@agentcenter/graphql-client";
 import { Avatar } from "../../src/components/Avatar";
 import { PRIORITY_HEX_COLORS, PRIORITY_VALUES } from "@agentcenter/utils";
 import type { Priority } from "@agentcenter/types";
@@ -47,6 +47,13 @@ interface TaskTemplate {
   description: string | null;
 }
 
+interface Project {
+  id: string;
+  name: string;
+  status: string;
+  shutdownActive: boolean;
+}
+
 export default function CreateTaskScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -65,6 +72,8 @@ export default function CreateTaskScreen() {
   const [taskPickerSearch, setTaskPickerSearch] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projectId ?? null);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
 
   const [profilesResult] = useQuery<{ profiles: Profile[] }>({
     query: PROFILES_QUERY,
@@ -81,6 +90,12 @@ export default function CreateTaskScreen() {
   const [templatesResult] = useQuery<{ taskTemplates: TaskTemplate[] }>({
     query: TASK_TEMPLATES_QUERY,
     pause: !templatePickerOpen,
+  });
+
+  const [projectsResult] = useQuery<{ projects: Project[] }>({
+    query: PROJECTS_QUERY,
+    requestPolicy: "cache-first",
+    pause: !projectPickerOpen && !selectedProjectId,
   });
 
   const [, createTask] = useMutation(CREATE_TASK_FROM_DASHBOARD);
@@ -103,7 +118,7 @@ export default function CreateTaskScreen() {
       priority: priority ?? undefined,
       assigneeIds: selectedIds,
       tags: finalTags.length > 0 ? finalTags : undefined,
-      projectId: projectId ?? undefined,
+      projectId: selectedProjectId ?? undefined,
       parentTaskId: parentTaskId ?? undefined,
       blockedByTaskId: blockedByTaskId ?? undefined,
       dueDate: dueDate.trim() ? new Date(dueDate.trim()).toISOString() : undefined,
@@ -182,7 +197,7 @@ export default function CreateTaskScreen() {
                         onPress={async () => {
                           const res = await instantiateTemplate({
                             templateId: item.id,
-                            projectId: projectId ?? undefined,
+                            projectId: selectedProjectId ?? undefined,
                           });
                           if (res.error) {
                             Alert.alert("Error", "Failed to create from template");
@@ -274,6 +289,29 @@ export default function CreateTaskScreen() {
               </TouchableOpacity>
             ))}
           </View>
+        </FormField>
+
+        {/* Project */}
+        <FormField label="Project">
+          <TouchableOpacity
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 min-h-11 justify-center flex-row items-center"
+            onPress={() => setProjectPickerOpen(true)}
+            activeOpacity={0.7}
+          >
+            <Text className={`flex-1 text-base ${selectedProjectId ? "text-gray-900 dark:text-slate-100" : "text-gray-400 dark:text-slate-500"}`}>
+              {selectedProjectId
+                ? (projectsResult.data?.projects.find((p) => p.id === selectedProjectId)?.name ?? "Loading…")
+                : "No Project"}
+            </Text>
+            {selectedProjectId && (
+              <TouchableOpacity
+                onPress={(e) => { e.stopPropagation(); setSelectedProjectId(null); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text className="text-gray-500 dark:text-slate-400 text-base">✕</Text>
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
         </FormField>
 
         {/* Due Date */}
@@ -530,6 +568,59 @@ export default function CreateTaskScreen() {
                           #{item.taskNumber} {item.title}
                         </Text>
                         <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">{item.status.replace("_", " ")}</Text>
+                      </View>
+                      {selected && <Text className="text-lg text-blue-600 dark:text-blue-400 font-bold">✓</Text>}
+                    </Pressable>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </Modal>
+
+        {/* Project picker modal */}
+        <Modal
+          visible={projectPickerOpen}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setProjectPickerOpen(false)}
+        >
+          <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+            <ModalSheetHeader title="Select Project" onClose={() => setProjectPickerOpen(false)} />
+            {projectsResult.fetching ? (
+              <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
+            ) : (
+              <FlatList
+                data={projectsResult.data?.projects ?? []}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+                ListHeaderComponent={
+                  <Pressable
+                    className={`flex-row items-center p-3.5 border-b border-gray-100 dark:border-slate-700 ${selectedProjectId === null ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
+                    onPress={() => { setSelectedProjectId(null); setProjectPickerOpen(false); }}
+                  >
+                    <Text className="flex-1 text-base font-medium italic text-gray-500 dark:text-slate-400">No Project</Text>
+                    {selectedProjectId === null && <Text className="text-lg text-blue-600 dark:text-blue-400 font-bold">✓</Text>}
+                  </Pressable>
+                }
+                renderItem={({ item }) => {
+                  const selected = selectedProjectId === item.id;
+                  const disabled = item.status === "archived" || item.shutdownActive;
+                  return (
+                    <Pressable
+                      className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
+                      onPress={() => {
+                        if (!disabled) {
+                          setSelectedProjectId(item.id);
+                          setProjectPickerOpen(false);
+                        }
+                      }}
+                    >
+                      <View className="flex-1">
+                        <Text className={`text-base font-medium ${disabled ? "text-gray-400 dark:text-slate-500" : "text-gray-900 dark:text-slate-100"}`}>
+                          {item.name}
+                          {item.status === "archived" ? " (Archived)" : item.shutdownActive ? " (Paused)" : ""}
+                        </Text>
                       </View>
                       {selected && <Text className="text-lg text-blue-600 dark:text-blue-400 font-bold">✓</Text>}
                     </Pressable>

@@ -429,22 +429,21 @@ interface WorkSummary {
 
 
 function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; onStatusChange: () => void; onProjectAssign: (projectId: string) => void }) {
-  const router = useRouter();
   const statusColor = STATUS_HEX_COLORS[task.status] ?? DEFAULT_COLOR;
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const [projectsResult] = useQuery<{ projects: { id: string; name: string; status: string }[] }>({
     query: PROJECTS_QUERY,
-    requestPolicy: "cache-and-network",
+    requestPolicy: "cache-first",
     pause: !mounted || !!task.project,
   });
 
-  function handleAssignProject() {
+  function openProjectPicker() {
     const projects = (projectsResult.data?.projects ?? []).filter((p) => p.status === "active");
     if (projects.length === 0) { Alert.alert("No Projects", "No active projects available."); return; }
     Alert.alert(
-      "Assign to Project",
-      "Select a project for this task",
+      "Assign Project",
+      undefined,
       [
         ...projects.map((p) => ({ text: p.name, onPress: () => onProjectAssign(p.id) })),
         { text: "Cancel", style: "cancel" as const },
@@ -499,16 +498,13 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
           </View>
         )}
         {task.project ? (
-          <TouchableOpacity
-            className="rounded-md px-2.5 py-1 bg-gray-100 dark:bg-slate-700"
-            onPress={() => router.push(`/project/${task.project!.id}`)}
-          >
+          <View className="rounded-md px-2.5 py-1 bg-gray-100 dark:bg-slate-700">
             <Text className="text-sm font-semibold text-gray-500 dark:text-slate-400">📁 {task.project.name}</Text>
-          </TouchableOpacity>
+          </View>
         ) : (
           <TouchableOpacity
             className="rounded-md px-2.5 py-1 bg-gray-100 dark:bg-slate-700 border border-dashed border-gray-300 dark:border-slate-600"
-            onPress={handleAssignProject}
+            onPress={openProjectPicker}
             activeOpacity={0.7}
           >
             <Text className="text-sm font-semibold text-gray-400 dark:text-slate-500">📁 Assign project</Text>

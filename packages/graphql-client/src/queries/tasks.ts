@@ -115,6 +115,10 @@ export const TASK_EDIT_QUERY = gql`
       parentTaskId
       blockedByTaskId
       projectId
+      project {
+        id
+        name
+      }
       assignees {
         id
         profileId

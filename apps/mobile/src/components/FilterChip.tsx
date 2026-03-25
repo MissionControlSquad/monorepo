@@ -18,7 +18,7 @@ export function FilterChip({
           ? "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700"
           : "bg-gray-100 dark:bg-slate-700 border-gray-200 dark:border-slate-600"
       }`}
-      style={{ minHeight: 20, maxHeight: 20 }}
+      style={{ height: 32 }}
       onPress={onPress}
       activeOpacity={0.7}
     >

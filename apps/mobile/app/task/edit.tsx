@@ -59,6 +59,7 @@ interface Task {
   parentTaskId: string | null;
   blockedByTaskId: string | null;
   projectId: string | null;
+  project?: { id: string; name: string } | null;
   assignees: TaskAssignee[];
 }
 
@@ -120,8 +121,8 @@ export default function EditTaskScreen() {
 
   const [projectsResult] = useQuery<{ projects: ProjectOption[] }>({
     query: PROJECTS_QUERY,
-    pause: !projectPickerOpen,
-    requestPolicy: "cache-and-network",
+    pause: !projectPickerOpen || !!task?.projectId,
+    requestPolicy: "cache-first",
   });
 
   const [, updateTask] = useMutation(UPDATE_TASK);
@@ -278,7 +279,9 @@ export default function EditTaskScreen() {
             ) : (
               <View className="flex-row flex-wrap gap-1.5">
                 {selectedIds.map((pid) => {
-                  const p = profilesResult.data?.profiles.find((x) => x.id === pid);
+                  const fromTask = task?.assignees.find((a) => a.profileId === pid)?.profile;
+                  const fromProfiles = profilesResult.data?.profiles.find((x) => x.id === pid);
+                  const p = fromTask ?? fromProfiles;
                   return (
                     <View key={pid} className="bg-blue-100 dark:bg-blue-900/30 rounded-full px-2.5 py-1">
                       <Text className="text-sm text-blue-700 dark:text-blue-300 font-medium">
@@ -335,24 +338,21 @@ export default function EditTaskScreen() {
         {/* Project */}
         <View className="gap-1.5">
           <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Project</Text>
-          <TouchableOpacity
-            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 min-h-11 justify-center"
-            onPress={() => setProjectPickerOpen(true)}
-            activeOpacity={0.7}
-          >
-            {projectId ? (
-              <View className="flex-row justify-between items-center">
-                <Text className="text-base text-gray-900 dark:text-slate-100">
-  {projectsResult.data?.projects.find((p) => p.id === projectId)?.name ?? "Loading..."}
-                </Text>
-                <TouchableOpacity onPress={(e) => { e.stopPropagation(); setProjectId(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text className="text-gray-500 dark:text-slate-400 text-base">✕</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <Text className="text-gray-400 dark:text-slate-500 text-base">No project</Text>
-            )}
-          </TouchableOpacity>
+          {projectId ? (
+            <View className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 min-h-11 justify-center">
+              <Text className="text-base text-gray-900 dark:text-slate-100">
+                {task?.project?.name ?? task?.projectId ?? "Assigned project"}
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 min-h-11 justify-center"
+              onPress={() => setProjectPickerOpen(true)}
+              activeOpacity={0.7}
+            >
+              <Text className="text-gray-400 dark:text-slate-500 text-base">No project — tap to assign</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Parent Task */}
@@ -477,15 +477,6 @@ export default function EditTaskScreen() {
               data={projectsResult.data?.projects ?? []}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
-              ListHeaderComponent={
-                <Pressable
-                  className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${projectId === null ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
-                  onPress={() => { setProjectId(null); setProjectPickerOpen(false); }}
-                >
-                  <Text className={`text-base italic ${projectId === null ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}>No project</Text>
-                  {projectId === null && <Text className="text-lg text-blue-600 dark:text-blue-400 font-bold ml-auto">✓</Text>}
-                </Pressable>
-              }
               renderItem={({ item }) => {
                 const selected = projectId === item.id;
                 return (
