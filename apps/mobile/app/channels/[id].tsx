@@ -22,6 +22,7 @@ import { useAuth } from "../../src/context/AuthContext";
 import { useTheme } from "../../src/hooks/useTheme";
 import { formatChatTime, appendDeduped } from "@agentcenter/utils";
 import { MentionInput } from "../../src/components/MentionInput";
+import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
 
 interface FromProfile {
   id: string;
@@ -464,9 +465,7 @@ export default function ChannelDetailScreen() {
                         ? [{ backgroundColor: colors.accent }, myBubbleRadius]
                         : [{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }, theirBubbleRadius],
                     ]}>
-                      <Text style={{ fontSize: 16, lineHeight: 23, color: isMe ? "#fff" : colors.text }}>
-                        {item.content}
-                      </Text>
+                      <SimpleMarkdown content={item.content} inverted={isMe} />
                       {isBottomOfGroup && (
                         <Text style={{ fontSize: 11, alignSelf: "flex-end", marginTop: 4, color: isMe ? "rgba(255,255,255,0.65)" : colors.textMuted }}>
                           {formatChatTime(item.createdAt)}

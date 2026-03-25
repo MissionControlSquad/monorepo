@@ -785,7 +785,7 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
                     <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">{item.fromProfile.displayName}</Text>
                     <Text className="text-xs text-gray-400 dark:text-slate-500">{formatRelativeTime(item.createdAt)}</Text>
                   </View>
-                  <Text className="text-sm text-gray-700 dark:text-slate-300 leading-5">{item.content}</Text>
+                  <SimpleMarkdown content={item.content} />
                 </View>
                 {(reactionList.length > 0 || true) && (
                   <View className="flex-row flex-wrap gap-1 mt-1 pl-0.5">
