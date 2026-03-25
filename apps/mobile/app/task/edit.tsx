@@ -26,6 +26,10 @@ import {
 import { Avatar } from "../../src/components/Avatar";
 import { PRIORITY_HEX_COLORS, PRIORITY_VALUES } from "@agentcenter/utils";
 import type { Priority } from "@agentcenter/types";
+import { FormField } from "../../src/components/FormField";
+import { ModalSheetHeader } from "../../src/components/ModalSheetHeader";
+import { ActionButton } from "../../src/components/ActionButton";
+import { ScreenLoading } from "../../src/components/ScreenLoading";
 
 const PRIORITIES = PRIORITY_VALUES;
 
@@ -168,13 +172,7 @@ export default function EditTaskScreen() {
     }
   };
 
-  if (taskResult.fetching && !task) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
+  if (taskResult.fetching && !task) return <ScreenLoading />;
 
   if (!task) {
     return (
@@ -195,8 +193,7 @@ export default function EditTaskScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Title */}
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Title *</Text>
+        <FormField label="Title" required>
           <TextInput
             className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
             placeholder="Task title…"
@@ -205,11 +202,10 @@ export default function EditTaskScreen() {
             onChangeText={setTitle}
             returnKeyType="next"
           />
-        </View>
+        </FormField>
 
         {/* Description */}
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Description</Text>
+        <FormField label="Description">
           <TextInput
             className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
             style={{ minHeight: 100, textAlignVertical: "top" }}
@@ -220,11 +216,10 @@ export default function EditTaskScreen() {
             multiline
             numberOfLines={4}
           />
-        </View>
+        </FormField>
 
         {/* Priority */}
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Priority</Text>
+        <FormField label="Priority">
           <View className="flex-row flex-wrap gap-2">
             <TouchableOpacity
               className={`border rounded-lg px-3 py-1.5 ${priority === null ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30" : "border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800"}`}
@@ -256,11 +251,10 @@ export default function EditTaskScreen() {
               );
             })}
           </View>
-        </View>
+        </FormField>
 
         {/* Due Date */}
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Due Date</Text>
+        <FormField label="Due Date">
           <TextInput
             className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
             placeholder="YYYY-MM-DD"
@@ -270,11 +264,10 @@ export default function EditTaskScreen() {
             keyboardType="numbers-and-punctuation"
             returnKeyType="done"
           />
-        </View>
+        </FormField>
 
         {/* Assignees */}
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Assignees</Text>
+        <FormField label="Assignees">
           <TouchableOpacity
             className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 min-h-11 justify-center"
             onPress={() => setAssigneeModalOpen(true)}
@@ -297,11 +290,10 @@ export default function EditTaskScreen() {
               </View>
             )}
           </TouchableOpacity>
-        </View>
+        </FormField>
 
         {/* Tags */}
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Tags</Text>
+        <FormField label="Tags">
           {tags.length > 0 && (
             <View className="flex-row flex-wrap gap-1.5 mb-1.5">
               {tags.map((tag) => (
@@ -338,7 +330,7 @@ export default function EditTaskScreen() {
             returnKeyType="done"
             blurOnSubmit={false}
           />
-        </View>
+        </FormField>
 
         {/* Project */}
         <View className="gap-1.5">
@@ -364,8 +356,7 @@ export default function EditTaskScreen() {
         </View>
 
         {/* Parent Task */}
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Parent Task</Text>
+        <FormField label="Parent Task">
           <TouchableOpacity
             className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 min-h-11 justify-center"
             onPress={() => setParentTaskPickerOpen(true)}
@@ -384,11 +375,10 @@ export default function EditTaskScreen() {
               <Text className="text-gray-400 dark:text-slate-500 text-base">None (top-level task)</Text>
             )}
           </TouchableOpacity>
-        </View>
+        </FormField>
 
         {/* Blocked By */}
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Blocked By</Text>
+        <FormField label="Blocked By">
           <TouchableOpacity
             className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 min-h-11 justify-center"
             onPress={() => setTaskPickerOpen(true)}
@@ -415,21 +405,10 @@ export default function EditTaskScreen() {
               <Text className="text-gray-400 dark:text-slate-500 text-base">Select blocking task…</Text>
             )}
           </TouchableOpacity>
-        </View>
+        </FormField>
 
         {/* Save */}
-        <TouchableOpacity
-          className={`bg-blue-600 rounded-xl py-3.5 items-center mt-1 ${(!title.trim() || saving) ? "opacity-50" : ""}`}
-          onPress={handleSave}
-          disabled={!title.trim() || saving}
-          activeOpacity={0.8}
-        >
-          {saving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text className="text-white text-base font-semibold">Save Changes</Text>
-          )}
-        </TouchableOpacity>
+        <ActionButton label="Save Changes" onPress={handleSave} loading={saving} disabled={!title.trim()} />
 
         <TouchableOpacity className="items-center py-2" onPress={() => router.back()}>
           <Text className="text-base text-gray-500 dark:text-slate-400">Cancel</Text>
@@ -444,12 +423,7 @@ export default function EditTaskScreen() {
         onRequestClose={() => setAssigneeModalOpen(false)}
       >
         <View className="flex-1 bg-gray-50 dark:bg-slate-900">
-          <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">Select Assignees</Text>
-            <TouchableOpacity onPress={() => setAssigneeModalOpen(false)}>
-              <Text className="text-base font-semibold text-blue-600 dark:text-blue-400">Done</Text>
-            </TouchableOpacity>
-          </View>
+          <ModalSheetHeader title="Select Assignees" onClose={() => setAssigneeModalOpen(false)} />
           {profilesResult.fetching ? (
             <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
           ) : (
@@ -495,12 +469,7 @@ export default function EditTaskScreen() {
         onRequestClose={() => setProjectPickerOpen(false)}
       >
         <View className="flex-1 bg-gray-50 dark:bg-slate-900">
-          <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">Select Project</Text>
-            <TouchableOpacity onPress={() => setProjectPickerOpen(false)}>
-              <Text className="text-base font-semibold text-blue-600 dark:text-blue-400">Done</Text>
-            </TouchableOpacity>
-          </View>
+          <ModalSheetHeader title="Select Project" onClose={() => setProjectPickerOpen(false)} />
           {projectsResult.fetching ? (
             <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
           ) : (
@@ -542,12 +511,7 @@ export default function EditTaskScreen() {
         onRequestClose={() => setParentTaskPickerOpen(false)}
       >
         <View className="flex-1 bg-gray-50 dark:bg-slate-900">
-          <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">Select Parent Task</Text>
-            <TouchableOpacity onPress={() => setParentTaskPickerOpen(false)}>
-              <Text className="text-base font-semibold text-blue-600 dark:text-blue-400">Done</Text>
-            </TouchableOpacity>
-          </View>
+          <ModalSheetHeader title="Select Parent Task" onClose={() => setParentTaskPickerOpen(false)} />
           <View className="px-3.5 py-2.5 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
             <TextInput
               className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-2.5 text-base text-gray-900 dark:text-slate-100"
@@ -608,12 +572,7 @@ export default function EditTaskScreen() {
         onRequestClose={() => setTaskPickerOpen(false)}
       >
         <View className="flex-1 bg-gray-50 dark:bg-slate-900">
-          <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">Blocked By Task</Text>
-            <TouchableOpacity onPress={() => setTaskPickerOpen(false)}>
-              <Text className="text-base font-semibold text-blue-600 dark:text-blue-400">Done</Text>
-            </TouchableOpacity>
-          </View>
+          <ModalSheetHeader title="Blocked By Task" onClose={() => setTaskPickerOpen(false)} />
           <View className="px-3.5 py-2.5 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
             <TextInput
               className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-2.5 text-base text-gray-900 dark:text-slate-100"

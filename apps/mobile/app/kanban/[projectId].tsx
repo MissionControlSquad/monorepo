@@ -13,6 +13,7 @@ import type { DueDateFilter, PriorityFilter } from "@agentcenter/utils";
 import { useTheme } from "../../src/hooks/useTheme";
 import { FilterChip } from "../../src/components/FilterChip";
 import { FAB } from "../../src/components/FAB";
+import { SectionLabel } from "../../src/components/SectionLabel";
 
 const DUE_DATE_OPTIONS = DUE_DATE_FILTER_OPTIONS as { key: DueDateFilter; label: string }[];
 const PRIORITY_OPTIONS = PRIORITY_FILTER_OPTIONS as { key: PriorityFilter; label: string }[];
@@ -63,7 +64,7 @@ export default function KanbanScreen() {
     <View className="flex-1">
       {filtersOpen && (
         <View className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3.5 pt-2.5 pb-3 gap-2">
-          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Due Date</Text>
+          <SectionLabel>Due Date</SectionLabel>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
             {DUE_DATE_OPTIONS.map((opt) => (
               <FilterChip
@@ -75,7 +76,7 @@ export default function KanbanScreen() {
             ))}
           </ScrollView>
 
-          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Priority</Text>
+          <SectionLabel>Priority</SectionLabel>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
             {PRIORITY_OPTIONS.map((opt) => (
               <FilterChip
@@ -87,7 +88,7 @@ export default function KanbanScreen() {
             ))}
           </ScrollView>
 
-          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">More Filters</Text>
+          <SectionLabel>More Filters</SectionLabel>
           <View className="flex-row flex-wrap gap-2">
             <FilterChip label="Blocked only" active={blockedOnly} onPress={() => setBlockedOnly((v) => !v)} />
             <FilterChip label="Top-level only" active={topLevelOnly} onPress={() => setTopLevelOnly((v) => !v)} />

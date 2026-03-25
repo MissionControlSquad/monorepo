@@ -9,6 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { FormField } from "../src/components/FormField";
+import { ActionButton } from "../src/components/ActionButton";
 import { useEffect, useState } from "react";
 import { useNavigation } from "expo-router";
 import { useQuery, useMutation } from "urql";
@@ -109,8 +111,7 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
         </View>
       </View>
 
-      <View className="gap-1.5">
-        <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Current Password</Text>
+      <FormField label="Current Password">
         <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
           <TextInput
             className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
@@ -126,10 +127,9 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
             <Ionicons name={showCurrent ? "eye-off-outline" : "eye-outline"} size={18} color="#9ca3af" />
           </TouchableOpacity>
         </View>
-      </View>
+      </FormField>
 
-      <View className="gap-1.5">
-        <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">New Password</Text>
+      <FormField label="New Password">
         <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
           <TextInput
             className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
@@ -145,10 +145,9 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
             <Ionicons name={showNext ? "eye-off-outline" : "eye-outline"} size={18} color="#9ca3af" />
           </TouchableOpacity>
         </View>
-      </View>
+      </FormField>
 
-      <View className="gap-1.5">
-        <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Confirm New Password</Text>
+      <FormField label="Confirm New Password">
         <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
           <TextInput
             className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
@@ -164,20 +163,9 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
             <Ionicons name={showConfirm ? "eye-off-outline" : "eye-outline"} size={18} color="#9ca3af" />
           </TouchableOpacity>
         </View>
-      </View>
+      </FormField>
 
-      <TouchableOpacity
-        className={`bg-blue-600 rounded-xl py-3.5 items-center ${fetching ? "opacity-50" : ""}`}
-        onPress={handleSubmit}
-        disabled={fetching}
-        activeOpacity={0.8}
-      >
-        {fetching ? (
-          <ActivityIndicator color="#fff" size="small" />
-        ) : (
-          <Text className="text-white text-base font-semibold">Change Password</Text>
-        )}
-      </TouchableOpacity>
+      <ActionButton label="Change Password" onPress={handleSubmit} loading={fetching} disabled={false} />
     </View>
   );
 }

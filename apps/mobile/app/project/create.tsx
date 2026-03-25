@@ -16,6 +16,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CREATE_PROJECT, PROFILES_QUERY } from "@agentcenter/graphql-client";
 import { DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 import { Ionicons } from "@expo/vector-icons";
+import { FormField } from "../../src/components/FormField";
+import { ActionButton } from "../../src/components/ActionButton";
 
 interface Profile {
   id: string;
@@ -78,8 +80,7 @@ export default function CreateProjectScreen() {
         contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: insets.bottom + 24 }}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Project Name *</Text>
+        <FormField label="Project Name" required>
           <TextInput
             className="border border-gray-300 dark:border-slate-600 rounded-xl p-3 text-base text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
             value={name}
@@ -88,10 +89,9 @@ export default function CreateProjectScreen() {
             placeholderTextColor="#9ca3af"
             autoFocus
           />
-        </View>
+        </FormField>
 
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Description</Text>
+        <FormField label="Description">
           <TextInput
             className="border border-gray-300 dark:border-slate-600 rounded-xl p-3 text-base text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
             style={{ height: 100 }}
@@ -103,7 +103,7 @@ export default function CreateProjectScreen() {
             numberOfLines={4}
             textAlignVertical="top"
           />
-        </View>
+        </FormField>
 
         {/* Members */}
         <View className="gap-1.5">
@@ -149,17 +149,7 @@ export default function CreateProjectScreen() {
           )}
         </View>
 
-        <TouchableOpacity
-          className={`bg-blue-600 rounded-xl p-3.5 items-center mt-2 ${saving ? "opacity-60" : ""}`}
-          onPress={handleCreate}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text className="text-white font-bold text-base">Create Project</Text>
-          )}
-        </TouchableOpacity>
+        <ActionButton label="Create Project" onPress={handleCreate} loading={saving} disabled={!name.trim()} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
