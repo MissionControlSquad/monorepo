@@ -83,7 +83,10 @@ export function ProfilePickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton className="max-w-sm p-0 gap-0 flex flex-col max-h-[70vh]">
+      <DialogContent
+        showCloseButton
+        className="max-w-sm p-0 gap-0 flex flex-col max-h-[70vh] overflow-hidden"
+      >
         <DialogHeader className="shrink-0 px-4 pt-4 pb-0">
           <DialogTitle className="text-base">{title}</DialogTitle>
         </DialogHeader>
