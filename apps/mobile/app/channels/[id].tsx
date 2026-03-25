@@ -325,6 +325,25 @@ export default function ChannelDetailScreen() {
           const isTopOfGroup = !olderMsg || olderMsg.fromProfileId !== item.fromProfileId;
           const isBottomOfGroup = !newerMsg || newerMsg.fromProfileId !== item.fromProfileId;
 
+          // Date separator: show when this message is on a different day than the one above it
+          const itemDay = item.createdAt.slice(0, 10); // "YYYY-MM-DD"
+          const olderDay = olderMsg?.createdAt.slice(0, 10);
+          const showDateSep = !olderMsg || itemDay !== olderDay;
+          let dateLabel = "";
+          if (showDateSep) {
+            const d = new Date(item.createdAt);
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            if (d.toDateString() === today.toDateString()) {
+              dateLabel = "Today";
+            } else if (d.toDateString() === yesterday.toDateString()) {
+              dateLabel = "Yesterday";
+            } else {
+              dateLabel = d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+            }
+          }
+
           // Group reactions by emoji
           const reactionGroups: Record<string, { emoji: string; count: number; iMine: boolean }> = {};
           for (const r of item.reactions ?? []) {
@@ -406,6 +425,14 @@ export default function ChannelDetailScreen() {
           const theirBubbleRadius = { borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomLeftRadius: isBottomOfGroup ? 4 : 18, borderBottomRightRadius: 18 };
 
           return (
+            <>
+            {showDateSep && (
+              <View style={{ flexDirection: "row", alignItems: "center", marginHorizontal: 12, marginVertical: 12, gap: 10 }}>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.textMuted, paddingHorizontal: 4 }}>{dateLabel}</Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              </View>
+            )}
             <View style={{ paddingHorizontal: 12, marginBottom: isBottomOfGroup ? 8 : 2, marginTop: isTopOfGroup ? 6 : 0 }}>
               <View style={{ flexDirection: "row", justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8 }}>
                 {/* Avatar slot — 32px wide so messages align even when avatar hidden */}
@@ -505,6 +532,7 @@ export default function ChannelDetailScreen() {
                 </View>
               </View>
             </View>
+            </>
           );
         }}
       />

@@ -167,20 +167,6 @@ export default function ChannelsScreen() {
           clearButtonMode="while-editing"
           returnKeyType="search"
         />
-        <TouchableOpacity
-          onPress={() => { setCreateName(""); setCreateSlug(""); setCreateVisibility("public"); setCreateDescription(""); setCreateOpen(true); }}
-          className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2.5 py-1.5 border border-blue-200 dark:border-blue-800"
-          activeOpacity={0.7}
-        >
-          <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold"># New</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => { setDmSearch(""); setDmPickerOpen(true); }}
-          className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2.5 py-1.5 border border-blue-200 dark:border-blue-800"
-          activeOpacity={0.7}
-        >
-          <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">💬 DM</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Create channel modal */}
@@ -375,14 +361,18 @@ export default function ChannelsScreen() {
             <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">
               {section.title}
             </Text>
-            {section.isDm && (
-              <TouchableOpacity
-                onPress={() => { setDmSearch(""); setDmPickerOpen(true); }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">+ New</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              onPress={() => {
+                if (section.isDm) {
+                  setDmSearch(""); setDmPickerOpen(true);
+                } else {
+                  setCreateName(""); setCreateSlug(""); setCreateVisibility("public"); setCreateDescription(""); setCreateOpen(true);
+                }
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">+ New</Text>
+            </TouchableOpacity>
           </View>
         )}
         renderItem={({ item }) => {
