@@ -31,6 +31,7 @@ import { EmptyState } from "../src/components/EmptyState";
 import { FormField } from "../src/components/FormField";
 import { StatusPill } from "../src/components/StatusPill";
 import { PriorityBadge } from "../src/components/PriorityBadge";
+import { FilterChip } from "../src/components/FilterChip";
 import { useAuth } from "../src/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { SearchBar } from "../src/components/SearchBar";
@@ -272,22 +273,12 @@ function RecurringTaskFormModal({
             <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Frequency</Text>
             <View className="flex-row flex-wrap gap-2">
               {FREQUENCIES.map((f, i) => (
-                <TouchableOpacity
+                <FilterChip
                   key={f.label}
+                  label={f.label}
+                  active={freqIdx === i}
                   onPress={() => setFreqIdx(i)}
-                  className={`px-3 py-2 rounded-lg border-[1.5px] ${
-                    freqIdx === i
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
-                      : "border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800"
-                  }`}
-                  activeOpacity={0.7}
-                >
-                  <Text className={`text-sm font-semibold ${
-                    freqIdx === i ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-slate-300"
-                  }`}>
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
+                />
               ))}
             </View>
           </View>
@@ -297,22 +288,12 @@ function RecurringTaskFormModal({
             <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Priority</Text>
             <View className="flex-row flex-wrap gap-2">
               {([null, ...PRIORITIES] as (string | null)[]).map((p) => (
-                <TouchableOpacity
+                <FilterChip
                   key={p ?? "none"}
+                  label={p ?? "None"}
+                  active={priority === p}
                   onPress={() => setPriority(p)}
-                  className={`px-3 py-1.5 rounded-lg border ${
-                    priority === p
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
-                      : "border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800"
-                  }`}
-                  activeOpacity={0.7}
-                >
-                  <Text className={`text-xs capitalize ${
-                    priority === p ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-slate-300"
-                  }`}>
-                    {p ?? "None"}
-                  </Text>
-                </TouchableOpacity>
+                />
               ))}
             </View>
           </View>

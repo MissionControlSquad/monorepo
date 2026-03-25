@@ -38,6 +38,7 @@ import {
   AGENTS_FOR_DELEGATE_QUERY,
   CREATE_TASK_FROM_DASHBOARD,
 } from "@agentcenter/graphql-client";
+import { FilterChip } from "../../src/components/FilterChip";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -253,8 +254,7 @@ export default function CreateAgentScreen() {
     >
       {/* Header */}
       <View
-        className="flex-row items-center px-3 pb-2.5 bg-gray-50 dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 gap-2"
-        style={{ paddingTop: insets.top + 8 }}
+        className="flex-row items-center px-3 py-2.5 bg-gray-50 dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 gap-2"
       >
         <TouchableOpacity
           onPress={() => {
@@ -337,48 +337,18 @@ export default function CreateAgentScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8, flexDirection: "row" }}
           >
-            <TouchableOpacity
-              className={[
-                "border rounded-lg px-3.5 py-2",
-                categoryFilter === "all"
-                  ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
-                  : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800",
-              ].join(" ")}
+            <FilterChip
+              label="All"
+              active={categoryFilter === "all"}
               onPress={() => setCategoryFilter("all")}
-            >
-              <Text
-                className={[
-                  "text-sm font-medium",
-                  categoryFilter === "all"
-                    ? "text-blue-600 dark:text-blue-400 font-semibold"
-                    : "text-gray-500 dark:text-slate-400",
-                ].join(" ")}
-              >
-                All
-              </Text>
-            </TouchableOpacity>
+            />
             {categories.map((c) => (
-              <TouchableOpacity
+              <FilterChip
                 key={c}
-                className={[
-                  "border rounded-lg px-3.5 py-2",
-                  categoryFilter === c
-                    ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
-                    : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800",
-                ].join(" ")}
+                label={CATEGORY_LABELS[c] ?? c}
+                active={categoryFilter === c}
                 onPress={() => setCategoryFilter(c)}
-              >
-                <Text
-                  className={[
-                    "text-sm font-medium",
-                    categoryFilter === c
-                      ? "text-blue-600 dark:text-blue-400 font-semibold"
-                      : "text-gray-500 dark:text-slate-400",
-                  ].join(" ")}
-                >
-                  {CATEGORY_LABELS[c] ?? c}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
 
