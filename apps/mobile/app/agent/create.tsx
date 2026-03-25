@@ -398,7 +398,7 @@ export default function CreateAgentScreen() {
                 <Text className="text-2xl w-9 text-center">{t.emoji}</Text>
                 <View className="flex-1">
                   <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">{t.name}</Text>
-                  <Text className="text-xs text-gray-500 dark:text-slate-400 leading-[17px] mt-0.5" numberOfLines={2}>{t.description}</Text>
+                  <Text className="text-xs text-gray-500 dark:text-slate-400 leading-4 mt-0.5" numberOfLines={2}>{t.description}</Text>
                   <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1 uppercase">
                     {CATEGORY_LABELS[t.category] ?? t.category}
                   </Text>
@@ -462,7 +462,7 @@ export default function CreateAgentScreen() {
           </View>
 
           {/* Description */}
-          <Text className="text-sm text-gray-700 dark:text-slate-300 leading-[21px]">{selectedTemplate.description}</Text>
+          <Text className="text-sm text-gray-700 dark:text-slate-300 leading-5">{selectedTemplate.description}</Text>
 
           {/* Behavior */}
           {selectedTemplate.personality ? (
@@ -479,7 +479,7 @@ export default function CreateAgentScreen() {
               {selectedTemplate.skills.map((s, i) => (
                 <View key={i} className="flex-row items-start gap-2">
                   <View className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
-                  <Text className="text-sm text-gray-700 dark:text-slate-300 flex-1 leading-[19px]">{s}</Text>
+                  <Text className="text-sm text-gray-700 dark:text-slate-300 flex-1 leading-5">{s}</Text>
                 </View>
               ))}
             </View>
@@ -684,7 +684,7 @@ export default function CreateAgentScreen() {
             <Ionicons name="shield-outline" size={20} color="#dc2626" />
             <View className="flex-1">
               <Text className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">Sensitive Credentials</Text>
-              <Text className="text-xs text-red-500 leading-[18px]">
+              <Text className="text-xs text-red-500 leading-5">
                 The content below contains your API key. Do not share publicly or commit to version control.
               </Text>
             </View>
@@ -766,7 +766,7 @@ export default function CreateAgentScreen() {
                 <Ionicons name="chatbubble-ellipses-outline" size={18} color="#2563eb" />
                 <View className="flex-1">
                   <Text className="text-sm font-bold text-blue-700 dark:text-blue-300 mb-1">Send to Your Connected Channel</Text>
-                  <Text className="text-xs text-blue-500 leading-[18px]">
+                  <Text className="text-xs text-blue-500 leading-5">
                     Copy the bootstrap message and send it via WhatsApp, Slack, Discord, or Telegram. The agent will read it and configure itself automatically.
                   </Text>
                 </View>
@@ -789,7 +789,7 @@ export default function CreateAgentScreen() {
                   contentContainerStyle={{ minWidth: "100%" }}
                 >
                   <Text
-                    className="text-xs text-emerald-100 leading-[18px]"
+                    className="text-xs text-emerald-100 leading-5"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >
@@ -809,7 +809,7 @@ export default function CreateAgentScreen() {
                     <View className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/20 justify-center items-center shrink-0 mt-px">
                       <Text className="text-xs font-bold text-blue-600 dark:text-blue-400">{i + 1}</Text>
                     </View>
-                    <Text className="text-sm text-gray-700 dark:text-slate-300 flex-1 leading-[19px]">{s}</Text>
+                    <Text className="text-sm text-gray-700 dark:text-slate-300 flex-1 leading-5">{s}</Text>
                   </View>
                 ))}
               </View>
@@ -824,7 +824,7 @@ export default function CreateAgentScreen() {
                 <Ionicons name="warning-outline" size={18} color="#d97706" />
                 <View className="flex-1">
                   <Text className="text-sm font-bold text-amber-600 mb-1">API Key — Save this now!</Text>
-                  <Text className="text-xs text-amber-800 leading-[18px] mb-2">
+                  <Text className="text-xs text-amber-800 leading-5 mb-2">
                     This key will only be shown once. It is already embedded in the config files.
                   </Text>
                   <View className="flex-row items-center gap-1.5 bg-white dark:bg-slate-800 rounded-lg p-2.5 border border-amber-200 dark:border-amber-700">
@@ -859,7 +859,7 @@ export default function CreateAgentScreen() {
                   <Ionicons name="terminal-outline" size={16} color="#374151" />
                   <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">1. Register Agent in OpenClaw</Text>
                 </View>
-                <Text className="text-xs text-gray-500 dark:text-slate-400 leading-[18px]">
+                <Text className="text-xs text-gray-500 dark:text-slate-400 leading-5">
                   Add this to{" "}
                   <Text style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }} className="text-xs">agents.list</Text>
                   {" "}in{" "}
@@ -867,7 +867,7 @@ export default function CreateAgentScreen() {
                 </Text>
                 <View className="bg-gray-800 rounded-lg p-3">
                   <Text
-                    className="text-xs text-green-400 leading-[18px]"
+                    className="text-xs text-green-400 leading-5"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >
@@ -891,7 +891,7 @@ export default function CreateAgentScreen() {
                 </View>
                 <View className="bg-gray-800 rounded-lg p-3">
                   <Text
-                    className="text-xs text-green-400 leading-[18px]"
+                    className="text-xs text-green-400 leading-5"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >{`mkdir -p ${result.workspacePath}`}</Text>
@@ -908,7 +908,7 @@ export default function CreateAgentScreen() {
               {/* 3. Config files */}
               <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-2.5">
                 <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">3. Config Files</Text>
-                <Text className="text-xs text-gray-500 dark:text-slate-400 leading-[18px]">
+                <Text className="text-xs text-gray-500 dark:text-slate-400 leading-5">
                   Copy each file to{" "}
                   <Text style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }} className="text-xs">{result.workspacePath}/</Text>
                 </Text>
@@ -937,7 +937,7 @@ export default function CreateAgentScreen() {
                 </View>
                 <View className="bg-gray-800 rounded-lg p-3">
                   <Text
-                    className="text-xs text-green-400 leading-[18px]"
+                    className="text-xs text-green-400 leading-5"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >{result.cronCommand}</Text>
@@ -960,7 +960,7 @@ export default function CreateAgentScreen() {
                 <Ionicons name="hardware-chip-outline" size={18} color="#16a34a" />
                 <View className="flex-1">
                   <Text className="text-sm font-bold text-green-700 dark:text-green-400 mb-1">Delegate Setup to Squad Lead</Text>
-                  <Text className="text-xs text-green-600 dark:text-green-500 leading-[18px]">
+                  <Text className="text-xs text-green-600 dark:text-green-500 leading-5">
                     A high-priority task will be created and assigned to your Squad Lead. It will bootstrap the workspace and set up the heartbeat cron on next wake-up.
                   </Text>
                 </View>
@@ -1011,7 +1011,7 @@ export default function CreateAgentScreen() {
                   <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
                   <View className="flex-1">
                     <Text className="text-sm font-bold text-green-700 dark:text-green-400 mb-0.5">Task #{delegateTaskNumber} Created</Text>
-                    <Text className="text-xs text-green-600 dark:text-green-500 leading-[18px]">
+                    <Text className="text-xs text-green-600 dark:text-green-500 leading-5">
                       Assigned to {squadLeads[0]?.name ?? SQUAD_LEAD_ROLE}. Setup will happen on next wake-up.
                     </Text>
                   </View>
@@ -1030,7 +1030,7 @@ export default function CreateAgentScreen() {
                 <Ionicons name="cloud-outline" size={18} color="#9333ea" />
                 <View className="flex-1">
                   <Text className="text-sm font-bold mb-1" style={{ color: "#6b21a8" }}>Host on Cloud VM</Text>
-                  <Text className="text-xs leading-[18px]" style={{ color: "#7c3aed" }}>
+                  <Text className="text-xs leading-5" style={{ color: "#7c3aed" }}>
                     Deploy this agent to one of your cloud VMs. The VM will automatically set up and start the agent.
                   </Text>
                 </View>
@@ -1041,7 +1041,7 @@ export default function CreateAgentScreen() {
                   <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
                   <View className="flex-1">
                     <Text className="text-sm font-bold text-green-700 dark:text-green-400 mb-0.5">Agent Deployed</Text>
-                    <Text className="text-xs text-green-600 dark:text-green-500 leading-[18px]">
+                    <Text className="text-xs text-green-600 dark:text-green-500 leading-5">
                       The VM is setting up your agent. You'll see it come online once it sends its first heartbeat.
                     </Text>
                   </View>

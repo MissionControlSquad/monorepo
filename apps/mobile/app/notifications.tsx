@@ -129,13 +129,13 @@ export default function NotificationsScreen() {
               {/* Content */}
               <View className="flex-1 gap-0.5">
                 <Text
-                  className={`text-sm leading-[19px] ${isUnread ? "text-gray-900 dark:text-slate-100 font-semibold" : "text-gray-500 dark:text-slate-400"}`}
+                  className={`text-sm leading-5 ${isUnread ? "text-gray-900 dark:text-slate-100 font-semibold" : "text-gray-500 dark:text-slate-400"}`}
                   numberOfLines={2}
                 >
                   {item.title}
                 </Text>
                 {item.body ? (
-                  <Text className="text-xs text-gray-400 dark:text-slate-500 leading-[17px]" numberOfLines={2}>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500 leading-4" numberOfLines={2}>
                     {item.body}
                   </Text>
                 ) : null}

@@ -61,7 +61,7 @@ export function SimpleMarkdown({ content }: { content: string }) {
 
     if (line.startsWith("### ")) {
       elements.push(
-        <Text key={key} className="text-base font-bold text-gray-700 dark:text-slate-200 mt-1.5 mb-0.5 leading-[22px]">
+        <Text key={key} className="text-base font-bold text-gray-700 dark:text-slate-200 mt-1.5 mb-0.5 leading-6">
           {renderInline(line.slice(4))}
         </Text>
       );

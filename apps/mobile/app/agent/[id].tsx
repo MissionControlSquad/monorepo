@@ -531,7 +531,7 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
       {agent.personality && (
         <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
           <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.5px]">Personality</Text>
-          <Text className="text-sm text-gray-700 dark:text-slate-300 leading-[22px]">{agent.personality}</Text>
+          <Text className="text-sm text-gray-700 dark:text-slate-300 leading-6">{agent.personality}</Text>
         </View>
       )}
     </ScrollView>
@@ -733,7 +733,7 @@ function QueueCard({ item, onStatusChange, onDelete, onTaskPress }: {
         </TouchableOpacity>
       </View>
       <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">{item.title}</Text>
-      {item.description && <Text className="text-sm text-gray-500 dark:text-slate-400 leading-[18px]" numberOfLines={2}>{item.description}</Text>}
+      {item.description && <Text className="text-sm text-gray-500 dark:text-slate-400 leading-5" numberOfLines={2}>{item.description}</Text>}
       {item.relatedTask && onTaskPress && (
         <TouchableOpacity onPress={onTaskPress}>
           <Text className="text-xs text-blue-600 dark:text-blue-400">→ #{item.relatedTask.taskNumber} {item.relatedTask.title}</Text>
@@ -808,7 +808,7 @@ function AgentTasksTab({
                 <View className="w-2 h-2 rounded" style={{ backgroundColor: priorityColor }} />
               )}
             </View>
-            <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 leading-[19px]" numberOfLines={2}>{item.title}</Text>
+            <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 leading-5" numberOfLines={2}>{item.title}</Text>
             {item.dueDate && (
               <Text className="text-xs text-gray-400 dark:text-slate-500">Due {formatDate(item.dueDate)}</Text>
             )}
@@ -878,7 +878,7 @@ function AgentDeliverablesTab({
                 {item.kind} · v{item.version}
               </Text>
             </View>
-            <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 leading-[19px]" numberOfLines={2}>{item.title}</Text>
+            <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 leading-5" numberOfLines={2}>{item.title}</Text>
             {item.task && (
               <Text className="text-xs text-gray-500 dark:text-slate-400" numberOfLines={1}>
                 #{item.task.taskNumber} {item.task.title}
@@ -920,7 +920,7 @@ function ActivityTab({ actions, fetching, onRefresh, router }: {
                 </View>
                 <Text className="text-xs text-gray-400 dark:text-slate-500">{formatRelativeTime(item.timestamp)}</Text>
               </View>
-              <Text className="text-sm text-gray-700 dark:text-slate-300 leading-[18px]">{item.description}</Text>
+              <Text className="text-sm text-gray-700 dark:text-slate-300 leading-5">{item.description}</Text>
               {item.task && (
                 <TouchableOpacity onPress={() => router.push(`/task/${item.task!.id}`)}>
                   <Text className="text-xs text-blue-600 dark:text-blue-400">→ #{item.task.taskNumber} {item.task.title}</Text>
@@ -1099,7 +1099,7 @@ function SetupTab({ agentId }: { agentId: string }) {
       {/* Security warning */}
       <View className="flex-row gap-2 bg-red-50 dark:bg-red-950/30 rounded-xl p-3 border border-red-200 dark:border-red-800">
         <Ionicons name="shield-outline" size={16} color="#dc2626" />
-        <Text className="flex-1 text-xs text-red-600 dark:text-red-400 leading-[17px]">
+        <Text className="flex-1 text-xs text-red-600 dark:text-red-400 leading-4">
           These credentials grant full access to your system. Do not share publicly.
         </Text>
       </View>
@@ -1174,7 +1174,7 @@ function SetupTab({ agentId }: { agentId: string }) {
         <>
           <View className="flex-row gap-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 border border-blue-200 dark:border-blue-800">
             <Ionicons name="chatbubble-outline" size={15} color="#2563eb" />
-            <Text className="flex-1 text-xs text-blue-700 dark:text-blue-300 leading-[17px]">
+            <Text className="flex-1 text-xs text-blue-700 dark:text-blue-300 leading-4">
               Copy the message below and send it to your agent via any connected channel (WhatsApp, Slack, Discord, etc.)
             </Text>
           </View>
@@ -1197,7 +1197,7 @@ function SetupTab({ agentId }: { agentId: string }) {
               </View>
               <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                 <Text
-                  className="text-xs text-slate-200 leading-[18px]"
+                  className="text-xs text-slate-200 leading-5"
                   style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                   selectable
                 >
@@ -1218,7 +1218,7 @@ function SetupTab({ agentId }: { agentId: string }) {
               <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">1. Create Workspace</Text>
               <View className="bg-slate-800 rounded-lg p-3">
                 <Text
-                  className="text-xs text-slate-200 leading-[18px]"
+                  className="text-xs text-slate-200 leading-5"
                   style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                   selectable
                 >
@@ -1260,7 +1260,7 @@ function SetupTab({ agentId }: { agentId: string }) {
                       nestedScrollEnabled
                     >
                       <Text
-                        className="text-xs text-slate-200 leading-[18px]"
+                        className="text-xs text-slate-200 leading-5"
                         style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                         selectable
                       >
@@ -1294,7 +1294,7 @@ function SetupTab({ agentId }: { agentId: string }) {
               <View className="bg-slate-800 rounded-lg p-3">
                 <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled>
                   <Text
-                    className="text-xs text-slate-200 leading-[18px]"
+                    className="text-xs text-slate-200 leading-5"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >

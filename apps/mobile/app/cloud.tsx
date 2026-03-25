@@ -106,7 +106,7 @@ function CreateVMModal({ visible, onClose, onCreated }: {
         >
           <View className="flex-row gap-2 bg-blue-50 dark:bg-blue-900/30 rounded-xl p-3 border border-blue-200 dark:border-blue-700">
             <Ionicons name="information-circle-outline" size={16} color="#2563eb" />
-            <Text className="flex-1 text-sm text-blue-700 dark:text-blue-300 leading-[18px]">
+            <Text className="flex-1 text-sm text-blue-700 dark:text-blue-300 leading-5">
               A cloud VM will be provisioned and configured to run OpenClaw agents. You can deploy agents to it after it's running.
             </Text>
           </View>

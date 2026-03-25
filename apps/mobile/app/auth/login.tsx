@@ -158,7 +158,7 @@ export default function LoginScreen() {
             <Text className="text-lg font-bold text-gray-900 dark:text-slate-100 mt-4 mb-1">
               Create Admin Account
             </Text>
-            <Text className="text-sm text-gray-500 dark:text-slate-400 leading-[18px] mb-4">
+            <Text className="text-sm text-gray-500 dark:text-slate-400 leading-5 mb-4">
               This server has not been set up yet. Create the first admin account to get started.
             </Text>
 

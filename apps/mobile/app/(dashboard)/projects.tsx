@@ -169,7 +169,7 @@ export default function ProjectsScreen() {
                   </View>
                 </View>
                 {item.description ? (
-                  <Text className="text-sm text-gray-500 dark:text-slate-400 leading-[18px]" numberOfLines={2}>
+                  <Text className="text-sm text-gray-500 dark:text-slate-400 leading-5" numberOfLines={2}>
                     {item.description}
                   </Text>
                 ) : null}

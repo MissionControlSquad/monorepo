@@ -225,7 +225,7 @@ function StepRow({ number, text }: { number: string; text: string }) {
       <View className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/30 justify-center items-center mt-px shrink-0">
         <Text className="text-xs font-bold text-blue-600 dark:text-blue-400">{number}</Text>
       </View>
-      <Text className="flex-1 text-sm text-gray-700 dark:text-slate-300 leading-[19px]">{text}</Text>
+      <Text className="flex-1 text-sm text-gray-700 dark:text-slate-300 leading-5">{text}</Text>
     </View>
   );
 }

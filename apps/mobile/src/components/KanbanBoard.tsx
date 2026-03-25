@@ -75,7 +75,7 @@ function KanbanTaskCard({
           </Text>
         )}
       </View>
-      <Text className="text-sm text-gray-900 dark:text-slate-100 leading-[18px] font-medium" numberOfLines={3}>
+      <Text className="text-sm text-gray-900 dark:text-slate-100 leading-5 font-medium" numberOfLines={3}>
         {task.title}
       </Text>
       {(task.assignees ?? []).length > 0 && (

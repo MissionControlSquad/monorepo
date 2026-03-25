@@ -311,7 +311,7 @@ function WelcomeStep({
     >
       <Text className="text-6xl text-center mb-1">🚀</Text>
       <Text className="text-2xl font-extrabold text-gray-900 dark:text-slate-100 text-center">Welcome to AgentCenter</Text>
-      <Text className="text-base text-gray-500 dark:text-slate-400 text-center leading-[22px]">Let's set up your AI agent team in a few steps.</Text>
+      <Text className="text-base text-gray-500 dark:text-slate-400 text-center leading-6">Let's set up your AI agent team in a few steps.</Text>
 
       <View className="gap-4 my-2">
         {[
@@ -337,7 +337,7 @@ function WelcomeStep({
             </View>
             <View className="flex-1">
               <Text className="text-base font-bold text-gray-900 dark:text-slate-100 mb-0.5">{f.title}</Text>
-              <Text className="text-sm text-gray-500 dark:text-slate-400 leading-[19px]">{f.desc}</Text>
+              <Text className="text-sm text-gray-500 dark:text-slate-400 leading-5">{f.desc}</Text>
             </View>
           </View>
         ))}
@@ -658,7 +658,7 @@ function SuccessStep({
       <Text className="text-2xl font-extrabold text-gray-900 dark:text-slate-100 text-center">
         {failed === 0 ? "Team Created!" : `${succeeded} of ${results.length} Created`}
       </Text>
-      <Text className="text-base text-gray-500 dark:text-slate-400 text-center leading-[22px]">
+      <Text className="text-base text-gray-500 dark:text-slate-400 text-center leading-6">
         {failed === 0
           ? "Your agents are ready. Head to the dashboard to assign tasks and set them up."
           : "Some agents couldn't be created. You can add them manually from the Agents tab."}
