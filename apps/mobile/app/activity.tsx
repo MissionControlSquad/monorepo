@@ -78,7 +78,7 @@ export default function ActivityScreen() {
     ? allDisplayed.filter(
         (a) =>
           a.type.toLowerCase().includes(q) ||
-          (a.summary ?? "").toLowerCase().includes(q),
+          (a.message ?? "").toLowerCase().includes(q),
       )
     : allDisplayed;
 

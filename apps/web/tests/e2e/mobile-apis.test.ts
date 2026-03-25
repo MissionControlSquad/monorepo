@@ -12,7 +12,6 @@
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { prisma } from "../../src/server/prisma";
 import { adminSetup, adminLogin, extractSessionCookie, runGraphQL, buildRequest } from "../helpers";
 
 // ── Shared state ──────────────────────────────────────────────────────────────

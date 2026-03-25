@@ -429,6 +429,7 @@ interface WorkSummary {
 
 
 function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; onStatusChange: () => void; onProjectAssign: (projectId: string) => void }) {
+  const router = useRouter();
   const statusColor = STATUS_HEX_COLORS[task.status] ?? DEFAULT_COLOR;
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
