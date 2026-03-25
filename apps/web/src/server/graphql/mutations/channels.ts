@@ -347,6 +347,22 @@ builder.mutationField("createChannelMessage", (t) =>
         validProfileIds,
       );
 
+      // Auto-join mentioned profiles on public channels so they can see and reply.
+      // Silently adds them as members (no activity message to avoid noise).
+      // Must happen before createChannelMessageFull so notifyAgentChannelMembers
+      // picks them up as members when deciding who to notify.
+      const channelForMention = await getChannelVisibilityOrThrow(args.channelId);
+      if (channelForMention.visibility === "public" && mentionedProfileIds.length > 0) {
+        await Promise.all(
+          mentionedProfileIds.map(async (pid) => {
+            const existing = await findChannelMemberRecord(args.channelId, pid);
+            if (!existing) {
+              await createChannelMember(args.channelId, pid, "member", {});
+            }
+          }),
+        );
+      }
+
       const message = await createChannelMessageFull(
         {
           channelId: args.channelId,

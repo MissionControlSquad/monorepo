@@ -14,7 +14,7 @@ import { useQuery, useMutation } from "urql";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CHANNELS_QUERY, PROFILES_QUERY, START_CONVERSATION } from "@agentcenter/graphql-client";
+import { CHANNELS_QUERY, PROFILES_QUERY, START_CONVERSATION, CREATE_CHANNEL } from "@agentcenter/graphql-client";
 import { PAGE_SIZE_CHANNELS, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 
@@ -43,6 +43,10 @@ function channelDisplayName(channel: Channel, myProfileId: string | null): strin
   return channel.name;
 }
 
+function toSlug(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
+
 function channelIcon(channel: Channel): string {
   if (channel.visibility === "dm") return "💬";
   if (channel.visibility === "private") return "🔒";
@@ -57,6 +61,16 @@ export default function ChannelsScreen() {
   const [limit, setLimit] = useState(PAGE_SIZE_CHANNELS);
   const [dmPickerOpen, setDmPickerOpen] = useState(false);
   const [dmSearch, setDmSearch] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createSlug, setCreateSlug] = useState("");
+  const [createVisibility, setCreateVisibility] = useState<"public" | "private">("public");
+  const [createDescription, setCreateDescription] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  // Mutations before queries — avoids useSyncExternalStore update-during-render with URQL v5
+  const [{ fetching: startingDm }, executeStartConversation] = useMutation(START_CONVERSATION);
+  const [, executeCreateChannel] = useMutation(CREATE_CHANNEL);
 
   const [result, reexecute] = useQuery<{ channels: Channel[] }>({
     query: CHANNELS_QUERY,
@@ -78,7 +92,27 @@ export default function ChannelsScreen() {
     pause: !dmPickerOpen,
   });
 
-  const [{ fetching: startingDm }, executeStartConversation] = useMutation(START_CONVERSATION);
+  async function handleCreateChannel() {
+    if (!profileId || !createName.trim() || !createSlug.trim()) return;
+    setCreating(true);
+    const res = await executeCreateChannel({
+      name: createName.trim(),
+      slug: createSlug.trim(),
+      visibility: createVisibility,
+      description: createDescription.trim() || undefined,
+      createdByProfileId: profileId,
+    });
+    setCreating(false);
+    if (res.error) {
+      Alert.alert("Error", res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to create channel");
+      return;
+    }
+    const channel = res.data?.createChannel;
+    setCreateOpen(false);
+    setCreateName(""); setCreateSlug(""); setCreateVisibility("public"); setCreateDescription("");
+    reexecute({ requestPolicy: "network-only" });
+    if (channel?.id) router.push(`/channels/${channel.id}` as Parameters<typeof router.push>[0]);
+  }
 
   const { data, fetching, error } = result;
   const allChannels = data?.channels ?? [];
@@ -134,6 +168,13 @@ export default function ChannelsScreen() {
           returnKeyType="search"
         />
         <TouchableOpacity
+          onPress={() => { setCreateName(""); setCreateSlug(""); setCreateVisibility("public"); setCreateDescription(""); setCreateOpen(true); }}
+          className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2.5 py-1.5 border border-blue-200 dark:border-blue-800"
+          activeOpacity={0.7}
+        >
+          <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold"># New</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           onPress={() => { setDmSearch(""); setDmPickerOpen(true); }}
           className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2.5 py-1.5 border border-blue-200 dark:border-blue-800"
           activeOpacity={0.7}
@@ -141,6 +182,95 @@ export default function ChannelsScreen() {
           <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">💬 DM</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Create channel modal */}
+      <Modal
+        visible={createOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setCreateOpen(false)}
+      >
+        <View className="flex-1 bg-white dark:bg-slate-900">
+          <View className="flex-row justify-between items-center p-4 border-b border-gray-100 dark:border-slate-700">
+            <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">New Channel</Text>
+            <TouchableOpacity onPress={() => setCreateOpen(false)} className="p-1">
+              <Text className="text-base text-gray-500 dark:text-slate-400">✕</Text>
+            </TouchableOpacity>
+          </View>
+          <View className="p-4 gap-4">
+            {/* Name */}
+            <View className="gap-1.5">
+              <Text className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Channel Name *</Text>
+              <TextInput
+                className="bg-gray-100 dark:bg-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
+                placeholder="e.g. General"
+                placeholderTextColor="#9ca3af"
+                value={createName}
+                onChangeText={(v) => { setCreateName(v); setCreateSlug(toSlug(v)); }}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+            {/* Slug */}
+            <View className="gap-1.5">
+              <Text className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Slug *</Text>
+              <TextInput
+                className="bg-gray-100 dark:bg-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100 font-mono"
+                placeholder="e.g. general"
+                placeholderTextColor="#9ca3af"
+                value={createSlug}
+                onChangeText={setCreateSlug}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+            {/* Visibility toggle */}
+            <View className="gap-1.5">
+              <Text className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Visibility</Text>
+              <View className="flex-row gap-2">
+                <TouchableOpacity
+                  onPress={() => setCreateVisibility("public")}
+                  className={`flex-1 py-2.5 rounded-xl border items-center ${createVisibility === "public" ? "bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700" : "bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700"}`}
+                  activeOpacity={0.7}
+                >
+                  <Text className={`text-sm font-semibold ${createVisibility === "public" ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}># Public</Text>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Anyone can join</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setCreateVisibility("private")}
+                  className={`flex-1 py-2.5 rounded-xl border items-center ${createVisibility === "private" ? "bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700" : "bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700"}`}
+                  activeOpacity={0.7}
+                >
+                  <Text className={`text-sm font-semibold ${createVisibility === "private" ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}>🔒 Private</Text>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Invite only</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            {/* Description */}
+            <View className="gap-1.5">
+              <Text className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Description (optional)</Text>
+              <TextInput
+                className="bg-gray-100 dark:bg-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
+                placeholder="What's this channel for?"
+                placeholderTextColor="#9ca3af"
+                value={createDescription}
+                onChangeText={setCreateDescription}
+                multiline
+                numberOfLines={2}
+              />
+            </View>
+            {/* Create button */}
+            <TouchableOpacity
+              onPress={handleCreateChannel}
+              disabled={!createName.trim() || !createSlug.trim() || creating}
+              className={`py-3 rounded-xl items-center mt-2 ${(!createName.trim() || !createSlug.trim() || creating) ? "bg-blue-300 dark:bg-blue-800" : "bg-blue-600"}`}
+              activeOpacity={0.8}
+            >
+              <Text className="text-white font-bold text-base">{creating ? "Creating…" : "Create Channel"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* DM picker modal */}
       <Modal
@@ -183,13 +313,14 @@ export default function ChannelsScreen() {
                     if (!profileId) return;
                     const res = await executeStartConversation({ myProfileId: profileId, otherProfileId: item.id });
                     if (res.error) {
-                      Alert.alert("Error", "Failed to start conversation");
+                      Alert.alert("Error", res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to start conversation");
                       return;
                     }
                     const channel = res.data?.startConversation;
                     setDmPickerOpen(false);
                     reexecute({ requestPolicy: "network-only" });
-                    if (channel?.id) router.push(`/channels/${channel.id}`);
+                    reexecuteDms({ requestPolicy: "network-only" });
+                    if (channel?.id) router.push(`/channels/${channel.id}` as Parameters<typeof router.push>[0]);
                   }}
                 >
                   <View className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 justify-center items-center">

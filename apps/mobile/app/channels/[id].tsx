@@ -166,7 +166,9 @@ export default function ChannelDetailScreen() {
   useEffect(() => {
     if (channel) {
       navigation.setOptions({
-        title: channel.name,
+        title: channel.visibility === "dm"
+          ? (channel.members.find((m) => m.profileId !== profileId)?.profile.displayName ?? channel.name)
+          : channel.name,
         headerRight: () => (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
             <TouchableOpacity
@@ -511,28 +513,37 @@ export default function ChannelDetailScreen() {
 
           {/* Join / Leave row */}
           <View className="flex-row gap-2.5 px-4 py-2.5 border-b border-gray-100 dark:border-slate-700">
-            {isMember ? (
+            {isMember && (channel?.visibility === "dm" || channel?.createdByProfileId !== profileId) ? (
               <TouchableOpacity
                 className="flex-1 py-2.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 items-center"
                 onPress={() => {
                   if (!profileId) return;
-                  Alert.alert("Leave Channel", "You will no longer receive messages from this channel.", [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Leave",
-                      style: "destructive",
-                      onPress: async () => {
-                        await executeLeave({ channelId: id, profileId });
-                        reexecuteChannel({ requestPolicy: "network-only" });
+                  const isDm = channel?.visibility === "dm";
+                  Alert.alert(
+                    isDm ? "Leave Conversation" : "Leave Channel",
+                    isDm
+                      ? "You will leave this direct message conversation."
+                      : "You will no longer receive messages from this channel.",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Leave",
+                        style: "destructive",
+                        onPress: async () => {
+                          await executeLeave({ channelId: id, profileId });
+                          router.replace("/(dashboard)/channels" as Parameters<typeof router.replace>[0]);
+                        },
                       },
-                    },
-                  ]);
+                    ],
+                  );
                 }}
                 activeOpacity={0.7}
               >
-                <Text className="text-red-600 font-semibold text-sm">Leave Channel</Text>
+                <Text className="text-red-600 font-semibold text-sm">
+                  {channel?.visibility === "dm" ? "Leave Conversation" : "Leave Channel"}
+                </Text>
               </TouchableOpacity>
-            ) : (
+            ) : !isMember && channel?.visibility === "public" ? (
               <TouchableOpacity
                 className="flex-1 py-2.5 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 items-center"
                 onPress={async () => {
@@ -544,7 +555,7 @@ export default function ChannelDetailScreen() {
               >
                 <Text className="text-green-600 font-semibold text-sm">Join Channel</Text>
               </TouchableOpacity>
-            )}
+            ) : null}
             {/* Add Member — private channels only, creator only */}
             {channel?.visibility === "private" && channel?.createdByProfileId === profileId && (
               <TouchableOpacity
@@ -557,8 +568,8 @@ export default function ChannelDetailScreen() {
             )}
           </View>
 
-          {/* Delete channel — only for creator */}
-          {channel?.createdByProfileId === profileId && (
+          {/* Delete channel — non-DM, creator only */}
+          {channel?.visibility !== "dm" && channel?.createdByProfileId === profileId && (
             <TouchableOpacity
               className="mx-4 mt-2.5 py-2.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 items-center"
               onPress={() => {
@@ -606,7 +617,7 @@ export default function ChannelDetailScreen() {
                 </View>
                 {m.profileId === profileId ? (
                   <Text className="text-xs text-blue-600 font-semibold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-xl">you</Text>
-                ) : (
+                ) : channel?.visibility === "private" && channel?.createdByProfileId === profileId ? (
                   <TouchableOpacity
                     onPress={() => {
                       if (!profileId) return;
@@ -627,7 +638,7 @@ export default function ChannelDetailScreen() {
                   >
                     <Ionicons name="person-remove-outline" size={16} color="#9ca3af" />
                   </TouchableOpacity>
-                )}
+                ) : null}
               </View>
             ))}
           </ScrollView>
@@ -744,34 +755,60 @@ export default function ChannelDetailScreen() {
         </View>
       </Modal>
 
-      <View
-        className="flex-row items-end pt-3 px-3 gap-2.5 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700"
-        style={{ paddingBottom: insets.bottom + 8 }}
-      >
-        <MentionInput
-          className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-2xl px-4 pt-2.5 pb-2.5 text-base text-gray-900 dark:text-slate-100 max-h-24"
-          placeholder="Message..."
-          placeholderTextColor="#9ca3af"
-          value={message}
-          onChangeText={setMessage}
-          multiline
-          maxLength={2000}
-          editable={!sending}
-          suggestionsAbove
-        />
-        <TouchableOpacity
-          className={`w-10 h-10 rounded-full justify-center items-center${(!message.trim() || sending) ? " bg-blue-300 dark:bg-blue-400" : " bg-blue-600"}`}
-          onPress={handleSend}
-          disabled={!message.trim() || sending}
-          activeOpacity={0.8}
+      {isMember ? (
+        <View
+          className="flex-row items-end pt-3 px-3 gap-2.5 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700"
+          style={{ paddingBottom: insets.bottom + 8 }}
         >
-          {sending ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text className="text-white text-lg font-bold">↑</Text>
+          <MentionInput
+            className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-2xl px-4 pt-2.5 pb-2.5 text-base text-gray-900 dark:text-slate-100 max-h-24"
+            placeholder="Message..."
+            placeholderTextColor="#9ca3af"
+            value={message}
+            onChangeText={setMessage}
+            multiline
+            maxLength={2000}
+            editable={!sending}
+            suggestionsAbove
+          />
+          <TouchableOpacity
+            className={`w-10 h-10 rounded-full justify-center items-center${(!message.trim() || sending) ? " bg-blue-300 dark:bg-blue-400" : " bg-blue-600"}`}
+            onPress={handleSend}
+            disabled={!message.trim() || sending}
+            activeOpacity={0.8}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text className="text-white text-lg font-bold">↑</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View
+          className="px-4 py-3 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 items-center gap-2"
+          style={{ paddingBottom: insets.bottom + 8 }}
+        >
+          <Text className="text-sm text-gray-500 dark:text-slate-400 text-center">
+            {channel?.visibility === "public"
+              ? "You're not a member. Join to post."
+              : "You're not a member of this private channel."}
+          </Text>
+          {channel?.visibility === "public" && (
+            <TouchableOpacity
+              className="px-6 py-2 bg-green-500 dark:bg-green-600 rounded-lg"
+              onPress={async () => {
+                if (!profileId) return;
+                await executeJoin({ channelId: id, profileId });
+                reexecuteChannel({ requestPolicy: "network-only" });
+              }}
+              activeOpacity={0.7}
+            >
+              <Text className="text-white font-semibold text-sm">Join Channel</Text>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
-      </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
