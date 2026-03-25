@@ -18,13 +18,12 @@ export function TabFilterStrip<K extends string>({
       showsVerticalScrollIndicator={false}
       bounces={false}
       directionalLockEnabled
-      className="h-14 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
+      style={{ height: 48 }}
+      className="flex flex-row bg-white  dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 max-h-12 min-h-12"
       contentContainerStyle={{
         paddingHorizontal: 12,
         gap: 8,
-        flexDirection: "row",
         alignItems: "center",
-        height: 52,
       }}
     >
       {filters.map((f) => {

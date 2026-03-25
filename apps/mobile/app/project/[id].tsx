@@ -36,8 +36,8 @@ import {
   PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
 import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, formatDate } from "@agentcenter/utils";
-import { useAuth } from "../../src/context/AuthContext";
 import { useTheme } from "../../src/hooks/useTheme";
+import { TabFilterStrip } from "../../src/components/TabFilterStrip";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -309,33 +309,12 @@ function TasksTab({ projectId }: { projectId: string }) {
 
   return (
     <View className="flex-1">
-      {/* Filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-        directionalLockEnabled={true}
-        className="h-13 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
-        contentContainerClassName="px-3 gap-2 flex-row items-center h-13"
-      >
-        {filters.map((f) => (
-          <TouchableOpacity
-            key={f.key}
-            className={`px-3.5 py-2 rounded-full${filter === f.key ? " bg-blue-100 dark:bg-blue-900/40" : " bg-gray-100 dark:bg-slate-700"}`}
-            onPress={() => setFilter(f.key)}
-          >
-            <Text
-              className={`text-xs font-medium${filter === f.key ? " text-blue-600 font-semibold" : " text-gray-500 dark:text-slate-400"}`}
-            >
-              {f.label}
-              {f.key !== "all"
-                ? ` (${allTasks.filter((t) => t.status === f.key).length})`
-                : ` (${allTasks.length})`}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <TabFilterStrip
+        filters={filters}
+        activeKey={filter}
+        onSelect={setFilter}
+        getCount={(key) => key === "all" ? allTasks.length : allTasks.filter((t) => t.status === key).length}
+      />
 
       {fetching && tasks.length === 0 ? (
         <View className="flex-1 justify-center items-center gap-3">

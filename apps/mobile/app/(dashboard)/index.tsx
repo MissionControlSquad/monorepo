@@ -171,7 +171,7 @@ export default function TaskListScreen() {
       {filtersOpen && (
         <View className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3.5 pt-2.5 pb-3 gap-2">
           <SectionLabel>Due Date</SectionLabel>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false} bounces={false} directionalLockEnabled contentContainerStyle={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
             {DUE_DATE_OPTIONS.map((opt) => (
               <FilterChip
                 key={opt.key}
@@ -183,7 +183,7 @@ export default function TaskListScreen() {
           </ScrollView>
 
           <SectionLabel>Priority</SectionLabel>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false} bounces={false} directionalLockEnabled contentContainerStyle={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
             {PRIORITY_OPTIONS.map((opt) => (
               <FilterChip
                 key={opt.key}
