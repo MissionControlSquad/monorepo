@@ -68,7 +68,7 @@ export default function KanbanScreen() {
           <Ionicons name="options-outline" size={22} color={filtersOpen ? "#2563eb" : "#374151"} />
           {activeFilterCount > 0 && (
             <View className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-600 justify-center items-center">
-              <Text className="text-[9px] text-white font-bold">{activeFilterCount}</Text>
+              <Text className="text-xs text-white font-bold">{activeFilterCount}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -139,7 +139,7 @@ export default function KanbanScreen() {
 
       {/* FAB */}
       <TouchableOpacity
-        className="absolute right-5 w-[52px] h-[52px] rounded-full bg-blue-600 justify-center items-center"
+        className="absolute right-5 w-14 h-14 rounded-full bg-blue-600 justify-center items-center"
         style={{
           bottom: insets.bottom + 20,
           shadowColor: "#000",

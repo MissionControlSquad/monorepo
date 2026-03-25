@@ -165,7 +165,7 @@ export default function TaskListScreen() {
           <Ionicons name="options-outline" size={20} color={filtersOpen ? "#2563eb" : "#6b7280"} />
           {activeFilterCount > 0 && (
             <View className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-blue-600 justify-center items-center">
-              <Text className="text-[9px] text-white font-bold">{activeFilterCount}</Text>
+              <Text className="text-xs text-white font-bold">{activeFilterCount}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -253,7 +253,7 @@ export default function TaskListScreen() {
             showsVerticalScrollIndicator={false}
             bounces={false}
             directionalLockEnabled={true}
-            className="h-[52px] bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
+            className="h-14 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
             contentContainerStyle={{ paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 }}
           >
             {FILTERS.map((f) => {
@@ -264,7 +264,7 @@ export default function TaskListScreen() {
                   className={`px-3.5 py-2 rounded-full ${filter === f.key ? "bg-blue-100 dark:bg-blue-900/30" : "bg-gray-100 dark:bg-slate-700"}`}
                   onPress={() => setFilter(f.key)}
                 >
-                  <Text className={`text-[13px] ${filter === f.key ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
+                  <Text className={`text-sm ${filter === f.key ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
                     {f.label} ({count})
                   </Text>
                 </TouchableOpacity>
@@ -317,7 +317,7 @@ export default function TaskListScreen() {
 
       {/* FAB — Create task */}
       <TouchableOpacity
-        className="absolute right-5 w-[52px] h-[52px] rounded-full bg-blue-600 justify-center items-center"
+        className="absolute right-5 w-14 h-14 rounded-full bg-blue-600 justify-center items-center"
         style={{
           bottom: insets.bottom + 20,
           shadowColor: "#000",
@@ -329,7 +329,7 @@ export default function TaskListScreen() {
         onPress={() => router.push("/task/create")}
         activeOpacity={0.85}
       >
-        <Text className="text-[28px] text-white leading-8">+</Text>
+        <Text className="text-3xl text-white leading-8">+</Text>
       </TouchableOpacity>
     </View>
   );

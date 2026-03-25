@@ -1177,7 +1177,7 @@ export default function ProjectDetailScreen() {
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">
       {/* Tab bar */}
-      <View className="flex-row bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 min-h-[46px]">
+      <View className="flex-row bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 min-h-12">
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.key}

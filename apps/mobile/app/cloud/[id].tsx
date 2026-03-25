@@ -59,8 +59,8 @@ const TRANSITIONAL = CLOUD_VM_TRANSITIONAL_STATUSES;
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <View className="flex-row justify-between gap-3">
-      <Text className="text-[13px] text-gray-500 dark:text-slate-400">{label}</Text>
-      <Text className="text-[13px] text-gray-900 dark:text-slate-100 font-medium text-right flex-1" selectable>{value}</Text>
+      <Text className="text-sm text-gray-500 dark:text-slate-400">{label}</Text>
+      <Text className="text-sm text-gray-900 dark:text-slate-100 font-medium text-right flex-1" selectable>{value}</Text>
     </View>
   );
 }
@@ -79,10 +79,10 @@ function RenameModal({ visible, currentName, onClose, onSave }: {
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View className="flex-1 justify-center p-6" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
-        <View className="bg-white dark:bg-slate-800 rounded-[14px] p-5 gap-3.5">
+        <View className="bg-white dark:bg-slate-800 rounded-2xl p-5 gap-3.5">
           <Text className="text-base font-bold text-gray-900 dark:text-slate-100">Rename VM</Text>
           <TextInput
-            className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+            className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
             value={name}
             onChangeText={setName}
             placeholder="VM name"
@@ -91,16 +91,16 @@ function RenameModal({ visible, currentName, onClose, onSave }: {
           />
           <View className="flex-row gap-2.5">
             <TouchableOpacity
-              className="flex-1 border border-gray-200 dark:border-slate-600 rounded-[10px] py-[11px] items-center"
+              className="flex-1 border border-gray-200 dark:border-slate-600 rounded-xl py-3 items-center"
               onPress={onClose}
             >
-              <Text className="text-[15px] text-gray-500 dark:text-slate-400 font-medium">Cancel</Text>
+              <Text className="text-base text-gray-500 dark:text-slate-400 font-medium">Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              className="flex-1 bg-blue-600 rounded-[10px] py-[11px] items-center"
+              className="flex-1 bg-blue-600 rounded-xl py-3 items-center"
               onPress={() => { if (name.trim()) { onSave(name.trim()); onClose(); } }}
             >
-              <Text className="text-[15px] text-white font-semibold">Save</Text>
+              <Text className="text-base text-white font-semibold">Save</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -273,21 +273,21 @@ export default function CloudVMDetailScreen() {
         }
       >
         {/* Status header */}
-        <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2">
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2">
           <View className="flex-row items-center gap-2">
             <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusColor }} />
-            <Text className="text-[15px] font-bold" style={{ color: statusColor }}>{statusLabel}</Text>
+            <Text className="text-base font-bold" style={{ color: statusColor }}>{statusLabel}</Text>
             {isTransitional && <ActivityIndicator size="small" color={statusColor} style={{ marginLeft: 4 }} />}
           </View>
 
           {vm.setupStep && (
-            <Text className="text-[13px] text-gray-500 dark:text-slate-400 capitalize">{vm.setupStep.replace(/_/g, " ")}</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400 capitalize">{vm.setupStep.replace(/_/g, " ")}</Text>
           )}
 
           {vm.setupProgress != null && vm.setupProgress > 0 && (
-            <View className="h-1 bg-gray-100 dark:bg-slate-700 rounded-[2px] overflow-hidden">
+            <View className="h-1 bg-gray-100 dark:bg-slate-700 rounded-sm overflow-hidden">
               <View
-                className="h-full rounded-[2px]"
+                className="h-full rounded-sm"
                 style={{ width: `${Math.min(vm.setupProgress, 100)}%` as any, backgroundColor: statusColor }}
               />
             </View>
@@ -296,15 +296,15 @@ export default function CloudVMDetailScreen() {
           {vm.errorMessage && (
             <View className="flex-row gap-1.5 bg-red-50 dark:bg-red-900/20 rounded-lg p-2.5 border border-red-200 dark:border-red-700">
               <Ionicons name="alert-circle-outline" size={14} color="#dc2626" />
-              <Text className="flex-1 text-[12px] text-red-600 dark:text-red-400">{vm.errorMessage}</Text>
+              <Text className="flex-1 text-xs text-red-600 dark:text-red-400">{vm.errorMessage}</Text>
             </View>
           )}
         </View>
 
         {/* VM Info */}
-        <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
           <View className="flex-row justify-between items-center">
-            <Text className="text-[14px] font-bold text-gray-900 dark:text-slate-100">VM Details</Text>
+            <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">VM Details</Text>
             <TouchableOpacity onPress={() => setShowRename(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="pencil-outline" size={16} color="#6b7280" />
             </TouchableOpacity>
@@ -322,12 +322,12 @@ export default function CloudVMDetailScreen() {
 
         {/* Actions */}
         {!isDestroyed && (
-          <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-3">
-            <Text className="text-[14px] font-bold text-gray-900 dark:text-slate-100">Actions</Text>
+          <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
+            <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">Actions</Text>
             <View className="flex-row flex-wrap gap-2.5">
               {isRunning && (
                 <TouchableOpacity
-                  className="flex-row items-center gap-1.5 px-3.5 py-[9px] rounded-[10px] border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20"
+                  className="flex-row items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20"
                   onPress={() => handleAction("stop")}
                   disabled={!!actionLoading}
                   activeOpacity={0.7}
@@ -337,13 +337,13 @@ export default function CloudVMDetailScreen() {
                   ) : (
                     <Ionicons name="stop-circle-outline" size={18} color="#d97706" />
                   )}
-                  <Text className="text-[13px] font-semibold text-yellow-600 dark:text-yellow-400">Stop</Text>
+                  <Text className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">Stop</Text>
                 </TouchableOpacity>
               )}
 
               {isStopped && (
                 <TouchableOpacity
-                  className="flex-row items-center gap-1.5 px-3.5 py-[9px] rounded-[10px] border border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/20"
+                  className="flex-row items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/20"
                   onPress={() => handleAction("start")}
                   disabled={!!actionLoading}
                   activeOpacity={0.7}
@@ -353,13 +353,13 @@ export default function CloudVMDetailScreen() {
                   ) : (
                     <Ionicons name="play-circle-outline" size={18} color="#16a34a" />
                   )}
-                  <Text className="text-[13px] font-semibold text-green-600 dark:text-green-400">Start</Text>
+                  <Text className="text-sm font-semibold text-green-600 dark:text-green-400">Start</Text>
                 </TouchableOpacity>
               )}
 
               {(isRunning || isStopped) && (
                 <TouchableOpacity
-                  className="flex-row items-center gap-1.5 px-3.5 py-[9px] rounded-[10px] border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700"
+                  className="flex-row items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700"
                   onPress={() => handleAction("restart")}
                   disabled={!!actionLoading}
                   activeOpacity={0.7}
@@ -369,13 +369,13 @@ export default function CloudVMDetailScreen() {
                   ) : (
                     <Ionicons name="refresh-outline" size={18} color="#374151" />
                   )}
-                  <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Restart</Text>
+                  <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Restart</Text>
                 </TouchableOpacity>
               )}
 
               {isError && (
                 <TouchableOpacity
-                  className="flex-row items-center gap-1.5 px-3.5 py-[9px] rounded-[10px] border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700"
+                  className="flex-row items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700"
                   onPress={() => {
                     Alert.alert(
                       "Retry Provisioning",
@@ -394,12 +394,12 @@ export default function CloudVMDetailScreen() {
                   ) : (
                     <Ionicons name="reload-outline" size={18} color="#374151" />
                   )}
-                  <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Retry</Text>
+                  <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Retry</Text>
                 </TouchableOpacity>
               )}
 
               <TouchableOpacity
-                className="flex-row items-center gap-1.5 px-3.5 py-[9px] rounded-[10px] border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
+                className="flex-row items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
                 onPress={handleDestroy}
                 disabled={!!actionLoading || isTransitional}
                 activeOpacity={0.7}
@@ -409,7 +409,7 @@ export default function CloudVMDetailScreen() {
                 ) : (
                   <Ionicons name="trash-outline" size={18} color="#dc2626" />
                 )}
-                <Text className="text-[13px] font-semibold text-red-600 dark:text-red-400">Destroy</Text>
+                <Text className="text-sm font-semibold text-red-600 dark:text-red-400">Destroy</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -417,8 +417,8 @@ export default function CloudVMDetailScreen() {
 
         {/* Agents */}
         {vm.agents.length > 0 && (
-          <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
-            <Text className="text-[14px] font-bold text-gray-900 dark:text-slate-100">Agents ({vm.agents.length})</Text>
+          <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+            <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">Agents ({vm.agents.length})</Text>
             {vm.agents.map((agent) => {
               const agentStatusColor = STATUS_HEX_COLORS[agent.status] ?? DEFAULT_COLOR;
               return (
@@ -429,11 +429,11 @@ export default function CloudVMDetailScreen() {
                   activeOpacity={0.7}
                 >
                   <View className="w-9 h-9 rounded-full bg-gray-100 dark:bg-slate-700 justify-center items-center">
-                    <Text className="text-[18px]">{agent.identityEmoji || DEFAULT_AGENT_EMOJI}</Text>
+                    <Text className="text-lg">{agent.identityEmoji || DEFAULT_AGENT_EMOJI}</Text>
                   </View>
                   <View className="flex-1">
-                    <Text className="text-[14px] font-semibold text-gray-900 dark:text-slate-100">{agent.name}</Text>
-                    {agent.username && <Text className="text-[12px] text-gray-500 dark:text-slate-400">@{agent.username}</Text>}
+                    <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">{agent.name}</Text>
+                    {agent.username && <Text className="text-xs text-gray-500 dark:text-slate-400">@{agent.username}</Text>}
                   </View>
                   <View className="w-2 h-2 rounded-full" style={{ backgroundColor: agentStatusColor }} />
                 </TouchableOpacity>
@@ -444,7 +444,7 @@ export default function CloudVMDetailScreen() {
 
         {/* VM Logs */}
         <TouchableOpacity
-          className="flex-row items-center gap-2 bg-white dark:bg-slate-800 rounded-[12px] p-3.5 border border-gray-200 dark:border-slate-700"
+          className="flex-row items-center gap-2 bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700"
           onPress={() => {
             setShowLogs((v) => !v);
             if (!showLogs) fetchLogs();
@@ -452,19 +452,19 @@ export default function CloudVMDetailScreen() {
           activeOpacity={0.7}
         >
           <Ionicons name="terminal-outline" size={16} color="#374151" />
-          <Text className="text-[14px] font-medium text-gray-700 dark:text-slate-300">Setup Logs</Text>
+          <Text className="text-sm font-medium text-gray-700 dark:text-slate-300">Setup Logs</Text>
           <Ionicons name={showLogs ? "chevron-up" : "chevron-down"} size={16} color="#6b7280" style={{ marginLeft: "auto" }} />
         </TouchableOpacity>
 
         {showLogs && (
-          <View className="bg-slate-900 rounded-[12px] p-3 gap-1.5">
+          <View className="bg-slate-900 rounded-xl p-3 gap-1.5">
             {logs.length === 0 ? (
-              <Text className="text-gray-500 text-[13px] text-center py-4">No logs yet</Text>
+              <Text className="text-gray-500 text-sm text-center py-4">No logs yet</Text>
             ) : (
               logs.map((log) => (
                 <View key={log.id} className="flex-row gap-1.5 flex-wrap">
                   <Text
-                    className="text-[11px] shrink-0"
+                    className="text-xs shrink-0"
                     style={{
                       color: log.level === "error" ? "#dc2626" : log.level === "warn" ? "#d97706" : "#6b7280",
                       fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
@@ -473,7 +473,7 @@ export default function CloudVMDetailScreen() {
                     [{log.level.toUpperCase()}]
                   </Text>
                   <Text
-                    className="flex-1 text-[11px] text-slate-200 leading-4"
+                    className="flex-1 text-xs text-slate-200 leading-4"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >

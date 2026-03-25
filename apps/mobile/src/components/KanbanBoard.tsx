@@ -68,18 +68,18 @@ function KanbanTaskCard({
       delayLongPress={400}
     >
       <View className="flex-row justify-between items-center">
-        <Text className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">#{task.taskNumber}</Text>
+        <Text className="text-xs text-gray-400 dark:text-slate-500 font-medium">#{task.taskNumber}</Text>
         {priorityColor && (
           <Text style={{ color: priorityColor, fontSize: 13, fontWeight: "700" }}>
             {priorityIcon}
           </Text>
         )}
       </View>
-      <Text className="text-[13px] text-gray-900 dark:text-slate-100 leading-[18px] font-medium" numberOfLines={3}>
+      <Text className="text-sm text-gray-900 dark:text-slate-100 leading-[18px] font-medium" numberOfLines={3}>
         {task.title}
       </Text>
       {(task.assignees ?? []).length > 0 && (
-        <Text className="text-[11px] text-gray-400 dark:text-slate-500" numberOfLines={1}>
+        <Text className="text-xs text-gray-400 dark:text-slate-500" numberOfLines={1}>
           {task.assignees![0].profile.displayName}
           {task.assignees!.length > 1 ? ` +${task.assignees!.length - 1}` : ""}
         </Text>
@@ -116,12 +116,12 @@ function Column({
         className="flex-row items-center justify-between px-3 py-2.5 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700"
         style={{ borderTopWidth: 3, borderTopColor: col.color }}
       >
-        <Text className="text-[13px] font-bold" style={{ color: col.color }}>{col.label}</Text>
+        <Text className="text-sm font-bold" style={{ color: col.color }}>{col.label}</Text>
         <View
-          className="min-w-[22px] h-[22px] rounded-full justify-center items-center px-1.5"
+          className="min-w-6 h-6 rounded-full justify-center items-center px-1.5"
           style={{ backgroundColor: col.color + "22" }}
         >
-          <Text className="text-[12px] font-bold" style={{ color: col.color }}>{tasks.length}</Text>
+          <Text className="text-xs font-bold" style={{ color: col.color }}>{tasks.length}</Text>
         </View>
       </View>
       <ScrollView
@@ -132,7 +132,7 @@ function Column({
       >
         {tasks.length === 0 ? (
           <View className="py-6 items-center">
-            <Text className="text-[12px] text-gray-300 dark:text-slate-600">No tasks</Text>
+            <Text className="text-xs text-gray-300 dark:text-slate-600">No tasks</Text>
           </View>
         ) : (
           tasks.map((task) => (
@@ -155,7 +155,7 @@ function Column({
             {loadingMore ? (
               <ActivityIndicator size="small" color={col.color} />
             ) : (
-              <Text className="text-[12px] font-semibold" style={{ color: col.color }}>Load more</Text>
+              <Text className="text-xs font-semibold" style={{ color: col.color }}>Load more</Text>
             )}
           </TouchableOpacity>
         )}

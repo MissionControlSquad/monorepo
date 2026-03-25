@@ -94,7 +94,7 @@ function CreateVMModal({ visible, onClose, onCreated }: {
           className="flex-row justify-between items-center px-4 pb-3.5 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700"
           style={{ paddingTop: insets.top || 16 }}
         >
-          <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">Create Cloud VM</Text>
+          <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">Create Cloud VM</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text className="text-base text-gray-500 dark:text-slate-400">Cancel</Text>
           </TouchableOpacity>
@@ -104,19 +104,19 @@ function CreateVMModal({ visible, onClose, onCreated }: {
           contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: insets.bottom + 24 }}
           keyboardShouldPersistTaps="handled"
         >
-          <View className="flex-row gap-2 bg-blue-50 dark:bg-blue-900/30 rounded-[10px] p-3 border border-blue-200 dark:border-blue-700">
+          <View className="flex-row gap-2 bg-blue-50 dark:bg-blue-900/30 rounded-xl p-3 border border-blue-200 dark:border-blue-700">
             <Ionicons name="information-circle-outline" size={16} color="#2563eb" />
-            <Text className="flex-1 text-[13px] text-blue-700 dark:text-blue-300 leading-[18px]">
+            <Text className="flex-1 text-sm text-blue-700 dark:text-blue-300 leading-[18px]">
               A cloud VM will be provisioned and configured to run OpenClaw agents. You can deploy agents to it after it's running.
             </Text>
           </View>
 
           <View className="gap-2">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">
               VM Name <Text className="text-red-600 dark:text-red-400">*</Text>
             </Text>
             <TextInput
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               value={name}
               onChangeText={setName}
               placeholder="e.g. production-vm-1"
@@ -125,7 +125,7 @@ function CreateVMModal({ visible, onClose, onCreated }: {
           </View>
 
           <View className="gap-2">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Server Type</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Server Type</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
               {SERVER_TYPES.map((t) => (
                 <TouchableOpacity
@@ -138,7 +138,7 @@ function CreateVMModal({ visible, onClose, onCreated }: {
                   onPress={() => setServerType(t)}
                   activeOpacity={0.7}
                 >
-                  <Text className={`text-[13px] font-medium ${
+                  <Text className={`text-sm font-medium ${
                     serverType === t ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-700 dark:text-slate-300"
                   }`}>{t}</Text>
                 </TouchableOpacity>
@@ -147,7 +147,7 @@ function CreateVMModal({ visible, onClose, onCreated }: {
           </View>
 
           <View className="gap-2">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Region</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Region</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
               {REGIONS.map((r) => (
                 <TouchableOpacity
@@ -160,7 +160,7 @@ function CreateVMModal({ visible, onClose, onCreated }: {
                   onPress={() => setRegion(r)}
                   activeOpacity={0.7}
                 >
-                  <Text className={`text-[13px] font-medium ${
+                  <Text className={`text-sm font-medium ${
                     region === r ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-700 dark:text-slate-300"
                   }`}>{r}</Text>
                 </TouchableOpacity>
@@ -169,7 +169,7 @@ function CreateVMModal({ visible, onClose, onCreated }: {
           </View>
 
           <TouchableOpacity
-            className={`bg-blue-600 rounded-[12px] py-3.5 items-center mt-2 ${creating ? "opacity-50" : ""}`}
+            className={`bg-blue-600 rounded-xl py-3.5 items-center mt-2 ${creating ? "opacity-50" : ""}`}
             onPress={handleCreate}
             disabled={creating}
             activeOpacity={0.8}
@@ -195,17 +195,17 @@ function VMCard({ vm, onPress }: { vm: CloudVM; onPress: () => void }) {
 
   return (
     <TouchableOpacity
-      className="bg-white dark:bg-slate-800 rounded-[14px] p-3.5 border border-gray-200 dark:border-slate-700 gap-2.5"
+      className="bg-white dark:bg-slate-800 rounded-2xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2.5"
       onPress={onPress}
       activeOpacity={0.75}
     >
       <View className="flex-row items-center justify-between gap-2">
         <View className="flex-row items-center gap-2 flex-1">
           <View className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: statusColor }} />
-          <Text className="text-[15px] font-semibold text-gray-900 dark:text-slate-100 flex-1" numberOfLines={1}>{displayName}</Text>
+          <Text className="text-base font-semibold text-gray-900 dark:text-slate-100 flex-1" numberOfLines={1}>{displayName}</Text>
         </View>
-        <View className="rounded-[6px] px-2 py-[3px]" style={{ backgroundColor: statusColor + "18" }}>
-          <Text className="text-[11px] font-semibold" style={{ color: statusColor }}>{statusLabel}</Text>
+        <View className="rounded-md px-2 py-1" style={{ backgroundColor: statusColor + "18" }}>
+          <Text className="text-xs font-semibold" style={{ color: statusColor }}>{statusLabel}</Text>
         </View>
       </View>
 
@@ -213,23 +213,23 @@ function VMCard({ vm, onPress }: { vm: CloudVM; onPress: () => void }) {
         {vm.ipv4 ? (
           <View className="flex-row items-center gap-1">
             <Ionicons name="globe-outline" size={12} color="#9ca3af" />
-            <Text className="text-[12px] text-gray-500 dark:text-slate-400">{vm.ipv4}</Text>
+            <Text className="text-xs text-gray-500 dark:text-slate-400">{vm.ipv4}</Text>
           </View>
         ) : null}
         <View className="flex-row items-center gap-1">
           <Ionicons name="hardware-chip-outline" size={12} color="#9ca3af" />
-          <Text className="text-[12px] text-gray-500 dark:text-slate-400">{vm.serverType} / {vm.region}</Text>
+          <Text className="text-xs text-gray-500 dark:text-slate-400">{vm.serverType} / {vm.region}</Text>
         </View>
         {vm.totalUptimeSeconds > 0 ? (
           <View className="flex-row items-center gap-1">
             <Ionicons name="time-outline" size={12} color="#9ca3af" />
-            <Text className="text-[12px] text-gray-500 dark:text-slate-400">{formatUptime(vm.totalUptimeSeconds)}</Text>
+            <Text className="text-xs text-gray-500 dark:text-slate-400">{formatUptime(vm.totalUptimeSeconds)}</Text>
           </View>
         ) : null}
         {vm.estimatedCostCents > 0 ? (
           <View className="flex-row items-center gap-1">
             <Ionicons name="cash-outline" size={12} color="#9ca3af" />
-            <Text className="text-[12px] text-gray-500 dark:text-slate-400">{formatCost(vm.estimatedCostCents)}</Text>
+            <Text className="text-xs text-gray-500 dark:text-slate-400">{formatCost(vm.estimatedCostCents)}</Text>
           </View>
         ) : null}
       </View>
@@ -241,11 +241,11 @@ function VMCard({ vm, onPress }: { vm: CloudVM; onPress: () => void }) {
               key={a.id}
               className="w-7 h-7 rounded-full bg-gray-100 dark:bg-slate-700 justify-center items-center border border-gray-200 dark:border-slate-600"
             >
-              <Text className="text-[14px]">{a.identityEmoji || DEFAULT_AGENT_EMOJI}</Text>
+              <Text className="text-sm">{a.identityEmoji || DEFAULT_AGENT_EMOJI}</Text>
             </View>
           ))}
           {vm.agents.length > 5 && (
-            <Text className="text-[12px] text-gray-500 dark:text-slate-400">+{vm.agents.length - 5}</Text>
+            <Text className="text-xs text-gray-500 dark:text-slate-400">+{vm.agents.length - 5}</Text>
           )}
         </View>
       )}
@@ -316,7 +316,7 @@ export default function CloudVMsScreen() {
       <View className="flex-row items-center bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-3 py-2 gap-2">
         <Ionicons name="search-outline" size={16} color="#9ca3af" />
         <TextInput
-          className="flex-1 text-[15px] text-gray-900 dark:text-slate-100 py-1.5"
+          className="flex-1 text-base text-gray-900 dark:text-slate-100 py-1.5"
           placeholder="Search VMs…"
           placeholderTextColor="#9ca3af"
           value={search}
@@ -333,12 +333,12 @@ export default function CloudVMsScreen() {
       ) : fetchError ? (
         <View className="flex-1 justify-center items-center gap-3 p-6">
           <Ionicons name="cloud-offline-outline" size={40} color="#dc2626" />
-          <Text className="text-[15px] text-red-600 dark:text-red-400 text-center">{fetchError}</Text>
+          <Text className="text-base text-red-600 dark:text-red-400 text-center">{fetchError}</Text>
           <TouchableOpacity
             className="px-5 py-2.5 bg-blue-600 rounded-lg"
             onPress={() => fetchVMs()}
           >
-            <Text className="text-white font-semibold text-[14px]">Retry</Text>
+            <Text className="text-white font-semibold text-sm">Retry</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -360,11 +360,11 @@ export default function CloudVMsScreen() {
           ListEmptyComponent={
             <View className="items-center gap-2.5 p-8">
               <Ionicons name="server-outline" size={48} color="#d1d5db" />
-              <Text className="text-[17px] font-semibold text-gray-700 dark:text-slate-300">
+              <Text className="text-lg font-semibold text-gray-700 dark:text-slate-300">
                 {search.trim() ? "No matching VMs" : "No cloud VMs yet"}
               </Text>
               {!search.trim() && (
-                <Text className="text-[14px] text-gray-400 dark:text-slate-500 text-center">
+                <Text className="text-sm text-gray-400 dark:text-slate-500 text-center">
                   Create a virtual machine to deploy agents to the cloud.
                 </Text>
               )}
@@ -378,7 +378,7 @@ export default function CloudVMsScreen() {
 
       {/* FAB */}
       <TouchableOpacity
-        className="absolute right-5 w-[52px] h-[52px] rounded-full bg-blue-600 justify-center items-center"
+        className="absolute right-5 w-14 h-14 rounded-full bg-blue-600 justify-center items-center"
         style={{
           bottom: insets.bottom + 20,
           shadowColor: "#000",

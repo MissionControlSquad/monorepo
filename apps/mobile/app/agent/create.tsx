@@ -443,7 +443,7 @@ export default function CreateAgentScreen() {
           contentInsetAdjustmentBehavior="automatic"
         >
           <View className="flex-row items-start gap-3.5">
-            <Text className="text-[44px]">{selectedTemplate.emoji}</Text>
+            <Text className="text-5xl">{selectedTemplate.emoji}</Text>
             <View className="flex-1">
               <Text className="text-xl font-extrabold text-gray-900 dark:text-slate-100">{selectedTemplate.name}</Text>
               <Text className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">{selectedTemplate.role}</Text>
@@ -630,7 +630,7 @@ export default function CreateAgentScreen() {
               Behavior guidelines, expertise, and working style. Describe how this agent should act.
             </Text>
             <TextInput
-              className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100 min-h-[110px]"
+              className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100 min-h-28"
               value={personality}
               onChangeText={setPersonality}
               placeholder="Agent personality and behavior guidelines…"
@@ -875,7 +875,7 @@ export default function CreateAgentScreen() {
                   </Text>
                 </View>
                 <TouchableOpacity
-                  className="flex-row items-center gap-[5px]"
+                  className="flex-row items-center gap-1"
                   onPress={() => copyText(JSON.stringify(result.openclawAgentConfig, null, 2), "Agent config")}
                 >
                   <Ionicons name="copy-outline" size={13} color="#2563eb" />
@@ -897,7 +897,7 @@ export default function CreateAgentScreen() {
                   >{`mkdir -p ${result.workspacePath}`}</Text>
                 </View>
                 <TouchableOpacity
-                  className="flex-row items-center gap-[5px]"
+                  className="flex-row items-center gap-1"
                   onPress={() => copyText(`mkdir -p ${result.workspacePath}`, "mkdir command")}
                 >
                   <Ionicons name="copy-outline" size={13} color="#2563eb" />
@@ -943,7 +943,7 @@ export default function CreateAgentScreen() {
                   >{result.cronCommand}</Text>
                 </View>
                 <TouchableOpacity
-                  className="flex-row items-center gap-[5px]"
+                  className="flex-row items-center gap-1"
                   onPress={() => copyText(result.cronCommand, "Cron command")}
                 >
                   <Ionicons name="copy-outline" size={13} color="#2563eb" />

@@ -157,7 +157,7 @@ export default function EditAgentScreen() {
             Define the agent's working style, expertise, and behaviour guidelines.
           </Text>
           <TextInput
-            className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+            className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
             style={{ minHeight: 140 }}
             value={personality}
             onChangeText={track(setPersonality)}

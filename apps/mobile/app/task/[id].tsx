@@ -565,7 +565,7 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
               <View className="flex-1">
                 <Text className="text-sm font-medium text-gray-900 dark:text-slate-100">{a.profile.displayName}</Text>
                 {a.profile.agent && (
-                  <Text className="text-[12px] text-gray-500 dark:text-slate-400 mt-[1px]">{humanizeLabel(a.profile.agent.status)}</Text>
+                  <Text className="text-xs text-gray-500 dark:text-slate-400 mt-px">{humanizeLabel(a.profile.agent.status)}</Text>
                 )}
               </View>
             </View>
@@ -590,8 +590,8 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
                 <View
                   style={{ backgroundColor: STATUS_HEX_COLORS[ct.status] ?? DEFAULT_COLOR, width: 8, height: 8, borderRadius: 4 }}
                 />
-                <Text className="text-[12px] text-gray-400 dark:text-slate-500 font-medium w-8">#{ct.taskNumber}</Text>
-                <Text className="text-[13px] text-gray-700 dark:text-slate-300 flex-1" numberOfLines={1}>
+                <Text className="text-xs text-gray-400 dark:text-slate-500 font-medium w-8">#{ct.taskNumber}</Text>
+                <Text className="text-sm text-gray-700 dark:text-slate-300 flex-1" numberOfLines={1}>
                   {ct.title}
                 </Text>
               </TouchableOpacity>
@@ -624,10 +624,10 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
       {task.tags.length > 0 && (
         <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
           <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Tags</Text>
-          <View className="flex-row flex-wrap gap-[6px]">
+          <View className="flex-row flex-wrap gap-1.5">
             {task.tags.map((tag) => (
-              <View key={tag} className="bg-blue-50 dark:bg-blue-900/30 rounded px-2 py-[3px]">
-                <Text className="text-[12px] text-blue-600 font-medium">{tag}</Text>
+              <View key={tag} className="bg-blue-50 dark:bg-blue-900/30 rounded px-2 py-1">
+                <Text className="text-xs text-blue-600 font-medium">{tag}</Text>
               </View>
             ))}
           </View>
@@ -648,13 +648,13 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
               </View>
             )}
           </View>
-          <Text className="text-[22px] font-bold text-gray-900 dark:text-slate-100 mt-1">
+          <Text className="text-xl font-bold text-gray-900 dark:text-slate-100 mt-1">
             {formatDuration(workSummary.totalWorkTimeMs)}
           </Text>
           {workSummary.agentBreakdown.map((ab) => (
             <View key={ab.agentId} className="flex-row justify-between gap-3">
-              <Text className="text-[14px] text-gray-500 dark:text-slate-400 w-[100px]" numberOfLines={1}>{ab.agentName}</Text>
-              <Text className="text-[14px] text-gray-900 dark:text-slate-100 flex-1 text-right">{formatDuration(ab.totalMs)}</Text>
+              <Text className="text-sm text-gray-500 dark:text-slate-400 w-24" numberOfLines={1}>{ab.agentName}</Text>
+              <Text className="text-sm text-gray-900 dark:text-slate-100 flex-1 text-right">{formatDuration(ab.totalMs)}</Text>
             </View>
           ))}
         </View>
@@ -666,8 +666,8 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <View className="flex-row justify-between gap-3">
-      <Text className="text-[14px] text-gray-500 dark:text-slate-400 w-[100px]">{label}</Text>
-      <Text className="text-[14px] text-gray-900 dark:text-slate-100 flex-1 text-right">{value}</Text>
+      <Text className="text-sm text-gray-500 dark:text-slate-400 w-24">{label}</Text>
+      <Text className="text-sm text-gray-900 dark:text-slate-100 flex-1 text-right">{value}</Text>
     </View>
   );
 }
@@ -745,7 +745,7 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
           messages.length === 0 && { flex: 1, justifyContent: "center", alignItems: "center" },
         ]}
         ListEmptyComponent={
-          <Text className="text-[15px] text-gray-400 dark:text-slate-500 text-center">No messages yet. Start the conversation.</Text>
+          <Text className="text-base text-gray-400 dark:text-slate-500 text-center">No messages yet. Start the conversation.</Text>
         }
         renderItem={({ item }) => {
           const reactionGroups: Record<string, { emoji: string; count: number; iMine: boolean }> = {};
@@ -771,21 +771,21 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
 
           return (
             <View className="flex-row gap-2.5 items-start">
-              <View className="w-[34px] h-[34px] rounded-full bg-blue-100 dark:bg-blue-900/40 justify-center items-center">
-                <Text className="text-[14px] font-bold text-blue-600">
+              <View className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/40 justify-center items-center">
+                <Text className="text-sm font-bold text-blue-600">
                   {item.fromProfile.displayName.charAt(0).toUpperCase()}
                 </Text>
               </View>
               <View className="flex-1">
                 <View className="flex-1 gap-1">
                   <View className="flex-row items-baseline gap-2">
-                    <Text className="text-[13px] font-semibold text-gray-900 dark:text-slate-100">{item.fromProfile.displayName}</Text>
-                    <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatRelativeTime(item.createdAt)}</Text>
+                    <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">{item.fromProfile.displayName}</Text>
+                    <Text className="text-xs text-gray-400 dark:text-slate-500">{formatRelativeTime(item.createdAt)}</Text>
                   </View>
-                  <Text className="text-[14px] text-gray-700 dark:text-slate-300 leading-5">{item.content}</Text>
+                  <Text className="text-sm text-gray-700 dark:text-slate-300 leading-5">{item.content}</Text>
                 </View>
                 {(reactionList.length > 0 || true) && (
-                  <View className="flex-row flex-wrap gap-1 mt-1 pl-[2px]">
+                  <View className="flex-row flex-wrap gap-1 mt-1 pl-0.5">
                     {reactionList.map((r) => (
                       <TouchableOpacity
                         key={r.emoji}
@@ -810,10 +810,10 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
                     ))}
                     <TouchableOpacity
                       onPress={showEmojiPicker}
-                      className="bg-gray-100 dark:bg-slate-700 rounded-xl px-[7px] py-[2px]"
+                      className="bg-gray-100 dark:bg-slate-700 rounded-xl px-2 py-0.5"
                       activeOpacity={0.7}
                     >
-                      <Text className="text-[12px] text-gray-400 dark:text-slate-500">+</Text>
+                      <Text className="text-xs text-gray-400 dark:text-slate-500">+</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -827,7 +827,7 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
         style={{ paddingBottom: insets.bottom + 8 }}
       >
         <MentionInput
-          className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-[20px] px-[14px] py-2 text-[15px] text-gray-900 dark:text-slate-100 max-h-[100px]"
+          className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-full px-3.5 py-2 text-base text-gray-900 dark:text-slate-100 max-h-24"
           placeholder="Write a message…"
           placeholderTextColor="#9ca3af"
           value={text}
@@ -837,12 +837,12 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
           suggestionsAbove
         />
         <TouchableOpacity
-          className={`rounded-[20px] px-4 py-2 ${!text.trim() ? "bg-blue-300" : "bg-blue-600"}`}
+          className={`rounded-full px-4 py-2 ${!text.trim() ? "bg-blue-300" : "bg-blue-600"}`}
           onPress={handleSend}
           disabled={!text.trim()}
           activeOpacity={0.7}
         >
-          <Text className="text-white font-semibold text-[14px]">Send</Text>
+          <Text className="text-white font-semibold text-sm">Send</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -885,7 +885,7 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
   if (deliverables.length === 0 && childGroups.length === 0) {
     return (
       <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
-        <Text className="text-[15px] text-gray-400 dark:text-slate-500 text-center">No deliverables yet</Text>
+        <Text className="text-base text-gray-400 dark:text-slate-500 text-center">No deliverables yet</Text>
       </View>
     );
   }
@@ -895,23 +895,23 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
       {deliverables.map((d) => (
         <TouchableOpacity
           key={d.id}
-          className="bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 flex-row items-center gap-3"
+          className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 flex-row items-center gap-3"
           onPress={() => router.push(`/deliverable/${d.id}`)}
           activeOpacity={0.7}
         >
-          <View className="w-10 h-10 rounded-[10px] bg-gray-100 dark:bg-slate-700 justify-center items-center">
+          <View className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-slate-700 justify-center items-center">
             <Text style={{ fontSize: 20 }}>{KIND_ICONS[d.kind] ?? "📄"}</Text>
           </View>
-          <View className="flex-1 gap-[2px]">
-            <Text className="text-[14px] font-semibold text-gray-900 dark:text-slate-100" numberOfLines={1}>
+          <View className="flex-1 gap-0.5">
+            <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100" numberOfLines={1}>
               {d.title}
             </Text>
-            <Text className="text-[12px] text-gray-500 dark:text-slate-400 capitalize">
+            <Text className="text-xs text-gray-500 dark:text-slate-400 capitalize">
               {d.kind} · v{d.version} · {d.profile.displayName}
             </Text>
-            <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatDate(d.createdAt)}</Text>
+            <Text className="text-xs text-gray-400 dark:text-slate-500">{formatDate(d.createdAt)}</Text>
           </View>
-          <Text className="text-[20px] text-gray-300 dark:text-slate-600">›</Text>
+          <Text className="text-xl text-gray-300 dark:text-slate-600">›</Text>
         </TouchableOpacity>
       ))}
 
@@ -926,21 +926,21 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
           {group.deliverables.map((d) => (
             <TouchableOpacity
               key={d.id}
-              className="bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 flex-row items-center gap-3 ml-3"
+              className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 flex-row items-center gap-3 ml-3"
               onPress={() => router.push(`/deliverable/${d.id}`)}
               activeOpacity={0.7}
             >
-              <View className="w-10 h-10 rounded-[10px] bg-gray-100 dark:bg-slate-700 justify-center items-center">
+              <View className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-slate-700 justify-center items-center">
                 <Text style={{ fontSize: 20 }}>{KIND_ICONS[d.kind] ?? "📄"}</Text>
               </View>
-              <View className="flex-1 gap-[2px]">
-                <Text className="text-[14px] font-semibold text-gray-900 dark:text-slate-100" numberOfLines={1}>{d.title}</Text>
-                <Text className="text-[12px] text-gray-500 dark:text-slate-400 capitalize">
+              <View className="flex-1 gap-0.5">
+                <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100" numberOfLines={1}>{d.title}</Text>
+                <Text className="text-xs text-gray-500 dark:text-slate-400 capitalize">
                   {d.kind} · v{d.version} · {d.profile.displayName}
                 </Text>
-                <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatDate(d.createdAt)}</Text>
+                <Text className="text-xs text-gray-400 dark:text-slate-500">{formatDate(d.createdAt)}</Text>
               </View>
-              <Text className="text-[20px] text-gray-300 dark:text-slate-600">›</Text>
+              <Text className="text-xl text-gray-300 dark:text-slate-600">›</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -1026,39 +1026,39 @@ function ApproveRejectBar({
         className="bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 px-4 pt-3 gap-2.5"
         style={{ paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }}
       >
-        <Text className="text-[12px] font-bold text-violet-700 uppercase tracking-[0.5px] text-center">Awaiting Review</Text>
+        <Text className="text-xs font-bold text-violet-700 uppercase tracking-[0.5px] text-center">Awaiting Review</Text>
         <View className="flex-row gap-2.5">
           <TouchableOpacity
-            className={`flex-1 py-3 rounded-[10px] border-2 border-violet-700 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
+            className={`flex-1 py-3 rounded-xl border-2 border-violet-700 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
             onPress={() => setShowClarifyModal(true)}
             disabled={loading !== null}
           >
             {loading === "clarify" ? (
               <ActivityIndicator size="small" color="#7c3aed" />
             ) : (
-              <Text className="text-violet-700 font-bold text-[15px]">? Clarify</Text>
+              <Text className="text-violet-700 font-bold text-base">? Clarify</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity
-            className={`flex-1 py-3 rounded-[10px] border-2 border-red-600 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
+            className={`flex-1 py-3 rounded-xl border-2 border-red-600 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
             onPress={() => setShowRejectModal(true)}
             disabled={loading !== null}
           >
             {loading === "reject" ? (
               <ActivityIndicator size="small" color="#dc2626" />
             ) : (
-              <Text className="text-red-600 font-bold text-[15px]">✕ Reject</Text>
+              <Text className="text-red-600 font-bold text-base">✕ Reject</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity
-            className={`flex-1 py-3 rounded-[10px] bg-green-600 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
+            className={`flex-1 py-3 rounded-xl bg-green-600 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
             onPress={() => setShowApproveModal(true)}
             disabled={loading !== null}
           >
             {loading === "approve" ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text className="text-white font-bold text-[15px]">✓ Approve</Text>
+              <Text className="text-white font-bold text-base">✓ Approve</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -1143,14 +1143,14 @@ export default function TaskDetailScreen() {
               className="px-2 py-1"
               activeOpacity={0.7}
             >
-              <Text className="text-[15px] font-semibold text-blue-600">Edit</Text>
+              <Text className="text-base font-semibold text-blue-600">Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleMoreActions(task.id)}
               className="px-2 py-1"
               activeOpacity={0.7}
             >
-              <Text className="text-[22px] text-gray-500 dark:text-slate-400 leading-6">•••</Text>
+              <Text className="text-xl text-gray-500 dark:text-slate-400 leading-6">•••</Text>
             </TouchableOpacity>
           </View>
         ),
@@ -1188,7 +1188,7 @@ export default function TaskDetailScreen() {
   if ((error && !task) || !task) {
     return (
       <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
-        <Text className="text-red-600 text-[16px]">Task not found</Text>
+        <Text className="text-red-600 text-base">Task not found</Text>
       </View>
     );
   }
@@ -1203,12 +1203,12 @@ export default function TaskDetailScreen() {
         onPress={setActiveTab}
       />
       {workingAgents.length > 0 && (
-        <View className="flex-row items-center px-3 py-[6px] bg-amber-50 border-b border-amber-200 gap-1">
-          <Text className="text-[12px]">⚡</Text>
-          <Text className="text-[12px] text-amber-800 flex-1 font-medium" numberOfLines={1}>
+        <View className="flex-row items-center px-3 py-1.5 bg-amber-50 border-b border-amber-200 gap-1">
+          <Text className="text-xs">⚡</Text>
+          <Text className="text-xs text-amber-800 flex-1 font-medium" numberOfLines={1}>
             {workingAgents.map((a) => `${a.identityEmoji ?? DEFAULT_AGENT_EMOJI} ${a.name}`).join("  ·  ")}
           </Text>
-          <Text className="text-[12px] text-amber-800 font-semibold"> working</Text>
+          <Text className="text-xs text-amber-800 font-semibold"> working</Text>
         </View>
       )}
       <View className="flex-1">

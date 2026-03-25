@@ -253,7 +253,7 @@ export default function ChannelDetailScreen() {
         <View className="flex-row items-center bg-gray-100 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3 py-2 gap-2">
           <Ionicons name="search-outline" size={16} color="#9ca3af" />
           <TextInput
-            className="flex-1 text-[15px] text-gray-900 dark:text-slate-100 py-1"
+            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-1"
             placeholder="Search messages…"
             placeholderTextColor="#9ca3af"
             value={searchQuery}

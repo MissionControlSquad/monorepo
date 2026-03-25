@@ -217,7 +217,7 @@ export default function AgentDetailScreen() {
       {/* Header */}
       <View className="flex-row items-start gap-3 bg-white dark:bg-slate-800 p-4 border-b border-gray-200 dark:border-slate-700">
         <View className="w-14 h-14 rounded-full bg-gray-100 dark:bg-slate-700 justify-center items-center">
-          <Text className="text-[26px]">{agent.identityEmoji ?? DEFAULT_AGENT_EMOJI}</Text>
+          <Text className="text-2xl">{agent.identityEmoji ?? DEFAULT_AGENT_EMOJI}</Text>
           <View
             className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-800"
             style={{ backgroundColor: online ? dotColor : "#d1d5db" }}
@@ -286,7 +286,7 @@ export default function AgentDetailScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 min-h-[46px]"
+        className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 min-h-12"
         contentContainerStyle={{ flexDirection: "row", alignItems: "stretch" }}
         bounces={false}
       >
@@ -455,7 +455,7 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
         {agent.workspacePath && <InfoRow label="Workspace" value={agent.workspacePath} mono />}
         {agent.apiKeyPrefix && (
           <View className="flex-row items-center justify-between py-2.5 border-b border-gray-100 dark:border-slate-700">
-            <Text className="text-sm text-gray-500 dark:text-slate-400 w-[90px]">API Key</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400 w-24">API Key</Text>
             <View className="flex-row items-center gap-2.5">
               <Text
                 className="text-sm text-gray-900 dark:text-slate-100 flex-1 text-right"
@@ -541,7 +541,7 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <View className="flex-row justify-between gap-3">
-      <Text className="text-sm text-gray-500 dark:text-slate-400 w-[90px]">{label}</Text>
+      <Text className="text-sm text-gray-500 dark:text-slate-400 w-24">{label}</Text>
       <Text
         className="text-sm text-gray-900 dark:text-slate-100 flex-1 text-right"
         style={mono ? { fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", fontSize: 11 } : undefined}
@@ -615,13 +615,13 @@ function QueueTab({
         activeOpacity={0.7}
       >
         <Ionicons name="add-circle-outline" size={18} color="#2563eb" />
-        <Text className="text-[14px] text-blue-600 dark:text-blue-400 font-medium">Add Queue Item</Text>
+        <Text className="text-sm text-blue-600 dark:text-blue-400 font-medium">Add Queue Item</Text>
       </TouchableOpacity>
 
       {fetching && items.length === 0 ? (
         <View className="flex-1 justify-center items-center gap-2"><ActivityIndicator color="#2563eb" /></View>
       ) : items.length === 0 ? (
-        <View className="flex-1 justify-center items-center gap-2"><Text className="text-[15px] text-gray-400 dark:text-slate-500">Queue is empty</Text></View>
+        <View className="flex-1 justify-center items-center gap-2"><Text className="text-base text-gray-400 dark:text-slate-500">Queue is empty</Text></View>
       ) : (
         <FlatList
           data={[
@@ -665,7 +665,7 @@ function QueueTab({
           </View>
           <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} keyboardShouldPersistTaps="handled">
             <View className="gap-1.5">
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Title *</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Title *</Text>
               <TextInput
                 className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 value={newTitle}
@@ -676,9 +676,9 @@ function QueueTab({
               />
             </View>
             <View className="gap-1.5">
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Description</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Description</Text>
               <TextInput
-                className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100 min-h-[80px]"
+                className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100 min-h-20"
                 value={newDesc}
                 onChangeText={setNewDesc}
                 placeholder="Additional context…"
@@ -774,7 +774,7 @@ function AgentTasksTab({
   if (allTasks.length === 0) {
     return (
       <View className="flex-1 justify-center items-center gap-2">
-        <Text className="text-[15px] text-gray-400 dark:text-slate-500">No tasks assigned</Text>
+        <Text className="text-base text-gray-400 dark:text-slate-500">No tasks assigned</Text>
       </View>
     );
   }
@@ -805,7 +805,7 @@ function AgentTasksTab({
                 </Text>
               </View>
               {priorityColor && (
-                <View className="w-2 h-2 rounded-[3.5px]" style={{ backgroundColor: priorityColor }} />
+                <View className="w-2 h-2 rounded" style={{ backgroundColor: priorityColor }} />
               )}
             </View>
             <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 leading-[19px]" numberOfLines={2}>{item.title}</Text>
@@ -846,7 +846,7 @@ function AgentDeliverablesTab({
   if (deliverables.length === 0) {
     return (
       <View className="flex-1 justify-center items-center gap-2">
-        <Text className="text-[15px] text-gray-400 dark:text-slate-500">No deliverables yet</Text>
+        <Text className="text-base text-gray-400 dark:text-slate-500">No deliverables yet</Text>
       </View>
     );
   }
@@ -898,7 +898,7 @@ function ActivityTab({ actions, fetching, onRefresh, router }: {
   actions: AgentAction[]; fetching: boolean; onRefresh: () => void; router: ReturnType<typeof useRouter>;
 }) {
   if (fetching && actions.length === 0) return <View className="flex-1 justify-center items-center gap-2"><ActivityIndicator color="#2563eb" /></View>;
-  if (actions.length === 0) return <View className="flex-1 justify-center items-center gap-2"><Text className="text-[15px] text-gray-400 dark:text-slate-500">No activity yet</Text></View>;
+  if (actions.length === 0) return <View className="flex-1 justify-center items-center gap-2"><Text className="text-base text-gray-400 dark:text-slate-500">No activity yet</Text></View>;
 
   return (
     <FlatList
@@ -940,7 +940,7 @@ function HistoryTab({ history, fetching, onRefresh }: {
   history: StatusHistory[]; fetching: boolean; onRefresh: () => void;
 }) {
   if (fetching && history.length === 0) return <View className="flex-1 justify-center items-center gap-2"><ActivityIndicator color="#2563eb" /></View>;
-  if (history.length === 0) return <View className="flex-1 justify-center items-center gap-2"><Text className="text-[15px] text-gray-400 dark:text-slate-500">No status history</Text></View>;
+  if (history.length === 0) return <View className="flex-1 justify-center items-center gap-2"><Text className="text-base text-gray-400 dark:text-slate-500">No status history</Text></View>;
 
   return (
     <FlatList
@@ -1068,7 +1068,7 @@ function SetupTab({ agentId }: { agentId: string }) {
 
   if (loading) return <View className="flex-1 justify-center items-center gap-2"><ActivityIndicator color="#2563eb" /></View>;
   if (error) return <View className="flex-1 justify-center items-center gap-2"><Text className="text-base text-red-600 dark:text-red-400">{error}</Text></View>;
-  if (!setup) return <View className="flex-1 justify-center items-center gap-2"><Text className="text-[15px] text-gray-400 dark:text-slate-500">No setup data</Text></View>;
+  if (!setup) return <View className="flex-1 justify-center items-center gap-2"><Text className="text-base text-gray-400 dark:text-slate-500">No setup data</Text></View>;
 
   return (
     <ScrollView
@@ -1099,7 +1099,7 @@ function SetupTab({ agentId }: { agentId: string }) {
       {/* Security warning */}
       <View className="flex-row gap-2 bg-red-50 dark:bg-red-950/30 rounded-xl p-3 border border-red-200 dark:border-red-800">
         <Ionicons name="shield-outline" size={16} color="#dc2626" />
-        <Text className="flex-1 text-[12px] text-red-600 dark:text-red-400 leading-[17px]">
+        <Text className="flex-1 text-xs text-red-600 dark:text-red-400 leading-[17px]">
           These credentials grant full access to your system. Do not share publicly.
         </Text>
       </View>
@@ -1109,7 +1109,7 @@ function SetupTab({ agentId }: { agentId: string }) {
         <View className="bg-amber-50 dark:bg-amber-900/10 rounded-xl p-3.5 border border-amber-200 dark:border-amber-700 gap-2">
           <View className="flex-row items-center gap-1.5">
             <Ionicons name="warning-outline" size={16} color="#d97706" />
-            <Text className="text-[13px] font-bold text-amber-600 dark:text-amber-400">New API Key — Save now!</Text>
+            <Text className="text-sm font-bold text-amber-600 dark:text-amber-400">New API Key — Save now!</Text>
             <TouchableOpacity
               onPress={() => {
                 Clipboard.setString(newApiKey);
@@ -1161,7 +1161,7 @@ function SetupTab({ agentId }: { agentId: string }) {
               ) : (
                 <Ionicons name="key-outline" size={14} color="#dc2626" />
               )}
-              <Text className="text-[12px] text-red-600 dark:text-red-400 font-semibold">
+              <Text className="text-xs text-red-600 dark:text-red-400 font-semibold">
                 {regenerating ? "Regenerating…" : "Regenerate"}
               </Text>
             </TouchableOpacity>
@@ -1174,7 +1174,7 @@ function SetupTab({ agentId }: { agentId: string }) {
         <>
           <View className="flex-row gap-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 border border-blue-200 dark:border-blue-800">
             <Ionicons name="chatbubble-outline" size={15} color="#2563eb" />
-            <Text className="flex-1 text-[12px] text-blue-700 dark:text-blue-300 leading-[17px]">
+            <Text className="flex-1 text-xs text-blue-700 dark:text-blue-300 leading-[17px]">
               Copy the message below and send it to your agent via any connected channel (WhatsApp, Slack, Discord, etc.)
             </Text>
           </View>
@@ -1182,22 +1182,22 @@ function SetupTab({ agentId }: { agentId: string }) {
           {setup.bootstrapMessage ? (
             <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2">
               <View className="flex-row items-start gap-2.5">
-                <Text className="text-[14px] font-bold text-gray-900 dark:text-slate-100">Bootstrap Message</Text>
+                <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">Bootstrap Message</Text>
                 <TouchableOpacity
                   onPress={() => {
                     Clipboard.setString(setup.bootstrapMessage);
                     Alert.alert("Copied", "Bootstrap message copied to clipboard");
                   }}
-                  className="flex-row items-center gap-1 px-2.5 py-[5px] rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 ml-auto"
+                  className="flex-row items-center gap-1 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 ml-auto"
                   activeOpacity={0.7}
                 >
                   <Ionicons name="copy-outline" size={14} color="#2563eb" />
-                  <Text className="text-[12px] text-blue-600 dark:text-blue-400 font-semibold">Copy</Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">Copy</Text>
                 </TouchableOpacity>
               </View>
               <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                 <Text
-                  className="text-[12px] text-slate-200 leading-[18px]"
+                  className="text-xs text-slate-200 leading-[18px]"
                   style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                   selectable
                 >
@@ -1215,10 +1215,10 @@ function SetupTab({ agentId }: { agentId: string }) {
           {/* Workspace path */}
           {setup.workspacePath && (
             <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2">
-              <Text className="text-[14px] font-bold text-gray-900 dark:text-slate-100">1. Create Workspace</Text>
+              <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">1. Create Workspace</Text>
               <View className="bg-slate-800 rounded-lg p-3">
                 <Text
-                  className="text-[12px] text-slate-200 leading-[18px]"
+                  className="text-xs text-slate-200 leading-[18px]"
                   style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                   selectable
                 >
@@ -1231,8 +1231,8 @@ function SetupTab({ agentId }: { agentId: string }) {
           {/* Config files */}
           {setup.configFiles.length > 0 && (
             <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2">
-              <Text className="text-[14px] font-bold text-gray-900 dark:text-slate-100">2. Config Files ({setup.configFiles.length})</Text>
-              <Text className="text-[12px] text-gray-400 dark:text-slate-500 mb-1">
+              <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">2. Config Files ({setup.configFiles.length})</Text>
+              <Text className="text-xs text-gray-400 dark:text-slate-500 mb-1">
                 Extract to{" "}
                 <Text style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}>
                   {setup.workspacePath}/
@@ -1245,7 +1245,7 @@ function SetupTab({ agentId }: { agentId: string }) {
                     onPress={() => setExpanded(expanded === file.filename ? null : file.filename)}
                     activeOpacity={0.7}
                   >
-                    <Text className="text-[12px] text-gray-700 dark:text-slate-300 font-medium flex-1" numberOfLines={1}>{file.filename}</Text>
+                    <Text className="text-xs text-gray-700 dark:text-slate-300 font-medium flex-1" numberOfLines={1}>{file.filename}</Text>
                     <Ionicons
                       name={expanded === file.filename ? "chevron-up" : "chevron-down"}
                       size={16}
@@ -1256,11 +1256,11 @@ function SetupTab({ agentId }: { agentId: string }) {
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator
-                      className="bg-slate-800 max-h-[200px]"
+                      className="bg-slate-800 max-h-48"
                       nestedScrollEnabled
                     >
                       <Text
-                        className="text-[12px] text-slate-200 leading-[18px]"
+                        className="text-xs text-slate-200 leading-[18px]"
                         style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                         selectable
                       >
@@ -1277,24 +1277,24 @@ function SetupTab({ agentId }: { agentId: string }) {
           {setup.cronCommand && (
             <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2">
               <View className="flex-row items-start gap-2.5">
-                <Text className="text-[14px] font-bold text-gray-900 dark:text-slate-100">3. Heartbeat Cron</Text>
+                <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">3. Heartbeat Cron</Text>
                 <TouchableOpacity
                   onPress={() => {
                     Clipboard.setString(setup.cronCommand);
                     Alert.alert("Copied", "Cron command copied to clipboard");
                   }}
-                  className="flex-row items-center gap-1 px-2.5 py-[5px] rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 ml-auto"
+                  className="flex-row items-center gap-1 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 ml-auto"
                   activeOpacity={0.7}
                 >
                   <Ionicons name="copy-outline" size={14} color="#2563eb" />
-                  <Text className="text-[12px] text-blue-600 dark:text-blue-400 font-semibold">Copy</Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">Copy</Text>
                 </TouchableOpacity>
               </View>
-              <Text className="text-[12px] text-gray-400 dark:text-slate-500 mb-1">Add this to your crontab to keep the agent running</Text>
+              <Text className="text-xs text-gray-400 dark:text-slate-500 mb-1">Add this to your crontab to keep the agent running</Text>
               <View className="bg-slate-800 rounded-lg p-3">
                 <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled>
                   <Text
-                    className="text-[12px] text-slate-200 leading-[18px]"
+                    className="text-xs text-slate-200 leading-[18px]"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >
@@ -1310,12 +1310,12 @@ function SetupTab({ agentId }: { agentId: string }) {
       {/* Cloud VMs shortcut */}
       {setup.cloudVms.length > 0 && (
         <TouchableOpacity
-          className="flex-row items-center gap-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-[14px] border border-blue-200 dark:border-blue-800"
+          className="flex-row items-center gap-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3.5 border border-blue-200 dark:border-blue-800"
           onPress={() => router.push("/cloud")}
           activeOpacity={0.7}
         >
           <Ionicons name="server-outline" size={16} color="#2563eb" />
-          <Text className="flex-1 text-[13px] text-blue-600 dark:text-blue-400 font-medium">
+          <Text className="flex-1 text-sm text-blue-600 dark:text-blue-400 font-medium">
             {setup.cloudVms.length} Cloud VM{setup.cloudVms.length !== 1 ? "s" : ""} available — Deploy to VM
           </Text>
           <Ionicons name="arrow-forward" size={14} color="#2563eb" />
