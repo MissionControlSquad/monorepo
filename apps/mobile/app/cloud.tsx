@@ -14,7 +14,8 @@ import {
   ScrollView,
 } from "react-native";
 import { useNavigation, useRouter } from "expo-router";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { usePollingInterval, useSearch } from "@agentcenter/hooks";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../src/context/AuthContext";
@@ -295,9 +296,7 @@ export default function CloudVMsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchVMs = useCallback(async (silent = false) => {
     if (!serverUrl) return;
@@ -327,29 +326,20 @@ export default function CloudVMsScreen() {
 
   useEffect(() => { fetchVMs(); }, [fetchVMs]);
 
-  // Poll while any VM is transitional
-  useEffect(() => {
-    const hasTransitional = vms.some((vm) => TRANSITIONAL.includes(vm.status));
-    if (pollRef.current) clearInterval(pollRef.current);
-    if (hasTransitional) {
-      pollRef.current = setInterval(() => fetchVMs(true), 5000);
-    }
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [vms, fetchVMs]);
+  const fetchVMsSilent = useCallback(() => fetchVMs(true), [fetchVMs]);
+  const hasTransitional = vms.some((vm) => TRANSITIONAL.includes(vm.status));
+  usePollingInterval(fetchVMsSilent, 5000, hasTransitional);
 
-  const filtered = search.trim()
-    ? vms.filter((vm) => {
-        const q = search.toLowerCase();
-        const name = (vm.name || vm.serverName || vm.id).toLowerCase();
-        return (
-          name.includes(q) ||
-          (vm.ipv4 || "").includes(q) ||
-          vm.region.toLowerCase().includes(q) ||
-          vm.status.toLowerCase().includes(q) ||
-          vm.agents.some((a) => a.name.toLowerCase().includes(q))
-        );
-      })
-    : vms;
+  const { search, setSearch, filtered } = useSearch(vms, (vm, q) => {
+    const name = (vm.name || vm.serverName || vm.id).toLowerCase();
+    return (
+      name.includes(q) ||
+      (vm.ipv4 || "").includes(q) ||
+      vm.region.toLowerCase().includes(q) ||
+      vm.status.toLowerCase().includes(q) ||
+      vm.agents.some((a) => a.name.toLowerCase().includes(q))
+    );
+  });
 
   return (
     <View style={styles.container}>
