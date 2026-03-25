@@ -69,7 +69,7 @@ const FilterChip = ({
     onPress={onPress}
     activeOpacity={0.7}
   >
-    <Text className={`text-[12px] ${active ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
+    <Text className={`text-xs ${active ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
       {label}
     </Text>
   </TouchableOpacity>
@@ -149,7 +149,7 @@ export default function TaskListScreen() {
       <View className="flex-row items-center bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-3 py-2 gap-2">
         <Text className="text-sm">🔍</Text>
         <TextInput
-          className="flex-1 text-[15px] text-gray-900 dark:text-slate-100 py-1.5 px-1"
+          className="flex-1 text-base text-gray-900 dark:text-slate-100 py-1.5 px-1"
           placeholder="Search tasks…"
           placeholderTextColor="#9ca3af"
           value={search}
@@ -185,7 +185,7 @@ export default function TaskListScreen() {
       {/* Advanced filter panel */}
       {filtersOpen && (
         <View className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3.5 pt-2.5 pb-3 gap-2">
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Due Date</Text>
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Due Date</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
             {DUE_DATE_OPTIONS.map((opt) => (
               <FilterChip
@@ -197,7 +197,7 @@ export default function TaskListScreen() {
             ))}
           </ScrollView>
 
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Priority</Text>
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Priority</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
             {PRIORITY_OPTIONS.map((opt) => (
               <FilterChip
@@ -209,7 +209,7 @@ export default function TaskListScreen() {
             ))}
           </ScrollView>
 
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">More Filters</Text>
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">More Filters</Text>
           <View className="flex-row flex-wrap gap-2">
             <FilterChip label="Blocked only" active={blockedOnly} onPress={() => setBlockedOnly((v) => !v)} />
             <FilterChip label="Top-level only" active={topLevelOnly} onPress={() => setTopLevelOnly((v) => !v)} />
@@ -227,7 +227,7 @@ export default function TaskListScreen() {
                 setUnassignedOnly(false);
               }}
             >
-              <Text className="text-[12px] text-red-600 dark:text-red-400 font-semibold">Clear all filters</Text>
+              <Text className="text-xs text-red-600 dark:text-red-400 font-semibold">Clear all filters</Text>
             </TouchableOpacity>
           )}
         </View>

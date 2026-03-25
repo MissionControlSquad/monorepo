@@ -80,7 +80,7 @@ export default function ProjectsScreen() {
       <View className="flex-row items-center bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-3 py-2 gap-2">
         <Text className="text-sm">🔍</Text>
         <TextInput
-          className="flex-1 text-[15px] text-gray-900 dark:text-slate-100 py-1.5 px-1"
+          className="flex-1 text-base text-gray-900 dark:text-slate-100 py-1.5 px-1"
           placeholder="Search projects…"
           placeholderTextColor="#9ca3af"
           value={search}
@@ -93,7 +93,7 @@ export default function ProjectsScreen() {
           className="w-8 h-8 rounded-full bg-blue-600 justify-center items-center"
           activeOpacity={0.7}
         >
-          <Text className="text-[20px] text-white leading-6">+</Text>
+          <Text className="text-xl text-white leading-6">+</Text>
         </TouchableOpacity>
       </View>
 
@@ -104,7 +104,7 @@ export default function ProjectsScreen() {
         showsVerticalScrollIndicator={false}
         bounces={false}
         directionalLockEnabled={true}
-        className="h-[52px] bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
+        className="h-14 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
         contentContainerStyle={{ paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 }}
       >
         {filters.map((f) => {
@@ -118,7 +118,7 @@ export default function ProjectsScreen() {
               className={`px-3.5 py-2 rounded-full ${statusFilter === f.key ? "bg-blue-100 dark:bg-blue-900/30" : "bg-gray-100 dark:bg-slate-700"}`}
               onPress={() => setStatusFilter(f.key)}
             >
-              <Text className={`text-[13px] ${statusFilter === f.key ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
+              <Text className={`text-sm ${statusFilter === f.key ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
                 {f.label} ({count})
               </Text>
             </TouchableOpacity>
@@ -153,30 +153,30 @@ export default function ProjectsScreen() {
             onPress={() => router.push(`/project/${item.id}`)}
           >
             <View className="flex-row items-start gap-3">
-              <View className="w-10 h-10 rounded-[10px] bg-blue-50 dark:bg-blue-900/20 justify-center items-center">
-                <Text className="text-[20px]">📁</Text>
+              <View className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 justify-center items-center">
+                <Text className="text-xl">📁</Text>
               </View>
               <View className="flex-1 gap-1">
                 <View className="flex-row items-center justify-between gap-2">
-                  <Text className="text-[15px] font-semibold text-gray-900 dark:text-slate-100 flex-1" numberOfLines={1}>
+                  <Text className="text-base font-semibold text-gray-900 dark:text-slate-100 flex-1" numberOfLines={1}>
                     {item.name}
                   </Text>
                   <View
                     className="px-2 py-0.5 rounded-lg"
                     style={{ backgroundColor: STATUS_HEX_COLORS[item.status ?? ""] ?? DEFAULT_COLOR }}
                   >
-                    <Text className="text-white text-[11px] font-semibold">{item.status}</Text>
+                    <Text className="text-white text-xs font-semibold">{item.status}</Text>
                   </View>
                 </View>
                 {item.description ? (
-                  <Text className="text-[13px] text-gray-500 dark:text-slate-400 leading-[18px]" numberOfLines={2}>
+                  <Text className="text-sm text-gray-500 dark:text-slate-400 leading-[18px]" numberOfLines={2}>
                     {item.description}
                   </Text>
                 ) : null}
               </View>
             </View>
             {(item.members ?? []).length > 0 && (
-              <Text className="text-[12px] text-gray-400 dark:text-slate-500">
+              <Text className="text-xs text-gray-400 dark:text-slate-500">
                 {memberEmojis(item.members ?? [])}
               </Text>
             )}

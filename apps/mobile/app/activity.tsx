@@ -148,7 +148,7 @@ export default function ActivityScreen() {
         return (
           <>
             {showDate && (
-              <Text className="text-[12px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide mt-5 mb-2 ml-7">
+              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide mt-5 mb-2 ml-7">
                 {new Date(item.createdAt).toLocaleDateString("en-US", {
                   weekday: "long",
                   month: "short",
@@ -168,30 +168,30 @@ export default function ActivityScreen() {
                 {/* Header: avatar + name + time */}
                 <View className="flex-row items-center gap-2">
                   <View
-                    className="w-[26px] h-[26px] rounded-full bg-gray-100 dark:bg-slate-700 border-[1.5px] justify-center items-center"
+                    className="w-7 h-7 rounded-full bg-gray-100 dark:bg-slate-700 border-[1.5px] justify-center items-center"
                     style={{ borderColor: color }}
                   >
-                    <Text className="text-[11px] font-bold" style={{ color }}>
+                    <Text className="text-xs font-bold" style={{ color }}>
                       {item.profile?.displayName?.charAt(0)?.toUpperCase() ?? "?"}
                     </Text>
                   </View>
-                  <Text className="text-[13px] font-semibold text-gray-900 dark:text-slate-100 flex-1" numberOfLines={1}>
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1" numberOfLines={1}>
                     {item.profile?.displayName ?? "Unknown"}
                   </Text>
-                  <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatRelativeTime(item.createdAt)}</Text>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500">{formatRelativeTime(item.createdAt)}</Text>
                 </View>
 
                 {/* Message */}
-                <Text className="text-[14px] text-gray-700 dark:text-slate-300 leading-5">{item.message}</Text>
+                <Text className="text-sm text-gray-700 dark:text-slate-300 leading-5">{item.message}</Text>
 
                 {/* Task link */}
                 {item.task && (
                   <TouchableOpacity
-                    className="px-2.5 py-[5px] bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-800 self-start"
+                    className="px-2.5 py-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-800 self-start"
                     onPress={() => router.push(`/task/${item.task!.id}`)}
                     activeOpacity={0.7}
                   >
-                    <Text className="text-[12px] text-blue-600 dark:text-blue-400 font-medium">
+                    <Text className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                       #{item.task.taskNumber} · {item.task.title}
                     </Text>
                   </TouchableOpacity>

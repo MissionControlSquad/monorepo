@@ -79,9 +79,9 @@ export default function CreateProjectScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="gap-1.5">
-          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Project Name *</Text>
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Project Name *</Text>
           <TextInput
-            className="border border-gray-300 dark:border-slate-600 rounded-[10px] p-3 text-[15px] text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+            className="border border-gray-300 dark:border-slate-600 rounded-xl p-3 text-base text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
             value={name}
             onChangeText={setName}
             placeholder="e.g. Q2 Marketing Campaign"
@@ -91,9 +91,9 @@ export default function CreateProjectScreen() {
         </View>
 
         <View className="gap-1.5">
-          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Description</Text>
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Description</Text>
           <TextInput
-            className="border border-gray-300 dark:border-slate-600 rounded-[10px] p-3 text-[15px] text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+            className="border border-gray-300 dark:border-slate-600 rounded-xl p-3 text-base text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
             style={{ height: 100 }}
             value={description}
             onChangeText={setDescription}
@@ -108,15 +108,15 @@ export default function CreateProjectScreen() {
         {/* Members */}
         <View className="gap-1.5">
           <View className="flex-row items-center justify-between">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Members</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Members</Text>
             {selectedProfileIds.length > 0 && (
-              <Text className="text-[12px] text-blue-600 dark:text-blue-400 font-semibold">{selectedProfileIds.length} selected</Text>
+              <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">{selectedProfileIds.length} selected</Text>
             )}
           </View>
           {profilesResult.fetching && profiles.length === 0 ? (
             <ActivityIndicator size="small" color="#2563eb" style={{ marginTop: 8 }} />
           ) : (
-            <View className="border border-gray-300 dark:border-slate-600 rounded-[10px] bg-white dark:bg-slate-800 overflow-hidden">
+            <View className="border border-gray-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 overflow-hidden">
               {profiles.map((profile) => {
                 const selected = selectedProfileIds.includes(profile.id);
                 const isAgent = profile.agentId != null;
@@ -128,14 +128,14 @@ export default function CreateProjectScreen() {
                     onPress={() => toggleProfile(profile.id)}
                     activeOpacity={0.7}
                   >
-                    <Text className="text-[18px] w-7 text-center">{emoji}</Text>
+                    <Text className="text-lg w-7 text-center">{emoji}</Text>
                     <View className="flex-1 gap-px">
-                      <Text className="text-[14px] font-medium text-gray-900 dark:text-slate-100" numberOfLines={1}>
+                      <Text className="text-sm font-medium text-gray-900 dark:text-slate-100" numberOfLines={1}>
                         {profile.displayName}
                       </Text>
-                      <Text className="text-[12px] text-gray-400 dark:text-slate-500">@{profile.username}</Text>
+                      <Text className="text-xs text-gray-400 dark:text-slate-500">@{profile.username}</Text>
                     </View>
-                    <View className={`w-[22px] h-[22px] rounded-full border-2 justify-center items-center ${
+                    <View className={`w-6 h-6 rounded-full border-2 justify-center items-center ${
                       selected ? "bg-blue-600 border-blue-600" : "border-gray-300 dark:border-slate-500"
                     }`}>
                       {selected && (
@@ -150,7 +150,7 @@ export default function CreateProjectScreen() {
         </View>
 
         <TouchableOpacity
-          className={`bg-blue-600 rounded-[12px] p-3.5 items-center mt-2 ${saving ? "opacity-60" : ""}`}
+          className={`bg-blue-600 rounded-xl p-3.5 items-center mt-2 ${saving ? "opacity-60" : ""}`}
           onPress={handleCreate}
           disabled={saving}
         >

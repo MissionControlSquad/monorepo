@@ -190,7 +190,7 @@ export default function ProfileScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Avatar card */}
-        <View className="bg-white dark:bg-slate-800 rounded-[14px] p-4 border border-gray-200 dark:border-slate-700 gap-3">
+        <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
           <View className="flex-row items-center gap-3.5">
             {/* Avatar */}
             <TouchableOpacity
@@ -219,19 +219,19 @@ export default function ProfileScreen() {
             </TouchableOpacity>
 
             {/* Identity info */}
-            <View className="flex-1 gap-[3px]">
+            <View className="flex-1 gap-1">
               <Text className="text-base font-bold text-gray-900 dark:text-slate-100" numberOfLines={1}>
                 {displayName || "Your Name"}
               </Text>
               {profile?.username ? (
-                <Text className="text-[13px] text-gray-500 dark:text-slate-400" numberOfLines={1}>
+                <Text className="text-sm text-gray-500 dark:text-slate-400" numberOfLines={1}>
                   @{profile.username}
                 </Text>
               ) : null}
               {profile?.user?.email ? (
                 <View className="flex-row items-center gap-1 mt-0.5">
                   <Ionicons name="mail-outline" size={12} color="#9ca3af" />
-                  <Text className="text-[12px] text-gray-400 dark:text-slate-500 flex-1" numberOfLines={1}>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500 flex-1" numberOfLines={1}>
                     {profile.user.email}
                   </Text>
                 </View>
@@ -242,16 +242,16 @@ export default function ProfileScreen() {
           {/* Avatar hint / remove */}
           <View className="flex-row items-center justify-between gap-2">
             {uploading ? (
-              <Text className="text-[11px] text-gray-400 dark:text-slate-500">Uploading avatar…</Text>
+              <Text className="text-xs text-gray-400 dark:text-slate-500">Uploading avatar…</Text>
             ) : (
               <>
-                <Text className="text-[11px] text-gray-400 dark:text-slate-500 flex-1">
+                <Text className="text-xs text-gray-400 dark:text-slate-500 flex-1">
                   Tap avatar to upload (PNG, JPEG, GIF, WebP · max 5 MB)
                 </Text>
                 {avatarUrl ? (
-                  <TouchableOpacity onPress={handleRemoveAvatar} className="flex-row items-center gap-[3px] shrink-0">
+                  <TouchableOpacity onPress={handleRemoveAvatar} className="flex-row items-center gap-1 shrink-0">
                     <Ionicons name="trash-outline" size={12} color="#9ca3af" />
-                    <Text className="text-[11px] text-gray-400 dark:text-slate-500">Remove</Text>
+                    <Text className="text-xs text-gray-400 dark:text-slate-500">Remove</Text>
                   </TouchableOpacity>
                 ) : null}
               </>
@@ -260,23 +260,23 @@ export default function ProfileScreen() {
         </View>
 
         {/* Profile info form */}
-        <View className="bg-white dark:bg-slate-800 rounded-[14px] p-4 border border-gray-200 dark:border-slate-700 gap-3">
+        <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
           <View className="flex-row items-center gap-3">
             <View className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-slate-700 justify-center items-center">
               <Ionicons name="person-outline" size={20} color="#6b7280" />
             </View>
             <View>
-              <Text className="text-[15px] font-bold text-gray-900 dark:text-slate-100">Profile Information</Text>
-              <Text className="text-[12px] text-gray-500 dark:text-slate-400 mt-px">Update your display name and bio</Text>
+              <Text className="text-base font-bold text-gray-900 dark:text-slate-100">Profile Information</Text>
+              <Text className="text-xs text-gray-500 dark:text-slate-400 mt-px">Update your display name and bio</Text>
             </View>
           </View>
 
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">
               Display Name <Text className="text-red-600 dark:text-red-400">*</Text>
             </Text>
             <TextInput
-              className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               value={displayName}
               onChangeText={(v) => { setDisplayName(v); setDirty(true); }}
               placeholder="Your display name"
@@ -286,9 +286,9 @@ export default function ProfileScreen() {
           </View>
 
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Bio</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Bio</Text>
             <TextInput
-              className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               style={{ minHeight: 96 }}
               value={bio}
               onChangeText={(v) => { setBio(v); setDirty(true); }}
@@ -298,11 +298,11 @@ export default function ProfileScreen() {
               numberOfLines={4}
               textAlignVertical="top"
             />
-            <Text className="text-[11px] text-gray-400 dark:text-slate-500">A short description visible to others</Text>
+            <Text className="text-xs text-gray-400 dark:text-slate-500">A short description visible to others</Text>
           </View>
 
           <TouchableOpacity
-            className={`bg-blue-600 rounded-[10px] py-[13px] items-center mt-1 ${(!dirty || saving) ? "opacity-45" : ""}`}
+            className={`bg-blue-600 rounded-xl py-3.5 items-center mt-1 ${(!dirty || saving) ? "opacity-45" : ""}`}
             onPress={handleSave}
             disabled={!dirty || saving}
             activeOpacity={0.8}
@@ -310,26 +310,26 @@ export default function ProfileScreen() {
             {saving ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text className="text-white text-[15px] font-semibold">Save Changes</Text>
+              <Text className="text-white text-base font-semibold">Save Changes</Text>
             )}
           </TouchableOpacity>
         </View>
 
         {/* Account section */}
-        <View className="bg-white dark:bg-slate-800 rounded-[14px] p-4 border border-gray-200 dark:border-slate-700 gap-3">
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Account</Text>
+        <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Account</Text>
 
           {profile?.user?.email ? (
             <View className="flex-row items-center gap-2.5 py-1">
               <Ionicons name="mail-outline" size={16} color="#6b7280" />
-              <Text className="text-[14px] text-gray-700 dark:text-slate-300">{profile.user.email}</Text>
+              <Text className="text-sm text-gray-700 dark:text-slate-300">{profile.user.email}</Text>
             </View>
           ) : null}
 
           {profile?.username ? (
             <View className="flex-row items-center gap-2.5 py-1">
               <Ionicons name="at-outline" size={16} color="#6b7280" />
-              <Text className="text-[14px] text-gray-700 dark:text-slate-300">{profile.username}</Text>
+              <Text className="text-sm text-gray-700 dark:text-slate-300">{profile.username}</Text>
             </View>
           ) : null}
 
@@ -339,7 +339,7 @@ export default function ProfileScreen() {
             activeOpacity={0.7}
           >
             <Ionicons name="log-out-outline" size={16} color="#dc2626" />
-            <Text className="text-[15px] font-semibold text-red-600 dark:text-red-400">Sign Out</Text>
+            <Text className="text-base font-semibold text-red-600 dark:text-red-400">Sign Out</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

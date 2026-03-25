@@ -76,12 +76,12 @@ export default function NotificationsScreen() {
       ListHeaderComponent={
         notifications.length > 0 ? (
           <View className="flex-row justify-between items-center mb-1">
-            <Text className="text-[13px] text-gray-500 dark:text-slate-400 font-medium">
+            <Text className="text-sm text-gray-500 dark:text-slate-400 font-medium">
               {unreadCount > 0 ? `${unreadCount} unread` : "All read"}
             </Text>
             {unreadCount > 0 && (
               <TouchableOpacity onPress={markAllRead}>
-                <Text className="text-[13px] text-blue-600 dark:text-blue-400 font-semibold">Mark all read</Text>
+                <Text className="text-sm text-blue-600 dark:text-blue-400 font-semibold">Mark all read</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -90,7 +90,7 @@ export default function NotificationsScreen() {
       ListEmptyComponent={
         <View className="items-center gap-2.5">
           <Ionicons name="notifications-outline" size={48} color="#d1d5db" />
-          <Text className="text-[17px] font-semibold text-gray-700 dark:text-slate-300">All caught up</Text>
+          <Text className="text-lg font-semibold text-gray-700 dark:text-slate-300">All caught up</Text>
           <Text className="text-sm text-gray-400 dark:text-slate-500">No notifications yet</Text>
         </View>
       }
@@ -135,11 +135,11 @@ export default function NotificationsScreen() {
                   {item.title}
                 </Text>
                 {item.body ? (
-                  <Text className="text-[12px] text-gray-400 dark:text-slate-500 leading-[17px]" numberOfLines={2}>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500 leading-[17px]" numberOfLines={2}>
                     {item.body}
                   </Text>
                 ) : null}
-                <Text className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
+                <Text className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
                   {formatRelativeTime(item.createdAt)}
                 </Text>
               </View>

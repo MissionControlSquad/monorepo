@@ -112,7 +112,7 @@ export default function ChannelsScreen() {
       <View className="flex-row items-center bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-3 py-2 gap-2">
         <Text className="text-sm">🔍</Text>
         <TextInput
-          className="flex-1 text-[15px] text-gray-900 dark:text-slate-100 py-1.5 px-1"
+          className="flex-1 text-base text-gray-900 dark:text-slate-100 py-1.5 px-1"
           placeholder="Search channels…"
           placeholderTextColor="#9ca3af"
           value={search}
@@ -122,10 +122,10 @@ export default function ChannelsScreen() {
         />
         <TouchableOpacity
           onPress={() => { setDmSearch(""); setDmPickerOpen(true); }}
-          className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2.5 py-[5px] border border-blue-200 dark:border-blue-800"
+          className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2.5 py-1.5 border border-blue-200 dark:border-blue-800"
           activeOpacity={0.7}
         >
-          <Text className="text-[12px] text-blue-600 dark:text-blue-400 font-semibold">💬 DM</Text>
+          <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">💬 DM</Text>
         </TouchableOpacity>
       </View>
 
@@ -138,14 +138,14 @@ export default function ChannelsScreen() {
       >
         <View className="flex-1 bg-white dark:bg-slate-900">
           <View className="flex-row justify-between items-center p-4 border-b border-gray-100 dark:border-slate-700">
-            <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">Start Direct Message</Text>
+            <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">Start Direct Message</Text>
             <TouchableOpacity onPress={() => setDmPickerOpen(false)} className="p-1">
               <Text className="text-base text-gray-500 dark:text-slate-400">✕</Text>
             </TouchableOpacity>
           </View>
           <View className="px-4 py-2.5 border-b border-gray-100 dark:border-slate-700">
             <TextInput
-              className="bg-gray-100 dark:bg-slate-700 rounded-[10px] px-3.5 py-2.5 text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-gray-100 dark:bg-slate-700 rounded-xl px-3.5 py-2.5 text-base text-gray-900 dark:text-slate-100"
               placeholder="Search people…"
               placeholderTextColor="#9ca3af"
               value={dmSearch}
@@ -180,11 +180,11 @@ export default function ChannelsScreen() {
                   }}
                 >
                   <View className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 justify-center items-center">
-                    <Text className="text-[18px]">{item.kind === "agent" ? DEFAULT_AGENT_EMOJI : item.displayName.charAt(0).toUpperCase()}</Text>
+                    <Text className="text-lg">{item.kind === "agent" ? DEFAULT_AGENT_EMOJI : item.displayName.charAt(0).toUpperCase()}</Text>
                   </View>
                   <View className="flex-1">
-                    <Text className="text-[15px] font-semibold text-gray-900 dark:text-slate-100">{item.displayName}</Text>
-                    <Text className="text-[12px] text-gray-400 dark:text-slate-500">@{item.username}</Text>
+                    <Text className="text-base font-semibold text-gray-900 dark:text-slate-100">{item.displayName}</Text>
+                    <Text className="text-xs text-gray-400 dark:text-slate-500">@{item.username}</Text>
                   </View>
                   {startingDm && <ActivityIndicator size="small" color="#2563eb" />}
                 </TouchableOpacity>
@@ -235,19 +235,19 @@ export default function ChannelsScreen() {
               activeOpacity={0.7}
             >
               <View className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 justify-center items-center">
-                <Text className="text-[18px]">{icon}</Text>
+                <Text className="text-lg">{icon}</Text>
               </View>
               <View className="flex-1 gap-0.5">
-                <Text className="text-[15px] font-semibold text-gray-900 dark:text-slate-100">{displayName}</Text>
+                <Text className="text-base font-semibold text-gray-900 dark:text-slate-100">{displayName}</Text>
                 {item.description ? (
-                  <Text className="text-[12px] text-gray-500 dark:text-slate-400" numberOfLines={1}>
+                  <Text className="text-xs text-gray-500 dark:text-slate-400" numberOfLines={1}>
                     {item.description}
                   </Text>
                 ) : null}
               </View>
               {item.unreadCount > 0 && (
-                <View className="bg-blue-600 rounded-[10px] min-w-5 h-5 justify-center items-center px-1.5">
-                  <Text className="text-white text-[11px] font-bold">
+                <View className="bg-blue-600 rounded-xl min-w-5 h-5 justify-center items-center px-1.5">
+                  <Text className="text-white text-xs font-bold">
                     {item.unreadCount > 99 ? "99+" : item.unreadCount}
                   </Text>
                 </View>

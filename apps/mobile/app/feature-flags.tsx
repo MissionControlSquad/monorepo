@@ -52,7 +52,7 @@ export default function FeatureFlagsScreen() {
   return (
     <View className="flex-1 bg-white dark:bg-slate-900">
       {result.error && !result.data && (
-        <View className="m-4 p-4 bg-red-50 dark:bg-red-950/30 rounded-[10px]">
+        <View className="m-4 p-4 bg-red-50 dark:bg-red-950/30 rounded-xl">
           <Text className="text-red-600 dark:text-red-400 text-sm">{result.error.message}</Text>
         </View>
       )}
@@ -83,12 +83,12 @@ export default function FeatureFlagsScreen() {
                   {item.key}
                 </Text>
                 {item.description ? (
-                  <Text className="text-[12px] text-gray-500 dark:text-slate-400" numberOfLines={2}>
+                  <Text className="text-xs text-gray-500 dark:text-slate-400" numberOfLines={2}>
                     {item.description}
                   </Text>
                 ) : null}
                 {item.managedBy ? (
-                  <Text className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
+                  <Text className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
                     Managed by: {item.managedBy}
                   </Text>
                 ) : null}

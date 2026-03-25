@@ -91,15 +91,15 @@ export default function EditAgentScreen() {
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
       >
-        <View className="bg-white dark:bg-slate-800 rounded-[14px] p-4 border border-gray-200 dark:border-slate-700 gap-3">
-          <Text className="text-[15px] font-bold text-gray-900 dark:text-slate-100">Identity</Text>
+        <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
+          <Text className="text-base font-bold text-gray-900 dark:text-slate-100">Identity</Text>
 
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">
               Name <Text className="text-red-600 dark:text-red-400">*</Text>
             </Text>
             <TextInput
-              className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               value={name}
               onChangeText={track(setName)}
               placeholder="Agent name"
@@ -108,11 +108,11 @@ export default function EditAgentScreen() {
           </View>
 
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">
               Role <Text className="text-red-600 dark:text-red-400">*</Text>
             </Text>
             <TextInput
-              className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               value={role}
               onChangeText={track(setRole)}
               placeholder="e.g. Backend Engineer"
@@ -122,21 +122,21 @@ export default function EditAgentScreen() {
 
           {agent?.username ? (
             <View className="gap-1.5">
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Username</Text>
-              <View className="bg-gray-100 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] justify-center">
-                <Text className="text-[14px] text-gray-400 dark:text-slate-500">@{agent.username}</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Username</Text>
+              <View className="bg-gray-100 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 justify-center">
+                <Text className="text-sm text-gray-400 dark:text-slate-500">@{agent.username}</Text>
               </View>
-              <Text className="text-[11px] text-gray-400 dark:text-slate-500">Username cannot be changed after creation</Text>
+              <Text className="text-xs text-gray-400 dark:text-slate-500">Username cannot be changed after creation</Text>
             </View>
           ) : null}
 
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Emoji</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Emoji</Text>
             <View className="flex-row flex-wrap gap-2">
               {AGENT_EMOJI_PRESETS.map((e) => (
                 <TouchableOpacity
                   key={e}
-                  className={`w-11 h-11 rounded-[10px] border-[1.5px] justify-center items-center ${
+                  className={`w-11 h-11 rounded-xl border-[1.5px] justify-center items-center ${
                     emoji === e
                       ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
                       : "border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700"
@@ -144,16 +144,16 @@ export default function EditAgentScreen() {
                   onPress={() => { setEmoji(e); setDirty(true); }}
                   activeOpacity={0.7}
                 >
-                  <Text className="text-[22px]">{e}</Text>
+                  <Text className="text-xl">{e}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
         </View>
 
-        <View className="bg-white dark:bg-slate-800 rounded-[14px] p-4 border border-gray-200 dark:border-slate-700 gap-3">
-          <Text className="text-[15px] font-bold text-gray-900 dark:text-slate-100">Personality & Instructions</Text>
-          <Text className="text-[12px] text-gray-400 dark:text-slate-500">
+        <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
+          <Text className="text-base font-bold text-gray-900 dark:text-slate-100">Personality & Instructions</Text>
+          <Text className="text-xs text-gray-400 dark:text-slate-500">
             Define the agent's working style, expertise, and behaviour guidelines.
           </Text>
           <TextInput
@@ -170,7 +170,7 @@ export default function EditAgentScreen() {
         </View>
 
         <TouchableOpacity
-          className={`bg-blue-600 rounded-[12px] py-3.5 items-center ${(!dirty || saving) ? "opacity-45" : ""}`}
+          className={`bg-blue-600 rounded-xl py-3.5 items-center ${(!dirty || saving) ? "opacity-45" : ""}`}
           onPress={handleSave}
           disabled={!dirty || saving}
           activeOpacity={0.8}
@@ -183,7 +183,7 @@ export default function EditAgentScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity className="items-center py-2.5" onPress={() => router.back()} activeOpacity={0.7}>
-          <Text className="text-[15px] text-gray-500 dark:text-slate-400">Cancel</Text>
+          <Text className="text-base text-gray-500 dark:text-slate-400">Cancel</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

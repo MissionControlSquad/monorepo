@@ -15,8 +15,8 @@ export function NotificationBell({ onPress, color }: NotificationBellProps) {
       <View>
         <Ionicons name="notifications-outline" size={24} color={color} />
         {count > 0 && (
-          <View className="absolute -top-0.5 -right-0.5 min-w-4 h-4 rounded-full bg-red-600 justify-center items-center px-[3px]">
-            <Text className="text-[9px] text-white font-bold">
+          <View className="absolute -top-0.5 -right-0.5 min-w-4 h-4 rounded-full bg-red-600 justify-center items-center px-1">
+            <Text className="text-xs text-white font-bold">
               {count > 99 ? "99+" : String(count)}
             </Text>
           </View>

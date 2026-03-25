@@ -126,7 +126,7 @@ export default function SearchScreen() {
           <Ionicons name="search-outline" size={18} color="#9ca3af" />
           <TextInput
             ref={inputRef}
-            className="flex-1 text-[15px] text-gray-900 dark:text-slate-100 py-2.5"
+            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-2.5"
             placeholder="Search tasks, messages, deliverables…"
             placeholderTextColor="#9ca3af"
             value={query}
@@ -144,7 +144,7 @@ export default function SearchScreen() {
           )}
         </View>
         <TouchableOpacity onPress={handleSubmit} activeOpacity={0.7}>
-          <Text className="text-blue-600 dark:text-blue-400 text-[15px] font-semibold">Search</Text>
+          <Text className="text-blue-600 dark:text-blue-400 text-base font-semibold">Search</Text>
         </TouchableOpacity>
       </View>
 
@@ -156,18 +156,18 @@ export default function SearchScreen() {
       ) : taskNumber !== null && !resolvedTaskId && !taskByNumberResult.fetching ? (
         <View className="flex-1 justify-center items-center gap-2">
           <Ionicons name="file-tray-outline" size={48} color="#d1d5db" />
-          <Text className="text-[15px] text-gray-400 dark:text-slate-500">Task #{taskNumber} not found</Text>
+          <Text className="text-base text-gray-400 dark:text-slate-500">Task #{taskNumber} not found</Text>
         </View>
       ) : !searched ? (
         <View className="flex-1 justify-center items-center gap-2">
           <Ionicons name="search-outline" size={48} color="#d1d5db" />
-          <Text className="text-[15px] text-gray-400 dark:text-slate-500">Search tasks, messages, deliverables</Text>
-          <Text className="text-[13px] text-gray-400 dark:text-slate-500">Tip: type #42 to jump to a task by number</Text>
+          <Text className="text-base text-gray-400 dark:text-slate-500">Search tasks, messages, deliverables</Text>
+          <Text className="text-sm text-gray-400 dark:text-slate-500">Tip: type #42 to jump to a task by number</Text>
         </View>
       ) : !hasResults ? (
         <View className="flex-1 justify-center items-center gap-2">
           <Ionicons name="file-tray-outline" size={48} color="#d1d5db" />
-          <Text className="text-[15px] text-gray-400 dark:text-slate-500">No results for "{submittedQuery}"</Text>
+          <Text className="text-base text-gray-400 dark:text-slate-500">No results for "{submittedQuery}"</Text>
         </View>
       ) : (
         <SectionList
@@ -178,7 +178,7 @@ export default function SearchScreen() {
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section }) => (
             <View className="px-4 pt-4 pb-1.5 bg-white dark:bg-slate-900">
-              <Text className="text-[12px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">
+              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">
                 {section.title}
               </Text>
             </View>
@@ -189,24 +189,24 @@ export default function SearchScreen() {
               const statusColor = STATUS_HEX_COLORS[t.status] ?? "#6b7280";
               return (
                 <TouchableOpacity
-                  className="bg-white dark:bg-slate-800 mx-4 mb-2 rounded-[10px] p-3.5 border border-gray-200 dark:border-slate-700 gap-1"
+                  className="bg-white dark:bg-slate-800 mx-4 mb-2 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-1"
                   onPress={() => router.push(`/task/${t.id}` as Parameters<typeof router.push>[0])}
                   activeOpacity={0.7}
                 >
                   <View className="flex-row items-center gap-2">
-                    <Text className="text-[11px] text-gray-400 dark:text-slate-500" style={{ fontVariant: ["tabular-nums"] }}>
+                    <Text className="text-xs text-gray-400 dark:text-slate-500" style={{ fontVariant: ["tabular-nums"] }}>
                       #{t.taskNumber}
                     </Text>
                     <View className="rounded px-1.5 py-0.5" style={{ backgroundColor: statusColor + "20" }}>
-                      <Text className="text-[10px] font-semibold uppercase" style={{ color: statusColor }}>
+                      <Text className="text-xs font-semibold uppercase" style={{ color: statusColor }}>
                         {t.status.replace("_", " ")}
                       </Text>
                     </View>
                     {t.priority && (
-                      <Text className="text-[11px] text-gray-400 dark:text-slate-500 capitalize">{t.priority}</Text>
+                      <Text className="text-xs text-gray-400 dark:text-slate-500 capitalize">{t.priority}</Text>
                     )}
                   </View>
-                  <Text className="text-[14px] font-semibold text-gray-900 dark:text-slate-100" numberOfLines={2}>
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100" numberOfLines={2}>
                     {t.title}
                   </Text>
                 </TouchableOpacity>
@@ -222,18 +222,18 @@ export default function SearchScreen() {
                 : null;
               return (
                 <TouchableOpacity
-                  className="bg-white dark:bg-slate-800 mx-4 mb-2 rounded-[10px] p-3.5 border border-gray-200 dark:border-slate-700 gap-1"
+                  className="bg-white dark:bg-slate-800 mx-4 mb-2 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-1"
                   onPress={() => dest && router.push(dest as Parameters<typeof router.push>[0])}
                   activeOpacity={0.7}
                   disabled={!dest}
                 >
                   <View className="flex-row items-center gap-1.5">
                     <Ionicons name="chatbubble-outline" size={13} color="#9ca3af" />
-                    <Text className="text-[11px] text-gray-400 dark:text-slate-500">
+                    <Text className="text-xs text-gray-400 dark:text-slate-500">
                       {m.taskId ? "Task message" : "Channel message"}
                     </Text>
                   </View>
-                  <Text className="text-[14px] text-gray-900 dark:text-slate-100" numberOfLines={3}>
+                  <Text className="text-sm text-gray-900 dark:text-slate-100" numberOfLines={3}>
                     {m.content}
                   </Text>
                 </TouchableOpacity>
@@ -244,15 +244,15 @@ export default function SearchScreen() {
               const d = item as DeliverableResult;
               return (
                 <TouchableOpacity
-                  className="bg-white dark:bg-slate-800 mx-4 mb-2 rounded-[10px] p-3.5 border border-gray-200 dark:border-slate-700 gap-1"
+                  className="bg-white dark:bg-slate-800 mx-4 mb-2 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-1"
                   onPress={() => router.push(`/deliverable/${d.id}` as Parameters<typeof router.push>[0])}
                   activeOpacity={0.7}
                 >
                   <View className="flex-row items-center gap-1.5">
                     <Ionicons name="attach-outline" size={13} color="#9ca3af" />
-                    <Text className="text-[11px] text-gray-400 dark:text-slate-500 capitalize">{d.type}</Text>
+                    <Text className="text-xs text-gray-400 dark:text-slate-500 capitalize">{d.type}</Text>
                   </View>
-                  <Text className="text-[14px] font-semibold text-gray-900 dark:text-slate-100" numberOfLines={2}>
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100" numberOfLines={2}>
                     {d.title}
                   </Text>
                 </TouchableOpacity>

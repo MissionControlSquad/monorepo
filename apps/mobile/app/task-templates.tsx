@@ -115,7 +115,7 @@ function TemplateFormModal({
           <TouchableOpacity onPress={onClose}>
             <Text className="text-base text-gray-500 dark:text-slate-400">Cancel</Text>
           </TouchableOpacity>
-          <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">
+          <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">
             {isEdit ? "Edit Template" : "New Template"}
           </Text>
           <TouchableOpacity onPress={handleSave} disabled={loading}>
@@ -131,9 +131,9 @@ function TemplateFormModal({
         >
           {/* Name */}
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Name *</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Name *</Text>
             <TextInput
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               placeholder="Template name…"
               placeholderTextColor="#9ca3af"
               value={name}
@@ -144,9 +144,9 @@ function TemplateFormModal({
 
           {/* Description */}
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Description</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Description</Text>
             <TextInput
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               style={{ minHeight: 70, textAlignVertical: "top" }}
               placeholder="What this template is for…"
               placeholderTextColor="#9ca3af"
@@ -158,10 +158,10 @@ function TemplateFormModal({
 
           {/* Subtasks */}
           <View className="gap-2">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Subtasks ({subtasks.length})</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Subtasks ({subtasks.length})</Text>
             {subtasks.map((s, i) => (
               <View key={i} className="flex-row items-center bg-white dark:bg-slate-800 rounded-lg px-3 py-2.5 gap-2.5">
-                <Text className="flex-1 text-[14px] text-gray-900 dark:text-slate-100">{s.title}</Text>
+                <Text className="flex-1 text-sm text-gray-900 dark:text-slate-100">{s.title}</Text>
                 <TouchableOpacity onPress={() => removeSubtask(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Text className="text-base text-red-600 dark:text-red-400">✕</Text>
                 </TouchableOpacity>
@@ -169,7 +169,7 @@ function TemplateFormModal({
             ))}
             <View className="flex-row gap-2">
               <TextInput
-                className="flex-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3 py-2.5 text-[14px] text-gray-900 dark:text-slate-100"
+                className="flex-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 text-sm text-gray-900 dark:text-slate-100"
                 placeholder="Add subtask…"
                 placeholderTextColor="#9ca3af"
                 value={subtaskInput}
@@ -180,7 +180,7 @@ function TemplateFormModal({
               />
               <TouchableOpacity
                 onPress={addSubtask}
-                className="bg-blue-600 rounded-[10px] px-3.5 justify-center"
+                className="bg-blue-600 rounded-xl px-3.5 justify-center"
                 activeOpacity={0.7}
               >
                 <Text className="text-white font-bold">Add</Text>
@@ -250,10 +250,10 @@ export default function TaskTemplatesScreen() {
       <View className="flex-row p-3 border-b border-gray-200 dark:border-slate-700 justify-end">
         <TouchableOpacity
           onPress={() => { setEditing(null); setFormVisible(true); }}
-          className="px-3.5 py-[7px] rounded-lg bg-blue-600"
+          className="px-3.5 py-2 rounded-lg bg-blue-600"
           activeOpacity={0.7}
         >
-          <Text className="text-[13px] font-bold text-white">+ New Template</Text>
+          <Text className="text-sm font-bold text-white">+ New Template</Text>
         </TouchableOpacity>
       </View>
 
@@ -280,7 +280,7 @@ export default function TaskTemplatesScreen() {
           const subtasks = parseSubtasks(item.subtasks);
           return (
             <TouchableOpacity
-              className="bg-white dark:bg-slate-800 rounded-[12px] p-3.5 border border-gray-200 dark:border-slate-700 gap-2"
+              className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2"
               onLongPress={() => handleLongPress(item)}
               onPress={() => { setEditing(item); setFormVisible(true); }}
               delayLongPress={400}
@@ -288,27 +288,27 @@ export default function TaskTemplatesScreen() {
             >
               <View className="flex-row items-center gap-2">
                 <Text className="text-base">📋</Text>
-                <Text className="flex-1 text-[15px] font-bold text-gray-900 dark:text-slate-100" numberOfLines={1}>
+                <Text className="flex-1 text-base font-bold text-gray-900 dark:text-slate-100" numberOfLines={1}>
                   {item.name}
                 </Text>
-                <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatDate(item.updatedAt)}</Text>
+                <Text className="text-xs text-gray-400 dark:text-slate-500">{formatDate(item.updatedAt)}</Text>
               </View>
 
               {item.description ? (
-                <Text className="text-[13px] text-gray-500 dark:text-slate-400" numberOfLines={2}>
+                <Text className="text-sm text-gray-500 dark:text-slate-400" numberOfLines={2}>
                   {item.description}
                 </Text>
               ) : null}
 
               {subtasks.length > 0 && (
-                <View className="gap-[3px]">
+                <View className="gap-1">
                   {subtasks.slice(0, 3).map((s, i) => (
-                    <Text key={i} className="text-[12px] text-gray-400 dark:text-slate-500">
+                    <Text key={i} className="text-xs text-gray-400 dark:text-slate-500">
                       · {s.title}
                     </Text>
                   ))}
                   {subtasks.length > 3 && (
-                    <Text className="text-[12px] text-gray-400 dark:text-slate-500">
+                    <Text className="text-xs text-gray-400 dark:text-slate-500">
                       +{subtasks.length - 3} more subtasks
                     </Text>
                   )}
@@ -316,8 +316,8 @@ export default function TaskTemplatesScreen() {
               )}
 
               <View className="flex-row gap-2">
-                <View className="bg-blue-50 dark:bg-blue-900/30 rounded-[6px] px-2 py-[3px]">
-                  <Text className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold">
+                <View className="bg-blue-50 dark:bg-blue-900/30 rounded-md px-2 py-1">
+                  <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">
                     {subtasks.length} subtask{subtasks.length !== 1 ? "s" : ""}
                   </Text>
                 </View>

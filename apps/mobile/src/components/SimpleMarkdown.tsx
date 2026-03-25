@@ -20,14 +20,14 @@ export function SimpleMarkdown({ content }: { content: string }) {
         <View key={key} className="bg-slate-900 rounded-lg p-3 my-1 gap-1.5">
           {codeLang ? (
             <Text
-              className="uppercase tracking-wide text-[10px] text-slate-400"
+              className="uppercase tracking-wide text-xs text-slate-400"
               style={{ fontFamily: MONO, letterSpacing: 0.5 }}
             >
               {codeLang}
             </Text>
           ) : null}
           <Text
-            className="text-slate-300 text-[13px] leading-5"
+            className="text-slate-300 text-sm leading-5"
             style={{ fontFamily: MONO }}
             selectable
           >
@@ -61,19 +61,19 @@ export function SimpleMarkdown({ content }: { content: string }) {
 
     if (line.startsWith("### ")) {
       elements.push(
-        <Text key={key} className="text-[15px] font-bold text-gray-700 dark:text-slate-200 mt-1.5 mb-0.5 leading-[22px]">
+        <Text key={key} className="text-base font-bold text-gray-700 dark:text-slate-200 mt-1.5 mb-0.5 leading-[22px]">
           {renderInline(line.slice(4))}
         </Text>
       );
     } else if (line.startsWith("## ")) {
       elements.push(
-        <Text key={key} className="text-[17px] font-bold text-gray-900 dark:text-slate-100 mt-2 mb-1 leading-6">
+        <Text key={key} className="text-lg font-bold text-gray-900 dark:text-slate-100 mt-2 mb-1 leading-6">
           {renderInline(line.slice(3))}
         </Text>
       );
     } else if (line.startsWith("# ")) {
       elements.push(
-        <Text key={key} className="text-[20px] font-extrabold text-gray-900 dark:text-slate-100 mt-2.5 mb-1 leading-7">
+        <Text key={key} className="text-xl font-extrabold text-gray-900 dark:text-slate-100 mt-2.5 mb-1 leading-7">
           {renderInline(line.slice(2))}
         </Text>
       );
@@ -82,8 +82,8 @@ export function SimpleMarkdown({ content }: { content: string }) {
     } else if (line.startsWith("- ") || line.startsWith("* ")) {
       elements.push(
         <View key={key} className="flex-row gap-2 items-start">
-          <Text className="text-[15px] text-gray-500 dark:text-slate-400 leading-6 w-3.5">•</Text>
-          <Text className="text-[15px] text-gray-700 dark:text-slate-300 leading-6 flex-1">
+          <Text className="text-base text-gray-500 dark:text-slate-400 leading-6 w-3.5">•</Text>
+          <Text className="text-base text-gray-700 dark:text-slate-300 leading-6 flex-1">
             {renderInline(line.slice(2))}
           </Text>
         </View>
@@ -93,8 +93,8 @@ export function SimpleMarkdown({ content }: { content: string }) {
       const num = line.slice(0, dotIdx);
       elements.push(
         <View key={key} className="flex-row gap-2 items-start">
-          <Text className="text-[15px] text-gray-500 dark:text-slate-400 leading-6 w-3.5">{num}.</Text>
-          <Text className="text-[15px] text-gray-700 dark:text-slate-300 leading-6 flex-1">
+          <Text className="text-base text-gray-500 dark:text-slate-400 leading-6 w-3.5">{num}.</Text>
+          <Text className="text-base text-gray-700 dark:text-slate-300 leading-6 flex-1">
             {renderInline(line.slice(dotIdx + 2))}
           </Text>
         </View>
@@ -103,7 +103,7 @@ export function SimpleMarkdown({ content }: { content: string }) {
       elements.push(<View key={key} className="h-2" />);
     } else {
       elements.push(
-        <Text key={key} className="text-[15px] text-gray-700 dark:text-slate-300 leading-6" selectable>
+        <Text key={key} className="text-base text-gray-700 dark:text-slate-300 leading-6" selectable>
           {renderInline(line)}
         </Text>
       );
@@ -146,7 +146,7 @@ function renderInline(text: string): React.ReactNode {
           return (
             <Text
               key={i}
-              className="text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/50 rounded text-[13px] px-[3px]"
+              className="text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/50 rounded text-sm px-1"
               style={{ fontFamily: MONO }}
             >
               {part.slice(1, -1)}

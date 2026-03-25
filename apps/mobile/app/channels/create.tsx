@@ -89,9 +89,9 @@ export default function CreateChannelScreen() {
       >
         {/* Name */}
         <View className="gap-1.5">
-          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Channel Name *</Text>
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Channel Name *</Text>
           <TextInput
-            className="border border-gray-300 dark:border-slate-600 rounded-[10px] p-3 text-[15px] text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+            className="border border-gray-300 dark:border-slate-600 rounded-xl p-3 text-base text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
             value={name}
             onChangeText={setName}
             placeholder="e.g. engineering-team"
@@ -100,15 +100,15 @@ export default function CreateChannelScreen() {
             autoFocus
           />
           {name.trim().length > 0 && (
-            <Text className="text-[12px] text-gray-400 dark:text-slate-500 mt-0.5">Slug: #{slugify(name.trim())}</Text>
+            <Text className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Slug: #{slugify(name.trim())}</Text>
           )}
         </View>
 
         {/* Description */}
         <View className="gap-1.5">
-          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Description</Text>
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Description</Text>
           <TextInput
-            className="border border-gray-300 dark:border-slate-600 rounded-[10px] p-3 text-[15px] text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+            className="border border-gray-300 dark:border-slate-600 rounded-xl p-3 text-base text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
             style={{ height: 80 }}
             value={description}
             onChangeText={setDescription}
@@ -122,12 +122,12 @@ export default function CreateChannelScreen() {
 
         {/* Visibility */}
         <View className="gap-1.5">
-          <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Visibility</Text>
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Visibility</Text>
           <View className="flex-row gap-2">
             {VISIBILITY_OPTIONS.map((opt) => (
               <TouchableOpacity
                 key={opt.key}
-                className={`flex-1 border rounded-[10px] p-3 items-center gap-0.5 ${
+                className={`flex-1 border rounded-xl p-3 items-center gap-0.5 ${
                   visibility === opt.key
                     ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
                     : "border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800"
@@ -136,7 +136,7 @@ export default function CreateChannelScreen() {
                 activeOpacity={0.8}
               >
                 <Text
-                  className={`text-[13px] font-semibold ${
+                  className={`text-sm font-semibold ${
                     visibility === opt.key
                       ? "text-blue-600 dark:text-blue-400"
                       : "text-gray-700 dark:text-slate-300"
@@ -144,14 +144,14 @@ export default function CreateChannelScreen() {
                 >
                   {opt.label}
                 </Text>
-                <Text className="text-[10px] text-gray-400 dark:text-slate-500 text-center">{opt.desc}</Text>
+                <Text className="text-xs text-gray-400 dark:text-slate-500 text-center">{opt.desc}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
         <TouchableOpacity
-          className={`bg-blue-600 rounded-[12px] p-3.5 items-center mt-2 ${saving ? "opacity-60" : ""}`}
+          className={`bg-blue-600 rounded-xl p-3.5 items-center mt-2 ${saving ? "opacity-60" : ""}`}
           onPress={handleCreate}
           disabled={saving}
         >

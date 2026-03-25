@@ -216,39 +216,39 @@ export default function AgentDetailScreen() {
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">
       {/* Header */}
       <View className="flex-row items-start gap-3 bg-white dark:bg-slate-800 p-4 border-b border-gray-200 dark:border-slate-700">
-        <View className="w-[52px] h-[52px] rounded-[26px] bg-gray-100 dark:bg-slate-700 justify-center items-center">
+        <View className="w-14 h-14 rounded-full bg-gray-100 dark:bg-slate-700 justify-center items-center">
           <Text className="text-[26px]">{agent.identityEmoji ?? DEFAULT_AGENT_EMOJI}</Text>
           <View
-            className="absolute bottom-0 right-0 w-[14px] h-[14px] rounded-[7px] border-2 border-white dark:border-slate-800"
+            className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-800"
             style={{ backgroundColor: online ? dotColor : "#d1d5db" }}
           />
         </View>
         <View className="flex-1 gap-1">
           <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">{agent.name}</Text>
-          <Text className="text-[13px] text-gray-500 dark:text-slate-400">{agent.role}</Text>
+          <Text className="text-sm text-gray-500 dark:text-slate-400">{agent.role}</Text>
           <View className="flex-row gap-1.5 mt-0.5 flex-wrap">
             {isDeactivated ? (
               <View className="rounded bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5">
-                <Text className="text-[11px] font-semibold text-gray-400 dark:text-slate-500">Deactivated</Text>
+                <Text className="text-xs font-semibold text-gray-400 dark:text-slate-500">Deactivated</Text>
               </View>
             ) : (
               <View
                 className="rounded px-1.5 py-0.5"
                 style={{ backgroundColor: (online ? dotColor : "#6b7280") + "22" }}
               >
-                <Text className="text-[11px] font-semibold" style={{ color: online ? dotColor : "#6b7280" }}>
+                <Text className="text-xs font-semibold" style={{ color: online ? dotColor : "#6b7280" }}>
                   {online ? (agent.detailedStatus ? humanizeLabel(agent.detailedStatus) : humanizeLabel(agent.status)) : "Offline"}
                 </Text>
               </View>
             )}
             {agent.isOnVacation && (
               <View className="rounded bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5">
-                <Text className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">On Vacation</Text>
+                <Text className="text-xs font-semibold text-amber-600 dark:text-amber-400">On Vacation</Text>
               </View>
             )}
             {agent.upgradeAvailable && (
               <View className="rounded bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5">
-                <Text className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">↑ Upgrade</Text>
+                <Text className="text-xs font-semibold text-amber-600 dark:text-amber-400">↑ Upgrade</Text>
               </View>
             )}
           </View>
@@ -293,11 +293,11 @@ export default function AgentDetailScreen() {
         {(["overview", "tasks", "deliverables", "queue", "activity", "history", ...(agent.setupStatus !== "deactivated" ? ["setup"] : [])] as Tab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
-            className={`items-center justify-center py-[13px] px-[14px] border-b-2 ${activeTab === tab ? "border-blue-600" : "border-transparent"}`}
+            className={`items-center justify-center py-3.5 px-3.5 border-b-2 ${activeTab === tab ? "border-blue-600" : "border-transparent"}`}
             onPress={() => setActiveTab(tab)}
             activeOpacity={0.7}
           >
-            <Text className={`text-[13px] ${activeTab === tab ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
+            <Text className={`text-sm ${activeTab === tab ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </Text>
           </TouchableOpacity>
@@ -358,7 +358,7 @@ function StatCard({ label, value, isText }: { label: string; value: number | str
   return (
     <View className="flex-1 items-center py-2.5 gap-0.5">
       <Text className="text-base font-bold text-gray-900 dark:text-slate-100">{isText ? value : (value as number).toLocaleString()}</Text>
-      <Text className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-[0.3px]">{label}</Text>
+      <Text className="text-xs text-gray-400 dark:text-slate-500 uppercase tracking-[0.3px]">{label}</Text>
     </View>
   );
 }
@@ -392,12 +392,12 @@ function UpgradeBanner({ agentId, serverUrl }: { agentId: string; serverUrl: str
   };
 
   return (
-    <View className="bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-200 dark:border-amber-700 p-[14px] gap-2.5">
+    <View className="bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-200 dark:border-amber-700 p-3.5 gap-2.5">
       <View className="flex-row items-center gap-2.5">
         <Ionicons name="arrow-up-circle" size={22} color="#d97706" />
         <View className="flex-1">
-          <Text className="text-[14px] font-bold text-amber-900 dark:text-amber-200">Upgrade Available</Text>
-          <Text className="text-[12px] text-amber-700 dark:text-amber-400 mt-0.5">
+          <Text className="text-sm font-bold text-amber-900 dark:text-amber-200">Upgrade Available</Text>
+          <Text className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
             A new version of the agent runtime is available. Create an upgrade task for the agent to apply it on next heartbeat.
           </Text>
         </View>
@@ -405,11 +405,11 @@ function UpgradeBanner({ agentId, serverUrl }: { agentId: string; serverUrl: str
       {requested ? (
         <View className="bg-green-100 dark:bg-green-900/20 rounded-lg p-2.5 flex-row items-center gap-1.5">
           <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
-          <Text className="text-[12px] text-green-700 dark:text-green-400 font-semibold">Upgrade task created. Agent will apply it on next heartbeat.</Text>
+          <Text className="text-xs text-green-700 dark:text-green-400 font-semibold">Upgrade task created. Agent will apply it on next heartbeat.</Text>
         </View>
       ) : (
         <TouchableOpacity
-          className="bg-amber-600 rounded-lg py-[9px] items-center"
+          className="bg-amber-600 rounded-lg py-2.5 items-center"
           style={{ opacity: requesting ? 0.6 : 1 }}
           onPress={handleRequestUpgrade}
           disabled={requesting}
@@ -418,7 +418,7 @@ function UpgradeBanner({ agentId, serverUrl }: { agentId: string; serverUrl: str
           {requesting ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text className="text-white text-[13px] font-semibold">Request Upgrade</Text>
+            <Text className="text-white text-sm font-semibold">Request Upgrade</Text>
           )}
         </TouchableOpacity>
       )}
@@ -438,13 +438,13 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
 
       {agent.currentTask && agent.currentTaskRef && (
         <TouchableOpacity
-          className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-[14px] border border-blue-200 dark:border-blue-800 gap-1.5"
+          className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3.5 border border-blue-200 dark:border-blue-800 gap-1.5"
           onPress={() => router.push(`/task/${agent.currentTaskRef!.id}`)}
           activeOpacity={0.7}
         >
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.5px]">Current Task</Text>
-          <Text className="text-[14px] font-semibold text-blue-800 dark:text-blue-300">#{agent.currentTaskRef.taskNumber} {agent.currentTaskRef.title}</Text>
-          {agent.statusMessage && <Text className="text-[12px] text-blue-500 dark:text-blue-400">{agent.statusMessage}</Text>}
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.5px]">Current Task</Text>
+          <Text className="text-sm font-semibold text-blue-800 dark:text-blue-300">#{agent.currentTaskRef.taskNumber} {agent.currentTaskRef.title}</Text>
+          {agent.statusMessage && <Text className="text-xs text-blue-500 dark:text-blue-400">{agent.statusMessage}</Text>}
         </TouchableOpacity>
       )}
 
@@ -455,10 +455,10 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
         {agent.workspacePath && <InfoRow label="Workspace" value={agent.workspacePath} mono />}
         {agent.apiKeyPrefix && (
           <View className="flex-row items-center justify-between py-2.5 border-b border-gray-100 dark:border-slate-700">
-            <Text className="text-[13px] text-gray-500 dark:text-slate-400 w-[90px]">API Key</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400 w-[90px]">API Key</Text>
             <View className="flex-row items-center gap-2.5">
               <Text
-                className="text-[13px] text-gray-900 dark:text-slate-100 flex-1 text-right"
+                className="text-sm text-gray-900 dark:text-slate-100 flex-1 text-right"
                 style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
               >
                 {agent.apiKeyPrefix}…
@@ -500,7 +500,7 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
                 className="bg-amber-50 dark:bg-amber-900/20 rounded-md px-2 py-1"
                 activeOpacity={0.7}
               >
-                <Text className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">Regen</Text>
+                <Text className="text-xs font-semibold text-amber-600 dark:text-amber-400">Regen</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -519,7 +519,7 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
           activeOpacity={0.75}
         >
           <View className="flex-row items-center justify-between">
-            <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.5px]">Cloud VM</Text>
+            <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.5px]">Cloud VM</Text>
             <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
           </View>
           <InfoRow label="Name" value={agent.cloudVm.name} />
@@ -530,8 +530,8 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
 
       {agent.personality && (
         <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.5px]">Personality</Text>
-          <Text className="text-[14px] text-gray-700 dark:text-slate-300 leading-[22px]">{agent.personality}</Text>
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.5px]">Personality</Text>
+          <Text className="text-sm text-gray-700 dark:text-slate-300 leading-[22px]">{agent.personality}</Text>
         </View>
       )}
     </ScrollView>
@@ -541,9 +541,9 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <View className="flex-row justify-between gap-3">
-      <Text className="text-[13px] text-gray-500 dark:text-slate-400 w-[90px]">{label}</Text>
+      <Text className="text-sm text-gray-500 dark:text-slate-400 w-[90px]">{label}</Text>
       <Text
-        className="text-[13px] text-gray-900 dark:text-slate-100 flex-1 text-right"
+        className="text-sm text-gray-900 dark:text-slate-100 flex-1 text-right"
         style={mono ? { fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", fontSize: 11 } : undefined}
         numberOfLines={2}
       >
@@ -638,7 +638,7 @@ function QueueTab({
             return (
               <>
                 {showHeader && (
-                  <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.5px] mb-1.5 mt-1">
+                  <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.5px] mb-1.5 mt-1">
                     {item._group}
                   </Text>
                 )}
@@ -658,7 +658,7 @@ function QueueTab({
       <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAddModal(false)}>
         <View className="flex-1 bg-gray-50 dark:bg-slate-900">
           <View className="flex-row items-center justify-between p-4 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
-            <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">Add Queue Item</Text>
+            <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">Add Queue Item</Text>
             <TouchableOpacity onPress={() => setShowAddModal(false)}>
               <Ionicons name="close" size={22} color="#6b7280" />
             </TouchableOpacity>
@@ -667,7 +667,7 @@ function QueueTab({
             <View className="gap-1.5">
               <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Title *</Text>
               <TextInput
-                className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-[14px] py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+                className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 value={newTitle}
                 onChangeText={setNewTitle}
                 placeholder="What needs to be done?"
@@ -678,7 +678,7 @@ function QueueTab({
             <View className="gap-1.5">
               <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Description</Text>
               <TextInput
-                className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-[14px] py-[11px] text-[15px] text-gray-900 dark:text-slate-100 min-h-[80px]"
+                className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100 min-h-[80px]"
                 value={newDesc}
                 onChangeText={setNewDesc}
                 placeholder="Additional context…"
@@ -689,13 +689,13 @@ function QueueTab({
               />
             </View>
             <TouchableOpacity
-              className="bg-blue-600 rounded-xl py-[13px] items-center"
+              className="bg-blue-600 rounded-xl py-3.5 items-center"
               style={{ opacity: (!newTitle.trim() || creating) ? 0.45 : 1 }}
               onPress={handleCreate}
               disabled={!newTitle.trim() || creating}
               activeOpacity={0.8}
             >
-              {creating ? <ActivityIndicator color="#fff" size="small" /> : <Text className="text-white text-[15px] font-semibold">Add Item</Text>}
+              {creating ? <ActivityIndicator color="#fff" size="small" /> : <Text className="text-white text-base font-semibold">Add Item</Text>}
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -709,7 +709,7 @@ function QueueCard({ item, onStatusChange, onDelete, onTaskPress }: {
 }) {
   const color = STATUS_HEX_COLORS[item.status] ?? DEFAULT_COLOR;
   return (
-    <View className="bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 gap-2">
+    <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2">
       <View className="flex-row items-center gap-1.5">
         <TouchableOpacity
           className="rounded px-1.5 py-0.5"
@@ -717,14 +717,14 @@ function QueueCard({ item, onStatusChange, onDelete, onTaskPress }: {
           onPress={onStatusChange}
           activeOpacity={0.7}
         >
-          <Text className="text-[11px] font-semibold" style={{ color }}>{humanizeLabel(item.status)}</Text>
+          <Text className="text-xs font-semibold" style={{ color }}>{humanizeLabel(item.status)}</Text>
         </TouchableOpacity>
         {item.priority && (
           <View
             className="rounded px-1.5 py-0.5"
             style={{ backgroundColor: (PRIORITY_HEX_COLORS[item.priority] ?? DEFAULT_COLOR) + "22" }}
           >
-            <Text className="text-[11px] font-semibold" style={{ color: PRIORITY_HEX_COLORS[item.priority] ?? DEFAULT_COLOR }}>{item.priority}</Text>
+            <Text className="text-xs font-semibold" style={{ color: PRIORITY_HEX_COLORS[item.priority] ?? DEFAULT_COLOR }}>{item.priority}</Text>
           </View>
         )}
         <View className="flex-1" />
@@ -732,14 +732,14 @@ function QueueCard({ item, onStatusChange, onDelete, onTaskPress }: {
           <Ionicons name="trash-outline" size={15} color="#d1d5db" />
         </TouchableOpacity>
       </View>
-      <Text className="text-[14px] font-semibold text-gray-900 dark:text-slate-100">{item.title}</Text>
-      {item.description && <Text className="text-[13px] text-gray-500 dark:text-slate-400 leading-[18px]" numberOfLines={2}>{item.description}</Text>}
+      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">{item.title}</Text>
+      {item.description && <Text className="text-sm text-gray-500 dark:text-slate-400 leading-[18px]" numberOfLines={2}>{item.description}</Text>}
       {item.relatedTask && onTaskPress && (
         <TouchableOpacity onPress={onTaskPress}>
-          <Text className="text-[12px] text-blue-600 dark:text-blue-400">→ #{item.relatedTask.taskNumber} {item.relatedTask.title}</Text>
+          <Text className="text-xs text-blue-600 dark:text-blue-400">→ #{item.relatedTask.taskNumber} {item.relatedTask.title}</Text>
         </TouchableOpacity>
       )}
-      <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatRelativeTime(item.createdAt)}</Text>
+      <Text className="text-xs text-gray-400 dark:text-slate-500">{formatRelativeTime(item.createdAt)}</Text>
     </View>
   );
 }
@@ -793,24 +793,24 @@ function AgentTasksTab({
         const priorityColor = item.priority ? (PRIORITY_HEX_COLORS[item.priority] ?? DEFAULT_COLOR) : null;
         return (
           <TouchableOpacity
-            className="bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 gap-1.5"
+            className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-1.5"
             onPress={() => router.push(`/task/${item.id}`)}
             activeOpacity={0.7}
           >
             <View className="flex-row items-center gap-2">
-              <Text className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">#{item.taskNumber}</Text>
-              <View className="rounded-[5px] px-[7px] py-0.5" style={{ backgroundColor: statusColor + "18" }}>
-                <Text className="text-[11px] font-semibold capitalize" style={{ color: statusColor }}>
+              <Text className="text-xs text-gray-400 dark:text-slate-500 font-medium">#{item.taskNumber}</Text>
+              <View className="rounded px-2 py-0.5" style={{ backgroundColor: statusColor + "18" }}>
+                <Text className="text-xs font-semibold capitalize" style={{ color: statusColor }}>
                   {item.status.replace("_", " ")}
                 </Text>
               </View>
               {priorityColor && (
-                <View className="w-[7px] h-[7px] rounded-[3.5px]" style={{ backgroundColor: priorityColor }} />
+                <View className="w-2 h-2 rounded-[3.5px]" style={{ backgroundColor: priorityColor }} />
               )}
             </View>
-            <Text className="text-[14px] font-semibold text-gray-900 dark:text-slate-100 leading-[19px]" numberOfLines={2}>{item.title}</Text>
+            <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 leading-[19px]" numberOfLines={2}>{item.title}</Text>
             {item.dueDate && (
-              <Text className="text-[11px] text-gray-400 dark:text-slate-500">Due {formatDate(item.dueDate)}</Text>
+              <Text className="text-xs text-gray-400 dark:text-slate-500">Due {formatDate(item.dueDate)}</Text>
             )}
           </TouchableOpacity>
         );
@@ -865,26 +865,26 @@ function AgentDeliverablesTab({
         const kindIcon = KIND_ICONS[item.kind] ?? "📄";
         return (
           <TouchableOpacity
-            className="bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 gap-1.5"
+            className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-1.5"
             onPress={() => router.push(`/deliverable/${item.id}`)}
             activeOpacity={0.7}
           >
             <View
-              className="flex-row items-center gap-[5px] rounded-md px-2 py-[3px] self-start"
+              className="flex-row items-center gap-1 rounded-md px-2 py-1 self-start"
               style={{ backgroundColor: kindColor + "18" }}
             >
-              <Text className="text-[12px]">{kindIcon}</Text>
-              <Text className="text-[11px] font-semibold capitalize" style={{ color: kindColor }}>
+              <Text className="text-xs">{kindIcon}</Text>
+              <Text className="text-xs font-semibold capitalize" style={{ color: kindColor }}>
                 {item.kind} · v{item.version}
               </Text>
             </View>
-            <Text className="text-[14px] font-semibold text-gray-900 dark:text-slate-100 leading-[19px]" numberOfLines={2}>{item.title}</Text>
+            <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 leading-[19px]" numberOfLines={2}>{item.title}</Text>
             {item.task && (
-              <Text className="text-[12px] text-gray-500 dark:text-slate-400" numberOfLines={1}>
+              <Text className="text-xs text-gray-500 dark:text-slate-400" numberOfLines={1}>
                 #{item.task.taskNumber} {item.task.title}
               </Text>
             )}
-            <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatDate(item.createdAt)}</Text>
+            <Text className="text-xs text-gray-400 dark:text-slate-500">{formatDate(item.createdAt)}</Text>
           </TouchableOpacity>
         );
       }}
@@ -910,20 +910,20 @@ function ActivityTab({ actions, fetching, onRefresh, router }: {
         return (
           <View className="flex-row gap-2.5">
             <View className="items-center w-8 gap-1">
-              <Text className="text-[20px] text-center">{icon}</Text>
+              <Text className="text-xl text-center">{icon}</Text>
               <View className="flex-1 w-px bg-gray-200 dark:bg-slate-700" />
             </View>
             <View className="flex-1 gap-1 pb-4">
               <View className="flex-row items-center gap-2">
                 <View className="bg-gray-100 dark:bg-slate-700 rounded px-1.5 py-0.5">
-                  <Text className="text-[11px] text-gray-700 dark:text-slate-300 font-semibold">{humanizeLabel(item.actionType)}</Text>
+                  <Text className="text-xs text-gray-700 dark:text-slate-300 font-semibold">{humanizeLabel(item.actionType)}</Text>
                 </View>
-                <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatRelativeTime(item.timestamp)}</Text>
+                <Text className="text-xs text-gray-400 dark:text-slate-500">{formatRelativeTime(item.timestamp)}</Text>
               </View>
-              <Text className="text-[13px] text-gray-700 dark:text-slate-300 leading-[18px]">{item.description}</Text>
+              <Text className="text-sm text-gray-700 dark:text-slate-300 leading-[18px]">{item.description}</Text>
               {item.task && (
                 <TouchableOpacity onPress={() => router.push(`/task/${item.task!.id}`)}>
-                  <Text className="text-[12px] text-blue-600 dark:text-blue-400">→ #{item.task.taskNumber} {item.task.title}</Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-400">→ #{item.task.taskNumber} {item.task.title}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -948,18 +948,18 @@ function HistoryTab({ history, fetching, onRefresh }: {
       keyExtractor={(h) => h.id}
       contentContainerStyle={{ padding: 16, gap: 10 }}
       renderItem={({ item }) => (
-        <View className="bg-white dark:bg-slate-800 rounded-[10px] p-3 border border-gray-200 dark:border-slate-700 gap-1">
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-3 border border-gray-200 dark:border-slate-700 gap-1">
           <View className="flex-row items-center gap-2">
-            <Text className="text-[13px] text-gray-500 dark:text-slate-400">
+            <Text className="text-sm text-gray-500 dark:text-slate-400">
               {item.fromDetailedStatus ? humanizeLabel(item.fromDetailedStatus) : item.fromStatus ? humanizeLabel(item.fromStatus) : "—"}
             </Text>
             <Ionicons name="arrow-forward" size={12} color="#9ca3af" />
-            <Text className="text-[13px] font-semibold text-gray-900 dark:text-slate-100">
+            <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">
               {item.toDetailedStatus ? humanizeLabel(item.toDetailedStatus) : humanizeLabel(item.toStatus)}
             </Text>
           </View>
-          {item.statusMessage && <Text className="text-[12px] text-gray-500 dark:text-slate-400" numberOfLines={2}>{item.statusMessage}</Text>}
-          <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatRelativeTime(item.timestamp)}</Text>
+          {item.statusMessage && <Text className="text-xs text-gray-500 dark:text-slate-400" numberOfLines={2}>{item.statusMessage}</Text>}
+          <Text className="text-xs text-gray-400 dark:text-slate-500">{formatRelativeTime(item.timestamp)}</Text>
         </View>
       )}
     />
@@ -1080,7 +1080,7 @@ function SetupTab({ agentId }: { agentId: string }) {
         {(["auto", "manual"] as SetupMode[]).map((m) => (
           <TouchableOpacity
             key={m}
-            className={`flex-1 flex-row items-center justify-center gap-[5px] py-2 rounded-lg ${mode === m ? "bg-white dark:bg-slate-800" : ""}`}
+            className={`flex-1 flex-row items-center justify-center gap-1 py-2 rounded-lg ${mode === m ? "bg-white dark:bg-slate-800" : ""}`}
             onPress={() => setMode(m)}
             activeOpacity={0.7}
           >
@@ -1089,7 +1089,7 @@ function SetupTab({ agentId }: { agentId: string }) {
               size={14}
               color={mode === m ? "#2563eb" : "#6b7280"}
             />
-            <Text className={`text-[12px] ${mode === m ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
+            <Text className={`text-xs ${mode === m ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
               {m === "auto" ? "Auto Setup" : "Manual Setup"}
             </Text>
           </TouchableOpacity>
@@ -1106,7 +1106,7 @@ function SetupTab({ agentId }: { agentId: string }) {
 
       {/* API Key section */}
       {newApiKey ? (
-        <View className="bg-amber-50 dark:bg-amber-900/10 rounded-xl p-[14px] border border-amber-200 dark:border-amber-700 gap-2">
+        <View className="bg-amber-50 dark:bg-amber-900/10 rounded-xl p-3.5 border border-amber-200 dark:border-amber-700 gap-2">
           <View className="flex-row items-center gap-1.5">
             <Ionicons name="warning-outline" size={16} color="#d97706" />
             <Text className="text-[13px] font-bold text-amber-600 dark:text-amber-400">New API Key — Save now!</Text>
@@ -1115,17 +1115,17 @@ function SetupTab({ agentId }: { agentId: string }) {
                 Clipboard.setString(newApiKey);
                 Alert.alert("Copied", "API key copied to clipboard");
               }}
-              className="flex-row items-center gap-1 px-2.5 py-[5px] rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 ml-auto"
+              className="flex-row items-center gap-1 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 ml-auto"
               activeOpacity={0.7}
             >
               <Ionicons name="copy-outline" size={14} color="#2563eb" />
-              <Text className="text-[12px] text-blue-600 dark:text-blue-400 font-semibold">Copy</Text>
+              <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">Copy</Text>
             </TouchableOpacity>
           </View>
-          <Text className="text-[12px] text-amber-900 dark:text-amber-300">This key will only be shown once. It's embedded in the configs below.</Text>
+          <Text className="text-xs text-amber-900 dark:text-amber-300">This key will only be shown once. It's embedded in the configs below.</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator>
             <Text
-              className="text-[12px] text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800 p-2.5 rounded-md border border-amber-200 dark:border-amber-700"
+              className="text-xs text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800 p-2.5 rounded-md border border-amber-200 dark:border-amber-700"
               style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
               selectable
             >
@@ -1134,23 +1134,23 @@ function SetupTab({ agentId }: { agentId: string }) {
           </ScrollView>
         </View>
       ) : (
-        <View className="bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 gap-2">
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2">
           <View className="flex-row items-start gap-2.5">
             <View className="flex-1">
-              <Text className="text-[14px] font-bold text-gray-900 dark:text-slate-100">API Key</Text>
-              <Text className="text-[12px] text-gray-400 dark:text-slate-500 mb-1">
+              <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">API Key</Text>
+              <Text className="text-xs text-gray-400 dark:text-slate-500 mb-1">
                 {setup.agent.apiKeyPrefix
                   ? `Current key: ${setup.agent.apiKeyPrefix}…`
                   : "No API key configured yet"}
               </Text>
               {!setup.agent.apiKeyPrefix && (
-                <Text className="text-[12px] text-amber-600 dark:text-amber-400 mb-1">
+                <Text className="text-xs text-amber-600 dark:text-amber-400 mb-1">
                   Config files use $API_KEY placeholder. Regenerate to embed the real key.
                 </Text>
               )}
             </View>
             <TouchableOpacity
-              className="flex-row items-center gap-[5px] bg-red-50 dark:bg-red-950/30 rounded-lg px-2.5 py-[7px] border border-red-200 dark:border-red-800 shrink-0"
+              className="flex-row items-center gap-1 bg-red-50 dark:bg-red-950/30 rounded-lg px-2.5 py-2 border border-red-200 dark:border-red-800 shrink-0"
               style={{ opacity: regenerating ? 0.5 : 1 }}
               onPress={handleRegenerateKey}
               disabled={regenerating}
@@ -1180,7 +1180,7 @@ function SetupTab({ agentId }: { agentId: string }) {
           </View>
 
           {setup.bootstrapMessage ? (
-            <View className="bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 gap-2">
+            <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2">
               <View className="flex-row items-start gap-2.5">
                 <Text className="text-[14px] font-bold text-gray-900 dark:text-slate-100">Bootstrap Message</Text>
                 <TouchableOpacity
@@ -1214,7 +1214,7 @@ function SetupTab({ agentId }: { agentId: string }) {
         <>
           {/* Workspace path */}
           {setup.workspacePath && (
-            <View className="bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 gap-2">
+            <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2">
               <Text className="text-[14px] font-bold text-gray-900 dark:text-slate-100">1. Create Workspace</Text>
               <View className="bg-slate-800 rounded-lg p-3">
                 <Text
@@ -1230,7 +1230,7 @@ function SetupTab({ agentId }: { agentId: string }) {
 
           {/* Config files */}
           {setup.configFiles.length > 0 && (
-            <View className="bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 gap-2">
+            <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2">
               <Text className="text-[14px] font-bold text-gray-900 dark:text-slate-100">2. Config Files ({setup.configFiles.length})</Text>
               <Text className="text-[12px] text-gray-400 dark:text-slate-500 mb-1">
                 Extract to{" "}
@@ -1275,7 +1275,7 @@ function SetupTab({ agentId }: { agentId: string }) {
 
           {/* Cron command */}
           {setup.cronCommand && (
-            <View className="bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 gap-2">
+            <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2">
               <View className="flex-row items-start gap-2.5">
                 <Text className="text-[14px] font-bold text-gray-900 dark:text-slate-100">3. Heartbeat Cron</Text>
                 <TouchableOpacity

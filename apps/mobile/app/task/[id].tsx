@@ -160,16 +160,16 @@ function RejectModal({
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
         <View className="flex-1 bg-white dark:bg-slate-800">
           <View className="flex-row items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200 dark:border-slate-700">
-            <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">Reject Task</Text>
+            <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">Reject Task</Text>
             <TouchableOpacity onPress={onClose} className="p-1">
-              <Text className="text-[22px] text-gray-700 dark:text-slate-300">✕</Text>
+              <Text className="text-xl text-gray-700 dark:text-slate-300">✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
             <View style={{ gap: 6 }}>
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Rejection Reason *</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Rejection Reason *</Text>
               <TextInput
-                className="border border-gray-300 dark:border-slate-600 rounded-lg p-[10px] text-[15px] text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
+                className="border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
                 style={{ height: 80 }}
                 value={reason}
                 onChangeText={setReason}
@@ -179,31 +179,31 @@ function RejectModal({
               />
             </View>
             <View style={{ gap: 6 }}>
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Changes Needed</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Changes Needed</Text>
               <View className="flex-row gap-2">
                 <TextInput
-                  className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg p-[10px] text-[15px] text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
+                  className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
                   value={changeText}
                   onChangeText={setChangeText}
                   placeholder="Add a required change"
                   returnKeyType="done"
                   onSubmitEditing={addChange}
                 />
-                <TouchableOpacity className="bg-blue-600 rounded-lg px-[14px] py-[10px] justify-center" onPress={addChange}>
+                <TouchableOpacity className="bg-blue-600 rounded-lg px-3.5 py-2.5 justify-center" onPress={addChange}>
                   <Text className="text-white font-semibold">Add</Text>
                 </TouchableOpacity>
               </View>
               {changes.map((c, i) => (
                 <View key={i} className="flex-row items-center gap-2 py-1">
-                  <Text className="flex-1 text-[13px] text-gray-700 dark:text-slate-300" numberOfLines={2}>• {c}</Text>
+                  <Text className="flex-1 text-sm text-gray-700 dark:text-slate-300" numberOfLines={2}>• {c}</Text>
                   <TouchableOpacity onPress={() => removeChange(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text className="text-red-600 text-[16px]">✕</Text>
+                    <Text className="text-red-600 text-base">✕</Text>
                   </TouchableOpacity>
                 </View>
               ))}
             </View>
-            <TouchableOpacity className="bg-red-600 rounded-[10px] p-[14px] items-center" onPress={handleConfirm}>
-              <Text className="text-white font-bold text-[15px]">Reject Task</Text>
+            <TouchableOpacity className="bg-red-600 rounded-xl p-3.5 items-center" onPress={handleConfirm}>
+              <Text className="text-white font-bold text-base">Reject Task</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -255,41 +255,41 @@ function ClarifyModal({
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
         <View className="flex-1 bg-white dark:bg-slate-800">
           <View className="flex-row items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200 dark:border-slate-700">
-            <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">Request Clarification</Text>
+            <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">Request Clarification</Text>
             <TouchableOpacity onPress={onClose} className="p-1">
-              <Text className="text-[22px] text-gray-700 dark:text-slate-300">✕</Text>
+              <Text className="text-xl text-gray-700 dark:text-slate-300">✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
             <View style={{ gap: 6 }}>
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Questions</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Questions</Text>
               <View className="flex-row gap-2">
                 <TextInput
-                  className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg p-[10px] text-[15px] text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
+                  className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
                   value={questionText}
                   onChangeText={setQuestionText}
                   placeholder="Add a question"
                   returnKeyType="done"
                   onSubmitEditing={addQuestion}
                 />
-                <TouchableOpacity className="bg-blue-600 rounded-lg px-[14px] py-[10px] justify-center" onPress={addQuestion}>
+                <TouchableOpacity className="bg-blue-600 rounded-lg px-3.5 py-2.5 justify-center" onPress={addQuestion}>
                   <Text className="text-white font-semibold">Add</Text>
                 </TouchableOpacity>
               </View>
               {questions.map((q, i) => (
                 <View key={i} className="flex-row items-center gap-2 py-1">
-                  <Text className="flex-1 text-[13px] text-gray-700 dark:text-slate-300" numberOfLines={2}>• {q}</Text>
+                  <Text className="flex-1 text-sm text-gray-700 dark:text-slate-300" numberOfLines={2}>• {q}</Text>
                   <TouchableOpacity onPress={() => removeQuestion(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text className="text-red-600 text-[16px]">✕</Text>
+                    <Text className="text-red-600 text-base">✕</Text>
                   </TouchableOpacity>
                 </View>
               ))}
             </View>
             <TouchableOpacity
-              className="bg-violet-700 rounded-[10px] p-[14px] items-center"
+              className="bg-violet-700 rounded-xl p-3.5 items-center"
               onPress={handleConfirm}
             >
-              <Text className="text-white font-bold text-[15px]">Send Questions</Text>
+              <Text className="text-white font-bold text-base">Send Questions</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -336,16 +336,16 @@ function ApproveModal({
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
         <View className="flex-1 bg-white dark:bg-slate-800">
           <View className="flex-row items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200 dark:border-slate-700">
-            <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">Approve Task</Text>
+            <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">Approve Task</Text>
             <TouchableOpacity onPress={onClose} className="p-1">
-              <Text className="text-[22px] text-gray-700 dark:text-slate-300">✕</Text>
+              <Text className="text-xl text-gray-700 dark:text-slate-300">✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
             <View style={{ gap: 6 }}>
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Approval Comment (optional)</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Approval Comment (optional)</Text>
               <TextInput
-                className="border border-gray-300 dark:border-slate-600 rounded-lg p-[10px] text-[15px] text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
+                className="border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
                 style={{ height: 72 }}
                 value={comment}
                 onChangeText={setComment}
@@ -355,34 +355,34 @@ function ApproveModal({
               />
             </View>
             <View style={{ gap: 6 }}>
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Spawn Follow-up Tasks (optional)</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Spawn Follow-up Tasks (optional)</Text>
               <View className="flex-row gap-2">
                 <TextInput
-                  className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg p-[10px] text-[15px] text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
+                  className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg p-2.5 text-base text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
                   value={taskTitle}
                   onChangeText={setTaskTitle}
                   placeholder="Follow-up task title"
                   returnKeyType="done"
                   onSubmitEditing={addChildTask}
                 />
-                <TouchableOpacity className="bg-blue-600 rounded-lg px-[14px] py-[10px] justify-center" onPress={addChildTask}>
+                <TouchableOpacity className="bg-blue-600 rounded-lg px-3.5 py-2.5 justify-center" onPress={addChildTask}>
                   <Text className="text-white font-semibold">Add</Text>
                 </TouchableOpacity>
               </View>
               {childTasks.map((ct, i) => (
                 <View key={i} className="flex-row items-center gap-2 py-1">
-                  <Text className="flex-1 text-[13px] text-gray-700 dark:text-slate-300" numberOfLines={1}>• {ct.title}</Text>
+                  <Text className="flex-1 text-sm text-gray-700 dark:text-slate-300" numberOfLines={1}>• {ct.title}</Text>
                   <TouchableOpacity onPress={() => removeChildTask(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text className="text-red-600 text-[16px]">✕</Text>
+                    <Text className="text-red-600 text-base">✕</Text>
                   </TouchableOpacity>
                 </View>
               ))}
             </View>
             <TouchableOpacity
-              className="bg-green-600 rounded-[10px] p-[14px] items-center"
+              className="bg-green-600 rounded-xl p-3.5 items-center"
               onPress={handleConfirm}
             >
-              <Text className="text-white font-bold text-[15px]">✓ Approve Task</Text>
+              <Text className="text-white font-bold text-base">✓ Approve Task</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -403,15 +403,15 @@ function TabBar({
   onPress: (i: number) => void;
 }) {
   return (
-    <View className="flex-row bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 min-h-[46px]">
+    <View className="flex-row bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 min-h-12">
       {tabs.map((tab, i) => (
         <TouchableOpacity
           key={tab}
-          className={`flex-1 py-[13px] items-center justify-center border-b-2 ${active === i ? "border-blue-600" : "border-transparent"}`}
+          className={`flex-1 py-3 items-center justify-center border-b-2 ${active === i ? "border-blue-600" : "border-transparent"}`}
           onPress={() => onPress(i)}
           activeOpacity={0.7}
         >
-          <Text className={`text-[14px] ${active === i ? "text-blue-600 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>{tab}</Text>
+          <Text className={`text-sm ${active === i ? "text-blue-600 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>{tab}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -470,7 +470,7 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
       contentContainerStyle={{ padding: 16, gap: 12 }}
     >
       {/* Title */}
-      <Text className="text-[20px] font-bold text-gray-900 dark:text-slate-100 leading-7">{task.title}</Text>
+      <Text className="text-xl font-bold text-gray-900 dark:text-slate-100 leading-7">{task.title}</Text>
 
       {/* Badges */}
       <View className="flex-row flex-wrap gap-2 items-center">
@@ -479,7 +479,7 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
           onPress={onStatusChange}
           activeOpacity={0.7}
         >
-          <Text style={{ color: statusColor }} className="text-[13px] font-semibold">
+          <Text style={{ color: statusColor }} className="text-sm font-semibold">
             {humanizeLabel(task.status)}
           </Text>
         </TouchableOpacity>
@@ -489,7 +489,7 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
           >
             <Text
               style={{ color: PRIORITY_HEX_COLORS[task.priority] ?? DEFAULT_COLOR, textTransform: "capitalize" }}
-              className="text-[13px] font-semibold"
+              className="text-sm font-semibold"
             >
               {task.priority}
             </Text>
@@ -497,18 +497,18 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
         )}
         {task.project ? (
           <TouchableOpacity
-            className="rounded-[6px] px-[10px] py-[4px] bg-gray-100 dark:bg-slate-700"
+            className="rounded-md px-2.5 py-1 bg-gray-100 dark:bg-slate-700"
             onPress={() => router.push(`/project/${task.project!.id}`)}
           >
-            <Text className="text-[13px] font-semibold text-gray-500 dark:text-slate-400">📁 {task.project.name}</Text>
+            <Text className="text-sm font-semibold text-gray-500 dark:text-slate-400">📁 {task.project.name}</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            className="rounded-[6px] px-[10px] py-[4px] bg-gray-100 dark:bg-slate-700 border border-dashed border-gray-300 dark:border-slate-600"
+            className="rounded-md px-2.5 py-1 bg-gray-100 dark:bg-slate-700 border border-dashed border-gray-300 dark:border-slate-600"
             onPress={handleAssignProject}
             activeOpacity={0.7}
           >
-            <Text className="text-[13px] font-semibold text-gray-400 dark:text-slate-500">📁 Assign project</Text>
+            <Text className="text-sm font-semibold text-gray-400 dark:text-slate-500">📁 Assign project</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -516,14 +516,14 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
       {/* Blocked-by dependency */}
       {task.blockedByTask && (
         <TouchableOpacity
-          className="bg-red-50 dark:bg-red-900/20 rounded-[10px] p-3 border border-red-200 dark:border-red-800 gap-[6px]"
+          className="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 border border-red-200 dark:border-red-800 gap-1.5"
           onPress={() => router.push(`/task/${task.blockedByTask!.id}`)}
           activeOpacity={0.8}
         >
-          <Text className="text-[12px] font-bold text-red-600">🚫 Blocked by</Text>
-          <View className="flex-row items-center gap-[6px]">
-            <Text className="text-[12px] text-gray-400 dark:text-slate-500 font-medium">#{task.blockedByTask.taskNumber}</Text>
-            <Text className="text-[13px] text-gray-900 dark:text-slate-100 flex-1 font-medium" numberOfLines={1}>
+          <Text className="text-xs font-bold text-red-600">🚫 Blocked by</Text>
+          <View className="flex-row items-center gap-1.5">
+            <Text className="text-xs text-gray-400 dark:text-slate-500 font-medium">#{task.blockedByTask.taskNumber}</Text>
+            <Text className="text-sm text-gray-900 dark:text-slate-100 flex-1 font-medium" numberOfLines={1}>
               {task.blockedByTask.title}
             </Text>
             <View
@@ -536,7 +536,7 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
             >
               <Text
                 style={{ color: STATUS_HEX_COLORS[task.blockedByTask.status] ?? DEFAULT_COLOR, textTransform: "capitalize" }}
-                className="text-[10px] font-semibold"
+                className="text-xs font-semibold"
               >
                 {task.blockedByTask.status.replace("_", " ")}
               </Text>
@@ -547,23 +547,23 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
 
       {/* Description */}
       {task.description ? (
-        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-[10px]">
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Description</Text>
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Description</Text>
           <SimpleMarkdown content={task.description} />
         </View>
       ) : null}
 
       {/* Assignees */}
       {task.assignees.length > 0 && (
-        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-[10px]">
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Assignees</Text>
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Assignees</Text>
           {task.assignees.map((a) => (
-            <View key={a.id} className="flex-row items-center gap-[10px]">
-              <Text className="text-[20px]">
+            <View key={a.id} className="flex-row items-center gap-2.5">
+              <Text className="text-xl">
                 {a.profile.agent?.identityEmoji ?? "👤"}
               </Text>
               <View className="flex-1">
-                <Text className="text-[14px] font-medium text-gray-900 dark:text-slate-100">{a.profile.displayName}</Text>
+                <Text className="text-sm font-medium text-gray-900 dark:text-slate-100">{a.profile.displayName}</Text>
                 {a.profile.agent && (
                   <Text className="text-[12px] text-gray-500 dark:text-slate-400 mt-[1px]">{humanizeLabel(a.profile.agent.status)}</Text>
                 )}
@@ -575,8 +575,8 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
 
       {/* Subtasks */}
       {(childTasks.length > 0 || childResult.fetching) && (
-        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-[10px]">
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Subtasks ({childTasks.length})</Text>
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Subtasks ({childTasks.length})</Text>
           {childResult.fetching ? (
             <ActivityIndicator size="small" color="#2563eb" />
           ) : (
@@ -601,8 +601,8 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
       )}
 
       {/* Details */}
-      <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-[10px]">
-        <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Details</Text>
+      <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Details</Text>
         <DetailRow label="Due Date" value={formatDate(task.dueDate)} />
         <DetailRow label="Created" value={formatDate(task.createdAt)} />
         {task.createdByProfile && (
@@ -622,8 +622,8 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
 
       {/* Tags */}
       {task.tags.length > 0 && (
-        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-[10px]">
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Tags</Text>
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Tags</Text>
           <View className="flex-row flex-wrap gap-[6px]">
             {task.tags.map((tag) => (
               <View key={tag} className="bg-blue-50 dark:bg-blue-900/30 rounded px-2 py-[3px]">
@@ -636,9 +636,9 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
 
       {/* Work time */}
       {workSummary && workSummary.totalWorkTimeMs > 0 && (
-        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-[10px]">
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
           <View className="flex-row items-center justify-between">
-            <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Work Time</Text>
+            <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Work Time</Text>
             {workSummary.activeSessionCount > 0 && (
               <View className="flex-row items-center gap-1">
                 <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#16a34a" }} />
@@ -770,7 +770,7 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
           }
 
           return (
-            <View className="flex-row gap-[10px] items-start">
+            <View className="flex-row gap-2.5 items-start">
               <View className="w-[34px] h-[34px] rounded-full bg-blue-100 dark:bg-blue-900/40 justify-center items-center">
                 <Text className="text-[14px] font-bold text-blue-600">
                   {item.fromProfile.displayName.charAt(0).toUpperCase()}
@@ -919,7 +919,7 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
         <View key={group.task.id}>
           <View className="flex-row items-center gap-2 py-2 px-1 mt-2">
             <View style={{ backgroundColor: STATUS_HEX_COLORS[group.task.status] ?? DEFAULT_COLOR, width: 8, height: 8, borderRadius: 4 }} />
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300 flex-1" numberOfLines={1}>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300 flex-1" numberOfLines={1}>
               #{group.task.taskNumber} {group.task.title}
             </Text>
           </View>
@@ -1023,11 +1023,11 @@ function ApproveRejectBar({
   return (
     <>
       <View
-        className="bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 px-4 pt-3 gap-[10px]"
+        className="bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 px-4 pt-3 gap-2.5"
         style={{ paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }}
       >
         <Text className="text-[12px] font-bold text-violet-700 uppercase tracking-[0.5px] text-center">Awaiting Review</Text>
-        <View className="flex-row gap-[10px]">
+        <View className="flex-row gap-2.5">
           <TouchableOpacity
             className={`flex-1 py-3 rounded-[10px] border-2 border-violet-700 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
             onPress={() => setShowClarifyModal(true)}

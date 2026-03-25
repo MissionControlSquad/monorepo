@@ -309,9 +309,9 @@ function WelcomeStep({
     <ScrollView
       contentContainerStyle={{ flexGrow: 1, padding: 24, gap: 16, paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }}
     >
-      <Text className="text-[56px] text-center mb-1">🚀</Text>
-      <Text className="text-[26px] font-extrabold text-gray-900 dark:text-slate-100 text-center">Welcome to AgentCenter</Text>
-      <Text className="text-[15px] text-gray-500 dark:text-slate-400 text-center leading-[22px]">Let's set up your AI agent team in a few steps.</Text>
+      <Text className="text-6xl text-center mb-1">🚀</Text>
+      <Text className="text-2xl font-extrabold text-gray-900 dark:text-slate-100 text-center">Welcome to AgentCenter</Text>
+      <Text className="text-base text-gray-500 dark:text-slate-400 text-center leading-[22px]">Let's set up your AI agent team in a few steps.</Text>
 
       <View className="gap-4 my-2">
         {[
@@ -336,8 +336,8 @@ function WelcomeStep({
               <Ionicons name={f.icon} size={22} color="#2563eb" />
             </View>
             <View className="flex-1">
-              <Text className="text-[15px] font-bold text-gray-900 dark:text-slate-100 mb-0.5">{f.title}</Text>
-              <Text className="text-[13px] text-gray-500 dark:text-slate-400 leading-[19px]">{f.desc}</Text>
+              <Text className="text-base font-bold text-gray-900 dark:text-slate-100 mb-0.5">{f.title}</Text>
+              <Text className="text-sm text-gray-500 dark:text-slate-400 leading-[19px]">{f.desc}</Text>
             </View>
           </View>
         ))}
@@ -347,7 +347,7 @@ function WelcomeStep({
         <Text className="text-white text-base font-semibold">Get Started</Text>
       </TouchableOpacity>
       <TouchableOpacity className="items-center py-2.5" onPress={onSkip} activeOpacity={0.7}>
-        <Text className="text-[14px] text-gray-400 dark:text-slate-500">Skip setup, go to dashboard</Text>
+        <Text className="text-sm text-gray-400 dark:text-slate-500">Skip setup, go to dashboard</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -372,12 +372,12 @@ function UseCaseStep({
         <TouchableOpacity onPress={onBack} className="w-11 h-11 justify-center">
           <Ionicons name="chevron-back" size={22} color="#374151" />
         </TouchableOpacity>
-        <Text className="flex-1 text-[17px] font-bold text-gray-900 dark:text-slate-100 text-center">Choose Your Use Case</Text>
+        <Text className="flex-1 text-lg font-bold text-gray-900 dark:text-slate-100 text-center">Choose Your Use Case</Text>
         <View className="w-11" />
       </View>
-      <Text className="text-[13px] text-gray-400 dark:text-slate-500 text-center mb-1 px-6">Pick the team template that best fits your work.</Text>
+      <Text className="text-sm text-gray-400 dark:text-slate-500 text-center mb-1 px-6">Pick the team template that best fits your work.</Text>
       {licenseLimit !== null && (
-        <Text className="text-[12px] text-blue-600 dark:text-blue-400 text-center mb-2 px-6">
+        <Text className="text-xs text-blue-600 dark:text-blue-400 text-center mb-2 px-6">
           Your plan supports up to {licenseLimit} agent{licenseLimit !== 1 ? "s" : ""}
         </Text>
       )}
@@ -394,16 +394,16 @@ function UseCaseStep({
           return (
             <TouchableOpacity
               key={uc.id}
-              className="bg-white dark:bg-slate-800 rounded-[14px] border border-gray-200 dark:border-slate-700 p-4 flex-row items-center gap-3.5"
+              className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4 flex-row items-center gap-3.5"
               onPress={() => onSelect(uc)}
               activeOpacity={0.75}
             >
-              <Text className="text-[32px]">{uc.emoji}</Text>
+              <Text className="text-4xl">{uc.emoji}</Text>
               <View className="flex-1">
-                <Text className="text-[15px] font-bold text-gray-900 dark:text-slate-100">{uc.title}</Text>
-                <Text className="text-[12px] text-gray-500 dark:text-slate-400 mt-0.5">{uc.subtitle}</Text>
+                <Text className="text-base font-bold text-gray-900 dark:text-slate-100">{uc.title}</Text>
+                <Text className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{uc.subtitle}</Text>
                 {agentCount > 0 && (
-                  <Text className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold mt-1">{agentCount} agent{agentCount !== 1 ? "s" : ""}</Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1">{agentCount} agent{agentCount !== 1 ? "s" : ""}</Text>
                 )}
               </View>
               <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
@@ -449,27 +449,27 @@ function PreviewStep({
         <TouchableOpacity onPress={onBack} className="w-11 h-11 justify-center">
           <Ionicons name="chevron-back" size={22} color="#374151" />
         </TouchableOpacity>
-        <Text className="flex-1 text-[17px] font-bold text-gray-900 dark:text-slate-100 text-center">Review Your Team</Text>
+        <Text className="flex-1 text-lg font-bold text-gray-900 dark:text-slate-100 text-center">Review Your Team</Text>
         <TouchableOpacity onPress={onAgentAdd} className="w-11 h-11 justify-center items-end" disabled={atLimit}>
           <Ionicons name="add" size={22} color={atLimit ? "#d1d5db" : "#2563eb"} />
         </TouchableOpacity>
       </View>
-      <Text className="text-[13px] text-gray-400 dark:text-slate-500 text-center mb-1 px-6">Tap an agent to edit name, role, or personality.</Text>
+      <Text className="text-sm text-gray-400 dark:text-slate-500 text-center mb-1 px-6">Tap an agent to edit name, role, or personality.</Text>
 
       {editingIdx !== null && editing ? (
         <ScrollView
           contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}
         >
-          <View className="bg-white dark:bg-slate-800 rounded-[14px] border border-gray-200 dark:border-slate-700 p-4 gap-4">
-            <Text className="text-[18px] font-bold text-gray-900 dark:text-slate-100">
+          <View className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4 gap-4">
+            <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">
               {editing.emoji} {editing.name}
             </Text>
-            <Text className="text-[13px] text-gray-500 dark:text-slate-400 -mt-3">{editing.role}</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400 -mt-3">{editing.role}</Text>
 
             <View className="gap-1.5">
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Name</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Name</Text>
               <TextInput
-                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 value={editing.name}
                 onChangeText={(t) => onAgentChange(editingIdx, { ...editing, name: t })}
                 placeholder="Agent name"
@@ -478,9 +478,9 @@ function PreviewStep({
             </View>
 
             <View className="gap-1.5">
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Username</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Username</Text>
               <TextInput
-                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 value={editing.username}
                 onChangeText={(t) =>
                   onAgentChange(editingIdx, {
@@ -496,9 +496,9 @@ function PreviewStep({
             </View>
 
             <View className="gap-1.5">
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Role</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Role</Text>
               <TextInput
-                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 value={editing.role}
                 onChangeText={(t) => onAgentChange(editingIdx, { ...editing, role: t })}
                 placeholder="e.g. Frontend Developer"
@@ -507,9 +507,9 @@ function PreviewStep({
             </View>
 
             <View className="gap-1.5">
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Personality</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Personality</Text>
               <TextInput
-                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 style={{ height: 96, textAlignVertical: "top" }}
                 value={editing.personality}
                 onChangeText={(t) => onAgentChange(editingIdx, { ...editing, personality: t })}
@@ -537,7 +537,7 @@ function PreviewStep({
                 }}
                 activeOpacity={0.7}
               >
-                <Text className="text-[14px] text-red-600 dark:text-red-400 font-medium">Remove Agent</Text>
+                <Text className="text-sm text-red-600 dark:text-red-400 font-medium">Remove Agent</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -552,12 +552,12 @@ function PreviewStep({
                 onPress={() => setEditingIdx(idx)}
                 activeOpacity={0.75}
               >
-                <Text className="text-[28px]">{agent.emoji}</Text>
+                <Text className="text-3xl">{agent.emoji}</Text>
                 <View className="flex-1">
-                  <Text className="text-[15px] font-bold text-gray-900 dark:text-slate-100">{agent.name}</Text>
-                  <Text className="text-[12px] text-gray-500 dark:text-slate-400">{agent.role}</Text>
+                  <Text className="text-base font-bold text-gray-900 dark:text-slate-100">{agent.name}</Text>
+                  <Text className="text-xs text-gray-500 dark:text-slate-400">{agent.role}</Text>
                   {agent.username && (
-                    <Text className="text-[11px] text-blue-600 dark:text-blue-400 mt-0.5">@{agent.username}</Text>
+                    <Text className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">@{agent.username}</Text>
                   )}
                 </View>
                 <Ionicons name="create-outline" size={18} color="#9ca3af" />
@@ -614,11 +614,11 @@ function CreatingStep({
       style={{ paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24 }}
     >
       <ActivityIndicator size="large" color="#2563eb" style={{ marginBottom: 24 }} />
-      <Text className="text-[22px] font-extrabold text-gray-900 dark:text-slate-100 text-center">Creating Your Team…</Text>
-      <Text className="text-[32px] font-extrabold text-blue-600 dark:text-blue-400 text-center">
+      <Text className="text-xl font-extrabold text-gray-900 dark:text-slate-100 text-center">Creating Your Team…</Text>
+      <Text className="text-4xl font-extrabold text-blue-600 dark:text-blue-400 text-center">
         {count} / {agents.length} agent{agents.length !== 1 ? "s" : ""}
       </Text>
-      <Text className="text-[14px] text-gray-500 dark:text-slate-400 text-center">This may take a moment.</Text>
+      <Text className="text-sm text-gray-500 dark:text-slate-400 text-center">This may take a moment.</Text>
       <View className="flex-row flex-wrap gap-2 justify-center mt-2">
         {agents.map((a, i) => (
           <View
@@ -626,7 +626,7 @@ function CreatingStep({
             className={`flex-row items-center gap-1.5 rounded-full px-3 py-1.5 ${i < count ? "bg-green-100 dark:bg-green-900/30" : "bg-blue-50 dark:bg-blue-900/20"}`}
           >
             <Text className="text-base">{a.emoji}</Text>
-            <Text className={`text-[13px] font-medium ${i < count ? "text-green-700 dark:text-green-400" : "text-blue-700 dark:text-blue-400"}`}>
+            <Text className={`text-sm font-medium ${i < count ? "text-green-700 dark:text-green-400" : "text-blue-700 dark:text-blue-400"}`}>
               {a.name}
             </Text>
           </View>
@@ -654,11 +654,11 @@ function SuccessStep({
     <ScrollView
       contentContainerStyle={{ flexGrow: 1, padding: 24, gap: 16, paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }}
     >
-      <Text className="text-[56px] text-center">🎉</Text>
-      <Text className="text-[26px] font-extrabold text-gray-900 dark:text-slate-100 text-center">
+      <Text className="text-6xl text-center">🎉</Text>
+      <Text className="text-2xl font-extrabold text-gray-900 dark:text-slate-100 text-center">
         {failed === 0 ? "Team Created!" : `${succeeded} of ${results.length} Created`}
       </Text>
-      <Text className="text-[15px] text-gray-500 dark:text-slate-400 text-center leading-[22px]">
+      <Text className="text-base text-gray-500 dark:text-slate-400 text-center leading-[22px]">
         {failed === 0
           ? "Your agents are ready. Head to the dashboard to assign tasks and set them up."
           : "Some agents couldn't be created. You can add them manually from the Agents tab."}
@@ -667,17 +667,17 @@ function SuccessStep({
       {results.map((r, i) => (
         <View
           key={i}
-          className={`flex-row items-center gap-2.5 p-3 rounded-[10px] border ${r.ok ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800" : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"}`}
+          className={`flex-row items-center gap-2.5 p-3 rounded-xl border ${r.ok ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800" : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"}`}
         >
           <Ionicons
             name={r.ok ? "checkmark-circle" : "close-circle"}
             size={20}
             color={r.ok ? "#16a34a" : "#dc2626"}
           />
-          <Text className={`flex-1 text-[14px] font-semibold ${r.ok ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
+          <Text className={`flex-1 text-sm font-semibold ${r.ok ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
             {r.name}
           </Text>
-          {r.error && <Text className="text-[11px] text-gray-500 dark:text-slate-400">{r.error}</Text>}
+          {r.error && <Text className="text-xs text-gray-500 dark:text-slate-400">{r.error}</Text>}
         </View>
       ))}
 

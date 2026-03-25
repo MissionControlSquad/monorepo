@@ -139,25 +139,25 @@ export function AppDrawer() {
                   ? profile.avatarUrl
                   : `${getStoredServerUrl() ?? ""}${profile.avatarUrl}`,
               }}
-              className="w-[72px] h-[72px] rounded-full mb-2"
+              className="w-16 h-16 rounded-full mb-2"
             />
           ) : (
-            <View className="w-[72px] h-[72px] rounded-full bg-blue-100 dark:bg-blue-900/30 justify-center items-center mb-2">
-              <Text className="text-[28px] font-bold text-blue-600 dark:text-blue-300">
+            <View className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 justify-center items-center mb-2">
+              <Text className="text-3xl font-bold text-blue-600 dark:text-blue-300">
                 {initials}
               </Text>
             </View>
           )}
-          <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100" numberOfLines={1}>
+          <Text className="text-lg font-bold text-gray-900 dark:text-slate-100" numberOfLines={1}>
             {profile?.displayName ?? "…"}
           </Text>
           {profile?.username ? (
-            <Text className="text-[13px] text-gray-500 dark:text-slate-400" numberOfLines={1}>
+            <Text className="text-sm text-gray-500 dark:text-slate-400" numberOfLines={1}>
               @{profile.username}
             </Text>
           ) : null}
           {profile?.user?.email ? (
-            <Text className="text-[12px] text-gray-400 dark:text-slate-500" numberOfLines={1}>
+            <Text className="text-xs text-gray-400 dark:text-slate-500" numberOfLines={1}>
               {profile.user.email}
             </Text>
           ) : null}
@@ -190,7 +190,7 @@ export function AppDrawer() {
           activeOpacity={0.7}
         >
           <Ionicons name="log-out-outline" size={20} color={isDark ? "#f87171" : "#dc2626"} />
-          <Text className="text-[15px] font-semibold text-red-600 dark:text-red-400">Sign Out</Text>
+          <Text className="text-base font-semibold text-red-600 dark:text-red-400">Sign Out</Text>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -219,10 +219,10 @@ function DrawerItem({
       <View className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-700 justify-center items-center">
         <Ionicons name={icon} size={20} color={isDark ? "#cbd5e1" : "#374151"} />
       </View>
-      <Text className="text-[15px] font-medium text-gray-900 dark:text-slate-100">{label}</Text>
+      <Text className="text-base font-medium text-gray-900 dark:text-slate-100">{label}</Text>
       {badge ? (
-        <View className="ml-auto mr-1 bg-red-600 rounded-[10px] px-1.5 py-0.5 min-w-[20px] items-center">
-          <Text className="text-[11px] text-white font-bold">{badge}</Text>
+        <View className="ml-auto mr-1 bg-red-600 rounded-xl px-1.5 py-0.5 min-w-5 items-center">
+          <Text className="text-xs text-white font-bold">{badge}</Text>
         </View>
       ) : (
         <Ionicons

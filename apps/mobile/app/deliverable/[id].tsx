@@ -78,23 +78,23 @@ function DeliverableContent({
 }) {
   if (kind === "link" && url) {
     return (
-      <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
-        <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">URL</Text>
+      <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">URL</Text>
         <TouchableOpacity onPress={() => Linking.openURL(url)} activeOpacity={0.7}>
-          <Text className="text-[14px] text-blue-600 dark:text-blue-400 underline">{url}</Text>
+          <Text className="text-sm text-blue-600 dark:text-blue-400 underline">{url}</Text>
         </TouchableOpacity>
       </View>
     );
   }
   if (kind === "code" && content) {
     return (
-      <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
-        <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">
+      <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">
           Code{language ? ` · ${language}` : ""}
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator>
           <Text
-            className="text-[13px] text-indigo-900 dark:text-indigo-200 bg-violet-50 dark:bg-slate-900 p-3 rounded-lg leading-5"
+            className="text-sm text-indigo-900 dark:text-indigo-200 bg-violet-50 dark:bg-slate-900 p-3 rounded-lg leading-5"
             style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
           >
             {content}
@@ -105,49 +105,49 @@ function DeliverableContent({
   }
   if (kind === "markdown" && content) {
     return (
-      <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
-        <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Content</Text>
+      <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Content</Text>
         <SimpleMarkdown content={content} />
       </View>
     );
   }
   if (kind === "file" && url && isImageMime(mimeType)) {
     return (
-      <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
-        <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Preview</Text>
+      <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Preview</Text>
         <Image
           source={{ uri: url }}
           style={{ width: width - 64, height: (width - 64) * 0.6, borderRadius: 8 }}
           resizeMode="contain"
         />
         <TouchableOpacity
-          className="bg-blue-600 rounded-[10px] py-3 items-center mt-2"
+          className="bg-blue-600 rounded-xl py-3 items-center mt-2"
           onPress={() => Linking.openURL(url)}
           activeOpacity={0.7}
         >
-          <Text className="text-white text-[15px] font-semibold">📥 Open Full Image</Text>
+          <Text className="text-white text-base font-semibold">📥 Open Full Image</Text>
         </TouchableOpacity>
       </View>
     );
   }
   if (url) {
     return (
-      <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700">
+      <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700">
         <TouchableOpacity
-          className="bg-blue-600 rounded-[10px] py-3 items-center"
+          className="bg-blue-600 rounded-xl py-3 items-center"
           onPress={() => Linking.openURL(url)}
           activeOpacity={0.7}
         >
-          <Text className="text-white text-[15px] font-semibold">📥 Open / Download File</Text>
+          <Text className="text-white text-base font-semibold">📥 Open / Download File</Text>
         </TouchableOpacity>
       </View>
     );
   }
   if (content) {
     return (
-      <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
-        <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Content</Text>
-        <Text className="text-[15px] text-gray-700 dark:text-slate-300 leading-6">{content}</Text>
+      <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Content</Text>
+        <Text className="text-base text-gray-700 dark:text-slate-300 leading-6">{content}</Text>
       </View>
     );
   }
@@ -190,7 +190,7 @@ function VersionHistoryModal({
     >
       <View className="flex-1 bg-gray-50 dark:bg-slate-900" style={{ paddingTop: insets.top || 16 }}>
         <View className="flex-row justify-between items-center px-4 py-3.5 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
-          <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">Version History</Text>
+          <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">Version History</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text className="text-base text-blue-600 dark:text-blue-400 font-semibold">Done</Text>
           </TouchableOpacity>
@@ -202,11 +202,11 @@ function VersionHistoryModal({
           </View>
         ) : error && versions.length === 0 ? (
           <View className="flex-1 justify-center items-center">
-            <Text className="text-red-600 dark:text-red-400 text-[15px]">Failed to load versions</Text>
+            <Text className="text-red-600 dark:text-red-400 text-base">Failed to load versions</Text>
           </View>
         ) : versions.length === 0 ? (
           <View className="flex-1 justify-center items-center">
-            <Text className="text-gray-400 dark:text-slate-500 text-[15px]">No version history yet</Text>
+            <Text className="text-gray-400 dark:text-slate-500 text-base">No version history yet</Text>
           </View>
         ) : (
           <FlatList
@@ -228,23 +228,23 @@ function VersionHistoryModal({
                 >
                   <View className="flex-1 gap-0.5">
                     <View className="flex-row items-center gap-2">
-                      <Text className="text-[15px] font-bold text-gray-900 dark:text-slate-100">v{item.version}</Text>
+                      <Text className="text-base font-bold text-gray-900 dark:text-slate-100">v{item.version}</Text>
                       {isCurrent && (
-                        <View className="bg-blue-100 dark:bg-blue-900/30 rounded-[6px] px-1.5 py-0.5">
-                          <Text className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold">Current</Text>
+                        <View className="bg-blue-100 dark:bg-blue-900/30 rounded-md px-1.5 py-0.5">
+                          <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">Current</Text>
                         </View>
                       )}
                     </View>
-                    <Text className="text-[12px] text-gray-500 dark:text-slate-400">{formatDate(item.createdAt)}</Text>
+                    <Text className="text-xs text-gray-500 dark:text-slate-400">{formatDate(item.createdAt)}</Text>
                     {item.editedByProfile && (
-                      <Text className="text-[12px] text-gray-400 dark:text-slate-500">by {item.editedByProfile.displayName}</Text>
+                      <Text className="text-xs text-gray-400 dark:text-slate-500">by {item.editedByProfile.displayName}</Text>
                     )}
                     {item.title && (
-                      <Text className="text-[13px] text-gray-700 dark:text-slate-300 mt-0.5" numberOfLines={1}>{item.title}</Text>
+                      <Text className="text-sm text-gray-700 dark:text-slate-300 mt-0.5" numberOfLines={1}>{item.title}</Text>
                     )}
                   </View>
                   {!isCurrent && (
-                    <Text className="text-[14px] text-blue-600 dark:text-blue-400 font-semibold ml-3">View →</Text>
+                    <Text className="text-sm text-blue-600 dark:text-blue-400 font-semibold ml-3">View →</Text>
                   )}
                 </TouchableOpacity>
               );
@@ -285,7 +285,7 @@ function VersionPreviewModal({
         <View className="flex-row justify-between items-start px-4 py-3.5 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 gap-3">
           <View className="flex-1">
             <Text className="text-base font-bold text-gray-900 dark:text-slate-100" numberOfLines={1}>{version.title}</Text>
-            <Text className="text-[12px] text-gray-500 dark:text-slate-400 mt-0.5">Version {version.version} · {formatDate(version.createdAt)}</Text>
+            <Text className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Version {version.version} · {formatDate(version.createdAt)}</Text>
           </View>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text className="text-base text-blue-600 dark:text-blue-400 font-semibold pt-0.5">Done</Text>
@@ -297,19 +297,19 @@ function VersionPreviewModal({
           contentInsetAdjustmentBehavior="automatic"
         >
           <View
-            className="flex-row items-center gap-1.5 rounded-lg px-2.5 py-[5px] self-start"
+            className="flex-row items-center gap-1.5 rounded-lg px-2.5 py-1 self-start"
             style={{ backgroundColor: kindColor + "18" }}
           >
-            <Text className="text-[14px]">{KIND_ICONS[version.kind] ?? "📄"}</Text>
-            <Text className="text-[13px] font-semibold capitalize" style={{ color: kindColor }}>
+            <Text className="text-sm">{KIND_ICONS[version.kind] ?? "📄"}</Text>
+            <Text className="text-sm font-semibold capitalize" style={{ color: kindColor }}>
               {version.kind} · v{version.version}
             </Text>
           </View>
 
           {version.editedByProfile && (
-            <View className="flex-row justify-between bg-white dark:bg-slate-800 rounded-[10px] p-3 border border-gray-200 dark:border-slate-700">
-              <Text className="text-[13px] text-gray-500 dark:text-slate-400">Edited by</Text>
-              <Text className="text-[13px] text-gray-900 dark:text-slate-100 font-medium">{version.editedByProfile.displayName}</Text>
+            <View className="flex-row justify-between bg-white dark:bg-slate-800 rounded-xl p-3 border border-gray-200 dark:border-slate-700">
+              <Text className="text-sm text-gray-500 dark:text-slate-400">Edited by</Text>
+              <Text className="text-sm text-gray-900 dark:text-slate-100 font-medium">{version.editedByProfile.displayName}</Text>
             </View>
           )}
 
@@ -390,20 +390,20 @@ export default function DeliverableScreen() {
         {/* Kind badge */}
         <View className="flex-row items-center">
           <View
-            className="flex-row items-center gap-1.5 rounded-lg px-2.5 py-[5px]"
+            className="flex-row items-center gap-1.5 rounded-lg px-2.5 py-1"
             style={{ backgroundColor: kindColor + "18" }}
           >
-            <Text className="text-[14px]">{KIND_ICONS[d.kind] ?? "📄"}</Text>
-            <Text className="text-[13px] font-semibold capitalize" style={{ color: kindColor }}>
+            <Text className="text-sm">{KIND_ICONS[d.kind] ?? "📄"}</Text>
+            <Text className="text-sm font-semibold capitalize" style={{ color: kindColor }}>
               {d.kind} · v{d.version}
             </Text>
           </View>
         </View>
 
-        <Text className="text-[20px] font-bold text-gray-900 dark:text-slate-100 leading-7">{d.title}</Text>
+        <Text className="text-xl font-bold text-gray-900 dark:text-slate-100 leading-7">{d.title}</Text>
 
         {/* Meta */}
-        <View className="bg-white dark:bg-slate-800 rounded-[12px] p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
           <MetaRow label="Author" value={d.profile.displayName} />
           <MetaRow label="Created" value={formatDateWithTime(d.createdAt)} />
           {d.task && (
@@ -416,13 +416,13 @@ export default function DeliverableScreen() {
 
         {/* Version History Button */}
         <TouchableOpacity
-          className="flex-row items-center gap-2 bg-white dark:bg-slate-800 rounded-[12px] p-3.5 border border-gray-200 dark:border-slate-700"
+          className="flex-row items-center gap-2 bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700"
           onPress={() => setShowVersionHistory(true)}
           activeOpacity={0.7}
         >
           <Text className="text-base">🕐</Text>
-          <Text className="flex-1 text-[14px] text-gray-700 dark:text-slate-300 font-medium">Version History</Text>
-          <Text className="text-[18px] text-gray-400 dark:text-slate-500">›</Text>
+          <Text className="flex-1 text-sm text-gray-700 dark:text-slate-300 font-medium">Version History</Text>
+          <Text className="text-lg text-gray-400 dark:text-slate-500">›</Text>
         </TouchableOpacity>
 
         {/* Content */}
@@ -456,8 +456,8 @@ export default function DeliverableScreen() {
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <View className="flex-row justify-between gap-3">
-      <Text className="text-[13px] text-gray-500 dark:text-slate-400 w-20">{label}</Text>
-      <Text className="text-[13px] text-gray-900 dark:text-slate-100 flex-1 text-right" numberOfLines={2}>{value}</Text>
+      <Text className="text-sm text-gray-500 dark:text-slate-400 w-20">{label}</Text>
+      <Text className="text-sm text-gray-900 dark:text-slate-100 flex-1 text-right" numberOfLines={2}>{value}</Text>
     </View>
   );
 }

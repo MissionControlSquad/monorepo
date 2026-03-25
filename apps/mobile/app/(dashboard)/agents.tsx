@@ -77,7 +77,7 @@ export default function AgentsScreen() {
       <View className="flex-row items-center gap-2 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-4 py-2.5">
         <Ionicons name="search-outline" size={16} color="#9ca3af" />
         <TextInput
-          className="flex-1 text-[15px] text-gray-900 dark:text-slate-100"
+          className="flex-1 text-base text-gray-900 dark:text-slate-100"
           value={search}
           onChangeText={setSearch}
           placeholder="Search agents…"
@@ -95,7 +95,7 @@ export default function AgentsScreen() {
           className="w-8 h-8 rounded-full bg-blue-600 justify-center items-center ml-1"
           activeOpacity={0.7}
         >
-          <Text className="text-[20px] text-white leading-6">+</Text>
+          <Text className="text-xl text-white leading-6">+</Text>
         </TouchableOpacity>
       </View>
 
@@ -108,12 +108,12 @@ export default function AgentsScreen() {
             onPress={() => setFilter(tab)}
             activeOpacity={0.7}
           >
-            <Text className={`text-[13px] ${filter === tab ? "text-blue-600 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
+            <Text className={`text-sm ${filter === tab ? "text-blue-600 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
               {FILTER_LABELS[tab]}
             </Text>
             {counts[tab] > 0 && (
-              <View className={`rounded-[10px] px-[5px] py-px min-w-[18px] items-center ${filter === tab ? "bg-blue-100 dark:bg-blue-900/30" : "bg-gray-100 dark:bg-slate-700"}`}>
-                <Text className={`text-[11px] font-semibold ${filter === tab ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}>
+              <View className={`rounded-xl px-1.5 py-px min-w-5 items-center ${filter === tab ? "bg-blue-100 dark:bg-blue-900/30" : "bg-gray-100 dark:bg-slate-700"}`}>
+                <Text className={`text-xs font-semibold ${filter === tab ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}>
                   {counts[tab]}
                 </Text>
               </View>
@@ -133,7 +133,7 @@ export default function AgentsScreen() {
           <RefreshControl refreshing={fetching} onRefresh={() => reexecute({ requestPolicy: "network-only" })} tintColor="#2563eb" />
         }
         ListEmptyComponent={
-          <Text className="text-gray-400 dark:text-slate-500 text-[15px] text-center">
+          <Text className="text-gray-400 dark:text-slate-500 text-base text-center">
             {search ? "No agents match your search" : "No agents in this category"}
           </Text>
         }
@@ -151,7 +151,7 @@ export default function AgentsScreen() {
             >
               <View className="flex-row items-center gap-3 flex-1">
                 <View className="w-11 h-11 rounded-full bg-gray-100 dark:bg-slate-700 justify-center items-center">
-                  <Text className="text-[22px]">{item.identityEmoji ?? DEFAULT_AGENT_EMOJI}</Text>
+                  <Text className="text-xl">{item.identityEmoji ?? DEFAULT_AGENT_EMOJI}</Text>
                   <View
                     className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800"
                     style={{ backgroundColor: online ? statusColor : "#d1d5db" }}
@@ -159,19 +159,19 @@ export default function AgentsScreen() {
                 </View>
                 <View className="flex-1 gap-0.5">
                   <View className="flex-row items-center gap-1.5">
-                    <Text className="text-[15px] font-semibold text-gray-900 dark:text-slate-100">{item.name}</Text>
+                    <Text className="text-base font-semibold text-gray-900 dark:text-slate-100">{item.name}</Text>
                     {item.upgradeAvailable && (
                       <View className="bg-amber-100 dark:bg-amber-900/30 rounded px-1 py-px">
-                        <Text className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">↑</Text>
+                        <Text className="text-xs text-amber-600 dark:text-amber-400 font-bold">↑</Text>
                       </View>
                     )}
                   </View>
-                  <Text className="text-[12px] text-gray-500 dark:text-slate-400">{item.role}</Text>
+                  <Text className="text-xs text-gray-500 dark:text-slate-400">{item.role}</Text>
                   {item.currentTask && !isDeactivated && (
-                    <Text className="text-[12px] text-blue-600 dark:text-blue-400 mt-0.5" numberOfLines={1}>{item.currentTask}</Text>
+                    <Text className="text-xs text-blue-600 dark:text-blue-400 mt-0.5" numberOfLines={1}>{item.currentTask}</Text>
                   )}
                   {isPending && (
-                    <Text className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">Needs setup</Text>
+                    <Text className="text-xs text-amber-600 dark:text-amber-400 font-semibold mt-0.5">Needs setup</Text>
                   )}
                 </View>
               </View>
@@ -179,19 +179,19 @@ export default function AgentsScreen() {
               <View className="items-end gap-1.5">
                 {isDeactivated ? (
                   <View className="bg-gray-100 dark:bg-slate-700 rounded px-1.5 py-0.5">
-                    <Text className="text-[11px] font-semibold text-gray-400 dark:text-slate-500">Deactivated</Text>
+                    <Text className="text-xs font-semibold text-gray-400 dark:text-slate-500">Deactivated</Text>
                   </View>
                 ) : (
                   <View
                     className="rounded px-1.5 py-0.5"
                     style={{ backgroundColor: (online ? statusColor : "#6b7280") + "22" }}
                   >
-                    <Text className="text-[11px] font-semibold" style={{ color: online ? statusColor : "#6b7280" }}>
+                    <Text className="text-xs font-semibold" style={{ color: online ? statusColor : "#6b7280" }}>
                       {online ? getAgentStatusLabel(item) : "Offline"}
                     </Text>
                   </View>
                 )}
-                <Text className="text-[11px] text-gray-400 dark:text-slate-500 capitalize">{item.level}</Text>
+                <Text className="text-xs text-gray-400 dark:text-slate-500 capitalize">{item.level}</Text>
                 {!isPending && (
                   <TouchableOpacity
                     className={`rounded-md px-2 py-0.5 ${isDeactivated ? "bg-blue-100 dark:bg-blue-900/30" : "bg-red-100 dark:bg-red-900/30"}`}
@@ -218,7 +218,7 @@ export default function AgentsScreen() {
                       );
                     }}
                   >
-                    <Text className={`text-[11px] font-semibold ${isDeactivated ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-400"}`}>
+                    <Text className={`text-xs font-semibold ${isDeactivated ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-400"}`}>
                       {isDeactivated ? "Activate" : "Deactivate"}
                     </Text>
                   </TouchableOpacity>

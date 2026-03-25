@@ -115,7 +115,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View className="flex-1 justify-center px-6 pb-10">
-        <Text className="text-[30px] font-bold text-gray-900 dark:text-slate-100 text-center mb-1">
+        <Text className="text-3xl font-bold text-gray-900 dark:text-slate-100 text-center mb-1">
           AgentCenter
         </Text>
         <Text className="text-sm text-gray-500 dark:text-slate-400 text-center mb-8">
@@ -123,11 +123,11 @@ export default function LoginScreen() {
         </Text>
 
         {/* Server URL — always visible, editable only in url mode */}
-        <Text className="text-[13px] font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">
+        <Text className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">
           Server URL
         </Text>
         <TextInput
-          className={`bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-[10px] px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3 ${mode !== "url" ? "bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400" : ""}`}
+          className={`bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3 ${mode !== "url" ? "bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400" : ""}`}
           placeholder="https://your-instance.com"
           placeholderTextColor="#9ca3af"
           value={serverUrl}
@@ -140,7 +140,7 @@ export default function LoginScreen() {
 
         {mode === "url" && (
           <TouchableOpacity
-            className={`bg-blue-600 dark:bg-blue-500 rounded-[10px] py-3.5 items-center mt-2 ${loading ? "opacity-60" : ""}`}
+            className={`bg-blue-600 dark:bg-blue-500 rounded-xl py-3.5 items-center mt-2 ${loading ? "opacity-60" : ""}`}
             onPress={handleConnect}
             disabled={loading}
             activeOpacity={0.8}
@@ -155,16 +155,16 @@ export default function LoginScreen() {
 
         {mode === "setup" && (
           <>
-            <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100 mt-4 mb-1">
+            <Text className="text-lg font-bold text-gray-900 dark:text-slate-100 mt-4 mb-1">
               Create Admin Account
             </Text>
-            <Text className="text-[13px] text-gray-500 dark:text-slate-400 leading-[18px] mb-4">
+            <Text className="text-sm text-gray-500 dark:text-slate-400 leading-[18px] mb-4">
               This server has not been set up yet. Create the first admin account to get started.
             </Text>
 
-            <Text className="text-[13px] font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Username</Text>
+            <Text className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Username</Text>
             <TextInput
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-[10px] px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
               placeholder="Username"
               placeholderTextColor="#9ca3af"
               value={username}
@@ -174,9 +174,9 @@ export default function LoginScreen() {
               editable={!loading}
             />
 
-            <Text className="text-[13px] font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Password</Text>
+            <Text className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Password</Text>
             <TextInput
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-[10px] px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
               placeholder="Password"
               placeholderTextColor="#9ca3af"
               value={password}
@@ -185,9 +185,9 @@ export default function LoginScreen() {
               editable={!loading}
             />
 
-            <Text className="text-[13px] font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Confirm Password</Text>
+            <Text className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Confirm Password</Text>
             <TextInput
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-[10px] px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
               placeholder="Confirm Password"
               placeholderTextColor="#9ca3af"
               value={confirmPassword}
@@ -197,7 +197,7 @@ export default function LoginScreen() {
             />
 
             <TouchableOpacity
-              className={`bg-blue-600 dark:bg-blue-500 rounded-[10px] py-3.5 items-center mt-2 ${loading ? "opacity-60" : ""}`}
+              className={`bg-blue-600 dark:bg-blue-500 rounded-xl py-3.5 items-center mt-2 ${loading ? "opacity-60" : ""}`}
               onPress={handleSetup}
               disabled={loading}
               activeOpacity={0.8}
@@ -214,16 +214,16 @@ export default function LoginScreen() {
               onPress={() => { setMode("url"); setUsername(""); setPassword(""); setConfirmPassword(""); }}
               activeOpacity={0.7}
             >
-              <Text className="text-gray-500 dark:text-slate-400 text-[13px]">← Change server</Text>
+              <Text className="text-gray-500 dark:text-slate-400 text-sm">← Change server</Text>
             </TouchableOpacity>
           </>
         )}
 
         {mode === "login" && (
           <>
-            <Text className="text-[13px] font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Username</Text>
+            <Text className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Username</Text>
             <TextInput
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-[10px] px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
               placeholder="Username"
               placeholderTextColor="#9ca3af"
               value={username}
@@ -233,9 +233,9 @@ export default function LoginScreen() {
               editable={!loading}
             />
 
-            <Text className="text-[13px] font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Password</Text>
+            <Text className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1 mt-1">Password</Text>
             <TextInput
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-[10px] px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3.5 text-base text-gray-900 dark:text-slate-100 mb-3"
               placeholder="Password"
               placeholderTextColor="#9ca3af"
               value={password}
@@ -245,7 +245,7 @@ export default function LoginScreen() {
             />
 
             <TouchableOpacity
-              className={`bg-blue-600 dark:bg-blue-500 rounded-[10px] py-3.5 items-center mt-2 ${loading ? "opacity-60" : ""}`}
+              className={`bg-blue-600 dark:bg-blue-500 rounded-xl py-3.5 items-center mt-2 ${loading ? "opacity-60" : ""}`}
               onPress={handleLogin}
               disabled={loading}
               activeOpacity={0.8}
@@ -270,7 +270,7 @@ export default function LoginScreen() {
               onPress={() => { setMode("url"); setUsername(""); setPassword(""); }}
               activeOpacity={0.7}
             >
-              <Text className="text-gray-500 dark:text-slate-400 text-[13px]">← Change server</Text>
+              <Text className="text-gray-500 dark:text-slate-400 text-sm">← Change server</Text>
             </TouchableOpacity>
           </>
         )}

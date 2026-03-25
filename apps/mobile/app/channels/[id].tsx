@@ -280,12 +280,12 @@ export default function ChannelDetailScreen() {
         ListHeaderComponent={
           pinnedMessages.length > 0 ? (
             <TouchableOpacity
-              className="flex-row items-center gap-1.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-[10px] px-3 py-2 mb-2 border border-yellow-200 dark:border-yellow-700"
+              className="flex-row items-center gap-1.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl px-3 py-2 mb-2 border border-yellow-200 dark:border-yellow-700"
               onPress={() => setPinnedOpen(true)}
               activeOpacity={0.8}
             >
               <Text className="text-sm">📌</Text>
-              <Text className="flex-1 text-[13px] font-semibold text-yellow-800 dark:text-yellow-300">
+              <Text className="flex-1 text-sm font-semibold text-yellow-800 dark:text-yellow-300">
                 {pinnedMessages.length} pinned {pinnedMessages.length === 1 ? "message" : "messages"}
               </Text>
               <Ionicons name="chevron-forward" size={14} color="#92400e" />
@@ -293,8 +293,8 @@ export default function ChannelDetailScreen() {
           ) : null
         }
         ListEmptyComponent={
-          <View className="flex-1 justify-center items-center pt-[60px]">
-            <Text className="text-gray-400 dark:text-slate-500 text-[15px]">
+          <View className="flex-1 justify-center items-center pt-16">
+            <Text className="text-gray-400 dark:text-slate-500 text-base">
               {searchOpen && searchQuery.trim().length >= 2
                 ? "No messages match your search"
                 : searchOpen
@@ -400,20 +400,20 @@ export default function ChannelDetailScreen() {
                   delayLongPress={350}
                 >
                   <View
-                    className={`max-w-[75%] rounded-2xl px-[14px] py-[10px] gap-1${
+                    className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 gap-1${
                       isMe
-                        ? " bg-blue-600 rounded-br-[4px]"
-                        : " bg-white dark:bg-slate-800 rounded-bl-[4px] border border-gray-200 dark:border-slate-700"
+                        ? " bg-blue-600 rounded-br"
+                        : " bg-white dark:bg-slate-800 rounded-bl border border-gray-200 dark:border-slate-700"
                     }`}
                   >
                     {!isMe && (
                       <Text className="text-xs font-semibold text-blue-600 mb-0.5">{item.fromProfile.displayName}</Text>
                     )}
-                    <Text className={`text-[15px] leading-5${isMe ? " text-white" : " text-gray-900 dark:text-slate-100"}`}>
+                    <Text className={`text-base leading-5${isMe ? " text-white" : " text-gray-900 dark:text-slate-100"}`}>
                       {item.content}
                     </Text>
                     <Text
-                      className={`text-[11px] self-end${isMe ? "" : " text-gray-400 dark:text-slate-500"}`}
+                      className={`text-xs self-end${isMe ? "" : " text-gray-400 dark:text-slate-500"}`}
                       style={isMe ? { color: "rgba(255,255,255,0.7)" } : undefined}
                     >
                       {formatChatTime(item.createdAt)}
@@ -435,13 +435,13 @@ export default function ChannelDetailScreen() {
                           : `${Math.round(a.document.fileSize / 1024)} KB`
                         : null;
                       return (
-                        <View key={a.id} className="flex-row items-center gap-2 bg-gray-100 dark:bg-slate-700 rounded-lg px-2.5 py-[7px] border border-gray-200 dark:border-slate-600">
+                        <View key={a.id} className="flex-row items-center gap-2 bg-gray-100 dark:bg-slate-700 rounded-lg px-2.5 py-2 border border-gray-200 dark:border-slate-600">
                           <Text className="text-base">{icon}</Text>
                           <View className="flex-1">
                             <Text className="text-xs font-medium text-gray-700 dark:text-slate-300" numberOfLines={1}>
                               {a.document.fileName || a.document.title}
                             </Text>
-                            {size && <Text className="text-[11px] text-gray-400 dark:text-slate-500 mt-px">{size}</Text>}
+                            {size && <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">{size}</Text>}
                           </View>
                         </View>
                       );
@@ -453,24 +453,24 @@ export default function ChannelDetailScreen() {
                     {reactionList.map((r) => (
                       <TouchableOpacity
                         key={r.emoji}
-                        className={`flex-row items-center gap-[3px] rounded-xl px-[7px] py-[3px] border${
+                        className={`flex-row items-center gap-1 rounded-xl px-2 py-1 border${
                           r.iMine
                             ? " bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-600"
                             : " bg-gray-100 dark:bg-slate-700 border-gray-200 dark:border-slate-600"
                         }`}
                         onPress={() => handleReact(r.emoji)}
                       >
-                        <Text className="text-[13px]">{r.emoji}</Text>
-                        <Text className={`text-[11px] font-semibold${r.iMine ? " text-blue-600" : " text-gray-500 dark:text-slate-400"}`}>
+                        <Text className="text-sm">{r.emoji}</Text>
+                        <Text className={`text-xs font-semibold${r.iMine ? " text-blue-600" : " text-gray-500 dark:text-slate-400"}`}>
                           {r.count}
                         </Text>
                       </TouchableOpacity>
                     ))}
                     <TouchableOpacity
-                      className="bg-gray-100 dark:bg-slate-700 rounded-xl px-2 py-[3px] border border-gray-200 dark:border-slate-600 justify-center items-center"
+                      className="bg-gray-100 dark:bg-slate-700 rounded-xl px-2 py-1 border border-gray-200 dark:border-slate-600 justify-center items-center"
                       onPress={showMessageActions}
                     >
-                      <Text className="text-[13px] text-gray-400 dark:text-slate-500 font-semibold">+</Text>
+                      <Text className="text-sm text-gray-400 dark:text-slate-500 font-semibold">+</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -488,7 +488,7 @@ export default function ChannelDetailScreen() {
       >
         <View className="flex-1 bg-gray-50 dark:bg-slate-900">
           <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <Text className="text-[17px] font-semibold text-gray-900 dark:text-slate-100">
+            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">
               Members ({channel?.members.length ?? 0})
             </Text>
             <TouchableOpacity onPress={() => setMembersOpen(false)} style={{ padding: 4 }}>
@@ -500,7 +500,7 @@ export default function ChannelDetailScreen() {
           <View className="flex-row gap-2.5 px-4 py-2.5 border-b border-gray-100 dark:border-slate-700">
             {isMember ? (
               <TouchableOpacity
-                className="flex-1 py-[9px] rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 items-center"
+                className="flex-1 py-2.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 items-center"
                 onPress={() => {
                   if (!profileId) return;
                   Alert.alert("Leave Channel", "You will no longer receive messages from this channel.", [
@@ -521,7 +521,7 @@ export default function ChannelDetailScreen() {
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                className="flex-1 py-[9px] rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 items-center"
+                className="flex-1 py-2.5 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 items-center"
                 onPress={async () => {
                   if (!profileId) return;
                   await executeJoin({ channelId: id, profileId });
@@ -533,7 +533,7 @@ export default function ChannelDetailScreen() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              className="flex-1 py-[9px] rounded-lg border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 items-center"
+              className="flex-1 py-2.5 rounded-lg border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 items-center"
               onPress={() => { setMembersOpen(false); setTimeout(() => setAddMemberOpen(true), 300); }}
               activeOpacity={0.7}
             >
@@ -544,7 +544,7 @@ export default function ChannelDetailScreen() {
           {/* Delete channel — only for creator */}
           {channel?.createdByProfileId === profileId && (
             <TouchableOpacity
-              className="mx-4 mt-2.5 py-[9px] rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 items-center"
+              className="mx-4 mt-2.5 py-2.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 items-center"
               onPress={() => {
                 if (!profileId) return;
                 Alert.alert(
@@ -577,19 +577,19 @@ export default function ChannelDetailScreen() {
           <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
             {(channel?.members ?? []).map((m) => (
               <View key={m.id} className="flex-row items-center p-3.5 gap-3 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700">
-                <View className="w-[38px] h-[38px] rounded-[19px] bg-blue-100 dark:bg-blue-900/50 justify-center items-center">
+                <View className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 justify-center items-center">
                   <Text className="text-base font-bold text-blue-700 dark:text-blue-300">
                     {m.profile.displayName.charAt(0).toUpperCase()}
                   </Text>
                 </View>
                 <View className="flex-1">
-                  <Text className="text-[15px] font-medium text-gray-900 dark:text-slate-100">{m.profile.displayName}</Text>
+                  <Text className="text-base font-medium text-gray-900 dark:text-slate-100">{m.profile.displayName}</Text>
                   <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">
                     {m.profile.kind === "agent" ? "🤖 Agent" : "👤 Human"} · @{m.profile.username}
                   </Text>
                 </View>
                 {m.profileId === profileId ? (
-                  <Text className="text-[11px] text-blue-600 font-semibold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-[10px]">you</Text>
+                  <Text className="text-xs text-blue-600 font-semibold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-xl">you</Text>
                 ) : (
                   <TouchableOpacity
                     onPress={() => {
@@ -627,16 +627,16 @@ export default function ChannelDetailScreen() {
       >
         <View className="flex-1 bg-gray-50 dark:bg-slate-900">
           <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <Text className="text-[17px] font-semibold text-gray-900 dark:text-slate-100">Add Member</Text>
+            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">Add Member</Text>
             <TouchableOpacity onPress={() => setAddMemberOpen(false)} style={{ padding: 4 }}>
               <Ionicons name="close" size={22} color="#374151" />
             </TouchableOpacity>
           </View>
           <View className="px-4 py-2.5 border-b border-gray-100 dark:border-slate-700">
-            <View className="flex-row items-center bg-gray-100 dark:bg-slate-700 rounded-[10px] px-3 gap-2">
+            <View className="flex-row items-center bg-gray-100 dark:bg-slate-700 rounded-xl px-3 gap-2">
               <Ionicons name="search-outline" size={16} color="#9ca3af" />
               <TextInput
-                className="flex-1 text-sm text-gray-900 dark:text-slate-100 py-[9px]"
+                className="flex-1 text-sm text-gray-900 dark:text-slate-100 py-2.5"
                 placeholder="Search by name or username…"
                 placeholderTextColor="#9ca3af"
                 value={profileSearch}
@@ -671,11 +671,11 @@ export default function ChannelDetailScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <View className="w-[38px] h-[38px] rounded-[19px] bg-blue-100 dark:bg-blue-900/50 justify-center items-center">
+                  <View className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 justify-center items-center">
                     <Text className="text-base font-bold text-blue-700 dark:text-blue-300">{p.displayName.charAt(0).toUpperCase()}</Text>
                   </View>
                   <View className="flex-1">
-                    <Text className="text-[15px] font-medium text-gray-900 dark:text-slate-100">{p.displayName}</Text>
+                    <Text className="text-base font-medium text-gray-900 dark:text-slate-100">{p.displayName}</Text>
                     <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">
                       {p.kind === "agent" ? "🤖 Agent" : "👤 Human"}{p.username ? ` · @${p.username}` : ""}
                     </Text>
@@ -697,7 +697,7 @@ export default function ChannelDetailScreen() {
       >
         <View className="flex-1 bg-gray-50 dark:bg-slate-900">
           <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <Text className="text-[17px] font-semibold text-gray-900 dark:text-slate-100">
+            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">
               📌 Pinned Messages ({pinnedMessages.length})
             </Text>
             <TouchableOpacity onPress={() => setPinnedOpen(false)} style={{ padding: 4 }}>
@@ -706,7 +706,7 @@ export default function ChannelDetailScreen() {
           </View>
           <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}>
             {pinnedMessages.map((msg) => (
-              <View key={msg.id} className="bg-white dark:bg-slate-800 rounded-[10px] p-3 gap-2 border border-gray-200 dark:border-slate-700">
+              <View key={msg.id} className="bg-white dark:bg-slate-800 rounded-xl p-3 gap-2 border border-gray-200 dark:border-slate-700">
                 <View className="flex-row items-center gap-2">
                   <View className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 justify-center items-center">
                     <Text className="text-blue-600 text-sm font-semibold">
@@ -714,7 +714,7 @@ export default function ChannelDetailScreen() {
                     </Text>
                   </View>
                   <Text className="text-xs font-semibold text-blue-600">{msg.fromProfile.displayName}</Text>
-                  <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatChatTime(msg.createdAt)}</Text>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500">{formatChatTime(msg.createdAt)}</Text>
                 </View>
                 <Text className="text-sm text-gray-700 dark:text-slate-300 leading-5">{msg.content}</Text>
               </View>
@@ -728,7 +728,7 @@ export default function ChannelDetailScreen() {
         style={{ paddingBottom: insets.bottom + 8 }}
       >
         <MentionInput
-          className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-[20px] px-4 pt-2.5 pb-2.5 text-[15px] text-gray-900 dark:text-slate-100 max-h-[100px]"
+          className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-2xl px-4 pt-2.5 pb-2.5 text-base text-gray-900 dark:text-slate-100 max-h-24"
           placeholder="Message..."
           placeholderTextColor="#9ca3af"
           value={message}

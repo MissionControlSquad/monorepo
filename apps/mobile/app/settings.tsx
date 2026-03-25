@@ -98,22 +98,22 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
   };
 
   return (
-    <View className="bg-white dark:bg-slate-800 rounded-[14px] p-4 border border-gray-200 dark:border-slate-700 gap-3.5">
+    <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3.5">
       <View className="flex-row items-start gap-3">
         <View className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-slate-700 justify-center items-center shrink-0">
           <Ionicons name="lock-closed-outline" size={20} color="#6b7280" />
         </View>
         <View className="flex-1">
-          <Text className="text-[15px] font-bold text-gray-900 dark:text-slate-100">Change Password</Text>
-          <Text className="text-[12px] text-gray-500 dark:text-slate-400 mt-0.5">All existing sessions will be revoked.</Text>
+          <Text className="text-base font-bold text-gray-900 dark:text-slate-100">Change Password</Text>
+          <Text className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">All existing sessions will be revoked.</Text>
         </View>
       </View>
 
       <View className="gap-1.5">
-        <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Current Password</Text>
-        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5">
+        <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Current Password</Text>
+        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
           <TextInput
-            className="flex-1 text-[15px] text-gray-900 dark:text-slate-100 py-[11px]"
+            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
             value={current}
             onChangeText={setCurrent}
             secureTextEntry={!showCurrent}
@@ -129,10 +129,10 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
       </View>
 
       <View className="gap-1.5">
-        <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">New Password</Text>
-        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5">
+        <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">New Password</Text>
+        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
           <TextInput
-            className="flex-1 text-[15px] text-gray-900 dark:text-slate-100 py-[11px]"
+            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
             value={next}
             onChangeText={setNext}
             secureTextEntry={!showNext}
@@ -148,10 +148,10 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
       </View>
 
       <View className="gap-1.5">
-        <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Confirm New Password</Text>
-        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5">
+        <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Confirm New Password</Text>
+        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
           <TextInput
-            className="flex-1 text-[15px] text-gray-900 dark:text-slate-100 py-[11px]"
+            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
             value={confirm}
             onChangeText={setConfirm}
             secureTextEntry={!showConfirm}
@@ -167,7 +167,7 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
       </View>
 
       <TouchableOpacity
-        className={`bg-blue-600 rounded-[10px] py-[13px] items-center ${fetching ? "opacity-50" : ""}`}
+        className={`bg-blue-600 rounded-xl py-3.5 items-center ${fetching ? "opacity-50" : ""}`}
         onPress={handleSubmit}
         disabled={fetching}
         activeOpacity={0.8}
@@ -175,7 +175,7 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
         {fetching ? (
           <ActivityIndicator color="#fff" size="small" />
         ) : (
-          <Text className="text-white text-[15px] font-semibold">Change Password</Text>
+          <Text className="text-white text-base font-semibold">Change Password</Text>
         )}
       </TouchableOpacity>
     </View>
@@ -244,18 +244,18 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
   const color = statusColor[status] ?? DEFAULT_COLOR;
 
   return (
-    <View className="bg-white dark:bg-slate-800 rounded-[14px] p-4 border border-gray-200 dark:border-slate-700 gap-3.5">
+    <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3.5">
       <View className="flex-row items-start gap-3">
         <View className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-slate-700 justify-center items-center shrink-0">
           <Ionicons name="key-outline" size={20} color="#6b7280" />
         </View>
         <View className="flex-1">
-          <Text className="text-[15px] font-bold text-gray-900 dark:text-slate-100">License</Text>
-          <Text className="text-[12px] text-gray-500 dark:text-slate-400 mt-0.5">Your current license details</Text>
+          <Text className="text-base font-bold text-gray-900 dark:text-slate-100">License</Text>
+          <Text className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Your current license details</Text>
         </View>
         {!loading && license && (
-          <View className="rounded-md px-2 py-[3px] self-center" style={{ backgroundColor: color + "22" }}>
-            <Text className="text-[12px] font-bold lowercase" style={{ color }}>{status}</Text>
+          <View className="rounded-md px-2 py-1 self-center" style={{ backgroundColor: color + "22" }}>
+            <Text className="text-xs font-bold lowercase" style={{ color }}>{status}</Text>
           </View>
         )}
       </View>
@@ -263,12 +263,12 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
       {loading && (
         <View className="flex-row items-center gap-2">
           <ActivityIndicator size="small" color="#2563eb" />
-          <Text className="text-[13px] text-gray-500 dark:text-slate-400">Loading license…</Text>
+          <Text className="text-sm text-gray-500 dark:text-slate-400">Loading license…</Text>
         </View>
       )}
 
       {error && !loading && (
-        <Text className="text-[13px] text-red-600 dark:text-red-400">Failed to load license: {error}</Text>
+        <Text className="text-sm text-red-600 dark:text-red-400">Failed to load license: {error}</Text>
       )}
 
       {license && !loading && (
@@ -285,11 +285,11 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
 
           {license.features.length > 0 && (
             <View className="gap-2">
-              <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 lowercase tracking-[0.3px]">Licensed features</Text>
+              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 lowercase tracking-[0.3px]">Licensed features</Text>
               <View className="flex-row flex-wrap gap-1.5">
                 {license.features.map((f) => (
-                  <View key={f} className="bg-gray-100 dark:bg-slate-700 rounded-md px-2 py-[3px]">
-                    <Text className="text-[12px] text-gray-700 dark:text-slate-300">{f}</Text>
+                  <View key={f} className="bg-gray-100 dark:bg-slate-700 rounded-md px-2 py-1">
+                    <Text className="text-xs text-gray-700 dark:text-slate-300">{f}</Text>
                   </View>
                 ))}
               </View>
@@ -301,10 +301,10 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
       {/* Activate / update license */}
       <View className="h-px bg-gray-100 dark:bg-slate-700" />
       <View className="gap-1.5">
-        <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">{license?.status === "active" ? "Update License Key" : "Activate License"}</Text>
-        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5">
+        <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">{license?.status === "active" ? "Update License Key" : "Activate License"}</Text>
+        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
           <TextInput
-            className="flex-1 text-[15px] text-gray-900 dark:text-slate-100 py-[11px]"
+            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
             value={licenseKey}
             onChangeText={setLicenseKey}
             placeholder="Paste your license key…"
@@ -313,10 +313,10 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
             autoCapitalize="none"
           />
         </View>
-        {activateError ? <Text className="text-[13px] text-red-600 dark:text-red-400">{activateError}</Text> : null}
+        {activateError ? <Text className="text-sm text-red-600 dark:text-red-400">{activateError}</Text> : null}
       </View>
       <TouchableOpacity
-        className={`bg-blue-600 rounded-[10px] py-[13px] items-center ${(!licenseKey.trim() || activating) ? "opacity-50" : ""}`}
+        className={`bg-blue-600 rounded-xl py-3.5 items-center ${(!licenseKey.trim() || activating) ? "opacity-50" : ""}`}
         onPress={handleActivate}
         disabled={!licenseKey.trim() || activating}
         activeOpacity={0.8}
@@ -324,7 +324,7 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
         {activating ? (
           <ActivityIndicator color="#fff" size="small" />
         ) : (
-          <Text className="text-white text-[15px] font-semibold">
+          <Text className="text-white text-base font-semibold">
             {license?.status === "active" ? "Update License" : "Activate License"}
           </Text>
         )}
@@ -336,8 +336,8 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
 function LicenseGridItem({ label, value }: { label: string; value: string }) {
   return (
     <View className="flex-row gap-3">
-      <Text className="text-[13px] text-gray-500 dark:text-slate-400 w-[100px] shrink-0">{label}</Text>
-      <Text className="text-[13px] font-semibold text-gray-900 dark:text-slate-100 flex-1">{value}</Text>
+      <Text className="text-sm text-gray-500 dark:text-slate-400 w-24 shrink-0">{label}</Text>
+      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1">{value}</Text>
     </View>
   );
 }
@@ -379,7 +379,7 @@ function SystemShutdownSection() {
   };
 
   return (
-    <View className="bg-white dark:bg-slate-800 rounded-[14px] p-4 border border-gray-200 dark:border-slate-700 gap-3.5">
+    <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3.5">
       <View className="flex-row items-start gap-3">
         <View className={`w-9 h-9 rounded-lg justify-center items-center shrink-0 ${active ? "bg-red-100 dark:bg-red-950/30" : "bg-gray-100 dark:bg-slate-700"}`}>
           <Ionicons
@@ -389,10 +389,10 @@ function SystemShutdownSection() {
           />
         </View>
         <View className="flex-1">
-          <Text className="text-[15px] font-bold text-gray-900 dark:text-slate-100">System Shutdown</Text>
+          <Text className="text-base font-bold text-gray-900 dark:text-slate-100">System Shutdown</Text>
           {active && (
-            <View className="bg-red-100 dark:bg-red-950/30 rounded-md px-2 py-[3px] self-start mt-1">
-              <Text className="text-[12px] font-bold text-red-600 dark:text-red-400">Active</Text>
+            <View className="bg-red-100 dark:bg-red-950/30 rounded-md px-2 py-1 self-start mt-1">
+              <Text className="text-xs font-bold text-red-600 dark:text-red-400">Active</Text>
             </View>
           )}
         </View>
@@ -406,14 +406,14 @@ function SystemShutdownSection() {
           "Does not affect tasks already in progress",
         ].map((line) => (
           <View key={line} className="flex-row gap-2 items-start">
-            <Text className="text-[14px] text-gray-500 dark:text-slate-400 leading-5">•</Text>
-            <Text className="text-[13px] text-gray-500 dark:text-slate-400 flex-1 leading-5">{line}</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400 leading-5">•</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400 flex-1 leading-5">{line}</Text>
           </View>
         ))}
       </View>
 
       <TouchableOpacity
-        className={`rounded-[10px] py-[13px] items-center ${active ? "bg-green-600" : "bg-red-600"} ${fetching ? "opacity-50" : ""}`}
+        className={`rounded-xl py-3.5 items-center ${active ? "bg-green-600" : "bg-red-600"} ${fetching ? "opacity-50" : ""}`}
         onPress={handleToggle}
         disabled={fetching || result.fetching}
         activeOpacity={0.8}
@@ -421,7 +421,7 @@ function SystemShutdownSection() {
         {fetching ? (
           <ActivityIndicator color="#fff" size="small" />
         ) : (
-          <Text className="text-white text-[15px] font-semibold">
+          <Text className="text-white text-base font-semibold">
             {active ? "Deactivate Shutdown" : "Activate Shutdown"}
           </Text>
         )}

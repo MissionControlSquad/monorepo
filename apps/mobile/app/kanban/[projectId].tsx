@@ -29,7 +29,7 @@ const FilterChip = ({
     onPress={onPress}
     activeOpacity={0.7}
   >
-    <Text className={`text-[12px] ${active ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
+    <Text className={`text-xs ${active ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
       {label}
     </Text>
   </TouchableOpacity>
@@ -80,7 +80,7 @@ export default function KanbanScreen() {
     <View className="flex-1">
       {filtersOpen && (
         <View className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3.5 pt-2.5 pb-3 gap-2">
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Due Date</Text>
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Due Date</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
             {DUE_DATE_OPTIONS.map((opt) => (
               <FilterChip
@@ -92,7 +92,7 @@ export default function KanbanScreen() {
             ))}
           </ScrollView>
 
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Priority</Text>
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Priority</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
             {PRIORITY_OPTIONS.map((opt) => (
               <FilterChip
@@ -104,7 +104,7 @@ export default function KanbanScreen() {
             ))}
           </ScrollView>
 
-          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">More Filters</Text>
+          <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">More Filters</Text>
           <View className="flex-row flex-wrap gap-2">
             <FilterChip label="Blocked only" active={blockedOnly} onPress={() => setBlockedOnly((v) => !v)} />
             <FilterChip label="Top-level only" active={topLevelOnly} onPress={() => setTopLevelOnly((v) => !v)} />
@@ -122,7 +122,7 @@ export default function KanbanScreen() {
                 setUnassignedOnly(false);
               }}
             >
-              <Text className="text-[12px] text-red-600 dark:text-red-400 font-semibold">Clear all filters</Text>
+              <Text className="text-xs text-red-600 dark:text-red-400 font-semibold">Clear all filters</Text>
             </TouchableOpacity>
           )}
         </View>

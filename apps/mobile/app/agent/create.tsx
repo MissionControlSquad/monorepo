@@ -268,7 +268,7 @@ export default function CreateAgentScreen() {
           <Ionicons name="chevron-back" size={22} color="#374151" />
         </TouchableOpacity>
         <View className="flex-1">
-          <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">Create Agent</Text>
+          <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">Create Agent</Text>
           <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">
             {step === "template" && "Choose a template"}
             {step === "preview" && "Template details"}
@@ -313,7 +313,7 @@ export default function CreateAgentScreen() {
       {/* ── Step 1: Template List ── */}
       {step === "template" && (
         <View className="flex-1">
-          <View className="flex-row items-center bg-white dark:bg-slate-800 rounded-[10px] border border-gray-200 dark:border-slate-700 px-3 py-[9px] mx-4 mt-3 mb-2">
+          <View className="flex-row items-center bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 px-3 py-2.5 mx-4 mt-3 mb-2">
             <Ionicons name="search-outline" size={16} color="#9ca3af" style={{ marginRight: 8 }} />
             <TextInput
               className="flex-1 text-sm text-gray-900 dark:text-slate-100"
@@ -339,7 +339,7 @@ export default function CreateAgentScreen() {
           >
             <TouchableOpacity
               className={[
-                "border rounded-lg px-[14px] py-2",
+                "border rounded-lg px-3.5 py-2",
                 categoryFilter === "all"
                   ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
                   : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800",
@@ -348,7 +348,7 @@ export default function CreateAgentScreen() {
             >
               <Text
                 className={[
-                  "text-[13px] font-medium",
+                  "text-sm font-medium",
                   categoryFilter === "all"
                     ? "text-blue-600 dark:text-blue-400 font-semibold"
                     : "text-gray-500 dark:text-slate-400",
@@ -361,7 +361,7 @@ export default function CreateAgentScreen() {
               <TouchableOpacity
                 key={c}
                 className={[
-                  "border rounded-lg px-[14px] py-2",
+                  "border rounded-lg px-3.5 py-2",
                   categoryFilter === c
                     ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
                     : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800",
@@ -370,7 +370,7 @@ export default function CreateAgentScreen() {
               >
                 <Text
                   className={[
-                    "text-[13px] font-medium",
+                    "text-sm font-medium",
                     categoryFilter === c
                       ? "text-blue-600 dark:text-blue-400 font-semibold"
                       : "text-gray-500 dark:text-slate-400",
@@ -388,18 +388,18 @@ export default function CreateAgentScreen() {
             contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, gap: 8, paddingBottom: insets.bottom + 80 }}
             renderItem={({ item: t }) => (
               <TouchableOpacity
-                className="flex-row items-center bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 gap-3"
+                className="flex-row items-center bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-3"
                 onPress={() => {
                   setSelectedTemplate(t);
                   setStep("preview");
                 }}
                 activeOpacity={0.75}
               >
-                <Text className="text-2xl w-[34px] text-center">{t.emoji}</Text>
+                <Text className="text-2xl w-9 text-center">{t.emoji}</Text>
                 <View className="flex-1">
                   <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">{t.name}</Text>
                   <Text className="text-xs text-gray-500 dark:text-slate-400 leading-[17px] mt-0.5" numberOfLines={2}>{t.description}</Text>
-                  <Text className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-[3px] uppercase">
+                  <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1 uppercase">
                     {CATEGORY_LABELS[t.category] ?? t.category}
                   </Text>
                 </View>
@@ -419,7 +419,7 @@ export default function CreateAgentScreen() {
             style={{ paddingBottom: insets.bottom + 12 }}
           >
             <TouchableOpacity
-              className="border border-gray-200 dark:border-slate-700 rounded-xl py-[13px] items-center bg-white dark:bg-slate-800"
+              className="border border-gray-200 dark:border-slate-700 rounded-xl py-3.5 items-center bg-white dark:bg-slate-800"
               onPress={() => {
                 setSelectedTemplate(null);
                 setRole("");
@@ -430,7 +430,7 @@ export default function CreateAgentScreen() {
               }}
               activeOpacity={0.8}
             >
-              <Text className="text-[15px] text-gray-700 dark:text-slate-300 font-medium">Start from Scratch</Text>
+              <Text className="text-base text-gray-700 dark:text-slate-300 font-medium">Start from Scratch</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -442,21 +442,21 @@ export default function CreateAgentScreen() {
           contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: insets.bottom + 24 }}
           contentInsetAdjustmentBehavior="automatic"
         >
-          <View className="flex-row items-start gap-[14px]">
+          <View className="flex-row items-start gap-3.5">
             <Text className="text-[44px]">{selectedTemplate.emoji}</Text>
             <View className="flex-1">
               <Text className="text-xl font-extrabold text-gray-900 dark:text-slate-100">{selectedTemplate.name}</Text>
-              <Text className="text-[13px] text-gray-500 dark:text-slate-400 mt-0.5">{selectedTemplate.role}</Text>
+              <Text className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">{selectedTemplate.role}</Text>
             </View>
-            <View className="bg-blue-50 dark:bg-blue-900/20 rounded-md px-2 py-[3px] self-start">
-              <Text className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold">
+            <View className="bg-blue-50 dark:bg-blue-900/20 rounded-md px-2 py-1 self-start">
+              <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">
                 {selectedTemplate.level.charAt(0).toUpperCase() + selectedTemplate.level.slice(1)}
               </Text>
             </View>
           </View>
 
-          <View className="self-start bg-gray-100 dark:bg-slate-700 rounded-md px-2 py-[3px]">
-            <Text className="text-[11px] text-gray-500 dark:text-slate-400 font-medium">
+          <View className="self-start bg-gray-100 dark:bg-slate-700 rounded-md px-2 py-1">
+            <Text className="text-xs text-gray-500 dark:text-slate-400 font-medium">
               {CATEGORY_LABELS[selectedTemplate.category] ?? selectedTemplate.category}
             </Text>
           </View>
@@ -466,20 +466,20 @@ export default function CreateAgentScreen() {
 
           {/* Behavior */}
           {selectedTemplate.personality ? (
-            <View className="bg-gray-50 dark:bg-slate-900 rounded-[10px] border border-gray-200 dark:border-slate-700 p-[14px] gap-1.5">
-              <Text className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.8px] mb-1">Behavior</Text>
-              <Text className="text-[13px] text-gray-700 dark:text-slate-300 leading-5">{selectedTemplate.personality}</Text>
+            <View className="bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-1.5">
+              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.8px] mb-1">Behavior</Text>
+              <Text className="text-sm text-gray-700 dark:text-slate-300 leading-5">{selectedTemplate.personality}</Text>
             </View>
           ) : null}
 
           {/* Skills */}
           {selectedTemplate.skills.length > 0 && (
             <View className="gap-2">
-              <Text className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.8px] mb-1">Pre-loaded Skills</Text>
+              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.8px] mb-1">Pre-loaded Skills</Text>
               {selectedTemplate.skills.map((s, i) => (
                 <View key={i} className="flex-row items-start gap-2">
                   <View className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
-                  <Text className="text-[13px] text-gray-700 dark:text-slate-300 flex-1 leading-[19px]">{s}</Text>
+                  <Text className="text-sm text-gray-700 dark:text-slate-300 flex-1 leading-[19px]">{s}</Text>
                 </View>
               ))}
             </View>
@@ -488,10 +488,10 @@ export default function CreateAgentScreen() {
           {/* Capabilities */}
           {selectedTemplate.capabilities.length > 0 && (
             <View className="gap-2">
-              <Text className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.8px] mb-1">Capabilities</Text>
+              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.8px] mb-1">Capabilities</Text>
               <View className="flex-row flex-wrap gap-2">
                 {selectedTemplate.capabilities.map((c, i) => (
-                  <View key={i} className="bg-gray-50 dark:bg-slate-900 rounded-[20px] border border-gray-200 dark:border-slate-700 px-2.5 py-[5px]">
+                  <View key={i} className="bg-gray-50 dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 px-2.5 py-1">
                     <Text className="text-xs text-gray-700 dark:text-slate-300">{c}</Text>
                   </View>
                 ))}
@@ -500,7 +500,7 @@ export default function CreateAgentScreen() {
           )}
 
           <TouchableOpacity
-            className="bg-blue-600 rounded-xl py-[14px] items-center"
+            className="bg-blue-600 rounded-xl py-3.5 items-center"
             onPress={() => applyTemplate(selectedTemplate)}
             activeOpacity={0.8}
           >
@@ -517,9 +517,9 @@ export default function CreateAgentScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {selectedTemplate && (
-            <View className="flex-row items-center bg-blue-50 dark:bg-blue-900/20 rounded-[10px] p-2.5 gap-2 border border-blue-200 dark:border-blue-800">
+            <View className="flex-row items-center bg-blue-50 dark:bg-blue-900/20 rounded-xl p-2.5 gap-2 border border-blue-200 dark:border-blue-800">
               <Text className="text-lg">{selectedTemplate.emoji}</Text>
-              <Text className="flex-1 text-[13px] font-semibold text-blue-700 dark:text-blue-300">{selectedTemplate.name}</Text>
+              <Text className="flex-1 text-sm font-semibold text-blue-700 dark:text-blue-300">{selectedTemplate.name}</Text>
               <TouchableOpacity onPress={() => setStep("preview")}>
                 <Text className="text-xs text-blue-600 dark:text-blue-400 font-medium">Change</Text>
               </TouchableOpacity>
@@ -530,9 +530,9 @@ export default function CreateAgentScreen() {
             <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">Identity</Text>
 
             <View className="gap-1.5">
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Name <Text className="text-red-600 dark:text-red-400">*</Text></Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Name <Text className="text-red-600 dark:text-red-400">*</Text></Text>
               <TextInput
-                className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-[10px] px-[14px] py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+                className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 value={name}
                 onChangeText={setName}
                 placeholder="e.g. Nova, Rex, Luna"
@@ -542,11 +542,11 @@ export default function CreateAgentScreen() {
             </View>
 
             <View className="gap-1.5">
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Username <Text className="text-gray-400 dark:text-slate-500 font-normal">(optional)</Text></Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Username <Text className="text-gray-400 dark:text-slate-500 font-normal">(optional)</Text></Text>
               <View className="flex-row items-center gap-1">
-                <Text className="text-[15px] text-gray-500 dark:text-slate-400 font-medium">@</Text>
+                <Text className="text-base text-gray-500 dark:text-slate-400 font-medium">@</Text>
                 <TextInput
-                  className="flex-1 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-[10px] px-[14px] py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+                  className="flex-1 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                   value={username}
                   onChangeText={(t) => setUsername(t.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
                   placeholder={
@@ -562,9 +562,9 @@ export default function CreateAgentScreen() {
             </View>
 
             <View className="gap-1.5">
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Role <Text className="text-red-600 dark:text-red-400">*</Text></Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Role <Text className="text-red-600 dark:text-red-400">*</Text></Text>
               <TextInput
-                className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-[10px] px-[14px] py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+                className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 value={role}
                 onChangeText={setRole}
                 placeholder="e.g. Research Specialist"
@@ -573,13 +573,13 @@ export default function CreateAgentScreen() {
             </View>
 
             <View className="gap-1.5">
-              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Emoji</Text>
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Emoji</Text>
               <View className="flex-row flex-wrap gap-2">
                 {AGENT_EMOJI_PRESETS.map((e) => (
                   <TouchableOpacity
                     key={e}
                     className={[
-                      "w-11 h-11 rounded-[10px] border-[1.5px] justify-center items-center",
+                      "w-11 h-11 rounded-xl border-[1.5px] justify-center items-center",
                       emoji === e
                         ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
                         : "border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900",
@@ -587,7 +587,7 @@ export default function CreateAgentScreen() {
                     onPress={() => setEmoji(e)}
                     activeOpacity={0.7}
                   >
-                    <Text className="text-[22px]">{e}</Text>
+                    <Text className="text-xl">{e}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -601,7 +601,7 @@ export default function CreateAgentScreen() {
                 <TouchableOpacity
                   key={l}
                   className={[
-                    "border rounded-lg px-[14px] py-2",
+                    "border rounded-lg px-3.5 py-2",
                     level === l
                       ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
                       : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800",
@@ -611,7 +611,7 @@ export default function CreateAgentScreen() {
                 >
                   <Text
                     className={[
-                      "text-[13px] font-medium",
+                      "text-sm font-medium",
                       level === l
                         ? "text-blue-600 dark:text-blue-400 font-semibold"
                         : "text-gray-500 dark:text-slate-400",
@@ -630,7 +630,7 @@ export default function CreateAgentScreen() {
               Behavior guidelines, expertise, and working style. Describe how this agent should act.
             </Text>
             <TextInput
-              className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-[10px] px-[14px] py-[11px] text-[15px] text-gray-900 dark:text-slate-100 min-h-[110px]"
+              className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100 min-h-[110px]"
               value={personality}
               onChangeText={setPersonality}
               placeholder="Agent personality and behavior guidelines…"
@@ -645,7 +645,7 @@ export default function CreateAgentScreen() {
             <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">Workspace Path <Text className="text-gray-400 dark:text-slate-500 font-normal">(optional)</Text></Text>
             <Text className="text-xs text-gray-400 dark:text-slate-500">Leave blank to use the default OpenClaw workspace path.</Text>
             <TextInput
-              className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-[10px] px-[14px] py-[11px] text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               value={workspacePath}
               onChangeText={setWorkspacePath}
               placeholder={`~/.openclaw/agents/${name ? name.toLowerCase().replace(/[^a-z0-9]+/g, "-") : "agent-name"}/workspace`}
@@ -657,7 +657,7 @@ export default function CreateAgentScreen() {
 
           <TouchableOpacity
             className={[
-              "bg-blue-600 rounded-xl py-[14px] items-center",
+              "bg-blue-600 rounded-xl py-3.5 items-center",
               (!name.trim() || !role.trim() || loading) ? "opacity-45" : "",
             ].join(" ")}
             onPress={handleCreate}
@@ -680,10 +680,10 @@ export default function CreateAgentScreen() {
           contentInsetAdjustmentBehavior="automatic"
         >
           {/* Security warning */}
-          <View className="flex-row gap-3 border-[1.5px] border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/20 rounded-xl p-[14px] items-start">
+          <View className="flex-row gap-3 border-[1.5px] border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/20 rounded-xl p-3.5 items-start">
             <Ionicons name="shield-outline" size={20} color="#dc2626" />
             <View className="flex-1">
-              <Text className="text-sm font-bold text-red-600 dark:text-red-400 mb-[3px]">Sensitive Credentials</Text>
+              <Text className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">Sensitive Credentials</Text>
               <Text className="text-xs text-red-500 leading-[18px]">
                 The content below contains your API key. Do not share publicly or commit to version control.
               </Text>
@@ -708,7 +708,7 @@ export default function CreateAgentScreen() {
                 <TouchableOpacity
                   key={m}
                   className={[
-                    "flex-row items-center gap-[5px] px-3 py-2 rounded-lg border",
+                    "flex-row items-center gap-1 px-3 py-2 rounded-lg border",
                     setupMode === m
                       ? "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20"
                       : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800",
@@ -762,10 +762,10 @@ export default function CreateAgentScreen() {
           {/* ── AUTO MODE ── */}
           {setupMode === "auto" && (
             <>
-              <View className="flex-row gap-3 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-[14px] items-start">
+              <View className="flex-row gap-3 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3.5 items-start">
                 <Ionicons name="chatbubble-ellipses-outline" size={18} color="#2563eb" />
                 <View className="flex-1">
-                  <Text className="text-[13px] font-bold text-blue-700 dark:text-blue-300 mb-[3px]">Send to Your Connected Channel</Text>
+                  <Text className="text-sm font-bold text-blue-700 dark:text-blue-300 mb-1">Send to Your Connected Channel</Text>
                   <Text className="text-xs text-blue-500 leading-[18px]">
                     Copy the bootstrap message and send it via WhatsApp, Slack, Discord, or Telegram. The agent will read it and configure itself automatically.
                   </Text>
@@ -785,11 +785,11 @@ export default function CreateAgentScreen() {
                 </View>
                 <ScrollView
                   horizontal
-                  className="bg-gray-800 rounded-[10px] p-3 max-h-[200px]"
+                  className="bg-gray-800 rounded-xl p-3 max-h-48"
                   contentContainerStyle={{ minWidth: "100%" }}
                 >
                   <Text
-                    className="text-[11px] text-emerald-100 leading-[18px]"
+                    className="text-xs text-emerald-100 leading-[18px]"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >
@@ -806,10 +806,10 @@ export default function CreateAgentScreen() {
                   "Agent will appear in the dashboard on next heartbeat",
                 ].map((s, i) => (
                   <View key={i} className="flex-row gap-2.5 items-start">
-                    <View className="w-[22px] h-[22px] rounded-full bg-blue-50 dark:bg-blue-900/20 justify-center items-center shrink-0 mt-[1px]">
-                      <Text className="text-[11px] font-bold text-blue-600 dark:text-blue-400">{i + 1}</Text>
+                    <View className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/20 justify-center items-center shrink-0 mt-px">
+                      <Text className="text-xs font-bold text-blue-600 dark:text-blue-400">{i + 1}</Text>
                     </View>
-                    <Text className="text-[13px] text-gray-700 dark:text-slate-300 flex-1 leading-[19px]">{s}</Text>
+                    <Text className="text-sm text-gray-700 dark:text-slate-300 flex-1 leading-[19px]">{s}</Text>
                   </View>
                 ))}
               </View>
@@ -820,16 +820,16 @@ export default function CreateAgentScreen() {
           {setupMode === "manual" && (
             <>
               {/* API Key */}
-              <View className="flex-row gap-3 border-[1.5px] border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/10 rounded-xl p-[14px] items-start">
+              <View className="flex-row gap-3 border-[1.5px] border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/10 rounded-xl p-3.5 items-start">
                 <Ionicons name="warning-outline" size={18} color="#d97706" />
                 <View className="flex-1">
-                  <Text className="text-[13px] font-bold text-amber-600 mb-[3px]">API Key — Save this now!</Text>
+                  <Text className="text-sm font-bold text-amber-600 mb-1">API Key — Save this now!</Text>
                   <Text className="text-xs text-amber-800 leading-[18px] mb-2">
                     This key will only be shown once. It is already embedded in the config files.
                   </Text>
                   <View className="flex-row items-center gap-1.5 bg-white dark:bg-slate-800 rounded-lg p-2.5 border border-amber-200 dark:border-amber-700">
                     <Text
-                      className="flex-1 text-[13px] text-gray-900 dark:text-slate-100"
+                      className="flex-1 text-sm text-gray-900 dark:text-slate-100"
                       style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                       selectable
                       numberOfLines={apiKeyVisible ? undefined : 1}
@@ -854,7 +854,7 @@ export default function CreateAgentScreen() {
               </View>
 
               {/* 1. OpenClaw config */}
-              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-[14px] gap-2.5">
+              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-2.5">
                 <View className="flex-row items-center gap-1.5">
                   <Ionicons name="terminal-outline" size={16} color="#374151" />
                   <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">1. Register Agent in OpenClaw</Text>
@@ -867,7 +867,7 @@ export default function CreateAgentScreen() {
                 </Text>
                 <View className="bg-gray-800 rounded-lg p-3">
                   <Text
-                    className="text-[11px] text-green-400 leading-[18px]"
+                    className="text-xs text-green-400 leading-[18px]"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >
@@ -884,14 +884,14 @@ export default function CreateAgentScreen() {
               </View>
 
               {/* 2. Workspace */}
-              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-[14px] gap-2.5">
+              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-2.5">
                 <View className="flex-row items-center gap-1.5">
                   <Ionicons name="folder-outline" size={16} color="#374151" />
                   <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">2. Create Workspace</Text>
                 </View>
                 <View className="bg-gray-800 rounded-lg p-3">
                   <Text
-                    className="text-[11px] text-green-400 leading-[18px]"
+                    className="text-xs text-green-400 leading-[18px]"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >{`mkdir -p ${result.workspacePath}`}</Text>
@@ -906,7 +906,7 @@ export default function CreateAgentScreen() {
               </View>
 
               {/* 3. Config files */}
-              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-[14px] gap-2.5">
+              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-2.5">
                 <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">3. Config Files</Text>
                 <Text className="text-xs text-gray-500 dark:text-slate-400 leading-[18px]">
                   Copy each file to{" "}
@@ -916,7 +916,7 @@ export default function CreateAgentScreen() {
                   <View key={file.filename} className="border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden">
                     <View className="flex-row items-center gap-2 px-3 py-2.5 bg-gray-50 dark:bg-slate-900">
                       <Ionicons name="document-text-outline" size={14} color="#374151" />
-                      <Text className="flex-1 text-[13px] font-medium text-gray-700 dark:text-slate-300">{file.filename}</Text>
+                      <Text className="flex-1 text-sm font-medium text-gray-700 dark:text-slate-300">{file.filename}</Text>
                       <TouchableOpacity
                         onPress={() => copyText(file.content, file.filename)}
                         className="flex-row items-center gap-1"
@@ -930,14 +930,14 @@ export default function CreateAgentScreen() {
               </View>
 
               {/* 4. Cron */}
-              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-[14px] gap-2.5">
+              <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-2.5">
                 <View className="flex-row items-center gap-1.5">
                   <Ionicons name="terminal-outline" size={16} color="#374151" />
                   <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">4. Add Heartbeat Cron</Text>
                 </View>
                 <View className="bg-gray-800 rounded-lg p-3">
                   <Text
-                    className="text-[11px] text-green-400 leading-[18px]"
+                    className="text-xs text-green-400 leading-[18px]"
                     style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
                     selectable
                   >{result.cronCommand}</Text>
@@ -956,10 +956,10 @@ export default function CreateAgentScreen() {
           {/* ── DELEGATE MODE ── */}
           {setupMode === "delegate" && (
             <>
-              <View className="flex-row gap-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 rounded-xl p-[14px] items-start">
+              <View className="flex-row gap-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 rounded-xl p-3.5 items-start">
                 <Ionicons name="hardware-chip-outline" size={18} color="#16a34a" />
                 <View className="flex-1">
-                  <Text className="text-[13px] font-bold text-green-700 dark:text-green-400 mb-[3px]">Delegate Setup to Squad Lead</Text>
+                  <Text className="text-sm font-bold text-green-700 dark:text-green-400 mb-1">Delegate Setup to Squad Lead</Text>
                   <Text className="text-xs text-green-600 dark:text-green-500 leading-[18px]">
                     A high-priority task will be created and assigned to your Squad Lead. It will bootstrap the workspace and set up the heartbeat cron on next wake-up.
                   </Text>
@@ -968,29 +968,29 @@ export default function CreateAgentScreen() {
 
               {delegateStatus !== "done" && (
                 <>
-                  <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-[14px] gap-2">
-                    <Text className="text-[13px] font-bold text-gray-700 dark:text-slate-300 mb-1">Task will include</Text>
+                  <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 gap-2">
+                    <Text className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Task will include</Text>
                     <View className="flex-row gap-2">
-                      <Text className="text-[13px] text-gray-500 dark:text-slate-400 w-20">Name</Text>
-                      <Text className="text-[13px] font-semibold text-gray-900 dark:text-slate-100 flex-1">{result.agent.name}</Text>
+                      <Text className="text-sm text-gray-500 dark:text-slate-400 w-20">Name</Text>
+                      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1">{result.agent.name}</Text>
                     </View>
                     <View className="flex-row gap-2">
-                      <Text className="text-[13px] text-gray-500 dark:text-slate-400 w-20">Role</Text>
-                      <Text className="text-[13px] font-semibold text-gray-900 dark:text-slate-100 flex-1">{result.agent.role}</Text>
+                      <Text className="text-sm text-gray-500 dark:text-slate-400 w-20">Role</Text>
+                      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1">{result.agent.role}</Text>
                     </View>
                     <View className="flex-row gap-2">
-                      <Text className="text-[13px] text-gray-500 dark:text-slate-400 w-20">Level</Text>
-                      <Text className="text-[13px] font-semibold text-gray-900 dark:text-slate-100 flex-1">{result.agent.level}</Text>
+                      <Text className="text-sm text-gray-500 dark:text-slate-400 w-20">Level</Text>
+                      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1">{result.agent.level}</Text>
                     </View>
                     <View className="flex-row gap-2">
-                      <Text className="text-[13px] text-gray-500 dark:text-slate-400 w-20">Assigned to</Text>
-                      <Text className="text-[13px] font-semibold text-gray-900 dark:text-slate-100 flex-1">{squadLeads[0]?.name ?? SQUAD_LEAD_ROLE}</Text>
+                      <Text className="text-sm text-gray-500 dark:text-slate-400 w-20">Assigned to</Text>
+                      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1">{squadLeads[0]?.name ?? SQUAD_LEAD_ROLE}</Text>
                     </View>
                   </View>
 
                   <TouchableOpacity
                     className={[
-                      "bg-blue-600 rounded-xl py-[14px] items-center",
+                      "bg-blue-600 rounded-xl py-3.5 items-center",
                       delegateStatus === "creating" ? "opacity-45" : "",
                     ].join(" ")}
                     onPress={handleDelegate}
@@ -1007,7 +1007,7 @@ export default function CreateAgentScreen() {
               )}
 
               {delegateStatus === "done" && delegateTaskNumber !== null && (
-                <View className="flex-row gap-3 border-[1.5px] border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 rounded-xl p-[14px] items-start">
+                <View className="flex-row gap-3 border-[1.5px] border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 rounded-xl p-3.5 items-start">
                   <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
                   <View className="flex-1">
                     <Text className="text-sm font-bold text-green-700 dark:text-green-400 mb-0.5">Task #{delegateTaskNumber} Created</Text>
@@ -1024,12 +1024,12 @@ export default function CreateAgentScreen() {
           {setupMode === "cloud" && (
             <>
               <View
-                className="flex-row gap-3 rounded-xl p-[14px] items-start border"
+                className="flex-row gap-3 rounded-xl p-3.5 items-start border"
                 style={{ borderColor: "#e9d5ff", backgroundColor: "#faf5ff" }}
               >
                 <Ionicons name="cloud-outline" size={18} color="#9333ea" />
                 <View className="flex-1">
-                  <Text className="text-[13px] font-bold mb-[3px]" style={{ color: "#6b21a8" }}>Host on Cloud VM</Text>
+                  <Text className="text-sm font-bold mb-1" style={{ color: "#6b21a8" }}>Host on Cloud VM</Text>
                   <Text className="text-xs leading-[18px]" style={{ color: "#7c3aed" }}>
                     Deploy this agent to one of your cloud VMs. The VM will automatically set up and start the agent.
                   </Text>
@@ -1037,7 +1037,7 @@ export default function CreateAgentScreen() {
               </View>
 
               {cloudVmId ? (
-                <View className="flex-row gap-3 border-[1.5px] border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 rounded-xl p-[14px] items-start">
+                <View className="flex-row gap-3 border-[1.5px] border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 rounded-xl p-3.5 items-start">
                   <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
                   <View className="flex-1">
                     <Text className="text-sm font-bold text-green-700 dark:text-green-400 mb-0.5">Agent Deployed</Text>
@@ -1049,7 +1049,7 @@ export default function CreateAgentScreen() {
               ) : cloudVmsLoading ? (
                 <View className="flex-row items-center gap-2.5 py-4">
                   <ActivityIndicator size="small" color="#9333ea" />
-                  <Text className="text-[13px] text-purple-600">Loading VMs…</Text>
+                  <Text className="text-sm text-purple-600">Loading VMs…</Text>
                 </View>
               ) : cloudVms.length === 0 ? (
                 <View className="items-center py-6 gap-2">
@@ -1067,7 +1067,7 @@ export default function CreateAgentScreen() {
                       <TouchableOpacity
                         key={vm.id}
                         className={[
-                          "flex-row items-center border rounded-[10px] p-3 gap-2.5",
+                          "flex-row items-center border rounded-xl p-3 gap-2.5",
                           selectedVmId === vm.id
                             ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
                             : "border-gray-200 dark:border-slate-700",
@@ -1075,12 +1075,12 @@ export default function CreateAgentScreen() {
                         onPress={() => setSelectedVmId(vm.id)}
                         activeOpacity={0.75}
                       >
-                        <View className="w-[22px]">
+                        <View className="w-6">
                           {selectedVmId === vm.id && (
                             <Ionicons name="checkmark-circle" size={18} color="#2563eb" />
                           )}
                           {selectedVmId !== vm.id && (
-                            <View className="w-[18px] h-[18px] rounded-full border-[1.5px] border-gray-300 dark:border-slate-500" />
+                            <View className="w-5 h-5 rounded-full border-[1.5px] border-gray-300 dark:border-slate-500" />
                           )}
                         </View>
                         <View className="flex-1">
@@ -1098,7 +1098,7 @@ export default function CreateAgentScreen() {
                   {selectedVmId && (
                     <TouchableOpacity
                       className={[
-                        "bg-blue-600 rounded-xl py-[14px] items-center",
+                        "bg-blue-600 rounded-xl py-3.5 items-center",
                         cloudDeploying ? "opacity-45" : "",
                       ].join(" ")}
                       onPress={handleCloudDeploy}
@@ -1119,11 +1119,11 @@ export default function CreateAgentScreen() {
 
           {/* Done */}
           <TouchableOpacity
-            className="border border-gray-200 dark:border-slate-700 rounded-xl py-[13px] items-center bg-white dark:bg-slate-800"
+            className="border border-gray-200 dark:border-slate-700 rounded-xl py-3.5 items-center bg-white dark:bg-slate-800"
             onPress={() => router.push(`/agent/${result.agent.id}` as never)}
             activeOpacity={0.8}
           >
-            <Text className="text-[15px] text-gray-700 dark:text-slate-300 font-medium">View Agent Profile</Text>
+            <Text className="text-base text-gray-700 dark:text-slate-300 font-medium">View Agent Profile</Text>
           </TouchableOpacity>
           <TouchableOpacity
             className="items-center py-2.5"

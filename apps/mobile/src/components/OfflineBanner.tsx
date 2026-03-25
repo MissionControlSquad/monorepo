@@ -20,7 +20,7 @@ export function OfflineBanner() {
       style={{ transform: [{ translateY }] }}
       pointerEvents="none"
     >
-      <Text className="text-white text-[13px] font-semibold">
+      <Text className="text-white text-sm font-semibold">
         ⚠️ No connection — check your network
       </Text>
     </Animated.View>

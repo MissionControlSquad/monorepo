@@ -13,7 +13,7 @@ export function EmptyState({ icon = "cube-outline", message, action }: EmptyStat
   return (
     <View className="flex-1 justify-center items-center gap-3 p-8">
       <Ionicons name={icon} size={48} color={isDark ? "#64748b" : "#9ca3af"} />
-      <Text className="text-gray-400 dark:text-slate-500 text-[15px] text-center leading-[22px]">
+      <Text className="text-gray-400 dark:text-slate-500 text-base text-center leading-[22px]">
         {message}
       </Text>
       {action && (

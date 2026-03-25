@@ -226,7 +226,7 @@ function RecurringTaskFormModal({
           <TouchableOpacity onPress={onClose}>
             <Text className="text-base text-gray-500 dark:text-slate-400">Cancel</Text>
           </TouchableOpacity>
-          <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">{modalTitle}</Text>
+          <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">{modalTitle}</Text>
           <TouchableOpacity onPress={handleSave} disabled={saving}>
             {saving
               ? <ActivityIndicator color="#2563eb" />
@@ -240,9 +240,9 @@ function RecurringTaskFormModal({
         >
           {/* Title */}
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Title *</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Title *</Text>
             <TextInput
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               placeholder="Task title…"
               placeholderTextColor="#9ca3af"
               value={taskTitle}
@@ -253,9 +253,9 @@ function RecurringTaskFormModal({
 
           {/* Description */}
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Description</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Description</Text>
             <TextInput
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               style={{ minHeight: 80, textAlignVertical: "top" }}
               placeholder="What should happen each time…"
               placeholderTextColor="#9ca3af"
@@ -267,20 +267,20 @@ function RecurringTaskFormModal({
 
           {/* Frequency */}
           <View className="gap-2">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Frequency</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Frequency</Text>
             <View className="flex-row flex-wrap gap-2">
               {FREQUENCIES.map((f, i) => (
                 <TouchableOpacity
                   key={f.label}
                   onPress={() => setFreqIdx(i)}
-                  className={`px-3 py-[7px] rounded-lg border-[1.5px] ${
+                  className={`px-3 py-2 rounded-lg border-[1.5px] ${
                     freqIdx === i
                       ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
                       : "border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800"
                   }`}
                   activeOpacity={0.7}
                 >
-                  <Text className={`text-[13px] font-semibold ${
+                  <Text className={`text-sm font-semibold ${
                     freqIdx === i ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-slate-300"
                   }`}>
                     {f.label}
@@ -292,7 +292,7 @@ function RecurringTaskFormModal({
 
           {/* Priority */}
           <View className="gap-2">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Priority</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Priority</Text>
             <View className="flex-row flex-wrap gap-2">
               {([null, ...PRIORITIES] as (string | null)[]).map((p) => (
                 <TouchableOpacity
@@ -305,7 +305,7 @@ function RecurringTaskFormModal({
                   }`}
                   activeOpacity={0.7}
                 >
-                  <Text className={`text-[12px] capitalize ${
+                  <Text className={`text-xs capitalize ${
                     priority === p ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-slate-300"
                   }`}>
                     {p ?? "None"}
@@ -317,9 +317,9 @@ function RecurringTaskFormModal({
 
           {/* Time */}
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Time (HH:MM)</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Time (HH:MM)</Text>
             <TextInput
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               placeholder="09:00"
               placeholderTextColor="#9ca3af"
               value={timeInput}
@@ -331,9 +331,9 @@ function RecurringTaskFormModal({
 
           {/* Tags */}
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Tags</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Tags</Text>
             <TextInput
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 text-[15px] text-gray-900 dark:text-slate-100"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               placeholder="bug, backend, api (comma-separated)"
               placeholderTextColor="#9ca3af"
               value={tagsInput}
@@ -344,34 +344,34 @@ function RecurringTaskFormModal({
 
           {/* Project */}
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Project</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Project</Text>
             <TouchableOpacity
               onPress={pickProject}
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 flex-row items-center justify-between"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 flex-row items-center justify-between"
               activeOpacity={0.7}
             >
-              <Text className={`text-[15px] ${selectedProject ? "text-gray-900 dark:text-slate-100" : "text-gray-400 dark:text-slate-500"}`}>
+              <Text className={`text-base ${selectedProject ? "text-gray-900 dark:text-slate-100" : "text-gray-400 dark:text-slate-500"}`}>
                 {selectedProject ? selectedProject.name : "None"}
               </Text>
-              <Text className="text-[12px] text-gray-400 dark:text-slate-500">▼</Text>
+              <Text className="text-xs text-gray-400 dark:text-slate-500">▼</Text>
             </TouchableOpacity>
           </View>
 
           {/* Assignees */}
           <View className="gap-1.5">
-            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Assignees</Text>
+            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Assignees</Text>
             <TouchableOpacity
               onPress={pickAssignees}
-              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-[10px] px-3.5 py-3 flex-row items-center justify-between"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 flex-row items-center justify-between"
               activeOpacity={0.7}
             >
               <Text
-                className={`text-[15px] flex-1 ${selectedAssigneeNames ? "text-gray-900 dark:text-slate-100" : "text-gray-400 dark:text-slate-500"}`}
+                className={`text-base flex-1 ${selectedAssigneeNames ? "text-gray-900 dark:text-slate-100" : "text-gray-400 dark:text-slate-500"}`}
                 numberOfLines={1}
               >
                 {selectedAssigneeNames || "None"}
               </Text>
-              <Text className="text-[12px] text-gray-400 dark:text-slate-500">▼</Text>
+              <Text className="text-xs text-gray-400 dark:text-slate-500">▼</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -480,21 +480,21 @@ export default function RecurringTasksScreen() {
           className={`px-3 py-1.5 rounded-lg ${!includeInactive ? "bg-blue-600" : "bg-gray-100 dark:bg-slate-700"}`}
           activeOpacity={0.7}
         >
-          <Text className={`text-[13px] font-semibold ${!includeInactive ? "text-white" : "text-gray-700 dark:text-slate-300"}`}>Active</Text>
+          <Text className={`text-sm font-semibold ${!includeInactive ? "text-white" : "text-gray-700 dark:text-slate-300"}`}>Active</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setIncludeInactive(true)}
           className={`px-3 py-1.5 rounded-lg ${includeInactive ? "bg-blue-600" : "bg-gray-100 dark:bg-slate-700"}`}
           activeOpacity={0.7}
         >
-          <Text className={`text-[13px] font-semibold ${includeInactive ? "text-white" : "text-gray-700 dark:text-slate-300"}`}>All</Text>
+          <Text className={`text-sm font-semibold ${includeInactive ? "text-white" : "text-gray-700 dark:text-slate-300"}`}>All</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setCreateOpen(true)}
           className="ml-auto px-3.5 py-1.5 rounded-lg bg-blue-600"
           activeOpacity={0.7}
         >
-          <Text className="text-[13px] font-bold text-white">+ New</Text>
+          <Text className="text-sm font-bold text-white">+ New</Text>
         </TouchableOpacity>
       </View>
 
@@ -519,7 +519,7 @@ export default function RecurringTasksScreen() {
         }
         renderItem={({ item }) => (
           <TouchableOpacity
-            className={`bg-white dark:bg-slate-800 rounded-[12px] p-3.5 border border-gray-200 dark:border-slate-700 gap-2 ${item.isActive ? "" : "opacity-60"}`}
+            className={`bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-2 ${item.isActive ? "" : "opacity-60"}`}
             onPress={() => handleActions(item)}
             activeOpacity={0.7}
           >
@@ -527,7 +527,7 @@ export default function RecurringTasksScreen() {
             <View className="flex-row items-center gap-2">
               <Text className="text-base">{item.isActive ? "🔄" : "⏸"}</Text>
               {item.priority && <PriorityBadge priority={item.priority} />}
-              <Text className="text-[12px] text-gray-400 dark:text-slate-500 ml-auto">
+              <Text className="text-xs text-gray-400 dark:text-slate-500 ml-auto">
                 {parseFreqLabel(item.recurrenceConfig)}
               </Text>
               {/* Edit shortcut */}
@@ -535,18 +535,18 @@ export default function RecurringTasksScreen() {
                 onPress={() => setEditTask(item)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text className="text-[13px] text-blue-600 dark:text-blue-400">✏️</Text>
+                <Text className="text-sm text-blue-600 dark:text-blue-400">✏️</Text>
               </TouchableOpacity>
             </View>
 
             {/* Title */}
-            <Text className="text-[15px] font-semibold text-gray-900 dark:text-slate-100 leading-[21px]" numberOfLines={2}>
+            <Text className="text-base font-semibold text-gray-900 dark:text-slate-100 leading-tight" numberOfLines={2}>
               {item.title}
             </Text>
 
             {/* Description */}
             {item.description ? (
-              <Text className="text-[13px] text-gray-500 dark:text-slate-400" numberOfLines={2}>
+              <Text className="text-sm text-gray-500 dark:text-slate-400" numberOfLines={2}>
                 {item.description}
               </Text>
             ) : null}
@@ -555,17 +555,17 @@ export default function RecurringTasksScreen() {
             <View className="flex-row items-center gap-2 flex-wrap">
               <StatusPill status={item.isActive ? "active" : "paused"} />
               {item.nextDueAt && (
-                <Text className="text-[11px] text-gray-400 dark:text-slate-500">
+                <Text className="text-xs text-gray-400 dark:text-slate-500">
                   Next: {formatDate(item.nextDueAt)}
                 </Text>
               )}
               {item.lastGeneratedAt && (
-                <Text className="text-[11px] text-gray-400 dark:text-slate-500">
+                <Text className="text-xs text-gray-400 dark:text-slate-500">
                   Last: {formatDate(item.lastGeneratedAt)}
                 </Text>
               )}
               {item.tags.length > 0 && (
-                <Text className="text-[11px] text-gray-400 dark:text-slate-500">
+                <Text className="text-xs text-gray-400 dark:text-slate-500">
                   {item.tags.join(", ")}
                 </Text>
               )}

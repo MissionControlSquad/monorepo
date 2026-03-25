@@ -31,12 +31,12 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
     >
       {/* Header row */}
       <View className="flex-row items-center gap-2 flex-wrap">
-        <Text className="text-[12px] text-gray-400 dark:text-slate-500 font-medium">
+        <Text className="text-xs text-gray-400 dark:text-slate-500 font-medium">
           #{task.taskNumber}
         </Text>
         {task.priority && <PriorityBadge priority={task.priority} />}
         {task.project && (
-          <Text className="text-[11px] text-gray-500 dark:text-slate-400 flex-1" numberOfLines={1}>
+          <Text className="text-xs text-gray-500 dark:text-slate-400 flex-1" numberOfLines={1}>
             📁 {task.project.name}
           </Text>
         )}
@@ -53,13 +53,13 @@ export function TaskCard({ task, onPress }: TaskCardProps) {
         <View className="flex-row items-center gap-2 flex-1 justify-end">
           {task.dueDate && (
             <Text
-              className={`text-[11px] ${isOverdue ? "text-red-600 dark:text-red-400 font-semibold" : "text-gray-400 dark:text-slate-500"}`}
+              className={`text-xs ${isOverdue ? "text-red-600 dark:text-red-400 font-semibold" : "text-gray-400 dark:text-slate-500"}`}
             >
               {formatDueDate(task.dueDate)}
             </Text>
           )}
           {(task.assignees ?? []).length > 0 && (
-            <Text className="text-[11px] text-gray-400 dark:text-slate-500 max-w-[100px]" numberOfLines={1}>
+            <Text className="text-xs text-gray-400 dark:text-slate-500 max-w-24" numberOfLines={1}>
               {task.assignees![0].profile.displayName}
               {task.assignees!.length > 1 ? ` +${task.assignees!.length - 1}` : ""}
             </Text>

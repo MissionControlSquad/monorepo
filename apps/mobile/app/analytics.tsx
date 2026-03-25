@@ -119,33 +119,33 @@ function ActivityHeatmap({ cells }: { cells: HeatmapCell[] }) {
       {/* Hour labels */}
       <View className="flex-row ml-8">
         {HOUR_LABELS.map((label) => (
-          <Text key={label} className="flex-1 text-[9px] text-gray-400 dark:text-slate-500 text-center">{label}</Text>
+          <Text key={label} className="flex-1 text-xs text-gray-400 dark:text-slate-500 text-center">{label}</Text>
         ))}
       </View>
       {/* Grid rows */}
       {DAY_LABELS.map((day, dayIdx) => (
         <View key={day} className="flex-row items-center gap-0.5">
-          <Text className="w-8 text-[10px] text-gray-400 dark:text-slate-500">{day}</Text>
+          <Text className="w-8 text-xs text-gray-400 dark:text-slate-500">{day}</Text>
           {HOUR_BUCKETS.map((_, bucketIdx) => {
             const count = lookup[dayIdx]?.[bucketIdx] ?? 0;
             const intensity = count / maxCount;
             return (
               <View
                 key={bucketIdx}
-                className="flex-1 h-3.5 rounded-[3px]"
+                className="flex-1 h-3.5 rounded"
                 style={{
                   backgroundColor: count === 0
                     ? undefined
                     : `rgba(37, 99, 235, ${Math.max(0.12, intensity * 0.9)})`,
                 }}
               >
-                {count === 0 && <View className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-[3px]" />}
+                {count === 0 && <View className="flex-1 bg-gray-100 dark:bg-slate-700 rounded" />}
               </View>
             );
           })}
         </View>
       ))}
-      <Text className="text-[10px] text-gray-400 dark:text-slate-500 mt-1 text-right">
+      <Text className="text-xs text-gray-400 dark:text-slate-500 mt-1 text-right">
         Darker = more agent actions
       </Text>
     </View>
@@ -154,7 +154,7 @@ function ActivityHeatmap({ cells }: { cells: HeatmapCell[] }) {
 
 function SectionTitle({ title }: { title: string }) {
   return (
-    <Text className="text-[13px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-2.5">
+    <Text className="text-sm font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-2.5">
       {title}
     </Text>
   );
@@ -174,13 +174,13 @@ function MetricCard({
   return (
     <View className="flex-1 bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-0.5">
       <Text
-        className="text-[22px] font-bold text-gray-900 dark:text-slate-100"
+        className="text-xl font-bold text-gray-900 dark:text-slate-100"
         style={accent ? { color: accent } : undefined}
       >
         {value}
       </Text>
-      <Text className="text-[12px] font-semibold text-gray-900 dark:text-slate-100">{label}</Text>
-      {sub ? <Text className="text-[11px] text-gray-400 dark:text-slate-500">{sub}</Text> : null}
+      <Text className="text-xs font-semibold text-gray-900 dark:text-slate-100">{label}</Text>
+      {sub ? <Text className="text-xs text-gray-400 dark:text-slate-500">{sub}</Text> : null}
     </View>
   );
 }
@@ -200,14 +200,14 @@ function StatusBar({
   return (
     <View className="gap-1">
       <View className="flex-row justify-between">
-        <Text className="text-[12px] font-medium text-gray-900 dark:text-slate-100 capitalize">
+        <Text className="text-xs font-medium text-gray-900 dark:text-slate-100 capitalize">
           {label.replace("inProgress", "In Progress")}
         </Text>
-        <Text className="text-[12px] text-gray-400 dark:text-slate-500">
+        <Text className="text-xs text-gray-400 dark:text-slate-500">
           {count} ({Math.round(pct * 100)}%)
         </Text>
       </View>
-      <View className="h-1.5 rounded-[3px] bg-gray-100 dark:bg-slate-700 overflow-hidden">
+      <View className="h-1.5 rounded bg-gray-100 dark:bg-slate-700 overflow-hidden">
         <View style={{ height: 6, width: `${Math.round(pct * 100)}%`, backgroundColor: color, borderRadius: 3 }} />
       </View>
     </View>
@@ -226,11 +226,11 @@ function TrendChart({ data }: { data: TrendPoint[] }) {
           const h = Math.max(4, Math.round((point.count / max) * 72));
           return (
             <View key={point.date} className="flex-1 items-center gap-0.5">
-              <Text className="text-[9px] text-gray-400 dark:text-slate-500">
+              <Text className="text-xs text-gray-400 dark:text-slate-500">
                 {point.count > 0 ? point.count : ""}
               </Text>
               <View
-                className="bg-blue-600 rounded-[3px] opacity-85"
+                className="bg-blue-600 rounded opacity-85"
                 style={{ width: barWidth, height: h }}
               />
             </View>
@@ -239,7 +239,7 @@ function TrendChart({ data }: { data: TrendPoint[] }) {
       </View>
       <View className="flex-row gap-1">
         {data.map((point) => (
-          <Text key={point.date} className="flex-1 text-[9px] text-gray-400 dark:text-slate-500 text-center">
+          <Text key={point.date} className="flex-1 text-xs text-gray-400 dark:text-slate-500 text-center">
             {fmtDate(point.date)}
           </Text>
         ))}
@@ -343,7 +343,7 @@ export default function AnalyticsScreen() {
   if (hasError) {
     return (
       <View className="flex-1 justify-center items-center bg-white dark:bg-slate-900 gap-3 p-8">
-        <Text className="text-[15px] text-red-600 dark:text-red-400 text-center">Failed to load analytics</Text>
+        <Text className="text-base text-red-600 dark:text-red-400 text-center">Failed to load analytics</Text>
         <TouchableOpacity
           onPress={onRefresh}
           className="bg-blue-600 rounded-lg px-4 py-2"
@@ -417,7 +417,7 @@ export default function AnalyticsScreen() {
                 className={`px-2.5 py-1 rounded-md ${days === d ? "bg-blue-600" : "bg-gray-100 dark:bg-slate-700"}`}
                 activeOpacity={0.7}
               >
-                <Text className={`text-[12px] font-semibold ${days === d ? "text-white" : "text-gray-500 dark:text-slate-400"}`}>
+                <Text className={`text-xs font-semibold ${days === d ? "text-white" : "text-gray-500 dark:text-slate-400"}`}>
                   {d}d
                 </Text>
               </TouchableOpacity>
@@ -428,7 +428,7 @@ export default function AnalyticsScreen() {
           {trendResult.fetching && !trend.length ? (
             <ActivityIndicator color="#2563eb" />
           ) : trend.length === 0 ? (
-            <Text className="text-gray-400 dark:text-slate-500 text-[13px] text-center">No data</Text>
+            <Text className="text-gray-400 dark:text-slate-500 text-sm text-center">No data</Text>
           ) : (
             <TrendChart data={trend} />
           )}
@@ -469,10 +469,10 @@ export default function AnalyticsScreen() {
           <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
             {/* Table header */}
             <View className="flex-row px-3 py-2 bg-gray-100 dark:bg-slate-700">
-              <Text className="flex-1 text-[11px] font-bold text-gray-400 dark:text-slate-500">Agent</Text>
-              <Text className="w-11 text-[11px] font-bold text-gray-400 dark:text-slate-500 text-right">Done</Text>
-              <Text className="w-11 text-[11px] font-bold text-gray-400 dark:text-slate-500 text-right">Rate</Text>
-              <Text className="w-11 text-[11px] font-bold text-gray-400 dark:text-slate-500 text-right">Deliv</Text>
+              <Text className="flex-1 text-xs font-bold text-gray-400 dark:text-slate-500">Agent</Text>
+              <Text className="w-11 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">Done</Text>
+              <Text className="w-11 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">Rate</Text>
+              <Text className="w-11 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">Deliv</Text>
             </View>
             {agents
               .slice()
@@ -483,21 +483,21 @@ export default function AnalyticsScreen() {
                   className="flex-row items-center px-3 py-2.5"
                   style={{ borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#f3f4f6" }}
                 >
-                  <Text className="flex-1 text-[13px] font-medium text-gray-900 dark:text-slate-100" numberOfLines={1}>
+                  <Text className="flex-1 text-sm font-medium text-gray-900 dark:text-slate-100" numberOfLines={1}>
                     {agent.agentName}
                   </Text>
-                  <Text className="w-11 text-[13px] text-gray-900 dark:text-slate-100 text-right">
+                  <Text className="w-11 text-sm text-gray-900 dark:text-slate-100 text-right">
                     {agent.tasksCompleted}
                   </Text>
                   <Text
-                    className="w-11 text-[12px] text-right font-semibold"
+                    className="w-11 text-xs text-right font-semibold"
                     style={{
                       color: agent.queueCompletionRate >= 0.8 ? "#16a34a" : agent.queueCompletionRate >= 0.5 ? "#d97706" : "#dc2626",
                     }}
                   >
                     {fmtPct(agent.queueCompletionRate)}
                   </Text>
-                  <Text className="w-11 text-[13px] text-gray-400 dark:text-slate-500 text-right">
+                  <Text className="w-11 text-sm text-gray-400 dark:text-slate-500 text-right">
                     {agent.deliverablesCount}
                   </Text>
                 </View>
@@ -528,7 +528,7 @@ export default function AnalyticsScreen() {
                 className={`px-2.5 py-1 rounded-md ${days === d ? "bg-blue-600" : "bg-gray-100 dark:bg-slate-700"}`}
                 activeOpacity={0.7}
               >
-                <Text className={`text-[12px] font-semibold ${days === d ? "text-white" : "text-gray-500 dark:text-slate-400"}`}>
+                <Text className={`text-xs font-semibold ${days === d ? "text-white" : "text-gray-500 dark:text-slate-400"}`}>
                   {d}d
                 </Text>
               </TouchableOpacity>
@@ -539,7 +539,7 @@ export default function AnalyticsScreen() {
           {activityTrendResult.fetching && !activityTrend.length ? (
             <ActivityIndicator color="#2563eb" />
           ) : activityTrend.length === 0 ? (
-            <Text className="text-gray-400 dark:text-slate-500 text-[13px] text-center">No data</Text>
+            <Text className="text-gray-400 dark:text-slate-500 text-sm text-center">No data</Text>
           ) : (
             <TrendChart data={activityTrend} />
           )}
@@ -553,11 +553,11 @@ export default function AnalyticsScreen() {
           <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
             {/* Table header */}
             <View className="flex-row px-3 py-2 bg-gray-100 dark:bg-slate-700">
-              <Text className="flex-1 text-[11px] font-bold text-gray-400 dark:text-slate-500">Agent</Text>
-              <Text className="w-9 text-[11px] font-bold text-gray-400 dark:text-slate-500 text-right">📥</Text>
-              <Text className="w-9 text-[11px] font-bold text-gray-400 dark:text-slate-500 text-right">🔄</Text>
-              <Text className="w-9 text-[11px] font-bold text-gray-400 dark:text-slate-500 text-right">🔍</Text>
-              <Text className="w-9 text-[11px] font-bold text-gray-400 dark:text-slate-500 text-right">✅</Text>
+              <Text className="flex-1 text-xs font-bold text-gray-400 dark:text-slate-500">Agent</Text>
+              <Text className="w-9 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">📥</Text>
+              <Text className="w-9 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">🔄</Text>
+              <Text className="w-9 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">🔍</Text>
+              <Text className="w-9 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">✅</Text>
             </View>
             {workload
               .slice()
@@ -570,12 +570,12 @@ export default function AnalyticsScreen() {
                     className="flex-row items-center px-3 py-2.5"
                     style={{ borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#f3f4f6" }}
                   >
-                    <View className="flex-1 gap-[3px]">
-                      <Text className="text-[13px] font-medium text-gray-900 dark:text-slate-100" numberOfLines={1}>
+                    <View className="flex-1 gap-1">
+                      <Text className="text-sm font-medium text-gray-900 dark:text-slate-100" numberOfLines={1}>
                         {entry.agentName}
                       </Text>
                       {/* Mini stacked bar */}
-                      <View className="h-1 rounded-[2px] flex-row overflow-hidden bg-gray-100 dark:bg-slate-700">
+                      <View className="h-1 rounded-sm flex-row overflow-hidden bg-gray-100 dark:bg-slate-700">
                         {active > 0 && (
                           <>
                             <View style={{ flex: entry.assigned, backgroundColor: "#2563eb" }} />
@@ -585,10 +585,10 @@ export default function AnalyticsScreen() {
                         )}
                       </View>
                     </View>
-                    <Text className="w-9 text-[12px] text-gray-400 dark:text-slate-500 text-right">{entry.inbox}</Text>
-                    <Text className="w-9 text-[12px] text-right font-semibold" style={{ color: "#d97706" }}>{entry.inProgress}</Text>
-                    <Text className="w-9 text-[12px] text-right font-semibold" style={{ color: "#7c3aed" }}>{entry.review}</Text>
-                    <Text className="w-9 text-[12px] text-right" style={{ color: "#16a34a" }}>{entry.done}</Text>
+                    <Text className="w-9 text-xs text-gray-400 dark:text-slate-500 text-right">{entry.inbox}</Text>
+                    <Text className="w-9 text-xs text-right font-semibold" style={{ color: "#d97706" }}>{entry.inProgress}</Text>
+                    <Text className="w-9 text-xs text-right font-semibold" style={{ color: "#7c3aed" }}>{entry.review}</Text>
+                    <Text className="w-9 text-xs text-right" style={{ color: "#16a34a" }}>{entry.done}</Text>
                   </View>
                 );
               })}
@@ -600,8 +600,8 @@ export default function AnalyticsScreen() {
                 { color: "#7c3aed", label: "Review" },
               ].map(({ color, label }) => (
                 <View key={label} className="flex-row items-center gap-1">
-                  <View className="w-2 h-2 rounded-[2px]" style={{ backgroundColor: color }} />
-                  <Text className="text-[10px] text-gray-400 dark:text-slate-500">{label}</Text>
+                  <View className="w-2 h-2 rounded-sm" style={{ backgroundColor: color }} />
+                  <Text className="text-xs text-gray-400 dark:text-slate-500">{label}</Text>
                 </View>
               ))}
             </View>
