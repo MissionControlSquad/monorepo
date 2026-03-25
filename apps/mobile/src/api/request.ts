@@ -1,72 +1,25 @@
 /**
  * Authenticated REST request helper for the mobile app.
  *
- * Centralises:
- *  - Cookie injection  (`mc_session` header — required because React Native's
- *    `fetch` ignores the `credentials` option entirely)
- *  - Default headers   (Content-Type, x-request-id for server-side tracing)
- *  - Error parsing     (turns non-2xx responses into thrown Error objects)
+ * Thin wrapper around the shared `makeRequest` from @agentcenter/utils that
+ * injects the `mc_session` cookie header on every request.
  *
- * Usage:
- *   import { makeRequest } from "../api/request";
- *   const data = await makeRequest<{ vms: CloudVM[] }>(serverUrl, "/api/cloud-vms");
+ * React Native's `fetch` ignores the `credentials` option entirely, so the
+ * cookie must be injected manually via the `getCookie` option.
  */
-
+export { ApiError } from "@agentcenter/utils";
+export type { ApiRequestOptions as RequestOptions } from "@agentcenter/utils";
+import { makeRequest as _makeRequest, ApiRequestOptions } from "@agentcenter/utils";
 import { getStoredCookie } from "./session";
-
-function generateRequestId(): string {
-  return `mob-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-    public readonly code?: string,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-}
-
-export interface RequestOptions extends Omit<RequestInit, "headers"> {
-  headers?: Record<string, string>;
-}
 
 /**
  * Make an authenticated request to the MissionControl server.
- * Throws `ApiError` for non-2xx responses.
+ * Automatically injects the session cookie. Throws `ApiError` for non-2xx responses.
  */
-export async function makeRequest<T = unknown>(
+export function makeRequest<T = unknown>(
   serverUrl: string,
   path: string,
-  options: RequestOptions = {},
+  options: Omit<ApiRequestOptions, "getCookie"> = {},
 ): Promise<T> {
-  const cookie = getStoredCookie();
-  const requestId = generateRequestId();
-
-  const res = await fetch(`${serverUrl}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "x-request-id": requestId,
-      ...(cookie ? { Cookie: `mc_session=${cookie}` } : {}),
-      ...options.headers,
-    },
-  });
-
-  if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    let code: string | undefined;
-    try {
-      const body = await res.json();
-      if (body.error) message = body.error;
-      if (body.code) code = body.code;
-    } catch {
-      // ignore JSON parse failure
-    }
-    throw new ApiError(res.status, message, code);
-  }
-
-  return res.json() as Promise<T>;
+  return _makeRequest<T>(serverUrl, path, { ...options, getCookie: getStoredCookie });
 }
