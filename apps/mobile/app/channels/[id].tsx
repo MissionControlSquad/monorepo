@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, CHANNEL_PINNED_MESSAGES_QUERY, ON_NEW_CHANNEL_MESSAGE, PROFILES_QUERY, SEARCH_CHANNEL_MESSAGES_QUERY } from "@agentcenter/graphql-client";
 import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_CHANNEL_MESSAGE_REACTION, UPDATE_CHANNEL_MESSAGE, DELETE_CHANNEL_MESSAGE, PIN_CHANNEL_MESSAGE, UNPIN_CHANNEL_MESSAGE, ADD_CHANNEL_MEMBER, REMOVE_CHANNEL_MEMBER, JOIN_CHANNEL, LEAVE_CHANNEL, DELETE_CHANNEL } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
+import { useTheme } from "../../src/hooks/useTheme";
 import { formatChatTime, appendDeduped } from "@agentcenter/utils";
 import { MentionInput } from "../../src/components/MentionInput";
 
@@ -79,6 +80,7 @@ export default function ChannelDetailScreen() {
   const router = useRouter();
   const { profileId } = useAuth();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -176,10 +178,10 @@ export default function ChannelDetailScreen() {
               }}
               style={{ padding: 8 }}
             >
-              <Ionicons name={searchOpen ? "close" : "search-outline"} size={20} color="#2563eb" />
+              <Ionicons name={searchOpen ? "close" : "search-outline"} size={20} color={colors.accent} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setMembersOpen(true)} style={{ padding: 8 }}>
-              <Ionicons name="people-outline" size={22} color="#2563eb" />
+              <Ionicons name="people-outline" size={22} color={colors.accent} />
             </TouchableOpacity>
           </View>
         ),

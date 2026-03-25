@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
 import { PRIORITY_FILTER_OPTIONS, DUE_DATE_FILTER_OPTIONS } from "@agentcenter/utils";
 import type { DueDateFilter, PriorityFilter } from "@agentcenter/utils";
+import { useTheme } from "../../src/hooks/useTheme";
 
 const DUE_DATE_OPTIONS = DUE_DATE_FILTER_OPTIONS as { key: DueDateFilter; label: string }[];
 const PRIORITY_OPTIONS = PRIORITY_FILTER_OPTIONS as { key: PriorityFilter; label: string }[];
@@ -40,6 +41,7 @@ export default function KanbanScreen() {
   const navigation = useNavigation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("");
@@ -65,7 +67,7 @@ export default function KanbanScreen() {
           className="mr-4 p-1 relative"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Ionicons name="options-outline" size={22} color={filtersOpen ? "#2563eb" : "#374151"} />
+          <Ionicons name="options-outline" size={22} color={filtersOpen ? colors.accent : colors.icon} />
           {activeFilterCount > 0 && (
             <View className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-600 justify-center items-center">
               <Text className="text-xs text-white font-bold">{activeFilterCount}</Text>

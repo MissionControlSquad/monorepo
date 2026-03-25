@@ -10,11 +10,13 @@ import { OfflineBanner } from "../src/components/OfflineBanner";
 import { usePushNotifications } from "../src/hooks/usePushNotifications";
 import { View, ActivityIndicator, useColorScheme } from "react-native";
 import { useEffect } from "react";
+import { useHeaderOptions } from "../src/hooks/useHeaderOptions";
 
 function RootLayoutNav() {
   const { urqlClient, isLoading, isSignedIn } = useAuth();
   const isDark = useColorScheme() === "dark";
   const router = useRouter();
+  const headerOptions = useHeaderOptions();
   usePushNotifications();
 
   // Imperatively redirect when auth state changes (e.g. after logout from any screen)
@@ -41,9 +43,7 @@ function RootLayoutNav() {
     return (
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: isDark ? "#0f172a" : "#ffffff" },
-          headerTintColor: isDark ? "#f1f5f9" : "#111827",
-          headerTitleStyle: { color: isDark ? "#f1f5f9" : "#111827" },
+          ...headerOptions,
           contentStyle: { backgroundColor: isDark ? "#0f172a" : "#ffffff" },
         }}
       >
@@ -64,9 +64,7 @@ function RootLayoutNav() {
         <OfflineBanner />
         <Stack
           screenOptions={{
-            headerStyle: { backgroundColor: isDark ? "#0f172a" : "#ffffff" },
-            headerTintColor: isDark ? "#f1f5f9" : "#111827",
-            headerTitleStyle: { color: isDark ? "#f1f5f9" : "#111827" },
+            ...headerOptions,
             contentStyle: { backgroundColor: isDark ? "#0f172a" : "#ffffff" },
           }}
         >

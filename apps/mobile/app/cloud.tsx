@@ -18,6 +18,7 @@ import { usePollingInterval, useSearch } from "@agentcenter/hooks";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../src/context/AuthContext";
+import { useTheme } from "../src/hooks/useTheme";
 import { makeRequest, ApiError } from "../src/api/request";
 import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatUptime, formatCost, CLOUD_VM_STATUS_LABELS, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
 
@@ -260,6 +261,7 @@ export default function CloudVMsScreen() {
   const router = useRouter();
   const { serverUrl } = useAuth();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   const [vms, setVMs] = useState<CloudVM[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,7 +289,7 @@ export default function CloudVMsScreen() {
       title: "Cloud VMs",
       headerRight: () => (
         <TouchableOpacity onPress={() => setShowCreate(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="add" size={24} color="#2563eb" />
+          <Ionicons name="add" size={24} color={colors.accent} />
         </TouchableOpacity>
       ),
     });

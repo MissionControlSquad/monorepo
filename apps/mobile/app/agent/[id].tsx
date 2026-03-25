@@ -35,6 +35,7 @@ import {
 import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS, formatRelativeTime, isAgentOnline, formatDuration, getAgentStatusColor } from "@agentcenter/utils";
 import { getStoredCookie } from "../../src/api/session";
 import { useAuth } from "../../src/context/AuthContext";
+import { useTheme } from "../../src/hooks/useTheme";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -106,6 +107,7 @@ export default function AgentDetailScreen() {
   const navigation = useNavigation();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const { colors } = useTheme();
 
   const [agentResult, reexecuteAgent] = useQuery<{ agent: Agent | null }>({
     query: AGENT_QUERY, variables: { id }, requestPolicy: "cache-and-network",
@@ -160,7 +162,7 @@ export default function AgentDetailScreen() {
             onPress={() => router.push({ pathname: "/agent/edit", params: { id } })}
             style={{ marginRight: 16 }}
           >
-            <Ionicons name="create-outline" size={22} color="#2563eb" />
+            <Ionicons name="create-outline" size={22} color={colors.accent} />
           </TouchableOpacity>
         ),
       });

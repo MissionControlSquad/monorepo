@@ -12,6 +12,7 @@ import {
   Modal,
 } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation, useSubscription } from "urql";
 import { useState, useEffect, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,6 +31,7 @@ import {
 import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION, APPROVE_TASK, REJECT_TASK, SAVE_TASK_AS_TEMPLATE } from "@agentcenter/graphql-client";
 import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, TASK_STATUSES, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatRelativeTime, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS, formatDuration } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
+import { useTheme } from "../../src/hooks/useTheme";
 import { MentionInput } from "../../src/components/MentionInput";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
 
@@ -1090,6 +1092,7 @@ export default function TaskDetailScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
   const { profileId } = useAuth();
+  const { colors } = useTheme();
 
   const [result, reexecute] = useQuery<{ task: Task | null }>({
     query: TASK_QUERY,
@@ -1143,14 +1146,14 @@ export default function TaskDetailScreen() {
               className="px-2 py-1"
               activeOpacity={0.7}
             >
-              <Text className="text-base font-semibold text-blue-600">Edit</Text>
+              <Text style={{ color: colors.accent }} className="text-base font-semibold">Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleMoreActions(task.id)}
               className="px-2 py-1"
               activeOpacity={0.7}
             >
-              <Text className="text-xl text-gray-500 dark:text-slate-400 leading-6">•••</Text>
+              <Ionicons name="ellipsis-horizontal" size={22} color={colors.icon} />
             </TouchableOpacity>
           </View>
         ),

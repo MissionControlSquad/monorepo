@@ -37,6 +37,7 @@ import {
 } from "@agentcenter/graphql-client";
 import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, formatDate } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
+import { useTheme } from "../../src/hooks/useTheme";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1062,6 +1063,7 @@ export default function ProjectDetailScreen() {
   const navigation = useNavigation();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const { colors } = useTheme();
 
   const [result, reexecute] = useQuery<{ project: Project }>({
     query: PROJECT_QUERY,
@@ -1135,10 +1137,10 @@ export default function ProjectDetailScreen() {
               onPress={() => router.push(`/kanban/${project.id}`)}
               style={{ padding: 8 }}
             >
-              <Ionicons name="grid-outline" size={22} color="#2563eb" />
+              <Ionicons name="grid-outline" size={22} color={colors.accent} />
             </TouchableOpacity>
             <TouchableOpacity onPress={handleMoreActions} style={{ padding: 8 }}>
-              <Ionicons name="ellipsis-horizontal" size={22} color="#6b7280" />
+              <Ionicons name="ellipsis-horizontal" size={22} color={colors.icon} />
             </TouchableOpacity>
           </View>
         ),

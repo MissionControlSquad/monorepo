@@ -18,6 +18,7 @@ import { DELIVERABLE_QUERY, DELIVERABLE_VERSIONS_QUERY } from "@agentcenter/grap
 import { DEFAULT_COLOR, formatDateWithTime, formatDate, formatFileSize, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS } from "@agentcenter/utils";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "../../src/hooks/useTheme";
 
 interface Deliverable {
   id: string;
@@ -333,6 +334,7 @@ export default function DeliverableScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
+  const { colors } = useTheme();
 
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [previewVersion, setPreviewVersion] = useState<DeliverableVersion | null>(null);
@@ -355,7 +357,7 @@ export default function DeliverableScreen() {
             onPress={() => setShowVersionHistory(true)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={{ color: "#2563eb", fontSize: 14, fontWeight: "600" }}>History</Text>
+            <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "600" }}>History</Text>
           </TouchableOpacity>
         ),
       });

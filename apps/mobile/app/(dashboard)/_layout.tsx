@@ -1,29 +1,30 @@
 import { Tabs, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { TouchableOpacity, View, useColorScheme } from "react-native";
+import { TouchableOpacity, View } from "react-native";
 import { useDrawer } from "../../src/context/DrawerContext";
 import { NotificationBell } from "../../src/components/NotificationBell";
+import { useTheme } from "../../src/hooks/useTheme";
+import { useHeaderOptions } from "../../src/hooks/useHeaderOptions";
 
 export default function DashboardLayout() {
   const { openDrawer } = useDrawer();
   const router = useRouter();
-  const isDark = useColorScheme() === "dark";
+  const { colors, isDark } = useTheme();
+  const headerOptions = useHeaderOptions();
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: isDark ? "#3b82f6" : "#2563eb",
-        tabBarInactiveTintColor: isDark ? "#64748b" : "#9ca3af",
+        ...headerOptions,
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          borderTopColor: isDark ? "#334155" : "#e5e7eb",
-          backgroundColor: isDark ? "#0f172a" : "#ffffff",
+          borderTopColor: colors.border,
+          backgroundColor: colors.tabBar,
         },
-        headerStyle: { backgroundColor: isDark ? "#0f172a" : "#ffffff" },
-        headerTitleStyle: { fontWeight: "600", color: isDark ? "#f1f5f9" : "#111827" },
-        headerShadowVisible: false,
         headerLeft: () => (
           <TouchableOpacity onPress={openDrawer} className="ml-4">
-            <Ionicons name="menu-outline" size={26} color={isDark ? "#94a3b8" : "#6b7280"} />
+            <Ionicons name="menu-outline" size={26} color={colors.icon} />
           </TouchableOpacity>
         ),
       }}
@@ -39,11 +40,11 @@ export default function DashboardLayout() {
           headerRight: () => (
             <View className="flex-row items-center gap-1 mr-2">
               <TouchableOpacity onPress={() => router.push("/search")} className="p-2">
-                <Ionicons name="search-outline" size={22} color={isDark ? "#94a3b8" : "#6b7280"} />
+                <Ionicons name="search-outline" size={22} color={colors.icon} />
               </TouchableOpacity>
               <NotificationBell
                 onPress={() => router.push("/notifications")}
-                color={isDark ? "#94a3b8" : "#6b7280"}
+                color={colors.icon}
               />
             </View>
           ),
@@ -60,7 +61,7 @@ export default function DashboardLayout() {
           headerRight: () => (
             <View className="flex-row items-center gap-1 mr-2">
               <TouchableOpacity onPress={() => router.push("/agent/create")} className="p-2">
-                <Ionicons name="add" size={26} color={isDark ? "#3b82f6" : "#2563eb"} />
+                <Ionicons name="add" size={26} color={colors.accent} />
               </TouchableOpacity>
             </View>
           ),
@@ -77,7 +78,7 @@ export default function DashboardLayout() {
           headerRight: () => (
             <View className="flex-row items-center gap-1 mr-2">
               <TouchableOpacity onPress={() => router.push("/channels/create")} className="p-2">
-                <Ionicons name="add" size={26} color={isDark ? "#3b82f6" : "#2563eb"} />
+                <Ionicons name="add" size={26} color={colors.accent} />
               </TouchableOpacity>
             </View>
           ),
@@ -94,7 +95,7 @@ export default function DashboardLayout() {
           headerRight: () => (
             <View className="flex-row items-center gap-1 mr-2">
               <TouchableOpacity onPress={() => router.push("/project/create")} className="p-2">
-                <Ionicons name="add" size={26} color={isDark ? "#3b82f6" : "#2563eb"} />
+                <Ionicons name="add" size={26} color={colors.accent} />
               </TouchableOpacity>
             </View>
           ),
