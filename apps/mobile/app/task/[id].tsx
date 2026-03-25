@@ -1098,34 +1098,37 @@ export default function TaskDetailScreen() {
   // Notifications use task numbers (e.g. /task/42). Detect and resolve to db id.
   const taskNumber = /^\d+$/.test(id ?? "") ? parseInt(id, 10) : null;
 
-  const [byNumberResult] = useQuery<{ taskByNumber: { id: string } | null }>({
+  // Numeric id (from notification URLs like /task/42): resolve via taskByNumber and render
+  // directly — no redirect, so only one query and one loading state.
+  const [byNumberResult] = useQuery<{ taskByNumber: Task | null }>({
     query: TASK_BY_NUMBER_QUERY,
     variables: { taskNumber: taskNumber ?? 0 },
     pause: taskNumber === null,
     requestPolicy: "cache-and-network",
   });
 
-  // Once resolved, redirect to the canonical id route
-  useEffect(() => {
-    if (taskNumber !== null && byNumberResult.data) {
-      const resolvedId = byNumberResult.data.taskByNumber?.id;
-      if (resolvedId) {
-        router.replace(`/task/${resolvedId}` as Parameters<typeof router.replace>[0]);
-      }
-    }
-  }, [byNumberResult.data, taskNumber]);
-
+  // Normal cuid route
   const [result, reexecute] = useQuery<{ task: Task | null }>({
     query: TASK_QUERY,
     variables: { id },
-    pause: taskNumber !== null, // wait for redirect when numeric
+    pause: taskNumber !== null, // numeric routes use byNumberResult directly
     requestPolicy: "cache-and-network",
   });
+
+  // Use byNumberResult for numeric routes, TASK_QUERY for normal routes
+  const task: Task | null =
+    taskNumber !== null
+      ? (byNumberResult.data?.taskByNumber ?? null)
+      : (result.data?.task ?? null);
+  const error = taskNumber !== null ? byNumberResult.error : result.error;
+
+  // Resolved cuid (needed for subscriptions / mutations on numeric routes)
+  const resolvedId = task?.id ?? id;
 
   // Subscribe to live task updates (status changes)
   const [taskSub] = useSubscription<{ taskUpdated: { id: string; status: string } }>({
     query: ON_TASK_UPDATED,
-    variables: { taskId: id },
+    variables: { taskId: resolvedId },
   });
   useEffect(() => {
     if (taskSub.data) reexecute({ requestPolicy: "network-only" });
@@ -1133,15 +1136,13 @@ export default function TaskDetailScreen() {
 
   const [, executeUpdate] = useMutation(UPDATE_TASK);
   const [, saveAsTemplate] = useMutation(SAVE_TASK_AS_TEMPLATE);
-  const { data, fetching, error } = result;
-  const task = data?.task;
 
   const [agentsResult] = useQuery<{ agents: { id: string; name: string; identityEmoji: string; currentTaskId: string | null }[] }>({
     query: AGENTS_FOR_TASK_QUERY,
     requestPolicy: "cache-only",
     pause: !task,
   });
-  const workingAgents = (agentsResult.data?.agents ?? []).filter((a) => a.currentTaskId === id);
+  const workingAgents = (agentsResult.data?.agents ?? []).filter((a) => a.currentTaskId === resolvedId);
 
   const handleMoreActions = (taskId: string) => {
     Alert.alert("Task Actions", undefined, [
@@ -1202,36 +1203,18 @@ export default function TaskDetailScreen() {
     );
   };
 
-  // Numeric id — still resolving via taskByNumber
-  if (taskNumber !== null && byNumberResult.fetching) {
+  if (!task) {
+    if (error) {
+      return (
+        <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
+          <Text className="text-red-600 text-base">Task not found</Text>
+        </View>
+      );
+    }
     return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900 gap-3">
         <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
-
-  // Numeric id resolved but task doesn't exist
-  if (taskNumber !== null && byNumberResult.data && !byNumberResult.data.taskByNumber) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
-        <Text className="text-red-600 text-base">Task not found</Text>
-      </View>
-    );
-  }
-
-  if (fetching && !task) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
-
-  if ((error && !task) || !task) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
-        <Text className="text-red-600 text-base">Task not found</Text>
+        <Text className="text-sm text-gray-400 dark:text-slate-500">Loading task…</Text>
       </View>
     );
   }
