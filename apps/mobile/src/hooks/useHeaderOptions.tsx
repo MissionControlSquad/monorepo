@@ -1,4 +1,3 @@
-import { View } from "react-native";
 import { useTheme } from "./useTheme";
 
 /**
@@ -12,7 +11,6 @@ export function useHeaderOptions() {
   const bg = colors.headerBg;
   return {
     headerStyle: { backgroundColor: bg },
-    headerBackground: () => <View style={{ flex: 1, backgroundColor: bg }} />,
     headerRightContainerStyle: { backgroundColor: "transparent", paddingRight: 8 },
     headerLeftContainerStyle: { backgroundColor: "transparent", paddingLeft: 8 },
     /** Blue tint for back chevron and headerRight touchable tint */
