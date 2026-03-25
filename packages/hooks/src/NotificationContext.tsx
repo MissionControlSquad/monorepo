@@ -9,7 +9,9 @@ const NotificationContext = createContext<UseNotificationsResult>({
   unreadCount: 0,
   fetching: false,
   error: false,
+  hasMore: false,
   reexecute: () => {},
+  loadMore: () => {},
   markOneRead: () => {},
   markAllRead: () => {},
 });

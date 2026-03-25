@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   fetchUserNotifications,
   markNotificationRead,
@@ -13,7 +13,9 @@ export interface UseNotificationsResult {
   unreadCount: number;
   fetching: boolean;
   error: boolean;
+  hasMore: boolean;
   reexecute: () => void;
+  loadMore: () => void;
   markOneRead: (id: string) => void;
   markAllRead: () => void;
 }
@@ -38,13 +40,16 @@ export function useNotifications(
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const limitRef = useRef(50);
 
   const fetchNotifications = useCallback(async () => {
     if (!enabled) return;
     try {
       setFetching(true);
-      const items = await fetchUserNotifications(serverUrl, 50, getCookie);
+      const items = await fetchUserNotifications(serverUrl, limitRef.current, getCookie);
       setNotifications(items);
+      setHasMore(items.length >= limitRef.current);
       setError(false);
     } catch {
       setError(true);
@@ -70,7 +75,12 @@ export function useNotifications(
 
   const reexecute = usePollingInterval(fetchNotifications, NOTIFICATION_POLL_INTERVAL_MS, enabled);
 
+  const loadMore = useCallback(() => {
+    limitRef.current += 50;
+    fetchNotifications();
+  }, [fetchNotifications]);
+
   const unreadCount = notifications.filter((n) => !n.readAt).length;
 
-  return { notifications, unreadCount, fetching, error, reexecute, markOneRead, markAllRead };
+  return { notifications, unreadCount, fetching, error, hasMore, reexecute, loadMore, markOneRead, markAllRead };
 }
