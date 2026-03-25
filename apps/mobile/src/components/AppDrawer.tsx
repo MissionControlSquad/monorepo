@@ -32,7 +32,7 @@ export function AppDrawer() {
   const { width: screenWidth } = useWindowDimensions();
   const isDark = useColorScheme() === "dark";
 
-  const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
+  const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   const [result] = useQuery<{ me: Profile | null }>({
@@ -62,7 +62,7 @@ export function AppDrawer() {
     } else {
       Animated.parallel([
         Animated.spring(translateX, {
-          toValue: DRAWER_WIDTH,
+          toValue: -DRAWER_WIDTH,
           useNativeDriver: true,
           damping: 20,
           stiffness: 200,
@@ -107,59 +107,79 @@ export function AppDrawer() {
 
       {/* Drawer panel */}
       <Animated.View
-        className="absolute top-0 bottom-0 right-0 bg-white dark:bg-slate-900"
+        className="absolute top-0 bottom-0 left-0 bg-white dark:bg-slate-900"
         style={{
           width: Math.min(DRAWER_WIDTH, screenWidth * 0.78),
           shadowColor: "#000000",
-          shadowOffset: { width: -3, height: 0 },
+          shadowOffset: { width: 3, height: 0 },
           shadowOpacity: 0.15,
           shadowRadius: 12,
           elevation: 20,
-          paddingTop: insets.top + 12,
+          paddingTop: insets.top,
           paddingBottom: insets.bottom + 16,
           transform: [{ translateX }],
         }}
       >
-        {/* Close button */}
-        <TouchableOpacity
-          className="self-end p-3 mr-1"
-          onPress={closeDrawer}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="close" size={22} color={isDark ? "#94a3b8" : "#6b7280"} />
-        </TouchableOpacity>
-
         {/* Profile section */}
-        <View className="items-center px-5 pb-5 gap-1">
-          {profile?.avatarUrl ? (
-            <Image
-              source={{
-                uri: profile.avatarUrl.startsWith("http")
-                  ? profile.avatarUrl
-                  : `${getStoredServerUrl() ?? ""}${profile.avatarUrl}`,
-              }}
-              className="w-16 h-16 rounded-full mb-2"
-            />
-          ) : (
-            <View className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 justify-center items-center mb-2">
-              <Text className="text-3xl font-bold text-blue-600 dark:text-blue-300">
-                {initials}
-              </Text>
-            </View>
-          )}
-          <Text className="text-lg font-bold text-gray-900 dark:text-slate-100" numberOfLines={1}>
+        <View className="px-5 pt-5 pb-4">
+          <View className="flex-row items-center justify-between mb-4">
+            {profile?.avatarUrl ? (
+              <Image
+                source={{
+                  uri: profile.avatarUrl.startsWith("http")
+                    ? profile.avatarUrl
+                    : `${getStoredServerUrl() ?? ""}${profile.avatarUrl}`,
+                }}
+                className="w-14 h-14 rounded-full"
+              />
+            ) : (
+              <View className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/30 justify-center items-center">
+                <Text className="text-2xl font-bold text-blue-600 dark:text-blue-300">
+                  {initials}
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity
+              onPress={closeDrawer}
+              activeOpacity={0.7}
+              className="p-2"
+            >
+              <Ionicons name="close" size={22} color={isDark ? "#94a3b8" : "#6b7280"} />
+            </TouchableOpacity>
+          </View>
+          <Text className="text-base font-bold text-gray-900 dark:text-slate-100" numberOfLines={1}>
             {profile?.displayName ?? "…"}
           </Text>
           {profile?.username ? (
-            <Text className="text-sm text-gray-500 dark:text-slate-400" numberOfLines={1}>
+            <Text className="text-sm text-gray-500 dark:text-slate-400 mt-0.5" numberOfLines={1}>
               @{profile.username}
             </Text>
           ) : null}
           {profile?.user?.email ? (
-            <Text className="text-xs text-gray-400 dark:text-slate-500" numberOfLines={1}>
+            <Text className="text-xs text-gray-400 dark:text-slate-500 mt-0.5" numberOfLines={1}>
               {profile.user.email}
             </Text>
           ) : null}
+
+          {/* Profile & Settings quick actions */}
+          <View className="flex-row gap-2 mt-4">
+            <TouchableOpacity
+              className="flex-1 flex-row items-center justify-center gap-1.5 py-2 rounded-lg bg-gray-100 dark:bg-slate-700"
+              onPress={() => navigate("/profile")}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="person-outline" size={16} color={isDark ? "#cbd5e1" : "#374151"} />
+              <Text className="text-xs font-medium text-gray-700 dark:text-slate-200">Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-1 flex-row items-center justify-center gap-1.5 py-2 rounded-lg bg-gray-100 dark:bg-slate-700"
+              onPress={() => navigate("/settings")}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="settings-outline" size={16} color={isDark ? "#cbd5e1" : "#374151"} />
+              <Text className="text-xs font-medium text-gray-700 dark:text-slate-200">Settings</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Divider */}
@@ -168,7 +188,6 @@ export function AppDrawer() {
         {/* Navigation items */}
         <View className="py-2">
           <DrawerItem icon="search-outline" label="Search" onPress={() => navigate("/search")} isDark={isDark} />
-          <DrawerItem icon="person-outline" label="Profile" onPress={() => navigate("/profile")} isDark={isDark} />
           <DrawerItem icon="pulse-outline" label="Activity Feed" onPress={() => navigate("/activity")} isDark={isDark} />
           <DrawerItem icon="bar-chart-outline" label="Analytics" onPress={() => navigate("/analytics")} isDark={isDark} />
           <DrawerItem icon="repeat-outline" label="Recurring Tasks" onPress={() => navigate("/recurring-tasks")} isDark={isDark} />
@@ -176,7 +195,6 @@ export function AppDrawer() {
           <DrawerItem icon="notifications-outline" label="Notifications" onPress={() => navigate("/notifications")} isDark={isDark} badge={notificationCount > 0 ? (notificationCount > 99 ? "99+" : String(notificationCount)) : undefined} />
           <DrawerItem icon="server-outline" label="Cloud VMs" onPress={() => navigate("/cloud")} isDark={isDark} />
           <DrawerItem icon="toggle-outline" label="Feature Flags" onPress={() => navigate("/feature-flags")} isDark={isDark} />
-          <DrawerItem icon="settings-outline" label="Settings" onPress={() => navigate("/settings")} isDark={isDark} />
         </View>
 
         {/* Divider */}

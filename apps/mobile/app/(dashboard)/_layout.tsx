@@ -21,9 +21,9 @@ export default function DashboardLayout() {
         headerStyle: { backgroundColor: isDark ? "#0f172a" : "#ffffff" },
         headerTitleStyle: { fontWeight: "600", color: isDark ? "#f1f5f9" : "#111827" },
         headerShadowVisible: false,
-        headerRight: () => (
-          <TouchableOpacity onPress={openDrawer} className="mr-4">
-            <Ionicons name="person-circle-outline" size={26} color={isDark ? "#94a3b8" : "#6b7280"} />
+        headerLeft: () => (
+          <TouchableOpacity onPress={openDrawer} className="ml-4">
+            <Ionicons name="menu-outline" size={26} color={isDark ? "#94a3b8" : "#6b7280"} />
           </TouchableOpacity>
         ),
       }}
@@ -45,9 +45,6 @@ export default function DashboardLayout() {
                 onPress={() => router.push("/notifications")}
                 color={isDark ? "#94a3b8" : "#6b7280"}
               />
-              <TouchableOpacity onPress={openDrawer} className="p-2">
-                <Ionicons name="person-circle-outline" size={26} color={isDark ? "#94a3b8" : "#6b7280"} />
-              </TouchableOpacity>
             </View>
           ),
         }}
@@ -64,9 +61,6 @@ export default function DashboardLayout() {
             <View className="flex-row items-center gap-1 mr-2">
               <TouchableOpacity onPress={() => router.push("/agent/create")} className="p-2">
                 <Ionicons name="add" size={26} color={isDark ? "#3b82f6" : "#2563eb"} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={openDrawer} className="p-2">
-                <Ionicons name="person-circle-outline" size={26} color={isDark ? "#94a3b8" : "#6b7280"} />
               </TouchableOpacity>
             </View>
           ),
@@ -85,9 +79,6 @@ export default function DashboardLayout() {
               <TouchableOpacity onPress={() => router.push("/channels/create")} className="p-2">
                 <Ionicons name="add" size={26} color={isDark ? "#3b82f6" : "#2563eb"} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={openDrawer} className="p-2">
-                <Ionicons name="person-circle-outline" size={26} color={isDark ? "#94a3b8" : "#6b7280"} />
-              </TouchableOpacity>
             </View>
           ),
         }}
@@ -104,9 +95,6 @@ export default function DashboardLayout() {
             <View className="flex-row items-center gap-1 mr-2">
               <TouchableOpacity onPress={() => router.push("/project/create")} className="p-2">
                 <Ionicons name="add" size={26} color={isDark ? "#3b82f6" : "#2563eb"} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={openDrawer} className="p-2">
-                <Ionicons name="person-circle-outline" size={26} color={isDark ? "#94a3b8" : "#6b7280"} />
               </TouchableOpacity>
             </View>
           ),
