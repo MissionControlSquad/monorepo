@@ -53,7 +53,7 @@ export default function AgentsScreen() {
       headerRight: () => (
         <TouchableOpacity
           onPress={() => router.push("/agent/create")}
-          style={{ marginRight: 8, padding: 4 }}
+          style={{ padding: 8 }}
         >
           <Ionicons name="add" size={26} color={colors.accent} />
         </TouchableOpacity>

@@ -174,7 +174,7 @@ export default function ChannelDetailScreen() {
           ? (channel.members.find((m) => m.profileId !== profileId)?.profile.displayName ?? channel.name)
           : channel.name,
         headerRight: () => (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4}}>
             <TouchableOpacity
               onPress={() => {
                 setSearchOpen((v) => {

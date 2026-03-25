@@ -290,7 +290,7 @@ export default function CloudVMsScreen() {
     navigation.setOptions({
       title: "Cloud VMs",
       headerRight: () => (
-        <TouchableOpacity onPress={() => setShowCreate(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={() => setShowCreate(true)} style={{ padding: 4 }}>
           <Ionicons name="add" size={24} color={colors.accent} />
         </TouchableOpacity>
       ),

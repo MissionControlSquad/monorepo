@@ -160,7 +160,7 @@ export default function AgentDetailScreen() {
         headerRight: () => (
           <TouchableOpacity
             onPress={() => router.push({ pathname: "/agent/edit", params: { id } })}
-            style={{ marginRight: 16 }}
+            style={{ paddingHorizontal: 8 }}
           >
             <Ionicons name="create-outline" size={22} color={colors.accent} />
           </TouchableOpacity>

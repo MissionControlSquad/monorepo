@@ -83,7 +83,7 @@ export default function ChannelsScreen() {
           onPress={() => {
             setCreateName(""); setCreateSlug(""); setCreateVisibility("public"); setCreateDescription(""); setCreateOpen(true);
           }}
-          style={{ marginRight: 8, padding: 4 }}
+          style={{ padding: 8 }}
         >
           <Ionicons name="add" size={26} color={colors.accent} />
         </TouchableOpacity>

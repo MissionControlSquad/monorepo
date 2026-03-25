@@ -91,7 +91,7 @@ export default function TaskListScreen() {
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
           <TouchableOpacity onPress={() => router.push("/search")} style={{ padding: 8 }}>
             <Ionicons name="search-outline" size={22} color={colors.icon} />
           </TouchableOpacity>
