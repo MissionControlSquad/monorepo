@@ -7,10 +7,12 @@ import {
   RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNotifications } from "../src/context/NotificationCountContext";
 import { NOTIFICATION_TYPE_HEX_COLORS, DEFAULT_COLOR, formatRelativeTime } from "@agentcenter/utils";
+import { SearchBar } from "../src/components/SearchBar";
 
 // ── Types & constants ─────────────────────────────────────────────────────────
 
@@ -34,7 +36,17 @@ const TYPE_ICONS: Record<string, IoniconName> = {
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [search, setSearch] = useState("");
   const { notifications, fetching, error, hasMore, reexecute, loadMore, markOneRead, markAllRead } = useNotifications();
+
+  const q = search.trim().toLowerCase();
+  const displayed = q
+    ? notifications.filter(
+        (n) =>
+          n.title?.toLowerCase().includes(q) ||
+          n.body?.toLowerCase().includes(q),
+      )
+    : notifications;
 
   const unreadCount = notifications.filter((n) => !n.readAt).length;
 
@@ -58,13 +70,19 @@ export default function NotificationsScreen() {
   }
 
   return (
+    <View className="flex-1">
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search notifications…"
+      />
     <FlatList
-      data={notifications}
+      data={displayed}
       keyExtractor={(n) => n.id}
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={[
         { padding: 16, gap: 10, paddingBottom: insets.bottom + 16 },
-        notifications.length === 0 && { flex: 1, justifyContent: "center", alignItems: "center" },
+        displayed.length === 0 && { flex: 1, justifyContent: "center", alignItems: "center" },
       ]}
       refreshControl={
         <RefreshControl
@@ -74,12 +92,12 @@ export default function NotificationsScreen() {
         />
       }
       ListHeaderComponent={
-        notifications.length > 0 ? (
+        displayed.length > 0 ? (
           <View className="flex-row justify-between items-center mb-1">
             <Text className="text-sm text-gray-500 dark:text-slate-400 font-medium">
-              {unreadCount > 0 ? `${unreadCount} unread` : "All read"}
+              {q ? `${displayed.length} result${displayed.length !== 1 ? "s" : ""}` : unreadCount > 0 ? `${unreadCount} unread` : "All read"}
             </Text>
-            {unreadCount > 0 && (
+            {!q && unreadCount > 0 && (
               <TouchableOpacity onPress={markAllRead}>
                 <Text className="text-sm text-blue-600 dark:text-blue-400 font-semibold">Mark all read</Text>
               </TouchableOpacity>
@@ -88,7 +106,7 @@ export default function NotificationsScreen() {
         ) : null
       }
       ListFooterComponent={
-        hasMore ? (
+        !q && hasMore ? (
           <TouchableOpacity
             className="mt-2 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 items-center"
             onPress={loadMore}
@@ -106,8 +124,12 @@ export default function NotificationsScreen() {
       ListEmptyComponent={
         <View className="items-center gap-2.5">
           <Ionicons name="notifications-outline" size={48} color="#d1d5db" />
-          <Text className="text-lg font-semibold text-gray-700 dark:text-slate-300">All caught up</Text>
-          <Text className="text-sm text-gray-400 dark:text-slate-500">No notifications yet</Text>
+          <Text className="text-lg font-semibold text-gray-700 dark:text-slate-300">
+            {q ? "No matches" : "All caught up"}
+          </Text>
+          <Text className="text-sm text-gray-400 dark:text-slate-500">
+            {q ? "Try a different search term" : "No notifications yet"}
+          </Text>
         </View>
       }
       renderItem={({ item }) => {
@@ -167,5 +189,6 @@ export default function NotificationsScreen() {
         );
       }}
     />
+    </View>
   );
 }

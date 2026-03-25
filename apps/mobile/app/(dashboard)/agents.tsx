@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
-  TextInput,
   Alert,
 } from "react-native";
 import { useQuery, useMutation } from "urql";
@@ -23,6 +22,7 @@ import {
 } from "@agentcenter/utils";
 import type { Agent } from "@agentcenter/types";
 import { useTheme } from "../../src/hooks/useTheme";
+import { SearchBar } from "../../src/components/SearchBar";
 
 type FilterTab = AgentSetupFilter;
 
@@ -89,24 +89,11 @@ export default function AgentsScreen() {
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">
-      {/* Search */}
-      <View className="flex-row items-center gap-2 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-4 py-2.5">
-        <Ionicons name="search-outline" size={16} color="#9ca3af" />
-        <TextInput
-          className="flex-1 text-base text-gray-900 dark:text-slate-100"
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search agents…"
-          placeholderTextColor="#9ca3af"
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch("")}>
-            <Ionicons name="close-circle" size={16} color="#9ca3af" />
-          </TouchableOpacity>
-        )}
-      </View>
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search agents…"
+      />
 
       {/* Filter tabs */}
       <View className="flex-row bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3">

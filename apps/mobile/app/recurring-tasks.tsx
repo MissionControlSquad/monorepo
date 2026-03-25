@@ -31,6 +31,8 @@ import { EmptyState } from "../src/components/EmptyState";
 import { StatusPill } from "../src/components/StatusPill";
 import { PriorityBadge } from "../src/components/PriorityBadge";
 import { useAuth } from "../src/context/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
+import { SearchBar } from "../src/components/SearchBar";
 
 interface RecurringTask {
   id: string;
@@ -388,6 +390,7 @@ export default function RecurringTasksScreen() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTask, setEditTask] = useState<RecurringTask | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [search, setSearch] = useState("");
 
   const [result, reexecute] = useQuery<{ recurringTasks: RecurringTask[] }>({
     query: RECURRING_TASKS_QUERY,
@@ -402,7 +405,16 @@ export default function RecurringTasksScreen() {
   const [, triggerTask] = useMutation(TRIGGER_RECURRING_TASK);
   const [, deleteTask] = useMutation(DELETE_RECURRING_TASK);
 
-  const tasks = result.data?.recurringTasks ?? [];
+  const allTasks = result.data?.recurringTasks ?? [];
+  const q = search.trim().toLowerCase();
+  const tasks = q
+    ? allTasks.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          (t.description ?? "").toLowerCase().includes(q) ||
+          t.tags.some((tag) => tag.toLowerCase().includes(q)),
+      )
+    : allTasks;
 
   const refresh = () => reexecute({ requestPolicy: "network-only" });
 
@@ -473,6 +485,12 @@ export default function RecurringTasksScreen() {
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search recurring tasks…"
+      />
+
       {/* Filter + Create toolbar */}
       <View className="flex-row p-3 gap-2 border-b border-gray-200 dark:border-slate-700">
         <TouchableOpacity

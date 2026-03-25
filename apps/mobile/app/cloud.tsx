@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../src/context/AuthContext";
 import { useTheme } from "../src/hooks/useTheme";
+import { SearchBar } from "../src/components/SearchBar";
 import { makeRequest, ApiError } from "../src/api/request";
 import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatUptime, formatCost, CLOUD_VM_STATUS_LABELS, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
 
@@ -314,19 +315,11 @@ export default function CloudVMsScreen() {
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">
-      {/* Search bar */}
-      <View className="flex-row items-center bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-3 py-2 gap-2">
-        <Ionicons name="search-outline" size={16} color="#9ca3af" />
-        <TextInput
-          className="flex-1 text-base text-gray-900 dark:text-slate-100 py-1.5"
-          placeholder="Search VMs…"
-          placeholderTextColor="#9ca3af"
-          value={search}
-          onChangeText={setSearch}
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-        />
-      </View>
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search VMs…"
+      />
 
       {loading ? (
         <View className="flex-1 justify-center items-center gap-3 p-6">

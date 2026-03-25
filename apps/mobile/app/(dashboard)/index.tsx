@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
-  TextInput,
 } from "react-native";
 import { useQuery } from "urql";
 import { useRouter, useNavigation } from "expo-router";
@@ -20,6 +19,7 @@ import { TaskCard } from "../../src/components/TaskCard";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
 import { useTheme } from "../../src/hooks/useTheme";
 import { NotificationBell } from "../../src/components/NotificationBell";
+import { SearchBar } from "../../src/components/SearchBar";
 
 interface TaskAssignee {
   id: string;
@@ -165,42 +165,38 @@ export default function TaskListScreen() {
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">
-      {/* Search bar + view toggle */}
-      <View className="flex-row items-center bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-3 py-2 gap-2">
-        <Text className="text-sm">🔍</Text>
-        <TextInput
-          className="flex-1 text-base text-gray-900 dark:text-slate-100 py-1.5 px-1"
-          placeholder="Search tasks…"
-          placeholderTextColor="#9ca3af"
-          value={search}
-          onChangeText={setSearch}
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-        />
-        <TouchableOpacity
-          onPress={() => setFiltersOpen((v) => !v)}
-          className={`p-1 relative ${filtersOpen ? "bg-blue-50 dark:bg-blue-900/20 rounded-lg" : ""}`}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="options-outline" size={20} color={filtersOpen ? "#2563eb" : "#6b7280"} />
-          {activeFilterCount > 0 && (
-            <View className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-blue-600 justify-center items-center">
-              <Text className="text-xs text-white font-bold">{activeFilterCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setViewMode((m) => (m === "list" ? "kanban" : "list"))}
-          className="p-1"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons
-            name={viewMode === "list" ? "grid-outline" : "list-outline"}
-            size={20}
-            color="#6b7280"
-          />
-        </TouchableOpacity>
-      </View>
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search tasks…"
+        right={
+          <>
+            <TouchableOpacity
+              onPress={() => setFiltersOpen((v) => !v)}
+              className={`p-1 relative ${filtersOpen ? "bg-blue-50 dark:bg-blue-900/20 rounded-lg" : ""}`}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="options-outline" size={20} color={filtersOpen ? "#2563eb" : "#6b7280"} />
+              {activeFilterCount > 0 && (
+                <View className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-blue-600 justify-center items-center">
+                  <Text className="text-xs text-white font-bold">{activeFilterCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setViewMode((m) => (m === "list" ? "kanban" : "list"))}
+              className="p-1"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={viewMode === "list" ? "grid-outline" : "list-outline"}
+                size={20}
+                color="#6b7280"
+              />
+            </TouchableOpacity>
+          </>
+        }
+      />
 
       {/* Advanced filter panel */}
       {filtersOpen && (

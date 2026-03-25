@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -23,6 +23,7 @@ import {
 } from "@agentcenter/graphql-client";
 import { formatDate } from "@agentcenter/utils";
 import { EmptyState } from "../src/components/EmptyState";
+import { SearchBar } from "../src/components/SearchBar";
 
 interface SubtaskDef {
   title: string;
@@ -33,12 +34,13 @@ interface TaskTemplate {
   id: string;
   name: string;
   description: string | null;
-  subtasks: string; // JSON string of SubtaskDef[]
+  subtasks: SubtaskDef[] | string; // server returns parsed JSON array; mutations send JSON string
   createdAt: string;
   updatedAt: string;
 }
 
-function parseSubtasks(raw: string): SubtaskDef[] {
+function parseSubtasks(raw: SubtaskDef[] | string): SubtaskDef[] {
+  if (Array.isArray(raw)) return raw;
   try {
     return JSON.parse(raw) as SubtaskDef[];
   } catch {
@@ -67,6 +69,16 @@ function TemplateFormModal({
   const [subtasks, setSubtasks] = useState<SubtaskDef[]>(initial ? parseSubtasks(initial.subtasks) : []);
   const [subtaskInput, setSubtaskInput] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Re-populate fields whenever the modal opens or the target template changes
+  useEffect(() => {
+    if (visible) {
+      setName(initial?.name ?? "");
+      setDescription(initial?.description ?? "");
+      setSubtasks(initial ? parseSubtasks(initial.subtasks) : []);
+      setSubtaskInput("");
+    }
+  }, [visible, initial?.id]);
 
   const [, createTemplate] = useMutation(CREATE_TASK_TEMPLATE);
   const [, updateTemplate] = useMutation(UPDATE_TASK_TEMPLATE);
@@ -199,6 +211,7 @@ export default function TaskTemplatesScreen() {
   const insets = useSafeAreaInsets();
   const [formVisible, setFormVisible] = useState(false);
   const [editing, setEditing] = useState<TaskTemplate | null>(null);
+  const [search, setSearch] = useState("");
 
   const [result, reexecute] = useQuery<{ taskTemplates: TaskTemplate[] }>({
     query: TASK_TEMPLATES_QUERY,
@@ -207,7 +220,15 @@ export default function TaskTemplatesScreen() {
 
   const [, deleteTemplate] = useMutation(DELETE_TASK_TEMPLATE);
 
-  const templates = result.data?.taskTemplates ?? [];
+  const allTemplates = result.data?.taskTemplates ?? [];
+  const q = search.trim().toLowerCase();
+  const templates = q
+    ? allTemplates.filter(
+        (t) =>
+          t.name.toLowerCase().includes(q) ||
+          (t.description ?? "").toLowerCase().includes(q),
+      )
+    : allTemplates;
 
   function handleDelete(template: TaskTemplate) {
     Alert.alert(
@@ -246,16 +267,20 @@ export default function TaskTemplatesScreen() {
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">
-      {/* Toolbar */}
-      <View className="flex-row p-3 border-b border-gray-200 dark:border-slate-700 justify-end">
-        <TouchableOpacity
-          onPress={() => { setEditing(null); setFormVisible(true); }}
-          className="px-3.5 py-2 rounded-lg bg-blue-600"
-          activeOpacity={0.7}
-        >
-          <Text className="text-sm font-bold text-white">+ New Template</Text>
-        </TouchableOpacity>
-      </View>
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search templates…"
+        right={
+          <TouchableOpacity
+            onPress={() => { setEditing(null); setFormVisible(true); }}
+            className="px-3 py-1.5 rounded-lg bg-blue-600"
+            activeOpacity={0.7}
+          >
+            <Text className="text-sm font-bold text-white">+ New</Text>
+          </TouchableOpacity>
+        }
+      />
 
       <FlatList
         data={templates}

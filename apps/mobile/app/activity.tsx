@@ -10,6 +10,7 @@ import { useQuery, useSubscription } from "urql";
 import { useRouter } from "expo-router";
 import { useState, useCallback, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SearchBar } from "../src/components/SearchBar";
 import { ACTIVITIES_CONNECTION_QUERY, ACTIVITY_CREATED_SUBSCRIPTION } from "@agentcenter/graphql-client";
 import { ACTIVITY_TYPE_HEX_COLORS, DEFAULT_COLOR, PAGE_SIZE_DEFAULT, formatRelativeTime, appendDeduped, prependDeduped } from "@agentcenter/utils";
 import type { Activity } from "@agentcenter/types";
@@ -32,6 +33,7 @@ function getColor(type: string) {
 export default function ActivityScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [search, setSearch] = useState("");
   const [after, setAfter] = useState<string | undefined>(undefined);
   const [accumulated, setAccumulated] = useState<Activity[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -62,10 +64,18 @@ export default function ActivityScreen() {
   const hasMore = connection?.hasMore ?? false;
 
   // Merge live (real-time) items on top, then paginated items below
-  const displayed: Activity[] = (() => {
+  const allDisplayed: Activity[] = (() => {
     const base = pageFetched.length === 0 ? accumulated : appendDeduped(accumulated, pageFetched);
     return prependDeduped(base, liveItems);
   })();
+  const q = search.trim().toLowerCase();
+  const displayed = q
+    ? allDisplayed.filter(
+        (a) =>
+          a.type.toLowerCase().includes(q) ||
+          (a.summary ?? "").toLowerCase().includes(q),
+      )
+    : allDisplayed;
 
   function handleRefresh() {
     setAfter(undefined);
@@ -104,6 +114,12 @@ export default function ActivityScreen() {
   }
 
   return (
+    <View className="flex-1">
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search activity…"
+      />
     <FlatList
       data={displayed}
       keyExtractor={(item) => item.id}
@@ -202,5 +218,6 @@ export default function ActivityScreen() {
         );
       }}
     />
+    </View>
   );
 }

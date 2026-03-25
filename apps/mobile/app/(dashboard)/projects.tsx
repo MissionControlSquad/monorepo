@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
-  TextInput,
 } from "react-native";
 import { useQuery } from "urql";
 import { useRouter, useNavigation } from "expo-router";
@@ -16,6 +15,7 @@ import { STATUS_HEX_COLORS, DEFAULT_COLOR } from "@agentcenter/utils";
 import type { Project, ProjectMember } from "@agentcenter/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/hooks/useTheme";
+import { SearchBar } from "../../src/components/SearchBar";
 
 type StatusFilter = "all" | "active" | "archived";
 
@@ -93,19 +93,11 @@ export default function ProjectsScreen() {
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">
-      {/* Search */}
-      <View className="flex-row items-center bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-3 py-2 gap-2">
-        <Text className="text-sm">🔍</Text>
-        <TextInput
-          className="flex-1 text-base text-gray-900 dark:text-slate-100 py-1.5 px-1"
-          placeholder="Search projects…"
-          placeholderTextColor="#9ca3af"
-          value={search}
-          onChangeText={setSearch}
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-        />
-      </View>
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search projects…"
+      />
 
       {/* Status filter */}
       <ScrollView

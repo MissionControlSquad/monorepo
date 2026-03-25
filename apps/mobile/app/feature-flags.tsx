@@ -8,15 +8,18 @@ import {
   Alert,
   useColorScheme,
 } from "react-native";
+import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FEATURE_FLAGS_QUERY, UPDATE_FEATURE_FLAG } from "@agentcenter/graphql-client";
 import { EmptyState } from "../src/components/EmptyState";
 import type { FeatureFlag } from "@agentcenter/types";
+import { SearchBar } from "../src/components/SearchBar";
 
 export default function FeatureFlagsScreen() {
   const insets = useSafeAreaInsets();
   const isDark = useColorScheme() === "dark";
+  const [search, setSearch] = useState("");
 
   const [result, reexecute] = useQuery<{ featureFlags: FeatureFlag[] }>({
     query: FEATURE_FLAGS_QUERY,
@@ -25,7 +28,15 @@ export default function FeatureFlagsScreen() {
 
   const [, updateFlag] = useMutation(UPDATE_FEATURE_FLAG);
 
-  const flags = result.data?.featureFlags ?? [];
+  const allFlags = result.data?.featureFlags ?? [];
+  const q = search.trim().toLowerCase();
+  const flags = q
+    ? allFlags.filter(
+        (f) =>
+          f.key.toLowerCase().includes(q) ||
+          (f.description ?? "").toLowerCase().includes(q),
+      )
+    : allFlags;
 
   async function handleToggle(flag: FeatureFlag) {
     if (flag.managedBy && flag.managedBy !== "admin") {
@@ -53,6 +64,11 @@ export default function FeatureFlagsScreen() {
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-900">
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search flags…"
+      />
       {result.error && !result.data && (
         <View className="m-4 p-4 bg-red-50 dark:bg-red-950/30 rounded-xl">
           <Text className="text-red-600 dark:text-red-400 text-sm">{result.error.message}</Text>

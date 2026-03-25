@@ -19,6 +19,7 @@ import { PAGE_SIZE_CHANNELS, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 import { useTheme } from "../../src/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
+import { SearchBar } from "../../src/components/SearchBar";
 
 interface ChannelMember {
   id: string;
@@ -175,19 +176,11 @@ export default function ChannelsScreen() {
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">
-      {/* Search bar */}
-      <View className="flex-row items-center bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-3 py-2 gap-2">
-        <Text className="text-sm">🔍</Text>
-        <TextInput
-          className="flex-1 text-base text-gray-900 dark:text-slate-100 py-1.5 px-1"
-          placeholder="Search channels…"
-          placeholderTextColor="#9ca3af"
-          value={search}
-          onChangeText={setSearch}
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-        />
-      </View>
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search channels…"
+      />
 
       {/* Create channel modal */}
       <Modal
