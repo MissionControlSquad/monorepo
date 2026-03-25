@@ -5,6 +5,7 @@ import { useQuery } from "urql";
 import { X, Trash2, Search } from "lucide-react";
 import { PROJECT_QUERY } from "../../lib/graphql/queries";
 import { Button } from "../ui";
+import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/shadcn/sheet";
 import type { FilterState, DueDateFilter } from "./FilterBar";
@@ -113,24 +114,13 @@ function AssigneeSection({
 
       <div className="space-y-0.5 max-h-64 overflow-y-auto">
         {/* Unassigned toggle */}
-        {!search && (
-          <AgentRow
-            label="Unassigned"
-            avatar="?"
-            isActive={unassignedOnly}
-            onClick={onToggleUnassigned}
-            avatarClass={
-              unassignedOnly ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-            }
-          />
-        )}
+        {!search && <AgentRow isActive={unassignedOnly} onClick={onToggleUnassigned} />}
 
         {/* Selected agents (always visible) */}
         {selected.map((agent) => (
           <AgentRow
             key={agent.id}
-            label={agent.name}
-            avatar={agent.avatar || agent.name?.[0]}
+            agent={agent}
             isActive
             onClick={() => onToggleAssignee(agent.id)}
           />
@@ -140,8 +130,7 @@ function AssigneeSection({
         {filtered.map((agent) => (
           <AgentRow
             key={agent.id}
-            label={agent.name}
-            avatar={agent.avatar || agent.name?.[0]}
+            agent={agent}
             isActive={false}
             onClick={() => onToggleAssignee(agent.id)}
           />
@@ -158,17 +147,13 @@ function AssigneeSection({
 }
 
 function AgentRow({
-  label,
-  avatar,
+  agent,
   isActive,
   onClick,
-  avatarClass,
 }: {
-  label: string;
-  avatar: string;
+  agent?: Agent;
   isActive: boolean;
   onClick: () => void;
-  avatarClass?: string;
 }) {
   return (
     <button
@@ -178,14 +163,23 @@ function AgentRow({
         isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
       }`}
     >
-      <div
-        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-          avatarClass ?? (isActive ? "bg-primary text-white" : "bg-muted-foreground/40 text-white")
-        }`}
-      >
-        {avatar}
-      </div>
-      <span className="truncate">{label}</span>
+      {agent ? (
+        <ProfileAvatar
+          src={agent.avatar}
+          name={agent.name}
+          emoji={agent.identityEmoji}
+          size="sm+"
+        />
+      ) : (
+        <div
+          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+            isActive ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+          }`}
+        >
+          ?
+        </div>
+      )}
+      <span className="truncate">{agent?.name ?? "Unassigned"}</span>
       {isActive && <div className="ml-auto w-2 h-2 rounded-full bg-primary shrink-0" />}
     </button>
   );

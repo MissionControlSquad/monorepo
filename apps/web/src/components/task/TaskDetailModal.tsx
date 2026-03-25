@@ -513,7 +513,8 @@ export function TaskDetailModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="p-0 gap-0 w-full h-full max-w-none sm:max-w-none max-h-none rounded-none bg-background shadow-2xl flex flex-col relative"
+        fullScreen
+        className="flex flex-col overflow-hidden shadow-2xl"
       >
         {/* ===== TOP BAR ===== */}
         <div className="shrink-0 px-3 py-2 sm:px-6 sm:py-3 border-b border-border flex flex-col gap-1">
