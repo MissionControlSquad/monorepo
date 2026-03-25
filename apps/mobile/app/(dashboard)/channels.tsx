@@ -11,12 +11,14 @@ import {
   Alert,
 } from "react-native";
 import { useQuery, useMutation } from "urql";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useRouter, useNavigation } from "expo-router";
+import { useState, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CHANNELS_QUERY, PROFILES_QUERY, START_CONVERSATION, CREATE_CHANNEL } from "@agentcenter/graphql-client";
 import { PAGE_SIZE_CHANNELS, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
+import { useTheme } from "../../src/hooks/useTheme";
+import { Ionicons } from "@expo/vector-icons";
 
 interface ChannelMember {
   id: string;
@@ -55,7 +57,9 @@ function channelIcon(channel: Channel): string {
 
 export default function ChannelsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { profileId } = useAuth();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState(PAGE_SIZE_CHANNELS);
@@ -67,6 +71,22 @@ export default function ChannelsScreen() {
   const [createVisibility, setCreateVisibility] = useState<"public" | "private">("public");
   const [createDescription, setCreateDescription] = useState("");
   const [creating, setCreating] = useState(false);
+
+  // Header + button → opens create channel modal (channel-only, no DM)
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => {
+            setCreateName(""); setCreateSlug(""); setCreateVisibility("public"); setCreateDescription(""); setCreateOpen(true);
+          }}
+          style={{ marginRight: 8, padding: 4 }}
+        >
+          <Ionicons name="add" size={26} color={colors.accent} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors.accent]);
 
   // Mutations before queries — avoids useSyncExternalStore update-during-render with URQL v5
   const [{ fetching: startingDm }, executeStartConversation] = useMutation(START_CONVERSATION);

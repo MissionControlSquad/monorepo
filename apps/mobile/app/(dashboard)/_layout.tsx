@@ -75,13 +75,6 @@ export default function DashboardLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubble-outline" size={size} color={color} />
           ),
-          headerRight: () => (
-            <View className="flex-row items-center gap-1 mr-2">
-              <TouchableOpacity onPress={() => router.push("/channels/create")} className="p-2">
-                <Ionicons name="add" size={26} color={colors.accent} />
-              </TouchableOpacity>
-            </View>
-          ),
         }}
       />
       <Tabs.Screen
