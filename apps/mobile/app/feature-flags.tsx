@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  useColorScheme,
 } from "react-native";
 import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,6 +16,7 @@ import type { FeatureFlag } from "@agentcenter/types";
 
 export default function FeatureFlagsScreen() {
   const insets = useSafeAreaInsets();
+  const isDark = useColorScheme() === "dark";
 
   const [result, reexecute] = useQuery<{ featureFlags: FeatureFlag[] }>({
     query: FEATURE_FLAGS_QUERY,
@@ -97,9 +99,9 @@ export default function FeatureFlagsScreen() {
                 value={item.enabled}
                 onValueChange={() => handleToggle(item)}
                 disabled={isManaged}
-                trackColor={{ false: colors.border, true: colors.accent + "80" }}
-                thumbColor={item.enabled ? colors.accent : colors.textMuted}
-                ios_backgroundColor={colors.border}
+                trackColor={{ false: isDark ? "#334155" : "#e5e7eb", true: "#2563eb80" }}
+                thumbColor={item.enabled ? "#2563eb" : isDark ? "#64748b" : "#9ca3af"}
+                ios_backgroundColor={isDark ? "#334155" : "#e5e7eb"}
               />
             </View>
           );

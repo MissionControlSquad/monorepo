@@ -18,7 +18,6 @@ import { useAuth } from "../context/AuthContext";
 import { useQuery } from "urql";
 import { ME_DRAWER_QUERY } from "@agentcenter/graphql-client";
 import { getStoredServerUrl } from "../api/session";
-import { useColorScheme } from "react-native";
 import { useNotificationCount } from "../hooks/useNotificationCount";
 import { generateInitials } from "@agentcenter/utils";
 import type { ProfileWithUser as Profile } from "@agentcenter/types";

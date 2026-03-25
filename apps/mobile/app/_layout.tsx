@@ -64,10 +64,10 @@ function RootLayoutNav() {
         <OfflineBanner />
         <Stack
           screenOptions={{
-            headerStyle: { backgroundColor: colors.headerBg },
-            headerTintColor: colors.text,
-            headerTitleStyle: { color: colors.text },
-            contentStyle: { backgroundColor: colors.background },
+            headerStyle: { backgroundColor: isDark ? "#0f172a" : "#ffffff" },
+            headerTintColor: isDark ? "#f1f5f9" : "#111827",
+            headerTitleStyle: { color: isDark ? "#f1f5f9" : "#111827" },
+            contentStyle: { backgroundColor: isDark ? "#0f172a" : "#ffffff" },
           }}
         >
           <Stack.Screen name="index" options={{ headerShown: false }} />
