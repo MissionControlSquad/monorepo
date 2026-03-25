@@ -24,6 +24,7 @@ import { ScreenError } from "../../src/components/ScreenError";
 import { FilterChip } from "../../src/components/FilterChip";
 import { FAB } from "../../src/components/FAB";
 import { SectionLabel } from "../../src/components/SectionLabel";
+import { TabFilterStrip } from "../../src/components/TabFilterStrip";
 
 interface TaskAssignee {
   id: string;
@@ -231,30 +232,12 @@ export default function TaskListScreen() {
         /* ── List view ── */
         <>
           {/* Status filter chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
-            bounces={false}
-            directionalLockEnabled={true}
-            className="h-14 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
-            contentContainerStyle={{ paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 }}
-          >
-            {FILTERS.map((f) => {
-              const count = f.key === "all" ? allTasks.length : allTasks.filter((t) => t.status === f.key).length;
-              return (
-                <TouchableOpacity
-                  key={f.key}
-                  className={`px-3.5 py-2 rounded-full ${filter === f.key ? "bg-blue-100 dark:bg-blue-900/30" : "bg-gray-100 dark:bg-slate-700"}`}
-                  onPress={() => setFilter(f.key)}
-                >
-                  <Text className={`text-sm ${filter === f.key ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
-                    {f.label} ({count})
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <TabFilterStrip
+            filters={FILTERS}
+            activeKey={filter}
+            onSelect={setFilter}
+            getCount={(key) => key === "all" ? allTasks.length : allTasks.filter((t) => t.status === key).length}
+          />
 
           <FlatList
             data={tasks}

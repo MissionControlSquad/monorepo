@@ -17,6 +17,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../src/context/AuthContext";
 import { makeRequest } from "../../src/api/request";
 import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatUptime, formatCost, formatDate, CLOUD_VM_STATUS_LABELS, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
+import { InfoRow } from "../../src/components/InfoRow";
+import { ScreenLoading } from "../../src/components/ScreenLoading";
 
 interface VMAgent {
   id: string;
@@ -55,15 +57,6 @@ interface VMLog {
 
 const STATUS_LABELS = CLOUD_VM_STATUS_LABELS;
 const TRANSITIONAL = CLOUD_VM_TRANSITIONAL_STATUSES;
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View className="flex-row justify-between gap-3">
-      <Text className="text-sm text-gray-500 dark:text-slate-400">{label}</Text>
-      <Text className="text-sm text-gray-900 dark:text-slate-100 font-medium text-right flex-1" selectable>{value}</Text>
-    </View>
-  );
-}
 
 // ── Rename Modal ──────────────────────────────────────────────────────────────
 
@@ -233,13 +226,7 @@ export default function CloudVMDetailScreen() {
     }
   };
 
-  if (loading) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
+  if (loading) return <ScreenLoading />;
 
   if (!vm) {
     return (

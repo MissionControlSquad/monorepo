@@ -28,6 +28,7 @@ import {
 } from "@agentcenter/graphql-client";
 import { formatDate, PRIORITY_VALUES } from "@agentcenter/utils";
 import { EmptyState } from "../src/components/EmptyState";
+import { FormField } from "../src/components/FormField";
 import { StatusPill } from "../src/components/StatusPill";
 import { PriorityBadge } from "../src/components/PriorityBadge";
 import { useAuth } from "../src/context/AuthContext";
@@ -242,8 +243,7 @@ function RecurringTaskFormModal({
           keyboardShouldPersistTaps="handled"
         >
           {/* Title */}
-          <View className="gap-1.5">
-            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Title *</Text>
+          <FormField label="Title" required>
             <TextInput
               className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               placeholder="Task title…"
@@ -252,11 +252,10 @@ function RecurringTaskFormModal({
               onChangeText={setTaskTitle}
               autoFocus
             />
-          </View>
+          </FormField>
 
           {/* Description */}
-          <View className="gap-1.5">
-            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Description</Text>
+          <FormField label="Description">
             <TextInput
               className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               style={{ minHeight: 80, textAlignVertical: "top" }}
@@ -266,7 +265,7 @@ function RecurringTaskFormModal({
               onChangeText={setDescription}
               multiline
             />
-          </View>
+          </FormField>
 
           {/* Frequency */}
           <View className="gap-2">
@@ -319,8 +318,7 @@ function RecurringTaskFormModal({
           </View>
 
           {/* Time */}
-          <View className="gap-1.5">
-            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Time (HH:MM)</Text>
+          <FormField label="Time (HH:MM)">
             <TextInput
               className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               placeholder="09:00"
@@ -330,7 +328,7 @@ function RecurringTaskFormModal({
               returnKeyType="done"
               keyboardType="numbers-and-punctuation"
             />
-          </View>
+          </FormField>
 
           {/* Tags */}
           <View className="gap-1.5">

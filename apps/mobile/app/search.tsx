@@ -11,8 +11,9 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "urql";
 import { GLOBAL_SEARCH_QUERY, TASK_BY_NUMBER_QUERY } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS } from "@agentcenter/utils";
 import { Ionicons } from "@expo/vector-icons";
+import { StatusPill } from "../src/components/StatusPill";
+import { SectionLabel } from "../src/components/SectionLabel";
 
 interface TaskResult {
   id: string;
@@ -171,15 +172,12 @@ export default function SearchScreen() {
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section }) => (
             <View className="px-4 pt-4 pb-1.5 bg-white dark:bg-slate-900">
-              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">
-                {section.title}
-              </Text>
+              <SectionLabel>{section.title}</SectionLabel>
             </View>
           )}
           renderItem={({ item, section }) => {
             if (section.type === "task") {
               const t = item as TaskResult;
-              const statusColor = STATUS_HEX_COLORS[t.status] ?? "#6b7280";
               return (
                 <TouchableOpacity
                   className="bg-white dark:bg-slate-800 mx-4 mb-2 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-1"
@@ -190,11 +188,7 @@ export default function SearchScreen() {
                     <Text className="text-xs text-gray-400 dark:text-slate-500" style={{ fontVariant: ["tabular-nums"] }}>
                       #{t.taskNumber}
                     </Text>
-                    <View className="rounded px-1.5 py-0.5" style={{ backgroundColor: statusColor + "20" }}>
-                      <Text className="text-xs font-semibold uppercase" style={{ color: statusColor }}>
-                        {t.status.replace("_", " ")}
-                      </Text>
-                    </View>
+                    <StatusPill status={t.status} />
                     {t.priority && (
                       <Text className="text-xs text-gray-400 dark:text-slate-500 capitalize">{t.priority}</Text>
                     )}

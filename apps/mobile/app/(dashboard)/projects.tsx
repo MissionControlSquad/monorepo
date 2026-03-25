@@ -4,7 +4,6 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  ScrollView,
 } from "react-native";
 import { useQuery } from "urql";
 import { useRouter, useNavigation } from "expo-router";
@@ -17,6 +16,7 @@ import { useTheme } from "../../src/hooks/useTheme";
 import { SearchBar } from "../../src/components/SearchBar";
 import { ScreenLoading } from "../../src/components/ScreenLoading";
 import { ScreenError } from "../../src/components/ScreenError";
+import { TabFilterStrip } from "../../src/components/TabFilterStrip";
 
 type StatusFilter = "all" | "active" | "archived";
 
@@ -85,33 +85,12 @@ export default function ProjectsScreen() {
       />
 
       {/* Status filter */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-        directionalLockEnabled={true}
-        className="h-14 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
-        contentContainerStyle={{ paddingHorizontal: 12, gap: 8, flexDirection: "row", alignItems: "center", height: 52 }}
-      >
-        {filters.map((f) => {
-          const count =
-            f.key === "all"
-              ? allProjects.length
-              : allProjects.filter((p) => p.status === f.key).length;
-          return (
-            <TouchableOpacity
-              key={f.key}
-              className={`px-3.5 py-2 rounded-full ${statusFilter === f.key ? "bg-blue-100 dark:bg-blue-900/30" : "bg-gray-100 dark:bg-slate-700"}`}
-              onPress={() => setStatusFilter(f.key)}
-            >
-              <Text className={`text-sm ${statusFilter === f.key ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
-                {f.label} ({count})
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      <TabFilterStrip
+        filters={filters}
+        activeKey={statusFilter}
+        onSelect={setStatusFilter}
+        getCount={(key) => key === "all" ? allProjects.length : allProjects.filter((p) => p.status === key).length}
+      />
 
       <FlatList
         data={projects}

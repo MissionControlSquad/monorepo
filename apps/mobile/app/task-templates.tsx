@@ -24,6 +24,7 @@ import {
 import { formatDate } from "@agentcenter/utils";
 import { EmptyState } from "../src/components/EmptyState";
 import { SearchBar } from "../src/components/SearchBar";
+import { FormField } from "../src/components/FormField";
 
 interface SubtaskDef {
   title: string;
@@ -142,8 +143,7 @@ function TemplateFormModal({
           keyboardShouldPersistTaps="handled"
         >
           {/* Name */}
-          <View className="gap-1.5">
-            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Name *</Text>
+          <FormField label="Name" required>
             <TextInput
               className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               placeholder="Template name…"
@@ -152,11 +152,10 @@ function TemplateFormModal({
               onChangeText={setName}
               autoFocus={!isEdit}
             />
-          </View>
+          </FormField>
 
           {/* Description */}
-          <View className="gap-1.5">
-            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Description</Text>
+          <FormField label="Description">
             <TextInput
               className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               style={{ minHeight: 70, textAlignVertical: "top" }}
@@ -166,7 +165,7 @@ function TemplateFormModal({
               onChangeText={setDescription}
               multiline
             />
-          </View>
+          </FormField>
 
           {/* Subtasks */}
           <View className="gap-2">

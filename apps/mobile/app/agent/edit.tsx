@@ -15,6 +15,8 @@ import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AGENT_EDIT_QUERY, UPDATE_AGENT_PROFILE } from "@agentcenter/graphql-client";
 import { AGENT_EMOJI_PRESETS, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
+import { FormField } from "../../src/components/FormField";
+import { ScreenLoading } from "../../src/components/ScreenLoading";
 
 export default function EditAgentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -73,13 +75,7 @@ export default function EditAgentScreen() {
     setDirty(true);
   };
 
-  if (result.fetching && !agent) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
+  if (result.fetching && !agent) return <ScreenLoading />;
 
   return (
     <KeyboardAvoidingView
@@ -94,10 +90,7 @@ export default function EditAgentScreen() {
         <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
           <Text className="text-base font-bold text-gray-900 dark:text-slate-100">Identity</Text>
 
-          <View className="gap-1.5">
-            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">
-              Name <Text className="text-red-600 dark:text-red-400">*</Text>
-            </Text>
+          <FormField label="Name" required>
             <TextInput
               className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               value={name}
@@ -105,12 +98,9 @@ export default function EditAgentScreen() {
               placeholder="Agent name"
               placeholderTextColor="#9ca3af"
             />
-          </View>
+          </FormField>
 
-          <View className="gap-1.5">
-            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">
-              Role <Text className="text-red-600 dark:text-red-400">*</Text>
-            </Text>
+          <FormField label="Role" required>
             <TextInput
               className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
               value={role}
@@ -118,20 +108,18 @@ export default function EditAgentScreen() {
               placeholder="e.g. Backend Engineer"
               placeholderTextColor="#9ca3af"
             />
-          </View>
+          </FormField>
 
           {agent?.username ? (
-            <View className="gap-1.5">
-              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Username</Text>
+            <FormField label="Username">
               <View className="bg-gray-100 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 justify-center">
                 <Text className="text-sm text-gray-400 dark:text-slate-500">@{agent.username}</Text>
               </View>
               <Text className="text-xs text-gray-400 dark:text-slate-500">Username cannot be changed after creation</Text>
-            </View>
+            </FormField>
           ) : null}
 
-          <View className="gap-1.5">
-            <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Emoji</Text>
+          <FormField label="Emoji">
             <View className="flex-row flex-wrap gap-2">
               {AGENT_EMOJI_PRESETS.map((e) => (
                 <TouchableOpacity
@@ -148,7 +136,7 @@ export default function EditAgentScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
+          </FormField>
         </View>
 
         <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">

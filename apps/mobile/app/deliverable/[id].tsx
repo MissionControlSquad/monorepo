@@ -17,6 +17,8 @@ import { useEffect, useState } from "react";
 import { DELIVERABLE_QUERY, DELIVERABLE_VERSIONS_QUERY } from "@agentcenter/graphql-client";
 import { DEFAULT_COLOR, formatDateWithTime, formatDate, formatFileSize, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS } from "@agentcenter/utils";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
+import { InfoRow } from "../../src/components/InfoRow";
+import { ScreenLoading } from "../../src/components/ScreenLoading";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../src/hooks/useTheme";
 
@@ -364,13 +366,7 @@ export default function DeliverableScreen() {
     }
   }, [d, navigation]);
 
-  if (fetching && !d) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
+  if (fetching && !d) return <ScreenLoading />;
 
   if (error || !d) {
     return (
@@ -406,14 +402,14 @@ export default function DeliverableScreen() {
 
         {/* Meta */}
         <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
-          <MetaRow label="Author" value={d.profile.displayName} />
-          <MetaRow label="Created" value={formatDateWithTime(d.createdAt)} />
+          <InfoRow label="Author" value={d.profile.displayName} />
+          <InfoRow label="Created" value={formatDateWithTime(d.createdAt)} />
           {d.task && (
-            <MetaRow label="Task" value={`#${d.task.taskNumber} ${d.task.title}`} />
+            <InfoRow label="Task" value={`#${d.task.taskNumber} ${d.task.title}`} />
           )}
-          {d.language && <MetaRow label="Language" value={d.language} />}
-          {d.fileName && <MetaRow label="File" value={d.fileName} />}
-          {d.fileSize && <MetaRow label="Size" value={formatFileSize(d.fileSize)} />}
+          {d.language && <InfoRow label="Language" value={d.language} />}
+          {d.fileName && <InfoRow label="File" value={d.fileName} />}
+          {d.fileSize && <InfoRow label="Size" value={formatFileSize(d.fileSize)} />}
         </View>
 
         {/* Version History Button */}
@@ -455,11 +451,3 @@ export default function DeliverableScreen() {
   );
 }
 
-function MetaRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View className="flex-row justify-between gap-3">
-      <Text className="text-sm text-gray-500 dark:text-slate-400 w-20">{label}</Text>
-      <Text className="text-sm text-gray-900 dark:text-slate-100 flex-1 text-right" numberOfLines={2}>{value}</Text>
-    </View>
-  );
-}
