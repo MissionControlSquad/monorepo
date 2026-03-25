@@ -38,6 +38,7 @@ import {
 import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, formatDate } from "@agentcenter/utils";
 import { useTheme } from "../../src/hooks/useTheme";
 import { TabFilterStrip } from "../../src/components/TabFilterStrip";
+import { KanbanBoard } from "../../src/components/KanbanBoard";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -287,7 +288,9 @@ type TaskFilter = "all" | "in_progress" | "review" | "done";
 
 function TasksTab({ projectId }: { projectId: string }) {
   const router = useRouter();
+  const { colors } = useTheme();
   const [filter, setFilter] = useState<TaskFilter>("all");
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
 
   const [result, reexecute] = useQuery<{ tasksByProject: Task[] }>({
     query: TASKS_BY_PROJECT_QUERY,
@@ -309,14 +312,36 @@ function TasksTab({ projectId }: { projectId: string }) {
 
   return (
     <View className="flex-1">
-      <TabFilterStrip
-        filters={filters}
-        activeKey={filter}
-        onSelect={setFilter}
-        getCount={(key) => key === "all" ? allTasks.length : allTasks.filter((t) => t.status === key).length}
-      />
+      {/* Filter strip + view toggle */}
+      <View className="flex-row items-stretch">
+        {viewMode === "list" && (
+          <View style={{ flex: 1 }}>
+            <TabFilterStrip
+              filters={filters}
+              activeKey={filter}
+              onSelect={setFilter}
+              getCount={(key) => key === "all" ? allTasks.length : allTasks.filter((t) => t.status === key).length}
+            />
+          </View>
+        )}
+        {viewMode === "kanban" && <View style={{ flex: 1 }} />}
+        <TouchableOpacity
+          style={{ width: 42, height: 42 }}
+          className="bg-white dark:bg-slate-800 border-b border-l border-gray-100 dark:border-slate-700 justify-center items-center"
+          onPress={() => setViewMode((m) => m === "list" ? "kanban" : "list")}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={viewMode === "list" ? "grid-outline" : "list-outline"}
+            size={20}
+            color={colors.accent}
+          />
+        </TouchableOpacity>
+      </View>
 
-      {fetching && tasks.length === 0 ? (
+      {viewMode === "kanban" ? (
+        <KanbanBoard projectId={projectId} />
+      ) : fetching && tasks.length === 0 ? (
         <View className="flex-1 justify-center items-center gap-3">
           <ActivityIndicator size="large" color="#2563eb" />
         </View>
@@ -1111,17 +1136,9 @@ export default function ProjectDetailScreen() {
       navigation.setOptions({
         title: project.name,
         headerRight: () => (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
-            <TouchableOpacity
-              onPress={() => router.push(`/kanban/${project.id}`)}
-              style={{ padding: 8 }}
-            >
-              <Ionicons name="grid-outline" size={22} color={colors.accent} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleMoreActions} style={{ padding: 8 }}>
-              <Ionicons name="ellipsis-horizontal" size={22} color={colors.icon} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={handleMoreActions} style={{ padding: 8, marginRight: 8 }}>
+            <Ionicons name="ellipsis-horizontal" size={22} color={colors.icon} />
+          </TouchableOpacity>
         ),
       });
     }
