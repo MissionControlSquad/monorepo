@@ -288,7 +288,7 @@ export default function AgentDetailScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 min-h-12"
+        className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 min-h-12 max-h-12"
         contentContainerStyle={{ flexDirection: "row", alignItems: "stretch" }}
         bounces={false}
       >
@@ -433,7 +433,7 @@ function UpgradeBanner({ agentId, serverUrl }: { agentId: string; serverUrl: str
 function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: ReturnType<typeof useRouter>; onRefresh: () => void }) {
   const { serverUrl } = useAuth();
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
       {agent.upgradeAvailable && (
         <UpgradeBanner agentId={agent.id} serverUrl={serverUrl} />
       )}
@@ -783,6 +783,7 @@ function AgentTasksTab({
 
   return (
     <FlatList
+      style={{ flex: 1 }}
       data={allTasks}
       keyExtractor={(t) => t.id}
       contentContainerStyle={[{ padding: 16, gap: 12 }, { paddingBottom: insets.bottom + 16 }]}
@@ -855,6 +856,7 @@ function AgentDeliverablesTab({
 
   return (
     <FlatList
+      style={{ flex: 1 }}
       data={deliverables}
       keyExtractor={(d) => d.id}
       contentContainerStyle={[{ padding: 16, gap: 12 }, { paddingBottom: insets.bottom + 16 }]}
@@ -904,6 +906,7 @@ function ActivityTab({ actions, fetching, onRefresh, router }: {
 
   return (
     <FlatList
+      style={{ flex: 1 }}
       data={actions}
       keyExtractor={(a) => a.id}
       contentContainerStyle={{ padding: 16, gap: 10 }}
@@ -946,6 +949,7 @@ function HistoryTab({ history, fetching, onRefresh }: {
 
   return (
     <FlatList
+      style={{ flex: 1 }}
       data={history}
       keyExtractor={(h) => h.id}
       contentContainerStyle={{ padding: 16, gap: 10 }}
@@ -1074,6 +1078,7 @@ function SetupTab({ agentId }: { agentId: string }) {
 
   return (
     <ScrollView
+      style={{ flex: 1 }}
       contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 16 }}
       keyboardShouldPersistTaps="handled"
     >
