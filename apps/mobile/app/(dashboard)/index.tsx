@@ -9,8 +9,8 @@ import {
   TextInput,
 } from "react-native";
 import { useQuery } from "urql";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useRouter, useNavigation } from "expo-router";
+import { useState, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
@@ -18,6 +18,8 @@ import { PAGE_SIZE_DEFAULT, PRIORITY_FILTER_OPTIONS, DUE_DATE_FILTER_OPTIONS, ma
 import type { DueDateFilter, PriorityFilter } from "@agentcenter/utils";
 import { TaskCard } from "../../src/components/TaskCard";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
+import { useTheme } from "../../src/hooks/useTheme";
+import { NotificationBell } from "../../src/components/NotificationBell";
 
 interface TaskAssignee {
   id: string;
@@ -77,6 +79,8 @@ const FilterChip = ({
 
 export default function TaskListScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [filter, setFilter] = useState<StatusFilter>("all");
@@ -98,6 +102,22 @@ export default function TaskListScreen() {
     topLevelOnly,
     unassignedOnly,
   ].filter(Boolean).length;
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginRight: 8 }}>
+          <TouchableOpacity onPress={() => router.push("/search")} style={{ padding: 8 }}>
+            <Ionicons name="search-outline" size={22} color={colors.icon} />
+          </TouchableOpacity>
+          <NotificationBell
+            onPress={() => router.push("/notifications")}
+            color={colors.icon}
+          />
+        </View>
+      ),
+    });
+  }, [navigation, colors.icon]);
 
   const [result, reexecute] = useQuery<{ tasks: Task[] }>({
     query: TASKS_QUERY,

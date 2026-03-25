@@ -9,8 +9,8 @@ import {
   Alert,
 } from "react-native";
 import { useQuery, useMutation } from "urql";
-import { useRouter } from "expo-router";
-import { useState, useMemo } from "react";
+import { useRouter, useNavigation } from "expo-router";
+import { useState, useMemo, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { AGENTS_QUERY, SET_AGENT_ACTIVATION } from "@agentcenter/graphql-client";
 import {
@@ -22,6 +22,7 @@ import {
   type AgentSetupFilter,
 } from "@agentcenter/utils";
 import type { Agent } from "@agentcenter/types";
+import { useTheme } from "../../src/hooks/useTheme";
 
 type FilterTab = AgentSetupFilter;
 
@@ -34,6 +35,8 @@ const FILTER_LABELS: Record<FilterTab, string> = {
 
 export default function AgentsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { colors } = useTheme();
   const [filter, setFilter] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
 
@@ -43,6 +46,19 @@ export default function AgentsScreen() {
   });
 
   const [, setActivation] = useMutation(SET_AGENT_ACTIVATION);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => router.push("/agent/create")}
+          style={{ marginRight: 8, padding: 4 }}
+        >
+          <Ionicons name="add" size={26} color={colors.accent} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors.accent]);
 
   const { data, fetching, error } = result;
   const allAgents = data?.agents ?? [];
@@ -90,13 +106,6 @@ export default function AgentsScreen() {
             <Ionicons name="close-circle" size={16} color="#9ca3af" />
           </TouchableOpacity>
         )}
-        <TouchableOpacity
-          onPress={() => router.push("/agent/create")}
-          className="w-8 h-8 rounded-full bg-blue-600 justify-center items-center ml-1"
-          activeOpacity={0.7}
-        >
-          <Text className="text-xl text-white leading-6">+</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Filter tabs */}

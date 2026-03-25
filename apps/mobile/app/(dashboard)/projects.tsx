@@ -9,11 +9,13 @@ import {
   TextInput,
 } from "react-native";
 import { useQuery } from "urql";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useRouter, useNavigation } from "expo-router";
+import { useState, useEffect } from "react";
 import { PROJECTS_QUERY } from "@agentcenter/graphql-client";
 import { STATUS_HEX_COLORS, DEFAULT_COLOR } from "@agentcenter/utils";
 import type { Project, ProjectMember } from "@agentcenter/types";
+import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../../src/hooks/useTheme";
 
 type StatusFilter = "all" | "active" | "archived";
 
@@ -28,8 +30,23 @@ function memberEmojis(members: ProjectMember[]): string {
 
 export default function ProjectsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { colors } = useTheme();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => router.push("/project/create")}
+          style={{ marginRight: 8, padding: 4 }}
+        >
+          <Ionicons name="add" size={26} color={colors.accent} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors.accent]);
 
   const [result, reexecute] = useQuery<{ projects: Project[] }>({
     query: PROJECTS_QUERY,
@@ -88,13 +105,6 @@ export default function ProjectsScreen() {
           clearButtonMode="while-editing"
           returnKeyType="search"
         />
-        <TouchableOpacity
-          onPress={() => router.push("/project/create")}
-          className="w-8 h-8 rounded-full bg-blue-600 justify-center items-center"
-          activeOpacity={0.7}
-        >
-          <Text className="text-xl text-white leading-6">+</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Status filter */}
