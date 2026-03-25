@@ -20,6 +20,8 @@ import { useAuth } from "../../src/context/AuthContext";
 import { useTheme } from "../../src/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { SearchBar } from "../../src/components/SearchBar";
+import { ScreenLoading } from "../../src/components/ScreenLoading";
+import { ScreenError } from "../../src/components/ScreenError";
 
 interface ChannelMember {
   id: string;
@@ -150,24 +152,8 @@ export default function ChannelsScreen() {
     ? allDms.filter((c) => channelDisplayName(c, profileId).toLowerCase().includes(q))
     : allDms;
 
-  if (fetching && allChannels.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center gap-3">
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
-
-  if (error && allChannels.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center gap-3">
-        <Text className="text-red-600 dark:text-red-400 text-base">Failed to load channels</Text>
-        <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
-          <Text className="text-blue-600 dark:text-blue-400 text-sm font-semibold">Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (fetching && allChannels.length === 0) return <ScreenLoading />;
+  if (error && allChannels.length === 0) return <ScreenError message="Failed to load channels" onRetry={() => reexecute({ requestPolicy: "network-only" })} />;
 
   const dmProfiles = (profilesResult.data?.profiles ?? []).filter((p) => p.id !== profileId);
   const filteredDmProfiles = dmSearch.trim()

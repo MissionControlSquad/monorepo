@@ -2,7 +2,6 @@ import {
   View,
   Text,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
   Alert,
@@ -23,6 +22,8 @@ import {
 import type { Agent } from "@agentcenter/types";
 import { useTheme } from "../../src/hooks/useTheme";
 import { SearchBar } from "../../src/components/SearchBar";
+import { ScreenLoading } from "../../src/components/ScreenLoading";
+import { ScreenError } from "../../src/components/ScreenError";
 
 type FilterTab = AgentSetupFilter;
 
@@ -72,20 +73,8 @@ export default function AgentsScreen() {
     deactivated: allAgents.filter((a) => a.setupStatus === "deactivated").length,
   }), [allAgents]);
 
-  if (fetching && allAgents.length === 0) {
-    return <View className="flex-1 justify-center items-center"><ActivityIndicator size="large" color="#2563eb" /></View>;
-  }
-
-  if (error && allAgents.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center gap-3">
-        <Text className="text-red-600 dark:text-red-400 text-base">Failed to load agents</Text>
-        <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })} className="mt-1">
-          <Text className="text-blue-600 dark:text-blue-400 text-sm font-semibold">Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (fetching && allAgents.length === 0) return <ScreenLoading />;
+  if (error && allAgents.length === 0) return <ScreenError message="Failed to load agents" onRetry={() => reexecute({ requestPolicy: "network-only" })} />;
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">

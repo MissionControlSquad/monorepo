@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ME_QUERY, UPDATE_MY_PROFILE } from "@agentcenter/graphql-client";
 import { useAuth } from "../src/context/AuthContext";
 import { getStoredCookie } from "../src/api/session";
+import { ScreenLoading } from "../src/components/ScreenLoading";
 
 interface Profile {
   id: string;
@@ -169,13 +170,7 @@ export default function ProfileScreen() {
     ]);
   };
 
-  if (result.fetching && !profile) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
+  if (result.fetching && !profile) return <ScreenLoading />;
 
   const initials = displayName.trim()[0]?.toUpperCase() ?? "?";
 

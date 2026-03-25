@@ -9,6 +9,8 @@ import {
 import { useState, useCallback } from "react";
 import { useQuery } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ScreenLoading } from "../src/components/ScreenLoading";
+import { ScreenError } from "../src/components/ScreenError";
 import {
   TASK_STATUS_COUNTS_QUERY,
   TASK_CYCLE_TIMES_QUERY,
@@ -332,28 +334,8 @@ export default function AnalyticsScreen() {
 
   const hasError = !!(statusResult.error && !status && cycleResult.error && !cycle);
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 justify-center items-center bg-white dark:bg-slate-900">
-        <ActivityIndicator color="#2563eb" size="large" />
-      </View>
-    );
-  }
-
-  if (hasError) {
-    return (
-      <View className="flex-1 justify-center items-center bg-white dark:bg-slate-900 gap-3 p-8">
-        <Text className="text-base text-red-600 dark:text-red-400 text-center">Failed to load analytics</Text>
-        <TouchableOpacity
-          onPress={onRefresh}
-          className="bg-blue-600 rounded-lg px-4 py-2"
-          activeOpacity={0.7}
-        >
-          <Text className="text-white font-semibold">Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (isLoading) return <ScreenLoading />;
+  if (hasError) return <ScreenError message="Failed to load analytics" onRetry={onRefresh} />;
 
   const reviewTotal = (review?.approved ?? 0) + (review?.rejected ?? 0) + (review?.clarification ?? 0);
 

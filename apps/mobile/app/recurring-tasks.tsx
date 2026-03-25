@@ -33,6 +33,7 @@ import { PriorityBadge } from "../src/components/PriorityBadge";
 import { useAuth } from "../src/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { SearchBar } from "../src/components/SearchBar";
+import { ScreenLoading } from "../src/components/ScreenLoading";
 
 interface RecurringTask {
   id: string;
@@ -475,13 +476,7 @@ export default function RecurringTasksScreen() {
     ]);
   }
 
-  if (result.fetching && tasks.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
-        <ActivityIndicator color="#2563eb" size="large" />
-      </View>
-    );
-  }
+  if (result.fetching && tasks.length === 0) return <ScreenLoading />;
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">

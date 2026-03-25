@@ -3,7 +3,6 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -13,6 +12,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNotifications } from "../src/context/NotificationCountContext";
 import { NOTIFICATION_TYPE_HEX_COLORS, DEFAULT_COLOR, formatRelativeTime } from "@agentcenter/utils";
 import { SearchBar } from "../src/components/SearchBar";
+import { ScreenLoading } from "../src/components/ScreenLoading";
+import { ScreenError } from "../src/components/ScreenError";
+import { ListFooterLoading } from "../src/components/ListFooterLoading";
 
 // ── Types & constants ─────────────────────────────────────────────────────────
 
@@ -50,24 +52,8 @@ export default function NotificationsScreen() {
 
   const unreadCount = notifications.filter((n) => !n.readAt).length;
 
-  if (fetching && notifications.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center gap-3">
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
-
-  if (error && notifications.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center gap-3">
-        <Text className="text-red-600 dark:text-red-400 text-base">Failed to load notifications</Text>
-        <TouchableOpacity onPress={reexecute}>
-          <Text className="text-blue-600 dark:text-blue-400 text-sm font-semibold">Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (fetching && notifications.length === 0) return <ScreenLoading />;
+  if (error && notifications.length === 0) return <ScreenError message="Failed to load notifications" onRetry={reexecute} />;
 
   return (
     <View className="flex-1">
@@ -106,20 +92,7 @@ export default function NotificationsScreen() {
         ) : null
       }
       ListFooterComponent={
-        !q && hasMore ? (
-          <TouchableOpacity
-            className="mt-2 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 items-center"
-            onPress={loadMore}
-            disabled={fetching}
-            activeOpacity={0.7}
-          >
-            {fetching ? (
-              <ActivityIndicator size="small" color="#2563eb" />
-            ) : (
-              <Text className="text-sm text-blue-600 dark:text-blue-400 font-semibold">Load more</Text>
-            )}
-          </TouchableOpacity>
-        ) : null
+        <ListFooterLoading hasMore={!q && hasMore} fetching={fetching} onLoadMore={loadMore} />
       }
       ListEmptyComponent={
         <View className="items-center gap-2.5">

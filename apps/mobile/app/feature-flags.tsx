@@ -3,7 +3,6 @@ import {
   Text,
   Switch,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
   Alert,
   useColorScheme,
@@ -15,6 +14,7 @@ import { FEATURE_FLAGS_QUERY, UPDATE_FEATURE_FLAG } from "@agentcenter/graphql-c
 import { EmptyState } from "../src/components/EmptyState";
 import type { FeatureFlag } from "@agentcenter/types";
 import { SearchBar } from "../src/components/SearchBar";
+import { ScreenLoading } from "../src/components/ScreenLoading";
 
 export default function FeatureFlagsScreen() {
   const insets = useSafeAreaInsets();
@@ -54,13 +54,7 @@ export default function FeatureFlagsScreen() {
     }
   }
 
-  if (result.fetching && flags.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center bg-white dark:bg-slate-900">
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
+  if (result.fetching && flags.length === 0) return <ScreenLoading />;
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-900">

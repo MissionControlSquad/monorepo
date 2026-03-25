@@ -10,7 +10,6 @@ import {
 import { useQuery } from "urql";
 import { useRouter, useNavigation } from "expo-router";
 import { useState, useEffect } from "react";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
 import { PAGE_SIZE_DEFAULT, PRIORITY_FILTER_OPTIONS, DUE_DATE_FILTER_OPTIONS, matchesDueDateFilter } from "@agentcenter/utils";
@@ -20,6 +19,10 @@ import { KanbanBoard } from "../../src/components/KanbanBoard";
 import { useTheme } from "../../src/hooks/useTheme";
 import { NotificationBell } from "../../src/components/NotificationBell";
 import { SearchBar } from "../../src/components/SearchBar";
+import { ScreenLoading } from "../../src/components/ScreenLoading";
+import { ScreenError } from "../../src/components/ScreenError";
+import { FilterChip } from "../../src/components/FilterChip";
+import { FAB } from "../../src/components/FAB";
 
 interface TaskAssignee {
   id: string;
@@ -57,31 +60,11 @@ const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "blocked", label: "Blocked" },
 ];
 
-const FilterChip = ({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) => (
-  <TouchableOpacity
-    className={`px-3 py-1.5 rounded-full border ${active ? "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700" : "bg-gray-100 dark:bg-slate-700 border-gray-200 dark:border-slate-600"}`}
-    onPress={onPress}
-    activeOpacity={0.7}
-  >
-    <Text className={`text-xs ${active ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
-      {label}
-    </Text>
-  </TouchableOpacity>
-);
 
 export default function TaskListScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
@@ -144,24 +127,8 @@ export default function TaskListScreen() {
     );
   }
 
-  if (fetching && allTasks.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900 gap-3">
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
-
-  if (error && allTasks.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900 gap-3">
-        <Text className="text-red-600 dark:text-red-400 text-base">Failed to load tasks</Text>
-        <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
-          <Text className="text-blue-600 dark:text-blue-400 text-sm font-semibold">Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (fetching && allTasks.length === 0) return <ScreenLoading />;
+  if (error && allTasks.length === 0) return <ScreenError message="Failed to load tasks" onRetry={() => reexecute({ requestPolicy: "network-only" })} />;
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">
@@ -331,22 +298,7 @@ export default function TaskListScreen() {
         </>
       )}
 
-      {/* FAB — Create task */}
-      <TouchableOpacity
-        className="absolute right-5 w-14 h-14 rounded-full bg-blue-600 justify-center items-center"
-        style={{
-          bottom: insets.bottom + 20,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 3 },
-          shadowOpacity: 0.2,
-          shadowRadius: 6,
-          elevation: 6,
-        }}
-        onPress={() => router.push("/task/create")}
-        activeOpacity={0.85}
-      >
-        <Text className="text-3xl text-white leading-8">+</Text>
-      </TouchableOpacity>
+      <FAB onPress={() => router.push("/task/create")} />
     </View>
   );
 }

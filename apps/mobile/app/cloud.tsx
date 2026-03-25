@@ -20,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../src/context/AuthContext";
 import { useTheme } from "../src/hooks/useTheme";
 import { SearchBar } from "../src/components/SearchBar";
+import { FAB } from "../src/components/FAB";
 import { makeRequest, ApiError } from "../src/api/request";
 import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatUptime, formatCost, CLOUD_VM_STATUS_LABELS, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
 
@@ -371,22 +372,7 @@ export default function CloudVMsScreen() {
         />
       )}
 
-      {/* FAB */}
-      <TouchableOpacity
-        className="absolute right-5 w-14 h-14 rounded-full bg-blue-600 justify-center items-center"
-        style={{
-          bottom: insets.bottom + 20,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 3 },
-          shadowOpacity: 0.2,
-          shadowRadius: 6,
-          elevation: 6,
-        }}
-        onPress={() => setShowCreate(true)}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="add" size={26} color="#fff" />
-      </TouchableOpacity>
+      <FAB onPress={() => setShowCreate(true)} />
 
       <CreateVMModal
         visible={showCreate}

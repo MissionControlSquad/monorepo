@@ -3,7 +3,6 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
 } from "react-native";
 import { useQuery, useSubscription } from "urql";
@@ -11,6 +10,9 @@ import { useRouter } from "expo-router";
 import { useState, useCallback, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SearchBar } from "../src/components/SearchBar";
+import { ScreenLoading } from "../src/components/ScreenLoading";
+import { ScreenError } from "../src/components/ScreenError";
+import { ListFooterLoading } from "../src/components/ListFooterLoading";
 import { ACTIVITIES_CONNECTION_QUERY, ACTIVITY_CREATED_SUBSCRIPTION } from "@agentcenter/graphql-client";
 import { ACTIVITY_TYPE_HEX_COLORS, DEFAULT_COLOR, PAGE_SIZE_DEFAULT, formatRelativeTime, appendDeduped, prependDeduped } from "@agentcenter/utils";
 import type { Activity } from "@agentcenter/types";
@@ -94,24 +96,8 @@ export default function ActivityScreen() {
     setAfter(last.id);
   }, [hasMore, loadingMore, fetching, pageFetched]);
 
-  if (fetching && displayed.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center gap-3">
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
-
-  if (error && displayed.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center gap-3">
-        <Text className="text-red-600 dark:text-red-400 text-base">Failed to load activity</Text>
-        <TouchableOpacity onPress={handleRefresh}>
-          <Text className="text-blue-600 dark:text-blue-400 text-sm font-semibold">Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (fetching && displayed.length === 0) return <ScreenLoading />;
+  if (error && displayed.length === 0) return <ScreenError message="Failed to load activity" onRetry={handleRefresh} />;
 
   return (
     <View className="flex-1">
@@ -139,19 +125,7 @@ export default function ActivityScreen() {
         <Text className="text-gray-400 dark:text-slate-500 text-base">No activity yet</Text>
       }
       ListFooterComponent={
-        hasMore ? (
-          <TouchableOpacity
-            className="mt-3 p-3 items-center"
-            onPress={handleLoadMore}
-            disabled={fetching}
-          >
-            {fetching ? (
-              <ActivityIndicator size="small" color="#2563eb" />
-            ) : (
-              <Text className="text-blue-600 dark:text-blue-400 font-semibold text-sm">Load more</Text>
-            )}
-          </TouchableOpacity>
-        ) : null
+        <ListFooterLoading hasMore={hasMore} fetching={fetching} onLoadMore={handleLoadMore} />
       }
       renderItem={({ item, index }) => {
         const color = getColor(item.type);

@@ -3,7 +3,6 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
 } from "react-native";
@@ -16,6 +15,8 @@ import type { Project, ProjectMember } from "@agentcenter/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/hooks/useTheme";
 import { SearchBar } from "../../src/components/SearchBar";
+import { ScreenLoading } from "../../src/components/ScreenLoading";
+import { ScreenError } from "../../src/components/ScreenError";
 
 type StatusFilter = "all" | "active" | "archived";
 
@@ -72,24 +73,8 @@ export default function ProjectsScreen() {
     { key: "archived", label: "Archived" },
   ];
 
-  if (fetching && allProjects.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900 gap-3">
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
-
-  if (error && allProjects.length === 0) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900 gap-3">
-        <Text className="text-red-600 dark:text-red-400 text-base">Failed to load projects</Text>
-        <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
-          <Text className="text-blue-600 dark:text-blue-400 text-sm font-semibold">Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (fetching && allProjects.length === 0) return <ScreenLoading />;
+  if (error && allProjects.length === 0) return <ScreenError message="Failed to load projects" onRetry={() => reexecute({ requestPolicy: "network-only" })} />;
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">

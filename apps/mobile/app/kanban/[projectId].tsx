@@ -6,41 +6,22 @@ import {
   ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
 import { PRIORITY_FILTER_OPTIONS, DUE_DATE_FILTER_OPTIONS } from "@agentcenter/utils";
 import type { DueDateFilter, PriorityFilter } from "@agentcenter/utils";
 import { useTheme } from "../../src/hooks/useTheme";
+import { FilterChip } from "../../src/components/FilterChip";
+import { FAB } from "../../src/components/FAB";
 
 const DUE_DATE_OPTIONS = DUE_DATE_FILTER_OPTIONS as { key: DueDateFilter; label: string }[];
 const PRIORITY_OPTIONS = PRIORITY_FILTER_OPTIONS as { key: PriorityFilter; label: string }[];
 
-const FilterChip = ({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) => (
-  <TouchableOpacity
-    className={`px-3 py-1.5 rounded-full border ${active ? "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700" : "bg-gray-100 dark:bg-slate-700 border-gray-200 dark:border-slate-600"}`}
-    onPress={onPress}
-    activeOpacity={0.7}
-  >
-    <Text className={`text-xs ${active ? "text-blue-600 dark:text-blue-400 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
-      {label}
-    </Text>
-  </TouchableOpacity>
-);
 
 export default function KanbanScreen() {
   const { projectId } = useLocalSearchParams<{ projectId: string }>();
   const navigation = useNavigation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -139,22 +120,7 @@ export default function KanbanScreen() {
         priorities={priorityFilter ? [priorityFilter] : undefined}
       />
 
-      {/* FAB */}
-      <TouchableOpacity
-        className="absolute right-5 w-14 h-14 rounded-full bg-blue-600 justify-center items-center"
-        style={{
-          bottom: insets.bottom + 20,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 8,
-        }}
-        onPress={() => router.push(`/task/create?projectId=${projectId}` as Parameters<typeof router.push>[0])}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
+      <FAB onPress={() => router.push(`/task/create?projectId=${projectId}` as Parameters<typeof router.push>[0])} />
     </View>
   );
 }
