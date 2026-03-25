@@ -165,11 +165,6 @@ builder.mutationField("addChannelMember", (t) =>
     resolve: async (query, _root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
       const channel = await getChannelVisibilityOrThrow(args.channelId);
-      if (channel.visibility === "dm") {
-        throw new Error(
-          "Direct messages allow only two participants. You cannot add people to a DM.",
-        );
-      }
       if (channel.visibility !== "private") {
         throw new Error(
           "addChannelMember is only for private channels. Use joinChannel for public channels.",

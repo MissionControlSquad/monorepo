@@ -545,13 +545,16 @@ export default function ChannelDetailScreen() {
                 <Text className="text-green-600 font-semibold text-sm">Join Channel</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              className="flex-1 py-2.5 rounded-lg border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 items-center"
-              onPress={() => { setMembersOpen(false); setTimeout(() => setAddMemberOpen(true), 300); }}
-              activeOpacity={0.7}
-            >
-              <Text className="text-blue-600 font-semibold text-sm">+ Add Member</Text>
-            </TouchableOpacity>
+            {/* Add Member — private channels only, creator only */}
+            {channel?.visibility === "private" && channel?.createdByProfileId === profileId && (
+              <TouchableOpacity
+                className="flex-1 py-2.5 rounded-lg border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 items-center"
+                onPress={() => { setMembersOpen(false); setTimeout(() => setAddMemberOpen(true), 300); }}
+                activeOpacity={0.7}
+              >
+                <Text className="text-blue-600 font-semibold text-sm">+ Add Member</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Delete channel — only for creator */}
@@ -677,7 +680,12 @@ export default function ChannelDetailScreen() {
                   className="flex-row items-center justify-between p-3.5 gap-3 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700"
                   onPress={async () => {
                     if (!profileId) return;
-                    await executeAddMember({ channelId: id, profileId: p.id, addedByProfileId: profileId });
+                    const res = await executeAddMember({ channelId: id, profileId: p.id, addedByProfileId: profileId });
+                    if (res.error) {
+                      const msg = res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to add member";
+                      Alert.alert("Error", msg);
+                      return;
+                    }
                     reexecuteChannel({ requestPolicy: "network-only" });
                     setAddMemberOpen(false);
                     setProfileSearch("");

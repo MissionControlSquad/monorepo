@@ -1,6 +1,7 @@
 import {
   View,
   Text,
+  SectionList,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
@@ -64,6 +65,13 @@ export default function ChannelsScreen() {
     pause: !profileId,
   });
 
+  const [dmsResult, reexecuteDms] = useQuery<{ channels: Channel[] }>({
+    query: CHANNELS_QUERY,
+    variables: { profileId: profileId ?? undefined, visibility: "dm", limit: 100 },
+    requestPolicy: "cache-and-network",
+    pause: !profileId,
+  });
+
   const [profilesResult] = useQuery<{ profiles: { id: string; displayName: string; username: string; avatarUrl: string | null; kind: string }[] }>({
     query: PROFILES_QUERY,
     variables: { limit: 200 },
@@ -74,13 +82,18 @@ export default function ChannelsScreen() {
 
   const { data, fetching, error } = result;
   const allChannels = data?.channels ?? [];
+  const allDms = dmsResult.data?.channels ?? [];
   const hasMore = allChannels.length === limit;
-  const channels = search.trim()
+  const q = search.trim().toLowerCase();
+  const channels = q
     ? allChannels.filter((c) =>
-        channelDisplayName(c, profileId).toLowerCase().includes(search.toLowerCase()) ||
-        (c.description ?? "").toLowerCase().includes(search.toLowerCase())
+        channelDisplayName(c, profileId).toLowerCase().includes(q) ||
+        (c.description ?? "").toLowerCase().includes(q)
       )
     : allChannels;
+  const dms = q
+    ? allDms.filter((c) => channelDisplayName(c, profileId).toLowerCase().includes(q))
+    : allDms;
 
   if (fetching && allChannels.length === 0) {
     return (
@@ -194,19 +207,25 @@ export default function ChannelsScreen() {
         </View>
       </Modal>
 
-      <FlatList
-        data={channels}
+      <SectionList
+        sections={[
+          ...(dms.length > 0 ? [{ title: "Direct Messages", data: dms, isDm: true }] : []),
+          ...(channels.length > 0 ? [{ title: "Channels", data: channels, isDm: false }] : []),
+        ]}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={channels.length === 0
-          ? { flex: 1, justifyContent: "center", alignItems: "center" }
-          : { padding: 16, gap: 8 }
+        contentContainerStyle={
+          dms.length === 0 && channels.length === 0
+            ? { flex: 1, justifyContent: "center", alignItems: "center", padding: 16 }
+            : { padding: 12, paddingBottom: insets.bottom + 24 }
         }
+        stickySectionHeadersEnabled={false}
         refreshControl={
           <RefreshControl
-            refreshing={fetching && allChannels.length > 0}
+            refreshing={(fetching || dmsResult.fetching) && (allChannels.length > 0 || allDms.length > 0)}
             onRefresh={() => {
               setLimit(PAGE_SIZE_CHANNELS);
               reexecute({ requestPolicy: "network-only" });
+              reexecuteDms({ requestPolicy: "network-only" });
             }}
             tintColor="#2563eb"
           />
@@ -215,31 +234,42 @@ export default function ChannelsScreen() {
           if (hasMore && !fetching && !search.trim()) setLimit((l) => l + PAGE_SIZE_CHANNELS);
         }}
         onEndReachedThreshold={0.3}
-        ListFooterComponent={
-          fetching && allChannels.length > 0 ? (
-            <ActivityIndicator color="#2563eb" style={{ marginVertical: 16 }} />
-          ) : null
-        }
         ListEmptyComponent={
-          <Text className="text-gray-400 dark:text-slate-500 text-base">
-            {search ? "No matching channels" : "No channels"}
+          <Text className="text-gray-400 dark:text-slate-500 text-base text-center">
+            {search.trim() ? "No matching channels or DMs" : "No channels yet"}
           </Text>
         }
+        renderSectionHeader={({ section }) => (
+          <View className="flex-row items-center justify-between px-1 pt-3 pb-1.5">
+            <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide">
+              {section.title}
+            </Text>
+            {section.isDm && (
+              <TouchableOpacity
+                onPress={() => { setDmSearch(""); setDmPickerOpen(true); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">+ New</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
         renderItem={({ item }) => {
           const displayName = channelDisplayName(item, profileId);
           const icon = channelIcon(item);
+          const isDm = item.visibility === "dm";
           return (
             <TouchableOpacity
-              className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 flex-row items-center gap-3"
+              className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 flex-row items-center gap-3 mb-2"
               onPress={() => router.push(`/channels/${item.id}`)}
               activeOpacity={0.7}
             >
-              <View className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 justify-center items-center">
+              <View className={`w-10 h-10 rounded-full justify-center items-center ${isDm ? "bg-purple-50 dark:bg-purple-900/20" : "bg-blue-50 dark:bg-blue-900/20"}`}>
                 <Text className="text-lg">{icon}</Text>
               </View>
               <View className="flex-1 gap-0.5">
                 <Text className="text-base font-semibold text-gray-900 dark:text-slate-100">{displayName}</Text>
-                {item.description ? (
+                {!isDm && item.description ? (
                   <Text className="text-xs text-gray-500 dark:text-slate-400" numberOfLines={1}>
                     {item.description}
                   </Text>
