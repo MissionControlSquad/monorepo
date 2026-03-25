@@ -24,7 +24,6 @@ import {
   PROJECTS_QUERY,
 } from "@agentcenter/graphql-client";
 import { Avatar } from "../../src/components/Avatar";
-import { useTheme } from "../../src/hooks/useTheme";
 import { PRIORITY_HEX_COLORS, PRIORITY_VALUES } from "@agentcenter/utils";
 import type { Priority } from "@agentcenter/types";
 
@@ -76,7 +75,6 @@ export default function EditTaskScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
   const [taskResult] = useQuery<{ task: Task | null }>({
     query: TASK_EDIT_QUERY,
     variables: { id },
@@ -85,7 +83,6 @@ export default function EditTaskScreen() {
 
   const task = taskResult.data?.task;
 
-  // Form state — initialized from task once loaded
   const [initialized, setInitialized] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -173,36 +170,23 @@ export default function EditTaskScreen() {
 
   if (taskResult.fetching && !task) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.accent} />
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
+        <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
   }
 
   if (!task) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
-        <Text style={{ color: colors.danger, fontSize: 16 }}>Task not found</Text>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
+        <Text className="text-base text-red-600 dark:text-red-400">Task not found</Text>
       </View>
     );
   }
 
-  const inputStyle = {
-    backgroundColor: colors.inputBg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: colors.text,
-  };
-
-  const labelStyle = { fontSize: 13, fontWeight: "600" as const, color: colors.textSecondary };
-
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: colors.background }}
+      className="flex-1 bg-gray-50 dark:bg-slate-900"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
@@ -211,12 +195,12 @@ export default function EditTaskScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Title */}
-        <View style={{ gap: 6 }}>
-          <Text style={labelStyle}>Title *</Text>
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Title *</Text>
           <TextInput
-            style={inputStyle}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
             placeholder="Task title…"
-            placeholderTextColor={colors.placeholder}
+            placeholderTextColor="#9ca3af"
             value={title}
             onChangeText={setTitle}
             returnKeyType="next"
@@ -224,12 +208,13 @@ export default function EditTaskScreen() {
         </View>
 
         {/* Description */}
-        <View style={{ gap: 6 }}>
-          <Text style={labelStyle}>Description</Text>
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Description</Text>
           <TextInput
-            style={[inputStyle, { minHeight: 100, textAlignVertical: "top", paddingTop: 12 }]}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
+            style={{ minHeight: 100, textAlignVertical: "top" }}
             placeholder="Task description…"
-            placeholderTextColor={colors.placeholder}
+            placeholderTextColor="#9ca3af"
             value={description}
             onChangeText={setDescription}
             multiline
@@ -238,45 +223,33 @@ export default function EditTaskScreen() {
         </View>
 
         {/* Priority */}
-        <View style={{ gap: 6 }}>
-          <Text style={labelStyle}>Priority</Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Priority</Text>
+          <View className="flex-row flex-wrap gap-2">
             <TouchableOpacity
-              style={{
-                borderWidth: 1,
-                borderColor: priority === null ? colors.accent : colors.border,
-                borderRadius: 8,
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                backgroundColor: priority === null ? colors.accentSurface : colors.inputBg,
-              }}
+              className={`border rounded-lg px-3 py-1.5 ${priority === null ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30" : "border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800"}`}
               onPress={() => setPriority(null)}
               activeOpacity={0.7}
             >
-              <Text style={{ fontSize: 13, color: priority === null ? colors.accent : colors.textSecondary }}>None</Text>
+              <Text className={`text-sm ${priority === null ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}>None</Text>
             </TouchableOpacity>
             {PRIORITIES.map((p) => {
               const active = priority === p;
               return (
                 <TouchableOpacity
                   key={p}
-                  style={{
-                    borderWidth: 1,
-                    borderColor: active ? PRIORITY_HEX_COLORS[p] : colors.border,
-                    borderRadius: 8,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    backgroundColor: active ? PRIORITY_HEX_COLORS[p] + "18" : colors.inputBg,
-                  }}
+                  className="border rounded-lg px-3 py-1.5 bg-white dark:bg-slate-800"
+                  style={active ? {
+                    borderColor: PRIORITY_HEX_COLORS[p],
+                    backgroundColor: PRIORITY_HEX_COLORS[p] + "18",
+                  } : { borderColor: "#e5e7eb" }}
                   onPress={() => setPriority(p)}
                   activeOpacity={0.7}
                 >
-                  <Text style={{
-                    fontSize: 13,
-                    textTransform: "capitalize",
-                    color: active ? PRIORITY_HEX_COLORS[p] : colors.textSecondary,
-                    fontWeight: active ? "600" : "400",
-                  }}>
+                  <Text
+                    className="text-sm capitalize"
+                    style={active ? { color: PRIORITY_HEX_COLORS[p], fontWeight: "600" } : { color: "#6b7280" }}
+                  >
                     {p}
                   </Text>
                 </TouchableOpacity>
@@ -286,12 +259,12 @@ export default function EditTaskScreen() {
         </View>
 
         {/* Due Date */}
-        <View style={{ gap: 6 }}>
-          <Text style={labelStyle}>Due Date</Text>
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Due Date</Text>
           <TextInput
-            style={inputStyle}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
             placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.placeholder}
+            placeholderTextColor="#9ca3af"
             value={dueDate}
             onChangeText={setDueDate}
             keyboardType="numbers-and-punctuation"
@@ -300,22 +273,22 @@ export default function EditTaskScreen() {
         </View>
 
         {/* Assignees */}
-        <View style={{ gap: 6 }}>
-          <Text style={labelStyle}>Assignees</Text>
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Assignees</Text>
           <TouchableOpacity
-            style={[inputStyle, { minHeight: 44, justifyContent: "center" }]}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 min-h-11 justify-center"
             onPress={() => setAssigneeModalOpen(true)}
             activeOpacity={0.7}
           >
             {selectedIds.length === 0 ? (
-              <Text style={{ color: colors.placeholder, fontSize: 15 }}>Tap to assign…</Text>
+              <Text className="text-gray-400 dark:text-slate-500 text-base">Tap to assign…</Text>
             ) : (
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              <View className="flex-row flex-wrap gap-1.5">
                 {selectedIds.map((pid) => {
                   const p = profilesResult.data?.profiles.find((x) => x.id === pid);
                   return (
-                    <View key={pid} style={{ backgroundColor: colors.accentSurface, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
-                      <Text style={{ fontSize: 13, color: colors.accent, fontWeight: "500" }}>
+                    <View key={pid} className="bg-blue-100 dark:bg-blue-900/30 rounded-full px-2.5 py-1">
+                      <Text className="text-sm text-blue-700 dark:text-blue-300 font-medium">
                         {p?.agent?.identityEmoji ?? ""} {p?.displayName ?? pid}
                       </Text>
                     </View>
@@ -327,26 +300,26 @@ export default function EditTaskScreen() {
         </View>
 
         {/* Tags */}
-        <View style={{ gap: 6 }}>
-          <Text style={labelStyle}>Tags</Text>
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Tags</Text>
           {tags.length > 0 && (
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+            <View className="flex-row flex-wrap gap-1.5 mb-1.5">
               {tags.map((tag) => (
                 <TouchableOpacity
                   key={tag}
-                  style={{ backgroundColor: colors.surface, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: colors.border }}
+                  className="bg-white dark:bg-slate-800 rounded-full px-2.5 py-1 border border-gray-200 dark:border-slate-600"
                   onPress={() => setTags((prev) => prev.filter((t) => t !== tag))}
                   activeOpacity={0.7}
                 >
-                  <Text style={{ fontSize: 13, color: colors.text }}>{tag} ✕</Text>
+                  <Text className="text-sm text-gray-900 dark:text-slate-100">{tag} ✕</Text>
                 </TouchableOpacity>
               ))}
             </View>
           )}
           <TextInput
-            style={inputStyle}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
             placeholder="Type a tag and press space or comma…"
-            placeholderTextColor={colors.placeholder}
+            placeholderTextColor="#9ca3af"
             value={tagInput}
             onChangeText={(text) => {
               if (text.endsWith(" ") || text.endsWith(",")) {
@@ -368,56 +341,56 @@ export default function EditTaskScreen() {
         </View>
 
         {/* Project */}
-        <View style={{ gap: 6 }}>
-          <Text style={labelStyle}>Project</Text>
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Project</Text>
           <TouchableOpacity
-            style={[inputStyle, { minHeight: 44, justifyContent: "center" }]}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 min-h-11 justify-center"
             onPress={() => setProjectPickerOpen(true)}
             activeOpacity={0.7}
           >
             {projectId ? (
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                <Text style={{ fontSize: 15, color: colors.text }}>
-                  {projectsResult.data?.projects.find((p) => p.id === projectId)?.name ?? "Loading..."}
+              <View className="flex-row justify-between items-center">
+                <Text className="text-base text-gray-900 dark:text-slate-100">
+  {projectsResult.data?.projects.find((p) => p.id === projectId)?.name ?? "Loading..."}
                 </Text>
                 <TouchableOpacity onPress={(e) => { e.stopPropagation(); setProjectId(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: 16 }}>✕</Text>
+                  <Text className="text-gray-500 dark:text-slate-400 text-base">✕</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <Text style={{ color: colors.placeholder, fontSize: 15 }}>No project</Text>
+              <Text className="text-gray-400 dark:text-slate-500 text-base">No project</Text>
             )}
           </TouchableOpacity>
         </View>
 
         {/* Parent Task */}
-        <View style={{ gap: 6 }}>
-          <Text style={labelStyle}>Parent Task</Text>
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Parent Task</Text>
           <TouchableOpacity
-            style={[inputStyle, { minHeight: 44, justifyContent: "center" }]}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 min-h-11 justify-center"
             onPress={() => setParentTaskPickerOpen(true)}
             activeOpacity={0.7}
           >
             {parentTaskId ? (
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                <Text style={{ fontSize: 15, color: colors.text }}>
-                  {(() => { const t = tasksResult.data?.tasks.find((x) => x.id === parentTaskId); return t ? `#${t.taskNumber} ${t.title}` : parentTaskId; })()}
+              <View className="flex-row justify-between items-center">
+                <Text className="text-base text-gray-900 dark:text-slate-100">
+  {(() => { const t = tasksResult.data?.tasks.find((x) => x.id === parentTaskId); return t ? `#${t.taskNumber} ${t.title}` : parentTaskId; })()}
                 </Text>
                 <TouchableOpacity onPress={(e) => { e.stopPropagation(); setParentTaskId(null); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: 16 }}>✕</Text>
+                  <Text className="text-gray-500 dark:text-slate-400 text-base">✕</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <Text style={{ color: colors.placeholder, fontSize: 15 }}>None (top-level task)</Text>
+              <Text className="text-gray-400 dark:text-slate-500 text-base">None (top-level task)</Text>
             )}
           </TouchableOpacity>
         </View>
 
         {/* Blocked By */}
-        <View style={{ gap: 6 }}>
-          <Text style={labelStyle}>Blocked By</Text>
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Blocked By</Text>
           <TouchableOpacity
-            style={[inputStyle, { minHeight: 44, justifyContent: "center" }]}
+            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 min-h-11 justify-center"
             onPress={() => setTaskPickerOpen(true)}
             activeOpacity={0.7}
           >
@@ -425,34 +398,28 @@ export default function EditTaskScreen() {
               (() => {
                 const t = tasksResult.data?.tasks.find((x) => x.id === blockedByTaskId);
                 return (
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={{ fontSize: 15, color: colors.text }}>
-                      {t ? `#${t.taskNumber} ${t.title}` : blockedByTaskId}
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-base text-gray-900 dark:text-slate-100">
+      {t ? `#${t.taskNumber} ${t.title}` : blockedByTaskId}
                     </Text>
                     <TouchableOpacity
                       onPress={(e) => { e.stopPropagation(); setBlockedByTaskId(null); }}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Text style={{ color: colors.textSecondary, fontSize: 16 }}>✕</Text>
+                      <Text className="text-gray-500 dark:text-slate-400 text-base">✕</Text>
                     </TouchableOpacity>
                   </View>
                 );
               })()
             ) : (
-              <Text style={{ color: colors.placeholder, fontSize: 15 }}>Select blocking task…</Text>
+              <Text className="text-gray-400 dark:text-slate-500 text-base">Select blocking task…</Text>
             )}
           </TouchableOpacity>
         </View>
 
         {/* Save */}
         <TouchableOpacity
-          style={{
-            backgroundColor: (!title.trim() || saving) ? colors.accent + "80" : colors.accent,
-            borderRadius: 12,
-            paddingVertical: 14,
-            alignItems: "center",
-            marginTop: 4,
-          }}
+          className={`bg-blue-600 rounded-xl py-3.5 items-center mt-1 ${(!title.trim() || saving) ? "opacity-50" : ""}`}
           onPress={handleSave}
           disabled={!title.trim() || saving}
           activeOpacity={0.8}
@@ -460,12 +427,12 @@ export default function EditTaskScreen() {
           {saving ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>Save Changes</Text>
+            <Text className="text-white text-base font-semibold">Save Changes</Text>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={{ alignItems: "center", paddingVertical: 8 }} onPress={() => router.back()}>
-          <Text style={{ fontSize: 15, color: colors.textSecondary }}>Cancel</Text>
+        <TouchableOpacity className="items-center py-2" onPress={() => router.back()}>
+          <Text className="text-base text-gray-500 dark:text-slate-400">Cancel</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -476,15 +443,15 @@ export default function EditTaskScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setAssigneeModalOpen(false)}
       >
-        <View style={{ flex: 1, backgroundColor: colors.background }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
-            <Text style={{ fontSize: 17, fontWeight: "600", color: colors.text }}>Select Assignees</Text>
+        <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+          <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">Select Assignees</Text>
             <TouchableOpacity onPress={() => setAssigneeModalOpen(false)}>
-              <Text style={{ fontSize: 16, fontWeight: "600", color: colors.accent }}>Done</Text>
+              <Text className="text-base font-semibold text-blue-600 dark:text-blue-400">Done</Text>
             </TouchableOpacity>
           </View>
           {profilesResult.fetching ? (
-            <ActivityIndicator style={{ marginTop: 32 }} color={colors.accent} />
+            <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
           ) : (
             <FlatList
               data={profilesResult.data?.profiles ?? []}
@@ -494,7 +461,7 @@ export default function EditTaskScreen() {
                 const selected = selectedIds.includes(item.id);
                 return (
                   <Pressable
-                    style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 12, backgroundColor: selected ? colors.accentSurface : colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                    className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
                     onPress={() =>
                       setSelectedIds((prev) =>
                         selected ? prev.filter((pid) => pid !== item.id) : [...prev, item.id]
@@ -507,11 +474,11 @@ export default function EditTaskScreen() {
                       emoji={item.agent?.identityEmoji}
                       size={36}
                     />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontWeight: "500", color: colors.text }}>{item.displayName}</Text>
-                      <Text style={{ fontSize: 12, color: colors.textMuted }}>@{item.username}</Text>
+                    <View className="flex-1">
+                      <Text className="text-base font-medium text-gray-900 dark:text-slate-100">{item.displayName}</Text>
+                      <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">@{item.username}</Text>
                     </View>
-                    {selected && <Text style={{ fontSize: 18, color: colors.accent, fontWeight: "700" }}>✓</Text>}
+                    {selected && <Text className="text-lg text-blue-600 dark:text-blue-400 font-bold">✓</Text>}
                   </Pressable>
                 );
               }}
@@ -527,15 +494,15 @@ export default function EditTaskScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setProjectPickerOpen(false)}
       >
-        <View style={{ flex: 1, backgroundColor: colors.background }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
-            <Text style={{ fontSize: 17, fontWeight: "600", color: colors.text }}>Select Project</Text>
+        <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+          <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">Select Project</Text>
             <TouchableOpacity onPress={() => setProjectPickerOpen(false)}>
-              <Text style={{ fontSize: 16, fontWeight: "600", color: colors.accent }}>Done</Text>
+              <Text className="text-base font-semibold text-blue-600 dark:text-blue-400">Done</Text>
             </TouchableOpacity>
           </View>
           {projectsResult.fetching ? (
-            <ActivityIndicator style={{ marginTop: 32 }} color={colors.accent} />
+            <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
           ) : (
             <FlatList
               data={projectsResult.data?.projects ?? []}
@@ -543,22 +510,22 @@ export default function EditTaskScreen() {
               contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
               ListHeaderComponent={
                 <Pressable
-                  style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 12, backgroundColor: projectId === null ? colors.accentSurface : colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                  className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${projectId === null ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
                   onPress={() => { setProjectId(null); setProjectPickerOpen(false); }}
                 >
-                  <Text style={{ fontSize: 15, color: projectId === null ? colors.accent : colors.textSecondary, fontStyle: "italic" }}>No project</Text>
-                  {projectId === null && <Text style={{ fontSize: 18, color: colors.accent, fontWeight: "700", marginLeft: "auto" }}>✓</Text>}
+                  <Text className={`text-base italic ${projectId === null ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}>No project</Text>
+                  {projectId === null && <Text className="text-lg text-blue-600 dark:text-blue-400 font-bold ml-auto">✓</Text>}
                 </Pressable>
               }
               renderItem={({ item }) => {
                 const selected = projectId === item.id;
                 return (
                   <Pressable
-                    style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 12, backgroundColor: selected ? colors.accentSurface : colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                    className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
                     onPress={() => { setProjectId(item.id); setProjectPickerOpen(false); }}
                   >
-                    <Text style={{ fontSize: 15, fontWeight: "500", color: colors.text, flex: 1 }}>{item.name}</Text>
-                    {selected && <Text style={{ fontSize: 18, color: colors.accent, fontWeight: "700" }}>✓</Text>}
+                    <Text className="text-base font-medium text-gray-900 dark:text-slate-100 flex-1">{item.name}</Text>
+                    {selected && <Text className="text-lg text-blue-600 dark:text-blue-400 font-bold">✓</Text>}
                   </Pressable>
                 );
               }}
@@ -574,25 +541,25 @@ export default function EditTaskScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setParentTaskPickerOpen(false)}
       >
-        <View style={{ flex: 1, backgroundColor: colors.background }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
-            <Text style={{ fontSize: 17, fontWeight: "600", color: colors.text }}>Select Parent Task</Text>
+        <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+          <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">Select Parent Task</Text>
             <TouchableOpacity onPress={() => setParentTaskPickerOpen(false)}>
-              <Text style={{ fontSize: 16, fontWeight: "600", color: colors.accent }}>Done</Text>
+              <Text className="text-base font-semibold text-blue-600 dark:text-blue-400">Done</Text>
             </TouchableOpacity>
           </View>
-          <View style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+          <View className="px-3.5 py-2.5 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
             <TextInput
-              style={inputStyle}
+              className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-2.5 text-base text-gray-900 dark:text-slate-100"
               placeholder="Search tasks…"
-              placeholderTextColor={colors.placeholder}
+              placeholderTextColor="#9ca3af"
               value={taskPickerSearch}
               onChangeText={setTaskPickerSearch}
               autoFocus
             />
           </View>
           {tasksResult.fetching ? (
-            <ActivityIndicator style={{ marginTop: 32 }} color={colors.accent} />
+            <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
           ) : (
             <FlatList
               data={(tasksResult.data?.tasks ?? []).filter(
@@ -606,25 +573,25 @@ export default function EditTaskScreen() {
               contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
               ListHeaderComponent={
                 <Pressable
-                  style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 12, backgroundColor: parentTaskId === null ? colors.accentSurface : colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                  className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${parentTaskId === null ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
                   onPress={() => { setParentTaskId(null); setParentTaskPickerOpen(false); }}
                 >
-                  <Text style={{ fontSize: 15, color: parentTaskId === null ? colors.accent : colors.textSecondary, fontStyle: "italic" }}>None (top-level task)</Text>
-                  {parentTaskId === null && <Text style={{ fontSize: 18, color: colors.accent, fontWeight: "700", marginLeft: "auto" }}>✓</Text>}
+                  <Text className={`text-base italic ${parentTaskId === null ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}>None (top-level task)</Text>
+                  {parentTaskId === null && <Text className="text-lg text-blue-600 dark:text-blue-400 font-bold ml-auto">✓</Text>}
                 </Pressable>
               }
               renderItem={({ item }) => {
                 const selected = parentTaskId === item.id;
                 return (
                   <Pressable
-                    style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 12, backgroundColor: selected ? colors.accentSurface : colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                    className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
                     onPress={() => { setParentTaskId(item.id); setParentTaskPickerOpen(false); }}
                   >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontWeight: "500", color: colors.text }}>#{item.taskNumber} {item.title}</Text>
-                      <Text style={{ fontSize: 12, color: colors.textMuted }}>{item.status.replace("_", " ")}</Text>
+                    <View className="flex-1">
+                      <Text className="text-base font-medium text-gray-900 dark:text-slate-100">#{item.taskNumber} {item.title}</Text>
+                      <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">{item.status.replace("_", " ")}</Text>
                     </View>
-                    {selected && <Text style={{ fontSize: 18, color: colors.accent, fontWeight: "700" }}>✓</Text>}
+                    {selected && <Text className="text-lg text-blue-600 dark:text-blue-400 font-bold">✓</Text>}
                   </Pressable>
                 );
               }}
@@ -640,25 +607,25 @@ export default function EditTaskScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setTaskPickerOpen(false)}
       >
-        <View style={{ flex: 1, backgroundColor: colors.background }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface }}>
-            <Text style={{ fontSize: 17, fontWeight: "600", color: colors.text }}>Blocked By Task</Text>
+        <View className="flex-1 bg-gray-50 dark:bg-slate-900">
+          <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <Text className="text-lg font-semibold text-gray-900 dark:text-slate-100">Blocked By Task</Text>
             <TouchableOpacity onPress={() => setTaskPickerOpen(false)}>
-              <Text style={{ fontSize: 16, fontWeight: "600", color: colors.accent }}>Done</Text>
+              <Text className="text-base font-semibold text-blue-600 dark:text-blue-400">Done</Text>
             </TouchableOpacity>
           </View>
-          <View style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+          <View className="px-3.5 py-2.5 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
             <TextInput
-              style={inputStyle}
+              className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-2.5 text-base text-gray-900 dark:text-slate-100"
               placeholder="Search tasks…"
-              placeholderTextColor={colors.placeholder}
+              placeholderTextColor="#9ca3af"
               value={taskPickerSearch}
               onChangeText={setTaskPickerSearch}
               autoFocus
             />
           </View>
           {tasksResult.fetching ? (
-            <ActivityIndicator style={{ marginTop: 32 }} color={colors.accent} />
+            <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
           ) : (
             <FlatList
               data={(tasksResult.data?.tasks ?? []).filter(
@@ -674,17 +641,17 @@ export default function EditTaskScreen() {
                 const selected = blockedByTaskId === item.id;
                 return (
                   <Pressable
-                    style={{ flexDirection: "row", alignItems: "center", padding: 14, gap: 12, backgroundColor: selected ? colors.accentSurface : colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                    className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
                     onPress={() => {
                       setBlockedByTaskId(selected ? null : item.id);
                       setTaskPickerOpen(false);
                     }}
                   >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontWeight: "500", color: colors.text }}>#{item.taskNumber} {item.title}</Text>
-                      <Text style={{ fontSize: 12, color: colors.textMuted }}>{item.status.replace("_", " ")}</Text>
+                    <View className="flex-1">
+                      <Text className="text-base font-medium text-gray-900 dark:text-slate-100">#{item.taskNumber} {item.title}</Text>
+                      <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">{item.status.replace("_", " ")}</Text>
                     </View>
-                    {selected && <Text style={{ fontSize: 18, color: colors.accent, fontWeight: "700" }}>✓</Text>}
+                    {selected && <Text className="text-lg text-blue-600 dark:text-blue-400 font-bold">✓</Text>}
                   </Pressable>
                 );
               }}

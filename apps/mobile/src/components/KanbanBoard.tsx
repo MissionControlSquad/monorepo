@@ -3,7 +3,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   Alert,
   RefreshControl,
@@ -61,25 +60,26 @@ function KanbanTaskCard({
 
   return (
     <TouchableOpacity
-      style={styles.taskCard}
+      className="bg-white dark:bg-slate-800 rounded-lg p-2.5 border border-gray-200 dark:border-slate-700 gap-1.5"
+      style={{ shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 }}
       onPress={onPress}
       onLongPress={onLongPress}
       activeOpacity={0.75}
       delayLongPress={400}
     >
-      <View style={styles.taskCardHeader}>
-        <Text style={styles.taskNumber}>#{task.taskNumber}</Text>
+      <View className="flex-row justify-between items-center">
+        <Text className="text-xs text-gray-400 dark:text-slate-500 font-medium">#{task.taskNumber}</Text>
         {priorityColor && (
-          <Text style={[styles.priorityBadge, { color: priorityColor }]}>
+          <Text style={{ color: priorityColor, fontSize: 13, fontWeight: "700" }}>
             {priorityIcon}
           </Text>
         )}
       </View>
-      <Text style={styles.taskTitle} numberOfLines={3}>
+      <Text className="text-sm text-gray-900 dark:text-slate-100 leading-5 font-medium" numberOfLines={3}>
         {task.title}
       </Text>
       {(task.assignees ?? []).length > 0 && (
-        <Text style={styles.assignee} numberOfLines={1}>
+        <Text className="text-xs text-gray-400 dark:text-slate-500" numberOfLines={1}>
           {task.assignees![0].profile.displayName}
           {task.assignees!.length > 1 ? ` +${task.assignees!.length - 1}` : ""}
         </Text>
@@ -108,22 +108,31 @@ function Column({
   onLoadMore: () => void;
 }) {
   return (
-    <View style={styles.column}>
-      <View style={[styles.columnHeader, { borderTopColor: col.color }]}>
-        <Text style={[styles.columnTitle, { color: col.color }]}>{col.label}</Text>
-        <View style={[styles.countBadge, { backgroundColor: col.color + "22" }]}>
-          <Text style={[styles.countText, { color: col.color }]}>{tasks.length}</Text>
+    <View
+      className="bg-gray-100 dark:bg-slate-800/50 rounded-xl overflow-hidden"
+      style={{ width: COLUMN_WIDTH, maxHeight: "100%" }}
+    >
+      <View
+        className="flex-row items-center justify-between px-3 py-2.5 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700"
+        style={{ borderTopWidth: 3, borderTopColor: col.color }}
+      >
+        <Text className="text-sm font-bold" style={{ color: col.color }}>{col.label}</Text>
+        <View
+          className="min-w-6 h-6 rounded-full justify-center items-center px-1.5"
+          style={{ backgroundColor: col.color + "22" }}
+        >
+          <Text className="text-xs font-bold" style={{ color: col.color }}>{tasks.length}</Text>
         </View>
       </View>
       <ScrollView
-        style={styles.columnScroll}
-        contentContainerStyle={styles.columnContent}
+        style={{ maxHeight: 600 }}
+        contentContainerStyle={{ padding: 8, gap: 8 }}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
       >
         {tasks.length === 0 ? (
-          <View style={styles.emptyColumn}>
-            <Text style={styles.emptyColumnText}>No tasks</Text>
+          <View className="py-6 items-center">
+            <Text className="text-xs text-gray-300 dark:text-slate-600">No tasks</Text>
           </View>
         ) : (
           tasks.map((task) => (
@@ -137,7 +146,8 @@ function Column({
         )}
         {hasMore && (
           <TouchableOpacity
-            style={[styles.loadMoreBtn, { borderColor: col.color + "44" }]}
+            className="py-2 rounded-md border items-center mt-0.5"
+            style={{ borderColor: col.color + "44" }}
             onPress={onLoadMore}
             disabled={loadingMore}
             activeOpacity={0.7}
@@ -145,7 +155,7 @@ function Column({
             {loadingMore ? (
               <ActivityIndicator size="small" color={col.color} />
             ) : (
-              <Text style={[styles.loadMoreText, { color: col.color }]}>Load more</Text>
+              <Text className="text-xs font-semibold" style={{ color: col.color }}>Load more</Text>
             )}
           </TouchableOpacity>
         )}
@@ -256,7 +266,7 @@ export function KanbanBoard({
 
   if (fetching && !hasData) {
     return (
-      <View style={styles.center}>
+      <View className="flex-1 justify-center items-center gap-3">
         <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
@@ -264,24 +274,27 @@ export function KanbanBoard({
 
   if (error && !hasData) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Failed to load board</Text>
+      <View className="flex-1 justify-center items-center gap-3">
+        <Text className="text-red-600 dark:text-red-400 text-base">Failed to load board</Text>
         <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
-          <Text style={styles.retryText}>Retry</Text>
+          <Text className="text-blue-600 dark:text-blue-400 text-sm font-semibold">Retry</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View className="flex-1">
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.boardContent,
-          { paddingBottom: insets.bottom + 16 + bottomPadding },
-        ]}
+        contentContainerStyle={{
+          padding: 12,
+          gap: 10,
+          flexDirection: "row",
+          alignItems: "flex-start",
+          paddingBottom: insets.bottom + 16 + bottomPadding,
+        }}
         refreshControl={
           <RefreshControl
             refreshing={fetching && hasData}
@@ -316,85 +329,3 @@ export function KanbanBoard({
     </View>
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
-  errorText: { color: "#dc2626", fontSize: 16 },
-  retryText: { color: "#2563eb", fontSize: 14, fontWeight: "600" },
-
-  boardContent: {
-    padding: 12,
-    gap: 10,
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
-
-  column: {
-    width: COLUMN_WIDTH,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 12,
-    overflow: "hidden",
-    maxHeight: "100%",
-  },
-  columnHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderTopWidth: 3,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-  },
-  columnTitle: { fontSize: 13, fontWeight: "700" },
-  countBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 6,
-  },
-  countText: { fontSize: 12, fontWeight: "700" },
-
-  columnScroll: { maxHeight: 600 },
-  columnContent: { padding: 8, gap: 8 },
-
-  emptyColumn: { paddingVertical: 24, alignItems: "center" },
-  emptyColumnText: { fontSize: 12, color: "#d1d5db" },
-
-  loadMoreBtn: {
-    paddingVertical: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    alignItems: "center",
-    marginTop: 2,
-  },
-  loadMoreText: { fontSize: 12, fontWeight: "600" },
-
-  taskCard: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  taskCardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  taskNumber: { fontSize: 11, color: "#9ca3af", fontWeight: "500" },
-  priorityBadge: { fontSize: 13, fontWeight: "700" },
-  taskTitle: { fontSize: 13, color: "#111827", lineHeight: 18, fontWeight: "500" },
-  assignee: { fontSize: 11, color: "#9ca3af" },
-});

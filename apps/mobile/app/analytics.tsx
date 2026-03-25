@@ -9,7 +9,6 @@ import {
 import { useState, useCallback } from "react";
 import { useQuery } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import {
   TASK_STATUS_COUNTS_QUERY,
   TASK_CYCLE_TIMES_QUERY,
@@ -21,7 +20,6 @@ import {
   ACTIVITY_TREND_QUERY,
 } from "@agentcenter/graphql-client";
 import { STATUS_HEX_COLORS } from "@agentcenter/utils";
-import { useTheme } from "../src/hooks/useTheme";
 
 // --------------- types ---------------
 interface TaskStatusCounts {
@@ -104,7 +102,7 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const HOUR_BUCKETS = [0, 4, 8, 12, 16, 20];
 const HOUR_LABELS = ["12a", "4a", "8a", "12p", "4p", "8p"];
 
-function ActivityHeatmap({ cells, colors }: { cells: HeatmapCell[]; colors: ReturnType<typeof useTheme>["colors"] }) {
+function ActivityHeatmap({ cells }: { cells: HeatmapCell[] }) {
   // Build lookup: dayOfWeek → hourBucket → count
   const lookup: Record<number, Record<number, number>> = {};
   for (const cell of cells) {
@@ -117,46 +115,46 @@ function ActivityHeatmap({ cells, colors }: { cells: HeatmapCell[]; colors: Retu
   const maxCount = Math.max(1, ...cells.map((c) => c.count));
 
   return (
-    <View style={{ gap: 4 }}>
+    <View className="gap-1">
       {/* Hour labels */}
-      <View style={{ flexDirection: "row", marginLeft: 32 }}>
+      <View className="flex-row ml-8">
         {HOUR_LABELS.map((label) => (
-          <Text key={label} style={{ flex: 1, fontSize: 9, color: colors.textMuted, textAlign: "center" }}>{label}</Text>
+          <Text key={label} className="flex-1 text-xs text-gray-400 dark:text-slate-500 text-center">{label}</Text>
         ))}
       </View>
       {/* Grid rows */}
       {DAY_LABELS.map((day, dayIdx) => (
-        <View key={day} style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-          <Text style={{ width: 30, fontSize: 10, color: colors.textMuted }}>{day}</Text>
+        <View key={day} className="flex-row items-center gap-0.5">
+          <Text className="w-8 text-xs text-gray-400 dark:text-slate-500">{day}</Text>
           {HOUR_BUCKETS.map((_, bucketIdx) => {
             const count = lookup[dayIdx]?.[bucketIdx] ?? 0;
             const intensity = count / maxCount;
             return (
               <View
                 key={bucketIdx}
+                className="flex-1 h-3.5 rounded"
                 style={{
-                  flex: 1,
-                  height: 14,
-                  borderRadius: 3,
                   backgroundColor: count === 0
-                    ? colors.surfaceAlt
+                    ? undefined
                     : `rgba(37, 99, 235, ${Math.max(0.12, intensity * 0.9)})`,
                 }}
-              />
+              >
+                {count === 0 && <View className="flex-1 bg-gray-100 dark:bg-slate-700 rounded" />}
+              </View>
             );
           })}
         </View>
       ))}
-      <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 4, textAlign: "right" }}>
+      <Text className="text-xs text-gray-400 dark:text-slate-500 mt-1 text-right">
         Darker = more agent actions
       </Text>
     </View>
   );
 }
 
-function SectionTitle({ title, colors }: { title: string; colors: ReturnType<typeof useTheme>["colors"] }) {
+function SectionTitle({ title }: { title: string }) {
   return (
-    <Text style={{ fontSize: 13, fontWeight: "700", color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+    <Text className="text-sm font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-2.5">
       {title}
     </Text>
   );
@@ -167,21 +165,22 @@ function MetricCard({
   value,
   sub,
   accent,
-  colors,
 }: {
   label: string;
   value: string;
   sub?: string;
   accent?: string;
-  colors: ReturnType<typeof useTheme>["colors"];
 }) {
   return (
-    <View style={{ flex: 1, backgroundColor: colors.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border, gap: 2 }}>
-      <Text style={{ fontSize: 22, fontWeight: "700", color: accent ?? colors.text, fontVariant: ["tabular-nums"] }}>
+    <View className="flex-1 bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-0.5">
+      <Text
+        className="text-xl font-bold text-gray-900 dark:text-slate-100"
+        style={accent ? { color: accent } : undefined}
+      >
         {value}
       </Text>
-      <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }}>{label}</Text>
-      {sub ? <Text style={{ fontSize: 11, color: colors.textMuted }}>{sub}</Text> : null}
+      <Text className="text-xs font-semibold text-gray-900 dark:text-slate-100">{label}</Text>
+      {sub ? <Text className="text-xs text-gray-400 dark:text-slate-500">{sub}</Text> : null}
     </View>
   );
 }
@@ -191,69 +190,56 @@ function StatusBar({
   count,
   total,
   color,
-  colors,
 }: {
   label: string;
   count: number;
   total: number;
   color: string;
-  colors: ReturnType<typeof useTheme>["colors"];
 }) {
   const pct = total > 0 ? count / total : 0;
   return (
-    <View style={{ gap: 4 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <Text style={{ fontSize: 12, fontWeight: "500", color: colors.text, textTransform: "capitalize" }}>
+    <View className="gap-1">
+      <View className="flex-row justify-between">
+        <Text className="text-xs font-medium text-gray-900 dark:text-slate-100 capitalize">
           {label.replace("inProgress", "In Progress")}
         </Text>
-        <Text style={{ fontSize: 12, color: colors.textMuted, fontVariant: ["tabular-nums"] }}>
+        <Text className="text-xs text-gray-400 dark:text-slate-500">
           {count} ({Math.round(pct * 100)}%)
         </Text>
       </View>
-      <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.surfaceAlt, overflow: "hidden" }}>
+      <View className="h-1.5 rounded bg-gray-100 dark:bg-slate-700 overflow-hidden">
         <View style={{ height: 6, width: `${Math.round(pct * 100)}%`, backgroundColor: color, borderRadius: 3 }} />
       </View>
     </View>
   );
 }
 
-function TrendChart({
-  data,
-  colors,
-}: {
-  data: TrendPoint[];
-  colors: ReturnType<typeof useTheme>["colors"];
-}) {
+function TrendChart({ data }: { data: TrendPoint[] }) {
   if (!data.length) return null;
   const max = Math.max(...data.map((d) => d.count), 1);
   const barWidth = Math.max(20, Math.floor(300 / data.length) - 4);
 
   return (
-    <View style={{ gap: 8 }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4, height: 80 }}>
+    <View className="gap-2">
+      <View className="flex-row items-end gap-1 h-20">
         {data.map((point) => {
           const h = Math.max(4, Math.round((point.count / max) * 72));
           return (
-            <View key={point.date} style={{ flex: 1, alignItems: "center", gap: 2 }}>
-              <Text style={{ fontSize: 9, color: colors.textMuted, fontVariant: ["tabular-nums"] }}>
+            <View key={point.date} className="flex-1 items-center gap-0.5">
+              <Text className="text-xs text-gray-400 dark:text-slate-500">
                 {point.count > 0 ? point.count : ""}
               </Text>
               <View
-                style={{
-                  width: barWidth,
-                  height: h,
-                  backgroundColor: colors.accent,
-                  borderRadius: 3,
-                  opacity: 0.85,
-                }}
+                className="bg-blue-600 rounded opacity-85"
+                style={{ width: barWidth, height: h }}
               />
             </View>
           );
         })}
       </View>
-      <View style={{ flexDirection: "row", gap: 4 }}>
+      <View className="flex-row gap-1">
         {data.map((point) => (
-          <Text key={point.date} style={{ flex: 1, fontSize: 9, color: colors.textMuted, textAlign: "center" }}>
+          <Text key={point.date} className="flex-1 text-xs text-gray-400 dark:text-slate-500 text-center">
             {fmtDate(point.date)}
           </Text>
         ))}
@@ -269,7 +255,6 @@ type Days = (typeof DAYS_OPTIONS)[number];
 
 export default function AnalyticsScreen() {
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
   const [days, setDays] = useState<Days>(14);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -349,22 +334,22 @@ export default function AnalyticsScreen() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
-        <ActivityIndicator color={colors.accent} size="large" />
+      <View className="flex-1 justify-center items-center bg-white dark:bg-slate-900">
+        <ActivityIndicator color="#2563eb" size="large" />
       </View>
     );
   }
 
   if (hasError) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background, gap: 12, padding: 32 }}>
-        <Text style={{ fontSize: 15, color: colors.danger, textAlign: "center" }}>Failed to load analytics</Text>
+      <View className="flex-1 justify-center items-center bg-white dark:bg-slate-900 gap-3 p-8">
+        <Text className="text-base text-red-600 dark:text-red-400 text-center">Failed to load analytics</Text>
         <TouchableOpacity
           onPress={onRefresh}
-          style={{ backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 }}
+          className="bg-blue-600 rounded-lg px-4 py-2"
           activeOpacity={0.7}
         >
-          <Text style={{ color: "#fff", fontWeight: "600" }}>Retry</Text>
+          <Text className="text-white font-semibold">Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -374,41 +359,39 @@ export default function AnalyticsScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
+      className="flex-1 bg-white dark:bg-slate-900"
       contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32, gap: 24 }}
       contentInsetAdjustmentBehavior="automatic"
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor={colors.accent}
+          tintColor="#2563eb"
         />
       }
     >
       {/* ── Cycle Time KPIs ── */}
-      <View style={{ gap: 10 }}>
-        <SectionTitle title="Cycle Time" colors={colors} />
-        <View style={{ flexDirection: "row", gap: 10 }}>
+      <View className="gap-2.5">
+        <SectionTitle title="Cycle Time" />
+        <View className="flex-row gap-2.5">
           <MetricCard
             label="Avg Cycle Time"
             value={cycle ? fmtMs(cycle.avgCycleTimeMs) : "—"}
             sub="task creation → done"
-            colors={colors}
           />
           <MetricCard
             label="Median"
             value={cycle ? fmtMs(cycle.medianCycleTimeMs) : "—"}
             sub={`${cycle?.completedCount ?? 0} completed`}
-            colors={colors}
           />
         </View>
       </View>
 
       {/* ── Task Status Distribution ── */}
       {status && (
-        <View style={{ gap: 10 }}>
-          <SectionTitle title={`Task Status (${status.total} total)`} colors={colors} />
-          <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border, gap: 12 }}>
+        <View className="gap-2.5">
+          <SectionTitle title={`Task Status (${status.total} total)`} />
+          <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 gap-3">
             {(["inbox", "assigned", "inProgress", "review", "done", "blocked"] as const).map((key) => (
               <StatusBar
                 key={key}
@@ -416,7 +399,6 @@ export default function AnalyticsScreen() {
                 count={status[key]}
                 total={status.total}
                 color={STATUS_HEX_COLORS[key]}
-                colors={colors}
               />
             ))}
           </View>
@@ -424,65 +406,57 @@ export default function AnalyticsScreen() {
       )}
 
       {/* ── Completion Trend ── */}
-      <View style={{ gap: 10 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <SectionTitle title="Completion Trend" colors={colors} />
-          <View style={{ flexDirection: "row", gap: 6 }}>
+      <View className="gap-2.5">
+        <View className="flex-row justify-between items-center">
+          <SectionTitle title="Completion Trend" />
+          <View className="flex-row gap-1.5">
             {DAYS_OPTIONS.map((d) => (
               <TouchableOpacity
                 key={d}
                 onPress={() => setDays(d)}
-                style={{
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 6,
-                  backgroundColor: days === d ? colors.accent : colors.surfaceAlt,
-                }}
+                className={`px-2.5 py-1 rounded-md ${days === d ? "bg-blue-600" : "bg-gray-100 dark:bg-slate-700"}`}
                 activeOpacity={0.7}
               >
-                <Text style={{ fontSize: 12, fontWeight: "600", color: days === d ? "#fff" : colors.textSecondary }}>
+                <Text className={`text-xs font-semibold ${days === d ? "text-white" : "text-gray-500 dark:text-slate-400"}`}>
                   {d}d
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
-        <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border }}>
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700">
           {trendResult.fetching && !trend.length ? (
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color="#2563eb" />
           ) : trend.length === 0 ? (
-            <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center" }}>No data</Text>
+            <Text className="text-gray-400 dark:text-slate-500 text-sm text-center">No data</Text>
           ) : (
-            <TrendChart data={trend} colors={colors} />
+            <TrendChart data={trend} />
           )}
         </View>
       </View>
 
       {/* ── Review Outcome ── */}
       {review && reviewTotal > 0 && (
-        <View style={{ gap: 10 }}>
-          <SectionTitle title="Review Outcomes" colors={colors} />
-          <View style={{ flexDirection: "row", gap: 10 }}>
+        <View className="gap-2.5">
+          <SectionTitle title="Review Outcomes" />
+          <View className="flex-row gap-2.5">
             <MetricCard
               label="Approved"
               value={String(review.approved)}
               sub={fmtPct(review.approved / reviewTotal)}
-              accent={colors.success}
-              colors={colors}
+              accent="#16a34a"
             />
             <MetricCard
               label="Rejected"
               value={String(review.rejected)}
               sub={fmtPct(review.rejected / reviewTotal)}
-              accent={colors.danger}
-              colors={colors}
+              accent="#dc2626"
             />
             <MetricCard
               label="Clarification"
               value={String(review.clarification)}
               sub={fmtPct(review.clarification / reviewTotal)}
-              accent={colors.warning}
-              colors={colors}
+              accent="#d97706"
             />
           </View>
         </View>
@@ -490,15 +464,15 @@ export default function AnalyticsScreen() {
 
       {/* ── Agent Productivity ── */}
       {agents.length > 0 && (
-        <View style={{ gap: 10 }}>
-          <SectionTitle title="Agent Productivity" colors={colors} />
-          <View style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, overflow: "hidden" }}>
+        <View className="gap-2.5">
+          <SectionTitle title="Agent Productivity" />
+          <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
             {/* Table header */}
-            <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.surfaceAlt }}>
-              <Text style={{ flex: 1, fontSize: 11, fontWeight: "700", color: colors.textMuted }}>Agent</Text>
-              <Text style={{ width: 44, fontSize: 11, fontWeight: "700", color: colors.textMuted, textAlign: "right" }}>Done</Text>
-              <Text style={{ width: 44, fontSize: 11, fontWeight: "700", color: colors.textMuted, textAlign: "right" }}>Rate</Text>
-              <Text style={{ width: 44, fontSize: 11, fontWeight: "700", color: colors.textMuted, textAlign: "right" }}>Deliv</Text>
+            <View className="flex-row px-3 py-2 bg-gray-100 dark:bg-slate-700">
+              <Text className="flex-1 text-xs font-bold text-gray-400 dark:text-slate-500">Agent</Text>
+              <Text className="w-11 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">Done</Text>
+              <Text className="w-11 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">Rate</Text>
+              <Text className="w-11 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">Deliv</Text>
             </View>
             {agents
               .slice()
@@ -506,34 +480,24 @@ export default function AnalyticsScreen() {
               .map((agent, i) => (
                 <View
                   key={agent.agentId}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    borderTopWidth: i === 0 ? 0 : 1,
-                    borderTopColor: colors.borderAlt,
-                  }}
+                  className="flex-row items-center px-3 py-2.5"
+                  style={{ borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#f3f4f6" }}
                 >
-                  <Text style={{ flex: 1, fontSize: 13, fontWeight: "500", color: colors.text }} numberOfLines={1}>
+                  <Text className="flex-1 text-sm font-medium text-gray-900 dark:text-slate-100" numberOfLines={1}>
                     {agent.agentName}
                   </Text>
-                  <Text style={{ width: 44, fontSize: 13, color: colors.text, textAlign: "right", fontVariant: ["tabular-nums"] }}>
+                  <Text className="w-11 text-sm text-gray-900 dark:text-slate-100 text-right">
                     {agent.tasksCompleted}
                   </Text>
                   <Text
+                    className="w-11 text-xs text-right font-semibold"
                     style={{
-                      width: 44,
-                      fontSize: 12,
-                      textAlign: "right",
-                      fontVariant: ["tabular-nums"],
-                      color: agent.queueCompletionRate >= 0.8 ? colors.success : agent.queueCompletionRate >= 0.5 ? colors.warning : colors.danger,
-                      fontWeight: "600",
+                      color: agent.queueCompletionRate >= 0.8 ? "#16a34a" : agent.queueCompletionRate >= 0.5 ? "#d97706" : "#dc2626",
                     }}
                   >
                     {fmtPct(agent.queueCompletionRate)}
                   </Text>
-                  <Text style={{ width: 44, fontSize: 13, color: colors.textMuted, textAlign: "right", fontVariant: ["tabular-nums"] }}>
+                  <Text className="w-11 text-sm text-gray-400 dark:text-slate-500 text-right">
                     {agent.deliverablesCount}
                   </Text>
                 </View>
@@ -544,61 +508,56 @@ export default function AnalyticsScreen() {
 
       {/* ── Activity Heatmap ── */}
       {heatmapCells.length > 0 && (
-        <View style={{ gap: 10 }}>
-          <SectionTitle title="Activity Heatmap (last 30 days)" colors={colors} />
-          <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border }}>
-            <ActivityHeatmap cells={heatmapCells} colors={colors} />
+        <View className="gap-2.5">
+          <SectionTitle title="Activity Heatmap (last 30 days)" />
+          <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700">
+            <ActivityHeatmap cells={heatmapCells} />
           </View>
         </View>
       )}
 
       {/* ── Activity Trend ── */}
-      <View style={{ gap: 10 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <SectionTitle title="Activity Trend" colors={colors} />
-          <View style={{ flexDirection: "row", gap: 6 }}>
+      <View className="gap-2.5">
+        <View className="flex-row justify-between items-center">
+          <SectionTitle title="Activity Trend" />
+          <View className="flex-row gap-1.5">
             {DAYS_OPTIONS.map((d) => (
               <TouchableOpacity
                 key={d}
                 onPress={() => setDays(d)}
-                style={{
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 6,
-                  backgroundColor: days === d ? colors.accent : colors.surfaceAlt,
-                }}
+                className={`px-2.5 py-1 rounded-md ${days === d ? "bg-blue-600" : "bg-gray-100 dark:bg-slate-700"}`}
                 activeOpacity={0.7}
               >
-                <Text style={{ fontSize: 12, fontWeight: "600", color: days === d ? "#fff" : colors.textSecondary }}>
+                <Text className={`text-xs font-semibold ${days === d ? "text-white" : "text-gray-500 dark:text-slate-400"}`}>
                   {d}d
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
-        <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border }}>
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700">
           {activityTrendResult.fetching && !activityTrend.length ? (
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color="#2563eb" />
           ) : activityTrend.length === 0 ? (
-            <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center" }}>No data</Text>
+            <Text className="text-gray-400 dark:text-slate-500 text-sm text-center">No data</Text>
           ) : (
-            <TrendChart data={activityTrend} colors={colors} />
+            <TrendChart data={activityTrend} />
           )}
         </View>
       </View>
 
       {/* ── Agent Workload Distribution ── */}
       {workload.length > 0 && (
-        <View style={{ gap: 10 }}>
-          <SectionTitle title="Agent Workload" colors={colors} />
-          <View style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, overflow: "hidden" }}>
+        <View className="gap-2.5">
+          <SectionTitle title="Agent Workload" />
+          <View className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
             {/* Table header */}
-            <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.surfaceAlt }}>
-              <Text style={{ flex: 1, fontSize: 11, fontWeight: "700", color: colors.textMuted }}>Agent</Text>
-              <Text style={{ width: 36, fontSize: 11, fontWeight: "700", color: colors.textMuted, textAlign: "right" }}>📥</Text>
-              <Text style={{ width: 36, fontSize: 11, fontWeight: "700", color: colors.textMuted, textAlign: "right" }}>🔄</Text>
-              <Text style={{ width: 36, fontSize: 11, fontWeight: "700", color: colors.textMuted, textAlign: "right" }}>🔍</Text>
-              <Text style={{ width: 36, fontSize: 11, fontWeight: "700", color: colors.textMuted, textAlign: "right" }}>✅</Text>
+            <View className="flex-row px-3 py-2 bg-gray-100 dark:bg-slate-700">
+              <Text className="flex-1 text-xs font-bold text-gray-400 dark:text-slate-500">Agent</Text>
+              <Text className="w-9 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">📥</Text>
+              <Text className="w-9 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">🔄</Text>
+              <Text className="w-9 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">🔍</Text>
+              <Text className="w-9 text-xs font-bold text-gray-400 dark:text-slate-500 text-right">✅</Text>
             </View>
             {workload
               .slice()
@@ -608,21 +567,15 @@ export default function AnalyticsScreen() {
                 return (
                   <View
                     key={entry.agentId}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      borderTopWidth: i === 0 ? 0 : 1,
-                      borderTopColor: colors.borderAlt,
-                    }}
+                    className="flex-row items-center px-3 py-2.5"
+                    style={{ borderTopWidth: i === 0 ? 0 : 1, borderTopColor: "#f3f4f6" }}
                   >
-                    <View style={{ flex: 1, gap: 3 }}>
-                      <Text style={{ fontSize: 13, fontWeight: "500", color: colors.text }} numberOfLines={1}>
+                    <View className="flex-1 gap-1">
+                      <Text className="text-sm font-medium text-gray-900 dark:text-slate-100" numberOfLines={1}>
                         {entry.agentName}
                       </Text>
                       {/* Mini stacked bar */}
-                      <View style={{ height: 4, borderRadius: 2, flexDirection: "row", overflow: "hidden", backgroundColor: colors.surfaceAlt }}>
+                      <View className="h-1 rounded-sm flex-row overflow-hidden bg-gray-100 dark:bg-slate-700">
                         {active > 0 && (
                           <>
                             <View style={{ flex: entry.assigned, backgroundColor: "#2563eb" }} />
@@ -632,31 +585,23 @@ export default function AnalyticsScreen() {
                         )}
                       </View>
                     </View>
-                    <Text style={{ width: 36, fontSize: 12, color: colors.textMuted, textAlign: "right", fontVariant: ["tabular-nums"] }}>
-                      {entry.inbox}
-                    </Text>
-                    <Text style={{ width: 36, fontSize: 12, color: "#d97706", textAlign: "right", fontVariant: ["tabular-nums"], fontWeight: "600" }}>
-                      {entry.inProgress}
-                    </Text>
-                    <Text style={{ width: 36, fontSize: 12, color: "#7c3aed", textAlign: "right", fontVariant: ["tabular-nums"], fontWeight: "600" }}>
-                      {entry.review}
-                    </Text>
-                    <Text style={{ width: 36, fontSize: 12, color: "#16a34a", textAlign: "right", fontVariant: ["tabular-nums"] }}>
-                      {entry.done}
-                    </Text>
+                    <Text className="w-9 text-xs text-gray-400 dark:text-slate-500 text-right">{entry.inbox}</Text>
+                    <Text className="w-9 text-xs text-right font-semibold" style={{ color: "#d97706" }}>{entry.inProgress}</Text>
+                    <Text className="w-9 text-xs text-right font-semibold" style={{ color: "#7c3aed" }}>{entry.review}</Text>
+                    <Text className="w-9 text-xs text-right" style={{ color: "#16a34a" }}>{entry.done}</Text>
                   </View>
                 );
               })}
             {/* Legend */}
-            <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.surfaceAlt, flexWrap: "wrap" }}>
+            <View className="flex-row gap-3 px-3 py-2 bg-gray-100 dark:bg-slate-700 flex-wrap">
               {[
                 { color: "#2563eb", label: "Assigned" },
                 { color: "#d97706", label: "In Progress" },
                 { color: "#7c3aed", label: "Review" },
               ].map(({ color, label }) => (
-                <View key={label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />
-                  <Text style={{ fontSize: 10, color: colors.textMuted }}>{label}</Text>
+                <View key={label} className="flex-row items-center gap-1">
+                  <View className="w-2 h-2 rounded-sm" style={{ backgroundColor: color }} />
+                  <Text className="text-xs text-gray-400 dark:text-slate-500">{label}</Text>
                 </View>
               ))}
             </View>

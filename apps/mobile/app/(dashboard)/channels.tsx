@@ -3,7 +3,6 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   RefreshControl,
   TextInput,
@@ -85,7 +84,7 @@ export default function ChannelsScreen() {
 
   if (fetching && allChannels.length === 0) {
     return (
-      <View style={styles.center}>
+      <View className="flex-1 justify-center items-center gap-3">
         <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
@@ -93,10 +92,10 @@ export default function ChannelsScreen() {
 
   if (error && allChannels.length === 0) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Failed to load channels</Text>
+      <View className="flex-1 justify-center items-center gap-3">
+        <Text className="text-red-600 dark:text-red-400 text-base">Failed to load channels</Text>
         <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })}>
-          <Text style={styles.retryText}>Retry</Text>
+          <Text className="text-blue-600 dark:text-blue-400 text-sm font-semibold">Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -108,12 +107,12 @@ export default function ChannelsScreen() {
     : dmProfiles;
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900">
       {/* Search bar */}
-      <View style={styles.searchBar}>
-        <Text style={styles.searchIcon}>🔍</Text>
+      <View className="flex-row items-center bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-3 py-2 gap-2">
+        <Text className="text-sm">🔍</Text>
         <TextInput
-          style={styles.searchInput}
+          className="flex-1 text-base text-gray-900 dark:text-slate-100 py-1.5 px-1"
           placeholder="Search channels…"
           placeholderTextColor="#9ca3af"
           value={search}
@@ -123,10 +122,10 @@ export default function ChannelsScreen() {
         />
         <TouchableOpacity
           onPress={() => { setDmSearch(""); setDmPickerOpen(true); }}
-          style={styles.dmBtn}
+          className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2.5 py-1.5 border border-blue-200 dark:border-blue-800"
           activeOpacity={0.7}
         >
-          <Text style={styles.dmBtnText}>💬 DM</Text>
+          <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold">💬 DM</Text>
         </TouchableOpacity>
       </View>
 
@@ -137,16 +136,16 @@ export default function ChannelsScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setDmPickerOpen(false)}
       >
-        <View style={styles.dmModal}>
-          <View style={styles.dmModalHeader}>
-            <Text style={styles.dmModalTitle}>Start Direct Message</Text>
-            <TouchableOpacity onPress={() => setDmPickerOpen(false)} style={{ padding: 4 }}>
-              <Text style={{ fontSize: 16, color: "#6b7280" }}>✕</Text>
+        <View className="flex-1 bg-white dark:bg-slate-900">
+          <View className="flex-row justify-between items-center p-4 border-b border-gray-100 dark:border-slate-700">
+            <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">Start Direct Message</Text>
+            <TouchableOpacity onPress={() => setDmPickerOpen(false)} className="p-1">
+              <Text className="text-base text-gray-500 dark:text-slate-400">✕</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.dmSearchBar}>
+          <View className="px-4 py-2.5 border-b border-gray-100 dark:border-slate-700">
             <TextInput
-              style={styles.dmSearchInput}
+              className="bg-gray-100 dark:bg-slate-700 rounded-xl px-3.5 py-2.5 text-base text-gray-900 dark:text-slate-100"
               placeholder="Search people…"
               placeholderTextColor="#9ca3af"
               value={dmSearch}
@@ -156,16 +155,16 @@ export default function ChannelsScreen() {
             />
           </View>
           {profilesResult.fetching ? (
-            <ActivityIndicator style={{ marginTop: 32 }} color="#2563eb" />
+            <ActivityIndicator className="mt-8" color="#2563eb" />
           ) : (
             <FlatList
               data={filteredDmProfiles}
               keyExtractor={(p) => p.id}
               contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-              ListEmptyComponent={<Text style={styles.emptyText}>No people found</Text>}
+              ListEmptyComponent={<Text className="text-gray-400 dark:text-slate-500 text-base text-center p-4">No people found</Text>}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={styles.dmProfileRow}
+                  className="flex-row items-center p-3.5 border-b border-gray-50 dark:border-slate-800 gap-3"
                   activeOpacity={0.7}
                   onPress={async () => {
                     if (!profileId) return;
@@ -180,12 +179,12 @@ export default function ChannelsScreen() {
                     if (channel?.id) router.push(`/channels/${channel.id}`);
                   }}
                 >
-                  <View style={styles.dmAvatar}>
-                    <Text style={styles.dmAvatarText}>{item.kind === "agent" ? DEFAULT_AGENT_EMOJI : item.displayName.charAt(0).toUpperCase()}</Text>
+                  <View className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 justify-center items-center">
+                    <Text className="text-lg">{item.kind === "agent" ? DEFAULT_AGENT_EMOJI : item.displayName.charAt(0).toUpperCase()}</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.dmName}>{item.displayName}</Text>
-                    <Text style={styles.dmUsername}>@{item.username}</Text>
+                  <View className="flex-1">
+                    <Text className="text-base font-semibold text-gray-900 dark:text-slate-100">{item.displayName}</Text>
+                    <Text className="text-xs text-gray-400 dark:text-slate-500">@{item.username}</Text>
                   </View>
                   {startingDm && <ActivityIndicator size="small" color="#2563eb" />}
                 </TouchableOpacity>
@@ -198,7 +197,10 @@ export default function ChannelsScreen() {
       <FlatList
         data={channels}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={channels.length === 0 ? styles.emptyContainer : styles.listContent}
+        contentContainerStyle={channels.length === 0
+          ? { flex: 1, justifyContent: "center", alignItems: "center" }
+          : { padding: 16, gap: 8 }
+        }
         refreshControl={
           <RefreshControl
             refreshing={fetching && allChannels.length > 0}
@@ -219,7 +221,7 @@ export default function ChannelsScreen() {
           ) : null
         }
         ListEmptyComponent={
-          <Text style={styles.emptyText}>
+          <Text className="text-gray-400 dark:text-slate-500 text-base">
             {search ? "No matching channels" : "No channels"}
           </Text>
         }
@@ -228,24 +230,24 @@ export default function ChannelsScreen() {
           const icon = channelIcon(item);
           return (
             <TouchableOpacity
-              style={styles.card}
+              className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 flex-row items-center gap-3"
               onPress={() => router.push(`/channels/${item.id}`)}
               activeOpacity={0.7}
             >
-              <View style={styles.iconContainer}>
-                <Text style={styles.channelIcon}>{icon}</Text>
+              <View className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 justify-center items-center">
+                <Text className="text-lg">{icon}</Text>
               </View>
-              <View style={styles.info}>
-                <Text style={styles.channelName}>{displayName}</Text>
+              <View className="flex-1 gap-0.5">
+                <Text className="text-base font-semibold text-gray-900 dark:text-slate-100">{displayName}</Text>
                 {item.description ? (
-                  <Text style={styles.description} numberOfLines={1}>
+                  <Text className="text-xs text-gray-500 dark:text-slate-400" numberOfLines={1}>
                     {item.description}
                   </Text>
                 ) : null}
               </View>
               {item.unreadCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
+                <View className="bg-blue-600 rounded-xl min-w-5 h-5 justify-center items-center px-1.5">
+                  <Text className="text-white text-xs font-bold">
                     {item.unreadCount > 99 ? "99+" : item.unreadCount}
                   </Text>
                 </View>
@@ -257,158 +259,3 @@ export default function ChannelsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f9fafb",
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-    gap: 12,
-  },
-  listContent: {
-    padding: 16,
-    gap: 8,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyText: {
-    color: "#9ca3af",
-    fontSize: 16,
-  },
-  errorText: {
-    color: "#dc2626",
-    fontSize: 16,
-  },
-  retryText: {
-    color: "#2563eb",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#eff6ff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  channelIcon: {
-    fontSize: 18,
-  },
-  info: {
-    flex: 1,
-    gap: 2,
-  },
-  channelName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  description: {
-    fontSize: 12,
-    color: "#6b7280",
-  },
-  badge: {
-    backgroundColor: "#2563eb",
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 6,
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  searchIcon: { fontSize: 14 },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: "#111827",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-  },
-  dmBtn: {
-    backgroundColor: "#eff6ff",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-  },
-  dmBtnText: { fontSize: 12, color: "#2563eb", fontWeight: "600" },
-
-  dmModal: { flex: 1, backgroundColor: "#fff" },
-  dmModalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  dmModalTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
-  dmSearchBar: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  dmSearchInput: {
-    backgroundColor: "#f3f4f6",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: "#111827",
-  },
-  dmProfileRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f9fafb",
-    gap: 12,
-  },
-  dmAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#eff6ff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  dmAvatarText: { fontSize: 18 },
-  dmName: { fontSize: 15, fontWeight: "600", color: "#111827" },
-  dmUsername: { fontSize: 12, color: "#9ca3af" },
-});

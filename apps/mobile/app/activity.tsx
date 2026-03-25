@@ -3,7 +3,6 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
@@ -87,7 +86,7 @@ export default function ActivityScreen() {
 
   if (fetching && displayed.length === 0) {
     return (
-      <View style={styles.center}>
+      <View className="flex-1 justify-center items-center gap-3">
         <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
@@ -95,10 +94,10 @@ export default function ActivityScreen() {
 
   if (error && displayed.length === 0) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Failed to load activity</Text>
+      <View className="flex-1 justify-center items-center gap-3">
+        <Text className="text-red-600 dark:text-red-400 text-base">Failed to load activity</Text>
         <TouchableOpacity onPress={handleRefresh}>
-          <Text style={styles.retryText}>Retry</Text>
+          <Text className="text-blue-600 dark:text-blue-400 text-sm font-semibold">Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -110,9 +109,8 @@ export default function ActivityScreen() {
       keyExtractor={(item) => item.id}
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={[
-        styles.listContent,
-        { paddingBottom: insets.bottom + 16 },
-        displayed.length === 0 && styles.emptyContainer,
+        { padding: 16, gap: 0, paddingBottom: insets.bottom + 16 },
+        displayed.length === 0 && { flex: 1, justifyContent: "center", alignItems: "center" },
       ]}
       refreshControl={
         <RefreshControl
@@ -122,21 +120,19 @@ export default function ActivityScreen() {
         />
       }
       ListEmptyComponent={
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No activity yet</Text>
-        </View>
+        <Text className="text-gray-400 dark:text-slate-500 text-base">No activity yet</Text>
       }
       ListFooterComponent={
         hasMore ? (
           <TouchableOpacity
-            style={styles.loadMoreBtn}
+            className="mt-3 p-3 items-center"
             onPress={handleLoadMore}
             disabled={fetching}
           >
             {fetching ? (
               <ActivityIndicator size="small" color="#2563eb" />
             ) : (
-              <Text style={styles.loadMoreText}>Load more</Text>
+              <Text className="text-blue-600 dark:text-blue-400 font-semibold text-sm">Load more</Text>
             )}
           </TouchableOpacity>
         ) : null
@@ -152,7 +148,7 @@ export default function ActivityScreen() {
         return (
           <>
             {showDate && (
-              <Text style={styles.dateDivider}>
+              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide mt-5 mb-2 ml-7">
                 {new Date(item.createdAt).toLocaleDateString("en-US", {
                   weekday: "long",
                   month: "short",
@@ -160,39 +156,42 @@ export default function ActivityScreen() {
                 })}
               </Text>
             )}
-            <View style={styles.activityRow}>
+            <View className="flex-row gap-3 mb-1">
               {/* Timeline line + dot */}
-              <View style={styles.timelineCol}>
-                <View style={[styles.dot, { backgroundColor: color }]} />
-                <View style={styles.line} />
+              <View className="w-4 items-center pt-1">
+                <View className="w-2.5 h-2.5 rounded-full mt-1" style={{ backgroundColor: color }} />
+                <View className="flex-1 w-px bg-gray-200 dark:bg-slate-700 mt-1" style={{ minHeight: 20 }} />
               </View>
 
               {/* Content */}
-              <View style={styles.contentCol}>
+              <View className="flex-1 pb-4 gap-1.5">
                 {/* Header: avatar + name + time */}
-                <View style={styles.activityHeader}>
-                  <View style={[styles.avatar, { borderColor: color }]}>
-                    <Text style={[styles.avatarText, { color }]}>
+                <View className="flex-row items-center gap-2">
+                  <View
+                    className="w-7 h-7 rounded-full bg-gray-100 dark:bg-slate-700 border-[1.5px] justify-center items-center"
+                    style={{ borderColor: color }}
+                  >
+                    <Text className="text-xs font-bold" style={{ color }}>
                       {item.profile?.displayName?.charAt(0)?.toUpperCase() ?? "?"}
                     </Text>
                   </View>
-                  <Text style={styles.actorName} numberOfLines={1}>
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1" numberOfLines={1}>
                     {item.profile?.displayName ?? "Unknown"}
                   </Text>
-                  <Text style={styles.timeText}>{formatRelativeTime(item.createdAt)}</Text>
+                  <Text className="text-xs text-gray-400 dark:text-slate-500">{formatRelativeTime(item.createdAt)}</Text>
                 </View>
 
                 {/* Message */}
-                <Text style={styles.activityMessage}>{item.message}</Text>
+                <Text className="text-sm text-gray-700 dark:text-slate-300 leading-5">{item.message}</Text>
 
                 {/* Task link */}
                 {item.task && (
                   <TouchableOpacity
-                    style={styles.taskLink}
+                    className="px-2.5 py-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-800 self-start"
                     onPress={() => router.push(`/task/${item.task!.id}`)}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.taskLinkText}>
+                    <Text className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                       #{item.task.taskNumber} · {item.task.title}
                     </Text>
                   </TouchableOpacity>
@@ -205,116 +204,3 @@ export default function ActivityScreen() {
     />
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
-  errorText: { color: "#dc2626", fontSize: 16 },
-  retryText: { color: "#2563eb", fontSize: 14, fontWeight: "600" },
-  listContent: { padding: 16, gap: 0 },
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyState: { alignItems: "center" },
-  emptyText: { color: "#9ca3af", fontSize: 16 },
-
-  dateDivider: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#9ca3af",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginTop: 20,
-    marginBottom: 8,
-    marginLeft: 28,
-  },
-
-  activityRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 4,
-  },
-
-  // Timeline
-  timelineCol: {
-    width: 16,
-    alignItems: "center",
-    paddingTop: 4,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 4,
-  },
-  line: {
-    flex: 1,
-    width: 1,
-    backgroundColor: "#e5e7eb",
-    marginTop: 4,
-    minHeight: 20,
-  },
-
-  // Content
-  contentCol: {
-    flex: 1,
-    paddingBottom: 16,
-    gap: 6,
-  },
-  activityHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  avatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "#f3f4f6",
-    borderWidth: 1.5,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  actorName: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#111827",
-    flex: 1,
-  },
-  timeText: {
-    fontSize: 11,
-    color: "#9ca3af",
-  },
-  activityMessage: {
-    fontSize: 14,
-    color: "#374151",
-    lineHeight: 20,
-  },
-  taskLink: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: "#eff6ff",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    alignSelf: "flex-start",
-  },
-  taskLinkText: {
-    fontSize: 12,
-    color: "#2563eb",
-    fontWeight: "500",
-  },
-  loadMoreBtn: {
-    marginTop: 12,
-    padding: 12,
-    alignItems: "center",
-  },
-  loadMoreText: {
-    color: "#2563eb",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-});

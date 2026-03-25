@@ -3,7 +3,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
@@ -81,18 +80,18 @@ export default function CreateChannelScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ flex: 1 }}
+      className="flex-1 bg-gray-50 dark:bg-slate-900"
     >
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: insets.bottom + 24 }}
         keyboardShouldPersistTaps="handled"
       >
         {/* Name */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Channel Name *</Text>
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Channel Name *</Text>
           <TextInput
-            style={styles.input}
+            className="border border-gray-300 dark:border-slate-600 rounded-xl p-3 text-base text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
             value={name}
             onChangeText={setName}
             placeholder="e.g. engineering-team"
@@ -101,15 +100,16 @@ export default function CreateChannelScreen() {
             autoFocus
           />
           {name.trim().length > 0 && (
-            <Text style={styles.slugPreview}>Slug: #{slugify(name.trim())}</Text>
+            <Text className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Slug: #{slugify(name.trim())}</Text>
           )}
         </View>
 
         {/* Description */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Description</Text>
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Description</Text>
           <TextInput
-            style={[styles.input, styles.multiline]}
+            className="border border-gray-300 dark:border-slate-600 rounded-xl p-3 text-base text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-800"
+            style={{ height: 80 }}
             value={description}
             onChangeText={setDescription}
             placeholder="What is this channel for?"
@@ -121,94 +121,47 @@ export default function CreateChannelScreen() {
         </View>
 
         {/* Visibility */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Visibility</Text>
-          <View style={styles.visibilityRow}>
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Visibility</Text>
+          <View className="flex-row gap-2">
             {VISIBILITY_OPTIONS.map((opt) => (
               <TouchableOpacity
                 key={opt.key}
-                style={[
-                  styles.visibilityCard,
-                  visibility === opt.key && styles.visibilityCardActive,
-                ]}
+                className={`flex-1 border rounded-xl p-3 items-center gap-0.5 ${
+                  visibility === opt.key
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
+                    : "border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800"
+                }`}
                 onPress={() => setVisibility(opt.key)}
                 activeOpacity={0.8}
               >
                 <Text
-                  style={[
-                    styles.visibilityLabel,
-                    visibility === opt.key && styles.visibilityLabelActive,
-                  ]}
+                  className={`text-sm font-semibold ${
+                    visibility === opt.key
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-gray-700 dark:text-slate-300"
+                  }`}
                 >
                   {opt.label}
                 </Text>
-                <Text style={styles.visibilityDesc}>{opt.desc}</Text>
+                <Text className="text-xs text-gray-400 dark:text-slate-500 text-center">{opt.desc}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
         <TouchableOpacity
-          style={[styles.createBtn, saving && { opacity: 0.6 }]}
+          className={`bg-blue-600 rounded-xl p-3.5 items-center mt-2 ${saving ? "opacity-60" : ""}`}
           onPress={handleCreate}
           disabled={saving}
         >
           {saving ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.createBtnText}>Create Channel</Text>
+            <Text className="text-white font-bold text-base">Create Channel</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { padding: 20, gap: 20 },
-  field: { gap: 6 },
-  label: { fontSize: 13, fontWeight: "600", color: "#374151" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    color: "#111827",
-    backgroundColor: "#fff",
-  },
-  multiline: { height: 80 },
-  slugPreview: { fontSize: 12, color: "#9ca3af", marginTop: 2 },
-
-  visibilityRow: { flexDirection: "row", gap: 8 },
-  visibilityCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    padding: 12,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    gap: 2,
-  },
-  visibilityCardActive: {
-    borderColor: "#2563eb",
-    backgroundColor: "#eff6ff",
-  },
-  visibilityLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  visibilityLabelActive: { color: "#2563eb" },
-  visibilityDesc: { fontSize: 10, color: "#9ca3af", textAlign: "center" },
-
-  createBtn: {
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  createBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-});

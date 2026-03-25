@@ -1,4 +1,4 @@
-import { View, Text, Image, StyleSheet } from "react-native";
+import { View, Text, Image } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { generateInitials } from "@agentcenter/utils";
 
@@ -27,10 +27,8 @@ export function Avatar({ avatarUrl, displayName, size = 32, emoji }: AvatarProps
   if (emoji) {
     return (
       <View
-        style={[
-          styles.circle,
-          { width: size, height: size, borderRadius: size / 2 },
-        ]}
+        className="bg-blue-100 dark:bg-blue-900/30 justify-center items-center"
+        style={{ width: size, height: size, borderRadius: size / 2 }}
       >
         <Text style={{ fontSize: size * 0.5 }}>{emoji}</Text>
       </View>
@@ -41,22 +39,15 @@ export function Avatar({ avatarUrl, displayName, size = 32, emoji }: AvatarProps
 
   return (
     <View
-      style={[
-        styles.circle,
-        { width: size, height: size, borderRadius: size / 2 },
-      ]}
+      className="bg-blue-100 dark:bg-blue-900/30 justify-center items-center"
+      style={{ width: size, height: size, borderRadius: size / 2 }}
     >
-      <Text style={{ fontSize: size * 0.35, fontWeight: "700", color: "#1d4ed8" }}>
+      <Text
+        className="font-bold text-blue-700 dark:text-blue-300"
+        style={{ fontSize: size * 0.35 }}
+      >
         {initials}
       </Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  circle: {
-    backgroundColor: "#dbeafe",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-});

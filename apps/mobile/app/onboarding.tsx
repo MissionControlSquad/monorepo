@@ -2,7 +2,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -246,7 +245,7 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#f9fafb" }}>
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900">
       {step === "welcome" && (
         <WelcomeStep onNext={() => setStep("use-case")} onSkip={handleSkip} insets={insets} />
       )}
@@ -308,16 +307,13 @@ function WelcomeStep({
 }) {
   return (
     <ScrollView
-      contentContainerStyle={[
-        styles.stepContent,
-        { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 },
-      ]}
+      contentContainerStyle={{ flexGrow: 1, padding: 24, gap: 16, paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }}
     >
-      <Text style={styles.welcomeEmoji}>🚀</Text>
-      <Text style={styles.welcomeTitle}>Welcome to AgentCenter</Text>
-      <Text style={styles.welcomeSub}>Let's set up your AI agent team in a few steps.</Text>
+      <Text className="text-6xl text-center mb-1">🚀</Text>
+      <Text className="text-2xl font-extrabold text-gray-900 dark:text-slate-100 text-center">Welcome to AgentCenter</Text>
+      <Text className="text-base text-gray-500 dark:text-slate-400 text-center leading-6">Let's set up your AI agent team in a few steps.</Text>
 
-      <View style={styles.featureList}>
+      <View className="gap-4 my-2">
         {[
           {
             icon: "people-outline" as const,
@@ -335,23 +331,23 @@ function WelcomeStep({
             desc: "Track every action, deliverable, and status change in real time.",
           },
         ].map((f) => (
-          <View key={f.title} style={styles.featureRow}>
-            <View style={styles.featureIcon}>
+          <View key={f.title} className="flex-row gap-3.5 items-start">
+            <View className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 justify-center items-center shrink-0">
               <Ionicons name={f.icon} size={22} color="#2563eb" />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.featureTitle}>{f.title}</Text>
-              <Text style={styles.featureDesc}>{f.desc}</Text>
+            <View className="flex-1">
+              <Text className="text-base font-bold text-gray-900 dark:text-slate-100 mb-0.5">{f.title}</Text>
+              <Text className="text-sm text-gray-500 dark:text-slate-400 leading-5">{f.desc}</Text>
             </View>
           </View>
         ))}
       </View>
 
-      <TouchableOpacity style={styles.primaryBtn} onPress={onNext} activeOpacity={0.8}>
-        <Text style={styles.primaryBtnText}>Get Started</Text>
+      <TouchableOpacity className="bg-blue-600 rounded-xl py-3.5 items-center" onPress={onNext} activeOpacity={0.8}>
+        <Text className="text-white text-base font-semibold">Get Started</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.skipBtn} onPress={onSkip} activeOpacity={0.7}>
-        <Text style={styles.skipBtnText}>Skip setup, go to dashboard</Text>
+      <TouchableOpacity className="items-center py-2.5" onPress={onSkip} activeOpacity={0.7}>
+        <Text className="text-sm text-gray-400 dark:text-slate-500">Skip setup, go to dashboard</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -371,22 +367,22 @@ function UseCaseStep({
   licenseLimit: number | null;
 }) {
   return (
-    <View style={{ flex: 1 }}>
-      <View style={[styles.stepHeader, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+    <View className="flex-1">
+      <View className="flex-row items-center px-4 pb-2" style={{ paddingTop: insets.top + 12 }}>
+        <TouchableOpacity onPress={onBack} className="w-11 h-11 justify-center">
           <Ionicons name="chevron-back" size={22} color="#374151" />
         </TouchableOpacity>
-        <Text style={styles.stepTitle}>Choose Your Use Case</Text>
-        <View style={{ width: 44 }} />
+        <Text className="flex-1 text-lg font-bold text-gray-900 dark:text-slate-100 text-center">Choose Your Use Case</Text>
+        <View className="w-11" />
       </View>
-      <Text style={styles.stepSubtitle}>Pick the team template that best fits your work.</Text>
+      <Text className="text-sm text-gray-400 dark:text-slate-500 text-center mb-1 px-6">Pick the team template that best fits your work.</Text>
       {licenseLimit !== null && (
-        <Text style={styles.licenseNote}>
+        <Text className="text-xs text-blue-600 dark:text-blue-400 text-center mb-2 px-6">
           Your plan supports up to {licenseLimit} agent{licenseLimit !== 1 ? "s" : ""}
         </Text>
       )}
       <ScrollView
-        contentContainerStyle={[styles.useCaseList, { paddingBottom: insets.bottom + 24 }]}
+        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}
       >
         {USE_CASES.map((uc) => {
           const agentCount =
@@ -398,16 +394,16 @@ function UseCaseStep({
           return (
             <TouchableOpacity
               key={uc.id}
-              style={styles.useCaseCard}
+              className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4 flex-row items-center gap-3.5"
               onPress={() => onSelect(uc)}
               activeOpacity={0.75}
             >
-              <Text style={styles.useCaseEmoji}>{uc.emoji}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.useCaseTitle}>{uc.title}</Text>
-                <Text style={styles.useCaseSub}>{uc.subtitle}</Text>
+              <Text className="text-4xl">{uc.emoji}</Text>
+              <View className="flex-1">
+                <Text className="text-base font-bold text-gray-900 dark:text-slate-100">{uc.title}</Text>
+                <Text className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{uc.subtitle}</Text>
                 {agentCount > 0 && (
-                  <Text style={styles.useCaseAgentCount}>{agentCount} agent{agentCount !== 1 ? "s" : ""}</Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1">{agentCount} agent{agentCount !== 1 ? "s" : ""}</Text>
                 )}
               </View>
               <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
@@ -448,32 +444,32 @@ function PreviewStep({
   const atLimit = licenseLimit !== null && agents.length >= licenseLimit;
 
   return (
-    <View style={{ flex: 1 }}>
-      <View style={[styles.stepHeader, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+    <View className="flex-1">
+      <View className="flex-row items-center px-4 pb-2" style={{ paddingTop: insets.top + 12 }}>
+        <TouchableOpacity onPress={onBack} className="w-11 h-11 justify-center">
           <Ionicons name="chevron-back" size={22} color="#374151" />
         </TouchableOpacity>
-        <Text style={styles.stepTitle}>Review Your Team</Text>
-        <TouchableOpacity onPress={onAgentAdd} style={styles.addBtn} disabled={atLimit}>
+        <Text className="flex-1 text-lg font-bold text-gray-900 dark:text-slate-100 text-center">Review Your Team</Text>
+        <TouchableOpacity onPress={onAgentAdd} className="w-11 h-11 justify-center items-end" disabled={atLimit}>
           <Ionicons name="add" size={22} color={atLimit ? "#d1d5db" : "#2563eb"} />
         </TouchableOpacity>
       </View>
-      <Text style={styles.stepSubtitle}>Tap an agent to edit name, role, or personality.</Text>
+      <Text className="text-sm text-gray-400 dark:text-slate-500 text-center mb-1 px-6">Tap an agent to edit name, role, or personality.</Text>
 
       {editingIdx !== null && editing ? (
         <ScrollView
-          contentContainerStyle={[styles.editForm, { paddingBottom: insets.bottom + 24 }]}
+          contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}
         >
-          <View style={styles.editCard}>
-            <Text style={styles.editCardTitle}>
+          <View className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4 gap-4">
+            <Text className="text-lg font-bold text-gray-900 dark:text-slate-100">
               {editing.emoji} {editing.name}
             </Text>
-            <Text style={styles.editCardRole}>{editing.role}</Text>
+            <Text className="text-sm text-gray-500 dark:text-slate-400 -mt-3">{editing.role}</Text>
 
-            <View style={styles.editField}>
-              <Text style={styles.editLabel}>Name</Text>
+            <View className="gap-1.5">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Name</Text>
               <TextInput
-                style={styles.editInput}
+                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 value={editing.name}
                 onChangeText={(t) => onAgentChange(editingIdx, { ...editing, name: t })}
                 placeholder="Agent name"
@@ -481,10 +477,10 @@ function PreviewStep({
               />
             </View>
 
-            <View style={styles.editField}>
-              <Text style={styles.editLabel}>Username</Text>
+            <View className="gap-1.5">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Username</Text>
               <TextInput
-                style={styles.editInput}
+                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 value={editing.username}
                 onChangeText={(t) =>
                   onAgentChange(editingIdx, {
@@ -499,10 +495,10 @@ function PreviewStep({
               />
             </View>
 
-            <View style={styles.editField}>
-              <Text style={styles.editLabel}>Role</Text>
+            <View className="gap-1.5">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Role</Text>
               <TextInput
-                style={styles.editInput}
+                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
                 value={editing.role}
                 onChangeText={(t) => onAgentChange(editingIdx, { ...editing, role: t })}
                 placeholder="e.g. Frontend Developer"
@@ -510,10 +506,11 @@ function PreviewStep({
               />
             </View>
 
-            <View style={styles.editField}>
-              <Text style={styles.editLabel}>Personality</Text>
+            <View className="gap-1.5">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">Personality</Text>
               <TextInput
-                style={[styles.editInput, styles.editTextarea]}
+                className="bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5 py-3 text-base text-gray-900 dark:text-slate-100"
+                style={{ height: 96, textAlignVertical: "top" }}
                 value={editing.personality}
                 onChangeText={(t) => onAgentChange(editingIdx, { ...editing, personality: t })}
                 placeholder="Describe how this agent thinks and works…"
@@ -524,52 +521,55 @@ function PreviewStep({
             </View>
 
             <TouchableOpacity
-              style={styles.primaryBtn}
+              className="bg-blue-600 rounded-xl py-3.5 items-center"
               onPress={() => setEditingIdx(null)}
               activeOpacity={0.8}
             >
-              <Text style={styles.primaryBtnText}>Done</Text>
+              <Text className="text-white text-base font-semibold">Done</Text>
             </TouchableOpacity>
 
             {agents.length > 1 && (
               <TouchableOpacity
-                style={styles.dangerBtn}
+                className="items-center py-3"
                 onPress={() => {
                   onAgentRemove(editingIdx);
                   setEditingIdx(null);
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.dangerBtnText}>Remove Agent</Text>
+                <Text className="text-sm text-red-600 dark:text-red-400 font-medium">Remove Agent</Text>
               </TouchableOpacity>
             )}
           </View>
         </ScrollView>
       ) : (
         <>
-          <ScrollView contentContainerStyle={[styles.previewList, { paddingBottom: 100 }]}>
+          <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 100 }}>
             {agents.map((agent, idx) => (
               <TouchableOpacity
                 key={idx}
-                style={styles.agentCard}
+                className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3.5 flex-row items-center gap-3"
                 onPress={() => setEditingIdx(idx)}
                 activeOpacity={0.75}
               >
-                <Text style={styles.agentEmoji}>{agent.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.agentName}>{agent.name}</Text>
-                  <Text style={styles.agentRole}>{agent.role}</Text>
+                <Text className="text-3xl">{agent.emoji}</Text>
+                <View className="flex-1">
+                  <Text className="text-base font-bold text-gray-900 dark:text-slate-100">{agent.name}</Text>
+                  <Text className="text-xs text-gray-500 dark:text-slate-400">{agent.role}</Text>
                   {agent.username && (
-                    <Text style={styles.agentUsername}>@{agent.username}</Text>
+                    <Text className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">@{agent.username}</Text>
                   )}
                 </View>
                 <Ionicons name="create-outline" size={18} color="#9ca3af" />
               </TouchableOpacity>
             ))}
           </ScrollView>
-          <View style={[styles.previewFooter, { paddingBottom: insets.bottom + 16 }]}>
-            <TouchableOpacity style={styles.primaryBtn} onPress={onCreate} activeOpacity={0.8}>
-              <Text style={styles.primaryBtnText}>
+          <View
+            className="absolute bottom-0 left-0 right-0 bg-gray-50 dark:bg-slate-900 p-4 border-t border-gray-200 dark:border-slate-700"
+            style={{ paddingBottom: insets.bottom + 16 }}
+          >
+            <TouchableOpacity className="bg-blue-600 rounded-xl py-3.5 items-center" onPress={onCreate} activeOpacity={0.8}>
+              <Text className="text-white text-base font-semibold">
                 Create {agents.length} Agent{agents.length !== 1 ? "s" : ""}
               </Text>
             </TouchableOpacity>
@@ -610,22 +610,23 @@ function CreatingStep({
 
   return (
     <View
-      style={[
-        styles.stepContent,
-        { paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24 },
-      ]}
+      className="flex-1 p-6 items-stretch gap-4"
+      style={{ paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24 }}
     >
       <ActivityIndicator size="large" color="#2563eb" style={{ marginBottom: 24 }} />
-      <Text style={styles.creatingTitle}>Creating Your Team…</Text>
-      <Text style={styles.creatingCounter}>
+      <Text className="text-xl font-extrabold text-gray-900 dark:text-slate-100 text-center">Creating Your Team…</Text>
+      <Text className="text-4xl font-extrabold text-blue-600 dark:text-blue-400 text-center">
         {count} / {agents.length} agent{agents.length !== 1 ? "s" : ""}
       </Text>
-      <Text style={styles.creatingSub}>This may take a moment.</Text>
-      <View style={styles.agentPillList}>
+      <Text className="text-sm text-gray-500 dark:text-slate-400 text-center">This may take a moment.</Text>
+      <View className="flex-row flex-wrap gap-2 justify-center mt-2">
         {agents.map((a, i) => (
-          <View key={i} style={[styles.agentPill, i < count ? styles.agentPillDone : null]}>
-            <Text style={styles.agentPillEmoji}>{a.emoji}</Text>
-            <Text style={[styles.agentPillName, i < count ? styles.agentPillNameDone : null]}>
+          <View
+            key={i}
+            className={`flex-row items-center gap-1.5 rounded-full px-3 py-1.5 ${i < count ? "bg-green-100 dark:bg-green-900/30" : "bg-blue-50 dark:bg-blue-900/20"}`}
+          >
+            <Text className="text-base">{a.emoji}</Text>
+            <Text className={`text-sm font-medium ${i < count ? "text-green-700 dark:text-green-400" : "text-blue-700 dark:text-blue-400"}`}>
               {a.name}
             </Text>
           </View>
@@ -651,16 +652,13 @@ function SuccessStep({
 
   return (
     <ScrollView
-      contentContainerStyle={[
-        styles.stepContent,
-        { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 },
-      ]}
+      contentContainerStyle={{ flexGrow: 1, padding: 24, gap: 16, paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }}
     >
-      <Text style={styles.successEmoji}>🎉</Text>
-      <Text style={styles.welcomeTitle}>
+      <Text className="text-6xl text-center">🎉</Text>
+      <Text className="text-2xl font-extrabold text-gray-900 dark:text-slate-100 text-center">
         {failed === 0 ? "Team Created!" : `${succeeded} of ${results.length} Created`}
       </Text>
-      <Text style={styles.welcomeSub}>
+      <Text className="text-base text-gray-500 dark:text-slate-400 text-center leading-6">
         {failed === 0
           ? "Your agents are ready. Head to the dashboard to assign tasks and set them up."
           : "Some agents couldn't be created. You can add them manually from the Agents tab."}
@@ -669,209 +667,27 @@ function SuccessStep({
       {results.map((r, i) => (
         <View
           key={i}
-          style={[
-            styles.resultRow,
-            {
-              borderColor: r.ok ? "#bbf7d0" : "#fecaca",
-              backgroundColor: r.ok ? "#f0fdf4" : "#fef2f2",
-            },
-          ]}
+          className={`flex-row items-center gap-2.5 p-3 rounded-xl border ${r.ok ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800" : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800"}`}
         >
           <Ionicons
             name={r.ok ? "checkmark-circle" : "close-circle"}
             size={20}
             color={r.ok ? "#16a34a" : "#dc2626"}
           />
-          <Text style={[styles.resultName, { color: r.ok ? "#15803d" : "#b91c1c" }]}>
+          <Text className={`flex-1 text-sm font-semibold ${r.ok ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
             {r.name}
           </Text>
-          {r.error && <Text style={styles.resultError}>{r.error}</Text>}
+          {r.error && <Text className="text-xs text-gray-500 dark:text-slate-400">{r.error}</Text>}
         </View>
       ))}
 
       <TouchableOpacity
-        style={[styles.primaryBtn, { marginTop: 16 }]}
+        className="bg-blue-600 rounded-xl py-3.5 items-center mt-4"
         onPress={onFinish}
         activeOpacity={0.8}
       >
-        <Text style={styles.primaryBtnText}>Go to Dashboard</Text>
+        <Text className="text-white text-base font-semibold">Go to Dashboard</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  stepContent: { flexGrow: 1, padding: 24, alignItems: "stretch", gap: 16 },
-
-  // Welcome
-  welcomeEmoji: { fontSize: 56, textAlign: "center", marginBottom: 4 },
-  welcomeTitle: { fontSize: 26, fontWeight: "800", color: "#111827", textAlign: "center" },
-  welcomeSub: { fontSize: 15, color: "#6b7280", textAlign: "center", lineHeight: 22 },
-  featureList: { gap: 16, marginVertical: 8 },
-  featureRow: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
-  featureIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "#eff6ff",
-    justifyContent: "center",
-    alignItems: "center",
-    flexShrink: 0,
-  },
-  featureTitle: { fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 2 },
-  featureDesc: { fontSize: 13, color: "#6b7280", lineHeight: 19 },
-
-  // Shared buttons
-  primaryBtn: {
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  primaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  skipBtn: { alignItems: "center", paddingVertical: 10 },
-  skipBtnText: { fontSize: 14, color: "#9ca3af" },
-  dangerBtn: { alignItems: "center", paddingVertical: 12 },
-  dangerBtnText: { fontSize: 14, color: "#dc2626", fontWeight: "500" },
-
-  // Step header
-  stepHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  backBtn: { width: 44, height: 44, justifyContent: "center" },
-  addBtn: { width: 44, height: 44, justifyContent: "center", alignItems: "flex-end" },
-  stepTitle: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#111827",
-    textAlign: "center",
-  },
-  stepSubtitle: {
-    fontSize: 13,
-    color: "#9ca3af",
-    textAlign: "center",
-    marginBottom: 4,
-    paddingHorizontal: 24,
-  },
-  licenseNote: {
-    fontSize: 12,
-    color: "#2563eb",
-    textAlign: "center",
-    marginBottom: 8,
-    paddingHorizontal: 24,
-  },
-
-  // Use case
-  useCaseList: { padding: 16, gap: 12 },
-  useCaseCard: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  useCaseEmoji: { fontSize: 32 },
-  useCaseTitle: { fontSize: 15, fontWeight: "700", color: "#111827" },
-  useCaseSub: { fontSize: 12, color: "#6b7280", marginTop: 2 },
-  useCaseAgentCount: { fontSize: 11, color: "#2563eb", fontWeight: "600", marginTop: 4 },
-
-  // Preview
-  previewList: { padding: 16, gap: 10 },
-  agentCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  agentEmoji: { fontSize: 28 },
-  agentName: { fontSize: 15, fontWeight: "700", color: "#111827" },
-  agentRole: { fontSize: 12, color: "#6b7280" },
-  agentUsername: { fontSize: 11, color: "#2563eb", marginTop: 2 },
-  previewFooter: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#f9fafb",
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-  },
-
-  // Edit form
-  editForm: { padding: 16, gap: 12 },
-  editCard: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    padding: 16,
-    gap: 16,
-  },
-  editCardTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
-  editCardRole: { fontSize: 13, color: "#6b7280", marginTop: -10 },
-  editField: { gap: 6 },
-  editLabel: { fontSize: 13, fontWeight: "600", color: "#374151" },
-  editInput: {
-    backgroundColor: "#f9fafb",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 15,
-    color: "#111827",
-  },
-  editTextarea: { height: 96, textAlignVertical: "top" },
-
-  // Creating
-  creatingTitle: { fontSize: 22, fontWeight: "800", color: "#111827", textAlign: "center" },
-  creatingCounter: { fontSize: 32, fontWeight: "800", color: "#2563eb", textAlign: "center" },
-  creatingSub: { fontSize: 14, color: "#6b7280", textAlign: "center" },
-  agentPillList: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  agentPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#eff6ff",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  agentPillDone: { backgroundColor: "#dcfce7" },
-  agentPillEmoji: { fontSize: 16 },
-  agentPillName: { fontSize: 13, color: "#1d4ed8", fontWeight: "500" },
-  agentPillNameDone: { color: "#15803d" },
-
-  // Success
-  successEmoji: { fontSize: 56, textAlign: "center" },
-  resultRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  resultName: { flex: 1, fontSize: 14, fontWeight: "600" },
-  resultError: { fontSize: 11, color: "#6b7280" },
-});

@@ -7,14 +7,13 @@ import { DrawerProvider } from "../src/context/DrawerContext";
 import { NotificationCountProvider } from "../src/context/NotificationCountContext";
 import { AppDrawer } from "../src/components/AppDrawer";
 import { OfflineBanner } from "../src/components/OfflineBanner";
-import { useTheme } from "../src/hooks/useTheme";
 import { usePushNotifications } from "../src/hooks/usePushNotifications";
-import { View, ActivityIndicator } from "react-native";
+import { View, ActivityIndicator, useColorScheme } from "react-native";
 import { useEffect } from "react";
 
 function RootLayoutNav() {
   const { urqlClient, isLoading, isSignedIn } = useAuth();
-  const { colors } = useTheme();
+  const isDark = useColorScheme() === "dark";
   const router = useRouter();
   usePushNotifications();
 
@@ -28,8 +27,8 @@ function RootLayoutNav() {
   // While restoring session show a neutral splash
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.accent} />
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
+        <ActivityIndicator size="large" color={isDark ? "#3b82f6" : "#2563eb"} />
       </View>
     );
   }
@@ -42,10 +41,10 @@ function RootLayoutNav() {
     return (
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: colors.headerBg },
-          headerTintColor: colors.text,
-          headerTitleStyle: { color: colors.text },
-          contentStyle: { backgroundColor: colors.background },
+          headerStyle: { backgroundColor: isDark ? "#0f172a" : "#ffffff" },
+          headerTintColor: isDark ? "#f1f5f9" : "#111827",
+          headerTitleStyle: { color: isDark ? "#f1f5f9" : "#111827" },
+          contentStyle: { backgroundColor: isDark ? "#0f172a" : "#ffffff" },
         }}
       >
         <Stack.Screen name="auth/login" options={{ headerShown: false }} />
@@ -61,14 +60,14 @@ function RootLayoutNav() {
   return (
     <Provider value={urqlClient}>
       <NotificationCountProvider>
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View className="flex-1 bg-white dark:bg-slate-900">
         <OfflineBanner />
         <Stack
           screenOptions={{
-            headerStyle: { backgroundColor: colors.headerBg },
-            headerTintColor: colors.text,
-            headerTitleStyle: { color: colors.text },
-            contentStyle: { backgroundColor: colors.background },
+            headerStyle: { backgroundColor: isDark ? "#0f172a" : "#ffffff" },
+            headerTintColor: isDark ? "#f1f5f9" : "#111827",
+            headerTitleStyle: { color: isDark ? "#f1f5f9" : "#111827" },
+            contentStyle: { backgroundColor: isDark ? "#0f172a" : "#ffffff" },
           }}
         >
           <Stack.Screen name="index" options={{ headerShown: false }} />

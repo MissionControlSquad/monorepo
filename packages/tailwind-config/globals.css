@@ -1,0 +1,46 @@
+/**
+ * AgentCenter shared design tokens — Tailwind v4 / web.
+ *
+ * Usage in globals.css:
+ *   @import "@agentcenter/tailwind-config/globals.css";
+ */
+
+@theme {
+  /* Brand (blue-600 base) */
+  --color-brand: #2563eb;
+  --color-brand-hover: #1d4ed8;
+  --color-brand-muted: #dbeafe;
+  --color-brand-dark: #3b82f6;
+  --color-brand-dark-hover: #2563eb;
+  --color-brand-dark-muted: #1e3a5f;
+  --color-brand-text: #1d4ed8;
+  --color-brand-dark-text: #93c5fd;
+
+  /* App surfaces (light defaults) */
+  --color-app-bg: #ffffff;
+  --color-app-surface: #f9fafb;
+  --color-app-surface-alt: #f3f4f6;
+  --color-app-border: #e5e7eb;
+  --color-app-border-alt: #f3f4f6;
+  --color-app-text: #111827;
+  --color-app-text-secondary: #6b7280;
+  --color-app-text-muted: #9ca3af;
+  --color-app-card: #ffffff;
+  --color-app-input-bg: #f9fafb;
+  --color-app-icon: #374151;
+  --color-app-icon-muted: #9ca3af;
+  --color-app-nav-icon-bg: #f3f4f6;
+  --color-app-divider: #f3f4f6;
+
+  /* Status */
+  --color-status-success: #16a34a;
+  --color-status-success-muted: #dcfce7;
+  --color-status-warning: #d97706;
+  --color-status-warning-muted: #fef3c7;
+  --color-status-danger: #dc2626;
+  --color-status-danger-muted: #fee2e2;
+
+  /* Typography */
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", Menlo, monospace;
+}

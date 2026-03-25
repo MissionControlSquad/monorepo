@@ -2,7 +2,6 @@ import {
   View,
   Text,
   FlatList,
-  StyleSheet,
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
@@ -58,27 +57,27 @@ export default function AgentsScreen() {
   }), [allAgents]);
 
   if (fetching && allAgents.length === 0) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#2563eb" /></View>;
+    return <View className="flex-1 justify-center items-center"><ActivityIndicator size="large" color="#2563eb" /></View>;
   }
 
   if (error && allAgents.length === 0) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Failed to load agents</Text>
-        <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })} style={styles.retryBtn}>
-          <Text style={styles.retryText}>Retry</Text>
+      <View className="flex-1 justify-center items-center gap-3">
+        <Text className="text-red-600 dark:text-red-400 text-base">Failed to load agents</Text>
+        <TouchableOpacity onPress={() => reexecute({ requestPolicy: "network-only" })} className="mt-1">
+          <Text className="text-blue-600 dark:text-blue-400 text-sm font-semibold">Retry</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900">
       {/* Search */}
-      <View style={styles.searchBar}>
+      <View className="flex-row items-center gap-2 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-4 py-2.5">
         <Ionicons name="search-outline" size={16} color="#9ca3af" />
         <TextInput
-          style={styles.searchInput}
+          className="flex-1 text-base text-gray-900 dark:text-slate-100"
           value={search}
           onChangeText={setSearch}
           placeholder="Search agents…"
@@ -93,28 +92,28 @@ export default function AgentsScreen() {
         )}
         <TouchableOpacity
           onPress={() => router.push("/agent/create")}
-          style={styles.createBtn}
+          className="w-8 h-8 rounded-full bg-blue-600 justify-center items-center ml-1"
           activeOpacity={0.7}
         >
-          <Text style={styles.createBtnText}>+</Text>
+          <Text className="text-xl text-white leading-6">+</Text>
         </TouchableOpacity>
       </View>
 
       {/* Filter tabs */}
-      <View style={styles.filterBar}>
+      <View className="flex-row bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3">
         {(["all", "active", "pending", "deactivated"] as FilterTab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
-            style={[styles.filterTab, filter === tab && styles.filterTabActive]}
+            className={`flex-row items-center gap-1.5 py-2.5 px-2 border-b-2 ${filter === tab ? "border-blue-600" : "border-transparent"}`}
             onPress={() => setFilter(tab)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.filterTabText, filter === tab && styles.filterTabTextActive]}>
+            <Text className={`text-sm ${filter === tab ? "text-blue-600 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>
               {FILTER_LABELS[tab]}
             </Text>
             {counts[tab] > 0 && (
-              <View style={[styles.filterCount, filter === tab && styles.filterCountActive]}>
-                <Text style={[styles.filterCountText, filter === tab && styles.filterCountTextActive]}>
+              <View className={`rounded-xl px-1.5 py-px min-w-5 items-center ${filter === tab ? "bg-blue-100 dark:bg-blue-900/30" : "bg-gray-100 dark:bg-slate-700"}`}>
+                <Text className={`text-xs font-semibold ${filter === tab ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}>
                   {counts[tab]}
                 </Text>
               </View>
@@ -126,12 +125,15 @@ export default function AgentsScreen() {
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={filtered.length === 0 ? styles.emptyContainer : styles.listContent}
+        contentContainerStyle={filtered.length === 0
+          ? { flex: 1, justifyContent: "center", alignItems: "center" }
+          : { padding: 16, gap: 10 }
+        }
         refreshControl={
           <RefreshControl refreshing={fetching} onRefresh={() => reexecute({ requestPolicy: "network-only" })} tintColor="#2563eb" />
         }
         ListEmptyComponent={
-          <Text style={styles.emptyText}>
+          <Text className="text-gray-400 dark:text-slate-500 text-base text-center">
             {search ? "No agents match your search" : "No agents in this category"}
           </Text>
         }
@@ -143,50 +145,56 @@ export default function AgentsScreen() {
 
           return (
             <TouchableOpacity
-              style={[styles.card, isDeactivated && styles.cardMuted]}
+              className={`bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 flex-row justify-between items-center gap-3 ${isDeactivated ? "opacity-60" : ""}`}
               onPress={() => router.push(`/agent/${item.id}`)}
               activeOpacity={0.7}
             >
-              <View style={styles.cardLeft}>
-                <View style={styles.emojiContainer}>
-                  <Text style={styles.emoji}>{item.identityEmoji ?? DEFAULT_AGENT_EMOJI}</Text>
-                  <View style={[styles.statusDot, { backgroundColor: online ? statusColor : "#d1d5db" }]} />
+              <View className="flex-row items-center gap-3 flex-1">
+                <View className="w-11 h-11 rounded-full bg-gray-100 dark:bg-slate-700 justify-center items-center">
+                  <Text className="text-xl">{item.identityEmoji ?? DEFAULT_AGENT_EMOJI}</Text>
+                  <View
+                    className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800"
+                    style={{ backgroundColor: online ? statusColor : "#d1d5db" }}
+                  />
                 </View>
-                <View style={styles.info}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.agentName}>{item.name}</Text>
+                <View className="flex-1 gap-0.5">
+                  <View className="flex-row items-center gap-1.5">
+                    <Text className="text-base font-semibold text-gray-900 dark:text-slate-100">{item.name}</Text>
                     {item.upgradeAvailable && (
-                      <View style={styles.upgradeDot}>
-                        <Text style={styles.upgradeDotText}>↑</Text>
+                      <View className="bg-amber-100 dark:bg-amber-900/30 rounded px-1 py-px">
+                        <Text className="text-xs text-amber-600 dark:text-amber-400 font-bold">↑</Text>
                       </View>
                     )}
                   </View>
-                  <Text style={styles.agentRole}>{item.role}</Text>
+                  <Text className="text-xs text-gray-500 dark:text-slate-400">{item.role}</Text>
                   {item.currentTask && !isDeactivated && (
-                    <Text style={styles.currentTask} numberOfLines={1}>{item.currentTask}</Text>
+                    <Text className="text-xs text-blue-600 dark:text-blue-400 mt-0.5" numberOfLines={1}>{item.currentTask}</Text>
                   )}
                   {isPending && (
-                    <Text style={styles.pendingTag}>Needs setup</Text>
+                    <Text className="text-xs text-amber-600 dark:text-amber-400 font-semibold mt-0.5">Needs setup</Text>
                   )}
                 </View>
               </View>
 
-              <View style={styles.cardRight}>
+              <View className="items-end gap-1.5">
                 {isDeactivated ? (
-                  <View style={[styles.statusBadge, { backgroundColor: "#f3f4f6" }]}>
-                    <Text style={[styles.statusText, { color: "#9ca3af" }]}>Deactivated</Text>
+                  <View className="bg-gray-100 dark:bg-slate-700 rounded px-1.5 py-0.5">
+                    <Text className="text-xs font-semibold text-gray-400 dark:text-slate-500">Deactivated</Text>
                   </View>
                 ) : (
-                  <View style={[styles.statusBadge, { backgroundColor: (online ? statusColor : "#6b7280") + "22" }]}>
-                    <Text style={[styles.statusText, { color: online ? statusColor : "#6b7280" }]}>
+                  <View
+                    className="rounded px-1.5 py-0.5"
+                    style={{ backgroundColor: (online ? statusColor : "#6b7280") + "22" }}
+                  >
+                    <Text className="text-xs font-semibold" style={{ color: online ? statusColor : "#6b7280" }}>
                       {online ? getAgentStatusLabel(item) : "Offline"}
                     </Text>
                   </View>
                 )}
-                <Text style={styles.levelText}>{item.level}</Text>
+                <Text className="text-xs text-gray-400 dark:text-slate-500 capitalize">{item.level}</Text>
                 {!isPending && (
                   <TouchableOpacity
-                    style={[styles.toggleBtn, { backgroundColor: isDeactivated ? "#dbeafe" : "#fee2e2" }]}
+                    className={`rounded-md px-2 py-0.5 ${isDeactivated ? "bg-blue-100 dark:bg-blue-900/30" : "bg-red-100 dark:bg-red-900/30"}`}
                     activeOpacity={0.7}
                     onPress={(e) => {
                       e.stopPropagation();
@@ -210,7 +218,7 @@ export default function AgentsScreen() {
                       );
                     }}
                   >
-                    <Text style={[styles.toggleBtnText, { color: isDeactivated ? "#2563eb" : "#dc2626" }]}>
+                    <Text className={`text-xs font-semibold ${isDeactivated ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-400"}`}>
                       {isDeactivated ? "Activate" : "Deactivate"}
                     </Text>
                   </TouchableOpacity>
@@ -223,124 +231,3 @@ export default function AgentsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9fafb" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
-  errorText: { color: "#dc2626", fontSize: 16 },
-  retryBtn: { marginTop: 4 },
-  retryText: { color: "#2563eb", fontSize: 14, fontWeight: "600" },
-
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  searchInput: { flex: 1, fontSize: 15, color: "#111827" },
-
-  filterBar: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    paddingHorizontal: 12,
-  },
-  filterTab: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  filterTabActive: { borderBottomColor: "#2563eb" },
-  filterTabText: { fontSize: 13, color: "#6b7280", fontWeight: "500" },
-  filterTabTextActive: { color: "#2563eb", fontWeight: "600" },
-  filterCount: {
-    backgroundColor: "#f3f4f6",
-    borderRadius: 10,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    minWidth: 18,
-    alignItems: "center",
-  },
-  filterCountActive: { backgroundColor: "#dbeafe" },
-  filterCountText: { fontSize: 11, color: "#6b7280", fontWeight: "600" },
-  filterCountTextActive: { color: "#2563eb" },
-
-  listContent: { padding: 16, gap: 10 },
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { color: "#9ca3af", fontSize: 15, textAlign: "center" },
-
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-  },
-  cardMuted: { opacity: 0.6 },
-  cardLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  emojiContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emoji: { fontSize: 22 },
-  statusDot: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
-  info: { flex: 1, gap: 2 },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  agentName: { fontSize: 15, fontWeight: "600", color: "#111827" },
-  upgradeDot: {
-    backgroundColor: "#fef3c7",
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  upgradeDotText: { fontSize: 10, color: "#d97706", fontWeight: "700" },
-  agentRole: { fontSize: 12, color: "#6b7280" },
-  currentTask: { fontSize: 12, color: "#2563eb", marginTop: 2 },
-  pendingTag: { fontSize: 11, color: "#d97706", fontWeight: "600", marginTop: 2 },
-  cardRight: { alignItems: "flex-end", gap: 6 },
-  statusBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  statusText: { fontSize: 11, fontWeight: "600" },
-  levelText: { fontSize: 11, color: "#9ca3af", textTransform: "capitalize" },
-  createBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#2563eb",
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 4,
-  },
-  createBtnText: { fontSize: 20, color: "#fff", lineHeight: 24, fontWeight: "400" },
-  toggleBtn: {
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  toggleBtnText: { fontSize: 11, fontWeight: "600" },
-});

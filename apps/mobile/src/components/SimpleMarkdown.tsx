@@ -1,4 +1,6 @@
-import { View, Text, StyleSheet, Platform } from "react-native";
+import { View, Text, Platform } from "react-native";
+
+const MONO = Platform.OS === "ios" ? "Menlo" : "monospace";
 
 /**
  * Lightweight markdown renderer for React Native.
@@ -15,11 +17,20 @@ export function SimpleMarkdown({ content }: { content: string }) {
   function flushCode(key: string) {
     if (codeLines.length > 0) {
       elements.push(
-        <View key={key} style={styles.codeBlock}>
+        <View key={key} className="bg-slate-900 rounded-lg p-3 my-1 gap-1.5">
           {codeLang ? (
-            <Text style={styles.codeLang}>{codeLang}</Text>
+            <Text
+              className="uppercase tracking-wide text-xs text-slate-400"
+              style={{ fontFamily: MONO, letterSpacing: 0.5 }}
+            >
+              {codeLang}
+            </Text>
           ) : null}
-          <Text style={styles.codeText} selectable>
+          <Text
+            className="text-slate-300 text-sm leading-5"
+            style={{ fontFamily: MONO }}
+            selectable
+          >
             {codeLines.join("\n")}
           </Text>
         </View>
@@ -49,33 +60,53 @@ export function SimpleMarkdown({ content }: { content: string }) {
     }
 
     if (line.startsWith("### ")) {
-      elements.push(<Text key={key} style={styles.h3}>{renderInline(line.slice(4))}</Text>);
+      elements.push(
+        <Text key={key} className="text-base font-bold text-gray-700 dark:text-slate-200 mt-1.5 mb-0.5 leading-6">
+          {renderInline(line.slice(4))}
+        </Text>
+      );
     } else if (line.startsWith("## ")) {
-      elements.push(<Text key={key} style={styles.h2}>{renderInline(line.slice(3))}</Text>);
+      elements.push(
+        <Text key={key} className="text-lg font-bold text-gray-900 dark:text-slate-100 mt-2 mb-1 leading-6">
+          {renderInline(line.slice(3))}
+        </Text>
+      );
     } else if (line.startsWith("# ")) {
-      elements.push(<Text key={key} style={styles.h1}>{renderInline(line.slice(2))}</Text>);
+      elements.push(
+        <Text key={key} className="text-xl font-extrabold text-gray-900 dark:text-slate-100 mt-2.5 mb-1 leading-7">
+          {renderInline(line.slice(2))}
+        </Text>
+      );
     } else if (line.match(/^(\*{3}|-{3}|_{3})$/)) {
-      elements.push(<View key={key} style={styles.hr} />);
+      elements.push(<View key={key} className="h-px bg-gray-200 dark:bg-slate-700 my-2" />);
     } else if (line.startsWith("- ") || line.startsWith("* ")) {
       elements.push(
-        <View key={key} style={styles.bulletRow}>
-          <Text style={styles.bulletDot}>•</Text>
-          <Text style={styles.bulletText}>{renderInline(line.slice(2))}</Text>
+        <View key={key} className="flex-row gap-2 items-start">
+          <Text className="text-base text-gray-500 dark:text-slate-400 leading-6 w-3.5">•</Text>
+          <Text className="text-base text-gray-700 dark:text-slate-300 leading-6 flex-1">
+            {renderInline(line.slice(2))}
+          </Text>
         </View>
       );
     } else if (line.match(/^\d+\. /)) {
       const dotIdx = line.indexOf(". ");
       const num = line.slice(0, dotIdx);
       elements.push(
-        <View key={key} style={styles.bulletRow}>
-          <Text style={styles.bulletDot}>{num}.</Text>
-          <Text style={styles.bulletText}>{renderInline(line.slice(dotIdx + 2))}</Text>
+        <View key={key} className="flex-row gap-2 items-start">
+          <Text className="text-base text-gray-500 dark:text-slate-400 leading-6 w-3.5">{num}.</Text>
+          <Text className="text-base text-gray-700 dark:text-slate-300 leading-6 flex-1">
+            {renderInline(line.slice(dotIdx + 2))}
+          </Text>
         </View>
       );
     } else if (line.trim() === "") {
-      elements.push(<View key={key} style={styles.spacer} />);
+      elements.push(<View key={key} className="h-2" />);
     } else {
-      elements.push(<Text key={key} style={styles.body} selectable>{renderInline(line)}</Text>);
+      elements.push(
+        <Text key={key} className="text-base text-gray-700 dark:text-slate-300 leading-6" selectable>
+          {renderInline(line)}
+        </Text>
+      );
     }
   });
 
@@ -83,7 +114,7 @@ export function SimpleMarkdown({ content }: { content: string }) {
     flushCode("final");
   }
 
-  return <View style={styles.container}>{elements}</View>;
+  return <View className="gap-0.5">{elements}</View>;
 }
 
 /**
@@ -91,7 +122,6 @@ export function SimpleMarkdown({ content }: { content: string }) {
  * Returns a React element with nested Text spans.
  */
 function renderInline(text: string): React.ReactNode {
-  // Split on bold (**text**), italic (*text*), and inline code (`text`)
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
   if (parts.length === 1) return text;
 
@@ -99,61 +129,32 @@ function renderInline(text: string): React.ReactNode {
     <>
       {parts.map((part, i) => {
         if (part.startsWith("**") && part.endsWith("**")) {
-          return <Text key={i} style={styles.bold}>{part.slice(2, -2)}</Text>;
+          return (
+            <Text key={i} className="font-bold text-gray-900 dark:text-slate-100">
+              {part.slice(2, -2)}
+            </Text>
+          );
         }
         if (part.startsWith("*") && part.endsWith("*")) {
-          return <Text key={i} style={styles.italic}>{part.slice(1, -1)}</Text>;
+          return (
+            <Text key={i} className="italic">
+              {part.slice(1, -1)}
+            </Text>
+          );
         }
         if (part.startsWith("`") && part.endsWith("`")) {
-          return <Text key={i} style={styles.inlineCode}>{part.slice(1, -1)}</Text>;
+          return (
+            <Text
+              key={i}
+              className="text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/50 rounded text-sm px-1"
+              style={{ fontFamily: MONO }}
+            >
+              {part.slice(1, -1)}
+            </Text>
+          );
         }
         return part || null;
       })}
     </>
   );
 }
-
-const MONO = Platform.OS === "ios" ? "Menlo" : "monospace";
-
-const styles = StyleSheet.create({
-  container: { gap: 2 },
-  h1: { fontSize: 20, fontWeight: "800", color: "#111827", marginTop: 10, marginBottom: 4, lineHeight: 28 },
-  h2: { fontSize: 17, fontWeight: "700", color: "#111827", marginTop: 8, marginBottom: 3, lineHeight: 24 },
-  h3: { fontSize: 15, fontWeight: "700", color: "#374151", marginTop: 6, marginBottom: 2, lineHeight: 22 },
-  body: { fontSize: 15, color: "#374151", lineHeight: 24 },
-  bold: { fontWeight: "700", color: "#111827" },
-  italic: { fontStyle: "italic" },
-  inlineCode: {
-    fontFamily: MONO,
-    fontSize: 13,
-    color: "#7c3aed",
-    backgroundColor: "#f5f3ff",
-    borderRadius: 3,
-    paddingHorizontal: 3,
-  },
-  bulletRow: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
-  bulletDot: { fontSize: 15, color: "#6b7280", lineHeight: 24, width: 14 },
-  bulletText: { fontSize: 15, color: "#374151", lineHeight: 24, flex: 1 },
-  spacer: { height: 8 },
-  hr: { height: 1, backgroundColor: "#e5e7eb", marginVertical: 8 },
-  codeBlock: {
-    backgroundColor: "#1e1e2e",
-    borderRadius: 8,
-    padding: 12,
-    marginVertical: 4,
-    gap: 6,
-  },
-  codeLang: {
-    fontFamily: MONO,
-    fontSize: 10,
-    color: "#7c7f93",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  codeText: {
-    fontFamily: MONO,
-    fontSize: 13,
-    color: "#cdd6f4",
-    lineHeight: 20,
-  },
-});

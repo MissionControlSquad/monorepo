@@ -53,7 +53,7 @@ export default function Index() {
 
   if (isLoading || checking) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View className="flex-1 justify-center items-center">
         <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
@@ -65,7 +65,7 @@ export default function Index() {
 
   // Redirect handled by useEffect above; show spinner while resolving
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+    <View className="flex-1 justify-center items-center">
       <ActivityIndicator size="large" color="#2563eb" />
     </View>
   );
