@@ -9,7 +9,7 @@ import type { NotificationItem } from "@agentcenter/types";
  *   `credentials:"include"` so the session cookie must be injected as an explicit header.
  */
 
-function notificationHeaders(getCookie?: () => string | null): HeadersInit {
+function notificationHeaders(getCookie?: () => string | null): Record<string, string> {
   const cookie = getCookie?.();
   return cookie ? { Cookie: `mc_session=${cookie}` } : {};
 }

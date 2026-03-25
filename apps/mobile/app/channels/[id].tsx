@@ -80,7 +80,7 @@ export default function ChannelDetailScreen() {
   const router = useRouter();
   const { profileId } = useAuth();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -195,13 +195,6 @@ export default function ChannelDetailScreen() {
     }
   }, [messages.length, id, profileId]);
 
-  // Auto-scroll when new messages arrive via subscription
-  useEffect(() => {
-    if (liveMessages.length > 0) {
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  }, [liveMessages.length]);
-
   const handleSend = async () => {
     const content = message.trim();
     if (!content || !profileId) return;
@@ -218,7 +211,6 @@ export default function ChannelDetailScreen() {
         setMessage(content);
       } else {
         reexecute({ requestPolicy: "network-only" });
-        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
       }
     } finally {
       setSending(false);
@@ -243,21 +235,23 @@ export default function ChannelDetailScreen() {
 
   const searchMessages = searchResult.data?.searchChannelMessages ?? [];
   const displayMessages = searchOpen && searchQuery.trim().length >= 2 ? searchMessages : messages;
+  // Inverted FlatList renders index 0 at visual bottom — so newest message goes first
+  const invertedMessages = [...displayMessages].reverse();
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-gray-50 dark:bg-slate-900"
+      style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 44 : 0}
     >
       {/* Search bar */}
       {searchOpen && (
-        <View className="flex-row items-center bg-gray-100 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3 py-2 gap-2">
-          <Ionicons name="search-outline" size={16} color="#9ca3af" />
+        <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
+          <Ionicons name="search-outline" size={16} color={colors.textMuted} />
           <TextInput
-            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-1"
+            style={{ flex: 1, fontSize: 15, color: colors.text, paddingVertical: 4 }}
             placeholder="Search messages…"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus
@@ -267,53 +261,58 @@ export default function ChannelDetailScreen() {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons name="close-circle" size={16} color="#9ca3af" />
+              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           )}
-          {searchResult.fetching && <ActivityIndicator size="small" color="#2563eb" style={{ marginLeft: 4 }} />}
+          {searchResult.fetching && <ActivityIndicator size="small" color={colors.accent} style={{ marginLeft: 4 }} />}
         </View>
       )}
       <FlatList
         ref={searchOpen ? undefined : listRef}
-        data={displayMessages}
+        data={invertedMessages}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16, gap: 12, flexGrow: 1 }}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-        ListHeaderComponent={
+        inverted
+        contentContainerStyle={{ paddingVertical: 12 }}
+        showsVerticalScrollIndicator={false}
+        ListFooterComponent={
           pinnedMessages.length > 0 ? (
             <TouchableOpacity
-              className="flex-row items-center gap-1.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl px-3 py-2 mb-2 border border-yellow-200 dark:border-yellow-700"
+              style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: isDark ? "rgba(234,179,8,0.15)" : "#fefce8", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, marginHorizontal: 12, marginBottom: 8, borderWidth: 1, borderColor: isDark ? "rgba(234,179,8,0.3)" : "#fde68a" }}
               onPress={() => setPinnedOpen(true)}
               activeOpacity={0.8}
             >
-              <Text className="text-sm">📌</Text>
-              <Text className="flex-1 text-sm font-semibold text-yellow-800 dark:text-yellow-300">
+              <Text style={{ fontSize: 14 }}>📌</Text>
+              <Text style={{ flex: 1, fontSize: 13, fontWeight: "600", color: isDark ? "#fbbf24" : "#92400e" }}>
                 {pinnedMessages.length} pinned {pinnedMessages.length === 1 ? "message" : "messages"}
               </Text>
-              <Ionicons name="chevron-forward" size={14} color="#92400e" />
+              <Ionicons name="chevron-forward" size={14} color={isDark ? "#fbbf24" : "#92400e"} />
             </TouchableOpacity>
           ) : null
         }
         ListEmptyComponent={
-          <View className="flex-1 justify-center items-center pt-16">
-            <Text className="text-gray-400 dark:text-slate-500 text-base">
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
+            <Text style={{ fontSize: 15, color: colors.textMuted, textAlign: "center" }}>
               {searchOpen && searchQuery.trim().length >= 2
                 ? "No messages match your search"
                 : searchOpen
                 ? "Type at least 2 characters to search"
-                : "No messages yet. Say hello!"}
+                : "No messages yet. Say hello! 👋"}
             </Text>
           </View>
         }
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const isMe = item.fromProfileId === profileId;
+
+          // In inverted data: index+1 = older (visual above), index-1 = newer (visual below)
+          const olderMsg = invertedMessages[index + 1];
+          const newerMsg = invertedMessages[index - 1];
+          const isTopOfGroup = !olderMsg || olderMsg.fromProfileId !== item.fromProfileId;
+          const isBottomOfGroup = !newerMsg || newerMsg.fromProfileId !== item.fromProfileId;
 
           // Group reactions by emoji
           const reactionGroups: Record<string, { emoji: string; count: number; iMine: boolean }> = {};
           for (const r of item.reactions ?? []) {
-            if (!reactionGroups[r.emoji]) {
-              reactionGroups[r.emoji] = { emoji: r.emoji, count: 0, iMine: false };
-            }
+            if (!reactionGroups[r.emoji]) reactionGroups[r.emoji] = { emoji: r.emoji, count: 0, iMine: false };
             reactionGroups[r.emoji].count++;
             if (r.profileId === profileId) reactionGroups[r.emoji].iMine = true;
           }
@@ -328,7 +327,7 @@ export default function ChannelDetailScreen() {
 
           function showMessageActions() {
             const isPinned = !!item.pinnedAt;
-            const baseActions: { text: string; onPress?: () => void; style?: "cancel" | "destructive" }[] = [
+            const actions: { text: string; onPress?: () => void; style?: "cancel" | "destructive" }[] = [
               {
                 text: isPinned ? "📌 Unpin" : "📌 Pin",
                 onPress: () => {
@@ -341,7 +340,7 @@ export default function ChannelDetailScreen() {
                 text: "😀 React",
                 onPress: () => {
                   Alert.alert("React", undefined, [
-                    ...["👍","❤️","😂","🎉","🔥","👀"].map((e) => ({
+                    ...["👍", "❤️", "😂", "🎉", "🔥", "👀"].map((e) => ({
                       text: e,
                       onPress: () => handleReact(e),
                     })),
@@ -351,7 +350,7 @@ export default function ChannelDetailScreen() {
               },
             ];
             if (isMe) {
-              baseActions.push({
+              actions.push({
                 text: "✏️ Edit",
                 onPress: () => {
                   Alert.prompt("Edit Message", undefined, (newContent) => {
@@ -362,7 +361,7 @@ export default function ChannelDetailScreen() {
                   }, "plain-text", item.content);
                 },
               });
-              baseActions.push({
+              actions.push({
                 text: "🗑️ Delete",
                 style: "destructive",
                 onPress: () => {
@@ -382,100 +381,112 @@ export default function ChannelDetailScreen() {
                 },
               });
             }
-            baseActions.push({ text: "Cancel", style: "cancel" });
-            Alert.alert("Message", undefined, baseActions);
+            actions.push({ text: "Cancel", style: "cancel" });
+            Alert.alert("Message", undefined, actions);
           }
 
+          // Bubble corner radius — flatten corner toward tail
+          const myBubbleRadius = { borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomLeftRadius: 18, borderBottomRightRadius: isBottomOfGroup ? 4 : 18 };
+          const theirBubbleRadius = { borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomLeftRadius: isBottomOfGroup ? 4 : 18, borderBottomRightRadius: 18 };
+
           return (
-            <View className={`flex-row items-end gap-2 mb-1${isMe ? " justify-end" : ""}`}>
-              {!isMe && (
-                <View className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 justify-center items-center">
-                  <Text className="text-blue-600 text-sm font-semibold">
-                    {item.fromProfile.displayName.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-              )}
-              <View className="flex-col gap-1 max-w-[75%]">
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onLongPress={showMessageActions}
-                  delayLongPress={350}
-                >
-                  <View
-                    className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 gap-1${
-                      isMe
-                        ? " bg-blue-600 rounded-br"
-                        : " bg-white dark:bg-slate-800 rounded-bl border border-gray-200 dark:border-slate-700"
-                    }`}
-                  >
-                    {!isMe && (
-                      <Text className="text-xs font-semibold text-blue-600 mb-0.5">{item.fromProfile.displayName}</Text>
-                    )}
-                    <Text className={`text-base leading-5${isMe ? " text-white" : " text-gray-900 dark:text-slate-100"}`}>
-                      {item.content}
-                    </Text>
-                    <Text
-                      className={`text-xs self-end${isMe ? "" : " text-gray-400 dark:text-slate-500"}`}
-                      style={isMe ? { color: "rgba(255,255,255,0.7)" } : undefined}
-                    >
-                      {formatChatTime(item.createdAt)}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-                {(item.attachments ?? []).length > 0 && (
-                  <View className="gap-1.5 mt-0.5">
-                    {(item.attachments ?? []).map((a: Attachment) => {
-                      const mime = a.document.mimeType ?? "";
-                      const icon = mime.startsWith("image/") ? "🖼️"
-                        : mime.startsWith("video/") ? "🎬"
-                        : mime.startsWith("audio/") ? "🎵"
-                        : mime === "application/pdf" ? "📄"
-                        : "📎";
-                      const size = a.document.fileSize
-                        ? a.document.fileSize > 1_000_000
-                          ? `${(a.document.fileSize / 1_000_000).toFixed(1)} MB`
-                          : `${Math.round(a.document.fileSize / 1024)} KB`
-                        : null;
-                      return (
-                        <View key={a.id} className="flex-row items-center gap-2 bg-gray-100 dark:bg-slate-700 rounded-lg px-2.5 py-2 border border-gray-200 dark:border-slate-600">
-                          <Text className="text-base">{icon}</Text>
-                          <View className="flex-1">
-                            <Text className="text-xs font-medium text-gray-700 dark:text-slate-300" numberOfLines={1}>
-                              {a.document.fileName || a.document.title}
-                            </Text>
-                            {size && <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">{size}</Text>}
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-                {reactionList.length > 0 && (
-                  <View className={`flex-row flex-wrap gap-1${isMe ? " justify-end pr-0.5" : " pl-0.5"}`}>
-                    {reactionList.map((r) => (
-                      <TouchableOpacity
-                        key={r.emoji}
-                        className={`flex-row items-center gap-1 rounded-xl px-2 py-1 border${
-                          r.iMine
-                            ? " bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-600"
-                            : " bg-gray-100 dark:bg-slate-700 border-gray-200 dark:border-slate-600"
-                        }`}
-                        onPress={() => handleReact(r.emoji)}
-                      >
-                        <Text className="text-sm">{r.emoji}</Text>
-                        <Text className={`text-xs font-semibold${r.iMine ? " text-blue-600" : " text-gray-500 dark:text-slate-400"}`}>
-                          {r.count}
+            <View style={{ paddingHorizontal: 12, marginBottom: isBottomOfGroup ? 8 : 2, marginTop: isTopOfGroup ? 6 : 0 }}>
+              <View style={{ flexDirection: "row", justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 8 }}>
+                {/* Avatar slot — 32px wide so messages align even when avatar hidden */}
+                {!isMe && (
+                  <View style={{ width: 32, alignSelf: "flex-end", marginBottom: 2 }}>
+                    {isBottomOfGroup && (
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.accentSurface, justifyContent: "center", alignItems: "center" }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.accent }}>
+                          {item.fromProfile.displayName.charAt(0).toUpperCase()}
                         </Text>
-                      </TouchableOpacity>
-                    ))}
-                    <TouchableOpacity
-                      className="bg-gray-100 dark:bg-slate-700 rounded-xl px-2 py-1 border border-gray-200 dark:border-slate-600 justify-center items-center"
-                      onPress={showMessageActions}
-                    >
-                      <Text className="text-sm text-gray-400 dark:text-slate-500 font-semibold">+</Text>
-                    </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 )}
+
+                {/* Bubble column */}
+                <View style={{ maxWidth: "75%" }}>
+                  {/* Sender name — only at top of group for others */}
+                  {!isMe && isTopOfGroup && (
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: colors.accent, marginBottom: 3, marginLeft: 2 }}>
+                      {item.fromProfile.displayName}
+                    </Text>
+                  )}
+
+                  <TouchableOpacity activeOpacity={0.85} onLongPress={showMessageActions} delayLongPress={350}>
+                    <View style={[
+                      { paddingHorizontal: 14, paddingVertical: 10 },
+                      isMe
+                        ? [{ backgroundColor: colors.accent }, myBubbleRadius]
+                        : [{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }, theirBubbleRadius],
+                    ]}>
+                      <Text style={{ fontSize: 16, lineHeight: 23, color: isMe ? "#fff" : colors.text }}>
+                        {item.content}
+                      </Text>
+                      {isBottomOfGroup && (
+                        <Text style={{ fontSize: 11, alignSelf: "flex-end", marginTop: 4, color: isMe ? "rgba(255,255,255,0.65)" : colors.textMuted }}>
+                          {formatChatTime(item.createdAt)}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Attachments */}
+                  {(item.attachments ?? []).length > 0 && (
+                    <View style={{ gap: 6, marginTop: 4 }}>
+                      {item.attachments.map((a: Attachment) => {
+                        const mime = a.document.mimeType ?? "";
+                        const icon = mime.startsWith("image/") ? "🖼️" : mime.startsWith("video/") ? "🎬" : mime.startsWith("audio/") ? "🎵" : mime === "application/pdf" ? "📄" : "📎";
+                        const size = a.document.fileSize
+                          ? a.document.fileSize > 1_000_000
+                            ? `${(a.document.fileSize / 1_000_000).toFixed(1)} MB`
+                            : `${Math.round(a.document.fileSize / 1024)} KB`
+                          : null;
+                        return (
+                          <View key={a.id} style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surfaceAlt, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: colors.border }}>
+                            <Text style={{ fontSize: 16 }}>{icon}</Text>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: "500", color: colors.text }} numberOfLines={1}>
+                                {a.document.fileName || a.document.title}
+                              </Text>
+                              {size && <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 1 }}>{size}</Text>}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  {/* Reactions */}
+                  {reactionList.length > 0 && (
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4, justifyContent: isMe ? "flex-end" : "flex-start" }}>
+                      {reactionList.map((r) => (
+                        <TouchableOpacity
+                          key={r.emoji}
+                          style={[
+                            { flexDirection: "row", alignItems: "center", gap: 3, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
+                            r.iMine
+                              ? { backgroundColor: colors.accentSurface, borderColor: isDark ? colors.accent : "#93c5fd" }
+                              : { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+                          ]}
+                          onPress={() => handleReact(r.emoji)}
+                        >
+                          <Text style={{ fontSize: 13 }}>{r.emoji}</Text>
+                          <Text style={{ fontSize: 12, fontWeight: "600", color: r.iMine ? colors.accent : colors.textSecondary }}>
+                            {r.count}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                      <TouchableOpacity
+                        style={{ borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, backgroundColor: colors.surfaceAlt, borderColor: colors.border, justifyContent: "center", alignItems: "center" }}
+                        onPress={showMessageActions}
+                      >
+                        <Text style={{ fontSize: 13, color: colors.textMuted, fontWeight: "600" }}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
           );
