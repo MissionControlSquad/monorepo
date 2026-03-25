@@ -194,7 +194,7 @@ export function AppDrawer() {
           <DrawerItem icon="document-text-outline" label="Task Templates" onPress={() => navigate("/task-templates")} isDark={isDark} />
           <DrawerItem icon="notifications-outline" label="Notifications" onPress={() => navigate("/notifications")} isDark={isDark} badge={notificationCount > 0 ? (notificationCount > 99 ? "99+" : String(notificationCount)) : undefined} />
           <DrawerItem icon="server-outline" label="Cloud VMs" onPress={() => navigate("/cloud")} isDark={isDark} />
-          <DrawerItem icon="toggle-outline" label="Feature Flags" onPress={() => navigate("/feature-flags")} isDark={isDark} />
+          {/* <DrawerItem icon="toggle-outline" label="Feature Flags" onPress={() => navigate("/feature-flags")} isDark={isDark} /> */}
         </View>
 
         {/* Divider */}
