@@ -10,12 +10,10 @@ import {
 import { useQuery, useMutation } from "urql";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FEATURE_FLAGS_QUERY, UPDATE_FEATURE_FLAG } from "@agentcenter/graphql-client";
-import { useTheme } from "../src/hooks/useTheme";
 import { EmptyState } from "../src/components/EmptyState";
 import type { FeatureFlag } from "@agentcenter/types";
 
 export default function FeatureFlagsScreen() {
-  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
   const [result, reexecute] = useQuery<{ featureFlags: FeatureFlag[] }>({
@@ -46,7 +44,7 @@ export default function FeatureFlagsScreen() {
   if (result.fetching && flags.length === 0) {
     return (
       <View className="flex-1 justify-center items-center bg-white dark:bg-slate-900">
-        <ActivityIndicator size="large" color={colors.accent} />
+        <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
   }
@@ -67,7 +65,7 @@ export default function FeatureFlagsScreen() {
           <RefreshControl
             refreshing={result.fetching && flags.length > 0}
             onRefresh={() => reexecute({ requestPolicy: "network-only" })}
-            tintColor={colors.accent}
+            tintColor="#2563eb"
           />
         }
         ListEmptyComponent={

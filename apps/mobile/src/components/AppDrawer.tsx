@@ -7,6 +7,7 @@ import {
   Image,
   Alert,
   useWindowDimensions,
+  useColorScheme,
 } from "react-native";
 import { useEffect, useRef } from "react";
 import { useRouter } from "expo-router";
@@ -17,7 +18,7 @@ import { useAuth } from "../context/AuthContext";
 import { useQuery } from "urql";
 import { ME_DRAWER_QUERY } from "@agentcenter/graphql-client";
 import { getStoredServerUrl } from "../api/session";
-import { useTheme } from "../hooks/useTheme";
+import { useColorScheme } from "react-native";
 import { useNotificationCount } from "../hooks/useNotificationCount";
 import { generateInitials } from "@agentcenter/utils";
 import type { ProfileWithUser as Profile } from "@agentcenter/types";
@@ -30,7 +31,7 @@ export function AppDrawer() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
-  const { colors, isDark } = useTheme();
+  const isDark = useColorScheme() === "dark";
 
   const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -110,7 +111,7 @@ export function AppDrawer() {
         className="absolute top-0 bottom-0 right-0 bg-white dark:bg-slate-900"
         style={{
           width: Math.min(DRAWER_WIDTH, screenWidth * 0.78),
-          shadowColor: colors.shadow,
+          shadowColor: "#000000",
           shadowOffset: { width: -3, height: 0 },
           shadowOpacity: 0.15,
           shadowRadius: 12,
@@ -126,7 +127,7 @@ export function AppDrawer() {
           onPress={closeDrawer}
           activeOpacity={0.7}
         >
-          <Ionicons name="close" size={22} color={colors.textSecondary} />
+          <Ionicons name="close" size={22} color={isDark ? "#94a3b8" : "#6b7280"} />
         </TouchableOpacity>
 
         {/* Profile section */}

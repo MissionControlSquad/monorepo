@@ -4,7 +4,6 @@ import {
   ScrollView,
   FlatList,
   TextInput,
-  StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -158,19 +157,20 @@ function RejectModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Reject Task</Text>
-            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
-              <Text style={{ fontSize: 22, color: "#374151" }}>✕</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
+        <View className="flex-1 bg-white dark:bg-slate-800">
+          <View className="flex-row items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200 dark:border-slate-700">
+            <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">Reject Task</Text>
+            <TouchableOpacity onPress={onClose} className="p-1">
+              <Text className="text-[22px] text-gray-700 dark:text-slate-300">✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
             <View style={{ gap: 6 }}>
-              <Text style={styles.rejectLabel}>Rejection Reason *</Text>
+              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Rejection Reason *</Text>
               <TextInput
-                style={[styles.rejectInput, { height: 80 }]}
+                className="border border-gray-300 dark:border-slate-600 rounded-lg p-[10px] text-[15px] text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
+                style={{ height: 80 }}
                 value={reason}
                 onChangeText={setReason}
                 placeholder="Why is this being rejected?"
@@ -179,31 +179,31 @@ function RejectModal({
               />
             </View>
             <View style={{ gap: 6 }}>
-              <Text style={styles.rejectLabel}>Changes Needed</Text>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Changes Needed</Text>
+              <View className="flex-row gap-2">
                 <TextInput
-                  style={[styles.rejectInput, { flex: 1 }]}
+                  className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg p-[10px] text-[15px] text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
                   value={changeText}
                   onChangeText={setChangeText}
                   placeholder="Add a required change"
                   returnKeyType="done"
                   onSubmitEditing={addChange}
                 />
-                <TouchableOpacity style={styles.addChangeBtn} onPress={addChange}>
-                  <Text style={styles.addChangeBtnText}>Add</Text>
+                <TouchableOpacity className="bg-blue-600 rounded-lg px-[14px] py-[10px] justify-center" onPress={addChange}>
+                  <Text className="text-white font-semibold">Add</Text>
                 </TouchableOpacity>
               </View>
               {changes.map((c, i) => (
-                <View key={i} style={styles.changeItem}>
-                  <Text style={styles.changeText} numberOfLines={2}>• {c}</Text>
+                <View key={i} className="flex-row items-center gap-2 py-1">
+                  <Text className="flex-1 text-[13px] text-gray-700 dark:text-slate-300" numberOfLines={2}>• {c}</Text>
                   <TouchableOpacity onPress={() => removeChange(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={{ color: "#dc2626", fontSize: 16 }}>✕</Text>
+                    <Text className="text-red-600 text-[16px]">✕</Text>
                   </TouchableOpacity>
                 </View>
               ))}
             </View>
-            <TouchableOpacity style={styles.rejectConfirmBtn} onPress={handleConfirm}>
-              <Text style={styles.rejectConfirmBtnText}>Reject Task</Text>
+            <TouchableOpacity className="bg-red-600 rounded-[10px] p-[14px] items-center" onPress={handleConfirm}>
+              <Text className="text-white font-bold text-[15px]">Reject Task</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -252,44 +252,44 @@ function ClarifyModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Request Clarification</Text>
-            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
-              <Text style={{ fontSize: 22, color: "#374151" }}>✕</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
+        <View className="flex-1 bg-white dark:bg-slate-800">
+          <View className="flex-row items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200 dark:border-slate-700">
+            <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">Request Clarification</Text>
+            <TouchableOpacity onPress={onClose} className="p-1">
+              <Text className="text-[22px] text-gray-700 dark:text-slate-300">✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
             <View style={{ gap: 6 }}>
-              <Text style={styles.rejectLabel}>Questions</Text>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Questions</Text>
+              <View className="flex-row gap-2">
                 <TextInput
-                  style={[styles.rejectInput, { flex: 1 }]}
+                  className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg p-[10px] text-[15px] text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
                   value={questionText}
                   onChangeText={setQuestionText}
                   placeholder="Add a question"
                   returnKeyType="done"
                   onSubmitEditing={addQuestion}
                 />
-                <TouchableOpacity style={styles.addChangeBtn} onPress={addQuestion}>
-                  <Text style={styles.addChangeBtnText}>Add</Text>
+                <TouchableOpacity className="bg-blue-600 rounded-lg px-[14px] py-[10px] justify-center" onPress={addQuestion}>
+                  <Text className="text-white font-semibold">Add</Text>
                 </TouchableOpacity>
               </View>
               {questions.map((q, i) => (
-                <View key={i} style={styles.changeItem}>
-                  <Text style={styles.changeText} numberOfLines={2}>• {q}</Text>
+                <View key={i} className="flex-row items-center gap-2 py-1">
+                  <Text className="flex-1 text-[13px] text-gray-700 dark:text-slate-300" numberOfLines={2}>• {q}</Text>
                   <TouchableOpacity onPress={() => removeQuestion(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={{ color: "#dc2626", fontSize: 16 }}>✕</Text>
+                    <Text className="text-red-600 text-[16px]">✕</Text>
                   </TouchableOpacity>
                 </View>
               ))}
             </View>
             <TouchableOpacity
-              style={[styles.rejectConfirmBtn, { backgroundColor: "#7c3aed" }]}
+              className="bg-violet-700 rounded-[10px] p-[14px] items-center"
               onPress={handleConfirm}
             >
-              <Text style={styles.rejectConfirmBtnText}>Send Questions</Text>
+              <Text className="text-white font-bold text-[15px]">Send Questions</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -333,19 +333,20 @@ function ApproveModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Approve Task</Text>
-            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
-              <Text style={{ fontSize: 22, color: "#374151" }}>✕</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
+        <View className="flex-1 bg-white dark:bg-slate-800">
+          <View className="flex-row items-center justify-between px-4 pt-4 pb-3 border-b border-gray-200 dark:border-slate-700">
+            <Text className="text-[17px] font-bold text-gray-900 dark:text-slate-100">Approve Task</Text>
+            <TouchableOpacity onPress={onClose} className="p-1">
+              <Text className="text-[22px] text-gray-700 dark:text-slate-300">✕</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
             <View style={{ gap: 6 }}>
-              <Text style={styles.rejectLabel}>Approval Comment (optional)</Text>
+              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Approval Comment (optional)</Text>
               <TextInput
-                style={[styles.rejectInput, { height: 72 }]}
+                className="border border-gray-300 dark:border-slate-600 rounded-lg p-[10px] text-[15px] text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
+                style={{ height: 72 }}
                 value={comment}
                 onChangeText={setComment}
                 placeholder="Great work! The task looks good."
@@ -354,34 +355,34 @@ function ApproveModal({
               />
             </View>
             <View style={{ gap: 6 }}>
-              <Text style={styles.rejectLabel}>Spawn Follow-up Tasks (optional)</Text>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300">Spawn Follow-up Tasks (optional)</Text>
+              <View className="flex-row gap-2">
                 <TextInput
-                  style={[styles.rejectInput, { flex: 1 }]}
+                  className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg p-[10px] text-[15px] text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900"
                   value={taskTitle}
                   onChangeText={setTaskTitle}
                   placeholder="Follow-up task title"
                   returnKeyType="done"
                   onSubmitEditing={addChildTask}
                 />
-                <TouchableOpacity style={styles.addChangeBtn} onPress={addChildTask}>
-                  <Text style={styles.addChangeBtnText}>Add</Text>
+                <TouchableOpacity className="bg-blue-600 rounded-lg px-[14px] py-[10px] justify-center" onPress={addChildTask}>
+                  <Text className="text-white font-semibold">Add</Text>
                 </TouchableOpacity>
               </View>
               {childTasks.map((ct, i) => (
-                <View key={i} style={styles.changeItem}>
-                  <Text style={styles.changeText} numberOfLines={1}>• {ct.title}</Text>
+                <View key={i} className="flex-row items-center gap-2 py-1">
+                  <Text className="flex-1 text-[13px] text-gray-700 dark:text-slate-300" numberOfLines={1}>• {ct.title}</Text>
                   <TouchableOpacity onPress={() => removeChildTask(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={{ color: "#dc2626", fontSize: 16 }}>✕</Text>
+                    <Text className="text-red-600 text-[16px]">✕</Text>
                   </TouchableOpacity>
                 </View>
               ))}
             </View>
             <TouchableOpacity
-              style={[styles.rejectConfirmBtn, { backgroundColor: "#16a34a" }]}
+              className="bg-green-600 rounded-[10px] p-[14px] items-center"
               onPress={handleConfirm}
             >
-              <Text style={styles.rejectConfirmBtnText}>✓ Approve Task</Text>
+              <Text className="text-white font-bold text-[15px]">✓ Approve Task</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -402,15 +403,15 @@ function TabBar({
   onPress: (i: number) => void;
 }) {
   return (
-    <View style={styles.tabBar}>
+    <View className="flex-row bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 min-h-[46px]">
       {tabs.map((tab, i) => (
         <TouchableOpacity
           key={tab}
-          style={[styles.tab, active === i && styles.tabActive]}
+          className={`flex-1 py-[13px] items-center justify-center border-b-2 ${active === i ? "border-blue-600" : "border-transparent"}`}
           onPress={() => onPress(i)}
           activeOpacity={0.7}
         >
-          <Text style={[styles.tabText, active === i && styles.tabTextActive]}>{tab}</Text>
+          <Text className={`text-[14px] ${active === i ? "text-blue-600 font-semibold" : "text-gray-500 dark:text-slate-400 font-medium"}`}>{tab}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -466,34 +467,29 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
 
   return (
     <ScrollView
-      contentContainerStyle={styles.tabContent}
+      contentContainerStyle={{ padding: 16, gap: 12 }}
     >
       {/* Title */}
-      <Text style={styles.title}>{task.title}</Text>
+      <Text className="text-[20px] font-bold text-gray-900 dark:text-slate-100 leading-7">{task.title}</Text>
 
       {/* Badges */}
-      <View style={styles.badgeRow}>
+      <View className="flex-row flex-wrap gap-2 items-center">
         <TouchableOpacity
-          style={[styles.badge, { backgroundColor: statusColor + "22" }]}
+          style={{ backgroundColor: statusColor + "22", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 }}
           onPress={onStatusChange}
           activeOpacity={0.7}
         >
-          <Text style={[styles.badgeText, { color: statusColor }]}>
+          <Text style={{ color: statusColor }} className="text-[13px] font-semibold">
             {humanizeLabel(task.status)}
           </Text>
         </TouchableOpacity>
         {task.priority && (
           <View
-            style={[
-              styles.badge,
-              { backgroundColor: (PRIORITY_HEX_COLORS[task.priority] ?? DEFAULT_COLOR) + "22" },
-            ]}
+            style={{ backgroundColor: (PRIORITY_HEX_COLORS[task.priority] ?? DEFAULT_COLOR) + "22", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 }}
           >
             <Text
-              style={[
-                styles.badgeText,
-                { color: PRIORITY_HEX_COLORS[task.priority] ?? DEFAULT_COLOR, textTransform: "capitalize" },
-              ]}
+              style={{ color: PRIORITY_HEX_COLORS[task.priority] ?? DEFAULT_COLOR, textTransform: "capitalize" }}
+              className="text-[13px] font-semibold"
             >
               {task.priority}
             </Text>
@@ -501,18 +497,18 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
         )}
         {task.project ? (
           <TouchableOpacity
-            style={[styles.badge, { backgroundColor: "#f3f4f6" }]}
+            className="rounded-[6px] px-[10px] py-[4px] bg-gray-100 dark:bg-slate-700"
             onPress={() => router.push(`/project/${task.project!.id}`)}
           >
-            <Text style={[styles.badgeText, { color: "#6b7280" }]}>📁 {task.project.name}</Text>
+            <Text className="text-[13px] font-semibold text-gray-500 dark:text-slate-400">📁 {task.project.name}</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[styles.badge, { backgroundColor: "#f3f4f6", borderStyle: "dashed", borderWidth: 1, borderColor: "#d1d5db" }]}
+            className="rounded-[6px] px-[10px] py-[4px] bg-gray-100 dark:bg-slate-700 border border-dashed border-gray-300 dark:border-slate-600"
             onPress={handleAssignProject}
             activeOpacity={0.7}
           >
-            <Text style={[styles.badgeText, { color: "#9ca3af" }]}>📁 Assign project</Text>
+            <Text className="text-[13px] font-semibold text-gray-400 dark:text-slate-500">📁 Assign project</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -520,27 +516,27 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
       {/* Blocked-by dependency */}
       {task.blockedByTask && (
         <TouchableOpacity
-          style={styles.blockedByCard}
+          className="bg-red-50 dark:bg-red-900/20 rounded-[10px] p-3 border border-red-200 dark:border-red-800 gap-[6px]"
           onPress={() => router.push(`/task/${task.blockedByTask!.id}`)}
           activeOpacity={0.8}
         >
-          <Text style={styles.blockedByLabel}>🚫 Blocked by</Text>
-          <View style={styles.blockedByRow}>
-            <Text style={styles.blockedByTaskNum}>#{task.blockedByTask.taskNumber}</Text>
-            <Text style={styles.blockedByTaskTitle} numberOfLines={1}>
+          <Text className="text-[12px] font-bold text-red-600">🚫 Blocked by</Text>
+          <View className="flex-row items-center gap-[6px]">
+            <Text className="text-[12px] text-gray-400 dark:text-slate-500 font-medium">#{task.blockedByTask.taskNumber}</Text>
+            <Text className="text-[13px] text-gray-900 dark:text-slate-100 flex-1 font-medium" numberOfLines={1}>
               {task.blockedByTask.title}
             </Text>
             <View
-              style={[
-                styles.miniPill,
-                { backgroundColor: (STATUS_HEX_COLORS[task.blockedByTask.status] ?? DEFAULT_COLOR) + "22" },
-              ]}
+              style={{
+                backgroundColor: (STATUS_HEX_COLORS[task.blockedByTask.status] ?? DEFAULT_COLOR) + "22",
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 4,
+              }}
             >
               <Text
-                style={[
-                  styles.miniPillText,
-                  { color: STATUS_HEX_COLORS[task.blockedByTask.status] ?? DEFAULT_COLOR },
-                ]}
+                style={{ color: STATUS_HEX_COLORS[task.blockedByTask.status] ?? DEFAULT_COLOR, textTransform: "capitalize" }}
+                className="text-[10px] font-semibold"
               >
                 {task.blockedByTask.status.replace("_", " ")}
               </Text>
@@ -551,25 +547,25 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
 
       {/* Description */}
       {task.description ? (
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Description</Text>
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-[10px]">
+          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Description</Text>
           <SimpleMarkdown content={task.description} />
         </View>
       ) : null}
 
       {/* Assignees */}
       {task.assignees.length > 0 && (
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Assignees</Text>
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-[10px]">
+          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Assignees</Text>
           {task.assignees.map((a) => (
-            <View key={a.id} style={styles.assigneeRow}>
-              <Text style={styles.assigneeEmoji}>
+            <View key={a.id} className="flex-row items-center gap-[10px]">
+              <Text className="text-[20px]">
                 {a.profile.agent?.identityEmoji ?? "👤"}
               </Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.assigneeName}>{a.profile.displayName}</Text>
+              <View className="flex-1">
+                <Text className="text-[14px] font-medium text-gray-900 dark:text-slate-100">{a.profile.displayName}</Text>
                 {a.profile.agent && (
-                  <Text style={styles.assigneeStatus}>{humanizeLabel(a.profile.agent.status)}</Text>
+                  <Text className="text-[12px] text-gray-500 dark:text-slate-400 mt-[1px]">{humanizeLabel(a.profile.agent.status)}</Text>
                 )}
               </View>
             </View>
@@ -579,26 +575,23 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
 
       {/* Subtasks */}
       {(childTasks.length > 0 || childResult.fetching) && (
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Subtasks ({childTasks.length})</Text>
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-[10px]">
+          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Subtasks ({childTasks.length})</Text>
           {childResult.fetching ? (
             <ActivityIndicator size="small" color="#2563eb" />
           ) : (
             childTasks.map((ct) => (
               <TouchableOpacity
                 key={ct.id}
-                style={styles.subtaskRow}
+                className="flex-row items-center gap-2 py-1"
                 onPress={() => router.push(`/task/${ct.id}`)}
                 activeOpacity={0.7}
               >
                 <View
-                  style={[
-                    styles.subtaskDot,
-                    { backgroundColor: STATUS_HEX_COLORS[ct.status] ?? DEFAULT_COLOR },
-                  ]}
+                  style={{ backgroundColor: STATUS_HEX_COLORS[ct.status] ?? DEFAULT_COLOR, width: 8, height: 8, borderRadius: 4 }}
                 />
-                <Text style={styles.subtaskNum}>#{ct.taskNumber}</Text>
-                <Text style={styles.subtaskTitle} numberOfLines={1}>
+                <Text className="text-[12px] text-gray-400 dark:text-slate-500 font-medium w-8">#{ct.taskNumber}</Text>
+                <Text className="text-[13px] text-gray-700 dark:text-slate-300 flex-1" numberOfLines={1}>
                   {ct.title}
                 </Text>
               </TouchableOpacity>
@@ -608,8 +601,8 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
       )}
 
       {/* Details */}
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>Details</Text>
+      <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-[10px]">
+        <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Details</Text>
         <DetailRow label="Due Date" value={formatDate(task.dueDate)} />
         <DetailRow label="Created" value={formatDate(task.createdAt)} />
         {task.createdByProfile && (
@@ -629,12 +622,12 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
 
       {/* Tags */}
       {task.tags.length > 0 && (
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Tags</Text>
-          <View style={styles.tagsRow}>
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-[10px]">
+          <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Tags</Text>
+          <View className="flex-row flex-wrap gap-[6px]">
             {task.tags.map((tag) => (
-              <View key={tag} style={styles.tag}>
-                <Text style={styles.tagText}>{tag}</Text>
+              <View key={tag} className="bg-blue-50 dark:bg-blue-900/30 rounded px-2 py-[3px]">
+                <Text className="text-[12px] text-blue-600 font-medium">{tag}</Text>
               </View>
             ))}
           </View>
@@ -643,11 +636,11 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
 
       {/* Work time */}
       {workSummary && workSummary.totalWorkTimeMs > 0 && (
-        <View style={styles.card}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={styles.cardLabel}>Work Time</Text>
+        <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-[10px]">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Work Time</Text>
             {workSummary.activeSessionCount > 0 && (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <View className="flex-row items-center gap-1">
                 <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#16a34a" }} />
                 <Text style={{ fontSize: 11, color: "#16a34a", fontWeight: "600" }}>
                   {workSummary.activeSessionCount} active
@@ -655,13 +648,13 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
               </View>
             )}
           </View>
-          <Text style={{ fontSize: 22, fontWeight: "700", color: "#111827", marginTop: 4 }}>
+          <Text className="text-[22px] font-bold text-gray-900 dark:text-slate-100 mt-1">
             {formatDuration(workSummary.totalWorkTimeMs)}
           </Text>
           {workSummary.agentBreakdown.map((ab) => (
-            <View key={ab.agentId} style={styles.detailRow}>
-              <Text style={styles.detailKey} numberOfLines={1}>{ab.agentName}</Text>
-              <Text style={styles.detailValue}>{formatDuration(ab.totalMs)}</Text>
+            <View key={ab.agentId} className="flex-row justify-between gap-3">
+              <Text className="text-[14px] text-gray-500 dark:text-slate-400 w-[100px]" numberOfLines={1}>{ab.agentName}</Text>
+              <Text className="text-[14px] text-gray-900 dark:text-slate-100 flex-1 text-right">{formatDuration(ab.totalMs)}</Text>
             </View>
           ))}
         </View>
@@ -672,9 +665,9 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailKey}>{label}</Text>
-      <Text style={styles.detailValue}>{value}</Text>
+    <View className="flex-row justify-between gap-3">
+      <Text className="text-[14px] text-gray-500 dark:text-slate-400 w-[100px]">{label}</Text>
+      <Text className="text-[14px] text-gray-900 dark:text-slate-100 flex-1 text-right">{value}</Text>
     </View>
   );
 }
@@ -731,7 +724,7 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
 
   if (result.fetching && messages.length === 0) {
     return (
-      <View style={styles.center}>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
         <ActivityIndicator color="#2563eb" />
       </View>
     );
@@ -739,7 +732,7 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      className="flex-1"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 88 + insets.bottom : 0}
     >
@@ -748,11 +741,11 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
         data={messages}
         keyExtractor={(m) => m.id}
         contentContainerStyle={[
-          styles.messagesList,
-          messages.length === 0 && styles.messagesEmpty,
+          { padding: 16, gap: 16 },
+          messages.length === 0 && { flex: 1, justifyContent: "center", alignItems: "center" },
         ]}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>No messages yet. Start the conversation.</Text>
+          <Text className="text-[15px] text-gray-400 dark:text-slate-500 text-center">No messages yet. Start the conversation.</Text>
         }
         renderItem={({ item }) => {
           const reactionGroups: Record<string, { emoji: string; count: number; iMine: boolean }> = {};
@@ -777,26 +770,25 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
           }
 
           return (
-            <View style={styles.messageRow}>
-              <View style={styles.messageAvatar}>
-                <Text style={styles.messageAvatarText}>
+            <View className="flex-row gap-[10px] items-start">
+              <View className="w-[34px] h-[34px] rounded-full bg-blue-100 dark:bg-blue-900/40 justify-center items-center">
+                <Text className="text-[14px] font-bold text-blue-600">
                   {item.fromProfile.displayName.charAt(0).toUpperCase()}
                 </Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.messageBubble}>
-                  <View style={styles.messageHeader}>
-                    <Text style={styles.messageSender}>{item.fromProfile.displayName}</Text>
-                    <Text style={styles.messageTime}>{formatRelativeTime(item.createdAt)}</Text>
+              <View className="flex-1">
+                <View className="flex-1 gap-1">
+                  <View className="flex-row items-baseline gap-2">
+                    <Text className="text-[13px] font-semibold text-gray-900 dark:text-slate-100">{item.fromProfile.displayName}</Text>
+                    <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatRelativeTime(item.createdAt)}</Text>
                   </View>
-                  <Text style={styles.messageContent}>{item.content}</Text>
+                  <Text className="text-[14px] text-gray-700 dark:text-slate-300 leading-5">{item.content}</Text>
                 </View>
                 {(reactionList.length > 0 || true) && (
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4, paddingLeft: 2 }}>
+                  <View className="flex-row flex-wrap gap-1 mt-1 pl-[2px]">
                     {reactionList.map((r) => (
                       <TouchableOpacity
                         key={r.emoji}
-                        onPress={() => handleReact(r.emoji)}
                         style={{
                           flexDirection: "row",
                           alignItems: "center",
@@ -818,10 +810,10 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
                     ))}
                     <TouchableOpacity
                       onPress={showEmojiPicker}
-                      style={{ backgroundColor: "#f3f4f6", borderRadius: 12, paddingHorizontal: 7, paddingVertical: 2 }}
+                      className="bg-gray-100 dark:bg-slate-700 rounded-xl px-[7px] py-[2px]"
                       activeOpacity={0.7}
                     >
-                      <Text style={{ fontSize: 12, color: "#9ca3af" }}>+</Text>
+                      <Text className="text-[12px] text-gray-400 dark:text-slate-500">+</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -830,9 +822,12 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
           );
         }}
       />
-      <View style={[styles.inputRow, { paddingBottom: insets.bottom + 8 }]}>
+      <View
+        className="flex-row pt-3 px-3 gap-2 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 items-end"
+        style={{ paddingBottom: insets.bottom + 8 }}
+      >
         <MentionInput
-          style={styles.messageInput}
+          className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-[20px] px-[14px] py-2 text-[15px] text-gray-900 dark:text-slate-100 max-h-[100px]"
           placeholder="Write a message…"
           placeholderTextColor="#9ca3af"
           value={text}
@@ -842,12 +837,12 @@ function MessagesTab({ taskId, profileId }: { taskId: string; profileId: string 
           suggestionsAbove
         />
         <TouchableOpacity
-          style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}
+          className={`rounded-[20px] px-4 py-2 ${!text.trim() ? "bg-blue-300" : "bg-blue-600"}`}
           onPress={handleSend}
           disabled={!text.trim()}
           activeOpacity={0.7}
         >
-          <Text style={styles.sendBtnText}>Send</Text>
+          <Text className="text-white font-semibold text-[14px]">Send</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -881,7 +876,7 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
 
   if (result.fetching && deliverables.length === 0) {
     return (
-      <View style={styles.center}>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
         <ActivityIndicator color="#2563eb" />
       </View>
     );
@@ -889,63 +884,63 @@ function DeliverablesTab({ taskId }: { taskId: string }) {
 
   if (deliverables.length === 0 && childGroups.length === 0) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.emptyText}>No deliverables yet</Text>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
+        <Text className="text-[15px] text-gray-400 dark:text-slate-500 text-center">No deliverables yet</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.tabContent}>
+    <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
       {deliverables.map((d) => (
         <TouchableOpacity
           key={d.id}
-          style={styles.deliverableCard}
+          className="bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 flex-row items-center gap-3"
           onPress={() => router.push(`/deliverable/${d.id}`)}
           activeOpacity={0.7}
         >
-          <View style={styles.deliverableIcon}>
+          <View className="w-10 h-10 rounded-[10px] bg-gray-100 dark:bg-slate-700 justify-center items-center">
             <Text style={{ fontSize: 20 }}>{KIND_ICONS[d.kind] ?? "📄"}</Text>
           </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={styles.deliverableTitle} numberOfLines={1}>
+          <View className="flex-1 gap-[2px]">
+            <Text className="text-[14px] font-semibold text-gray-900 dark:text-slate-100" numberOfLines={1}>
               {d.title}
             </Text>
-            <Text style={styles.deliverableMeta}>
+            <Text className="text-[12px] text-gray-500 dark:text-slate-400 capitalize">
               {d.kind} · v{d.version} · {d.profile.displayName}
             </Text>
-            <Text style={styles.deliverableTime}>{formatDate(d.createdAt)}</Text>
+            <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatDate(d.createdAt)}</Text>
           </View>
-          <Text style={styles.chevron}>›</Text>
+          <Text className="text-[20px] text-gray-300 dark:text-slate-600">›</Text>
         </TouchableOpacity>
       ))}
 
       {childGroups.map((group) => (
         <View key={group.task.id}>
-          <View style={styles.childGroupHeader}>
-            <View style={[styles.subtaskDot, { backgroundColor: STATUS_HEX_COLORS[group.task.status] ?? DEFAULT_COLOR }]} />
-            <Text style={styles.childGroupTitle} numberOfLines={1}>
+          <View className="flex-row items-center gap-2 py-2 px-1 mt-2">
+            <View style={{ backgroundColor: STATUS_HEX_COLORS[group.task.status] ?? DEFAULT_COLOR, width: 8, height: 8, borderRadius: 4 }} />
+            <Text className="text-[13px] font-semibold text-gray-700 dark:text-slate-300 flex-1" numberOfLines={1}>
               #{group.task.taskNumber} {group.task.title}
             </Text>
           </View>
           {group.deliverables.map((d) => (
             <TouchableOpacity
               key={d.id}
-              style={[styles.deliverableCard, { marginLeft: 12 }]}
+              className="bg-white dark:bg-slate-800 rounded-xl p-[14px] border border-gray-200 dark:border-slate-700 flex-row items-center gap-3 ml-3"
               onPress={() => router.push(`/deliverable/${d.id}`)}
               activeOpacity={0.7}
             >
-              <View style={styles.deliverableIcon}>
+              <View className="w-10 h-10 rounded-[10px] bg-gray-100 dark:bg-slate-700 justify-center items-center">
                 <Text style={{ fontSize: 20 }}>{KIND_ICONS[d.kind] ?? "📄"}</Text>
               </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.deliverableTitle} numberOfLines={1}>{d.title}</Text>
-                <Text style={styles.deliverableMeta}>
+              <View className="flex-1 gap-[2px]">
+                <Text className="text-[14px] font-semibold text-gray-900 dark:text-slate-100" numberOfLines={1}>{d.title}</Text>
+                <Text className="text-[12px] text-gray-500 dark:text-slate-400 capitalize">
                   {d.kind} · v{d.version} · {d.profile.displayName}
                 </Text>
-                <Text style={styles.deliverableTime}>{formatDate(d.createdAt)}</Text>
+                <Text className="text-[11px] text-gray-400 dark:text-slate-500">{formatDate(d.createdAt)}</Text>
               </View>
-              <Text style={styles.chevron}>›</Text>
+              <Text className="text-[20px] text-gray-300 dark:text-slate-600">›</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -1028,44 +1023,42 @@ function ApproveRejectBar({
   return (
     <>
       <View
-        style={[
-          styles.approveRejectBar,
-          { paddingBottom: insets.bottom > 0 ? insets.bottom : 16 },
-        ]}
+        className="bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 px-4 pt-3 gap-[10px]"
+        style={{ paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }}
       >
-        <Text style={styles.reviewLabel}>Awaiting Review</Text>
-        <View style={styles.approveRejectBtns}>
+        <Text className="text-[12px] font-bold text-violet-700 uppercase tracking-[0.5px] text-center">Awaiting Review</Text>
+        <View className="flex-row gap-[10px]">
           <TouchableOpacity
-            style={[styles.clarifyBtn, loading !== null && { opacity: 0.6 }]}
+            className={`flex-1 py-3 rounded-[10px] border-2 border-violet-700 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
             onPress={() => setShowClarifyModal(true)}
             disabled={loading !== null}
           >
             {loading === "clarify" ? (
               <ActivityIndicator size="small" color="#7c3aed" />
             ) : (
-              <Text style={styles.clarifyBtnText}>? Clarify</Text>
+              <Text className="text-violet-700 font-bold text-[15px]">? Clarify</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.rejectBtn, loading !== null && { opacity: 0.6 }]}
+            className={`flex-1 py-3 rounded-[10px] border-2 border-red-600 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
             onPress={() => setShowRejectModal(true)}
             disabled={loading !== null}
           >
             {loading === "reject" ? (
               <ActivityIndicator size="small" color="#dc2626" />
             ) : (
-              <Text style={styles.rejectBtnText}>✕ Reject</Text>
+              <Text className="text-red-600 font-bold text-[15px]">✕ Reject</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.approveBtn, loading !== null && { opacity: 0.6 }]}
+            className={`flex-1 py-3 rounded-[10px] bg-green-600 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
             onPress={() => setShowApproveModal(true)}
             disabled={loading !== null}
           >
             {loading === "approve" ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.approveBtnText}>✓ Approve</Text>
+              <Text className="text-white font-bold text-[15px]">✓ Approve</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -1144,20 +1137,20 @@ export default function TaskDetailScreen() {
       navigation.setOptions({
         title: `#${task.taskNumber} · ${task.title.slice(0, 30)}`,
         headerRight: () => (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <View className="flex-row items-center gap-1">
             <TouchableOpacity
               onPress={() => router.push(`/task/edit?id=${task.id}` as Parameters<typeof router.push>[0])}
-              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+              className="px-2 py-1"
               activeOpacity={0.7}
             >
-              <Text style={{ fontSize: 15, fontWeight: "600", color: "#2563eb" }}>Edit</Text>
+              <Text className="text-[15px] font-semibold text-blue-600">Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleMoreActions(task.id)}
-              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+              className="px-2 py-1"
               activeOpacity={0.7}
             >
-              <Text style={{ fontSize: 22, color: "#6b7280", lineHeight: 24 }}>•••</Text>
+              <Text className="text-[22px] text-gray-500 dark:text-slate-400 leading-6">•••</Text>
             </TouchableOpacity>
           </View>
         ),
@@ -1186,7 +1179,7 @@ export default function TaskDetailScreen() {
 
   if (fetching && !task) {
     return (
-      <View style={styles.center}>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
         <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
@@ -1194,8 +1187,8 @@ export default function TaskDetailScreen() {
 
   if ((error && !task) || !task) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Task not found</Text>
+      <View className="flex-1 justify-center items-center bg-gray-50 dark:bg-slate-900">
+        <Text className="text-red-600 text-[16px]">Task not found</Text>
       </View>
     );
   }
@@ -1203,22 +1196,22 @@ export default function TaskDetailScreen() {
   const showApproveReject = task.status === "review";
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#f9fafb" }}>
+    <View className="flex-1 bg-gray-50 dark:bg-slate-900">
       <TabBar
         tabs={["Overview", "Messages", "Deliverables"]}
         active={activeTab}
         onPress={setActiveTab}
       />
       {workingAgents.length > 0 && (
-        <View style={styles.workingAgentsBar}>
-          <Text style={styles.workingAgentsBolt}>⚡</Text>
-          <Text style={styles.workingAgentsText} numberOfLines={1}>
+        <View className="flex-row items-center px-3 py-[6px] bg-amber-50 border-b border-amber-200 gap-1">
+          <Text className="text-[12px]">⚡</Text>
+          <Text className="text-[12px] text-amber-800 flex-1 font-medium" numberOfLines={1}>
             {workingAgents.map((a) => `${a.identityEmoji ?? DEFAULT_AGENT_EMOJI} ${a.name}`).join("  ·  ")}
           </Text>
-          <Text style={styles.workingAgentsLabel}> working</Text>
+          <Text className="text-[12px] text-amber-800 font-semibold"> working</Text>
         </View>
       )}
-      <View style={{ flex: 1 }}>
+      <View className="flex-1">
         {activeTab === 0 && (
           <OverviewTab
             task={task}
@@ -1246,426 +1239,3 @@ export default function TaskDetailScreen() {
     </View>
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f9fafb",
-  },
-  errorText: { color: "#dc2626", fontSize: 16 },
-  emptyText: { color: "#9ca3af", fontSize: 15, textAlign: "center" },
-
-  // Tab bar
-  tabBar: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    minHeight: 46,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  tabActive: {
-    borderBottomColor: "#2563eb",
-  },
-  tabText: {
-    fontSize: 14,
-    color: "#6b7280",
-    fontWeight: "500",
-  },
-  tabTextActive: {
-    color: "#2563eb",
-    fontWeight: "600",
-  },
-
-  // Overview
-  tabContent: {
-    padding: 16,
-    gap: 12,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#111827",
-    lineHeight: 28,
-  },
-  badgeRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    alignItems: "center",
-  },
-  badge: {
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  badgeText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 10,
-  },
-  cardLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#9ca3af",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  description: {
-    fontSize: 15,
-    color: "#374151",
-    lineHeight: 22,
-  },
-
-  // Blocked-by
-  blockedByCard: {
-    backgroundColor: "#fef2f2",
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#fecaca",
-    gap: 6,
-  },
-  blockedByLabel: { fontSize: 12, fontWeight: "700", color: "#dc2626" },
-  blockedByRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  blockedByTaskNum: { fontSize: 12, color: "#9ca3af", fontWeight: "500" },
-  blockedByTaskTitle: { fontSize: 13, color: "#111827", flex: 1, fontWeight: "500" },
-  miniPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  miniPillText: { fontSize: 10, fontWeight: "600", textTransform: "capitalize" },
-
-  // Subtasks
-  childGroupHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    marginTop: 8,
-  },
-  childGroupTitle: { fontSize: 13, fontWeight: "600", color: "#374151", flex: 1 },
-  subtaskRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 4,
-  },
-  subtaskDot: { width: 8, height: 8, borderRadius: 4 },
-  subtaskNum: { fontSize: 12, color: "#9ca3af", fontWeight: "500", width: 32 },
-  subtaskTitle: { fontSize: 13, color: "#374151", flex: 1 },
-
-  assigneeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  assigneeEmoji: { fontSize: 20 },
-  assigneeName: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#111827",
-  },
-  assigneeStatus: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 1,
-  },
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  detailKey: {
-    fontSize: 14,
-    color: "#6b7280",
-    width: 100,
-  },
-  detailValue: {
-    fontSize: 14,
-    color: "#111827",
-    flex: 1,
-    textAlign: "right",
-  },
-  tagsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  tag: {
-    backgroundColor: "#eff6ff",
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  tagText: {
-    fontSize: 12,
-    color: "#2563eb",
-    fontWeight: "500",
-  },
-
-  // Messages
-  messagesList: {
-    padding: 16,
-    gap: 16,
-  },
-  messagesEmpty: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  messageRow: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "flex-start",
-  },
-  messageAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#dbeafe",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  messageAvatarText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#2563eb",
-  },
-  messageBubble: {
-    flex: 1,
-    gap: 4,
-  },
-  messageHeader: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
-  },
-  messageSender: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  messageTime: {
-    fontSize: 11,
-    color: "#9ca3af",
-  },
-  messageContent: {
-    fontSize: 14,
-    color: "#374151",
-    lineHeight: 20,
-  },
-  inputRow: {
-    flexDirection: "row",
-    paddingTop: 12,
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    gap: 8,
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    alignItems: "flex-end",
-  },
-  messageInput: {
-    flex: 1,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 15,
-    color: "#111827",
-    maxHeight: 100,
-  },
-  sendBtn: {
-    backgroundColor: "#2563eb",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  sendBtnDisabled: {
-    backgroundColor: "#93c5fd",
-  },
-  sendBtnText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-
-  // Deliverables
-  deliverableCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  deliverableIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: "#f3f4f6",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  deliverableTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  deliverableMeta: {
-    fontSize: 12,
-    color: "#6b7280",
-    textTransform: "capitalize",
-  },
-  deliverableTime: {
-    fontSize: 11,
-    color: "#9ca3af",
-  },
-  chevron: {
-    fontSize: 20,
-    color: "#d1d5db",
-  },
-
-  // Working agents bar
-  workingAgentsBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: "#fffbeb",
-    borderBottomWidth: 1,
-    borderBottomColor: "#fde68a",
-    gap: 4,
-  },
-  workingAgentsBolt: { fontSize: 12 },
-  workingAgentsText: { fontSize: 12, color: "#92400e", flex: 1, fontWeight: "500" },
-  workingAgentsLabel: { fontSize: 12, color: "#92400e", fontWeight: "600" },
-
-  // Approve/Reject bar
-  approveRejectBar: {
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 10,
-  },
-  reviewLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#7c3aed",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    textAlign: "center",
-  },
-  approveRejectBtns: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  clarifyBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: "#7c3aed",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  clarifyBtnText: {
-    color: "#7c3aed",
-    fontWeight: "700",
-    fontSize: 15,
-  },
-  rejectBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: "#dc2626",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rejectBtnText: {
-    color: "#dc2626",
-    fontWeight: "700",
-    fontSize: 15,
-  },
-  approveBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: "#16a34a",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  approveBtnText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 15,
-  },
-
-  // Reject modal
-  modalContainer: { flex: 1, backgroundColor: "#fff" },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-  },
-  modalTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
-  rejectLabel: { fontSize: 13, fontWeight: "600", color: "#374151" },
-  rejectInput: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 15,
-    color: "#111827",
-    backgroundColor: "#f9fafb",
-  },
-  addChangeBtn: {
-    backgroundColor: "#2563eb",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    justifyContent: "center",
-  },
-  addChangeBtnText: { color: "#fff", fontWeight: "600" },
-  changeItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 4,
-  },
-  changeText: { flex: 1, fontSize: 13, color: "#374151" },
-  rejectConfirmBtn: {
-    backgroundColor: "#dc2626",
-    borderRadius: 10,
-    padding: 14,
-    alignItems: "center",
-  },
-  rejectConfirmBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-});

@@ -1,6 +1,5 @@
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, useColorScheme } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "../hooks/useTheme";
 
 interface EmptyStateProps {
   icon?: React.ComponentProps<typeof Ionicons>["name"];
@@ -9,11 +8,11 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ icon = "cube-outline", message, action }: EmptyStateProps) {
-  const { colors } = useTheme();
+  const isDark = useColorScheme() === "dark";
 
   return (
     <View className="flex-1 justify-center items-center gap-3 p-8">
-      <Ionicons name={icon} size={48} color={colors.iconMuted} />
+      <Ionicons name={icon} size={48} color={isDark ? "#64748b" : "#9ca3af"} />
       <Text className="text-gray-400 dark:text-slate-500 text-[15px] text-center leading-[22px]">
         {message}
       </Text>

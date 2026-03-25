@@ -9,7 +9,6 @@ import {
 import { useQuery } from "urql";
 import { useState, useCallback } from "react";
 import { PROFILES_QUERY } from "@agentcenter/graphql-client";
-import { useTheme } from "../hooks/useTheme";
 import { getMentionQuery, insertMentionHandle } from "@agentcenter/utils";
 import type { ProfileWithAgent as Profile } from "@agentcenter/types";
 
@@ -27,7 +26,6 @@ export function MentionInput({
   style,
   ...rest
 }: MentionInputProps) {
-  const { colors } = useTheme();
   const mentionQuery = getMentionQuery(value);
   const isSearching = mentionQuery !== null;
 
@@ -64,7 +62,7 @@ export function MentionInput({
           className="absolute left-0 right-0 bg-white dark:bg-slate-800 rounded-[10px] border border-gray-200 dark:border-slate-700 overflow-hidden z-[100]"
           style={{
             ...(suggestionsAbove ? { bottom: "100%", marginBottom: 6 } : { top: "100%", marginTop: 6 }),
-            shadowColor: colors.shadow,
+            shadowColor: "#000000",
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.08,
             shadowRadius: 8,
