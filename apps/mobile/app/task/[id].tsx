@@ -1027,54 +1027,22 @@ function ApproveRejectBar({
         style={{ paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }}
       >
         <Text className="text-xs font-bold text-violet-700 uppercase tracking-[0.5px] text-center">Awaiting Review</Text>
-        <View className="flex-row gap-2.5">
-          <TouchableOpacity
-            className={`flex-1 py-3 rounded-xl border-2 border-violet-700 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
-            onPress={() => setShowClarifyModal(true)}
-            disabled={loading !== null}
-          >
-            {loading === "clarify" ? (
-              <ActivityIndicator size="small" color="#7c3aed" />
-            ) : (
-              <Text className="text-violet-700 font-bold text-base">? Clarify</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            className={`flex-1 py-3 rounded-xl border-2 border-red-600 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
-            onPress={() => setShowRejectModal(true)}
-            disabled={loading !== null}
-          >
-            {loading === "reject" ? (
-              <ActivityIndicator size="small" color="#dc2626" />
-            ) : (
-              <Text className="text-red-600 font-bold text-base">✕ Reject</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            className={`flex-1 py-3 rounded-xl bg-green-600 items-center justify-center ${loading !== null ? "opacity-60" : ""}`}
-            onPress={() => setShowApproveModal(true)}
-            disabled={loading !== null}
-          >
-            {loading === "approve" ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text className="text-white font-bold text-base">✓ Approve</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* Disabled: approval is handled by Squad Leader agent via comments */}
+        <Text className="text-xs text-amber-600 text-center">Squad Leader will review via comments</Text>
       </View>
+      {/* Approve/Reject/Clarify modals disabled — Squad Leader handles via comments */}
       <ApproveModal
-        visible={showApproveModal}
+        visible={false}
         onClose={() => setShowApproveModal(false)}
         onConfirm={doApprove}
       />
       <RejectModal
-        visible={showRejectModal}
+        visible={false}
         onClose={() => setShowRejectModal(false)}
         onConfirm={doReject}
       />
       <ClarifyModal
-        visible={showClarifyModal}
+        visible={false}
         onClose={() => setShowClarifyModal(false)}
         onConfirm={doClarify}
       />

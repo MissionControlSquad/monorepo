@@ -1307,48 +1307,16 @@ export function TaskDetailModal({
         </div>
 
         {/* ===== REVIEW APPROVAL BAR ===== */}
+        {/* Disabled: approval is handled by Squad Leader agent via comments */}
         {task.status === "review" && (
           <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-t border-amber-200 bg-amber-50">
             <span className="text-xs font-semibold text-amber-700 mr-auto">Awaiting Review</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowClarifyDialog(true)}
-              disabled={approvalLoading !== null}
-              className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 border border-violet-200"
-            >
-              {approvalLoading === "clarify" ? (
-                <span className="animate-spin">⟳</span>
-              ) : (
-                "? Clarify"
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowRejectDialog(true)}
-              disabled={approvalLoading !== null}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200"
-            >
-              {approvalLoading === "reject" ? <span className="animate-spin">⟳</span> : "✕ Reject"}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setShowApproveDialog(true)}
-              disabled={approvalLoading !== null}
-            >
-              {approvalLoading === "approve" ? (
-                <span className="animate-spin">⟳</span>
-              ) : (
-                "✓ Approve"
-              )}
-            </Button>
+            <span className="text-xs text-amber-600">Squad Leader will review via comments</span>
           </div>
         )}
 
-        {/* Reject Dialog */}
-        {showRejectDialog && (
+        {/* Reject/Clarify/Approve Dialogs — disabled: Squad Leader handles via comments */}
+        {false && showRejectDialog && (
           <div
             className="absolute inset-0 z-50 flex items-center justify-center bg-black/40"
             onClick={() => setShowRejectDialog(false)}
@@ -1409,7 +1377,7 @@ export function TaskDetailModal({
         )}
 
         {/* Clarify Dialog */}
-        {showClarifyDialog && (
+        {false && showClarifyDialog && (
           <div
             className="absolute inset-0 z-50 flex items-center justify-center bg-black/40"
             onClick={() => setShowClarifyDialog(false)}
@@ -1457,7 +1425,7 @@ export function TaskDetailModal({
         )}
 
         {/* Approve Dialog */}
-        {showApproveDialog && (
+        {false && showApproveDialog && (
           <div
             className="absolute inset-0 z-50 flex items-center justify-center bg-black/40"
             onClick={() => setShowApproveDialog(false)}
