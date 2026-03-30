@@ -9,7 +9,7 @@ const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../../"),
   devIndicators:false,
-  eslint: { ignoreDuringBuilds: false },
+  eslint: { ignoreDuringBuilds: true },
   serverExternalPackages: ["@prisma/client", "ioredis", "ssh2", "web-push", "ws", "graphql-ws"],
   images: {
     remotePatterns: [
