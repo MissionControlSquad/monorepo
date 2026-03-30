@@ -111,7 +111,7 @@ export function TaskDetailModal({
   const [, executeRequestClarification] = useMutation(REQUEST_CLARIFICATION);
 
   // Approval UI state
-  const [approvalLoading, setApprovalLoading] = useState<"approve" | "reject" | "clarify" | null>(
+  const [_approvalLoading, setApprovalLoading] = useState<"approve" | "reject" | "clarify" | null>(
     null,
   );
   const [showApproveDialog, setShowApproveDialog] = useState(false);
