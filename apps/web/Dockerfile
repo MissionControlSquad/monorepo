@@ -79,7 +79,8 @@ COPY --from=build /app/packages/database/prisma.config.ts ./prisma.config.ts
 RUN ln -s /app/prisma/migrations /app/prisma/schema/migrations
 
 # Copy agent templates (read at runtime by agent-config-generator)
-COPY --from=build /app/apps/web/src/server/agent-templates ./apps/web/src/server/agent-templates
+# process.cwd() in the runner is /app, so agent-config-generator.ts resolves to /app/src/server/agent-templates
+COPY --from=build /app/apps/web/src/server/agent-templates ./src/server/agent-templates
 
 # Install Prisma CLI in a separate directory so npm doesn't prune standalone node_modules
 RUN mkdir -p /prisma-cli && cd /prisma-cli && \
