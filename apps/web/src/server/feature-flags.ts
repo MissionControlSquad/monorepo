@@ -1,5 +1,5 @@
 import { listAllFeatureFlags } from "@agentcenter/database";
-import { isFeatureLicensed } from "./license";
+import { isFeatureLicensed, getLicenseStatus } from "./license";
 
 interface FlagEntry {
   key: string;
@@ -38,14 +38,18 @@ export async function getFeatureFlags(): Promise<Map<string, FlagEntry>> {
 /**
  * Check if a feature is enabled.
  * Double-gated: feature flag must be enabled AND license must include the feature.
- * If no license is configured (hosted mode), only the flag check applies.
+ * If no license is configured (status "none"), only the flag check applies.
  */
 export async function isFeatureEnabled(key: string): Promise<boolean> {
   const flags = await getFeatureFlags();
   const flagEnabled = flags.get(key)?.enabled ?? true;
   if (!flagEnabled) return false;
 
-  // Also check license allows this feature
+  // When no license is configured, rely only on the feature flag.
+  const licenseStatus = await getLicenseStatus();
+  if (licenseStatus.status === "none") return true;
+
+  // License is present — check it allows this feature.
   const licensed = await isFeatureLicensed(key);
   return licensed;
 }
