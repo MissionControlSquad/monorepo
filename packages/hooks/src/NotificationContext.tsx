@@ -38,7 +38,7 @@ export function NotificationCountProvider({
   getCookie,
   children,
 }: NotificationCountProviderProps) {
-  const value = useNotifications(serverUrl, isSignedIn && !!serverUrl, getCookie);
+  const value = useNotifications(serverUrl, isSignedIn, getCookie);
   return (
     <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>
   );

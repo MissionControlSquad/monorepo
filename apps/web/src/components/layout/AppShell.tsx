@@ -21,6 +21,9 @@ import type { Agent } from "@agentcenter/types";
 import { Button } from "../ui";
 import { KeyboardShortcutsOverlay } from "../common/KeyboardShortcutsOverlay";
 import { useGoShortcuts } from "../../hooks/useGoShortcuts";
+import { PushPermissionBanner } from "../notifications/PushPermissionBanner";
+import { WhenFeatureEnabled } from "../context/FeatureFlagContext";
+import { FLAG_KEYS } from "@agentcenter/utils";
 const CreateTaskModal = lazy(() =>
   import("../task/CreateTaskModal").then((m) => ({ default: m.CreateTaskModal })),
 );
@@ -175,6 +178,9 @@ export function AppShell({ children, modal }: AppShellProps) {
         )}
 
         <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
+          <WhenFeatureEnabled flag={FLAG_KEYS.NOTIFICATIONS}>
+            <PushPermissionBanner />
+          </WhenFeatureEnabled>
           {showWaitingBanner && (
             <div className="mx-4 mt-3 mb-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-lg flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse flex-shrink-0" />

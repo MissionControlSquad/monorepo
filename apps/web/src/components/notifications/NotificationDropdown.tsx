@@ -70,7 +70,7 @@ export function NotificationDropdown({
   );
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-background border border-border rounded-lg shadow-xl z-50 overflow-hidden">
+    <div className="absolute left-full top-0 ml-2 w-80 sm:w-96 bg-background border border-border rounded-lg shadow-xl z-50 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
         <button

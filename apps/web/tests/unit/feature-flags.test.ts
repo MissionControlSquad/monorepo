@@ -7,9 +7,10 @@ vi.mock("@agentcenter/database", () => ({
   listAllFeatureFlags: (...args: unknown[]) => mockListAllFeatureFlags(...args),
 }));
 
-// Mock the license module — in tests, all features are licensed
+// Mock the license module — in tests, all features are licensed and no license configured
 vi.mock("../../src/server/license", () => ({
   isFeatureLicensed: vi.fn().mockResolvedValue(true),
+  getLicenseStatus: vi.fn().mockResolvedValue({ status: "none" }),
 }));
 
 import {
