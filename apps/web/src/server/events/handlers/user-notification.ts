@@ -246,6 +246,7 @@ on(EventTypes.DOCUMENT_CREATED, async (e) => {
     title: `New ${e.docType}: ${e.title}`,
     body: `${e.creatorName} added ${e.docType} "${e.title}" to "${e.taskTitle}".`,
     taskId: e.taskId,
+    url: taskUrl(e.taskId),
   });
 });
 

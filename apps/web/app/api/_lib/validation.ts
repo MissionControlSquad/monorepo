@@ -242,6 +242,8 @@ export const updateNotificationPrefsSchema = z.object({
   mention: z.boolean().optional(),
   deliverableSubmitted: z.boolean().optional(),
   taskAssigned: z.boolean().optional(),
+  teamUpdate: z.boolean().optional(),
+  documentAdded: z.boolean().optional(),
   pushEnabled: z.boolean().optional(),
   emailEnabled: z.boolean().optional(),
   inAppEnabled: z.boolean().optional(),
