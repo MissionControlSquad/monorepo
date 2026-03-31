@@ -5,9 +5,6 @@ import { usePathname } from "next/navigation";
 import { Activity, Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { GlobalSearch } from "./GlobalSearch";
 import { Button } from "../ui";
-import { NotificationBell } from "../notifications/NotificationBell";
-import { WhenFeatureEnabled } from "../context/FeatureFlagContext";
-import { FLAG_KEYS } from "@agentcenter/utils";
 
 interface HeaderProps {
   onToggleActivity: () => void;
@@ -65,9 +62,6 @@ export const Header = memo(function Header({
 
         {/* Right controls */}
         <div className="flex items-center gap-1 shrink-0">
-          <WhenFeatureEnabled flag={FLAG_KEYS.NOTIFICATIONS}>
-            <NotificationBell />
-          </WhenFeatureEnabled>
           {isHome && (
             <Button
               variant="ghost"
