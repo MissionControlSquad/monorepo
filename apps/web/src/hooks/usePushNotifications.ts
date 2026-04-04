@@ -57,6 +57,13 @@ export function usePushNotifications() {
         setIsSubscribed(true);
         return true;
       }
+
+      const errData = await res.json().catch(() => ({}));
+      console.error(
+        `[push] Subscribe failed (${res.status}):`,
+        errData.error ?? errData.message ?? "unknown error",
+        res.status === 403 ? "— notifications may not be included in your license plan" : "",
+      );
       return false;
     } catch (err) {
       console.error("[push] Subscribe failed:", err);
