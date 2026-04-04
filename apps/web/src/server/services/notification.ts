@@ -161,6 +161,8 @@ export async function dispatchNotification(record: UserNotification): Promise<vo
       break;
 
     case "push":
+      // sendPushToUser throws if VAPID is not configured (error propagates to handleDispatchFailure)
+      // returns false (no-op) if user has no subscriptions — still mark sent
       await sendPushToUser(record.userId, {
         title: record.title,
         body: record.body,
