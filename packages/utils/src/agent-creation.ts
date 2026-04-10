@@ -1,13 +1,14 @@
 // Shared types and constants for the agent creation/setup flow.
 // Used by both web (NewAgentWizard) and mobile (agent/create.tsx).
 
-export type SetupMode = "auto" | "manual" | "delegate" | "cloud";
+export type SetupMode = "auto" | "manual" | "delegate" | "cloud" | "desktop";
 
 export const SETUP_MODE_LABELS: Record<SetupMode, string> = {
   auto: "Auto Setup",
   manual: "Manual Setup",
   delegate: "Delegate to Lead",
   cloud: "Deploy to Cloud",
+  desktop: "Desktop App",
 };
 
 export interface AgentConfigFile {
@@ -21,9 +22,12 @@ export interface AgentSetupResult {
   configFiles: AgentConfigFile[];
   bootstrapMessage: string;
   cronSchedule: string;
+  cronMessage: string;
   cronCommand: string;
   workspacePath: string;
   openclawAgentConfig: { id: string; name: string; workspace: string };
+  /** CLIs the desktop bootstrap must verify before setup starts. */
+  requiredClis: string[];
   mcUrl: string;
 }
 

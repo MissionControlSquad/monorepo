@@ -14,7 +14,10 @@ import { autoUpdater } from "electron-updater";
 import Store from "electron-store";
 import log from "electron-log/main";
 import path from "path";
-import { spawn } from "child_process";
+import { spawn, exec } from "child_process";
+import https from "https";
+import os from "os";
+import fs from "fs";
 
 // Initialise electron-log: writes to ~/Library/Logs/AgentCenter/ (macOS),
 // %APPDATA%\AgentCenter\logs\ (Windows), ~/.config/AgentCenter/logs/ (Linux).
@@ -60,6 +63,77 @@ const MAX_AUTO_RELOADS = 3;
 const CRASH_WINDOW_MS = 30_000;
 let rendererCrashCount = 0;
 let crashWindowTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ── Shell PATH resolution (macOS + Linux GUI fix) ─────────────────────
+// Populated once inside app.whenReady() before any IPC handlers are called.
+// Safe defaults until resolved — never undefined.
+let SHELL_PATH = process.env.PATH ?? "";
+let EXTRA_PATHS: string[] = [];
+
+/**
+ * Resolves the full login-shell PATH asynchronously.
+ *
+ * macOS and Linux GUI apps launch without a login shell, so process.env.PATH
+ * is stripped to /usr/bin:/bin:/usr/sbin:/sbin. Tools installed via Homebrew,
+ * nvm, or similar are invisible. Spawning a login shell fixes this.
+ * Windows GUI apps inherit the full system PATH — no fix needed.
+ */
+function resolveShellPathAsync(): Promise<string> {
+  if (process.platform === "win32") return Promise.resolve(process.env.PATH ?? "");
+  return new Promise((resolve) => {
+    const shell = process.env.SHELL || "/bin/bash";
+    exec(`${shell} -l -c 'echo $PATH'`, { timeout: 5000 }, (err, stdout) => {
+      if (err) {
+        log.warn("[PATH] login-shell exec failed, keeping current PATH:", err.message);
+        resolve(process.env.PATH ?? "");
+      } else {
+        resolve(stdout.trim());
+      }
+    });
+  });
+}
+
+/**
+ * Builds a list of extra PATH entries to prepend.
+ * Called once at startup; result is cached in EXTRA_PATHS.
+ * Mirrors ShellService.buildEnv() in the native macOS companion app.
+ */
+function buildExtraPaths(): string[] {
+  const home = os.homedir();
+  const extras: string[] = [];
+
+  if (process.platform !== "win32") {
+    // NVM: add latest installed Node bin/ so npm global CLIs (openclaw etc.)
+    // are found even when Node was installed via nvm, not a system package.
+    const nvmDir = path.join(home, ".nvm", "versions", "node");
+    try {
+      const versions = fs
+        .readdirSync(nvmDir)
+        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+      for (const version of versions) {
+        const binPath = path.join(nvmDir, version, "bin");
+        try {
+          fs.readdirSync(binPath);
+          extras.push(binPath);
+          break;
+        } catch { /* skip broken version */ }
+      }
+    } catch { /* nvm not installed */ }
+
+    extras.push(
+      path.join(home, ".local", "bin"),
+      path.join(home, ".cargo", "bin"),
+      "/usr/local/bin",     // Homebrew Intel Mac + common Linux
+      "/opt/homebrew/bin",  // Homebrew Apple Silicon
+    );
+  } else {
+    // Windows: npm global CLIs land in %APPDATA%\npm
+    const appData = process.env.APPDATA;
+    if (appData) extras.push(path.join(appData, "npm"));
+  }
+
+  return extras;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -496,10 +570,129 @@ function buildSafeEnv(): NodeJS.ProcessEnv {
       safe[key] = process.env[key];
     }
   }
+  // Two-layer PATH: cached extra paths (nvm, homebrew, etc.) prepended to the
+  // full login-shell PATH resolved at startup. Zero filesystem I/O per call.
+  safe["PATH"] = [...EXTRA_PATHS, SHELL_PATH].filter(Boolean).join(path.delimiter);
   return safe;
 }
 
 const SPAWN_MAX_BYTES = 32 * 1024; // 32 KB cap per stream
+
+/**
+ * On Windows, npm global CLIs install as `<name>.cmd`.
+ * `spawn("openclaw", ...)` with `shell: false` won't find `.cmd` files.
+ * Using `shell: true` + args array is deprecated in Node v23.11+ (word-splitting risk).
+ * Correct fix: resolve the full .cmd path via where.exe, then spawn with shell: false.
+ * Returns the original cmd unchanged on non-Windows or if where.exe fails.
+ */
+function resolveWindowsCmd(cmd: string): Promise<string> {
+  if (process.platform !== "win32") return Promise.resolve(cmd);
+  return new Promise((resolve) => {
+    exec(`where.exe "${cmd}"`, { timeout: 3000 }, (err, stdout) => {
+      if (err) { resolve(cmd); return; }
+      const lines = stdout.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      // Prefer .cmd over .exe — npm global installs are .cmd
+      resolve(lines.find((l) => l.toLowerCase().endsWith(".cmd")) ?? lines[0] ?? cmd);
+    });
+  });
+}
+
+/**
+ * Spawns a CLI with a proper arg array (shell: false on all platforms).
+ * Resolves the .cmd path on Windows first so shell: false works correctly.
+ * Caps stdout/stderr at SPAWN_MAX_BYTES to prevent memory exhaustion.
+ */
+async function spawnAsync(
+  cmd: string,
+  args: string[],
+  timeoutMs = 30_000,
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  return spawnWithProgress(cmd, args, timeoutMs, null);
+}
+
+/**
+ * Like spawnAsync but also calls onProgress with each stdout/stderr chunk
+ * as it arrives, enabling live-streaming output to the renderer.
+ * Pass null for onProgress to skip streaming (equivalent to spawnAsync).
+ */
+async function spawnWithProgress(
+  cmd: string,
+  args: string[],
+  timeoutMs = 30_000,
+  onProgress: ((chunk: string) => void) | null,
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  const resolvedCmd = await resolveWindowsCmd(cmd);
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(resolvedCmd, args, {
+      timeout: timeoutMs,
+      env: buildSafeEnv(),
+      shell: false, // always false — args as array, no shell injection, no word-splitting
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+
+    child.stdout?.on("data", (data: Buffer) => {
+      stdoutBytes += data.length;
+      if (stdoutBytes <= SPAWN_MAX_BYTES) {
+        const chunk = data.toString();
+        stdout += chunk;
+        onProgress?.(chunk);
+      }
+    });
+    child.stderr?.on("data", (data: Buffer) => {
+      stderrBytes += data.length;
+      if (stderrBytes <= SPAWN_MAX_BYTES) {
+        const chunk = data.toString();
+        stderr += chunk;
+        onProgress?.(chunk);
+      }
+    });
+    child.on("error", (err) => {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        reject(new Error(`"${cmd}" not found. Is it installed and on your PATH?`));
+      } else {
+        reject(err);
+      }
+    });
+    child.on("close", (code) => resolve({ stdout, stderr, code: code ?? 1 }));
+  });
+}
+
+/**
+ * Downloads a file via HTTPS to a local destination, following up to 5 redirects.
+ */
+function downloadFile(url: string, dest: string, redirectsLeft = 5): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (redirectsLeft === 0) { reject(new Error("Too many redirects")); return; }
+    const file = fs.createWriteStream(dest);
+    const req = https.get(url, (res) => {
+      if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
+        file.close();
+        fs.unlink(dest, () => {});
+        if (res.headers.location) {
+          downloadFile(res.headers.location, dest, redirectsLeft - 1).then(resolve).catch(reject);
+        } else {
+          reject(new Error("Redirect without Location header"));
+        }
+        return;
+      }
+      if (res.statusCode !== 200) {
+        file.close();
+        fs.unlink(dest, () => {});
+        reject(new Error(`HTTP ${res.statusCode} from ${url}`));
+        return;
+      }
+      res.pipe(file);
+      file.on("finish", () => file.close(() => resolve()));
+    });
+    req.on("error", (err) => { fs.unlink(dest, () => {}); reject(err); });
+    file.on("error", (err) => { fs.unlink(dest, () => {}); reject(err); });
+  });
+}
 
 function setupIPC() {
   // Config window: set server URL
@@ -528,38 +721,517 @@ function setupIPC() {
           `Command not allowed: "${subcommand}". Allowed: ${ALLOWED_OPENCLAW_COMMANDS.join(", ")}`
         );
       }
-
-      return new Promise((resolve, reject) => {
-        const child = spawn("openclaw", args, {
-          timeout: 30_000,
-          env: buildSafeEnv(),
-        });
-
-        let stdout = "";
-        let stderr = "";
-        let stdoutBytes = 0;
-        let stderrBytes = 0;
-
-        child.stdout.on("data", (data: Buffer) => {
-          stdoutBytes += data.length;
-          if (stdoutBytes <= SPAWN_MAX_BYTES) {
-            stdout += data.toString();
-          }
-        });
-        child.stderr.on("data", (data: Buffer) => {
-          stderrBytes += data.length;
-          if (stderrBytes <= SPAWN_MAX_BYTES) {
-            stderr += data.toString();
-          }
-        });
-
-        child.on("error", (err) => reject(err));
-        child.on("close", (code) => {
-          resolve({ stdout, stderr, code: code ?? 1 });
-        });
-      });
+      return spawnAsync("openclaw", args, 30_000);
     }
   );
+
+  // ── One-click agent bootstrap ────────────────────────────────────────
+  // Types mirror electron-env.d.ts (BootstrapAgentPayload / BootstrapResult).
+  // Handler always returns a BootstrapResult — never throws — because
+  // ipcMain.handle only serialises error.message on thrown exceptions (stack lost).
+
+  interface BootstrapAgentPayload {
+    agentId: string;
+    agentName: string;
+    workspacePath: string;
+    configFiles: Array<{ filename: string; content: string }>;
+    requiredClis: string[];
+    cronSchedule: string;
+    cronMessage: string;
+    triggerImmediately?: boolean;
+  }
+
+  interface BootstrapResult {
+    success: boolean;
+    steps: Array<{
+      name: string;
+      status: "success" | "failed" | "skipped";
+      output?: string;
+      error?: string;
+    }>;
+  }
+
+  // Guard against concurrent calls (e.g. user double-clicks the button)
+  let bootstrapInProgress = false;
+
+  ipcMain.handle(
+    "bootstrap-agent",
+    async (event, payload: BootstrapAgentPayload): Promise<BootstrapResult> => {
+      const sendStatus = (message: string) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send("bootstrap-status", message);
+        }
+      };
+
+      if (bootstrapInProgress) {
+        return {
+          success: false,
+          steps: [{ name: "Guard", status: "failed", error: "A bootstrap is already in progress." }],
+        };
+      }
+      bootstrapInProgress = true;
+
+      const steps: BootstrapResult["steps"] = [];
+
+      try {
+        // ── Validation ─────────────────────────────────────────────────
+        // 1. Expand "~" — Node.js fs does NOT expand tilde.
+        const resolvedWorkspace = payload.workspacePath.startsWith("~")
+          ? path.join(os.homedir(), payload.workspacePath.slice(1))
+          : payload.workspacePath;
+
+        // 2. Prevent path traversal — workspace must be inside ~/.openclaw/agents/
+        const allowedRoot = path.join(os.homedir(), ".openclaw", "agents");
+        const normalized = path.resolve(resolvedWorkspace);
+        if (!normalized.startsWith(allowedRoot + path.sep) && normalized !== allowedRoot) {
+          return {
+            success: false,
+            steps: [{ name: "Validation", status: "failed", error: `workspacePath must be inside ${allowedRoot}` }],
+          };
+        }
+
+        // 3. Filenames must be bare names — no path separators or traversal
+        for (const file of payload.configFiles) {
+          if (path.basename(file.filename) !== file.filename || file.filename.includes("..")) {
+            return {
+              success: false,
+              steps: [{ name: "Validation", status: "failed", error: `Invalid filename: "${file.filename}"` }],
+            };
+          }
+        }
+
+        // ── Step 1: Verify all required CLIs are installed ──────────────
+        // Run FIRST — fail fast before touching the filesystem so no partial
+        // workspace is left on disk if a CLI is missing.
+        const missingClis: string[] = [];
+        for (const cli of payload.requiredClis) {
+          try {
+            const result = await spawnAsync(cli, ["--version"], 10_000);
+            if (result.code !== 0) missingClis.push(cli);
+          } catch {
+            missingClis.push(cli);
+          }
+        }
+        if (missingClis.length > 0) {
+          steps.push({
+            name: "Verify required CLIs",
+            status: "failed",
+            error: `Missing: ${missingClis.join(", ")}. Ensure these are installed and on your PATH.`,
+          });
+          return { success: false, steps };
+        }
+        steps.push({
+          name: `Verify required CLIs (${payload.requiredClis.join(", ")})`,
+          status: "success",
+        });
+
+        // ── Step 2: Ensure OpenClaw gateway is running ──────────────────
+        // `openclaw gateway status` reads the service state without connecting —
+        // safe to call even when pairing is required.
+        const gatewayStatus = await spawnAsync("openclaw", ["gateway", "status"], 10_000);
+        const statusOut = gatewayStatus.stdout + gatewayStatus.stderr;
+        const gatewayRunning = statusOut.includes("running") && statusOut.includes("pid");
+        const gatewayInstalled = !statusOut.includes("not installed");
+
+        if (!gatewayInstalled) {
+          // Service not installed — install it first, then start.
+          log.info("[bootstrap] gateway service not installed, installing...");
+          await spawnAsync("openclaw", ["gateway", "install"], 15_000);
+        }
+
+        // Ensure gateway.mode is set in openclaw.json before starting.
+        // A fresh install (or wiped ~/.openclaw) creates a config without gateway.mode,
+        // causing the gateway to start but reject ALL connections with error 1006.
+        // Setting gateway.mode=local here fixes that without requiring an interactive setup.
+        try {
+          const ocConfigPath = path.join(os.homedir(), ".openclaw", "openclaw.json");
+          const raw = await fs.promises.readFile(ocConfigPath, "utf-8");
+          const ocConfig = JSON.parse(raw);
+          if (!ocConfig.gateway?.mode) {
+            ocConfig.gateway = { ...(ocConfig.gateway ?? {}), mode: "local" };
+            await fs.promises.writeFile(ocConfigPath, JSON.stringify(ocConfig, null, 2), "utf-8");
+            log.info("[bootstrap] patched openclaw.json: set gateway.mode=local");
+          }
+        } catch (err) {
+          log.warn("[bootstrap] could not patch openclaw.json:", err);
+        }
+
+        if (!gatewayRunning) {
+          log.info("[bootstrap] gateway not running, starting service...");
+          const startResult = await spawnAsync("openclaw", ["gateway", "start"], 15_000);
+          const startOut = startResult.stdout + startResult.stderr;
+
+          // Poll up to 10 s for gateway to become ready.
+          let ready = false;
+          for (let i = 0; i < 10; i++) {
+            await new Promise((r) => setTimeout(r, 1000));
+            const poll = await spawnAsync("openclaw", ["gateway", "status"], 5_000);
+            if ((poll.stdout + poll.stderr).includes("running")) { ready = true; break; }
+          }
+
+          steps.push({
+            name: "Start OpenClaw gateway",
+            status: ready ? "success" : "failed",
+            output: startOut || undefined,
+            error: ready ? undefined : "Gateway did not start within 10 s. Run: openclaw gateway start",
+          });
+          if (!ready) return { success: false, steps };
+        } else {
+          steps.push({ name: "OpenClaw gateway is running", status: "success" });
+        }
+
+        // Check if gateway requires device pairing before proceeding.
+        // `openclaw gateway health` actually connects — if pairing is required
+        // it exits non-zero with "pairing required" in stderr.
+        const healthResult = await spawnAsync("openclaw", ["gateway", "health"], 10_000);
+        const healthOut = healthResult.stdout + healthResult.stderr;
+        if (healthOut.includes("pairing required") || healthOut.includes("GatewayClientRequestError")) {
+          steps.push({
+            name: "OpenClaw gateway pairing",
+            status: "failed",
+            error:
+              "The OpenClaw gateway requires device pairing.\n\n" +
+              "Fix:\n" +
+              "  1. Run: openclaw devices list\n" +
+              "  2. Find your pending request ID\n" +
+              "  3. Run: openclaw devices approve <requestId>\n\n" +
+              "Then retry — workspace files are already written.",
+          });
+          return { success: false, steps };
+        }
+        steps.push({ name: "OpenClaw gateway pairing", status: "success" });
+
+        // ── Step 3: Create workspace directories ────────────────────────
+        // recursive: true creates all intermediate dirs in one call.
+        await fs.promises.mkdir(path.join(normalized, "memory"), { recursive: true });
+        steps.push({ name: "Create workspace directories", status: "success" });
+
+        // ── Step 4: Write config files ──────────────────────────────────
+        for (const file of payload.configFiles) {
+          await fs.promises.writeFile(
+            path.join(normalized, file.filename),
+            file.content,
+            "utf-8",
+          );
+        }
+        steps.push({ name: `Write ${payload.configFiles.length} config files`, status: "success" });
+
+        // ── Step 5: Register agent ──────────────────────────────────────
+        // Correct syntax: openclaw agents add <name> --workspace <dir> --non-interactive
+        // There is no --id or --name flag; name is a positional argument.
+        const addResult = await spawnAsync(
+          "openclaw",
+          ["agents", "add", payload.agentName, "--workspace", normalized, "--non-interactive"],
+          30_000,
+        );
+
+        // Treat "already exists" as a soft warning so re-running bootstrap is safe (idempotent).
+        // openclaw prints "already exists" to stdout (not stderr), so check both.
+        const addOk = addResult.code === 0;
+        const addOut = (addResult.stdout + addResult.stderr).toLowerCase();
+        const alreadyExists = !addOk && addOut.includes("already");
+        steps.push({
+          name: "Register agent (openclaw agents add)",
+          status: addOk ? "success" : alreadyExists ? "skipped" : "failed",
+          output: addResult.stdout || undefined,
+          error: addOk || alreadyExists ? undefined : `exit ${addResult.code}: ${addResult.stderr}`,
+        });
+        if (!addOk && !alreadyExists) return { success: false, steps };
+
+        // ── Between Step 5 and 6: wait for gateway to reload ──────────
+        // `openclaw agents add` restarts the gateway via LaunchAgent to reload
+        // the new agent config. The process comes back quickly but can get
+        // stuck accepting connections (1006). If health keeps failing after
+        // 5 s we force a full restart to clear the stuck state.
+        {
+          log.info("[bootstrap] agents add done, waiting for gateway to be healthy...");
+          sendStatus("Waiting for gateway to reload…");
+
+          const isGatewayHealthy = async (): Promise<boolean> => {
+            const poll = await spawnAsync("openclaw", ["gateway", "health"], 8_000);
+            const out = (poll.stdout + poll.stderr).trim();
+            log.info(`[bootstrap] gateway health: code=${poll.code} out="${out.slice(0, 160)}"`);
+            return poll.code === 0 && !out.includes("pairing required") && !out.includes("gateway closed");
+          };
+
+          // Phase 1: poll health for 5 s — fast path if gateway reloads cleanly
+          let gatewayReady = false;
+          for (let i = 0; i < 5; i++) {
+            await new Promise((r) => setTimeout(r, 1000));
+            sendStatus(`Waiting for gateway… (${i + 1}/5)`);
+            if (await isGatewayHealthy()) { gatewayReady = true; break; }
+          }
+
+          // Phase 2: gateway stuck — patch config + force a full restart
+          if (!gatewayReady) {
+            log.info("[bootstrap] gateway stuck after agents add, forcing restart...");
+            sendStatus("Gateway stuck — restarting…");
+            const stopRes = await spawnAsync("openclaw", ["gateway", "stop"], 10_000);
+            log.info(`[bootstrap] gateway stop: code=${stopRes.code} out="${(stopRes.stdout + stopRes.stderr).trim().slice(0, 120)}"`);
+            await new Promise((r) => setTimeout(r, 2000)); // let it fully stop
+            // Re-apply config patch — agents add can rewrite openclaw.json without gateway.mode
+            try {
+              const ocConfigPath = path.join(os.homedir(), ".openclaw", "openclaw.json");
+              const raw = await fs.promises.readFile(ocConfigPath, "utf-8");
+              const ocConfig = JSON.parse(raw);
+              if (!ocConfig.gateway?.mode) {
+                ocConfig.gateway = { ...(ocConfig.gateway ?? {}), mode: "local" };
+                await fs.promises.writeFile(ocConfigPath, JSON.stringify(ocConfig, null, 2), "utf-8");
+                log.info("[bootstrap] patched openclaw.json (post-agents-add): set gateway.mode=local");
+              }
+            } catch (err) {
+              log.warn("[bootstrap] could not patch openclaw.json:", err);
+            }
+            const startRes = await spawnAsync("openclaw", ["gateway", "start"], 15_000);
+            log.info(`[bootstrap] gateway start: code=${startRes.code} out="${(startRes.stdout + startRes.stderr).trim().slice(0, 120)}"`);
+          }
+
+          // Phase 3: poll health for up to 20 s after restart
+          if (!gatewayReady) {
+            for (let i = 0; i < 20; i++) {
+              await new Promise((r) => setTimeout(r, 1000));
+              sendStatus(`Waiting for gateway to come back… (${i + 1}/20)`);
+              if (await isGatewayHealthy()) { gatewayReady = true; break; }
+            }
+          }
+
+          if (!gatewayReady) {
+            steps.push({
+              name: "Gateway reload after agent registration",
+              status: "failed",
+              error: "Gateway did not recover after restart. Run: openclaw gateway restart",
+            });
+            return { success: false, steps };
+          }
+          steps.push({ name: "Gateway reload after agent registration", status: "success" });
+        }
+
+        // ── Step 6: Schedule heartbeat cron (with retry on gateway crash) ─
+        // The gateway occasionally closes (1006) immediately after agent
+        // registration. Retry up to 3 times, restarting the gateway between
+        // attempts if a connection error is detected.
+        const CRON_ARGS = [
+          "cron", "add",
+          "--agent", payload.agentId,
+          "--name", `${payload.agentId}-heartbeat`,
+          "--cron", payload.cronSchedule,
+          "--session", "isolated",
+          "--message", payload.cronMessage,
+          "--timeout-seconds", "300",
+        ];
+
+        let cronResult = { stdout: "", stderr: "", code: 1 };
+        const MAX_CRON_RETRIES = 3;
+        for (let attempt = 1; attempt <= MAX_CRON_RETRIES; attempt++) {
+          cronResult = await spawnAsync("openclaw", CRON_ARGS, 30_000);
+          const out = (cronResult.stdout + cronResult.stderr).toLowerCase();
+          const isGatewayCrash = out.includes("gateway closed") || out.includes("1006") || out.includes("abnormal closure");
+
+          if (cronResult.code === 0 || out.includes("already")) break; // success or already exists
+          if (!isGatewayCrash || attempt === MAX_CRON_RETRIES) break;  // non-retryable or exhausted
+
+          // Gateway crashed — wait up to 8 s for auto-restart, then start explicitly
+          log.warn(`[bootstrap] cron add attempt ${attempt} failed (gateway crash), recovering...`);
+          let cronGatewayReady = false;
+          for (let i = 0; i < 8; i++) {
+            await new Promise((r) => setTimeout(r, 1000));
+            const st = await spawnAsync("openclaw", ["gateway", "status"], 5_000);
+            if ((st.stdout + st.stderr).includes("running")) { cronGatewayReady = true; break; }
+          }
+          if (!cronGatewayReady) {
+            await spawnAsync("openclaw", ["gateway", "start"], 15_000);
+            for (let i = 0; i < 10; i++) {
+              await new Promise((r) => setTimeout(r, 1000));
+              const poll = await spawnAsync("openclaw", ["gateway", "health"], 5_000);
+              const pollOut = poll.stdout + poll.stderr;
+              if (poll.code === 0 && !pollOut.includes("pairing required") && !pollOut.includes("gateway closed")) break;
+            }
+          }
+        }
+
+        const cronOk = cronResult.code === 0;
+        const cronOut = (cronResult.stdout + cronResult.stderr).toLowerCase();
+        const cronAlreadyExists = !cronOk && cronOut.includes("already");
+        steps.push({
+          name: "Schedule heartbeat cron",
+          status: cronOk ? "success" : cronAlreadyExists ? "skipped" : "failed",
+          output: cronResult.stdout || undefined,
+          error: cronOk || cronAlreadyExists ? undefined : cronResult.stderr || cronResult.stdout,
+        });
+        if (!cronOk && !cronAlreadyExists) return { success: false, steps };
+
+        // ── Step 7: Trigger first heartbeat (optional) ──────────────────
+        // Requires parsing the cronId from "openclaw cron add" output.
+        // Skipped until the output format is confirmed — agent fires on schedule.
+        if (payload.triggerImmediately) {
+          steps.push({
+            name: "Trigger first heartbeat",
+            status: "skipped",
+            output: "Skipped — cronId parsing not yet confirmed. Agent will fire on its scheduled cron.",
+          });
+        }
+
+        return { success: true, steps };
+      } finally {
+        bootstrapInProgress = false;
+      }
+    }
+  );
+
+  // ── Install OpenClaw ─────────────────────────────────────────────────
+  // Installs openclaw globally via npm and streams live output to the renderer.
+  // The renderer subscribes to 'openclaw-install-progress' IPC events for live log lines.
+  // Returns { success: boolean; error?: string }.
+  let installInProgress = false;
+
+  ipcMain.handle("install-openclaw", async (event): Promise<{ success: boolean; error?: string }> => {
+    if (installInProgress) {
+      return { success: false, error: "An install is already in progress." };
+    }
+    installInProgress = true;
+
+    const sender = event.sender;
+    const sendProgress = (chunk: string) => {
+      if (!sender.isDestroyed()) {
+        sender.send("openclaw-install-progress", chunk);
+      }
+    };
+
+    try {
+      // 1. Verify Node.js / npm is available
+      try {
+        await spawnAsync("npm", ["--version"], 8_000);
+      } catch {
+        return {
+          success: false,
+          error:
+            "npm not found. Install Node.js (https://nodejs.org) first, then retry.\n\n" +
+            "Tip: if you installed Node via nvm, restart the desktop app after installing.",
+        };
+      }
+
+      sendProgress("Installing openclaw globally via npm…\n");
+
+      // 2. Run npm install -g openclaw@latest with streaming output
+      const result = await spawnWithProgress(
+        "npm",
+        ["install", "-g", "openclaw@latest"],
+        120_000, // 2 minutes — npm can be slow on first install
+        sendProgress,
+      );
+
+      if (result.code !== 0) {
+        const detail = (result.stderr || result.stdout).trim();
+        return {
+          success: false,
+          error: `npm install exited with code ${result.code}:\n${detail}`,
+        };
+      }
+
+      sendProgress("\nRefreshing PATH…\n");
+
+      // 3. Refresh the PATH cache so the newly installed openclaw is found
+      //    without requiring an app restart.
+      SHELL_PATH = await resolveShellPathAsync();
+      EXTRA_PATHS = buildExtraPaths();
+
+      sendProgress("openclaw installed successfully.\n");
+      return { success: true };
+    } finally {
+      installInProgress = false;
+    }
+  });
+
+  // ── Install NVM + Node.js ────────────────────────────────────────────
+  // Downloads the official nvm install script, runs it, then installs the LTS
+  // Node.js release. Progress is streamed via the same 'openclaw-install-progress'
+  // channel so the renderer can reuse the same onInstallProgress subscription.
+  // Windows is not supported by nvm-sh — returns a helpful error.
+  let nvmInstallInProgress = false;
+
+  ipcMain.handle("install-nvm", async (event): Promise<{ success: boolean; error?: string }> => {
+    if (nvmInstallInProgress) {
+      return { success: false, error: "An install is already in progress." };
+    }
+
+    if (process.platform === "win32") {
+      return {
+        success: false,
+        error:
+          "Automatic nvm install is not supported on Windows.\n\n" +
+          "Please install Node.js from https://nodejs.org, then restart the desktop app and retry.",
+      };
+    }
+
+    nvmInstallInProgress = true;
+
+    const sender = event.sender;
+    const sendProgress = (chunk: string) => {
+      if (!sender.isDestroyed()) {
+        sender.send("openclaw-install-progress", chunk);
+      }
+    };
+
+    try {
+      // 1. Download the nvm install script to a temp file
+      const NVM_VERSION = "v0.40.3";
+      const NVM_INSTALL_URL = `https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh`;
+      const tmpScript = path.join(os.tmpdir(), `nvm-install-${Date.now()}.sh`);
+
+      sendProgress(`Downloading nvm ${NVM_VERSION} install script…\n`);
+      try {
+        await downloadFile(NVM_INSTALL_URL, tmpScript);
+      } catch (err) {
+        return {
+          success: false,
+          error: `Failed to download nvm install script: ${err instanceof Error ? err.message : String(err)}\n\nCheck your internet connection and retry.`,
+        };
+      }
+
+      // 2. Run the nvm install script with bash
+      sendProgress("Running nvm install script…\n");
+      const nvmInstallResult = await spawnWithProgress("bash", [tmpScript], 60_000, sendProgress);
+      try { await fs.promises.unlink(tmpScript); } catch { /* cleanup best-effort */ }
+
+      if (nvmInstallResult.code !== 0) {
+        return {
+          success: false,
+          error: `nvm install script failed (exit ${nvmInstallResult.code}):\n${nvmInstallResult.stderr || nvmInstallResult.stdout}`,
+        };
+      }
+
+      sendProgress("\nnvm installed. Installing latest LTS Node.js…\n");
+
+      // 3. Use nvm to install the latest LTS Node.js.
+      //    nvm is a shell function — source it first in the same bash process.
+      const nvmDir = path.join(os.homedir(), ".nvm");
+      const nvmScript = path.join(nvmDir, "nvm.sh");
+      const nodeInstallResult = await spawnWithProgress(
+        "bash",
+        ["-c", `export NVM_DIR="${nvmDir}" && . "${nvmScript}" && nvm install --lts`],
+        120_000,
+        sendProgress,
+      );
+
+      if (nodeInstallResult.code !== 0) {
+        return {
+          success: false,
+          error: `Node.js install via nvm failed (exit ${nodeInstallResult.code}):\n${nodeInstallResult.stderr || nodeInstallResult.stdout}`,
+        };
+      }
+
+      sendProgress("\nRefreshing PATH…\n");
+
+      // 4. Refresh the PATH cache so the newly installed node/npm are found.
+      SHELL_PATH = await resolveShellPathAsync();
+      EXTRA_PATHS = buildExtraPaths();
+
+      sendProgress("Node.js installed via nvm. npm is now available.\n");
+      return { success: true };
+    } finally {
+      nvmInstallInProgress = false;
+    }
+  });
 }
 
 // ── Auto-updater ──────────────────────────────────────────────────────
@@ -662,7 +1334,14 @@ if (!gotSingleInstanceLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    // Resolve the full login-shell PATH and cache extra paths (nvm, homebrew, etc.)
+    // BEFORE registering IPC handlers so every spawn call gets the correct PATH.
+    // resolveShellPathAsync() is async — never use execSync here (blocks UI thread).
+    SHELL_PATH = await resolveShellPathAsync();
+    EXTRA_PATHS = buildExtraPaths();
+    log.info("[PATH] resolved SHELL_PATH segments:", SHELL_PATH.split(path.delimiter).length);
+
     // Set dock icon (macOS only; electron-builder injects it at build time for production)
     if (process.platform === "darwin") {
       const dockIcon = nativeImage.createFromPath(getIconPath("icns"));

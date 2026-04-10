@@ -94,7 +94,8 @@ export async function createSingleAgent(
     workspace: resolvedWorkspacePath,
   };
 
-  const cronCommand = `openclaw cron add --name "${agentSlug}-heartbeat" --agent "${agentSlug}" --cron "${cronSchedule}" --session isolated --message "Read HEARTBEAT.md and follow the instructions." --timeout-seconds 300`;
+  const cronMessage = "Read HEARTBEAT.md and follow the instructions.";
+  const cronCommand = `openclaw cron add --name "${agentSlug}-heartbeat" --agent "${agentSlug}" --cron "${cronSchedule}" --session isolated --message "${cronMessage}" --timeout-seconds 300`;
 
   const bootstrapMessage = generateBootstrapMessage(agentInfo, mcUrl, plainKey, {
     workspacePath: resolvedWorkspacePath,
@@ -109,9 +110,11 @@ export async function createSingleAgent(
     configFiles,
     bootstrapMessage,
     cronSchedule,
+    cronMessage,
     cronCommand,
     workspacePath: resolvedWorkspacePath,
     openclawAgentConfig,
+    requiredClis: ["openclaw"],
     mcUrl,
   };
 }
