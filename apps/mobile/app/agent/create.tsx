@@ -675,6 +675,7 @@ export default function CreateAgentScreen() {
                 manual: "construct-outline",
                 delegate: "hardware-chip-outline",
                 cloud: "cloud-outline",
+                desktop: "desktop-outline", // not rendered in mobile, Electron-only
               };
               const disabled = m === "delegate" && squadLeads.length === 0;
               return (
