@@ -13,6 +13,9 @@ import Store from "electron-store";
 import path from "path";
 import { spawn } from "child_process";
 
+// ── App identity (must be set before app is ready) ───────────────────
+app.setName("AgentCenter");
+
 // ── Global error handlers ─────────────────────────────────────────────
 process.on("uncaughtException", (err) => {
   console.error("[uncaughtException]", err);
@@ -54,6 +57,7 @@ function createConfigWindow() {
     height: 300,
     resizable: false,
     title: "AgentCenter — Server Configuration",
+    icon: path.join(app.getAppPath(), "build/icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -140,6 +144,7 @@ function createMainWindow(serverUrl: string) {
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 16, y: 16 },
     title: "AgentCenter",
+    icon: path.join(app.getAppPath(), "build/icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -236,7 +241,7 @@ function createTray() {
 function buildAppMenu() {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
-      label: app.name,
+      label: "AgentCenter",
       submenu: [
         { role: "about" },
         { type: "separator" },
@@ -481,6 +486,23 @@ if (!gotSingleInstanceLock) {
   });
 
   app.whenReady().then(() => {
+    // Set dock/taskbar icon in dev mode (electron-builder injects this at build time)
+    const iconPath =
+      process.platform === "darwin"
+        ? path.join(app.getAppPath(), "build/icon.icns")
+        : path.join(app.getAppPath(), "build/icon.png");
+
+    const appIcon = nativeImage.createFromPath(iconPath);
+    if (process.platform === "darwin") app.dock?.setIcon(appIcon);
+
+    // Override the native About dialog (otherwise shows "Electron" in dev)
+    app.setAboutPanelOptions({
+      applicationName: "AgentCenter",
+      applicationVersion: app.getVersion(),
+      copyright: "Copyright © 2026 AgentCenter",
+      iconPath,
+    });
+
     setupIPC();
     buildAppMenu();
     createTray();
