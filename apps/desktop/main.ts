@@ -764,12 +764,71 @@ function setupIPC() {
           status: "success",
         });
 
-        // ── Step 2: Create workspace directories ────────────────────────
+        // ── Step 2: Ensure OpenClaw gateway is running ──────────────────
+        // `openclaw gateway status` reads the service state without connecting —
+        // safe to call even when pairing is required.
+        const gatewayStatus = await spawnAsync("openclaw", ["gateway", "status"], 10_000);
+        const statusOut = gatewayStatus.stdout + gatewayStatus.stderr;
+        const gatewayRunning = statusOut.includes("running") && statusOut.includes("pid");
+        const gatewayInstalled = !statusOut.includes("not installed");
+
+        if (!gatewayInstalled) {
+          // Service not installed — install it first, then start.
+          log.info("[bootstrap] gateway service not installed, installing...");
+          await spawnAsync("openclaw", ["gateway", "install"], 15_000);
+        }
+
+        if (!gatewayRunning) {
+          log.info("[bootstrap] gateway not running, starting service...");
+          const startResult = await spawnAsync("openclaw", ["gateway", "start"], 15_000);
+          const startOut = startResult.stdout + startResult.stderr;
+
+          // Poll up to 10 s for gateway to become ready.
+          let ready = false;
+          for (let i = 0; i < 10; i++) {
+            await new Promise((r) => setTimeout(r, 1000));
+            const poll = await spawnAsync("openclaw", ["gateway", "status"], 5_000);
+            if ((poll.stdout + poll.stderr).includes("running")) { ready = true; break; }
+          }
+
+          steps.push({
+            name: "Start OpenClaw gateway",
+            status: ready ? "success" : "failed",
+            output: startOut || undefined,
+            error: ready ? undefined : "Gateway did not start within 10 s. Run: openclaw gateway start",
+          });
+          if (!ready) return { success: false, steps };
+        } else {
+          steps.push({ name: "OpenClaw gateway is running", status: "success" });
+        }
+
+        // Check if gateway requires device pairing before proceeding.
+        // `openclaw gateway health` actually connects — if pairing is required
+        // it exits non-zero with "pairing required" in stderr.
+        const healthResult = await spawnAsync("openclaw", ["gateway", "health"], 10_000);
+        const healthOut = healthResult.stdout + healthResult.stderr;
+        if (healthOut.includes("pairing required") || healthOut.includes("GatewayClientRequestError")) {
+          steps.push({
+            name: "OpenClaw gateway pairing",
+            status: "failed",
+            error:
+              "The OpenClaw gateway requires device pairing.\n\n" +
+              "Fix:\n" +
+              "  1. Run: openclaw devices list\n" +
+              "  2. Find your pending request ID\n" +
+              "  3. Run: openclaw devices approve <requestId>\n\n" +
+              "Then retry — workspace files are already written.",
+          });
+          return { success: false, steps };
+        }
+        steps.push({ name: "OpenClaw gateway pairing", status: "success" });
+
+        // ── Step 3: Create workspace directories ────────────────────────
         // recursive: true creates all intermediate dirs in one call.
         await fs.promises.mkdir(path.join(normalized, "memory"), { recursive: true });
         steps.push({ name: "Create workspace directories", status: "success" });
 
-        // ── Step 3: Write config files ──────────────────────────────────
+        // ── Step 4: Write config files ──────────────────────────────────
         for (const file of payload.configFiles) {
           await fs.promises.writeFile(
             path.join(normalized, file.filename),
@@ -779,25 +838,29 @@ function setupIPC() {
         }
         steps.push({ name: `Write ${payload.configFiles.length} config files`, status: "success" });
 
-        // ── Step 4: Register agent ──────────────────────────────────────
+        // ── Step 5: Register agent ──────────────────────────────────────
+        // Correct syntax: openclaw agents add <name> --workspace <dir> --non-interactive
+        // There is no --id or --name flag; name is a positional argument.
         const addResult = await spawnAsync(
           "openclaw",
-          ["agents", "add", "--id", payload.agentId, "--name", payload.agentName, "--workspace", normalized],
+          ["agents", "add", payload.agentName, "--workspace", normalized, "--non-interactive"],
           30_000,
         );
 
         // Treat "already exists" as a soft warning so re-running bootstrap is safe (idempotent).
+        // openclaw prints "already exists" to stdout (not stderr), so check both.
         const addOk = addResult.code === 0;
-        const alreadyExists = !addOk && addResult.stderr.toLowerCase().includes("already");
+        const addOut = (addResult.stdout + addResult.stderr).toLowerCase();
+        const alreadyExists = !addOk && addOut.includes("already");
         steps.push({
           name: "Register agent (openclaw agents add)",
           status: addOk ? "success" : alreadyExists ? "skipped" : "failed",
           output: addResult.stdout || undefined,
-          error: addOk ? undefined : `exit ${addResult.code}: ${addResult.stderr}`,
+          error: addOk || alreadyExists ? undefined : `exit ${addResult.code}: ${addResult.stderr}`,
         });
         if (!addOk && !alreadyExists) return { success: false, steps };
 
-        // ── Step 5: Schedule heartbeat cron ────────────────────────────
+        // ── Step 6: Schedule heartbeat cron ────────────────────────────
         const cronResult = await spawnAsync(
           "openclaw",
           [
@@ -811,6 +874,7 @@ function setupIPC() {
           ],
           30_000,
         );
+
         steps.push({
           name: "Schedule heartbeat cron",
           status: cronResult.code === 0 ? "success" : "failed",
@@ -819,7 +883,7 @@ function setupIPC() {
         });
         if (cronResult.code !== 0) return { success: false, steps };
 
-        // ── Step 6: Trigger first heartbeat (optional) ──────────────────
+        // ── Step 7: Trigger first heartbeat (optional) ──────────────────
         // Requires parsing the cronId from "openclaw cron add" output.
         // Skipped until the output format is confirmed — agent fires on schedule.
         if (payload.triggerImmediately) {

@@ -42,7 +42,7 @@ OpenClaw is the gateway that manages agent sessions and cron jobs. You need to a
 Run the following command (use the workspace path from Step 1):
 
 ```bash
-openclaw agents add --id "{{openclawAgentConfig.id}}" --name "{{agent.name}}" --workspace "{{workspacePath}}"
+openclaw agents add "{{agent.name}}" --workspace "{{workspacePath}}" --non-interactive
 ```
 
 If the `openclaw agents add` command is not available, manually add this entry to your OpenClaw config file (`~/.openclaw/openclaw.json`) under the `"agents"` array:
