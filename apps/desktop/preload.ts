@@ -16,4 +16,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   /** Set the server URL (used by the config window) */
   setServerUrl: (url: string): void => ipcRenderer.send("set-server-url", url),
+
+  /** One-click agent bootstrap: writes config files, registers agent, schedules cron */
+  bootstrapAgent: (payload: BootstrapAgentPayload): Promise<BootstrapResult> =>
+    ipcRenderer.invoke("bootstrap-agent", payload),
 });

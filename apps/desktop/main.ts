@@ -14,7 +14,9 @@ import { autoUpdater } from "electron-updater";
 import Store from "electron-store";
 import log from "electron-log/main";
 import path from "path";
-import { spawn } from "child_process";
+import { spawn, exec } from "child_process";
+import os from "os";
+import fs from "fs";
 
 // Initialise electron-log: writes to ~/Library/Logs/AgentCenter/ (macOS),
 // %APPDATA%\AgentCenter\logs\ (Windows), ~/.config/AgentCenter/logs/ (Linux).
@@ -60,6 +62,77 @@ const MAX_AUTO_RELOADS = 3;
 const CRASH_WINDOW_MS = 30_000;
 let rendererCrashCount = 0;
 let crashWindowTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ── Shell PATH resolution (macOS + Linux GUI fix) ─────────────────────
+// Populated once inside app.whenReady() before any IPC handlers are called.
+// Safe defaults until resolved — never undefined.
+let SHELL_PATH = process.env.PATH ?? "";
+let EXTRA_PATHS: string[] = [];
+
+/**
+ * Resolves the full login-shell PATH asynchronously.
+ *
+ * macOS and Linux GUI apps launch without a login shell, so process.env.PATH
+ * is stripped to /usr/bin:/bin:/usr/sbin:/sbin. Tools installed via Homebrew,
+ * nvm, or similar are invisible. Spawning a login shell fixes this.
+ * Windows GUI apps inherit the full system PATH — no fix needed.
+ */
+function resolveShellPathAsync(): Promise<string> {
+  if (process.platform === "win32") return Promise.resolve(process.env.PATH ?? "");
+  return new Promise((resolve) => {
+    const shell = process.env.SHELL || "/bin/bash";
+    exec(`${shell} -l -c 'echo $PATH'`, { timeout: 5000 }, (err, stdout) => {
+      if (err) {
+        log.warn("[PATH] login-shell exec failed, keeping current PATH:", err.message);
+        resolve(process.env.PATH ?? "");
+      } else {
+        resolve(stdout.trim());
+      }
+    });
+  });
+}
+
+/**
+ * Builds a list of extra PATH entries to prepend.
+ * Called once at startup; result is cached in EXTRA_PATHS.
+ * Mirrors ShellService.buildEnv() in the native macOS companion app.
+ */
+function buildExtraPaths(): string[] {
+  const home = os.homedir();
+  const extras: string[] = [];
+
+  if (process.platform !== "win32") {
+    // NVM: add latest installed Node bin/ so npm global CLIs (openclaw etc.)
+    // are found even when Node was installed via nvm, not a system package.
+    const nvmDir = path.join(home, ".nvm", "versions", "node");
+    try {
+      const versions = fs
+        .readdirSync(nvmDir)
+        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+      for (const version of versions) {
+        const binPath = path.join(nvmDir, version, "bin");
+        try {
+          fs.readdirSync(binPath);
+          extras.push(binPath);
+          break;
+        } catch { /* skip broken version */ }
+      }
+    } catch { /* nvm not installed */ }
+
+    extras.push(
+      path.join(home, ".local", "bin"),
+      path.join(home, ".cargo", "bin"),
+      "/usr/local/bin",     // Homebrew Intel Mac + common Linux
+      "/opt/homebrew/bin",  // Homebrew Apple Silicon
+    );
+  } else {
+    // Windows: npm global CLIs land in %APPDATA%\npm
+    const appData = process.env.APPDATA;
+    if (appData) extras.push(path.join(appData, "npm"));
+  }
+
+  return extras;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -496,10 +569,75 @@ function buildSafeEnv(): NodeJS.ProcessEnv {
       safe[key] = process.env[key];
     }
   }
+  // Two-layer PATH: cached extra paths (nvm, homebrew, etc.) prepended to the
+  // full login-shell PATH resolved at startup. Zero filesystem I/O per call.
+  safe["PATH"] = [...EXTRA_PATHS, SHELL_PATH].filter(Boolean).join(path.delimiter);
   return safe;
 }
 
 const SPAWN_MAX_BYTES = 32 * 1024; // 32 KB cap per stream
+
+/**
+ * On Windows, npm global CLIs install as `<name>.cmd`.
+ * `spawn("openclaw", ...)` with `shell: false` won't find `.cmd` files.
+ * Using `shell: true` + args array is deprecated in Node v23.11+ (word-splitting risk).
+ * Correct fix: resolve the full .cmd path via where.exe, then spawn with shell: false.
+ * Returns the original cmd unchanged on non-Windows or if where.exe fails.
+ */
+function resolveWindowsCmd(cmd: string): Promise<string> {
+  if (process.platform !== "win32") return Promise.resolve(cmd);
+  return new Promise((resolve) => {
+    exec(`where.exe "${cmd}"`, { timeout: 3000 }, (err, stdout) => {
+      if (err) { resolve(cmd); return; }
+      const lines = stdout.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      // Prefer .cmd over .exe — npm global installs are .cmd
+      resolve(lines.find((l) => l.toLowerCase().endsWith(".cmd")) ?? lines[0] ?? cmd);
+    });
+  });
+}
+
+/**
+ * Spawns a CLI with a proper arg array (shell: false on all platforms).
+ * Resolves the .cmd path on Windows first so shell: false works correctly.
+ * Caps stdout/stderr at SPAWN_MAX_BYTES to prevent memory exhaustion.
+ */
+async function spawnAsync(
+  cmd: string,
+  args: string[],
+  timeoutMs = 30_000,
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  const resolvedCmd = await resolveWindowsCmd(cmd);
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(resolvedCmd, args, {
+      timeout: timeoutMs,
+      env: buildSafeEnv(),
+      shell: false, // always false — args as array, no shell injection, no word-splitting
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+
+    child.stdout?.on("data", (data: Buffer) => {
+      stdoutBytes += data.length;
+      if (stdoutBytes <= SPAWN_MAX_BYTES) stdout += data.toString();
+    });
+    child.stderr?.on("data", (data: Buffer) => {
+      stderrBytes += data.length;
+      if (stderrBytes <= SPAWN_MAX_BYTES) stderr += data.toString();
+    });
+    child.on("error", (err) => {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        reject(new Error(`"${cmd}" not found. Is it installed and on your PATH?`));
+      } else {
+        reject(err);
+      }
+    });
+    child.on("close", (code) => resolve({ stdout, stderr, code: code ?? 1 }));
+  });
+}
 
 function setupIPC() {
   // Config window: set server URL
@@ -528,36 +666,174 @@ function setupIPC() {
           `Command not allowed: "${subcommand}". Allowed: ${ALLOWED_OPENCLAW_COMMANDS.join(", ")}`
         );
       }
+      return spawnAsync("openclaw", args, 30_000);
+    }
+  );
 
-      return new Promise((resolve, reject) => {
-        const child = spawn("openclaw", args, {
-          timeout: 30_000,
-          env: buildSafeEnv(),
-        });
+  // ── One-click agent bootstrap ────────────────────────────────────────
+  // Types mirror electron-env.d.ts (BootstrapAgentPayload / BootstrapResult).
+  // Handler always returns a BootstrapResult — never throws — because
+  // ipcMain.handle only serialises error.message on thrown exceptions (stack lost).
 
-        let stdout = "";
-        let stderr = "";
-        let stdoutBytes = 0;
-        let stderrBytes = 0;
+  interface BootstrapAgentPayload {
+    agentId: string;
+    agentName: string;
+    workspacePath: string;
+    configFiles: Array<{ filename: string; content: string }>;
+    requiredClis: string[];
+    cronSchedule: string;
+    cronMessage: string;
+    triggerImmediately?: boolean;
+  }
 
-        child.stdout.on("data", (data: Buffer) => {
-          stdoutBytes += data.length;
-          if (stdoutBytes <= SPAWN_MAX_BYTES) {
-            stdout += data.toString();
+  interface BootstrapResult {
+    success: boolean;
+    steps: Array<{
+      name: string;
+      status: "success" | "failed" | "skipped";
+      output?: string;
+      error?: string;
+    }>;
+  }
+
+  // Guard against concurrent calls (e.g. user double-clicks the button)
+  let bootstrapInProgress = false;
+
+  ipcMain.handle(
+    "bootstrap-agent",
+    async (_event, payload: BootstrapAgentPayload): Promise<BootstrapResult> => {
+      if (bootstrapInProgress) {
+        return {
+          success: false,
+          steps: [{ name: "Guard", status: "failed", error: "A bootstrap is already in progress." }],
+        };
+      }
+      bootstrapInProgress = true;
+
+      const steps: BootstrapResult["steps"] = [];
+
+      try {
+        // ── Validation ─────────────────────────────────────────────────
+        // 1. Expand "~" — Node.js fs does NOT expand tilde.
+        const resolvedWorkspace = payload.workspacePath.startsWith("~")
+          ? path.join(os.homedir(), payload.workspacePath.slice(1))
+          : payload.workspacePath;
+
+        // 2. Prevent path traversal — workspace must be inside ~/.openclaw/agents/
+        const allowedRoot = path.join(os.homedir(), ".openclaw", "agents");
+        const normalized = path.resolve(resolvedWorkspace);
+        if (!normalized.startsWith(allowedRoot + path.sep) && normalized !== allowedRoot) {
+          return {
+            success: false,
+            steps: [{ name: "Validation", status: "failed", error: `workspacePath must be inside ${allowedRoot}` }],
+          };
+        }
+
+        // 3. Filenames must be bare names — no path separators or traversal
+        for (const file of payload.configFiles) {
+          if (path.basename(file.filename) !== file.filename || file.filename.includes("..")) {
+            return {
+              success: false,
+              steps: [{ name: "Validation", status: "failed", error: `Invalid filename: "${file.filename}"` }],
+            };
           }
-        });
-        child.stderr.on("data", (data: Buffer) => {
-          stderrBytes += data.length;
-          if (stderrBytes <= SPAWN_MAX_BYTES) {
-            stderr += data.toString();
+        }
+
+        // ── Step 1: Verify all required CLIs are installed ──────────────
+        // Run FIRST — fail fast before touching the filesystem so no partial
+        // workspace is left on disk if a CLI is missing.
+        const missingClis: string[] = [];
+        for (const cli of payload.requiredClis) {
+          try {
+            const result = await spawnAsync(cli, ["--version"], 10_000);
+            if (result.code !== 0) missingClis.push(cli);
+          } catch {
+            missingClis.push(cli);
           }
+        }
+        if (missingClis.length > 0) {
+          steps.push({
+            name: "Verify required CLIs",
+            status: "failed",
+            error: `Missing: ${missingClis.join(", ")}. Ensure these are installed and on your PATH.`,
+          });
+          return { success: false, steps };
+        }
+        steps.push({
+          name: `Verify required CLIs (${payload.requiredClis.join(", ")})`,
+          status: "success",
         });
 
-        child.on("error", (err) => reject(err));
-        child.on("close", (code) => {
-          resolve({ stdout, stderr, code: code ?? 1 });
+        // ── Step 2: Create workspace directories ────────────────────────
+        // recursive: true creates all intermediate dirs in one call.
+        await fs.promises.mkdir(path.join(normalized, "memory"), { recursive: true });
+        steps.push({ name: "Create workspace directories", status: "success" });
+
+        // ── Step 3: Write config files ──────────────────────────────────
+        for (const file of payload.configFiles) {
+          await fs.promises.writeFile(
+            path.join(normalized, file.filename),
+            file.content,
+            "utf-8",
+          );
+        }
+        steps.push({ name: `Write ${payload.configFiles.length} config files`, status: "success" });
+
+        // ── Step 4: Register agent ──────────────────────────────────────
+        const addResult = await spawnAsync(
+          "openclaw",
+          ["agents", "add", "--id", payload.agentId, "--name", payload.agentName, "--workspace", normalized],
+          30_000,
+        );
+
+        // Treat "already exists" as a soft warning so re-running bootstrap is safe (idempotent).
+        const addOk = addResult.code === 0;
+        const alreadyExists = !addOk && addResult.stderr.toLowerCase().includes("already");
+        steps.push({
+          name: "Register agent (openclaw agents add)",
+          status: addOk ? "success" : alreadyExists ? "skipped" : "failed",
+          output: addResult.stdout || undefined,
+          error: addOk ? undefined : `exit ${addResult.code}: ${addResult.stderr}`,
         });
-      });
+        if (!addOk && !alreadyExists) return { success: false, steps };
+
+        // ── Step 5: Schedule heartbeat cron ────────────────────────────
+        const cronResult = await spawnAsync(
+          "openclaw",
+          [
+            "cron", "add",
+            "--agent", payload.agentId,
+            "--name", `${payload.agentId}-heartbeat`,
+            "--cron", payload.cronSchedule,
+            "--session", "isolated",
+            "--message", payload.cronMessage,
+            "--timeout-seconds", "300",
+          ],
+          30_000,
+        );
+        steps.push({
+          name: "Schedule heartbeat cron",
+          status: cronResult.code === 0 ? "success" : "failed",
+          output: cronResult.stdout || undefined,
+          error: cronResult.code !== 0 ? cronResult.stderr : undefined,
+        });
+        if (cronResult.code !== 0) return { success: false, steps };
+
+        // ── Step 6: Trigger first heartbeat (optional) ──────────────────
+        // Requires parsing the cronId from "openclaw cron add" output.
+        // Skipped until the output format is confirmed — agent fires on schedule.
+        if (payload.triggerImmediately) {
+          steps.push({
+            name: "Trigger first heartbeat",
+            status: "skipped",
+            output: "Skipped — cronId parsing not yet confirmed. Agent will fire on its scheduled cron.",
+          });
+        }
+
+        return { success: true, steps };
+      } finally {
+        bootstrapInProgress = false;
+      }
     }
   );
 }
@@ -662,7 +938,14 @@ if (!gotSingleInstanceLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    // Resolve the full login-shell PATH and cache extra paths (nvm, homebrew, etc.)
+    // BEFORE registering IPC handlers so every spawn call gets the correct PATH.
+    // resolveShellPathAsync() is async — never use execSync here (blocks UI thread).
+    SHELL_PATH = await resolveShellPathAsync();
+    EXTRA_PATHS = buildExtraPaths();
+    log.info("[PATH] resolved SHELL_PATH segments:", SHELL_PATH.split(path.delimiter).length);
+
     // Set dock icon (macOS only; electron-builder injects it at build time for production)
     if (process.platform === "darwin") {
       const dockIcon = nativeImage.createFromPath(getIconPath("icns"));

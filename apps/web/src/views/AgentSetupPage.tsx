@@ -19,10 +19,13 @@ import {
   MessageSquare,
   Cloud,
   Server,
+  MonitorDown,
 } from "lucide-react";
 import { Button, Badge, Card } from "@/components/ui";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS, type AgentConfigFile } from "@agentcenter/utils";
+import { useIsElectron } from "@agentcenter/hooks/browser";
+import { DesktopBootstrapButton } from "@/components/common/DesktopBootstrapButton";
 
 interface CloudVMAgent {
   id: string;
@@ -54,14 +57,16 @@ interface SetupData {
   configFiles: AgentConfigFile[];
   bootstrapMessage: string;
   cronSchedule: string;
+  cronMessage: string;
   cronCommand: string;
   workspacePath: string;
   openclawAgentConfig: { id: string; name: string; workspace: string };
+  requiredClis: string[];
   mcUrl: string;
   cloudVms: CloudVMOption[];
 }
 
-type SetupMode = "cloud" | "auto" | "manual";
+type SetupMode = "cloud" | "auto" | "manual" | "desktop";
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -211,6 +216,7 @@ function DownloadZipButton({ files, zipName }: { files: AgentConfigFile[]; zipNa
 
 export function AgentSetupPage({ agentId }: { agentId: string }) {
   const router = useRouter();
+  const isDesktopApp = useIsElectron();
   const [setupData, setSetupData] = useState<SetupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
@@ -223,6 +229,12 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
   const isAlreadyOnCloud = setupData?.agent.hostingType === "cloudVM";
   const hasApiKey = !!setupData?.agent.apiKeyPrefix;
   const cloudVmsEnabled = useFeatureFlag(FLAG_KEYS.CLOUD_VMS);
+
+  // Once isDesktopApp resolves (after hydration), switch to the desktop tab.
+  // Only switches if the user hasn't already manually picked a different tab.
+  useEffect(() => {
+    if (isDesktopApp) setSetupMode("desktop");
+  }, [isDesktopApp]);
 
   useEffect(() => {
     fetch(`/api/agents/${agentId}/setup`)
@@ -386,8 +398,21 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
         </div>
 
         <div className="space-y-6">
-          {/* Mode toggle — 3 tabs */}
+          {/* Mode toggle */}
           <div className="flex bg-muted rounded-lg p-1 gap-1">
+            {isDesktopApp && (
+              <button
+                onClick={() => setSetupMode("desktop")}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition ${
+                  setupMode === "desktop"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <MonitorDown className="w-4 h-4" />
+                Desktop App
+              </button>
+            )}
             <button
               onClick={() => setSetupMode("auto")}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition ${
@@ -632,8 +657,31 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
             </>
           )}
 
+          {/* ==================== DESKTOP APP TAB ==================== */}
+          {setupMode === "desktop" && (
+            <DesktopBootstrapButton
+              payload={{
+                agentId,
+                agentName: setupData.agent.name,
+                workspacePath: setupData.workspacePath,
+                configFiles: setupData.configFiles,
+                requiredClis: setupData.requiredClis,
+                cronSchedule: setupData.cronSchedule,
+                cronMessage: setupData.cronMessage,
+              }}
+              onComplete={() => {
+                fetch(`/api/agents/${agentId}/setup`)
+                  .then((r) => r.json())
+                  .then((data) => {
+                    if (!data.error) setSetupData(data);
+                  })
+                  .catch(() => {});
+              }}
+            />
+          )}
+
           {/* ==================== AUTO & MANUAL shared: Security + API Key ==================== */}
-          {(setupMode === "auto" || setupMode === "manual") && (
+          {(setupMode === "auto" || setupMode === "manual" || setupMode === "desktop") && (
             <>
               {/* Security warning */}
               <div className="border-2 border-destructive/30 bg-destructive-muted rounded-xl p-5">

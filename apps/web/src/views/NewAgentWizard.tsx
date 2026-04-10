@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "urql";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import {
   EyeOff,
   Cloud,
   Server,
+  MonitorDown,
 } from "lucide-react";
 import { AGENTS_QUERY } from "../lib/graphql/queries";
 import { CREATE_TASK_FROM_DASHBOARD } from "../lib/graphql/mutations/tasks";
@@ -59,6 +60,8 @@ import {
   type WizardTemplate as Template,
 } from "../lib/agent-wizard-templates";
 import { type SetupMode, type AgentConfigFile, type AgentSetupResult } from "@agentcenter/utils";
+import { useIsElectron } from "@agentcenter/hooks/browser";
+import { DesktopBootstrapButton } from "@/components/common/DesktopBootstrapButton";
 import { createZipBlob } from "../lib/createZipBlob";
 
 type Step = "template" | "details" | "setup";
@@ -142,6 +145,12 @@ export function NewAgentWizard() {
     ) ?? [];
   const hasSquadLead = squadLeads.length > 0;
   const cloudVmsEnabled = useFeatureFlag(FLAG_KEYS.CLOUD_VMS);
+  const isDesktopApp = useIsElectron();
+
+  // Auto-switch to the Desktop App tab once isDesktopApp resolves after hydration.
+  useEffect(() => {
+    if (isDesktopApp) setSetupMode("desktop");
+  }, [isDesktopApp]);
 
   // Form fields with zod validation
   const form = useForm<AgentWizardValues>({
@@ -242,7 +251,7 @@ export function NewAgentWizard() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className={`${step === "template" ? "max-w-5xl" : "max-w-3xl"} mx-auto px-4 py-8`}>
+      <div className={`${step === "template" ? "max-w-5xl" : "max-w-4xl"} mx-auto px-4 py-8`}>
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
           <Button
@@ -651,6 +660,19 @@ export function NewAgentWizard() {
 
             {/* Mode toggle */}
             <div className="flex bg-muted rounded-lg p-1 gap-1">
+              {isDesktopApp && (
+                <button
+                  onClick={() => setSetupMode("desktop")}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition ${
+                    setupMode === "desktop"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <MonitorDown className="w-4 h-4" />
+                  Desktop App
+                </button>
+              )}
               <button
                 onClick={() => setSetupMode("auto")}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition ${
@@ -725,6 +747,21 @@ export function NewAgentWizard() {
                 </button>
               )}
             </div>
+
+            {/* ==================== DESKTOP APP TAB ==================== */}
+            {setupMode === "desktop" && result && (
+              <DesktopBootstrapButton
+                payload={{
+                  agentId: String(result.agent.username || result.agent.id),
+                  agentName: String(result.agent.name ?? ""),
+                  workspacePath: result.workspacePath,
+                  configFiles: result.configFiles,
+                  requiredClis: result.requiredClis,
+                  cronSchedule: result.cronSchedule,
+                  cronMessage: result.cronMessage,
+                }}
+              />
+            )}
 
             {/* ==================== AUTO MODE ==================== */}
             {setupMode === "auto" && (
