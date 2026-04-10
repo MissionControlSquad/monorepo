@@ -194,13 +194,28 @@ jobs:
           RELEASES_BASE_URL: ${{ vars.RELEASES_BASE_URL }}
 
       # ── macOS ─────────────────────────────────────────────────────────────
-      # Signing:
-      #   CSC_LINK set     → signed with Developer ID cert
-      #   CSC_LINK absent  → CSC_IDENTITY_AUTO_DISCOVERY=false prevents electron-builder
-      #                       from searching the empty CI keychain; builds unsigned DMG
-      # Notarization:
-      #   APPLE_* set      → notarized (no xattr needed on end-user machines)
-      #   APPLE_* absent   → skipped (users run: xattr -cr AgentCenter.app)
+      # Signing is optional. When CSC_LINK secret is absent GitHub passes it
+      # as an empty string. electron-builder treats CSC_LINK="" as a file path,
+      # resolves it to the working directory, and fails with "not a file".
+      # Fix: write signing vars to GITHUB_ENV only when the secret is non-empty
+      # so electron-builder never sees an empty CSC_LINK.
+      - name: Configure macOS signing
+        if: steps.gate.outputs.run == 'true' && matrix.platform == 'mac'
+        shell: bash
+        run: |
+          if [[ -n "$CSC_LINK_SECRET" ]]; then
+            printf 'CSC_LINK=%s\n'          "$CSC_LINK_SECRET"          >> "$GITHUB_ENV"
+            printf 'CSC_KEY_PASSWORD=%s\n'  "$CSC_KEY_PASSWORD_SECRET"  >> "$GITHUB_ENV"
+            echo "CSC_IDENTITY_AUTO_DISCOVERY=true"                      >> "$GITHUB_ENV"
+            echo "Signing: enabled"
+          else
+            echo "CSC_IDENTITY_AUTO_DISCOVERY=false"                     >> "$GITHUB_ENV"
+            echo "Signing: disabled (CSC_LINK secret not set — unsigned DMG)"
+          fi
+        env:
+          CSC_LINK_SECRET:         ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD_SECRET: ${{ secrets.CSC_KEY_PASSWORD }}
+
       - name: Build macOS DMG
         if: steps.gate.outputs.run == 'true' && matrix.platform == 'mac'
         working-directory: apps/desktop
@@ -209,13 +224,12 @@ jobs:
           PUBLISH_FLAG=$( [[ "$SHOULD_PUBLISH" == "true" ]] && echo "always" || echo "never" )
           npm exec -- electron-builder --mac --publish "$PUBLISH_FLAG"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
+          GH_TOKEN:                    ${{ secrets.GITHUB_TOKEN }}
+          APPLE_ID:                    ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
+          # CSC_LINK, CSC_KEY_PASSWORD, CSC_IDENTITY_AUTO_DISCOVERY are set
+          # by the "Configure macOS signing" step above via GITHUB_ENV.
 
       # ── Windows ───────────────────────────────────────────────────────────
       # Signing:
