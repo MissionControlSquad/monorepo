@@ -47,6 +47,17 @@ jobs:
         if: matrix.platform == 'linux'
         run: sudo apt-get install -y fakeroot dpkg
 
+      # Sync package.json version from the git tag (desktop-v1.2.3 → 1.2.3).
+      # This ensures the built app reports the correct version for auto-update comparisons.
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          TAG_VERSION="${{ github.ref_name }}"
+          APP_VERSION="${TAG_VERSION#desktop-v}"
+          npm version "$APP_VERSION" --no-git-tag-version --allow-same-version
+
       - name: Compile Electron TypeScript (production)
         working-directory: apps/desktop
         run: npx tsc -p tsconfig.prod.json

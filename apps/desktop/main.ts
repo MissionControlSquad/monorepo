@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   dialog,
   Menu,
+  session,
   Tray,
   ipcMain,
   screen,
@@ -11,24 +12,37 @@ import {
 } from "electron";
 import { autoUpdater } from "electron-updater";
 import Store from "electron-store";
+import log from "electron-log/main";
 import path from "path";
 import { spawn } from "child_process";
+
+// Initialise electron-log: writes to ~/Library/Logs/AgentCenter/ (macOS),
+// %APPDATA%\AgentCenter\logs\ (Windows), ~/.config/AgentCenter/logs/ (Linux).
+log.initialize();
+log.transports.file.maxSize = 5 * 1024 * 1024; // 5 MB per log file
+// Also forward to the renderer console in dev
+log.transports.console.level = app.isPackaged ? "warn" : "debug";
 
 // ── App identity (must be set before app is ready) ───────────────────
 app.setName("AgentCenter");
 
+// Only http/https/mailto are safe to hand off to the OS
+const SAFE_EXTERNAL_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
 // ── Global error handlers ─────────────────────────────────────────────
 process.on("uncaughtException", (err) => {
-  console.error("[uncaughtException]", err);
+  // Log full details internally; show only a generic message to the user
+  // to avoid leaking file paths or internal state.
+  log.error("[uncaughtException]", err);
   dialog.showErrorBox(
     "Unexpected Error",
-    `AgentCenter encountered an unexpected error and needs to restart.\n\n${err.message}`
+    "AgentCenter encountered an unexpected error and needs to restart.\n\nIf this keeps happening, please check the application logs."
   );
   app.exit(1);
 });
 
 process.on("unhandledRejection", (reason) => {
-  console.error("[unhandledRejection]", reason);
+  log.error("[unhandledRejection]", reason);
 });
 
 // ── Persistent config store ───────────────────────────────────────────
@@ -39,6 +53,13 @@ const store = new Store<{ serverUrl: string; windowBounds: Electron.Rectangle }>
 let mainWindow: BrowserWindow | null = null;
 let configWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+
+// Crash-loop protection: stop auto-reloading after MAX_AUTO_RELOADS consecutive
+// crashes within CRASH_WINDOW_MS. Counter resets after a clean CRASH_WINDOW_MS period.
+const MAX_AUTO_RELOADS = 3;
+const CRASH_WINDOW_MS = 30_000;
+let rendererCrashCount = 0;
+let crashWindowTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -97,10 +118,17 @@ function createConfigWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
 
-  const currentUrl = getServerUrl() || "";
+  // Escape for safe embedding inside an HTML attribute value
+  const currentUrl = (getServerUrl() || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
   configWindow.loadURL(
     `data:text/html;charset=utf-8,${encodeURIComponent(`
@@ -183,6 +211,7 @@ function createMainWindow(serverUrl: string) {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       allowRunningInsecureContent: false,
       partition: "persist:agentcenter",
     },
@@ -190,20 +219,36 @@ function createMainWindow(serverUrl: string) {
 
   mainWindow.loadURL(serverUrl);
 
-  // Crash / GPU process gone
+  // Crash / GPU process gone — with loop protection
   mainWindow.webContents.on("render-process-gone", (_event, details) => {
-    console.error("[render-process-gone]", details);
-    if (details.reason !== "clean-exit") {
+    log.error("[render-process-gone]", details);
+    if (details.reason === "clean-exit") return;
+
+    rendererCrashCount++;
+
+    // Reset the counter after a stable CRASH_WINDOW_MS with no crashes
+    if (crashWindowTimer) clearTimeout(crashWindowTimer);
+    crashWindowTimer = setTimeout(() => {
+      rendererCrashCount = 0;
+      crashWindowTimer = null;
+    }, CRASH_WINDOW_MS);
+
+    if (rendererCrashCount <= MAX_AUTO_RELOADS) {
       dialog.showErrorBox(
         "Renderer Crashed",
-        `The AgentCenter window crashed (${details.reason}). It will reload.`
+        `The AgentCenter window crashed (${details.reason}). Reloading…`
       );
       mainWindow?.reload();
+    } else {
+      dialog.showErrorBox(
+        "Renderer Crashed",
+        "AgentCenter has crashed multiple times in a short period.\n\nPlease restart the application manually."
+      );
     }
   });
 
   mainWindow.webContents.on("unresponsive", () => {
-    console.warn("[webContents] window became unresponsive");
+    log.warn("[webContents] window became unresponsive");
     dialog
       .showMessageBox({
         type: "warning",
@@ -217,14 +262,42 @@ function createMainWindow(serverUrl: string) {
       });
   });
 
-  // Open external links in default browser
+  // Open external links in the default browser.
+  // Only allow http/https/mailto — block file://, smb://, ms-settings://, etc.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     const serverOrigin = new URL(serverUrl).origin;
     if (!url.startsWith(serverOrigin)) {
-      shell.openExternal(url);
+      try {
+        const { protocol } = new URL(url);
+        if (SAFE_EXTERNAL_PROTOCOLS.has(protocol)) {
+          shell.openExternal(url);
+        }
+      } catch {
+        // ignore unparseable URLs
+      }
       return { action: "deny" };
     }
     return { action: "allow" };
+  });
+
+  // Prevent the main window from navigating away from the server origin.
+  // Reads from store on every call so it stays correct after a server URL change.
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    const currentServerUrl = getServerUrl();
+    if (!currentServerUrl) return;
+    try {
+      const serverOrigin = new URL(currentServerUrl).origin;
+      const navOrigin = new URL(url).origin;
+      if (navOrigin !== serverOrigin) {
+        event.preventDefault();
+        const { protocol } = new URL(url);
+        if (SAFE_EXTERNAL_PROTOCOLS.has(protocol)) {
+          shell.openExternal(url);
+        }
+      }
+    } catch {
+      event.preventDefault();
+    }
   });
 
   mainWindow.on("resize", saveWindowBounds);
@@ -385,7 +458,9 @@ const SPAWN_MAX_BYTES = 32 * 1024; // 32 KB cap per stream
 
 function setupIPC() {
   // Config window: set server URL
-  ipcMain.on("set-server-url", (_event, url: string) => {
+  ipcMain.on("set-server-url", (event, url: string) => {
+    // Only accept this message from the config window to prevent spoofing
+    if (!configWindow || event.sender !== configWindow.webContents) return;
     store.set("serverUrl", url);
     if (configWindow) {
       configWindow.close();
@@ -479,11 +554,11 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on("error", (err) => {
-    console.error("[autoUpdater] error:", err);
+    log.error("[autoUpdater] error:", err);
   });
 
   autoUpdater.checkForUpdates().catch((err) => {
-    console.warn("[autoUpdater] check failed:", err);
+    log.warn("[autoUpdater] check failed:", err);
   });
 }
 
@@ -506,7 +581,7 @@ function handleDeepLink(url: string) {
     mainWindow.loadURL(`${serverUrl}${parsed.pathname}${parsed.search}`);
     mainWindow.focus();
   } catch {
-    console.warn("[deepLink] invalid URL:", url);
+    log.warn("[deepLink] invalid URL:", url);
   }
 }
 
@@ -549,6 +624,20 @@ if (!gotSingleInstanceLock) {
     });
 
     setupIPC();
+
+    // Lock down permissions for the persistent session.
+    // The web app content can still request camera/mic/notifications through normal
+    // browser prompts — we explicitly block openExternal (we handle that ourselves)
+    // and anything the app doesn't need (midi, pointerLock, etc.).
+    const appSession = session.fromPartition("persist:agentcenter");
+    const BLOCKED_PERMISSIONS = new Set(["openExternal", "midi", "midiSysex", "pointerLock"]);
+    appSession.setPermissionRequestHandler((_wc, permission, callback) => {
+      callback(!BLOCKED_PERMISSIONS.has(permission));
+    });
+    appSession.setPermissionCheckHandler((_wc, permission) => {
+      return !BLOCKED_PERMISSIONS.has(permission);
+    });
+
     buildAppMenu();
     createTray();
 

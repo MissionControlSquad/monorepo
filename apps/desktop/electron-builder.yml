@@ -55,6 +55,7 @@ win:
 
 nsis:
   oneClick: false
+  shortcutName: AgentCenter
   allowToChangeInstallationDirectory: true
   deleteAppDataOnUninstall: false
 
