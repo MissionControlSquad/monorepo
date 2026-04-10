@@ -8,10 +8,15 @@ directories:
 
 files:
   - dist-electron/**/*
-  - "!node_modules"
+  - "!node_modules/**"
   - "!src"
   - "!electron"
   - "!.next"
+  - "!scripts"
+
+# All npm dependencies are bundled into dist-electron/main.js by esbuild,
+# so electron-builder does not need to resolve or package node_modules.
+npmRebuild: false
 
 icon: build/icon
 
