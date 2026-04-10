@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  dialog,
   Menu,
   Tray,
   ipcMain,
@@ -11,6 +12,20 @@ import { autoUpdater } from "electron-updater";
 import Store from "electron-store";
 import path from "path";
 import { spawn } from "child_process";
+
+// ── Global error handlers ─────────────────────────────────────────────
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+  dialog.showErrorBox(
+    "Unexpected Error",
+    `AgentCenter encountered an unexpected error and needs to restart.\n\n${err.message}`
+  );
+  app.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+});
 
 // ── Persistent config store ───────────────────────────────────────────
 const store = new Store<{ serverUrl: string; windowBounds: Electron.Rectangle }>(
@@ -129,11 +144,39 @@ function createMainWindow(serverUrl: string) {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      allowRunningInsecureContent: false,
       partition: "persist:agentcenter",
     },
   });
 
   mainWindow.loadURL(serverUrl);
+
+  // Crash / GPU process gone
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    console.error("[render-process-gone]", details);
+    if (details.reason !== "clean-exit") {
+      dialog.showErrorBox(
+        "Renderer Crashed",
+        `The AgentCenter window crashed (${details.reason}). It will reload.`
+      );
+      mainWindow?.reload();
+    }
+  });
+
+  mainWindow.webContents.on("unresponsive", () => {
+    console.warn("[webContents] window became unresponsive");
+    dialog
+      .showMessageBox({
+        type: "warning",
+        title: "AgentCenter is not responding",
+        message: "The window is not responding. Would you like to reload it?",
+        buttons: ["Reload", "Wait"],
+        defaultId: 0,
+      })
+      .then(({ response }) => {
+        if (response === 0) mainWindow?.reload();
+      });
+  });
 
   // Open external links in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -270,6 +313,34 @@ const ALLOWED_OPENCLAW_COMMANDS = [
   "help",
 ];
 
+// Only pass through safe, non-sensitive environment variables to the subprocess
+const SAFE_ENV_KEYS = [
+  "PATH",
+  "HOME",
+  "SHELL",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "TERM",
+  "USER",
+  "LOGNAME",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+];
+
+function buildSafeEnv(): NodeJS.ProcessEnv {
+  const safe: NodeJS.ProcessEnv = {};
+  for (const key of SAFE_ENV_KEYS) {
+    if (process.env[key] !== undefined) {
+      safe[key] = process.env[key];
+    }
+  }
+  return safe;
+}
+
+const SPAWN_MAX_BYTES = 32 * 1024; // 32 KB cap per stream
+
 function setupIPC() {
   // Config window: set server URL
   ipcMain.on("set-server-url", (_event, url: string) => {
@@ -299,17 +370,25 @@ function setupIPC() {
       return new Promise((resolve, reject) => {
         const child = spawn("openclaw", args, {
           timeout: 30_000,
-          env: { ...process.env },
+          env: buildSafeEnv(),
         });
 
         let stdout = "";
         let stderr = "";
+        let stdoutBytes = 0;
+        let stderrBytes = 0;
 
         child.stdout.on("data", (data: Buffer) => {
-          stdout += data.toString();
+          stdoutBytes += data.length;
+          if (stdoutBytes <= SPAWN_MAX_BYTES) {
+            stdout += data.toString();
+          }
         });
         child.stderr.on("data", (data: Buffer) => {
-          stderr += data.toString();
+          stderrBytes += data.length;
+          if (stderrBytes <= SPAWN_MAX_BYTES) {
+            stderr += data.toString();
+          }
         });
 
         child.on("error", (err) => reject(err));
@@ -319,6 +398,51 @@ function setupIPC() {
       });
     }
   );
+}
+
+// ── Auto-updater ──────────────────────────────────────────────────────
+function setupAutoUpdater() {
+  autoUpdater.autoDownload = false;
+
+  autoUpdater.on("update-available", (info) => {
+    dialog
+      .showMessageBox({
+        type: "info",
+        title: "Update Available",
+        message: `AgentCenter ${info.version} is available.`,
+        detail: "Would you like to download and install it now?",
+        buttons: ["Download", "Later"],
+        defaultId: 0,
+      })
+      .then(({ response }) => {
+        if (response === 0) autoUpdater.downloadUpdate();
+      });
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    dialog
+      .showMessageBox({
+        type: "info",
+        title: "Update Ready",
+        message: `AgentCenter ${info.version} has been downloaded.`,
+        detail: "Restart now to apply the update.",
+        buttons: ["Restart Now", "Later"],
+        defaultId: 0,
+      })
+      .then(({ response }) => {
+        if (response === 0) {
+          setImmediate(() => autoUpdater.quitAndInstall());
+        }
+      });
+  });
+
+  autoUpdater.on("error", (err) => {
+    console.error("[autoUpdater] error:", err);
+  });
+
+  autoUpdater.checkForUpdates().catch((err) => {
+    console.warn("[autoUpdater] check failed:", err);
+  });
 }
 
 // ── Deep link protocol ────────────────────────────────────────────────
@@ -368,10 +492,7 @@ if (!gotSingleInstanceLock) {
       createConfigWindow();
     }
 
-    // Auto-updater (silent check)
-    autoUpdater.checkForUpdatesAndNotify().catch(() => {
-      // Silently ignore update errors (e.g. no internet, no release)
-    });
+    setupAutoUpdater();
   });
 
   app.on("window-all-closed", () => {

@@ -1,14 +1,16 @@
 {
   "name": "@agentcenter/desktop",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "tsc -p tsconfig.json && electron .",
     "build": "tsc -p tsconfig.json",
-    "package:mac": "tsc -p tsconfig.json && electron-builder --mac",
-    "package:win": "tsc -p tsconfig.json && electron-builder --win",
-    "package:linux": "tsc -p tsconfig.json && electron-builder --linux",
+    "build:prod": "tsc -p tsconfig.prod.json",
+    "package:mac": "npm run build:prod && electron-builder --mac",
+    "package:win": "npm run build:prod && electron-builder --win",
+    "package:linux": "npm run build:prod && electron-builder --linux",
+    "package:all": "npm run build:prod && electron-builder --mac --win --linux",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {

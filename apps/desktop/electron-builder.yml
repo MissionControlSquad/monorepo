@@ -13,20 +13,27 @@ files:
   - "!electron"
   - "!.next"
 
+# Place icon files at:
+#   build/icon.icns  (512x512, macOS)
+#   build/icon.ico   (256x256, Windows)
+#   build/icon.png   (1024x1024, Linux)
+icon: build/icon
+
 mac:
   category: public.app-category.developer-tools
   target:
     - target: dmg
       arch:
         - universal
-  # icon: build/icon.icns  — add a real 512x512 .icns before releasing
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  notarize:
+    teamId: ${APPLE_TEAM_ID}
 
 dmg:
-  sign: false
+  sign: true
   contents:
     - x: 130
       y: 220
@@ -35,6 +42,27 @@ dmg:
       type: link
       path: /Applications
 
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - arm64
+  certificateSubjectName: ${WIN_CERT_SUBJECT_NAME}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+        - arm64
+  category: Development
+
 protocols:
   - name: AgentCenter
     schemes:
@@ -42,5 +70,5 @@ protocols:
 
 publish:
   provider: github
-  owner: agentcenter
-  repo: agentcenter-desktop
+  owner: ${GH_OWNER}
+  repo: ${GH_REPO}
