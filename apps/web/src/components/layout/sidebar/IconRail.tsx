@@ -19,11 +19,9 @@ import {
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
-import { WhenFeatureEnabled } from "../../context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { Button } from "../../ui";
 import { ProfileAvatar } from "../../ui/ProfileAvatar";
-import { NotificationBell } from "../../notifications/NotificationBell";
 
 interface IconRailProps {
   onCreateTask: () => void;
@@ -97,13 +95,6 @@ export function IconRail({ onCreateTask }: IconRailProps) {
       </nav>
 
       <div className="flex-1" />
-
-      {/* Notification Bell */}
-      <WhenFeatureEnabled flag={FLAG_KEYS.NOTIFICATIONS}>
-        <div className="mb-1">
-          <NotificationBell />
-        </div>
-      </WhenFeatureEnabled>
 
       {/* New Task */}
       <Button
