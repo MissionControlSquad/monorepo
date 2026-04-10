@@ -829,7 +829,7 @@ function setupIPC() {
         // `openclaw gateway status` reads the service state without connecting —
         // safe to call even when pairing is required.
         const gatewayStatus = await spawnAsync("openclaw", ["gateway", "status"], 10_000);
-        const statusOut = gatewayStatus.stdout + gatewayStatus.stderr;
+        const statusOut = (gatewayStatus.stdout + gatewayStatus.stderr).toLowerCase();
         const gatewayRunning = statusOut.includes("running") && statusOut.includes("pid");
         const gatewayInstalled = !statusOut.includes("not installed");
 
@@ -866,7 +866,7 @@ function setupIPC() {
           for (let i = 0; i < 10; i++) {
             await new Promise((r) => setTimeout(r, 1000));
             const poll = await spawnAsync("openclaw", ["gateway", "status"], 5_000);
-            if ((poll.stdout + poll.stderr).includes("running")) { ready = true; break; }
+            if ((poll.stdout + poll.stderr).toLowerCase().includes("running")) { ready = true; break; }
           }
 
           steps.push({
@@ -949,7 +949,7 @@ function setupIPC() {
 
           const isGatewayHealthy = async (): Promise<boolean> => {
             const poll = await spawnAsync("openclaw", ["gateway", "health"], 8_000);
-            const out = (poll.stdout + poll.stderr).trim();
+            const out = (poll.stdout + poll.stderr).trim().toLowerCase();
             log.info(`[bootstrap] gateway health: code=${poll.code} out="${out.slice(0, 160)}"`);
             return poll.code === 0 && !out.includes("pairing required") && !out.includes("gateway closed");
           };
@@ -1036,14 +1036,14 @@ function setupIPC() {
           for (let i = 0; i < 8; i++) {
             await new Promise((r) => setTimeout(r, 1000));
             const st = await spawnAsync("openclaw", ["gateway", "status"], 5_000);
-            if ((st.stdout + st.stderr).includes("running")) { cronGatewayReady = true; break; }
+            if ((st.stdout + st.stderr).toLowerCase().includes("running")) { cronGatewayReady = true; break; }
           }
           if (!cronGatewayReady) {
             await spawnAsync("openclaw", ["gateway", "start"], 15_000);
             for (let i = 0; i < 10; i++) {
               await new Promise((r) => setTimeout(r, 1000));
               const poll = await spawnAsync("openclaw", ["gateway", "health"], 5_000);
-              const pollOut = poll.stdout + poll.stderr;
+              const pollOut = (poll.stdout + poll.stderr).toLowerCase();
               if (poll.code === 0 && !pollOut.includes("pairing required") && !pollOut.includes("gateway closed")) break;
             }
           }
