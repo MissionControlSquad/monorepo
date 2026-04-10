@@ -58,9 +58,9 @@ jobs:
           APP_VERSION="${TAG_VERSION#desktop-v}"
           npm version "$APP_VERSION" --no-git-tag-version --allow-same-version
 
-      - name: Compile Electron TypeScript (production)
+      - name: Bundle Electron main process (production)
         working-directory: apps/desktop
-        run: npx tsc -p tsconfig.prod.json
+        run: node scripts/build.mjs --prod
 
       # ── macOS: build + optionally sign & notarize ───────────────────
       - name: Build macOS DMG

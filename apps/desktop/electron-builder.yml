@@ -6,16 +6,21 @@ directories:
   output: release
   buildResources: build
 
-files:
-  - dist-electron/**/*
-  - "!node_modules/**"
-  - "!src"
-  - "!electron"
-  - "!.next"
-  - "!scripts"
-
 # All npm dependencies are bundled into dist-electron/main.js by esbuild,
-# so electron-builder does not need to resolve or package node_modules.
+# so only the compiled JS files need to be packaged — no node_modules required.
+files:
+  - dist-electron/main.js
+  - dist-electron/preload.js
+  - "!dist-electron/*.map"
+  - "!scripts"
+  - "!src"
+  - "!*.ts"
+  - "!tsconfig*.json"
+
+# Bundle all files into an asar archive to prevent users from editing the app
+asar: true
+
+# No native modules to rebuild (everything is bundled by esbuild)
 npmRebuild: false
 
 icon: build/icon
