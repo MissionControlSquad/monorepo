@@ -5,6 +5,7 @@ import {
   Menu,
   Tray,
   ipcMain,
+  screen,
   shell,
   nativeImage,
 } from "electron";
@@ -40,6 +41,19 @@ let configWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 
 // ── Helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Resolves the path to a bundled icon file.
+ * In a packaged app, icons are copied to process.resourcesPath via extraResources.
+ * In development they live in apps/desktop/build/.
+ */
+function getIconPath(format: "png" | "icns" = "png"): string {
+  const filename = format === "icns" ? "icon.icns" : "icon.png";
+  return app.isPackaged
+    ? path.join(process.resourcesPath, filename)
+    : path.join(app.getAppPath(), "build", filename);
+}
+
 function getServerUrl(): string | undefined {
   return store.get("serverUrl") as string | undefined;
 }
@@ -50,6 +64,27 @@ function saveWindowBounds() {
   }
 }
 
+/**
+ * Returns the saved bounds only if they intersect a connected display.
+ * Prevents the window from opening off-screen after a monitor is disconnected.
+ */
+function getValidatedBounds(
+  saved: Electron.Rectangle | undefined
+): Partial<Electron.Rectangle> {
+  if (!saved) return {};
+  const displays = screen.getAllDisplays();
+  const isVisible = displays.some((d) => {
+    const b = d.bounds;
+    return (
+      saved.x < b.x + b.width &&
+      saved.x + saved.width > b.x &&
+      saved.y < b.y + b.height &&
+      saved.y + saved.height > b.y
+    );
+  });
+  return isVisible ? saved : {};
+}
+
 // ── Config (first-launch) window ──────────────────────────────────────
 function createConfigWindow() {
   configWindow = new BrowserWindow({
@@ -57,7 +92,7 @@ function createConfigWindow() {
     height: 300,
     resizable: false,
     title: "AgentCenter — Server Configuration",
-    icon: path.join(app.getAppPath(), "build/icon.png"),
+    icon: getIconPath("png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -132,19 +167,18 @@ function createConfigWindow() {
 
 // ── Main window ───────────────────────────────────────────────────────
 function createMainWindow(serverUrl: string) {
-  const savedBounds = store.get("windowBounds") as
-    | Electron.Rectangle
-    | undefined;
+  const savedBounds = store.get("windowBounds") as Electron.Rectangle | undefined;
+  const bounds = getValidatedBounds(savedBounds);
 
   mainWindow = new BrowserWindow({
-    width: savedBounds?.width ?? 1280,
-    height: savedBounds?.height ?? 800,
-    x: savedBounds?.x,
-    y: savedBounds?.y,
+    width: bounds.width ?? 1280,
+    height: bounds.height ?? 800,
+    x: bounds.x,
+    y: bounds.y,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 16, y: 16 },
     title: "AgentCenter",
-    icon: path.join(app.getAppPath(), "build/icon.png"),
+    icon: getIconPath("png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -203,12 +237,12 @@ function createMainWindow(serverUrl: string) {
 
 // ── System tray ───────────────────────────────────────────────────────
 function createTray() {
-  // Use a template image for macOS menu bar (16x16)
-  const icon = nativeImage.createFromNamedImage(
-    "NSImageNameApplicationIcon",
-    [-1, 0, 1]
-  );
-  tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  // Resize to 16x16 for macOS menu bar; other platforms use the icon as-is
+  let trayIcon = nativeImage.createFromPath(getIconPath("png"));
+  if (process.platform === "darwin") {
+    trayIcon = trayIcon.resize({ width: 16, height: 16 });
+  }
+  tray = new Tray(trayIcon);
   tray.setToolTip("AgentCenter");
 
   tray.on("click", () => {
@@ -275,7 +309,10 @@ function buildAppMenu() {
       submenu: [
         { role: "reload" },
         { role: "forceReload" },
-        { role: "toggleDevTools" },
+        // DevTools only available in development
+        ...(!app.isPackaged
+          ? ([{ role: "toggleDevTools" }] as Electron.MenuItemConstructorOptions[])
+          : []),
         { type: "separator" },
         { role: "resetZoom" },
         { role: "zoomIn" },
@@ -461,15 +498,21 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient("agentcenter");
 }
 
-app.on("open-url", (_event, url) => {
-  if (mainWindow) {
+function handleDeepLink(url: string) {
+  const serverUrl = getServerUrl();
+  if (!serverUrl || !mainWindow) return;
+  try {
     const parsed = new URL(url);
-    const serverUrl = getServerUrl();
-    if (serverUrl) {
-      mainWindow.loadURL(`${serverUrl}${parsed.pathname}${parsed.search}`);
-      mainWindow.focus();
-    }
+    mainWindow.loadURL(`${serverUrl}${parsed.pathname}${parsed.search}`);
+    mainWindow.focus();
+  } catch {
+    console.warn("[deepLink] invalid URL:", url);
   }
+}
+
+// macOS delivers deep links via open-url
+app.on("open-url", (_event, url) => {
+  handleDeepLink(url);
 });
 
 // ── App lifecycle ─────────────────────────────────────────────────────
@@ -478,7 +521,12 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
 } else {
-  app.on("second-instance", (_event, _argv) => {
+  app.on("second-instance", (_event, argv) => {
+    // On Windows/Linux, deep links arrive as an argv entry in the second instance
+    if (process.platform !== "darwin") {
+      const deepLinkUrl = argv.find((arg) => arg.startsWith("agentcenter://"));
+      if (deepLinkUrl) handleDeepLink(deepLinkUrl);
+    }
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
@@ -486,21 +534,18 @@ if (!gotSingleInstanceLock) {
   });
 
   app.whenReady().then(() => {
-    // Set dock/taskbar icon in dev mode (electron-builder injects this at build time)
-    const iconPath =
-      process.platform === "darwin"
-        ? path.join(app.getAppPath(), "build/icon.icns")
-        : path.join(app.getAppPath(), "build/icon.png");
-
-    const appIcon = nativeImage.createFromPath(iconPath);
-    if (process.platform === "darwin") app.dock?.setIcon(appIcon);
+    // Set dock icon (macOS only; electron-builder injects it at build time for production)
+    if (process.platform === "darwin") {
+      const dockIcon = nativeImage.createFromPath(getIconPath("icns"));
+      if (!dockIcon.isEmpty()) app.dock?.setIcon(dockIcon);
+    }
 
     // Override the native About dialog (otherwise shows "Electron" in dev)
     app.setAboutPanelOptions({
       applicationName: "AgentCenter",
       applicationVersion: app.getVersion(),
       copyright: "Copyright © 2026 AgentCenter",
-      iconPath,
+      iconPath: getIconPath(process.platform === "darwin" ? "icns" : "png"),
     });
 
     setupIPC();
@@ -514,7 +559,7 @@ if (!gotSingleInstanceLock) {
       createConfigWindow();
     }
 
-    setupAutoUpdater();
+    if (app.isPackaged) setupAutoUpdater();
   });
 
   app.on("window-all-closed", () => {

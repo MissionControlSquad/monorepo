@@ -42,41 +42,48 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Required by electron-builder on Linux for AppImage packaging
+      - name: Install Linux build tools
+        if: matrix.platform == 'linux'
+        run: sudo apt-get install -y fakeroot dpkg
+
       - name: Compile Electron TypeScript (production)
         working-directory: apps/desktop
         run: npx tsc -p tsconfig.prod.json
 
-      # ── macOS: sign + notarize ──────────────────────────────────────
-      - name: Import macOS signing certificate
-        if: matrix.platform == 'mac' && env.CSC_LINK != ''
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-        run: echo "Certificate imported via electron-builder env vars"
-
+      # ── macOS: build + optionally sign & notarize ───────────────────
       - name: Build macOS DMG
         if: matrix.platform == 'mac'
         working-directory: apps/desktop
-        run: npx electron-builder --mac --publish ${{ startsWith(github.ref, 'refs/tags/') && 'always' || 'never' }}
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            PUBLISH_FLAG="always"
+          else
+            PUBLISH_FLAG="never"
+          fi
+          npx electron-builder --mac --publish "$PUBLISH_FLAG"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_OWNER: ${{ github.repository_owner }}
-          GH_REPO: ${{ github.event.repository.name }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      # ── Windows: sign ───────────────────────────────────────────────
+      # ── Windows: build + optionally sign ───────────────────────────
       - name: Build Windows NSIS installer
         if: matrix.platform == 'win'
         working-directory: apps/desktop
-        run: npx electron-builder --win --publish ${{ startsWith(github.ref, 'refs/tags/') && 'always' || 'never' }}
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            PUBLISH_FLAG="always"
+          else
+            PUBLISH_FLAG="never"
+          fi
+          npx electron-builder --win --publish "$PUBLISH_FLAG"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_OWNER: ${{ github.repository_owner }}
-          GH_REPO: ${{ github.event.repository.name }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
           WIN_CERT_SUBJECT_NAME: ${{ secrets.WIN_CERT_SUBJECT_NAME }}
@@ -85,15 +92,20 @@ jobs:
       - name: Build Linux AppImage
         if: matrix.platform == 'linux'
         working-directory: apps/desktop
-        run: npx electron-builder --linux --publish ${{ startsWith(github.ref, 'refs/tags/') && 'always' || 'never' }}
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            PUBLISH_FLAG="always"
+          else
+            PUBLISH_FLAG="never"
+          fi
+          npx electron-builder --linux --publish "$PUBLISH_FLAG"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_OWNER: ${{ github.repository_owner }}
-          GH_REPO: ${{ github.event.repository.name }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_glob }}
-          if-no-files-found: warn
+          retention-days: 30
+          if-no-files-found: error
