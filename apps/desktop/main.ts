@@ -15,6 +15,7 @@ import Store from "electron-store";
 import log from "electron-log/main";
 import path from "path";
 import { spawn, exec } from "child_process";
+import https from "https";
 import os from "os";
 import fs from "fs";
 
@@ -606,6 +607,20 @@ async function spawnAsync(
   args: string[],
   timeoutMs = 30_000,
 ): Promise<{ stdout: string; stderr: string; code: number }> {
+  return spawnWithProgress(cmd, args, timeoutMs, null);
+}
+
+/**
+ * Like spawnAsync but also calls onProgress with each stdout/stderr chunk
+ * as it arrives, enabling live-streaming output to the renderer.
+ * Pass null for onProgress to skip streaming (equivalent to spawnAsync).
+ */
+async function spawnWithProgress(
+  cmd: string,
+  args: string[],
+  timeoutMs = 30_000,
+  onProgress: ((chunk: string) => void) | null,
+): Promise<{ stdout: string; stderr: string; code: number }> {
   const resolvedCmd = await resolveWindowsCmd(cmd);
 
   return new Promise((resolve, reject) => {
@@ -622,11 +637,19 @@ async function spawnAsync(
 
     child.stdout?.on("data", (data: Buffer) => {
       stdoutBytes += data.length;
-      if (stdoutBytes <= SPAWN_MAX_BYTES) stdout += data.toString();
+      if (stdoutBytes <= SPAWN_MAX_BYTES) {
+        const chunk = data.toString();
+        stdout += chunk;
+        onProgress?.(chunk);
+      }
     });
     child.stderr?.on("data", (data: Buffer) => {
       stderrBytes += data.length;
-      if (stderrBytes <= SPAWN_MAX_BYTES) stderr += data.toString();
+      if (stderrBytes <= SPAWN_MAX_BYTES) {
+        const chunk = data.toString();
+        stderr += chunk;
+        onProgress?.(chunk);
+      }
     });
     child.on("error", (err) => {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
@@ -636,6 +659,38 @@ async function spawnAsync(
       }
     });
     child.on("close", (code) => resolve({ stdout, stderr, code: code ?? 1 }));
+  });
+}
+
+/**
+ * Downloads a file via HTTPS to a local destination, following up to 5 redirects.
+ */
+function downloadFile(url: string, dest: string, redirectsLeft = 5): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (redirectsLeft === 0) { reject(new Error("Too many redirects")); return; }
+    const file = fs.createWriteStream(dest);
+    const req = https.get(url, (res) => {
+      if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
+        file.close();
+        fs.unlink(dest, () => {});
+        if (res.headers.location) {
+          downloadFile(res.headers.location, dest, redirectsLeft - 1).then(resolve).catch(reject);
+        } else {
+          reject(new Error("Redirect without Location header"));
+        }
+        return;
+      }
+      if (res.statusCode !== 200) {
+        file.close();
+        fs.unlink(dest, () => {});
+        reject(new Error(`HTTP ${res.statusCode} from ${url}`));
+        return;
+      }
+      res.pipe(file);
+      file.on("finish", () => file.close(() => resolve()));
+    });
+    req.on("error", (err) => { fs.unlink(dest, () => {}); reject(err); });
+    file.on("error", (err) => { fs.unlink(dest, () => {}); reject(err); });
   });
 }
 
@@ -701,7 +756,13 @@ function setupIPC() {
 
   ipcMain.handle(
     "bootstrap-agent",
-    async (_event, payload: BootstrapAgentPayload): Promise<BootstrapResult> => {
+    async (event, payload: BootstrapAgentPayload): Promise<BootstrapResult> => {
+      const sendStatus = (message: string) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send("bootstrap-status", message);
+        }
+      };
+
       if (bootstrapInProgress) {
         return {
           success: false,
@@ -776,6 +837,23 @@ function setupIPC() {
           // Service not installed — install it first, then start.
           log.info("[bootstrap] gateway service not installed, installing...");
           await spawnAsync("openclaw", ["gateway", "install"], 15_000);
+        }
+
+        // Ensure gateway.mode is set in openclaw.json before starting.
+        // A fresh install (or wiped ~/.openclaw) creates a config without gateway.mode,
+        // causing the gateway to start but reject ALL connections with error 1006.
+        // Setting gateway.mode=local here fixes that without requiring an interactive setup.
+        try {
+          const ocConfigPath = path.join(os.homedir(), ".openclaw", "openclaw.json");
+          const raw = await fs.promises.readFile(ocConfigPath, "utf-8");
+          const ocConfig = JSON.parse(raw);
+          if (!ocConfig.gateway?.mode) {
+            ocConfig.gateway = { ...(ocConfig.gateway ?? {}), mode: "local" };
+            await fs.promises.writeFile(ocConfigPath, JSON.stringify(ocConfig, null, 2), "utf-8");
+            log.info("[bootstrap] patched openclaw.json: set gateway.mode=local");
+          }
+        } catch (err) {
+          log.warn("[bootstrap] could not patch openclaw.json:", err);
         }
 
         if (!gatewayRunning) {
@@ -860,28 +938,127 @@ function setupIPC() {
         });
         if (!addOk && !alreadyExists) return { success: false, steps };
 
-        // ── Step 6: Schedule heartbeat cron ────────────────────────────
-        const cronResult = await spawnAsync(
-          "openclaw",
-          [
-            "cron", "add",
-            "--agent", payload.agentId,
-            "--name", `${payload.agentId}-heartbeat`,
-            "--cron", payload.cronSchedule,
-            "--session", "isolated",
-            "--message", payload.cronMessage,
-            "--timeout-seconds", "300",
-          ],
-          30_000,
-        );
+        // ── Between Step 5 and 6: wait for gateway to reload ──────────
+        // `openclaw agents add` restarts the gateway via LaunchAgent to reload
+        // the new agent config. The process comes back quickly but can get
+        // stuck accepting connections (1006). If health keeps failing after
+        // 5 s we force a full restart to clear the stuck state.
+        {
+          log.info("[bootstrap] agents add done, waiting for gateway to be healthy...");
+          sendStatus("Waiting for gateway to reload…");
 
+          const isGatewayHealthy = async (): Promise<boolean> => {
+            const poll = await spawnAsync("openclaw", ["gateway", "health"], 8_000);
+            const out = (poll.stdout + poll.stderr).trim();
+            log.info(`[bootstrap] gateway health: code=${poll.code} out="${out.slice(0, 160)}"`);
+            return poll.code === 0 && !out.includes("pairing required") && !out.includes("gateway closed");
+          };
+
+          // Phase 1: poll health for 5 s — fast path if gateway reloads cleanly
+          let gatewayReady = false;
+          for (let i = 0; i < 5; i++) {
+            await new Promise((r) => setTimeout(r, 1000));
+            sendStatus(`Waiting for gateway… (${i + 1}/5)`);
+            if (await isGatewayHealthy()) { gatewayReady = true; break; }
+          }
+
+          // Phase 2: gateway stuck — patch config + force a full restart
+          if (!gatewayReady) {
+            log.info("[bootstrap] gateway stuck after agents add, forcing restart...");
+            sendStatus("Gateway stuck — restarting…");
+            const stopRes = await spawnAsync("openclaw", ["gateway", "stop"], 10_000);
+            log.info(`[bootstrap] gateway stop: code=${stopRes.code} out="${(stopRes.stdout + stopRes.stderr).trim().slice(0, 120)}"`);
+            await new Promise((r) => setTimeout(r, 2000)); // let it fully stop
+            // Re-apply config patch — agents add can rewrite openclaw.json without gateway.mode
+            try {
+              const ocConfigPath = path.join(os.homedir(), ".openclaw", "openclaw.json");
+              const raw = await fs.promises.readFile(ocConfigPath, "utf-8");
+              const ocConfig = JSON.parse(raw);
+              if (!ocConfig.gateway?.mode) {
+                ocConfig.gateway = { ...(ocConfig.gateway ?? {}), mode: "local" };
+                await fs.promises.writeFile(ocConfigPath, JSON.stringify(ocConfig, null, 2), "utf-8");
+                log.info("[bootstrap] patched openclaw.json (post-agents-add): set gateway.mode=local");
+              }
+            } catch (err) {
+              log.warn("[bootstrap] could not patch openclaw.json:", err);
+            }
+            const startRes = await spawnAsync("openclaw", ["gateway", "start"], 15_000);
+            log.info(`[bootstrap] gateway start: code=${startRes.code} out="${(startRes.stdout + startRes.stderr).trim().slice(0, 120)}"`);
+          }
+
+          // Phase 3: poll health for up to 20 s after restart
+          if (!gatewayReady) {
+            for (let i = 0; i < 20; i++) {
+              await new Promise((r) => setTimeout(r, 1000));
+              sendStatus(`Waiting for gateway to come back… (${i + 1}/20)`);
+              if (await isGatewayHealthy()) { gatewayReady = true; break; }
+            }
+          }
+
+          if (!gatewayReady) {
+            steps.push({
+              name: "Gateway reload after agent registration",
+              status: "failed",
+              error: "Gateway did not recover after restart. Run: openclaw gateway restart",
+            });
+            return { success: false, steps };
+          }
+          steps.push({ name: "Gateway reload after agent registration", status: "success" });
+        }
+
+        // ── Step 6: Schedule heartbeat cron (with retry on gateway crash) ─
+        // The gateway occasionally closes (1006) immediately after agent
+        // registration. Retry up to 3 times, restarting the gateway between
+        // attempts if a connection error is detected.
+        const CRON_ARGS = [
+          "cron", "add",
+          "--agent", payload.agentId,
+          "--name", `${payload.agentId}-heartbeat`,
+          "--cron", payload.cronSchedule,
+          "--session", "isolated",
+          "--message", payload.cronMessage,
+          "--timeout-seconds", "300",
+        ];
+
+        let cronResult = { stdout: "", stderr: "", code: 1 };
+        const MAX_CRON_RETRIES = 3;
+        for (let attempt = 1; attempt <= MAX_CRON_RETRIES; attempt++) {
+          cronResult = await spawnAsync("openclaw", CRON_ARGS, 30_000);
+          const out = (cronResult.stdout + cronResult.stderr).toLowerCase();
+          const isGatewayCrash = out.includes("gateway closed") || out.includes("1006") || out.includes("abnormal closure");
+
+          if (cronResult.code === 0 || out.includes("already")) break; // success or already exists
+          if (!isGatewayCrash || attempt === MAX_CRON_RETRIES) break;  // non-retryable or exhausted
+
+          // Gateway crashed — wait up to 8 s for auto-restart, then start explicitly
+          log.warn(`[bootstrap] cron add attempt ${attempt} failed (gateway crash), recovering...`);
+          let cronGatewayReady = false;
+          for (let i = 0; i < 8; i++) {
+            await new Promise((r) => setTimeout(r, 1000));
+            const st = await spawnAsync("openclaw", ["gateway", "status"], 5_000);
+            if ((st.stdout + st.stderr).includes("running")) { cronGatewayReady = true; break; }
+          }
+          if (!cronGatewayReady) {
+            await spawnAsync("openclaw", ["gateway", "start"], 15_000);
+            for (let i = 0; i < 10; i++) {
+              await new Promise((r) => setTimeout(r, 1000));
+              const poll = await spawnAsync("openclaw", ["gateway", "health"], 5_000);
+              const pollOut = poll.stdout + poll.stderr;
+              if (poll.code === 0 && !pollOut.includes("pairing required") && !pollOut.includes("gateway closed")) break;
+            }
+          }
+        }
+
+        const cronOk = cronResult.code === 0;
+        const cronOut = (cronResult.stdout + cronResult.stderr).toLowerCase();
+        const cronAlreadyExists = !cronOk && cronOut.includes("already");
         steps.push({
           name: "Schedule heartbeat cron",
-          status: cronResult.code === 0 ? "success" : "failed",
+          status: cronOk ? "success" : cronAlreadyExists ? "skipped" : "failed",
           output: cronResult.stdout || undefined,
-          error: cronResult.code !== 0 ? cronResult.stderr : undefined,
+          error: cronOk || cronAlreadyExists ? undefined : cronResult.stderr || cronResult.stdout,
         });
-        if (cronResult.code !== 0) return { success: false, steps };
+        if (!cronOk && !cronAlreadyExists) return { success: false, steps };
 
         // ── Step 7: Trigger first heartbeat (optional) ──────────────────
         // Requires parsing the cronId from "openclaw cron add" output.
@@ -900,6 +1077,161 @@ function setupIPC() {
       }
     }
   );
+
+  // ── Install OpenClaw ─────────────────────────────────────────────────
+  // Installs openclaw globally via npm and streams live output to the renderer.
+  // The renderer subscribes to 'openclaw-install-progress' IPC events for live log lines.
+  // Returns { success: boolean; error?: string }.
+  let installInProgress = false;
+
+  ipcMain.handle("install-openclaw", async (event): Promise<{ success: boolean; error?: string }> => {
+    if (installInProgress) {
+      return { success: false, error: "An install is already in progress." };
+    }
+    installInProgress = true;
+
+    const sender = event.sender;
+    const sendProgress = (chunk: string) => {
+      if (!sender.isDestroyed()) {
+        sender.send("openclaw-install-progress", chunk);
+      }
+    };
+
+    try {
+      // 1. Verify Node.js / npm is available
+      try {
+        await spawnAsync("npm", ["--version"], 8_000);
+      } catch {
+        return {
+          success: false,
+          error:
+            "npm not found. Install Node.js (https://nodejs.org) first, then retry.\n\n" +
+            "Tip: if you installed Node via nvm, restart the desktop app after installing.",
+        };
+      }
+
+      sendProgress("Installing openclaw globally via npm…\n");
+
+      // 2. Run npm install -g openclaw@latest with streaming output
+      const result = await spawnWithProgress(
+        "npm",
+        ["install", "-g", "openclaw@latest"],
+        120_000, // 2 minutes — npm can be slow on first install
+        sendProgress,
+      );
+
+      if (result.code !== 0) {
+        const detail = (result.stderr || result.stdout).trim();
+        return {
+          success: false,
+          error: `npm install exited with code ${result.code}:\n${detail}`,
+        };
+      }
+
+      sendProgress("\nRefreshing PATH…\n");
+
+      // 3. Refresh the PATH cache so the newly installed openclaw is found
+      //    without requiring an app restart.
+      SHELL_PATH = await resolveShellPathAsync();
+      EXTRA_PATHS = buildExtraPaths();
+
+      sendProgress("openclaw installed successfully.\n");
+      return { success: true };
+    } finally {
+      installInProgress = false;
+    }
+  });
+
+  // ── Install NVM + Node.js ────────────────────────────────────────────
+  // Downloads the official nvm install script, runs it, then installs the LTS
+  // Node.js release. Progress is streamed via the same 'openclaw-install-progress'
+  // channel so the renderer can reuse the same onInstallProgress subscription.
+  // Windows is not supported by nvm-sh — returns a helpful error.
+  let nvmInstallInProgress = false;
+
+  ipcMain.handle("install-nvm", async (event): Promise<{ success: boolean; error?: string }> => {
+    if (nvmInstallInProgress) {
+      return { success: false, error: "An install is already in progress." };
+    }
+
+    if (process.platform === "win32") {
+      return {
+        success: false,
+        error:
+          "Automatic nvm install is not supported on Windows.\n\n" +
+          "Please install Node.js from https://nodejs.org, then restart the desktop app and retry.",
+      };
+    }
+
+    nvmInstallInProgress = true;
+
+    const sender = event.sender;
+    const sendProgress = (chunk: string) => {
+      if (!sender.isDestroyed()) {
+        sender.send("openclaw-install-progress", chunk);
+      }
+    };
+
+    try {
+      // 1. Download the nvm install script to a temp file
+      const NVM_VERSION = "v0.40.3";
+      const NVM_INSTALL_URL = `https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh`;
+      const tmpScript = path.join(os.tmpdir(), `nvm-install-${Date.now()}.sh`);
+
+      sendProgress(`Downloading nvm ${NVM_VERSION} install script…\n`);
+      try {
+        await downloadFile(NVM_INSTALL_URL, tmpScript);
+      } catch (err) {
+        return {
+          success: false,
+          error: `Failed to download nvm install script: ${err instanceof Error ? err.message : String(err)}\n\nCheck your internet connection and retry.`,
+        };
+      }
+
+      // 2. Run the nvm install script with bash
+      sendProgress("Running nvm install script…\n");
+      const nvmInstallResult = await spawnWithProgress("bash", [tmpScript], 60_000, sendProgress);
+      try { await fs.promises.unlink(tmpScript); } catch { /* cleanup best-effort */ }
+
+      if (nvmInstallResult.code !== 0) {
+        return {
+          success: false,
+          error: `nvm install script failed (exit ${nvmInstallResult.code}):\n${nvmInstallResult.stderr || nvmInstallResult.stdout}`,
+        };
+      }
+
+      sendProgress("\nnvm installed. Installing latest LTS Node.js…\n");
+
+      // 3. Use nvm to install the latest LTS Node.js.
+      //    nvm is a shell function — source it first in the same bash process.
+      const nvmDir = path.join(os.homedir(), ".nvm");
+      const nvmScript = path.join(nvmDir, "nvm.sh");
+      const nodeInstallResult = await spawnWithProgress(
+        "bash",
+        ["-c", `export NVM_DIR="${nvmDir}" && . "${nvmScript}" && nvm install --lts`],
+        120_000,
+        sendProgress,
+      );
+
+      if (nodeInstallResult.code !== 0) {
+        return {
+          success: false,
+          error: `Node.js install via nvm failed (exit ${nodeInstallResult.code}):\n${nodeInstallResult.stderr || nodeInstallResult.stdout}`,
+        };
+      }
+
+      sendProgress("\nRefreshing PATH…\n");
+
+      // 4. Refresh the PATH cache so the newly installed node/npm are found.
+      SHELL_PATH = await resolveShellPathAsync();
+      EXTRA_PATHS = buildExtraPaths();
+
+      sendProgress("Node.js installed via nvm. npm is now available.\n");
+      return { success: true };
+    } finally {
+      nvmInstallInProgress = false;
+    }
+  });
 }
 
 // ── Auto-updater ──────────────────────────────────────────────────────

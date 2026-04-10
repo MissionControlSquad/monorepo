@@ -44,6 +44,30 @@ interface ElectronAPI {
 
   /** One-click agent bootstrap: writes config files, registers agent, schedules cron */
   bootstrapAgent(payload: BootstrapAgentPayload): Promise<BootstrapResult>;
+
+  /**
+   * Install openclaw globally via npm with live progress streaming.
+   * Subscribe via onInstallProgress first, then call this.
+   */
+  installOpenclaw(): Promise<{ success: boolean; error?: string }>;
+
+  /**
+   * Install nvm + latest LTS Node.js (macOS/Linux only).
+   * Subscribe via onInstallProgress first, then call this.
+   */
+  installNvm(): Promise<{ success: boolean; error?: string }>;
+
+  /**
+   * Subscribe to live install output chunks (shared by installOpenclaw + installNvm).
+   * Returns an unsubscribe function — call it when the install is done.
+   */
+  onInstallProgress(callback: (chunk: string) => void): () => void;
+
+  /**
+   * Subscribe to live bootstrap status messages (gateway wait progress, etc).
+   * Returns an unsubscribe function.
+   */
+  onBootstrapStatus(callback: (message: string) => void): () => void;
 }
 
 interface Window {
