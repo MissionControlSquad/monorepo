@@ -15,6 +15,7 @@ import {
   Settings,
   LogOut,
   Cloud,
+  CreditCard,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -164,6 +165,16 @@ export function IconRail({ onCreateTask }: IconRailProps) {
                 <Settings className="w-4 h-4 text-muted-foreground" />
                 Settings
               </Link>
+              <a
+                href="https://billing.stripe.com/p/login/dRm7sN0KKdnfbs4afl53O00"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setUserMenuOpen(false)}
+                className="flex items-center gap-2.5 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
+              >
+                <CreditCard className="w-4 h-4 text-muted-foreground" />
+                Billing
+              </a>
               <Button
                 variant="ghost"
                 onClick={handleLogout}
