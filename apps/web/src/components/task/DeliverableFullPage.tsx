@@ -11,8 +11,8 @@ function DeliverablePageSkeleton() {
   return (
     <div className="relative z-[60]">
       {/* Backdrop — matches DeliverableFullView Dialog */}
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="fixed inset-0 lg:overflow-y-auto">
+      <div className="fixed inset-x-0 bottom-0 top-titlebar bg-black/50 backdrop-blur-sm" />
+      <div className="fixed inset-x-0 bottom-0 top-titlebar lg:overflow-y-auto">
         <div className="h-full lg:h-auto lg:flex lg:min-h-full lg:items-center lg:justify-center lg:p-4">
           <div className="w-full h-full lg:h-auto lg:max-w-4xl overflow-hidden lg:rounded-2xl bg-background shadow-2xl">
             <div className="flex flex-col h-full lg:h-[85vh]">

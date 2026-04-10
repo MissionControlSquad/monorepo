@@ -2,6 +2,8 @@ import { useSyncExternalStore } from "react";
 
 export interface ElectronAPI {
   isElectron: boolean;
+  /** OS platform string: 'darwin' | 'win32' | 'linux' */
+  platform: string;
   execute: (args: string[]) => Promise<{ stdout: string; stderr: string; code: number }>;
 }
 

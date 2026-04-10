@@ -56,6 +56,11 @@
 }
 
 @layer base {
+  :root {
+    /* Default 0px; overridden to 38px by the Electron main process on macOS
+       via webContents.insertCSS() to clear the traffic-light buttons. */
+    --electron-titlebar-height: 0px;
+  }
   * {
     border-color: var(--color-border);
   }
@@ -68,6 +73,14 @@
 
 @utility text-balance {
   text-wrap: balance;
+}
+
+/* Utility for fixed elements that must sit below the Electron title bar.
+   Uses the CSS variable injected by the Electron main process (38px on macOS,
+   0px default in a regular browser tab). Apply to any fixed/absolute element
+   that would otherwise be hidden behind the title bar overlay. */
+@utility top-titlebar {
+  top: var(--electron-titlebar-height, 0px);
 }
 
 @utility content-auto {

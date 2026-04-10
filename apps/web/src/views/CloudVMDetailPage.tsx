@@ -881,7 +881,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
 
       {/* Fullscreen daemon logs overlay */}
       {daemonFullscreen && showDaemonLogs && (
-        <div className="fixed inset-0 z-50 bg-foreground flex flex-col">
+        <div className="fixed inset-x-0 bottom-0 top-titlebar z-50 bg-foreground flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
             <div className="flex items-center gap-2">
               <Terminal className="w-4 h-4 text-muted-foreground" />
@@ -1707,7 +1707,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
 
       {/* Cron Setup Dialog */}
       {cronDialogAgent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-x-0 bottom-0 top-titlebar z-50 flex items-center justify-center bg-black/40">
           <div className="bg-background rounded-xl shadow-xl w-full max-w-md mx-4 p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">

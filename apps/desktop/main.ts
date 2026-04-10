@@ -219,6 +219,51 @@ function createMainWindow(serverUrl: string) {
 
   mainWindow.loadURL(serverUrl);
 
+  // ── macOS traffic-light clearance ────────────────────────────────────
+  // With titleBarStyle: "hiddenInset" the web content fills the full window
+  // height from y=0, putting it directly under the traffic-light buttons.
+  // After every navigation we:
+  //   1. Set --electron-titlebar-height on :root so the web app can use it.
+  //   2. Inject a thin transparent drag region so the inset area still moves
+  //      the window even when the web app has content there.
+  if (process.platform === "darwin") {
+    const TITLEBAR_HEIGHT = 38; // px — covers traffic lights + comfortable margin
+
+    const injectTitlebarShim = () => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+
+      mainWindow.webContents
+        .insertCSS(
+          `:root { --electron-titlebar-height: ${TITLEBAR_HEIGHT}px; }`
+        )
+        .catch(() => {});
+
+      // A fixed, transparent, pointer-events-none drag strip at the top.
+      // z-index is intentionally enormous so it sits above web content but
+      // pointer-events:none means it never steals clicks.
+      mainWindow.webContents
+        .executeJavaScript(
+          `(function(){
+            var ID='__electron_drag_strip__';
+            if(document.getElementById(ID))return;
+            var el=document.createElement('div');
+            el.id=ID;
+            el.style.cssText=[
+              'position:fixed','top:0','left:0','right:0',
+              'height:${TITLEBAR_HEIGHT}px',
+              'z-index:2147483647',
+              '-webkit-app-region:drag',
+              'pointer-events:none'
+            ].join(';');
+            document.documentElement.appendChild(el);
+          })()`
+        )
+        .catch(() => {});
+    };
+
+    mainWindow.webContents.on("did-finish-load", injectTitlebarShim);
+  }
+
   // Crash / GPU process gone — with loop protection
   mainWindow.webContents.on("render-process-gone", (_event, details) => {
     log.error("[render-process-gone]", details);

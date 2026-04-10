@@ -173,7 +173,7 @@ function MediaLightbox({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      className="fixed inset-x-0 bottom-0 top-titlebar z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
       onClick={onClose}
     >
       {/* Header bar */}
