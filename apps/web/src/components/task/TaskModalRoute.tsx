@@ -12,8 +12,8 @@ function TaskOverlaySkeleton() {
   return (
     <div className="relative z-50">
       {/* Backdrop — matches TaskDetailModal */}
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="fixed inset-0">
+      <div className="fixed inset-x-0 bottom-0 top-titlebar bg-black/40 backdrop-blur-sm" />
+      <div className="fixed inset-x-0 bottom-0 top-titlebar">
         <div className="h-full">
           <div className="w-full h-full bg-background shadow-2xl flex flex-col">
             {/* Top bar — matches px-3 py-2 sm:px-6 sm:py-3 */}

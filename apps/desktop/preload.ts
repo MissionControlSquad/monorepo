@@ -4,6 +4,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   /** Whether the app is running inside Electron */
   isElectron: true,
 
+  /**
+   * Current OS platform — lets the web app apply platform-specific styles
+   * (e.g. padding-top for macOS traffic lights).
+   */
+  platform: process.platform,
+
   /** Execute an allowlisted openclaw CLI command */
   execute: (args: string[]): Promise<{ stdout: string; stderr: string; code: number }> =>
     ipcRenderer.invoke("execute-openclaw", args),

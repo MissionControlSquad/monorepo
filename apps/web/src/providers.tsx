@@ -10,11 +10,13 @@ import { MentionDataProvider } from "./components/context/MentionDataContext";
 import { TaskListProvider } from "./components/context/TaskListContext";
 import { UrqlProvider } from "./lib/graphql/provider";
 import { ConnectionStatusBanner } from "./components/common/ConnectionStatusBanner";
+import { ElectronTitleBar } from "./components/layout/ElectronTitleBar";
 import { NotificationCountProvider } from "@agentcenter/hooks";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <UrqlProvider>
+      <ElectronTitleBar />
       <ConnectionStatusBanner />
       <ErrorBoundary fallback={<FullPageErrorFallback />}>
         <NotificationCountProvider serverUrl="" isSignedIn={true}>

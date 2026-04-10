@@ -1,21 +1,30 @@
 {
   "name": "@agentcenter/desktop",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "AgentCenter desktop application",
+  "author": "AgentCenter <support@agentcenter.cloud>",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "tsc -p tsconfig.json && electron .",
-    "build": "tsc -p tsconfig.json",
-    "package:mac": "tsc -p tsconfig.json && electron-builder --mac",
-    "package:win": "tsc -p tsconfig.json && electron-builder --win",
-    "package:linux": "tsc -p tsconfig.json && electron-builder --linux",
+    "dev": "node scripts/build.mjs && electron .",
+    "build": "node scripts/build.mjs",
+    "build:prod": "node scripts/build.mjs --prod",
+    "package:mac:local": "npm run build:prod && electron-builder --mac --arm64 --publish never --config.mac.hardenedRuntime=false --config.mac.gatekeeperAssess=false && node scripts/sign-local.mjs",
+    "package:mac": "npm run build:prod && electron-builder --mac --publish never",
+    "package:win": "npm run build:prod && electron-builder --win --publish never",
+    "package:linux": "npm run build:prod && electron-builder --linux --publish never",
+    "package:all": "npm run build:prod && electron-builder --mac --win --linux --publish never",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
+  "dependencies": {
+    "electron-log": "^5.2.4",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.6.2"
+  },
   "devDependencies": {
+    "esbuild": "^0.25.0",
     "electron": "35.7.5",
     "electron-builder": "^26.0.12",
-    "electron-store": "^8.2.0",
-    "electron-updater": "^6.6.2",
     "typescript": "~5.9.3"
   }
 }

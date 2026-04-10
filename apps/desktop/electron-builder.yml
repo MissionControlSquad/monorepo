@@ -6,12 +6,32 @@ directories:
   output: release
   buildResources: build
 
+# All npm dependencies are bundled into dist-electron/main.js by esbuild,
+# so only the compiled JS files need to be packaged — no node_modules required.
 files:
-  - dist-electron/**/*
-  - "!node_modules"
+  - dist-electron/main.js
+  - dist-electron/preload.js
+  - "!dist-electron/*.map"
+  - "!scripts"
   - "!src"
-  - "!electron"
-  - "!.next"
+  - "!*.ts"
+  - "!tsconfig*.json"
+
+# Bundle all files into an asar archive to prevent users from editing the app
+asar: true
+
+# No native modules to rebuild (everything is bundled by esbuild)
+npmRebuild: false
+
+icon: build/icon
+
+# Copy icon files into the packaged app's resources directory so main.ts
+# can load them at runtime via process.resourcesPath
+extraResources:
+  - from: build/icon.png
+    to: icon.png
+  - from: build/icon.icns
+    to: icon.icns
 
 mac:
   category: public.app-category.developer-tools
@@ -19,11 +39,12 @@ mac:
     - target: dmg
       arch:
         - universal
-  # icon: build/icon.icns  — add a real 512x512 .icns before releasing
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  # Set notarize: true and provide APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID env vars to enable notarization
+  notarize: false
 
 dmg:
   sign: false
@@ -35,6 +56,27 @@ dmg:
       type: link
       path: /Applications
 
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - arm64
+
+nsis:
+  oneClick: false
+  shortcutName: AgentCenter
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+        - arm64
+  category: Development
+
 protocols:
   - name: AgentCenter
     schemes:
@@ -42,5 +84,5 @@ protocols:
 
 publish:
   provider: github
-  owner: agentcenter
-  repo: agentcenter-desktop
+  owner: MissionControlSquad
+  repo: monorepo

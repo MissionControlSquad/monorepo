@@ -135,17 +135,26 @@ export function AppShell({ children, modal }: AppShellProps) {
   const isOnboarding = pathname === "/onboarding";
 
   return (
-    <div className="flex h-screen bg-muted">
+    <div
+      className="flex bg-muted"
+      style={{
+        marginTop: "var(--electron-titlebar-height, 0px)",
+        height: "calc(100dvh - var(--electron-titlebar-height, 0px))",
+      }}
+    >
       {/* Sidebar backdrop (mobile) */}
       {mobileOpen && !isOnboarding && (
-        <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={handleCloseSidebar} />
+        <div
+          className="fixed inset-x-0 bottom-0 top-titlebar bg-black/30 z-40 lg:hidden"
+          onClick={handleCloseSidebar}
+        />
       )}
 
       {/* Icon rail — hidden during onboarding */}
       {!isOnboarding && (
         <aside
           className={`
-            fixed inset-y-0 left-0 z-50
+            fixed bottom-0 top-titlebar left-0 z-50
             transition-all duration-200 ease-out
             lg:static lg:z-50 lg:shrink-0
             ${sidebarCollapsed ? "lg:-translate-x-full lg:w-0 lg:overflow-hidden" : "lg:translate-x-0"}
@@ -237,7 +246,7 @@ export function AppShell({ children, modal }: AppShellProps) {
       {/* Create Task Modal */}
       <ErrorBoundary
         fallback={({ resetErrorBoundary }) => (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30">
+          <div className="fixed inset-x-0 bottom-0 top-titlebar z-[60] flex items-center justify-center bg-black/30">
             <div className="bg-background rounded-xl shadow-xl p-6 max-w-sm mx-4 text-center">
               <p className="text-sm font-medium text-foreground mb-1">Failed to load</p>
               <p className="text-xs text-muted-foreground mb-4">

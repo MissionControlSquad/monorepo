@@ -12,7 +12,7 @@ export function ConnectionStatusBanner() {
   if (connected) return null;
 
   return (
-    <div className="fixed top-0 inset-x-0 z-[200] flex items-center justify-center gap-2 py-1.5 px-4 bg-warning text-warning-foreground text-xs font-medium shadow-md">
+    <div className="fixed inset-x-0 top-titlebar z-[200] flex items-center justify-center gap-2 py-1.5 px-4 bg-warning text-warning-foreground text-xs font-medium shadow-md">
       <WifiOff className="w-3.5 h-3.5" />
       Connection lost — reconnecting…
     </div>

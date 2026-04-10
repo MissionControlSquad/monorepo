@@ -1272,12 +1272,12 @@ export function ChannelView({ channelId, suggestionCategories }: ChannelViewProp
         createPortal(
           <>
             <div
-              className="fixed inset-0 bg-black/30 z-[90] md:hidden"
+              className="fixed inset-x-0 bottom-0 top-titlebar bg-black/30 z-[90] md:hidden"
               onClick={channelsLayout.closeInfoSidebar}
               aria-hidden
             />
             <div
-              className="fixed inset-y-0 right-0 w-[min(20rem,100vw)] z-[91] md:hidden flex flex-col bg-background border-l border-border shadow-xl"
+              className="fixed bottom-0 top-titlebar right-0 w-[min(20rem,100vw)] z-[91] md:hidden flex flex-col bg-background border-l border-border shadow-xl"
               role="dialog"
               aria-modal="true"
               aria-label="Channel info"
