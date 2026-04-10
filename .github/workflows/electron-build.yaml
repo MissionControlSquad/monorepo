@@ -207,7 +207,7 @@ jobs:
         shell: bash
         run: |
           PUBLISH_FLAG=$( [[ "$SHOULD_PUBLISH" == "true" ]] && echo "always" || echo "never" )
-          ./node_modules/.bin/electron-builder --mac --publish "$PUBLISH_FLAG"
+          npm exec -- electron-builder --mac --publish "$PUBLISH_FLAG"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
@@ -228,7 +228,7 @@ jobs:
         shell: bash
         run: |
           PUBLISH_FLAG=$( [[ "$SHOULD_PUBLISH" == "true" ]] && echo "always" || echo "never" )
-          ./node_modules/.bin/electron-builder --win --publish "$PUBLISH_FLAG"
+          npm exec -- electron-builder --win --publish "$PUBLISH_FLAG"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
@@ -242,7 +242,7 @@ jobs:
         shell: bash
         run: |
           PUBLISH_FLAG=$( [[ "$SHOULD_PUBLISH" == "true" ]] && echo "always" || echo "never" )
-          ./node_modules/.bin/electron-builder --linux --publish "$PUBLISH_FLAG"
+          npm exec -- electron-builder --linux --publish "$PUBLISH_FLAG"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
