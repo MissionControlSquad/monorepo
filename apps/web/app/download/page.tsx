@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { DesktopRelease } from "@/app/api/desktop-release/route";
+
+interface DesktopRelease {
+  version: string;
+  name: string;
+  publishedAt: string;
+  releaseUrl: string;
+  assets: {
+    mac?: { url: string; size: number };
+    win?: { url: string; size: number };
+    linux?: { url: string; size: number };
+  };
+}
 
 type Platform = "mac" | "win" | "linux" | "unknown";
 

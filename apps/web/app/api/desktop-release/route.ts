@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
 const RELEASES_BASE_URL = process.env.RELEASES_BASE_URL?.replace(/\/$/, "");
 const GITHUB_REPO = "MissionControlSquad/monorepo";
 
-export interface DesktopRelease {
+interface DesktopRelease {
   version: string;
   name: string;
   publishedAt: string;
