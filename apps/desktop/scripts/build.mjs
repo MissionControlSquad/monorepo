@@ -41,6 +41,13 @@ const base = {
   minify: isProd,
   define: {
     "process.env.NODE_ENV": isProd ? '"production"' : '"development"',
+    // Bake the public releases CDN URL into the binary so electron-updater
+    // checks a public S3/CDN endpoint instead of the private GitHub repo.
+    // Set RELEASES_BASE_URL in CI (e.g. https://releases.agentcenter.cloud/desktop).
+    // Leave empty in dev — auto-update is disabled in development anyway.
+    "process.env.RELEASES_BASE_URL": JSON.stringify(
+      process.env.RELEASES_BASE_URL || ""
+    ),
   },
   // Surface individual bundle warnings as errors in CI
   logLevel: "warning",

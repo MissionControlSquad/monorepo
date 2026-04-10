@@ -1,122 +1,314 @@
 name: Build & Publish Electron Desktop App
 
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  HOW TO RELEASE                                                         │
+# │                                                                         │
+# │  All platforms:                                                         │
+# │    git tag desktop-v1.2.3 && git push origin desktop-v1.2.3            │
+# │                                                                         │
+# │  Single platform (GitHub UI → Actions → Run workflow):                 │
+# │    Select platform: mac | win | linux | all                             │
+# │    Toggle "Publish to Releases" if needed                               │
+# │                                                                         │
+# │  SIGNING SECRETS (repo Settings → Secrets → Actions)                   │
+# │  All optional — omitting them produces unsigned builds that still work. │
+# │                                                                         │
+# │  macOS:  CSC_LINK, CSC_KEY_PASSWORD                                     │
+# │          APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID          │
+# │  Windows: WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD                            │
+# │                                                                         │
+# │  Without signing secrets:                                               │
+# │    macOS   → unsigned DMG  (users: xattr -cr AgentCenter.app)          │
+# │    Windows → unsigned EXE  (SmartScreen warning, installs fine)        │
+# │    Linux   → no signing needed, always clean                           │
+# └─────────────────────────────────────────────────────────────────────────┘
+
 on:
   workflow_dispatch:
+    inputs:
+      platform:
+        description: "Platform to build"
+        required: false
+        default: "all"
+        type: choice
+        options: [all, mac, win, linux]
+      publish:
+        description: "Publish to GitHub Releases?"
+        required: false
+        default: false
+        type: boolean
+
   push:
     tags:
       - "desktop-v*"
 
+# ── Shared expression helpers ────────────────────────────────────────────────
+# IS_TAG_PUSH   → true when triggered by a desktop-v* tag
+# SHOULD_PUBLISH → true on tag push OR when manually asked to publish
+env:
+  IS_TAG_PUSH: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+  SHOULD_PUBLISH: ${{ startsWith(github.ref, 'refs/tags/desktop-v') || inputs.publish == true }}
+
 jobs:
+  # ── 1. TypeScript typecheck ──────────────────────────────────────────────
+  # Fail fast before spinning up expensive macOS / Windows runners.
+  typecheck:
+    name: TypeScript typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        working-directory: apps/desktop
+        run: npm run typecheck
+
+  # ── 2. Create draft GitHub Release ──────────────────────────────────────
+  # Runs only on tag push. Pre-creates the release as a DRAFT so all three
+  # platform builds can upload to it without racing to create it.
+  create-release:
+    name: Create GitHub Release draft
+    runs-on: ubuntu-latest
+    needs: typecheck
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.create.outputs.id }}
+    steps:
+      - name: Create draft release
+        id: create
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          name: "AgentCenter ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 3. Build matrix ──────────────────────────────────────────────────────
+  # Each platform only runs when selected:
+  #   tag push          → all 3 platforms always run
+  #   workflow_dispatch → only the selected platform runs (or all if "all")
   build:
+    name: Build ${{ matrix.artifact_name }}
+    needs: [typecheck, create-release]
+    # matrix context is NOT available in job-level if: — GitHub evaluates job
+    # conditions before matrix expansion. Platform filtering is handled inside
+    # the job: each build step already has  if: matrix.platform == 'xxx'  so
+    # non-selected platforms skip their build step and exit cleanly.
+    if: |
+      always() &&
+      needs.typecheck.result == 'success' &&
+      (needs.create-release.result == 'success' || needs.create-release.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
+          - os: macos-14          # Apple Silicon; cross-compiles x86_64 for universal DMG
             platform: mac
             artifact_name: AgentCenter-macOS
-            artifact_glob: apps/desktop/release/*.dmg
+            # DMG + update manifest (latest-mac.yml) for electron-updater
+            artifact_glob: |
+              apps/desktop/release/*.dmg
+              apps/desktop/release/latest-mac.yml
+
           - os: windows-latest
             platform: win
             artifact_name: AgentCenter-Windows
-            artifact_glob: apps/desktop/release/*.exe
+            # EXE + update manifest (latest.yml) for electron-updater
+            artifact_glob: |
+              apps/desktop/release/*.exe
+              apps/desktop/release/latest.yml
+
           - os: ubuntu-latest
             platform: linux
             artifact_name: AgentCenter-Linux
-            artifact_glob: apps/desktop/release/*.AppImage
+            # AppImage + update manifest (latest-linux.yml) for electron-updater
+            artifact_glob: |
+              apps/desktop/release/*.AppImage
+              apps/desktop/release/latest-linux.yml
 
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      # Gate: on workflow_dispatch, skip this matrix entry if it wasn't selected.
+      # (matrix context is unavailable in job-level if:, so we gate here instead.)
+      - name: Check platform selection
+        id: gate
+        shell: bash
+        run: |
+          IS_TAG="${{ startsWith(github.ref, 'refs/tags/desktop-v') }}"
+          SEL="${{ inputs.platform || 'all' }}"
+          THIS="${{ matrix.platform }}"
+          if [[ "$IS_TAG" == "true" || "$SEL" == "all" || "$SEL" == "$THIS" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping $THIS build (selected platform: $SEL)"
+          fi
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
+        if: steps.gate.outputs.run == 'true'
         run: npm ci
 
-      # Required by electron-builder on Linux for AppImage packaging
-      - name: Install Linux build tools
-        if: matrix.platform == 'linux'
+      - name: Install Linux packaging tools
+        if: steps.gate.outputs.run == 'true' && matrix.platform == 'linux'
         run: sudo apt-get install -y fakeroot dpkg
 
-      # Sync package.json version from the git tag (desktop-v1.2.3 → 1.2.3).
-      # This ensures the built app reports the correct version for auto-update comparisons.
-      - name: Set version from tag
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
+      # Sync package.json version from the git tag (desktop-v1.2.3 → 1.2.3)
+      # so the shipped app reports the correct version for auto-update checks.
+      - name: Sync version from tag
+        if: steps.gate.outputs.run == 'true' && startsWith(github.ref, 'refs/tags/desktop-v')
         working-directory: apps/desktop
         shell: bash
         run: |
-          TAG_VERSION="${{ github.ref_name }}"
-          APP_VERSION="${TAG_VERSION#desktop-v}"
+          APP_VERSION="${{ github.ref_name }}"
+          APP_VERSION="${APP_VERSION#desktop-v}"
           npm version "$APP_VERSION" --no-git-tag-version --allow-same-version
 
-      - name: Bundle Electron main process (production)
+      # Bundle main.ts + preload.ts with esbuild.
+      # All npm dependencies are inlined — no node_modules lookup at package time.
+      # RELEASES_BASE_URL is baked into the binary so electron-updater checks the
+      # public S3/CDN endpoint rather than the (possibly private) GitHub repo.
+      - name: Bundle Electron (production)
+        if: steps.gate.outputs.run == 'true'
         working-directory: apps/desktop
         run: node scripts/build.mjs --prod
+        env:
+          RELEASES_BASE_URL: ${{ vars.RELEASES_BASE_URL }}
 
-      # ── macOS: build + optionally sign & notarize ───────────────────
+      # ── macOS ─────────────────────────────────────────────────────────────
+      # Signing:
+      #   CSC_LINK set     → signed with Developer ID cert
+      #   CSC_LINK absent  → CSC_IDENTITY_AUTO_DISCOVERY=false prevents electron-builder
+      #                       from searching the empty CI keychain; builds unsigned DMG
+      # Notarization:
+      #   APPLE_* set      → notarized (no xattr needed on end-user machines)
+      #   APPLE_* absent   → skipped (users run: xattr -cr AgentCenter.app)
       - name: Build macOS DMG
-        if: matrix.platform == 'mac'
+        if: steps.gate.outputs.run == 'true' && matrix.platform == 'mac'
         working-directory: apps/desktop
+        shell: bash
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            PUBLISH_FLAG="always"
-          else
-            PUBLISH_FLAG="never"
-          fi
-          npx electron-builder --mac --publish "$PUBLISH_FLAG"
+          PUBLISH_FLAG=$( [[ "$SHOULD_PUBLISH" == "true" ]] && echo "always" || echo "never" )
+          ./node_modules/.bin/electron-builder --mac --publish "$PUBLISH_FLAG"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      # ── Windows: build + optionally sign ───────────────────────────
-      - name: Build Windows NSIS installer
-        if: matrix.platform == 'win'
+      # ── Windows ───────────────────────────────────────────────────────────
+      # Signing:
+      #   WIN_CSC_LINK set     → EV/OV signed; no SmartScreen warning
+      #   WIN_CSC_LINK absent  → electron-builder skips signing automatically;
+      #                          SmartScreen shows "Unknown publisher" on first run
+      - name: Build Windows installer
+        if: steps.gate.outputs.run == 'true' && matrix.platform == 'win'
         working-directory: apps/desktop
         shell: bash
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            PUBLISH_FLAG="always"
-          else
-            PUBLISH_FLAG="never"
-          fi
-          npx electron-builder --win --publish "$PUBLISH_FLAG"
+          PUBLISH_FLAG=$( [[ "$SHOULD_PUBLISH" == "true" ]] && echo "always" || echo "never" )
+          ./node_modules/.bin/electron-builder --win --publish "$PUBLISH_FLAG"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-          WIN_CERT_SUBJECT_NAME: ${{ secrets.WIN_CERT_SUBJECT_NAME }}
 
-      # ── Linux ───────────────────────────────────────────────────────
+      # ── Linux ─────────────────────────────────────────────────────────────
+      # No signing required. Always builds cleanly.
       - name: Build Linux AppImage
-        if: matrix.platform == 'linux'
+        if: steps.gate.outputs.run == 'true' && matrix.platform == 'linux'
         working-directory: apps/desktop
+        shell: bash
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            PUBLISH_FLAG="always"
-          else
-            PUBLISH_FLAG="never"
-          fi
-          npx electron-builder --linux --publish "$PUBLISH_FLAG"
+          PUBLISH_FLAG=$( [[ "$SHOULD_PUBLISH" == "true" ]] && echo "always" || echo "never" )
+          ./node_modules/.bin/electron-builder --linux --publish "$PUBLISH_FLAG"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifact
+        if: steps.gate.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_glob }}
           retention-days: 30
-          if-no-files-found: error
+          # warn instead of error because latest-*.yml is only present when
+          # --publish always was used (tag push / manual publish toggle)
+          if-no-files-found: warn
+
+      # ── Mirror to public S3 ───────────────────────────────────────────
+      # Uploads installers + electron-updater manifests (latest-*.yml) to a
+      # public S3 bucket so downloads and auto-updates work from private repos.
+      #
+      # Required repo secrets / vars:
+      #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY  — IAM key with s3:PutObject
+      #   AWS_REGION                                 — e.g. us-east-1  (variable)
+      #   S3_RELEASES_BUCKET                         — e.g. agentcenter-releases
+      #   S3_RELEASES_PREFIX                         — e.g. desktop  (variable, no leading /)
+      #
+      # Skipped automatically when secrets are absent (non-S3 setups).
+      # NOTE: secrets context is not allowed in step if: — gate via env var instead.
+      - name: Mirror to public S3
+        if: steps.gate.outputs.run == 'true' && env.SHOULD_PUBLISH == 'true' && env.S3_BUCKET != ''
+        shell: bash
+        run: |
+          aws s3 sync apps/desktop/release/ \
+            "s3://${S3_BUCKET}/${S3_PREFIX}/" \
+            --exclude "*" \
+            --include "*.dmg"      \
+            --include "*.exe"      \
+            --include "*.AppImage" \
+            --include "latest-mac.yml"   \
+            --include "latest.yml"       \
+            --include "latest-linux.yml" \
+            --acl public-read \
+            --cache-control "no-cache, no-store, must-revalidate"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          S3_BUCKET: ${{ secrets.S3_RELEASES_BUCKET }}
+          S3_PREFIX: ${{ vars.S3_RELEASES_PREFIX || 'desktop' }}
+
+  # ── 4. Publish release ────────────────────────────────────────────────────
+  # Flips the draft release to published only when ALL selected builds succeed.
+  # If any build failed the draft stays hidden — nothing broken ships.
+  # Only runs on tag push (workflow_dispatch has its own publish toggle above).
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [create-release, build]
+    if: |
+      startsWith(github.ref, 'refs/tags/desktop-v') &&
+      needs.build.result == 'success'
+    permissions:
+      contents: write
+    steps:
+      - name: Publish draft → live
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

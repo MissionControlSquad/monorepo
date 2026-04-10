@@ -566,6 +566,15 @@ function setupIPC() {
 function setupAutoUpdater() {
   autoUpdater.autoDownload = false;
 
+  // Override the update feed to a public S3/CDN URL so auto-updates work
+  // from private GitHub repos. RELEASES_BASE_URL is baked in at build time
+  // by esbuild (e.g. https://releases.agentcenter.cloud/desktop).
+  // Falls back to the electron-builder.yml publish config when empty (dev).
+  const releasesUrl = process.env.RELEASES_BASE_URL;
+  if (releasesUrl) {
+    autoUpdater.setFeedURL({ provider: "generic", url: releasesUrl });
+  }
+
   autoUpdater.on("update-available", (info) => {
     dialog
       .showMessageBox({
