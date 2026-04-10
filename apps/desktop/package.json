@@ -2,15 +2,17 @@
   "name": "@agentcenter/desktop",
   "private": true,
   "version": "1.0.0",
+  "description": "AgentCenter desktop application",
+  "author": "AgentCenter <support@agentcenter.cloud>",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "tsc -p tsconfig.json && electron .",
     "build": "tsc -p tsconfig.json",
     "build:prod": "tsc -p tsconfig.prod.json",
-    "package:mac": "npm run build:prod && electron-builder --mac",
-    "package:win": "npm run build:prod && electron-builder --win",
-    "package:linux": "npm run build:prod && electron-builder --linux",
-    "package:all": "npm run build:prod && electron-builder --mac --win --linux",
+    "package:mac": "npm run build:prod && electron-builder --mac --publish never && codesign --deep --force --sign - release/*/AgentCenter.app 2>/dev/null || true",
+    "package:win": "npm run build:prod && electron-builder --win --publish never",
+    "package:linux": "npm run build:prod && electron-builder --linux --publish never",
+    "package:all": "npm run build:prod && electron-builder --mac --win --linux --publish never",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {

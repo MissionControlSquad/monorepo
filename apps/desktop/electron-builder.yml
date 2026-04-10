@@ -13,10 +13,6 @@ files:
   - "!electron"
   - "!.next"
 
-# Place icon files at:
-#   build/icon.icns  (512x512, macOS)
-#   build/icon.ico   (256x256, Windows)
-#   build/icon.png   (1024x1024, Linux)
 icon: build/icon
 
 mac:
@@ -29,11 +25,11 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
-  notarize:
-    teamId: ${APPLE_TEAM_ID}
+  # Set notarize: true and provide APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID env vars to enable notarization
+  notarize: false
 
 dmg:
-  sign: true
+  sign: false
   contents:
     - x: 130
       y: 220
@@ -48,7 +44,6 @@ win:
       arch:
         - x64
         - arm64
-  certificateSubjectName: ${WIN_CERT_SUBJECT_NAME}
 
 nsis:
   oneClick: false
