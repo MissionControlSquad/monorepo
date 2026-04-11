@@ -7,7 +7,8 @@ import { deleteLiveGatewayConnection, listLiveGatewayConnections } from "@agentc
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { resolveSession } from "../../../_lib/resolve-session";
 import { connectionRegistry } from "@/server/services/live-connection-registry";
-import { withFeature } from "../../../_lib/require-feature";
+import { apiLimiters } from "../../../_lib/rate-limit-check";
+import { withFeature, withRateLimit } from "../../../_lib/route-hoc";
 import { FLAG_KEYS } from "@agentcenter/utils";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -35,4 +36,7 @@ async function deleteHandler(request: Request, ctx: RouteContext) {
   }
 }
 
-export const DELETE = withFeature(FLAG_KEYS.LIVE_GATEWAY, deleteHandler);
+export const DELETE = withRateLimit(
+  apiLimiters.liveGatewayConnections,
+  withFeature(FLAG_KEYS.LIVE_GATEWAY, deleteHandler),
+);

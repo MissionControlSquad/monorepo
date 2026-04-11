@@ -4,17 +4,14 @@
 
 import { revokeLiveGatewayToken } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
-import { apiLimiters, checkRateLimit } from "../../../_lib/rate-limit-check";
+import { apiLimiters } from "../../../_lib/rate-limit-check";
 import { resolveSession } from "../../../_lib/resolve-session";
-import { withFeature } from "../../../_lib/require-feature";
+import { withFeature, withRateLimit } from "../../../_lib/route-hoc";
 import { FLAG_KEYS } from "@agentcenter/utils";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 async function deleteHandler(request: Request, ctx: RouteContext) {
-  const limited = await checkRateLimit(apiLimiters.liveGatewayTokens, request);
-  if (limited) return limited;
-
   try {
     await resolveSession(request);
 
@@ -28,4 +25,7 @@ async function deleteHandler(request: Request, ctx: RouteContext) {
   }
 }
 
-export const DELETE = withFeature(FLAG_KEYS.LIVE_GATEWAY, deleteHandler);
+export const DELETE = withRateLimit(
+  apiLimiters.liveGatewayTokens,
+  withFeature(FLAG_KEYS.LIVE_GATEWAY, deleteHandler),
+);

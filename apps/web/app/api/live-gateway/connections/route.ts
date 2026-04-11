@@ -5,15 +5,13 @@
 
 import { listLiveGatewayConnections } from "@agentcenter/database";
 import { successResponse, handleError } from "../../_lib/json-response";
-import { apiLimiters, checkRateLimit } from "../../_lib/rate-limit-check";
+import { apiLimiters } from "../../_lib/rate-limit-check";
 import { resolveSession } from "../../_lib/resolve-session";
-import { withFeature } from "../../_lib/require-feature";
+import { withFeature } from "../../_lib/with-feature";
+import { withRateLimit } from "../../_lib/with-rate-limit";
 import { FLAG_KEYS } from "@agentcenter/utils";
 
 async function getHandler(request: Request) {
-  const limited = await checkRateLimit(apiLimiters.liveGatewayConnections, request);
-  if (limited) return limited;
-
   try {
     await resolveSession(request);
 
@@ -36,4 +34,7 @@ async function getHandler(request: Request) {
   }
 }
 
-export const GET = withFeature(FLAG_KEYS.LIVE_GATEWAY, getHandler);
+export const GET = withRateLimit(
+  apiLimiters.liveGatewayConnections,
+  withFeature(FLAG_KEYS.LIVE_GATEWAY, getHandler),
+);

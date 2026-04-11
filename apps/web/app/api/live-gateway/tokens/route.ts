@@ -7,9 +7,9 @@ import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { listActiveLiveGatewayTokens, createLiveGatewayToken } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
-import { apiLimiters, checkRateLimit } from "../../_lib/rate-limit-check";
+import { apiLimiters } from "../../_lib/rate-limit-check";
 import { resolveSession } from "../../_lib/resolve-session";
-import { withFeature } from "../../_lib/require-feature";
+import { withFeature, withRateLimit } from "../../_lib/route-hoc";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { z } from "zod";
 
@@ -18,9 +18,6 @@ const createTokenSchema = z.object({
 });
 
 async function getHandler(request: Request) {
-  const limited = await checkRateLimit(apiLimiters.liveGatewayTokens, request);
-  if (limited) return limited;
-
   try {
     await resolveSession(request);
 
@@ -39,9 +36,6 @@ async function getHandler(request: Request) {
 }
 
 async function postHandler(request: Request) {
-  const limited = await checkRateLimit(apiLimiters.liveGatewayTokens, request);
-  if (limited) return limited;
-
   try {
     await resolveSession(request);
 
@@ -71,5 +65,11 @@ async function postHandler(request: Request) {
   }
 }
 
-export const GET = withFeature(FLAG_KEYS.LIVE_GATEWAY, getHandler);
-export const POST = withFeature(FLAG_KEYS.LIVE_GATEWAY, postHandler);
+export const GET = withRateLimit(
+  apiLimiters.liveGatewayTokens,
+  withFeature(FLAG_KEYS.LIVE_GATEWAY, getHandler),
+);
+export const POST = withRateLimit(
+  apiLimiters.liveGatewayTokens,
+  withFeature(FLAG_KEYS.LIVE_GATEWAY, postHandler),
+);
