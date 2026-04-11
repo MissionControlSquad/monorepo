@@ -105,6 +105,10 @@ export async function markConnectionDisconnected(id: string) {
   });
 }
 
+export async function deleteLiveGatewayConnection(id: string) {
+  await prisma.liveGatewayConnection.delete({ where: { id } });
+}
+
 // ── Agent routes ──────────────────────────────────────────────────────────────
 
 /**
