@@ -21,6 +21,7 @@ import {
   createConnection,
   markConnectionConnected,
   markConnectionDisconnected,
+  refreshConnectionToken,
   syncAgentRoutes,
   clearAgentRoutes,
   drainPendingDeliveries,
@@ -91,22 +92,37 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
   const existing = await findConnectionByFingerprint(msg.fingerprint);
 
   if (existing) {
-    // Reconnect: verify per-machine token
-    if (!existing.connectionToken || !(await bcrypt.compare(msg.token, existing.connectionToken))) {
+    const connectionId = existing.id;
+    const hostMeta = msg.meta as unknown as Record<string, unknown>;
+
+    // Fast path: valid per-machine permanent token
+    const permTokenOk =
+      existing.connectionToken && (await bcrypt.compare(msg.token, existing.connectionToken));
+
+    if (permTokenOk) {
+      await markConnectionConnected(connectionId, msg.pluginVersion, hostMeta);
+      if (msg.agents?.length) await syncAgentRoutes(connectionId, msg.agents);
+      send(ws, { type: "mc.welcome", vmId: connectionId });
+      return connectionId;
+    }
+
+    // Fallback: machine restarted without persisting the permanent token.
+    // Accept the install token and re-issue a fresh permanent token automatically.
+    const installToken = await findValidInstallToken(msg.token);
+    if (!installToken) {
       sendError(ws, "auth_failed", "Invalid connection token");
       return null;
     }
 
-    const connectionId = existing.id;
-    const hostMeta = msg.meta as unknown as Record<string, unknown>;
+    const rawConnectionToken = randomBytes(32).toString("hex");
+    const connectionTokenHash = await bcrypt.hash(rawConnectionToken, 12);
+    await refreshConnectionToken(connectionId, connectionTokenHash);
     await markConnectionConnected(connectionId, msg.pluginVersion, hostMeta);
+    if (msg.agents?.length) await syncAgentRoutes(connectionId, msg.agents);
+    await touchLiveGatewayToken(installToken.id);
 
-    // Sync reported agents
-    if (msg.agents?.length) {
-      await syncAgentRoutes(connectionId, msg.agents);
-    }
-
-    send(ws, { type: "mc.welcome", vmId: connectionId });
+    // Send fresh permanent token — plugin stores it in memory for this session
+    send(ws, { type: "mc.welcome", vmId: connectionId, vmToken: rawConnectionToken });
     return connectionId;
   }
 

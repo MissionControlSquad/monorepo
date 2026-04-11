@@ -811,29 +811,9 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
               )}
             </div>
 
-            {/* One final action — update key */}
-            <Callout variant="warning" icon={<AlertTriangle />}>
-              <strong className="block mb-1.5">One last thing — save your permanent key.</strong>
-              <p className="leading-relaxed mb-2">
-                When your machine connected, OpenClaw printed a permanent key that replaces the
-                one-time setup key. You should update the config with this permanent key so things
-                keep working if you ever restart.
-              </p>
-              <p className="font-semibold mb-1">Where to find it:</p>
-              <ol className="list-decimal list-inside space-y-0.5 mb-2">
-                <li>Open OpenClaw on that machine</li>
-                <li>
-                  Go to <strong>Plugins → mc-bridge → Logs</strong>
-                </li>
-                <li>
-                  Look for a line that says <code>connectionToken:</code>
-                </li>
-              </ol>
-              <p className="text-[11px] leading-relaxed opacity-80">
-                Copy that value, replace the <code>token</code> in your mc-bridge settings with it,
-                and restart OpenClaw. If you skip this, the setup key will still work until it's
-                revoked — but updating it now is the safe option.
-              </p>
+            <Callout variant="info" icon={<CheckCircle2 />}>
+              Your setup key keeps working across restarts — no manual key rotation needed. If you
+              ever need to revoke access for this machine, use the Setup Keys tab.
             </Callout>
           </>
         )}

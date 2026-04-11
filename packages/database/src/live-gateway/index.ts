@@ -82,6 +82,13 @@ export async function createConnection(data: {
   });
 }
 
+export async function refreshConnectionToken(id: string, connectionToken: string) {
+  await prisma.liveGatewayConnection.update({
+    where: { id },
+    data: { connectionToken },
+  });
+}
+
 export async function markConnectionConnected(
   id: string,
   pluginVersion: string,
