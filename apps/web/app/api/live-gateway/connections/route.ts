@@ -9,7 +9,7 @@ import { apiLimiters, checkRateLimit } from "../../_lib/rate-limit-check";
 import { resolveSession } from "../../_lib/resolve-session";
 
 export async function GET(request: Request) {
-  const limited = await checkRateLimit(apiLimiters.liveGatewayTokens, request);
+  const limited = await checkRateLimit(apiLimiters.liveGatewayConnections, request);
   if (limited) return limited;
 
   try {

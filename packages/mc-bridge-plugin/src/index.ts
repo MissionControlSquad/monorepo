@@ -1,52 +1,64 @@
 /**
  * mc-bridge OpenClaw plugin entry point.
  *
- * Registers with the OpenClaw runtime via definePluginEntry.
- * On activation: starts the WS client and agent reporter.
- * On deactivation: tears down both cleanly.
+ * Exports a plain OpenClawPluginDefinition object — no import from
+ * "openclaw/plugin-sdk" needed. OpenClaw loads this module and calls
+ * register(api) to wire up the service lifecycle.
+ *
+ * On start:  opens a persistent WebSocket to Mission Control and starts the
+ *            agent reporter (reads pluginConfig for mcUrl + token).
+ * On stop:   tears down the WS client and agent reporter cleanly.
  */
 
 import type { MCBridgeConfig } from "./config-schema";
 import { MCBridgeWsClient } from "./ws-client";
 import { AgentReporter } from "./agent-reporter";
 
-// OpenClaw plugin runtime globals
-declare const definePluginEntry: (def: {
-  name: string;
-  activate: (config: MCBridgeConfig) => Promise<void> | void;
-  deactivate: () => Promise<void> | void;
-}) => void;
-
 let client: MCBridgeWsClient | null = null;
 let reporter: AgentReporter | null = null;
 
-definePluginEntry({
-  name: "mc-bridge",
+// eslint-disable-next-line import/no-default-export
+export default {
+  id: "mc-bridge",
+  name: "Mission Control Bridge",
+  description:
+    "Persistent WebSocket bridge between this OpenClaw instance and Mission Control for live task delivery and agent status reporting.",
 
-  async activate(config: MCBridgeConfig) {
-    if (!config.mcUrl) {
-      throw new Error("[mc-bridge] mcUrl is required in plugin config");
-    }
-    if (!config.token) {
-      throw new Error("[mc-bridge] token is required in plugin config");
-    }
+  // api is typed as `any` to avoid a hard dependency on openclaw/plugin-sdk
+  // at bundle time. The shape matches OpenClawPluginApi at runtime.
+  register(api: any) {
+    api.registerService({
+      id: "mc-bridge-ws",
 
-    client = new MCBridgeWsClient(config);
-    reporter = new AgentReporter(client);
+      async start() {
+        const config = api.pluginConfig as MCBridgeConfig | undefined;
 
-    // Start reporter once WS is connected (mc.welcome received)
-    client.onConnect(() => reporter!.start());
+        if (!config?.mcUrl) {
+          api.logger.warn("[mc-bridge] mcUrl not set in plugin config — bridge not started");
+          return;
+        }
+        if (!config?.token) {
+          api.logger.warn("[mc-bridge] token not set in plugin config — bridge not started");
+          return;
+        }
 
-    await client.start();
+        client = new MCBridgeWsClient(config);
+        reporter = new AgentReporter(client);
 
-    console.log("[mc-bridge] Plugin activated. Connecting to:", config.mcUrl);
+        // Start reporter once WS handshake completes (mc.welcome received)
+        client.onConnect(() => reporter!.start());
+
+        await client.start();
+        api.logger.info("[mc-bridge] Bridge started →", config.mcUrl);
+      },
+
+      async stop() {
+        reporter?.stop();
+        client?.stop();
+        reporter = null;
+        client = null;
+        api.logger.info("[mc-bridge] Bridge stopped.");
+      },
+    });
   },
-
-  async deactivate() {
-    reporter?.stop();
-    client?.stop();
-    reporter = null;
-    client = null;
-    console.log("[mc-bridge] Plugin deactivated.");
-  },
-});
+};

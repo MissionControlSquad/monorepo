@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Zap,
   Plus,
@@ -72,6 +73,11 @@ function wsUrlFromOrigin(): string {
   if (typeof window === "undefined") return "ws://localhost:3000/live-gateway";
   const proto = window.location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${window.location.host}/live-gateway`;
+}
+
+function pluginInstallUrl(): string {
+  if (typeof window === "undefined") return "http://localhost:3000/api/live-gateway/plugin.tgz";
+  return `${window.location.origin}/api/live-gateway/plugin.tgz`;
 }
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
@@ -283,6 +289,7 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
   const [connectedMachine, setConnectedMachine] = useState<LiveConnection | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mcUrl = wsUrlFromOrigin();
+  const pluginUrl = pluginInstallUrl();
   const currentIndex = STEP_INDEX[step];
 
   const installDone = installChecks.ran && installChecks.config && installChecks.restarted;
@@ -333,16 +340,30 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
 
   function handleCopy() {
     if (!newToken) return;
-    const snippet = JSON.stringify({ mcUrl, token: newToken.token }, null, 2);
-    navigator.clipboard.writeText(snippet);
+    navigator.clipboard.writeText(configSnippet);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const configSnippet = newToken ? JSON.stringify({ mcUrl, token: newToken.token }, null, 2) : "";
+  const configSnippet = newToken
+    ? JSON.stringify(
+        {
+          plugins: {
+            entries: {
+              "mc-bridge": {
+                enabled: true,
+                config: { mcUrl, token: newToken.token },
+              },
+            },
+          },
+        },
+        null,
+        2,
+      )
+    : "";
 
   return (
-    <ModalShell>
+    <ModalShell maxWidth="max-w-2xl">
       <ModalHeader
         icon={step === "done" ? <CheckCircle2 /> : <Radio />}
         title={
@@ -404,33 +425,116 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
               </p>
             </div>
 
-            {/* What you need checklist */}
+            {/* OS picker — first so requirements update reactively */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-foreground">
+                Which OS is the target machine running?
+              </p>
+              <div className="flex gap-2">
+                {(["mac", "windows", "linux"] as OS[]).map((o) => (
+                  <button
+                    key={o}
+                    onClick={() => setOs(o)}
+                    className={`flex-1 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                      os === o
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {o === "mac" ? "macOS" : o === "windows" ? "Windows" : "Linux"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* OS-specific requirements */}
             <div className="space-y-2.5">
               <p className="text-xs font-semibold text-foreground">
-                What you need on the target machine:
+                What you need on that machine:
               </p>
 
               <div className="space-y-2">
-                {[
-                  {
-                    icon: <Monitor className="w-4 h-4" />,
-                    label: "A machine running OpenClaw",
-                    detail:
-                      "This can be your laptop, a Mac Mini, a PC, a VM, or a server — anywhere OpenClaw is installed and running.",
-                  },
-                  {
-                    icon: <Terminal className="w-4 h-4" />,
-                    label: "Access to a terminal on that machine",
-                    detail:
-                      "You'll run one command to install the mc-bridge plugin. On Mac/Linux this is Terminal; on Windows, Command Prompt or PowerShell.",
-                  },
-                  {
-                    icon: <Wifi className="w-4 h-4" />,
-                    label: "That machine can reach this server",
-                    detail:
-                      "The machine needs outbound internet access to connect back here. Most machines on a regular network already have this.",
-                  },
-                ].map(({ icon, label, detail }) => (
+                {(os === "mac"
+                  ? [
+                      {
+                        icon: <Monitor className="w-4 h-4" />,
+                        label: "OpenClaw for macOS",
+                        detail:
+                          "Download and install the OpenClaw Mac app (.dmg). Works on macOS 12 Monterey or later (Intel or Apple Silicon).",
+                      },
+                      {
+                        icon: <Terminal className="w-4 h-4" />,
+                        label: "Terminal",
+                        detail:
+                          'Built into macOS — open it from Applications → Utilities → Terminal, or search Spotlight for "Terminal".',
+                      },
+                      {
+                        icon: <CheckCircle2 className="w-4 h-4" />,
+                        label: "curl (pre-installed)",
+                        detail:
+                          "curl comes with every modern Mac. You'll use it to download the bridge plugin in one command.",
+                      },
+                      {
+                        icon: <Wifi className="w-4 h-4" />,
+                        label: "Outbound internet access",
+                        detail:
+                          "The machine needs to reach this server over the network. Most home and office networks already allow this.",
+                      },
+                    ]
+                  : os === "windows"
+                    ? [
+                        {
+                          icon: <Monitor className="w-4 h-4" />,
+                          label: "OpenClaw for Windows",
+                          detail:
+                            "Download and run the OpenClaw Windows installer (.exe). Works on Windows 10 or Windows 11.",
+                        },
+                        {
+                          icon: <Terminal className="w-4 h-4" />,
+                          label: "PowerShell 5.1 or later",
+                          detail:
+                            'Built into Windows 10 and 11. Search the Start menu for "PowerShell" and open it. No extra install needed.',
+                        },
+                        {
+                          icon: <CheckCircle2 className="w-4 h-4" />,
+                          label: "Invoke-WebRequest (built-in)",
+                          detail:
+                            "Part of PowerShell — you'll use it to download the plugin. No extra tools required.",
+                        },
+                        {
+                          icon: <Wifi className="w-4 h-4" />,
+                          label: "Outbound internet access",
+                          detail:
+                            "The machine needs to reach this server. If you're behind a corporate firewall, check with your IT team.",
+                        },
+                      ]
+                    : [
+                        {
+                          icon: <Monitor className="w-4 h-4" />,
+                          label: "OpenClaw for Linux",
+                          detail:
+                            "Install OpenClaw using the package for your distro (deb, rpm, or AppImage). Works on Ubuntu 20.04+, Debian 11+, Fedora 36+, and most modern distros.",
+                        },
+                        {
+                          icon: <Terminal className="w-4 h-4" />,
+                          label: "A terminal emulator",
+                          detail:
+                            "Any terminal works — GNOME Terminal, Konsole, xterm, or an SSH session into the machine.",
+                        },
+                        {
+                          icon: <CheckCircle2 className="w-4 h-4" />,
+                          label: "curl",
+                          detail:
+                            "Usually pre-installed. If not: sudo apt install curl (Debian/Ubuntu) or sudo dnf install curl (Fedora/RHEL).",
+                        },
+                        {
+                          icon: <Wifi className="w-4 h-4" />,
+                          label: "Outbound internet access",
+                          detail:
+                            "The machine needs to reach this server. Most servers already have outbound HTTP/HTTPS allowed.",
+                        },
+                      ]
+                ).map(({ icon, label, detail }) => (
                   <div
                     key={label}
                     className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 border border-border"
@@ -450,30 +554,13 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
             </div>
 
             <Callout variant="info" icon={<Zap />}>
-              <strong>Don't have OpenClaw yet?</strong> Download it from the OpenClaw website and
-              install it on the machine you want to connect. Come back here once it's running.
+              <strong>Don't have OpenClaw yet?</strong>{" "}
+              {os === "mac"
+                ? "Download the .dmg from the OpenClaw website, open it, and drag OpenClaw to Applications."
+                : os === "windows"
+                  ? "Download the .exe installer from the OpenClaw website and run it. No admin rights needed for a user install."
+                  : "Download the package for your distro from the OpenClaw website and follow the install instructions for your package manager."}
             </Callout>
-
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold text-foreground">
-                Which operating system is that machine?
-              </p>
-              <div className="flex gap-2">
-                {(["mac", "windows", "linux"] as OS[]).map((o) => (
-                  <button
-                    key={o}
-                    onClick={() => setOs(o)}
-                    className={`flex-1 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
-                      os === o
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {o === "mac" ? "Mac" : o === "windows" ? "Windows" : "Linux"}
-                  </button>
-                ))}
-              </div>
-            </div>
           </>
         )}
 
@@ -531,7 +618,7 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
             </Callout>
 
             {/* OS context */}
-            <div className="flex items-center gap-2 -mb-2">
+            <div className="flex items-center gap-2">
               <p className="text-xs text-muted-foreground">Instructions for:</p>
               <div className="flex gap-1.5">
                 {(["mac", "windows", "linux"] as OS[]).map((o) => (
@@ -550,15 +637,28 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
               </div>
             </div>
 
-            {/* Step A — install command */}
+            {/* Step A — install via terminal */}
             <div className="space-y-1.5">
               <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
                 {os === "windows"
-                  ? "A. Open Command Prompt or PowerShell on that machine and run:"
+                  ? "A. Open PowerShell on that machine and run:"
                   : "A. Open Terminal on that machine and run:"}
               </p>
-              <CodeBlock code="openclaw plugins install mc-bridge" />
+              <CodeBlock
+                code={
+                  os === "windows"
+                    ? `Invoke-WebRequest -Uri "${pluginUrl}" -OutFile "$env:TEMP\\mc-bridge.tgz"\nopenclaw plugins install "$env:TEMP\\mc-bridge.tgz" --force`
+                    : `curl -fsSL "${pluginUrl}" -o /tmp/mc-bridge.tgz\nopenclaw plugins install /tmp/mc-bridge.tgz --force`
+                }
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {os === "mac"
+                  ? "This downloads directly via Terminal — skips macOS quarantine restrictions that block browser-downloaded files."
+                  : os === "linux"
+                    ? "Downloads and installs in one go. curl is pre-installed on most Linux systems."
+                    : "Downloads to the Temp folder and installs from there."}
+              </p>
             </div>
 
             {/* Step B — config snippet */}
@@ -566,7 +666,8 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <Key className="w-3.5 h-3.5 text-muted-foreground" />
-                  B. Copy this config block into OpenClaw → Plugins → mc-bridge → Settings:
+                  B. Merge this into your{" "}
+                  <span className="font-mono">~/.openclaw/openclaw.json</span>:
                 </p>
                 <button
                   onClick={handleCopy}
@@ -602,7 +703,7 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
               </p>
               {(
                 [
-                  { key: "ran", label: "Ran the install command in terminal" },
+                  { key: "ran", label: "Ran both commands in Terminal (download + install)" },
                   { key: "config", label: "Pasted the config block into OpenClaw" },
                   { key: "restarted", label: "Restarted OpenClaw" },
                 ] as const
@@ -1371,6 +1472,16 @@ export function LiveGatewayPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("connections");
   const [showWizard, setShowWizard] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Auto-open wizard when navigated here with ?wizard=open
+  useEffect(() => {
+    if (searchParams.get("wizard") === "open") {
+      setShowWizard(true);
+      router.replace("/live-gateway");
+    }
+  }, [searchParams, router]);
 
   const fetchConnections = useCallback(async () => {
     try {
