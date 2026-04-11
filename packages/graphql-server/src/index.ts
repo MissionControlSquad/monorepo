@@ -25,6 +25,7 @@ export {
   activityProjectTopic,
   agentActionAgentTopic,
   agentActionProjectTopic,
+  vmConnectionTopic,
 } from "./pubsub";
 export type { PubSubEvents } from "./pubsub";
 

@@ -1,0 +1,21 @@
+{
+  "name": "@agentcenter/mc-bridge-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentcenter/types": "*",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "typescript": "~5.9.3"
+  },
+  "openclaw": {
+    "plugin": "./openclaw.plugin.json"
+  }
+}

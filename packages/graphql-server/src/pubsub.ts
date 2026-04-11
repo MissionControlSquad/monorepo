@@ -22,6 +22,11 @@ export const PubSubEvent = {
   FEATURE_FLAGS: {
     CHANGED: "featureFlags:changed" as const,
   },
+  VM: {
+    /** Per-VM connection status change: use vmConnectionTopic(vmId) to get the full key. */
+    CONNECTED: "vm:connected" as const,
+    DISCONNECTED: "vm:disconnected" as const,
+  },
   // NOTIFICATION and MESSAGE use per-entity topics only (notificationTopic, messageTopic, messageReactionTopic)
   // No global constants needed — subscribers always scope by agentId/taskId.
   CHANNEL_MESSAGE: {
@@ -83,6 +88,11 @@ export function agentActionAgentTopic(agentId: string) {
   return `agentAction:agent:${agentId}` as const;
 }
 
+/** Per-VM connection status topic. */
+export function vmConnectionTopic(vmId: string) {
+  return `vm:connection:${vmId}` as const;
+}
+
 /** Per-project action topic. */
 export function agentActionProjectTopic(projectId: string) {
   return `agentAction:project:${projectId}` as const;
@@ -127,6 +137,8 @@ export type PubSubEvents = {
   [key: `channelMessage:reactionChanged:${string}`]: [ChannelMessagePayload];
   // Per-agent stream topics (agent SSE — DMs + group channels)
   [key: `agent:stream:${string}`]: [AgentDmPayload];
+  // Per-VM connection topics
+  [key: `vm:connection:${string}`]: [{ vmId: string; connected: boolean }];
 };
 
 /**

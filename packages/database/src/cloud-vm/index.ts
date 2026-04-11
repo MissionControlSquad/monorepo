@@ -16,3 +16,19 @@ export {
   findAgentByVmAndSlug,
   listRunningCloudVMsForRepair,
 } from "./vm-ops";
+export {
+  listActiveInstallTokens,
+  createInstallToken,
+  revokeInstallToken,
+  touchInstallToken,
+  consumeNonce,
+  deleteExpiredNonces,
+  findVMByFingerprint,
+  markVMConnected,
+  markVMDisconnected,
+  bindVMFingerprint,
+  enqueuePendingTask,
+  drainPendingTasks,
+  markTaskDelivered,
+  deleteExpiredDeliveries,
+} from "./live-gateway";

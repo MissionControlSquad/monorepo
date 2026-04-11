@@ -1,0 +1,11 @@
+{
+  "name": "mc-bridge",
+  "displayName": "Mission Control Bridge",
+  "version": "0.1.0",
+  "description": "Persistent WebSocket bridge between this OpenClaw instance and Mission Control for live task delivery and agent status reporting.",
+  "author": "AgentCenter",
+  "entry": "./src/index.ts",
+  "configSchema": "./src/config-schema.ts",
+  "hooks": ["message_sending"],
+  "permissions": ["network", "agent_status", "agent_list"]
+}
