@@ -39,7 +39,7 @@ WORKDIR /app/apps/web
 ENV NEXT_PHASE=phase-production-build
 RUN npm run build
 
-# Bundle custom server (adds WebSocket support for GraphQL subscriptions)
+# Bundle custom server (WebSocket support for GraphQL subscriptions + Live Gateway)
 RUN npm run build:server
 
 # ── Stage 3: Production runner ─────────────────────────────────────
@@ -67,7 +67,7 @@ COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build /app/apps/web/public ./apps/web/public
 
-# Copy bundled custom server (WebSocket support for GraphQL subscriptions)
+# Copy bundled custom server (WebSocket support for GraphQL subscriptions + Live Gateway)
 COPY --from=build /app/apps/web/server.cjs ./apps/web/server.cjs
 
 # Copy Prisma schema + migrations for runtime migrate deploy
