@@ -9,13 +9,15 @@ import { listActiveLiveGatewayTokens, createLiveGatewayToken } from "@agentcente
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { apiLimiters, checkRateLimit } from "../../_lib/rate-limit-check";
 import { resolveSession } from "../../_lib/resolve-session";
+import { withFeature } from "../../_lib/require-feature";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { z } from "zod";
 
 const createTokenSchema = z.object({
   name: z.string().min(1).max(100).optional(),
 });
 
-export async function GET(request: Request) {
+async function getHandler(request: Request) {
   const limited = await checkRateLimit(apiLimiters.liveGatewayTokens, request);
   if (limited) return limited;
 
@@ -36,7 +38,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   const limited = await checkRateLimit(apiLimiters.liveGatewayTokens, request);
   if (limited) return limited;
 
@@ -68,3 +70,6 @@ export async function POST(request: Request) {
     return handleError(err);
   }
 }
+
+export const GET = withFeature(FLAG_KEYS.LIVE_GATEWAY, getHandler);
+export const POST = withFeature(FLAG_KEYS.LIVE_GATEWAY, postHandler);

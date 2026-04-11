@@ -7,12 +7,15 @@ import { deleteLiveGatewayConnection, listLiveGatewayConnections } from "@agentc
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { resolveSession } from "../../../_lib/resolve-session";
 import { connectionRegistry } from "@/server/services/live-connection-registry";
+import { withFeature } from "../../../_lib/require-feature";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function DELETE(request: Request, ctx: RouteContext) {
+async function deleteHandler(request: Request, ctx: RouteContext) {
   try {
     await resolveSession(request);
+
     const { id } = await ctx.params;
 
     // Refuse to delete a currently live connection — must disconnect first.
@@ -31,3 +34,5 @@ export async function DELETE(request: Request, ctx: RouteContext) {
     return handleError(err);
   }
 }
+
+export const DELETE = withFeature(FLAG_KEYS.LIVE_GATEWAY, deleteHandler);

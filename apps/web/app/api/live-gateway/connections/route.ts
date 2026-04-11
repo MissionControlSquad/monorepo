@@ -7,8 +7,10 @@ import { listLiveGatewayConnections } from "@agentcenter/database";
 import { successResponse, handleError } from "../../_lib/json-response";
 import { apiLimiters, checkRateLimit } from "../../_lib/rate-limit-check";
 import { resolveSession } from "../../_lib/resolve-session";
+import { withFeature } from "../../_lib/require-feature";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
-export async function GET(request: Request) {
+async function getHandler(request: Request) {
   const limited = await checkRateLimit(apiLimiters.liveGatewayConnections, request);
   if (limited) return limited;
 
@@ -33,3 +35,5 @@ export async function GET(request: Request) {
     return handleError(err);
   }
 }
+
+export const GET = withFeature(FLAG_KEYS.LIVE_GATEWAY, getHandler);
