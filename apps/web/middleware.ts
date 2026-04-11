@@ -93,6 +93,7 @@ const PUBLIC_PREFIXES = [
   "/api/agents/me", // Agent-scoped "me" routes (Bearer token auth in handler)
   "/api/cron/", // Cron jobs (CRON_SECRET auth in handler)
   "/api/health", // Health check (public)
+  "/api/live-gateway/plugin.tgz", // Plugin download — no secrets inside, public
   "/_next/", // Static assets
 ];
 

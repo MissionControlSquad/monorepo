@@ -23,3 +23,4 @@ export * from "./push-subscription";
 export * from "./activity";
 export * from "./message";
 export * from "./deliverable";
+export * from "./live-gateway";

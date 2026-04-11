@@ -8,6 +8,7 @@ export const FLAG_KEYS = {
   DOCUMENTS: "documents",
   AGENT_QUEUE: "agent_queue",
   NOTIFICATIONS: "notifications",
+  LIVE_GATEWAY: "live_gateway",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -22,4 +23,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.DOCUMENTS]: true,
   [FLAG_KEYS.AGENT_QUEUE]: true,
   [FLAG_KEYS.NOTIFICATIONS]: true,
+  [FLAG_KEYS.LIVE_GATEWAY]: false,
 };

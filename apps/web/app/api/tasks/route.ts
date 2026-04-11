@@ -17,6 +17,10 @@ import {
 } from "../_lib/project-access";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { generateRecurringTasks } from "@/server/recurring-tasks";
+import {
+  tryDeliverTaskToLiveAgents,
+  tryDeliverInboxTaskNotification,
+} from "@/server/services/live-task-delivery";
 
 export async function GET(request: Request) {
   try {
@@ -150,6 +154,22 @@ export async function POST(request: Request) {
       `CREATED agent="${agent.name}" task=#${task.taskNumber} "${title}" project=${projectId ?? "none"}`,
       request,
     );
+
+    // Live gateway: push to assigned agents immediately (task created with assignees).
+    // For unassigned inbox tasks, notify all project members so they can pick it up.
+    // Both are fire-and-forget — heartbeat is the fallback.
+    if (assigneeIds?.length) {
+      tryDeliverTaskToLiveAgents(assigneeIds, {
+        taskId: task.id,
+        taskTitle: task.title,
+        taskDescription: (task as any).description ?? null,
+        priority: (task as any).priority ?? "medium",
+        assignedBy: agent.name,
+      }).catch(() => undefined);
+    } else if (projectId) {
+      tryDeliverInboxTaskNotification(task.id, projectId, task.title, []).catch(() => undefined);
+    }
+
     return successResponse(task, 201);
   } catch (err) {
     return handleError(err);

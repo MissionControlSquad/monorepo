@@ -10,7 +10,7 @@ import type { CloudVM } from "@prisma/client";
 export async function updateCloudVM(id: string, data: Partial<CloudVM>) {
   return prisma.cloudVM.update({
     where: { id },
-    data,
+    data: data as any,
     include: {
       agents: { select: { id: true, name: true, username: true, identityEmoji: true, status: true, llmModel: true } },
     },

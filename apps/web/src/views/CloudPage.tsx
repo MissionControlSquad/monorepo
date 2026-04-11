@@ -151,93 +151,87 @@ export function CloudPage() {
           />
         </div>
 
-        {(() => {
-          if (filtered.length === 0) {
-            return (
-              <EmptyState
-                icon={<Search />}
-                title="No matching VMs"
-                description="Try adjusting your search."
-              />
-            );
-          }
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon={<Search />}
+            title="No matching VMs"
+            description="Try adjusting your search."
+          />
+        ) : (
+          <Card className="overflow-hidden divide-y divide-border">
+            {filtered.map((vm) => {
+              const badgeInfo = STATUS_BADGE_VARIANT[vm.status] || STATUS_BADGE_VARIANT.error;
+              const statusDot =
+                vm.status === "running"
+                  ? "bg-success"
+                  : vm.status === "error"
+                    ? "bg-destructive"
+                    : "bg-gray-400";
+              return (
+                <Link
+                  key={vm.id}
+                  href={`/cloud/${vm.id}`}
+                  className="flex items-center gap-4 px-4 py-3 hover:bg-muted transition-all group"
+                >
+                  {/* Status dot + Name */}
+                  <div className="flex items-center gap-3 min-w-0 w-[220px] flex-shrink-0">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot}`} />
+                    <span className="font-medium text-foreground truncate group-hover:text-indigo-600 transition-colors">
+                      {vm.name || vm.serverName || vm.id.slice(0, 8)}
+                    </span>
+                  </div>
 
-          return (
-            <Card className="overflow-hidden divide-y divide-border">
-              {filtered.map((vm) => {
-                const badgeInfo = STATUS_BADGE_VARIANT[vm.status] || STATUS_BADGE_VARIANT.error;
-                const statusDot =
-                  vm.status === "running"
-                    ? "bg-success"
-                    : vm.status === "error"
-                      ? "bg-destructive"
-                      : "bg-gray-400";
-                return (
-                  <Link
-                    key={vm.id}
-                    href={`/cloud/${vm.id}`}
-                    className="flex items-center gap-4 px-4 py-3 hover:bg-muted transition-all group"
-                  >
-                    {/* Status dot + Name */}
-                    <div className="flex items-center gap-3 min-w-0 w-[220px] flex-shrink-0">
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot}`} />
-                      <span className="font-medium text-foreground truncate group-hover:text-indigo-600 transition-colors">
-                        {vm.name || vm.serverName || vm.id.slice(0, 8)}
-                      </span>
-                    </div>
+                  {/* Status badge */}
+                  <Badge variant={badgeInfo.variant}>{badgeInfo.label}</Badge>
 
-                    {/* Status badge */}
-                    <Badge variant={badgeInfo.variant}>{badgeInfo.label}</Badge>
+                  {/* IP */}
+                  <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground w-[130px] flex-shrink-0">
+                    <Globe className="w-3 h-3 text-muted-foreground" />
+                    <span className="font-mono">{vm.ipv4 || "—"}</span>
+                  </div>
 
-                    {/* IP */}
-                    <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground w-[130px] flex-shrink-0">
-                      <Globe className="w-3 h-3 text-muted-foreground" />
-                      <span className="font-mono">{vm.ipv4 || "—"}</span>
-                    </div>
+                  {/* Spec + Region */}
+                  <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground w-[140px] flex-shrink-0">
+                    <Cpu className="w-3 h-3 text-muted-foreground" />
+                    <span>
+                      {vm.serverType} / {vm.region}
+                    </span>
+                  </div>
 
-                    {/* Spec + Region */}
-                    <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground w-[140px] flex-shrink-0">
-                      <Cpu className="w-3 h-3 text-muted-foreground" />
-                      <span>
-                        {vm.serverType} / {vm.region}
-                      </span>
-                    </div>
+                  {/* Uptime */}
+                  <div className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground w-[80px] flex-shrink-0">
+                    <Clock className="w-3 h-3 text-muted-foreground" />
+                    <span>{formatUptime(vm.totalUptimeSeconds)}</span>
+                  </div>
 
-                    {/* Uptime */}
-                    <div className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground w-[80px] flex-shrink-0">
-                      <Clock className="w-3 h-3 text-muted-foreground" />
-                      <span>{formatUptime(vm.totalUptimeSeconds)}</span>
-                    </div>
-
-                    {/* Agents */}
-                    <div className="flex items-center gap-1 ml-auto flex-shrink-0">
-                      {vm.agents.length > 0 ? (
-                        <>
-                          {vm.agents.slice(0, 4).map((agent) => (
-                            <div
-                              key={agent.id}
-                              className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs"
-                              title={agent.name}
-                            >
-                              {agent.identityEmoji || agent.name[0]}
-                            </div>
-                          ))}
-                          {vm.agents.length > 4 && (
-                            <span className="text-xs text-muted-foreground ml-0.5">
-                              +{vm.agents.length - 4}
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No agents</span>
-                      )}
-                    </div>
-                  </Link>
-                );
-              })}
-            </Card>
-          );
-        })()}
+                  {/* Agents */}
+                  <div className="flex items-center gap-1 ml-auto flex-shrink-0">
+                    {vm.agents.length > 0 ? (
+                      <>
+                        {vm.agents.slice(0, 4).map((agent) => (
+                          <div
+                            key={agent.id}
+                            className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs"
+                            title={agent.name}
+                          >
+                            {agent.identityEmoji || agent.name[0]}
+                          </div>
+                        ))}
+                        {vm.agents.length > 4 && (
+                          <span className="text-xs text-muted-foreground ml-0.5">
+                            +{vm.agents.length - 4}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No agents</span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </Card>
+        )}
 
         {showCreateDialog && (
           <CreateVMDialog

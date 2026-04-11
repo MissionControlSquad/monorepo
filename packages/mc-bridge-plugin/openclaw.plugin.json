@@ -1,0 +1,32 @@
+{
+  "id": "mc-bridge",
+  "name": "Mission Control Bridge",
+  "description": "Persistent WebSocket bridge between this OpenClaw instance and Mission Control for live task delivery and agent status reporting.",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "mcUrl": {
+        "type": "string",
+        "description": "WebSocket URL of Mission Control live gateway, e.g. ws://localhost:3000/live-gateway"
+      },
+      "token": {
+        "type": "string",
+        "description": "One-time setup key from the Live Gateway wizard. Replaced by a permanent key after first connect."
+      },
+      "fingerprint": {
+        "type": "string",
+        "description": "Stable machine fingerprint. Leave blank to auto-derive from hostname + MAC."
+      },
+      "reconnectBaseMs": {
+        "type": "number",
+        "description": "Reconnect backoff base interval in milliseconds. Default: 2000"
+      },
+      "reconnectMaxMs": {
+        "type": "number",
+        "description": "Maximum reconnect backoff in milliseconds. Default: 30000"
+      }
+    }
+  }
+}

@@ -10,6 +10,10 @@ import { assertProjectMember, assertAllMembersOfProject } from "../../_lib/proje
 import { assertAssignableAgents } from "@/server/assignment-guard";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isSystemShutdown, isProjectShutdown } from "@/server/system-settings";
+import {
+  tryDeliverTaskToLiveAgents,
+  tryDeliverReviewNotification,
+} from "@/server/services/live-task-delivery";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -142,6 +146,19 @@ export async function PATCH(request: Request, ctx: RouteContext) {
           addedNames: addedAgents.map((a) => a.name),
           removedNames: removedAgents.map((a) => a.name),
         });
+
+        // Live Gateway: attempt instant delivery to agents with live connections.
+        // Fire-and-forget — never affects the task API response.
+        // If no live connection exists, existing heartbeat handles the task.
+        if (addedAgentIds.length > 0) {
+          tryDeliverTaskToLiveAgents(addedAgentIds, {
+            taskId: task.id,
+            taskTitle: task.title,
+            taskDescription: (task as any).description ?? null,
+            priority: (task as any).priority ?? "medium",
+            assignedBy: agent.name,
+          }).catch((err) => console.error("[live-task-delivery] error:", err));
+        }
       }
     }
 
@@ -157,6 +174,14 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         toStatus: body.status,
         changedBy: agent.id,
       });
+
+      // Live gateway: notify squad leads immediately when task enters review.
+      // Fire-and-forget — heartbeat (hasPendingReview) is the fallback.
+      if (body.status === "review") {
+        tryDeliverReviewNotification(task.id, task.projectId ?? null, task.title).catch(
+          () => undefined,
+        );
+      }
     }
 
     // Emit generic fields updated
