@@ -2,7 +2,7 @@
  * DELETE /api/live-gateway/tokens/[id] — revoke an install token
  */
 
-import { revokeInstallToken } from "@agentcenter/database";
+import { revokeLiveGatewayToken } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { apiLimiters, checkRateLimit } from "../../../_lib/rate-limit-check";
 import { resolveSession } from "../../../_lib/resolve-session";
@@ -19,7 +19,7 @@ export async function DELETE(request: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
     if (!id) return errorResponse("Missing token id", 400);
 
-    await revokeInstallToken(id);
+    await revokeLiveGatewayToken(id);
     return successResponse({ revoked: true });
   } catch (err) {
     return handleError(err);

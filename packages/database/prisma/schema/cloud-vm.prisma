@@ -49,48 +49,12 @@ model CloudVM {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
-  // ── Live Gateway fields ──────────────────────────────────────────
-  vmToken              String?              // bcrypt hash of per-VM token (raw shown once, never stored)
-  vmFingerprint        String?   @unique    // Stable ID assigned by MC on first vm.hello
-  connectionStatus     VMConnectionStatus   @default(disconnected)
-  connectedAt          DateTime?            // Timestamp of most recent successful connection
-  lastDisconnectedAt   DateTime?
-  pluginVersion        String?              // mc-bridge plugin version reported by plugin
-  hostMeta             Json?                // { hostname, platform, arch, openclawVersion? }
-
-  agents            Agent[]
-  logs              CloudVMLog[]
-  usageRecords      CloudVMUsage[]
-  pendingDeliveries PendingTaskDelivery[]
+  agents       Agent[]
+  logs         CloudVMLog[]
+  usageRecords CloudVMUsage[]
 
   @@index([status])
-  @@index([connectionStatus])
   @@map("cloud_vms")
-}
-
-enum VMConnectionStatus {
-  connected
-  disconnected
-}
-
-model PendingTaskDelivery {
-  id             String   @id @default(cuid())
-  vmId           String
-  agentSlug      String
-  taskId         String
-  message        String   @db.Text
-  priority       String   @default("medium")
-  idempotencyKey String   @unique           // DB-level uniqueness — prevents double-delivery
-  createdAt      DateTime @default(now())
-  expiresAt      DateTime                   // 24h TTL — stale tasks not delivered
-  delivered      Boolean  @default(false)
-  deliveredAt    DateTime?
-
-  cloudVm CloudVM @relation(fields: [vmId], references: [id], onDelete: Cascade)
-
-  @@index([vmId, delivered])
-  @@index([vmId, delivered, expiresAt])
-  @@map("pending_task_deliveries")
 }
 
 model CloudVMLog {

@@ -1,0 +1,86 @@
+// ─── Live Gateway ─────────────────────────────────────────────────
+// Additive layer — no FK to CloudVM. Works for any machine type.
+
+// Nonces prevent vm.hello replay attacks
+model UsedNonce {
+  nonce  String   @id
+  usedAt DateTime @default(now())
+
+  @@index([usedAt])
+  @@map("used_nonces")
+}
+
+// Install tokens — issued once, used by plugin on first connect.
+// After first connect the plugin receives a per-machine connectionToken.
+model LiveGatewayToken {
+  id          String    @id @default(cuid())
+  tokenHash   String    @unique        // bcrypt hash — never stored plain
+  tokenPrefix String    @db.VarChar(8) // first 8 chars shown in UI
+  name        String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+
+  @@index([isActive])
+  @@map("live_gateway_tokens")
+}
+
+// One record per connected machine. machineFingerprint is stable across reboots.
+// Not tied to CloudVM — works for self-hosted, user VPS, or MC-provisioned VMs.
+model LiveGatewayConnection {
+  id                 String    @id @default(cuid())
+  machineFingerprint String    @unique         // sha256(hostname:primaryMac)
+  connectionToken    String?                   // bcrypt hash of per-machine token (raw shown once)
+  machineName        String?   @db.VarChar(255)
+  connectionStatus   String    @default("disconnected") // connected | disconnected
+  connectedAt        DateTime?
+  lastDisconnectedAt DateTime?
+  pluginVersion      String?
+  hostMeta           Json?                     // { hostname, platform, arch, openclawVersion? }
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  agentRoutes       LiveAgentRoute[]
+  pendingDeliveries LivePendingDelivery[]
+
+  @@index([connectionStatus])
+  @@map("live_gateway_connections")
+}
+
+// Maps agent username (slug) → connection. Plugin reports its agent list on hello.
+// Hot path: task assignment looks up agent username → finds connection → delivers via WS.
+model LiveAgentRoute {
+  id           String               @id @default(cuid())
+  connectionId String
+  agentSlug    String               // Agent.username
+  createdAt    DateTime             @default(now())
+
+  connection   LiveGatewayConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, agentSlug])
+  @@index([agentSlug])              // hot path lookup
+  @@map("live_agent_routes")
+}
+
+// Offline delivery queue. Drained on next vm.hello. Has 24h TTL.
+// idempotencyKey prevents double-delivery on reconnect.
+model LivePendingDelivery {
+  id             String               @id @default(cuid())
+  connectionId   String
+  agentSlug      String
+  taskId         String
+  message        String               @db.Text
+  priority       String               @default("normal")
+  idempotencyKey String               @unique        // task:{taskId}:agent:{agentSlug}
+  createdAt      DateTime             @default(now())
+  expiresAt      DateTime                            // 24h TTL
+  delivered      Boolean              @default(false)
+  deliveredAt    DateTime?
+
+  connection     LiveGatewayConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, delivered])
+  @@index([expiresAt])
+  @@map("live_pending_deliveries")
+}

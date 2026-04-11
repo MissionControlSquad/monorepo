@@ -5,7 +5,7 @@
 
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { listActiveInstallTokens, createInstallToken } from "@agentcenter/database";
+import { listActiveLiveGatewayTokens, createLiveGatewayToken } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { apiLimiters, checkRateLimit } from "../../_lib/rate-limit-check";
 import { resolveSession } from "../../_lib/resolve-session";
@@ -22,8 +22,7 @@ export async function GET(request: Request) {
   try {
     await resolveSession(request);
 
-    const tokens = await listActiveInstallTokens();
-    // Return masked view — never expose tokenHash
+    const tokens = await listActiveLiveGatewayTokens();
     const masked = tokens.map(({ id, tokenPrefix, name }) => ({
       id,
       prefix: tokenPrefix,
@@ -48,18 +47,17 @@ export async function POST(request: Request) {
     const parsed = createTokenSchema.safeParse(body);
     if (!parsed.success) return errorResponse("Invalid request body", 400);
 
-    // Generate a 64-char hex token (256 bits entropy)
+    // Generate 64-char hex token (256 bits of entropy)
     const rawToken = randomBytes(32).toString("hex");
     const tokenPrefix = rawToken.slice(0, 8);
     const tokenHash = await bcrypt.hash(rawToken, 12);
 
-    await createInstallToken({
+    await createLiveGatewayToken({
       tokenHash,
       tokenPrefix,
       name: parsed.data.name,
     });
 
-    // Raw token is returned ONCE — never stored in plaintext
     return successResponse({
       token: rawToken,
       prefix: tokenPrefix,

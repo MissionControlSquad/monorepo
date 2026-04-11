@@ -21,33 +21,6 @@ export async function listCloudVMs() {
   });
 }
 
-export async function listCloudVMsWithLiveStatus() {
-  return prisma.cloudVM.findMany({
-    where: { status: { notIn: ["destroyed"] } },
-    select: {
-      id: true,
-      name: true,
-      serverName: true,
-      status: true,
-      connectionStatus: true,
-      connectedAt: true,
-      lastDisconnectedAt: true,
-      pluginVersion: true,
-      ipv4: true,
-      region: true,
-      serverType: true,
-      totalUptimeSeconds: true,
-      estimatedCostCents: true,
-      createdAt: true,
-      agents: {
-        select: { id: true, name: true, identityEmoji: true, username: true, status: true },
-      },
-      _count: { select: { agents: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-}
-
 export async function listRunningCloudVMs() {
   return prisma.cloudVM.findMany({ where: { status: "running" } });
 }

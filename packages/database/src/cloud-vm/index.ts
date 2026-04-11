@@ -1,5 +1,5 @@
 export { findCloudVMById, findCloudVMConnection, findCloudVMRaw } from "./find-by-id";
-export { listCloudVMs, listCloudVMsWithLiveStatus, listRunningCloudVMs, listRunningCloudVMsWithAgents } from "./list";
+export { listCloudVMs, listRunningCloudVMs, listRunningCloudVMsWithAgents } from "./list";
 export { updateCloudVM, markCloudVMError, updateCloudVMUptime, retryCloudVMProvisioning } from "./update";
 export { logCloudVMEvent, getCloudVMLogs } from "./log-event";
 export { findStaleSetupCloudVMs } from "./find-stale-setup";
@@ -16,19 +16,3 @@ export {
   findAgentByVmAndSlug,
   listRunningCloudVMsForRepair,
 } from "./vm-ops";
-export {
-  listActiveInstallTokens,
-  createInstallToken,
-  revokeInstallToken,
-  touchInstallToken,
-  consumeNonce,
-  deleteExpiredNonces,
-  findVMByFingerprint,
-  markVMConnected,
-  markVMDisconnected,
-  bindVMFingerprint,
-  enqueuePendingTask,
-  drainPendingTasks,
-  markTaskDelivered,
-  deleteExpiredDeliveries,
-} from "./live-gateway";

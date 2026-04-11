@@ -16,7 +16,7 @@ import type {
 } from "@agentcenter/types";
 import { LIVE_GATEWAY } from "@agentcenter/types";
 import type { MCBridgeConfig } from "./config-schema";
-import { deriveMachineFingerprint, deliverToLocalAgent } from "./openclaw-local";
+import { deriveMachineFingerprint, deliverToLocalAgent, listLocalAgents } from "./openclaw-local";
 
 type SendHandler = (msg: PluginToMC) => void;
 
@@ -27,14 +27,14 @@ export class MCBridgeWsClient {
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private fingerprint = "";
-  private vmId = "";
-  private vmToken = ""; // Updated after first mc.welcome
+  private connectionId = "";
+  private connectionToken = ""; // Updated after first mc.welcome (per-machine token, persisted in config)
   private deliveredIds = new Set<string>(); // Dedup buffer (capped at PLUGIN_DEDUP_LIMIT)
   private onConnectCallbacks: Array<() => void> = [];
 
   constructor(private config: MCBridgeConfig) {
     this.reconnectMs = config.reconnectBaseMs ?? 2_000;
-    this.vmToken = config.token;
+    this.connectionToken = config.token;
   }
 
   onConnect(cb: () => void): void {
@@ -73,20 +73,24 @@ export class MCBridgeWsClient {
       return;
     }
 
-    this.ws.on("open", () => this.handleOpen());
+    this.ws.on("open", () => this.handleOpen().catch(console.error));
     this.ws.on("message", (raw) => this.handleMessage(raw.toString()));
     this.ws.on("close", () => this.handleClose());
     this.ws.on("error", (err) => console.error("[mc-bridge] WS error:", err.message));
   }
 
-  private handleOpen(): void {
+  private async handleOpen(): Promise<void> {
     // Reset backoff on successful open
     this.reconnectMs = this.config.reconnectBaseMs ?? 2_000;
+
+    // Gather agent slugs to register routes on MC side
+    const agents = await listLocalAgents().catch(() => []);
+    const agentSlugs = agents.map((a) => a.slug);
 
     const nonce = randomBytes(16).toString("hex");
     this.send({
       type: "vm.hello",
-      token: this.vmToken,
+      token: this.connectionToken,
       fingerprint: this.fingerprint,
       nonce,
       timestamp: Date.now(),
@@ -96,6 +100,7 @@ export class MCBridgeWsClient {
         platform: os.platform(),
         arch: os.arch(),
       },
+      agents: agentSlugs,
     });
   }
 
@@ -109,14 +114,14 @@ export class MCBridgeWsClient {
 
     switch (msg.type) {
       case "mc.welcome":
-        this.vmId = msg.vmId;
+        this.connectionId = msg.vmId; // vmId field carries connectionId
         if (msg.vmToken) {
-          // First-time registration: persist new per-VM token
-          this.vmToken = msg.vmToken;
+          // First-time registration: persist new per-machine connectionToken
+          this.connectionToken = msg.vmToken;
           console.log(
             "[mc-bridge] Registered with Mission Control.",
-            "\n  vmId:", this.vmId,
-            "\n  vmToken (save to config):", msg.vmToken,
+            "\n  connectionId:", this.connectionId,
+            "\n  connectionToken (save to config as 'token'):", msg.vmToken,
           );
         }
         this.startPing();

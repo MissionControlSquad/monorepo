@@ -2,7 +2,7 @@
  * live-gateway-handler.ts
  *
  * Handles all WebSocket messages from mc-bridge plugin connections.
- * Each VM maintains one persistent outbound WS connection to MC.
+ * Works for any machine type (self-hosted, user VPS, MC-provisioned CloudVM).
  *
  * Message flow:
  *   Plugin → MC: vm.hello → mc.welcome (then vm.ping / vm.agents_report / etc.)
@@ -14,20 +14,20 @@ import type { IncomingMessage } from "node:http";
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import {
-  findVMByFingerprint,
-  markVMConnected,
-  markVMDisconnected,
-  listActiveInstallTokens,
-  touchInstallToken,
+  listActiveLiveGatewayTokens,
+  touchLiveGatewayToken,
   consumeNonce,
-  drainPendingTasks,
-  markTaskDelivered,
-  findAgentByVmAndSlug,
-  logCloudVMEvent,
-  updateAgent,
+  findConnectionByFingerprint,
+  createConnection,
+  markConnectionConnected,
+  markConnectionDisconnected,
+  syncAgentRoutes,
+  clearAgentRoutes,
+  drainPendingDeliveries,
+  markDeliveryReceived,
 } from "@agentcenter/database";
-import { vmLiveRegistry } from "./vm-live-registry";
-import { pubsub, PubSubEvent, vmConnectionTopic } from "@agentcenter/graphql-server";
+import { connectionRegistry } from "./live-connection-registry";
+import { pubsub, PubSubEvent } from "@agentcenter/graphql-server";
 import type {
   PluginToMC,
   MCToPlugin,
@@ -51,10 +51,6 @@ function sendError(ws: WebSocket, code: VMErrorCode, message: string): void {
   send(ws, { type: "mc.error", code, message });
 }
 
-async function logVM(vmId: string, message: string, level: "info" | "warn" | "error" = "info") {
-  await logCloudVMEvent(vmId, message, level).catch(() => undefined);
-}
-
 /** Strip all HTML tags from a string (server-side, no DOM required). */
 function stripHtml(str: string): string {
   return str.replace(/<[^>]*>/g, "").trim();
@@ -62,12 +58,8 @@ function stripHtml(str: string): string {
 
 // ─── Install token lookup ─────────────────────────────────────────────────────
 
-/**
- * Find the first active install token whose hash matches the raw token.
- * Returns the token record or null if none match.
- */
 async function findValidInstallToken(rawToken: string) {
-  const tokens = await listActiveInstallTokens();
+  const tokens = await listActiveLiveGatewayTokens();
   for (const t of tokens) {
     if (await bcrypt.compare(rawToken, t.tokenHash)) return t;
   }
@@ -84,7 +76,7 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
     return null;
   }
 
-  // 2. Validate nonce format (must be 32-char hex) then atomic consumption — prevents replay attacks
+  // 2. Nonce format + atomic consumption — prevents replay attacks
   if (!/^[0-9a-f]{32}$/i.test(msg.nonce)) {
     sendError(ws, "auth_failed", "Invalid nonce format");
     return null;
@@ -96,65 +88,56 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
   }
 
   // 3. Check if fingerprint already registered (reconnect path)
-  const existingVM = await findVMByFingerprint(msg.fingerprint);
+  const existing = await findConnectionByFingerprint(msg.fingerprint);
 
-  if (existingVM) {
-    // Reconnect: verify per-VM token
-    if (!existingVM.vmToken || !(await bcrypt.compare(msg.token, existingVM.vmToken))) {
-      sendError(ws, "auth_failed", "Invalid VM token");
+  if (existing) {
+    // Reconnect: verify per-machine token
+    if (!existing.connectionToken || !(await bcrypt.compare(msg.token, existing.connectionToken))) {
+      sendError(ws, "auth_failed", "Invalid connection token");
       return null;
     }
 
-    const vmId = existingVM.id;
-    await markVMConnected(vmId, msg.pluginVersion, msg.meta as unknown as Record<string, unknown>);
+    const connectionId = existing.id;
+    const hostMeta = msg.meta as unknown as Record<string, unknown>;
+    await markConnectionConnected(connectionId, msg.pluginVersion, hostMeta);
 
-    send(ws, { type: "mc.welcome", vmId });
-    await logVM(vmId, `Plugin reconnected (v${msg.pluginVersion})`);
-    return vmId;
+    // Sync reported agents
+    if (msg.agents?.length) {
+      await syncAgentRoutes(connectionId, msg.agents);
+    }
+
+    send(ws, { type: "mc.welcome", vmId: connectionId });
+    return connectionId;
   }
 
-  // 4. First connect: validate against an install token
+  // 4. First connect: validate install token
   const installToken = await findValidInstallToken(msg.token);
   if (!installToken) {
     sendError(ws, "auth_failed", "Invalid install token");
     return null;
   }
 
-  // 5. Create a new CloudVM record on first connect.
-  //    vmFingerprint @unique ensures only one record per machine.
-  const { prisma } = await import("../prisma");
-  let vmId: string;
+  // 5. Create new connection record — machineFingerprint @unique ensures one record per machine
+  const rawConnectionToken = randomBytes(32).toString("hex");
+  const connectionTokenHash = await bcrypt.hash(rawConnectionToken, 12);
+
+  const hostMeta = msg.meta as unknown as Record<string, unknown>;
+  const safeHostMeta =
+    JSON.stringify(hostMeta).length <= 4096
+      ? hostMeta
+      : { hostname: hostMeta.hostname, platform: hostMeta.platform, arch: hostMeta.arch };
+
+  let connectionId: string;
   try {
-    const rawVMToken = randomBytes(32).toString("hex");
-    const vmTokenHash = await bcrypt.hash(rawVMToken, 12);
-
-    const hostMeta = msg.meta as unknown as Record<string, unknown>;
-    const safeHostMeta =
-      JSON.stringify(hostMeta).length <= 4096
-        ? hostMeta
-        : { hostname: hostMeta.hostname, platform: hostMeta.platform, arch: hostMeta.arch };
-
-    const vm = await prisma.cloudVM.create({
-      data: {
-        name: String(msg.meta.hostname).slice(0, 255),
-        vmFingerprint: msg.fingerprint,
-        vmToken: vmTokenHash,
-        connectionStatus: "connected",
-        connectedAt: new Date(),
-        pluginVersion: msg.pluginVersion,
-        hostMeta: safeHostMeta as any,
-        status: "running",
-      } as any,
+    const conn = await createConnection({
+      machineFingerprint: msg.fingerprint,
+      connectionToken: connectionTokenHash,
+      machineName: String(msg.meta.hostname).slice(0, 255),
+      pluginVersion: msg.pluginVersion,
+      hostMeta: safeHostMeta,
     });
-
-    vmId = vm.id;
-    await touchInstallToken(installToken.id);
-    await logVM(vmId, `New VM registered via install token (v${msg.pluginVersion})`);
-
-    // Send welcome with raw vmToken (shown once — plugin must persist it)
-    send(ws, { type: "mc.welcome", vmId, vmToken: rawVMToken });
+    connectionId = conn.id;
   } catch (err: any) {
-    // vmFingerprint unique violation — race on simultaneous first-connect
     if (err?.code === "P2002") {
       sendError(ws, "internal_error", "Fingerprint collision, please retry");
     } else {
@@ -163,50 +146,81 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
     return null;
   }
 
-  return vmId;
+  // Sync reported agents
+  if (msg.agents?.length) {
+    await syncAgentRoutes(connectionId, msg.agents);
+  }
+
+  await touchLiveGatewayToken(installToken.id);
+
+  // Send welcome with raw connectionToken (shown once — plugin must persist it)
+  send(ws, { type: "mc.welcome", vmId: connectionId, vmToken: rawConnectionToken });
+  return connectionId;
 }
 
 // ─── vm.agents_report handler ─────────────────────────────────────────────────
 
-async function handleAgentsReport(vmId: string, msg: MsgAgentsReport): Promise<void> {
+async function handleAgentsReport(connectionId: string, msg: MsgAgentsReport): Promise<void> {
+  const { prisma } = await import("../prisma");
+
+  // Sync route table with latest roster
+  await syncAgentRoutes(
+    connectionId,
+    msg.agents.map((a) => a.slug),
+  );
+
   for (const info of msg.agents) {
-    const agent = await findAgentByVmAndSlug(vmId, info.slug).catch(() => null);
+    const agent = await prisma.agent
+      .findUnique({ where: { username: info.slug } })
+      .catch(() => null);
     if (!agent) continue;
-    await updateAgent(agent.id, {
-      status: info.status,
-      detailedStatus: info.detailedStatus ?? null,
-      statusMessage: info.statusMessage ?? null,
-      currentTaskId: info.currentTaskId ?? null,
-    } as any).catch(() => undefined);
+    await prisma.agent
+      .update({
+        where: { id: agent.id },
+        data: {
+          status: info.status,
+          detailedStatus: info.detailedStatus ?? null,
+          statusMessage: info.statusMessage ?? null,
+          currentTaskId: info.currentTaskId ?? null,
+        } as any,
+      })
+      .catch(() => undefined);
     pubsub.publish(PubSubEvent.AGENT.STATUS_CHANGED, { agentId: agent.id });
   }
 }
 
 // ─── vm.agent_status handler ──────────────────────────────────────────────────
 
-async function handleAgentStatus(vmId: string, msg: MsgAgentStatus): Promise<void> {
-  const agent = await findAgentByVmAndSlug(vmId, msg.slug).catch(() => null);
+async function handleAgentStatus(_connectionId: string, msg: MsgAgentStatus): Promise<void> {
+  const { prisma } = await import("../prisma");
+  const agent = await prisma.agent.findUnique({ where: { username: msg.slug } }).catch(() => null);
   if (!agent) return;
-  await updateAgent(agent.id, {
-    status: msg.status,
-    detailedStatus: msg.detailedStatus ?? null,
-    statusMessage: msg.statusMessage ?? null,
-    currentTaskId: msg.currentTaskId ?? null,
-  } as any).catch(() => undefined);
+  await prisma.agent
+    .update({
+      where: { id: agent.id },
+      data: {
+        status: msg.status,
+        detailedStatus: msg.detailedStatus ?? null,
+        statusMessage: msg.statusMessage ?? null,
+        currentTaskId: msg.currentTaskId ?? null,
+      } as any,
+    })
+    .catch(() => undefined);
   pubsub.publish(PubSubEvent.AGENT.STATUS_CHANGED, { agentId: agent.id });
 }
 
 // ─── vm.agent_message handler ─────────────────────────────────────────────────
 
-async function handleAgentMessage(vmId: string, msg: MsgAgentMessage): Promise<void> {
+async function handleAgentMessage(_connectionId: string, msg: MsgAgentMessage): Promise<void> {
   const clean = stripHtml(msg.content);
   if (!clean) return;
 
-  // If agent + task are known, log as an agent action
   if (msg.taskId) {
-    const agent = await findAgentByVmAndSlug(vmId, msg.slug).catch(() => null);
+    const { prisma } = await import("../prisma");
+    const agent = await prisma.agent
+      .findUnique({ where: { username: msg.slug } })
+      .catch(() => null);
     if (agent) {
-      const { prisma } = await import("../prisma");
       const action = await prisma.agentAction
         .create({
           data: {
@@ -230,7 +244,7 @@ async function handleAgentMessage(vmId: string, msg: MsgAgentMessage): Promise<v
 
 // ─── vm.task_done handler ─────────────────────────────────────────────────────
 
-async function handleTaskDone(_vmId: string, msg: MsgTaskDone): Promise<void> {
+async function handleTaskDone(_connectionId: string, msg: MsgTaskDone): Promise<void> {
   const { prisma } = await import("../prisma");
   await prisma.task
     .updateMany({
@@ -244,13 +258,13 @@ async function handleTaskDone(_vmId: string, msg: MsgTaskDone): Promise<void> {
 // ─── vm.task_ack handler ──────────────────────────────────────────────────────
 
 async function handleTaskAck(msg: MsgTaskAck): Promise<void> {
-  await markTaskDelivered(msg.deliveryId).catch(() => undefined);
+  await markDeliveryReceived(msg.deliveryId);
 }
 
 // ─── Pending task drain ───────────────────────────────────────────────────────
 
-async function drainAndDeliverPending(vmId: string, ws: WebSocket): Promise<void> {
-  const pending = await drainPendingTasks(vmId);
+async function drainAndDeliver(connectionId: string, ws: WebSocket): Promise<void> {
+  const pending = await drainPendingDeliveries(connectionId);
   for (const task of pending) {
     send(ws, {
       type: "mc.deliver_task",
@@ -266,13 +280,13 @@ async function drainAndDeliverPending(vmId: string, ws: WebSocket): Promise<void
 // ─── Connection entry point ───────────────────────────────────────────────────
 
 export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): void {
-  let vmId: string | null = null;
+  let connectionId: string | null = null;
   let helloReceived = false;
 
   // Enforce hello timeout — close if no hello within 10s
   const helloTimer = setTimeout(() => {
     if (!helloReceived) ws.terminate();
-  }, 10_000);
+  }, LIVE_GATEWAY.HELLO_TIMEOUT_MS);
 
   ws.on("message", async (raw) => {
     let msg: PluginToMC;
@@ -282,13 +296,12 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
       return; // ignore unparseable frames
     }
 
-    // Update last-seen timestamp for eviction tracking
-    if (vmId) vmLiveRegistry.touch(vmId);
+    if (connectionId) connectionRegistry.touch(connectionId);
 
     try {
       switch (msg.type) {
         case "vm.hello": {
-          if (helloReceived) return; // ignore duplicate hellos
+          if (helloReceived) return;
           helloReceived = true;
           clearTimeout(helloTimer);
 
@@ -298,9 +311,9 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
             return;
           }
 
-          vmId = resolvedId;
-          vmLiveRegistry.add({
-            vmId,
+          connectionId = resolvedId;
+          connectionRegistry.add({
+            connectionId,
             ws,
             connectedAt: new Date(),
             lastMessageAt: new Date(),
@@ -308,40 +321,37 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
           });
 
           // Drain queued tasks immediately
-          await drainAndDeliverPending(vmId, ws);
-
-          // Notify subscribers of VM connection
-          pubsub.publish(vmConnectionTopic(vmId), { vmId, connected: true });
+          await drainAndDeliver(connectionId, ws);
           break;
         }
 
         case "vm.ping": {
-          if (!vmId) return;
+          if (!connectionId) return;
           send(ws, { type: "mc.pong", timestamp: Date.now() });
           break;
         }
 
         case "vm.agents_report": {
-          if (!vmId) return;
-          await handleAgentsReport(vmId, msg);
+          if (!connectionId) return;
+          await handleAgentsReport(connectionId, msg);
           break;
         }
 
         case "vm.agent_status": {
-          if (!vmId) return;
-          await handleAgentStatus(vmId, msg);
+          if (!connectionId) return;
+          await handleAgentStatus(connectionId, msg);
           break;
         }
 
         case "vm.agent_message": {
-          if (!vmId) return;
-          await handleAgentMessage(vmId, msg);
+          if (!connectionId) return;
+          await handleAgentMessage(connectionId, msg);
           break;
         }
 
         case "vm.task_done": {
-          if (!vmId) return;
-          await handleTaskDone(vmId, msg);
+          if (!connectionId) return;
+          await handleTaskDone(connectionId, msg);
           break;
         }
 
@@ -351,7 +361,6 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
         }
 
         default:
-          // Unknown message type — ignore for forward compatibility
           break;
       }
     } catch (err) {
@@ -361,11 +370,10 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
 
   ws.on("close", async () => {
     clearTimeout(helloTimer);
-    if (vmId) {
-      vmLiveRegistry.remove(vmId);
-      await markVMDisconnected(vmId).catch(() => undefined);
-      await logVM(vmId, "Plugin disconnected");
-      pubsub.publish(vmConnectionTopic(vmId), { vmId, connected: false });
+    if (connectionId) {
+      connectionRegistry.remove(connectionId);
+      await markConnectionDisconnected(connectionId).catch(() => undefined);
+      await clearAgentRoutes(connectionId).catch(() => undefined);
     }
   });
 
@@ -381,13 +389,13 @@ let evictionInterval: ReturnType<typeof setInterval> | null = null;
 export function startEvictionLoop(): void {
   if (evictionInterval) return;
   evictionInterval = setInterval(async () => {
-    const stale = vmLiveRegistry.staleIds(LIVE_GATEWAY.MC_EVICT_TIMEOUT_MS);
-    for (const vmId of stale) {
-      const conn = vmLiveRegistry.get(vmId);
+    const stale = connectionRegistry.staleIds(LIVE_GATEWAY.MC_EVICT_TIMEOUT_MS);
+    for (const id of stale) {
+      const conn = connectionRegistry.get(id);
       if (conn) {
-        console.warn(`[live-gateway] Evicting stale connection: ${vmId}`);
-        conn.ws.terminate(); // triggers "close" event which handles cleanup
+        console.warn(`[live-gateway] Evicting stale connection: ${id}`);
+        conn.ws.terminate(); // triggers "close" which handles cleanup
       }
     }
-  }, 30_000);
+  }, LIVE_GATEWAY.EVICTION_CHECK_MS);
 }

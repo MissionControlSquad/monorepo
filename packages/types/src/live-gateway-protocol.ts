@@ -35,16 +35,18 @@ export type VMErrorCode =
 /** First message sent by plugin after WS connection is established. */
 export interface MsgHello {
   type: "vm.hello";
-  /** Install token (raw, 64-char hex) or per-VM token (after first handshake). */
+  /** Install token (raw, 64-char hex) on first connect; connectionToken on reconnect. */
   token: string;
-  /** Stable fingerprint derived by plugin from machine identifiers. */
+  /** Stable fingerprint derived by plugin from machine identifiers (sha256 hostname:mac). */
   fingerprint: string;
-  /** Random hex nonce — consumed atomically by MC, prevents replay. */
+  /** Random 32-char hex nonce — consumed atomically by MC, prevents replay. */
   nonce: string;
   /** Unix timestamp (ms) on plugin side — MC rejects if |delta| > 30 000 ms. */
   timestamp: number;
   pluginVersion: string;
   meta: VMMeta;
+  /** Agent slugs (username) this plugin manages — used to build LiveAgentRoute records. */
+  agents?: string[];
 }
 
 /** Periodic heartbeat — sent every 30 s by plugin. */
@@ -148,11 +150,15 @@ export const LIVE_GATEWAY = {
   PATH: "/live-gateway",
   /** Max clock skew allowed on vm.hello timestamp (ms). */
   MAX_CLOCK_SKEW_MS: 30_000,
+  /** Close connection if no vm.hello within this window (ms). */
+  HELLO_TIMEOUT_MS: 10_000,
   /** Plugin sends ping every N ms. */
   PLUGIN_PING_INTERVAL_MS: 30_000,
   /** MC drops connection if no message received within this window (ms). */
   MC_EVICT_TIMEOUT_MS: 90_000,
-  /** PendingTaskDelivery TTL (ms) — tasks older than this are not delivered. */
+  /** How often the eviction loop runs (ms). */
+  EVICTION_CHECK_MS: 30_000,
+  /** LivePendingDelivery TTL (ms) — tasks older than this are not delivered. */
   TASK_DELIVERY_TTL_MS: 24 * 60 * 60 * 1_000,
   /** Max dedup Set size on plugin side. */
   PLUGIN_DEDUP_LIMIT: 500,

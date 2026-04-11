@@ -1,12 +1,19 @@
 /**
  * live-task-delivery.ts
  *
- * Delivers a task to cloudVM agents via the Live Gateway.
- * If the VM is connected, sends directly. Otherwise queues for when it reconnects.
+ * Attempts to deliver a newly-assigned task to agents via the Live Gateway.
+ * This is a purely additive fast path — existing heartbeat handling is untouched.
+ *
+ * Rules:
+ *  - Never throws. All errors are swallowed — must not affect the task API response.
+ *  - If no live connection exists for an agent → return silently (heartbeat handles it).
+ *  - If connection exists but offline → enqueue in LivePendingDelivery (drained on reconnect).
+ *  - If connection is live → enqueue first (idempotency) then send WS frame.
+ *  - Delivery is only marked as received when plugin sends vm.task_ack (in handler).
  */
 
-import { enqueuePendingTask } from "@agentcenter/database";
-import { vmLiveRegistry } from "./vm-live-registry";
+import { findConnectionByAgentSlug, enqueuePendingDelivery } from "@agentcenter/database";
+import { connectionRegistry } from "./live-connection-registry";
 import { LIVE_GATEWAY } from "@agentcenter/types";
 
 interface DeliverOptions {
@@ -15,82 +22,6 @@ interface DeliverOptions {
   taskDescription?: string | null;
   priority: string;
   assignedBy?: string;
-}
-
-/**
- * Deliver a task to all cloudVM agents with the given agentIds.
- * Agents not on a VM are silently skipped (handled by existing heartbeat flow).
- */
-export async function deliverTaskToCloudVMAgents(
-  agentIds: string[],
-  opts: DeliverOptions,
-): Promise<void> {
-  if (!agentIds.length) return;
-
-  const { prisma } = await import("../prisma");
-
-  // Load agents with their VM relationship
-  const agents = await prisma.agent.findMany({
-    where: {
-      id: { in: agentIds },
-      hostingType: "cloudVM",
-      cloudVmId: { not: null },
-    },
-    select: {
-      id: true,
-      username: true,
-      name: true,
-      cloudVmId: true,
-    },
-  });
-
-  for (const agent of agents) {
-    if (!agent.cloudVmId) continue;
-    const slug = agent.username ?? agent.name;
-    const message = buildTaskMessage(opts);
-    const idempotencyKey = `task:${opts.taskId}:agent:${agent.id}`;
-    const expiresAt = new Date(Date.now() + LIVE_GATEWAY.TASK_DELIVERY_TTL_MS);
-
-    const conn = vmLiveRegistry.get(agent.cloudVmId);
-
-    if (conn && conn.ws.readyState === 1 /* OPEN */) {
-      // VM is live — queue first (idempotency), then deliver directly
-      const delivery = await enqueuePendingTask({
-        vmId: agent.cloudVmId,
-        agentSlug: slug,
-        taskId: opts.taskId,
-        message,
-        priority: opts.priority,
-        idempotencyKey,
-        expiresAt,
-      });
-
-      if (delivery) {
-        vmLiveRegistry.send(agent.cloudVmId, {
-          type: "mc.deliver_task",
-          deliveryId: delivery.id,
-          agentSlug: slug,
-          taskId: opts.taskId,
-          message,
-          priority: opts.priority as any,
-        });
-        // Plugin will send vm.task_ack → handleTaskAck marks delivery as received.
-        // Do NOT mark delivered here — if the WS send fails the record stays pending
-        // and will be drained on next connect.
-      }
-    } else {
-      // VM offline — queue for drain on next connect
-      await enqueuePendingTask({
-        vmId: agent.cloudVmId,
-        agentSlug: slug,
-        taskId: opts.taskId,
-        message,
-        priority: opts.priority,
-        idempotencyKey,
-        expiresAt,
-      });
-    }
-  }
 }
 
 const MAX_MESSAGE_BYTES = 4096;
@@ -104,6 +35,71 @@ function buildTaskMessage(opts: DeliverOptions): string {
     lines.push("", `Assigned by: ${opts.assignedBy.slice(0, 100)}`);
   }
   const msg = lines.join("\n");
-  // Hard cap to prevent oversized WS frames
   return msg.length > MAX_MESSAGE_BYTES ? msg.slice(0, MAX_MESSAGE_BYTES) : msg;
+}
+
+/**
+ * Called fire-and-forget from the task assignment route.
+ * Silently no-ops for agents without a live connection.
+ */
+export async function tryDeliverTaskToLiveAgents(
+  agentIds: string[],
+  opts: DeliverOptions,
+): Promise<void> {
+  if (!agentIds.length) return;
+
+  const { prisma } = await import("../prisma");
+
+  // Load agent usernames — username is the slug used by the plugin
+  const agents = await prisma.agent
+    .findMany({
+      where: { id: { in: agentIds } },
+      select: { id: true, username: true, name: true },
+    })
+    .catch(() => []);
+
+  for (const agent of agents) {
+    const slug = agent.username ?? agent.name;
+    if (!slug) continue;
+
+    try {
+      const connection = await findConnectionByAgentSlug(slug);
+      if (!connection) continue; // no live route for this agent — heartbeat handles it
+
+      const idempotencyKey = `task:${opts.taskId}:agent:${slug}`;
+      const expiresAt = new Date(Date.now() + LIVE_GATEWAY.TASK_DELIVERY_TTL_MS);
+      const message = buildTaskMessage(opts);
+
+      const delivery = await enqueuePendingDelivery({
+        connectionId: connection.id,
+        agentSlug: slug,
+        taskId: opts.taskId,
+        message,
+        priority: opts.priority,
+        idempotencyKey,
+        expiresAt,
+      });
+
+      if (!delivery) continue; // already queued (idempotency key collision)
+
+      const isLive = connectionRegistry.send(connection.id, {
+        type: "mc.deliver_task",
+        deliveryId: delivery.id,
+        agentSlug: slug,
+        taskId: opts.taskId,
+        message,
+        priority: opts.priority as any,
+      });
+
+      if (!isLive) {
+        // VM was in registry but WS closed — delivery stays queued, will drain on reconnect
+        console.debug(
+          `[live-delivery] Connection ${connection.id} not live — task ${opts.taskId} queued`,
+        );
+      }
+      // vm.task_ack → handleTaskAck will call markDeliveryReceived (never mark here)
+    } catch (err) {
+      console.error(`[live-delivery] Failed to deliver task ${opts.taskId} to agent ${slug}:`, err);
+    }
+  }
 }

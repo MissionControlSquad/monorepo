@@ -3,10 +3,8 @@
 import { useState, useCallback } from "react";
 import { usePollingInterval, useSearch } from "@agentcenter/hooks";
 import Link from "next/link";
-import { Server, Plus, Loader2, Globe, Cpu, Clock, Search, Key } from "lucide-react";
+import { Server, Plus, Loader2, Globe, Cpu, Clock, Search } from "lucide-react";
 import { CreateVMDialog } from "../components/cloud/CreateVMDialog";
-import { VMConnectionBadge } from "../components/cloud/VMConnectionBadge";
-import { VMTokenPanel } from "../components/cloud/VMTokenPanel";
 import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout } from "../components/ui";
 import { formatUptime, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
@@ -23,7 +21,6 @@ interface CloudVM {
   name?: string | null;
   serverName?: string | null;
   status: string;
-  connectionStatus?: string;
   ipv4?: string | null;
   region: string;
   serverType: string;
@@ -50,13 +47,10 @@ const STATUS_BADGE_VARIANT: Record<
   destroying: { label: "Destroying", variant: "orange" },
 };
 
-type Tab = "vms" | "tokens";
-
 export function CloudPage() {
   const [vms, setVMs] = useState<CloudVM[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [tab, setTab] = useState<Tab>("vms");
 
   const fetchVMs = useCallback(async () => {
     try {
@@ -142,150 +136,111 @@ export function CloudPage() {
               {vms.length} virtual machine{vms.length !== 1 ? "s" : ""}
             </p>
           </div>
-          {tab === "vms" && (
-            <Button variant="primary" icon={<Plus />} onClick={() => setShowCreateDialog(true)}>
-              Create VM
-            </Button>
-          )}
+          <Button variant="primary" icon={<Plus />} onClick={() => setShowCreateDialog(true)}>
+            Create VM
+          </Button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 border-b border-border">
-          {(["vms", "tokens"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                tab === t
-                  ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t === "vms" ? <Server className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-              {t === "vms" ? "Virtual Machines" : "Install Tokens"}
-            </button>
-          ))}
+        {/* Search */}
+        <div className="mb-5">
+          <Input
+            placeholder="Search VMs..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            icon={<Search />}
+          />
         </div>
 
-        {/* Token panel tab */}
-        {tab === "tokens" && <VMTokenPanel />}
-
-        {/* VM list tab */}
-        {tab === "vms" && (
-          <>
-            {/* Search */}
-            <div className="mb-5">
-              <Input
-                placeholder="Search VMs..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                icon={<Search />}
-              />
-            </div>
-
-            {(() => {
-              if (filtered.length === 0) {
-                return (
-                  <EmptyState
-                    icon={<Search />}
-                    title="No matching VMs"
-                    description="Try adjusting your search."
-                  />
-                );
-              }
-
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon={<Search />}
+            title="No matching VMs"
+            description="Try adjusting your search."
+          />
+        ) : (
+          <Card className="overflow-hidden divide-y divide-border">
+            {filtered.map((vm) => {
+              const badgeInfo = STATUS_BADGE_VARIANT[vm.status] || STATUS_BADGE_VARIANT.error;
+              const statusDot =
+                vm.status === "running"
+                  ? "bg-success"
+                  : vm.status === "error"
+                    ? "bg-destructive"
+                    : "bg-gray-400";
               return (
-                <Card className="overflow-hidden divide-y divide-border">
-                  {filtered.map((vm) => {
-                    const badgeInfo = STATUS_BADGE_VARIANT[vm.status] || STATUS_BADGE_VARIANT.error;
-                    const statusDot =
-                      vm.status === "running"
-                        ? "bg-success"
-                        : vm.status === "error"
-                          ? "bg-destructive"
-                          : "bg-gray-400";
-                    return (
-                      <Link
-                        key={vm.id}
-                        href={`/cloud/${vm.id}`}
-                        className="flex items-center gap-4 px-4 py-3 hover:bg-muted transition-all group"
-                      >
-                        {/* Status dot + Name */}
-                        <div className="flex items-center gap-3 min-w-0 w-[220px] flex-shrink-0">
-                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot}`} />
-                          <span className="font-medium text-foreground truncate group-hover:text-indigo-600 transition-colors">
-                            {vm.name || vm.serverName || vm.id.slice(0, 8)}
+                <Link
+                  key={vm.id}
+                  href={`/cloud/${vm.id}`}
+                  className="flex items-center gap-4 px-4 py-3 hover:bg-muted transition-all group"
+                >
+                  {/* Status dot + Name */}
+                  <div className="flex items-center gap-3 min-w-0 w-[220px] flex-shrink-0">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot}`} />
+                    <span className="font-medium text-foreground truncate group-hover:text-indigo-600 transition-colors">
+                      {vm.name || vm.serverName || vm.id.slice(0, 8)}
+                    </span>
+                  </div>
+
+                  {/* Status badge */}
+                  <Badge variant={badgeInfo.variant}>{badgeInfo.label}</Badge>
+
+                  {/* IP */}
+                  <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground w-[130px] flex-shrink-0">
+                    <Globe className="w-3 h-3 text-muted-foreground" />
+                    <span className="font-mono">{vm.ipv4 || "—"}</span>
+                  </div>
+
+                  {/* Spec + Region */}
+                  <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground w-[140px] flex-shrink-0">
+                    <Cpu className="w-3 h-3 text-muted-foreground" />
+                    <span>
+                      {vm.serverType} / {vm.region}
+                    </span>
+                  </div>
+
+                  {/* Uptime */}
+                  <div className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground w-[80px] flex-shrink-0">
+                    <Clock className="w-3 h-3 text-muted-foreground" />
+                    <span>{formatUptime(vm.totalUptimeSeconds)}</span>
+                  </div>
+
+                  {/* Agents */}
+                  <div className="flex items-center gap-1 ml-auto flex-shrink-0">
+                    {vm.agents.length > 0 ? (
+                      <>
+                        {vm.agents.slice(0, 4).map((agent) => (
+                          <div
+                            key={agent.id}
+                            className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs"
+                            title={agent.name}
+                          >
+                            {agent.identityEmoji || agent.name[0]}
+                          </div>
+                        ))}
+                        {vm.agents.length > 4 && (
+                          <span className="text-xs text-muted-foreground ml-0.5">
+                            +{vm.agents.length - 4}
                           </span>
-                        </div>
-
-                        {/* Status badge */}
-                        <Badge variant={badgeInfo.variant}>{badgeInfo.label}</Badge>
-
-                        {/* Live connection badge (only for running VMs) */}
-                        {vm.status === "running" && vm.connectionStatus && (
-                          <VMConnectionBadge vmId={vm.id} initialStatus={vm.connectionStatus} />
                         )}
-
-                        {/* IP */}
-                        <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground w-[130px] flex-shrink-0">
-                          <Globe className="w-3 h-3 text-muted-foreground" />
-                          <span className="font-mono">{vm.ipv4 || "—"}</span>
-                        </div>
-
-                        {/* Spec + Region */}
-                        <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground w-[140px] flex-shrink-0">
-                          <Cpu className="w-3 h-3 text-muted-foreground" />
-                          <span>
-                            {vm.serverType} / {vm.region}
-                          </span>
-                        </div>
-
-                        {/* Uptime */}
-                        <div className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground w-[80px] flex-shrink-0">
-                          <Clock className="w-3 h-3 text-muted-foreground" />
-                          <span>{formatUptime(vm.totalUptimeSeconds)}</span>
-                        </div>
-
-                        {/* Agents */}
-                        <div className="flex items-center gap-1 ml-auto flex-shrink-0">
-                          {vm.agents.length > 0 ? (
-                            <>
-                              {vm.agents.slice(0, 4).map((agent) => (
-                                <div
-                                  key={agent.id}
-                                  className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs"
-                                  title={agent.name}
-                                >
-                                  {agent.identityEmoji || agent.name[0]}
-                                </div>
-                              ))}
-                              {vm.agents.length > 4 && (
-                                <span className="text-xs text-muted-foreground ml-0.5">
-                                  +{vm.agents.length - 4}
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">No agents</span>
-                          )}
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </Card>
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No agents</span>
+                    )}
+                  </div>
+                </Link>
               );
-            })()}
+            })}
+          </Card>
+        )}
 
-            {showCreateDialog && (
-              <CreateVMDialog
-                onClose={() => setShowCreateDialog(false)}
-                onCreated={() => {
-                  setShowCreateDialog(false);
-                  fetchVMs();
-                }}
-              />
-            )}
-          </>
+        {showCreateDialog && (
+          <CreateVMDialog
+            onClose={() => setShowCreateDialog(false)}
+            onCreated={() => {
+              setShowCreateDialog(false);
+              fetchVMs();
+            }}
+          />
         )}
       </ErrorBoundary>
     </PageLayout>

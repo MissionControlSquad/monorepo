@@ -10,7 +10,7 @@ import { assertProjectMember, assertAllMembersOfProject } from "../../_lib/proje
 import { assertAssignableAgents } from "@/server/assignment-guard";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isSystemShutdown, isProjectShutdown } from "@/server/system-settings";
-import { deliverTaskToCloudVMAgents } from "@/server/services/live-task-delivery";
+import { tryDeliverTaskToLiveAgents } from "@/server/services/live-task-delivery";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -144,9 +144,11 @@ export async function PATCH(request: Request, ctx: RouteContext) {
           removedNames: removedAgents.map((a) => a.name),
         });
 
-        // Live Gateway: deliver task to newly assigned cloudVM agents
+        // Live Gateway: attempt instant delivery to agents with live connections.
+        // Fire-and-forget — never affects the task API response.
+        // If no live connection exists, existing heartbeat handles the task.
         if (addedAgentIds.length > 0) {
-          deliverTaskToCloudVMAgents(addedAgentIds, {
+          tryDeliverTaskToLiveAgents(addedAgentIds, {
             taskId: task.id,
             taskTitle: task.title,
             taskDescription: (task as any).description ?? null,
