@@ -7,6 +7,7 @@ import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { listActiveInstallTokens, createInstallToken } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { apiLimiters, checkRateLimit } from "../../_lib/rate-limit-check";
 import { resolveSession } from "../../_lib/resolve-session";
 import { z } from "zod";
 
@@ -15,6 +16,9 @@ const createTokenSchema = z.object({
 });
 
 export async function GET(request: Request) {
+  const limited = await checkRateLimit(apiLimiters.liveGatewayTokens, request);
+  if (limited) return limited;
+
   try {
     await resolveSession(request);
 
@@ -34,6 +38,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const limited = await checkRateLimit(apiLimiters.liveGatewayTokens, request);
+  if (limited) return limited;
+
   try {
     await resolveSession(request);
 

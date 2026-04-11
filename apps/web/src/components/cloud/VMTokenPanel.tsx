@@ -21,6 +21,7 @@ interface NewTokenResult {
 export function VMTokenPanel() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -34,7 +35,12 @@ export function VMTokenPanel() {
       if (res.ok) {
         const data = await res.json();
         setTokens(data.tokens ?? []);
+        setFetchError(false);
+      } else {
+        setFetchError(true);
       }
+    } catch {
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
@@ -177,6 +183,8 @@ export function VMTokenPanel() {
       {/* Token list */}
       {loading ? (
         <p className="text-xs text-muted-foreground">Loading…</p>
+      ) : fetchError ? (
+        <p className="text-xs text-destructive">Failed to load tokens. Please refresh.</p>
       ) : tokens.length === 0 ? (
         <p className="text-xs text-muted-foreground">No active install tokens.</p>
       ) : (

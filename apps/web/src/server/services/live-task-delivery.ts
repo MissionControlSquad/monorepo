@@ -5,7 +5,7 @@
  * If the VM is connected, sends directly. Otherwise queues for when it reconnects.
  */
 
-import { enqueuePendingTask, markTaskDelivered } from "@agentcenter/database";
+import { enqueuePendingTask } from "@agentcenter/database";
 import { vmLiveRegistry } from "./vm-live-registry";
 import { LIVE_GATEWAY } from "@agentcenter/types";
 
@@ -74,8 +74,9 @@ export async function deliverTaskToCloudVMAgents(
           message,
           priority: opts.priority as any,
         });
-        // Optimistically mark as delivered — plugin will ack, but this is fine for retry logic
-        await markTaskDelivered(delivery.id).catch(() => undefined);
+        // Plugin will send vm.task_ack → handleTaskAck marks delivery as received.
+        // Do NOT mark delivered here — if the WS send fails the record stays pending
+        // and will be drained on next connect.
       }
     } else {
       // VM offline — queue for drain on next connect
@@ -92,13 +93,17 @@ export async function deliverTaskToCloudVMAgents(
   }
 }
 
+const MAX_MESSAGE_BYTES = 4096;
+
 function buildTaskMessage(opts: DeliverOptions): string {
-  const lines = [`You have been assigned a new task: "${opts.taskTitle}"`];
+  const lines = [`You have been assigned a new task: "${opts.taskTitle.slice(0, 200)}"`];
   if (opts.taskDescription) {
     lines.push("", opts.taskDescription.slice(0, 1000));
   }
   if (opts.assignedBy) {
-    lines.push("", `Assigned by: ${opts.assignedBy}`);
+    lines.push("", `Assigned by: ${opts.assignedBy.slice(0, 100)}`);
   }
-  return lines.join("\n");
+  const msg = lines.join("\n");
+  // Hard cap to prevent oversized WS frames
+  return msg.length > MAX_MESSAGE_BYTES ? msg.slice(0, MAX_MESSAGE_BYTES) : msg;
 }

@@ -1,4 +1,4 @@
-import { listCloudVMs } from "@agentcenter/database";
+import { listCloudVMsWithLiveStatus } from "@agentcenter/database";
 import { createCloudVM } from "@/server/services/cloud-vm";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
 import { validateBody, createCloudVMSchema } from "../_lib/validation";
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     const limited = await checkRateLimit(apiLimiters.cloudVms, request);
     if (limited) return limited;
 
-    const vms = await listCloudVMs();
+    const vms = await listCloudVMsWithLiveStatus();
 
     return successResponse({ vms });
   } catch (err) {

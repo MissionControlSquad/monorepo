@@ -84,7 +84,11 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
     return null;
   }
 
-  // 2. Atomic nonce consumption — prevents replay attacks
+  // 2. Validate nonce format (must be 32-char hex) then atomic consumption — prevents replay attacks
+  if (!/^[0-9a-f]{32}$/i.test(msg.nonce)) {
+    sendError(ws, "auth_failed", "Invalid nonce format");
+    return null;
+  }
   const nonceOk = await consumeNonce(msg.nonce);
   if (!nonceOk) {
     sendError(ws, "nonce_replay", "Nonce already used");
@@ -124,16 +128,21 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
     const rawVMToken = randomBytes(32).toString("hex");
     const vmTokenHash = await bcrypt.hash(rawVMToken, 12);
 
+    const hostMeta = msg.meta as unknown as Record<string, unknown>;
+    const safeHostMeta =
+      JSON.stringify(hostMeta).length <= 4096
+        ? hostMeta
+        : { hostname: hostMeta.hostname, platform: hostMeta.platform, arch: hostMeta.arch };
+
     const vm = await prisma.cloudVM.create({
       data: {
-        name: msg.meta.hostname,
-        hostingType: "selfHosted",
+        name: String(msg.meta.hostname).slice(0, 255),
         vmFingerprint: msg.fingerprint,
         vmToken: vmTokenHash,
         connectionStatus: "connected",
         connectedAt: new Date(),
         pluginVersion: msg.pluginVersion,
-        hostMeta: msg.meta as any,
+        hostMeta: safeHostMeta as any,
         status: "running",
       } as any,
     });
