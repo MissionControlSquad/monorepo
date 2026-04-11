@@ -18,6 +18,8 @@ import { execute, subscribe, type ExecutionArgs } from "graphql";
 import { schema } from "./src/server/graphql/schema";
 import { prisma } from "./src/server/prisma";
 import { verifySessionToken, COOKIE_NAME } from "./src/server/admin-auth";
+import { isFeatureEnabled } from "./src/server/feature-flags";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import {
   handlePluginConnection,
   startEvictionLoop,
@@ -49,9 +51,10 @@ const server = createServer();
 const wss = new WebSocketServer({ noServer: true });
 
 // ── WebSocket server for Live Gateway (mc-bridge plugin connections) ──
-const liveGatewayWss = new WebSocketServer({ noServer: true });
-liveGatewayWss.on("connection", handlePluginConnection);
-startEvictionLoop();
+// Created at startup only if the LIVE_GATEWAY feature flag is enabled.
+// Requires a server restart to pick up flag changes (intentional — avoids
+// running unused WebSocket infrastructure when the feature is off).
+let liveGatewayWss: WebSocketServer | null = null;
 
 setupGraphQLWS(
   {
@@ -84,8 +87,13 @@ const originalEmit = server.emit.bind(server);
       return true; // Swallow the event — no other listener sees it
     }
     if (pathname === "/live-gateway") {
+      if (!liveGatewayWss) {
+        socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+        socket.destroy();
+        return true;
+      }
       liveGatewayWss.handleUpgrade(req, socket, head, (ws: WebSocket) => {
-        liveGatewayWss.emit("connection", ws, req);
+        liveGatewayWss!.emit("connection", ws, req);
       });
       return true;
     }
@@ -97,13 +105,26 @@ const originalEmit = server.emit.bind(server);
 const app = next({ dev, hostname, port, dir: __dirname });
 const handle = app.getRequestHandler();
 
-app.prepare().then(() => {
+app.prepare().then(async () => {
+  // Check the LIVE_GATEWAY flag once at startup.
+  // If enabled, create the WebSocket server and start the eviction loop.
+  // If disabled, the /live-gateway upgrade path returns 403 with zero overhead.
+  const liveGatewayEnabled = await isFeatureEnabled(FLAG_KEYS.LIVE_GATEWAY);
+  if (liveGatewayEnabled) {
+    liveGatewayWss = new WebSocketServer({ noServer: true });
+    liveGatewayWss.on("connection", handlePluginConnection);
+    startEvictionLoop();
+  }
+
   server.on("request", async (req, res) => {
     const parsedUrl = parse(req.url!, true);
     await handle(req, res, parsedUrl);
   });
 
   server.listen(port, hostname, () => {
-    console.log(`> Ready on http://${hostname}:${port} (ws: enabled)`);
+    const ws = ["graphql-ws", liveGatewayEnabled ? "live-gateway" : null]
+      .filter(Boolean)
+      .join(", ");
+    console.log(`> Ready on http://${hostname}:${port} (ws: ${ws})`);
   });
 });
