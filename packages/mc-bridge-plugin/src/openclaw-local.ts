@@ -2,8 +2,18 @@
  * openclaw-local.ts
  *
  * Thin abstraction over OpenClaw's local plugin API.
- * Centralizes all calls to `openclaw.*` globals so the rest of the plugin
- * can be tested without the OpenClaw runtime.
+ *
+ * According to OpenClaw docs, plugins interact with the runtime through:
+ * - The `api` object received in the register() callback (registerHook, registerTool, etc.)
+ * - The `openclaw system event` CLI mechanism for triggering agent turns
+ *
+ * OpenClaw does NOT expose a triggerCycle/triggerHeartbeat API for plugins.
+ * The closest equivalent is `openclaw system event --text "..." --mode now`
+ * which causes the target agent to immediately process a new turn.
+ *
+ * All `(globalThis as any).openclaw.*` calls below are the runtime bridge that
+ * OpenClaw injects into the plugin process. These are the actual available globals
+ * based on the OpenClaw plugin runtime contract.
  */
 
 /** List agents currently running in this OpenClaw instance. */
@@ -17,7 +27,6 @@ export async function listLocalAgents(): Promise<
     currentTaskId?: string | null;
   }>
 > {
-  // OpenClaw plugin API: openclaw.agents.list()
   const raw: any[] = await (globalThis as any).openclaw.agents.list();
   return raw.map((a: any) => ({
     slug: a.slug ?? a.name,
@@ -29,9 +38,35 @@ export async function listLocalAgents(): Promise<
   }));
 }
 
-/** Send a task message to a specific local agent. */
-export async function deliverToLocalAgent(agentSlug: string, message: string): Promise<void> {
-  await (globalThis as any).openclaw.agents.sendMessage(agentSlug, message);
+/**
+ * Deliver a task notification to a local agent.
+ *
+ * OpenClaw docs confirm there is no plugin API to directly trigger an agent's
+ * heartbeat-preflight cycle. The correct mechanism is sending a system event
+ * to the agent with `--mode now`, which causes it to immediately process a new
+ * turn — equivalent to `openclaw agent -m "message" --to <slug>`.
+ *
+ * The taskNotification message MUST include the taskId so the agent can call
+ * MC APIs (status update, action logging, completion). The agent's PLAYBOOK
+ * must treat this incoming message as a task assignment and run the full MC
+ * API chain: fetch task → update status → work → log actions → mark done.
+ *
+ * This IS the OpenClaw-sanctioned way for plugins to initiate agent work.
+ * It is not identical to heartbeat-preflight (skips vacation/shutdown checks)
+ * but the agent's PLAYBOOK handles those when it calls back to MC APIs.
+ */
+export async function deliverToLocalAgent(agentSlug: string, taskNotification: string): Promise<void> {
+  // Primary path: enqueue an immediate system event for this agent.
+  // Equivalent to: openclaw system event --text "..." --mode now --to <slug>
+  const oc = (globalThis as any).openclaw;
+  if (typeof oc.system?.event === "function") {
+    await oc.system.event({ text: taskNotification, to: agentSlug, mode: "now" });
+    return;
+  }
+
+  // Fallback: direct agent message (older OpenClaw runtimes).
+  // openclaw agent -m "message" --to <slug>
+  await oc.agents.sendMessage(agentSlug, taskNotification);
 }
 
 /** Subscribe to agent status change events. */

@@ -16,13 +16,19 @@ function buildTaskMessage(opts: {
   priority: string;
   assignedBy?: string;
 }): string {
-  const lines = [`You have been assigned a new task: "${opts.taskTitle.slice(0, 200)}"`];
+  const lines = [
+    `You have been assigned a new task (task ID: ${opts.taskId}): "${opts.taskTitle.slice(0, 200)}"`,
+  ];
   if (opts.taskDescription) {
     lines.push("", opts.taskDescription.slice(0, 1000));
   }
   if (opts.assignedBy) {
     lines.push("", `Assigned by: ${opts.assignedBy.slice(0, 100)}`);
   }
+  lines.push(
+    "",
+    "Run your normal work cycle: update your status, complete the task, and report done per your PLAYBOOK.",
+  );
   const msg = lines.join("\n");
   return msg.length > MAX_MESSAGE_BYTES ? msg.slice(0, MAX_MESSAGE_BYTES) : msg;
 }
@@ -30,9 +36,11 @@ function buildTaskMessage(opts: {
 // ─── buildTaskMessage tests ───────────────────────────────────────────────────
 
 describe("buildTaskMessage", () => {
-  it("builds a basic message with title only", () => {
+  it("builds a basic message with title and taskId", () => {
     const msg = buildTaskMessage({ taskId: "t1", taskTitle: "Fix the bug", priority: "normal" });
-    expect(msg).toBe('You have been assigned a new task: "Fix the bug"');
+    expect(msg).toContain("(task ID: t1)");
+    expect(msg).toContain('"Fix the bug"');
+    expect(msg).toContain("Run your normal work cycle");
   });
 
   it("truncates title at 200 characters", () => {
@@ -85,7 +93,8 @@ describe("buildTaskMessage", () => {
       priority: "normal",
     });
     expect(msg).not.toContain("Assigned by:");
-    expect(msg).toBe('You have been assigned a new task: "Title"');
+    expect(msg).toContain("(task ID: t1)");
+    expect(msg).toContain('"Title"');
   });
 
   it("omits assignedBy section when absent", () => {

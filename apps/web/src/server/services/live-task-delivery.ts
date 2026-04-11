@@ -27,13 +27,21 @@ interface DeliverOptions {
 const MAX_MESSAGE_BYTES = 4096;
 
 function buildTaskMessage(opts: DeliverOptions): string {
-  const lines = [`You have been assigned a new task: "${opts.taskTitle.slice(0, 200)}"`];
+  // Task ID is included so the agent can call MC APIs (status updates, action logs, etc.)
+  // without it the agent cannot follow PLAYBOOK — it would have no ID to reference.
+  const lines = [
+    `You have been assigned a new task (task ID: ${opts.taskId}): "${opts.taskTitle.slice(0, 200)}"`,
+  ];
   if (opts.taskDescription) {
     lines.push("", opts.taskDescription.slice(0, 1000));
   }
   if (opts.assignedBy) {
     lines.push("", `Assigned by: ${opts.assignedBy.slice(0, 100)}`);
   }
+  lines.push(
+    "",
+    "Run your normal work cycle: update your status, complete the task, and report done per your PLAYBOOK.",
+  );
   const msg = lines.join("\n");
   return msg.length > MAX_MESSAGE_BYTES ? msg.slice(0, MAX_MESSAGE_BYTES) : msg;
 }
