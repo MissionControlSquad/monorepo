@@ -558,7 +558,7 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
                   ? "A. Open Command Prompt or PowerShell on that machine and run:"
                   : "A. Open Terminal on that machine and run:"}
               </p>
-              <CodeBlock code="openclaw plugin install mc-bridge" />
+              <CodeBlock code="openclaw plugins install mc-bridge" />
             </div>
 
             {/* Step B — config snippet */}
@@ -913,7 +913,7 @@ function DeleteConfirmModal({
               </p>
               <div className="space-y-1">
                 <code className="block text-[11px] bg-muted rounded px-2.5 py-1.5 font-mono text-foreground select-all">
-                  openclaw plugin disable mc-bridge
+                  openclaw plugins disable mc-bridge
                 </code>
                 <p className="text-[11px] text-muted-foreground">or quit OpenClaw entirely</p>
               </div>
@@ -938,7 +938,7 @@ function DeleteConfirmModal({
                 block from your OpenClaw plugin config, then optionally uninstall:
               </p>
               <code className="block text-[11px] bg-muted rounded px-2.5 py-1.5 font-mono text-foreground select-all">
-                openclaw plugin uninstall mc-bridge
+                openclaw plugins uninstall mc-bridge
               </code>
             </div>
           </label>
