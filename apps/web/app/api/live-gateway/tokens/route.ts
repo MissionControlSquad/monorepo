@@ -9,7 +9,8 @@ import { listActiveLiveGatewayTokens, createLiveGatewayToken } from "@agentcente
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { apiLimiters } from "../../_lib/rate-limit-check";
 import { resolveSession } from "../../_lib/resolve-session";
-import { withFeature, withRateLimit } from "../../_lib/route-hoc";
+import { withFeature } from "../../_lib/with-feature";
+import { withRateLimit } from "../../_lib/with-rate-limit";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { z } from "zod";
 

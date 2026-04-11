@@ -8,7 +8,8 @@ import { successResponse, errorResponse, handleError } from "../../../_lib/json-
 import { resolveSession } from "../../../_lib/resolve-session";
 import { connectionRegistry } from "@/server/services/live-connection-registry";
 import { apiLimiters } from "../../../_lib/rate-limit-check";
-import { withFeature, withRateLimit } from "../../../_lib/route-hoc";
+import { withFeature } from "../../../_lib/with-feature";
+import { withRateLimit } from "../../../_lib/with-rate-limit";
 import { FLAG_KEYS } from "@agentcenter/utils";
 
 type RouteContext = { params: Promise<{ id: string }> };
