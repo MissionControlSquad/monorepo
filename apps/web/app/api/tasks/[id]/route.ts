@@ -10,6 +10,7 @@ import { assertProjectMember, assertAllMembersOfProject } from "../../_lib/proje
 import { assertAssignableAgents } from "@/server/assignment-guard";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isSystemShutdown, isProjectShutdown } from "@/server/system-settings";
+import { deliverTaskToCloudVMAgents } from "@/server/services/live-task-delivery";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -142,6 +143,17 @@ export async function PATCH(request: Request, ctx: RouteContext) {
           addedNames: addedAgents.map((a) => a.name),
           removedNames: removedAgents.map((a) => a.name),
         });
+
+        // Live Gateway: deliver task to newly assigned cloudVM agents
+        if (addedAgentIds.length > 0) {
+          deliverTaskToCloudVMAgents(addedAgentIds, {
+            taskId: task.id,
+            taskTitle: task.title,
+            taskDescription: (task as any).description ?? null,
+            priority: (task as any).priority ?? "medium",
+            assignedBy: agent.name,
+          }).catch((err) => console.error("[live-task-delivery] error:", err));
+        }
       }
     }
 

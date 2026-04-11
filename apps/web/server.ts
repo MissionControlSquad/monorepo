@@ -18,6 +18,10 @@ import { execute, subscribe, type ExecutionArgs } from "graphql";
 import { schema } from "./src/server/graphql/schema";
 import { prisma } from "./src/server/prisma";
 import { verifySessionToken, COOKIE_NAME } from "./src/server/admin-auth";
+import {
+  handlePluginConnection,
+  startEvictionLoop,
+} from "./src/server/services/live-gateway-handler";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
@@ -43,6 +47,11 @@ const server = createServer();
 
 // ── WebSocket server for GraphQL subscriptions ────────────────────
 const wss = new WebSocketServer({ noServer: true });
+
+// ── WebSocket server for Live Gateway (mc-bridge plugin connections) ──
+const liveGatewayWss = new WebSocketServer({ noServer: true });
+liveGatewayWss.on("connection", handlePluginConnection);
+startEvictionLoop();
 
 setupGraphQLWS(
   {
@@ -73,6 +82,12 @@ const originalEmit = server.emit.bind(server);
         wss.emit("connection", ws, req);
       });
       return true; // Swallow the event — no other listener sees it
+    }
+    if (pathname === "/live-gateway") {
+      liveGatewayWss.handleUpgrade(req, socket, head, (ws: WebSocket) => {
+        liveGatewayWss.emit("connection", ws, req);
+      });
+      return true;
     }
   }
   return originalEmit(event, ...args);
