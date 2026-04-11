@@ -12,5 +12,12 @@ builder.prismaObject("CloudVM", {
     llmProvider: t.exposeString("llmProvider", { nullable: true }),
     llmModel: t.exposeString("llmModel", { nullable: true }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
+
+    // ── Live Gateway fields ───────────────────────────────────────
+    connectionStatus: t.exposeString("connectionStatus"),
+    connectedAt: t.expose("connectedAt", { type: "DateTime", nullable: true }),
+    lastDisconnectedAt: t.expose("lastDisconnectedAt", { type: "DateTime", nullable: true }),
+    pluginVersion: t.exposeString("pluginVersion", { nullable: true }),
+    vmFingerprint: t.exposeString("vmFingerprint", { nullable: true }),
   }),
 });

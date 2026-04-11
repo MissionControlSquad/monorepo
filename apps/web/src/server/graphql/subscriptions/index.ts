@@ -9,3 +9,4 @@ import "./messageReactionChanged";
 import "./channelMessageCreated";
 import "./channelMessageReactionChanged";
 import "./featureFlagsChanged";
+import "./vmConnectionChanged";

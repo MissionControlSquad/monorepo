@@ -37,6 +37,69 @@ import {
 } from "@agentcenter/utils";
 import { toast } from "sonner";
 import { Breadcrumbs, Button, Badge, Card, ConfirmDialog, Input } from "../components/ui";
+import { VMConnectionBadge } from "../components/cloud/VMConnectionBadge";
+import { useSubscription } from "urql";
+
+const VM_CONNECTION_SUB = `
+  subscription VMConnectionChanged($vmId: String!) {
+    vmConnectionChanged(vmId: $vmId) { vmId connected }
+  }
+`;
+
+function LiveGatewayStatus({
+  vmId,
+  initialStatus,
+  connectedAt,
+  lastDisconnectedAt,
+  pluginVersion,
+}: {
+  vmId: string;
+  initialStatus: string;
+  connectedAt: string | null;
+  lastDisconnectedAt: string | null;
+  pluginVersion: string | null;
+}) {
+  const [connected, setConnected] = useState(initialStatus === "connected");
+  const [result] = useSubscription({ query: VM_CONNECTION_SUB, variables: { vmId } });
+
+  useEffect(() => {
+    const e = result.data?.vmConnectionChanged;
+    if (e) setConnected(e.connected);
+  }, [result.data]);
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-foreground">Live Gateway</h3>
+        <VMConnectionBadge vmId={vmId} initialStatus={initialStatus} />
+      </div>
+      <div className="grid grid-cols-3 gap-4 text-xs">
+        <div>
+          <p className="text-muted-foreground mb-1">Status</p>
+          <p className="text-foreground font-medium">
+            {connected ? "Plugin connected" : "Plugin offline"}
+          </p>
+        </div>
+        {pluginVersion && (
+          <div>
+            <p className="text-muted-foreground mb-1">Plugin version</p>
+            <p className="text-foreground font-mono">{pluginVersion}</p>
+          </div>
+        )}
+        <div>
+          <p className="text-muted-foreground mb-1">{connected ? "Connected at" : "Last seen"}</p>
+          <p className="text-foreground">
+            {connected && connectedAt
+              ? new Date(connectedAt).toLocaleString()
+              : lastDisconnectedAt
+                ? new Date(lastDisconnectedAt).toLocaleString()
+                : "Never"}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 interface VMAgent {
   id: string;
@@ -51,6 +114,10 @@ interface CloudVM {
   id: string;
   name?: string | null;
   status: string;
+  connectionStatus?: string;
+  connectedAt?: string | null;
+  lastDisconnectedAt?: string | null;
+  pluginVersion?: string | null;
   ipv4?: string | null;
   region: string;
   serverType: string;
@@ -697,6 +764,17 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
           </div>
         </div>
       </Card>
+
+      {/* Live Gateway status */}
+      {vm.status === "running" && vm.connectionStatus && (
+        <LiveGatewayStatus
+          vmId={vm.id}
+          initialStatus={vm.connectionStatus}
+          connectedAt={vm.connectedAt ?? null}
+          lastDisconnectedAt={vm.lastDisconnectedAt ?? null}
+          pluginVersion={vm.pluginVersion ?? null}
+        />
+      )}
 
       {/* VM Actions */}
       <div className="flex items-center gap-2">
