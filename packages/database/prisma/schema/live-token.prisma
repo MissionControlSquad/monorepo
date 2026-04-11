@@ -1,0 +1,23 @@
+// ─── Live Gateway Token & Nonce Tables ───────────────────────────
+
+model UsedNonce {
+  nonce  String   @id
+  usedAt DateTime @default(now())
+
+  @@index([usedAt])
+  @@map("used_nonces")
+}
+
+model VMInstallToken {
+  id          String    @id @default(cuid())
+  tokenHash   String    @unique
+  tokenPrefix String
+  name        String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+
+  @@index([isActive])
+  @@map("vm_install_tokens")
+}
