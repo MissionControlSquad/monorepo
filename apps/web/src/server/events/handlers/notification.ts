@@ -3,6 +3,7 @@ import { pubsub, notificationTopic } from "../../pubsub";
 import { subscriberCache } from "../../cache";
 import { EventTypes } from "../../constants";
 import { notificationModel, subscriptionModel } from "../../models";
+import { tryDeliverMentionNotification } from "../../services/live-task-delivery";
 
 async function notify(
   mentionedAgentId: string,
@@ -91,6 +92,17 @@ on(EventTypes.MESSAGE_CREATED, async (e) => {
       ),
     ),
   );
+
+  // Live gateway: push mention notification immediately to connected agents.
+  // Fire-and-forget — heartbeat is the fallback for offline agents.
+  if (e.mentionedAgentIds.length > 0) {
+    tryDeliverMentionNotification(e.mentionedAgentIds, {
+      fromName: e.fromAgentName,
+      taskTitle: e.taskTitle,
+      taskId: e.taskId,
+      messageId: e.messageId,
+    }).catch(() => undefined);
+  }
 
   // Notify subscribers (excluding sender and mentioned)
   const msgSubscriberIds = await getSubscriberIds(e.taskId);

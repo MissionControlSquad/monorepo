@@ -13,6 +13,7 @@ import type {
   PluginToMC,
   MCToPlugin,
   MsgDeliverTask,
+  MsgNotify,
 } from "@agentcenter/types";
 import { LIVE_GATEWAY } from "@agentcenter/types";
 import type { MCBridgeConfig } from "./config-schema";
@@ -136,6 +137,10 @@ export class MCBridgeWsClient {
         this.handleDeliverTask(msg).catch(console.error);
         break;
 
+      case "mc.notify":
+        this.handleNotify(msg).catch(console.error);
+        break;
+
       case "mc.error":
         console.error(`[mc-bridge] MC error [${msg.code}]: ${msg.message}`);
         if (msg.code === "auth_failed" || msg.code === "token_revoked") {
@@ -169,6 +174,12 @@ export class MCBridgeWsClient {
 
     // Always ack — MC marks as delivered on ack
     this.send({ type: "vm.task_ack", deliveryId: msg.deliveryId });
+  }
+
+  private async handleNotify(msg: MsgNotify): Promise<void> {
+    // No ack needed — notifications are fire-and-forget.
+    // Trigger the agent's work cycle with the notification content.
+    await deliverToLocalAgent(msg.agentSlug, msg.content);
   }
 
   private handleClose(): void {

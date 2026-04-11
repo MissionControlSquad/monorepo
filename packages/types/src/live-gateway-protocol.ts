@@ -130,6 +130,20 @@ export interface MsgDeliverTask {
   priority: "low" | "medium" | "high" | "urgent";
 }
 
+/**
+ * Lightweight notification push — does NOT require a vm.task_ack.
+ * Used for @mentions, new inbox tasks, and review-needed signals.
+ * If the agent is offline the heartbeat handles it; this is a fast-path wakeup only.
+ */
+export interface MsgNotify {
+  type: "mc.notify";
+  agentSlug: string;
+  kind: "mention" | "inbox_task" | "review_needed";
+  content: string;   // human-readable + includes taskId so agent can call MC APIs
+  taskId?: string;
+  messageId?: string;
+}
+
 /** Authentication / protocol error — connection will be closed after this. */
 export interface MsgError {
   type: "mc.error";
@@ -141,6 +155,7 @@ export type MCToPlugin =
   | MsgWelcome
   | MsgPong
   | MsgDeliverTask
+  | MsgNotify
   | MsgError;
 
 // ── Protocol constants ────────────────────────────────────────────────────────

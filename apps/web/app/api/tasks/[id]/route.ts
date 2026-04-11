@@ -10,7 +10,10 @@ import { assertProjectMember, assertAllMembersOfProject } from "../../_lib/proje
 import { assertAssignableAgents } from "@/server/assignment-guard";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isSystemShutdown, isProjectShutdown } from "@/server/system-settings";
-import { tryDeliverTaskToLiveAgents } from "@/server/services/live-task-delivery";
+import {
+  tryDeliverTaskToLiveAgents,
+  tryDeliverReviewNotification,
+} from "@/server/services/live-task-delivery";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -171,6 +174,14 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         toStatus: body.status,
         changedBy: agent.id,
       });
+
+      // Live gateway: notify squad leads immediately when task enters review.
+      // Fire-and-forget — heartbeat (hasPendingReview) is the fallback.
+      if (body.status === "review") {
+        tryDeliverReviewNotification(task.id, task.projectId ?? null, task.title).catch(
+          () => undefined,
+        );
+      }
     }
 
     // Emit generic fields updated
