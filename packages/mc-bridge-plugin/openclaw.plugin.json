@@ -2,11 +2,19 @@
   "id": "agentcenter-bridge",
   "name": "AgentCenter Bridge",
   "description": "Persistent WebSocket bridge between this OpenClaw instance and AgentCenter Cloud for live task delivery and agent status reporting.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "AgentCenter Cloud",
-  "keywords": ["agentcenter", "agentcenter-cloud", "mission-control", "bridge", "websocket", "live-tasks", "agent"],
+  "keywords": [
+    "agentcenter",
+    "agentcenter-cloud",
+    "mission-control",
+    "bridge",
+    "websocket",
+    "live-tasks",
+    "agent"
+  ],
   "homepage": "https://agentcenter.cloud",
-  "clawhub": "agentcenter/agentcenter-bridge",
+  "clawhub": "@agentcenter/agentcenter-bridge",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

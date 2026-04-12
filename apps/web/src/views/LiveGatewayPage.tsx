@@ -645,7 +645,7 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
                   ? "A. Open PowerShell on that machine and run:"
                   : "A. Open Terminal on that machine and run:"}
               </p>
-              <CodeBlock code="openclaw plugins install clawhub:agentcenter/agentcenter-bridge" />
+              <CodeBlock code="openclaw plugins install clawhub:@agentcenter/agentcenter-bridge" />
               <p className="text-[11px] text-muted-foreground">
                 Installs the AgentCenter Bridge plugin directly from ClawHub — works on Mac, Linux,
                 and Windows.

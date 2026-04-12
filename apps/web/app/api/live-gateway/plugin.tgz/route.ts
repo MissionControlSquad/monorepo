@@ -3,7 +3,7 @@
  *
  * Serves the agentcenter-bridge OpenClaw plugin archive as a fallback.
  * Preferred install method is ClawHub:
- *   openclaw plugins install clawhub:agentcenter/agentcenter-bridge
+ *   openclaw plugins install clawhub:@agentcenter/agentcenter-bridge
  *
  * No auth required — the tgz contains no secrets.
  * The actual secret (token) is entered in OpenClaw after install.
