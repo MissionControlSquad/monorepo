@@ -49,6 +49,9 @@ export async function isFeatureEnabled(key: string): Promise<boolean> {
   const licenseStatus = await getLicenseStatus();
   if (licenseStatus.status === "none") return true;
 
+  // In development, skip license feature check — flag being enabled is enough.
+  if (process.env.NODE_ENV === "development") return true;
+
   // License is present — check it allows this feature.
   const licensed = await isFeatureLicensed(key);
   return licensed;
