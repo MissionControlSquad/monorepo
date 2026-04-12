@@ -24,10 +24,11 @@ import type { AgentInfo } from "@agentcenter/types";
  */
 async function readAgentIdFromIdentity(slug: string): Promise<string | null> {
   try {
-    const os = await import("node:os");
     const fs = await import("node:fs");
     const path = await import("node:path");
-    const identityPath = path.join(os.homedir(), ".openclaw", "agents", slug, "workspace", "IDENTITY.md");
+    const agentsDir = await resolveAgentsDir();
+    if (!agentsDir) return null;
+    const identityPath = path.join(agentsDir, slug, "workspace", "IDENTITY.md");
     const content = fs.readFileSync(identityPath, "utf8");
     const match = content.match(/\*\*Agent ID\*\*:\s*(\S+)/);
     return match?.[1] ?? null;
@@ -37,15 +38,56 @@ async function readAgentIdFromIdentity(slug: string): Promise<string | null> {
 }
 
 /**
- * List agents from the filesystem by scanning ~/.openclaw/agents/.
+ * Resolve the OpenClaw agents directory across platforms.
+ *
+ * Search order:
+ *  1. ~/.openclaw/agents          — Mac, Linux, and Windows (dotfile convention)
+ *  2. %APPDATA%\OpenClaw\agents   — Windows Electron/GUI apps
+ *  3. ~/Library/Application Support/OpenClaw/agents — Mac Electron/GUI apps
+ *
+ * Returns the first directory that exists, or null if none found.
+ */
+async function resolveAgentsDir(): Promise<string | null> {
+  const os = await import("node:os");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+
+  const candidates: string[] = [
+    path.join(os.homedir(), ".openclaw", "agents"),
+  ];
+
+  if (process.platform === "win32") {
+    const appData = process.env["APPDATA"];
+    if (appData) candidates.push(path.join(appData, "OpenClaw", "agents"));
+    const localAppData = process.env["LOCALAPPDATA"];
+    if (localAppData) candidates.push(path.join(localAppData, "OpenClaw", "agents"));
+  } else if (process.platform === "darwin") {
+    candidates.push(path.join(os.homedir(), "Library", "Application Support", "OpenClaw", "agents"));
+  } else {
+    // Linux XDG
+    const xdgConfig = process.env["XDG_CONFIG_HOME"] ?? path.join(os.homedir(), ".config");
+    candidates.push(path.join(xdgConfig, "openclaw", "agents"));
+  }
+
+  for (const dir of candidates) {
+    try {
+      if (fs.statSync(dir).isDirectory()) return dir;
+    } catch {
+      // not found, try next
+    }
+  }
+  return null;
+}
+
+/**
+ * List agents from the filesystem by scanning the OpenClaw agents directory.
  * Used as a fallback when the OpenClaw runtime API is not available.
  */
 async function listAgentsFromFilesystem(): Promise<AgentInfo[]> {
   try {
-    const os = await import("node:os");
     const fs = await import("node:fs");
-    const path = await import("node:path");
-    const agentsDir = path.join(os.homedir(), ".openclaw", "agents");
+    const agentsDir = await resolveAgentsDir();
+    if (!agentsDir) return [];
     const entries = fs.readdirSync(agentsDir, { withFileTypes: true });
     const agents: AgentInfo[] = [];
     for (const entry of entries) {
