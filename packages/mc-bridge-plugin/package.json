@@ -1,18 +1,47 @@
 {
-  "name": "mc-bridge",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@agentcenter/agentcenter-bridge",
+  "version": "0.1.3",
+  "description": "Persistent WebSocket bridge between OpenClaw and AgentCenter Cloud for live task delivery and agent status reporting.",
   "type": "module",
   "main": "./dist/index.js",
+  "license": "MIT",
+  "keywords": [
+    "openclaw",
+    "mission-control",
+    "agentcenter",
+    "agentcenter-cloud",
+    "bridge",
+    "websocket",
+    "live-tasks",
+    "agent"
+  ],
+  "author": "AgentCenter Cloud",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MissionControlSquad/monorepo",
+    "directory": "packages/mc-bridge-plugin"
+  },
+  "publishConfig": {
+    "registry": "https://registry.clawhub.ai",
+    "access": "public"
+  },
   "files": [
     "dist/index.js",
     "openclaw.plugin.json",
-    "config-schema.json"
+    "config-schema.json",
+    "LICENSE"
   ],
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --define:process.env.WS_NO_BUFFER_UTIL='\"1\"' --define:process.env.WS_NO_UTF_8_VALIDATE='\"1\"' --log-level=info",
+    "typecheck": "tsc --noEmit",
     "pack": "npm run build && npm pack --pack-destination ../../apps/web/public",
-    "typecheck": "tsc --noEmit"
+    "clawhub:setup": "npm install -g clawhub && clawhub auth login",
+    "clawhub:dry": "npm run build && npm pack --dry-run",
+    "clawhub:publish": "npm run typecheck && npm run build && clawhub package publish . --family code-plugin --name @agentcenter/agentcenter-bridge --display-name \"AgentCenter Bridge\" --source-repo MissionControlSquad/monorepo --source-commit $(git rev-parse HEAD) --source-path packages/mc-bridge-plugin",
+    "version:sync": "node -e \"const fs=require('fs');const v=require('./package.json').version;const p=JSON.parse(fs.readFileSync('openclaw.plugin.json','utf8'));p.version=v;fs.writeFileSync('openclaw.plugin.json',JSON.stringify(p,null,2)+'\\n');console.log('openclaw.plugin.json synced to',v)\"",
+    "release:patch": "npm version patch && npm run version:sync && npm run clawhub:publish",
+    "release:minor": "npm version minor && npm run version:sync && npm run clawhub:publish",
+    "release:major": "npm version major && npm run version:sync && npm run clawhub:publish"
   },
   "devDependencies": {
     "@agentcenter/types": "*",
@@ -21,6 +50,14 @@
     "ws": "^8.20.0"
   },
   "openclaw": {
-    "extensions": ["./dist/index.js"]
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=1.0.0"
+    },
+    "build": {
+      "openclawVersion": "1.0.0"
+    }
   }
 }

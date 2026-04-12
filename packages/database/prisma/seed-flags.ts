@@ -62,7 +62,7 @@ const DEFAULT_FLAGS: {
     key: FLAG_KEYS.LIVE_GATEWAY,
     enabled: false,
     managedBy: "system",
-    description: "Live WebSocket task delivery — mc-bridge plugin connects any machine to MC for sub-second task assignment",
+    description: "Live WebSocket task delivery — AgentCenter Bridge plugin connects any machine for sub-second task assignment",
   },
 ];
 

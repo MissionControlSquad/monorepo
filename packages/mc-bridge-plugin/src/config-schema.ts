@@ -1,11 +1,11 @@
 /**
- * mc-bridge plugin configuration schema.
+ * agentcenter-bridge plugin configuration schema.
  * Users set these values in their openclaw plugin config.
  */
 
 export interface MCBridgeConfig {
-  /** WebSocket URL of Mission Control live gateway, e.g. ws://mc.example.com/live-gateway */
-  mcUrl: string;
+  /** WebSocket URL of AgentCenter Cloud live gateway, e.g. wss://your-instance.agentcenter.cloud/live-gateway */
+  agentCenterUrl: string;
 
   /**
    * Per-VM token (obtained from MC after first registration).
