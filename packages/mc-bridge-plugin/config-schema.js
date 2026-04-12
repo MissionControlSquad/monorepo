@@ -1,11 +1,11 @@
 export default {
   $schema: "http://json-schema.org/draft-07/schema#",
   type: "object",
-  required: ["mcUrl", "token"],
+  required: ["agentCenterUrl", "token"],
   properties: {
-    mcUrl: {
+    agentCenterUrl: {
       type: "string",
-      description: "WebSocket URL of Mission Control live gateway, e.g. ws://localhost:3000/live-gateway",
+      description: "WebSocket URL of AgentCenter Cloud live gateway, e.g. wss://your-instance.agentcenter.cloud/live-gateway",
     },
     token: {
       type: "string",

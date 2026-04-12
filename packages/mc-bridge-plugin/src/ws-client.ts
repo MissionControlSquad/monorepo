@@ -67,7 +67,7 @@ export class MCBridgeWsClient {
     if (!this.running) return;
 
     try {
-      this.ws = new WebSocket(this.config.mcUrl);
+      this.ws = new WebSocket(this.config.agentCenterUrl);
     } catch (err) {
       console.error("[agentcenter-bridge] Failed to create WebSocket:", err);
       this.scheduleReconnect();

@@ -5,7 +5,7 @@
 
 export interface MCBridgeConfig {
   /** WebSocket URL of AgentCenter Cloud live gateway, e.g. wss://your-instance.agentcenter.cloud/live-gateway */
-  mcUrl: string;
+  agentCenterUrl: string;
 
   /**
    * Per-VM token (obtained from MC after first registration).

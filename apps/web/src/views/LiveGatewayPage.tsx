@@ -350,9 +350,9 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
         {
           plugins: {
             entries: {
-              "mc-bridge": {
+              "agentcenter-bridge": {
                 enabled: true,
-                config: { mcUrl, token: newToken.token },
+                config: { agentCenterUrl: mcUrl, token: newToken.token },
               },
             },
           },
@@ -637,7 +637,7 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
               </div>
             </div>
 
-            {/* Step A — install via terminal */}
+            {/* Step A — install via ClawHub */}
             <div className="space-y-1.5">
               <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
@@ -645,19 +645,10 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
                   ? "A. Open PowerShell on that machine and run:"
                   : "A. Open Terminal on that machine and run:"}
               </p>
-              <CodeBlock
-                code={
-                  os === "windows"
-                    ? `Invoke-WebRequest -Uri "${pluginUrl}" -OutFile "$env:TEMP\\mc-bridge.tgz"\nopenclaw plugins install "$env:TEMP\\mc-bridge.tgz" --force`
-                    : `curl -fsSL "${pluginUrl}" -o /tmp/mc-bridge.tgz\nopenclaw plugins install /tmp/mc-bridge.tgz --force`
-                }
-              />
+              <CodeBlock code="openclaw plugins install clawhub:agentcenter/agentcenter-bridge" />
               <p className="text-[11px] text-muted-foreground">
-                {os === "mac"
-                  ? "This downloads directly via Terminal — skips macOS quarantine restrictions that block browser-downloaded files."
-                  : os === "linux"
-                    ? "Downloads and installs in one go. curl is pre-installed on most Linux systems."
-                    : "Downloads to the Temp folder and installs from there."}
+                Installs the AgentCenter Bridge plugin directly from ClawHub — works on Mac, Linux,
+                and Windows.
               </p>
             </div>
 
@@ -703,7 +694,7 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
               </p>
               {(
                 [
-                  { key: "ran", label: "Ran both commands in Terminal (download + install)" },
+                  { key: "ran", label: "Ran the install command in Terminal" },
                   { key: "config", label: "Pasted the config block into OpenClaw" },
                   { key: "restarted", label: "Restarted OpenClaw" },
                 ] as const
@@ -759,7 +750,7 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
                   <ul className="space-y-1.5 text-[11px] text-muted-foreground leading-relaxed list-disc list-inside">
                     <li>Make sure OpenClaw is open and not minimised</li>
                     <li>
-                      Check that mc-bridge shows as{" "}
+                      Check that agentcenter-bridge shows as{" "}
                       <strong className="text-foreground">Enabled</strong> in OpenClaw → Plugins
                     </li>
                     <li>
@@ -990,11 +981,11 @@ function DeleteConfirmModal({
             />
             <div className="space-y-1.5 min-w-0">
               <p className="text-xs font-semibold text-foreground leading-snug">
-                Stop the mc-bridge plugin
+                Stop the AgentCenter Bridge plugin
               </p>
               <div className="space-y-1">
                 <code className="block text-[11px] bg-muted rounded px-2.5 py-1.5 font-mono text-foreground select-all">
-                  openclaw plugins disable mc-bridge
+                  openclaw plugins disable agentcenter-bridge
                 </code>
                 <p className="text-[11px] text-muted-foreground">or quit OpenClaw entirely</p>
               </div>
@@ -1011,15 +1002,17 @@ function DeleteConfirmModal({
             />
             <div className="space-y-1.5 min-w-0">
               <p className="text-xs font-semibold text-foreground leading-snug">
-                Remove mc-bridge from config &amp; uninstall
+                Remove AgentCenter Bridge from config &amp; uninstall
               </p>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
                 Delete the{" "}
-                <code className="rounded px-1 py-px bg-muted font-mono text-[10px]">mc-bridge</code>{" "}
+                <code className="rounded px-1 py-px bg-muted font-mono text-[10px]">
+                  agentcenter-bridge
+                </code>{" "}
                 block from your OpenClaw plugin config, then optionally uninstall:
               </p>
               <code className="block text-[11px] bg-muted rounded px-2.5 py-1.5 font-mono text-foreground select-all">
-                openclaw plugins uninstall mc-bridge
+                openclaw plugins uninstall agentcenter-bridge
               </code>
             </div>
           </label>
@@ -1259,8 +1252,8 @@ function TokenPanel() {
           <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
             Paste this as the{" "}
             <code className="rounded px-1 py-px bg-amber-500/15 font-mono">token</code> in your
-            mc-bridge plugin config. After first connect, OpenClaw prints a permanent key — replace
-            this setup key with that one to finish pairing.
+            agentcenter-bridge plugin config. After first connect, OpenClaw prints a permanent key —
+            replace this setup key with that one to finish pairing.
           </p>
         </div>
       )}

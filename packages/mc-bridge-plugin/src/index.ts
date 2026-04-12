@@ -6,7 +6,7 @@
  * register(api) to wire up the service lifecycle.
  *
  * On start:  opens a persistent WebSocket to AgentCenter Cloud and starts the
- *            agent reporter (reads pluginConfig for mcUrl + token).
+ *            agent reporter (reads pluginConfig for agentCenterUrl + token).
  * On stop:   tears down the WS client and agent reporter cleanly.
  */
 
@@ -33,8 +33,8 @@ export default {
       async start() {
         const config = api.pluginConfig as MCBridgeConfig | undefined;
 
-        if (!config?.mcUrl) {
-          api.logger.warn("[agentcenter-bridge] mcUrl not set in plugin config — bridge not started");
+        if (!config?.agentCenterUrl) {
+          api.logger.warn("[agentcenter-bridge] agentCenterUrl not set in plugin config — bridge not started");
           return;
         }
         if (!config?.token) {
@@ -49,7 +49,7 @@ export default {
         client.onConnect(() => reporter!.start());
 
         await client.start();
-        api.logger.info("[agentcenter-bridge] Bridge started →", config.mcUrl);
+        api.logger.info("[agentcenter-bridge] Bridge started →", config.agentCenterUrl);
       },
 
       async stop() {

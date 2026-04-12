@@ -11,7 +11,7 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
-      "mcUrl": {
+      "agentCenterUrl": {
         "type": "string",
         "description": "WebSocket URL of AgentCenter Cloud live gateway, e.g. wss://your-instance.agentcenter.cloud/live-gateway"
       },
