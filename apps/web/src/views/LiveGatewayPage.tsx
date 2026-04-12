@@ -75,11 +75,6 @@ function wsUrlFromOrigin(): string {
   return `${proto}://${window.location.host}/live-gateway`;
 }
 
-function pluginInstallUrl(): string {
-  if (typeof window === "undefined") return "http://localhost:3000/api/live-gateway/plugin.tgz";
-  return `${window.location.origin}/api/live-gateway/plugin.tgz`;
-}
-
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
 /** Inline callout used in modals — warning / info / success / danger */
@@ -289,7 +284,7 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
   const [connectedMachine, setConnectedMachine] = useState<LiveConnection | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mcUrl = wsUrlFromOrigin();
-  const pluginUrl = pluginInstallUrl();
+
   const currentIndex = STEP_INDEX[step];
 
   const installDone = installChecks.ran && installChecks.config && installChecks.restarted;

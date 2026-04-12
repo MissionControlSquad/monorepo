@@ -44,7 +44,10 @@ export async function getChannelAgentMembers(channelId: string, excludeProfileId
       profileId: { not: excludeProfileId },
       profile: { kind: "agent" },
     },
-    select: { profileId: true },
+    select: {
+      profileId: true,
+      profile: { select: { agentId: true } },
+    },
   });
 }
 

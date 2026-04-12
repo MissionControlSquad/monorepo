@@ -16,26 +16,121 @@
  * based on the OpenClaw plugin runtime contract.
  */
 
+import type { AgentInfo } from "@agentcenter/types";
+
+/**
+ * Read the Agent ID from an agent's IDENTITY.md workspace file.
+ * Returns null if the file doesn't exist or the field isn't present.
+ */
+async function readAgentIdFromIdentity(slug: string): Promise<string | null> {
+  try {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const agentsDir = await resolveAgentsDir();
+    if (!agentsDir) return null;
+    const identityPath = path.join(agentsDir, slug, "workspace", "IDENTITY.md");
+    const content = fs.readFileSync(identityPath, "utf8");
+    const match = content.match(/\*\*Agent ID\*\*:\s*(\S+)/);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the OpenClaw agents directory across platforms.
+ *
+ * Search order:
+ *  1. ~/.openclaw/agents          — Mac, Linux, and Windows (dotfile convention)
+ *  2. %APPDATA%\OpenClaw\agents   — Windows Electron/GUI apps
+ *  3. ~/Library/Application Support/OpenClaw/agents — Mac Electron/GUI apps
+ *
+ * Returns the first directory that exists, or null if none found.
+ */
+async function resolveAgentsDir(): Promise<string | null> {
+  const os = await import("node:os");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+
+  const candidates: string[] = [
+    path.join(os.homedir(), ".openclaw", "agents"),
+  ];
+
+  if (process.platform === "win32") {
+    // Derive AppData paths from homedir to avoid env var access
+    const home = os.homedir();
+    candidates.push(path.join(home, "AppData", "Roaming", "OpenClaw", "agents"));
+    candidates.push(path.join(home, "AppData", "Local", "OpenClaw", "agents"));
+  } else if (process.platform === "darwin") {
+    candidates.push(path.join(os.homedir(), "Library", "Application Support", "OpenClaw", "agents"));
+  } else {
+    // Linux: standard XDG location derived from homedir
+    candidates.push(path.join(os.homedir(), ".config", "openclaw", "agents"));
+  }
+
+  for (const dir of candidates) {
+    try {
+      if (fs.statSync(dir).isDirectory()) return dir;
+    } catch {
+      // not found, try next
+    }
+  }
+  return null;
+}
+
+/**
+ * List agents from the filesystem by scanning the OpenClaw agents directory.
+ * Used as a fallback when the OpenClaw runtime API is not available.
+ */
+async function listAgentsFromFilesystem(): Promise<AgentInfo[]> {
+  try {
+    const fs = await import("node:fs");
+    const agentsDir = await resolveAgentsDir();
+    if (!agentsDir) return [];
+    const entries = fs.readdirSync(agentsDir, { withFileTypes: true });
+    const agents: AgentInfo[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const slug = entry.name;
+      const agentId = await readAgentIdFromIdentity(slug);
+      agents.push({
+        slug,
+        name: slug,
+        status: "idle",
+        agentId,
+      });
+    }
+    return agents;
+  } catch {
+    return [];
+  }
+}
+
 /** List agents currently running in this OpenClaw instance. */
-export async function listLocalAgents(): Promise<
-  Array<{
-    slug: string;
-    name: string;
-    status: string;
-    detailedStatus?: string | null;
-    statusMessage?: string | null;
-    currentTaskId?: string | null;
-  }>
-> {
-  const raw: any[] = await (globalThis as any).openclaw.agents.list();
-  return raw.map((a: any) => ({
-    slug: a.slug ?? a.name,
-    name: a.name,
-    status: a.status ?? "idle",
-    detailedStatus: a.detailedStatus ?? null,
-    statusMessage: a.statusMessage ?? null,
-    currentTaskId: a.currentTaskId ?? null,
-  }));
+export async function listLocalAgents(): Promise<AgentInfo[]> {
+  const oc = (globalThis as any).openclaw;
+
+  // Primary path: use OpenClaw runtime API
+  if (typeof oc?.agents?.list === "function") {
+    const raw: any[] = await oc.agents.list();
+    return Promise.all(
+      raw.map(async (a: any) => {
+        const slug = a.slug ?? a.id ?? a.name;
+        return {
+          slug,
+          name: a.name,
+          status: (a.status ?? "idle") as "idle" | "active" | "blocked",
+          detailedStatus: a.detailedStatus ?? null,
+          statusMessage: a.statusMessage ?? null,
+          currentTaskId: a.currentTaskId ?? null,
+          agentId: a.agentId ?? (await readAgentIdFromIdentity(slug)),
+        };
+      }),
+    );
+  }
+
+  // Fallback: scan ~/.openclaw/agents/ directory
+  return listAgentsFromFilesystem();
 }
 
 /**
@@ -77,11 +172,22 @@ export function onAgentStatusChange(
     detailedStatus?: string | null;
     statusMessage?: string | null;
     currentTaskId?: string | null;
+    agentId?: string | null;
   }) => void,
 ): () => void {
   const oc = (globalThis as any).openclaw;
   if (typeof oc?.events?.on !== "function") return () => {};
-  return oc.events.on("agent:statusChange", handler);
+  return oc.events.on("agent:statusChange", async (event: any) => {
+    const slug = event.slug ?? event.id ?? event.name;
+    handler({
+      slug,
+      status: event.status,
+      detailedStatus: event.detailedStatus ?? null,
+      statusMessage: event.statusMessage ?? null,
+      currentTaskId: event.currentTaskId ?? null,
+      agentId: event.agentId ?? (await readAgentIdFromIdentity(slug)),
+    });
+  });
 }
 
 /** Subscribe to agent message events (outgoing). */

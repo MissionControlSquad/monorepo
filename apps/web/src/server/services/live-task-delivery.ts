@@ -147,10 +147,20 @@ export async function tryDeliverTaskToLiveAgents(
 // hasInboxTasks, hasPendingReview). The live push is a fast-path wakeup only.
 
 interface NotifyOptions {
-  kind: "mention" | "inbox_task" | "review_needed";
+  kind:
+    | "mention"
+    | "inbox_task"
+    | "review_needed"
+    | "task_approved"
+    | "task_rejected"
+    | "task_clarification"
+    | "dm"
+    | "channel_mention";
   content: string;
   taskId?: string;
   messageId?: string;
+  channelId?: string;
+  fromHandle?: string;
 }
 
 async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Promise<void> {
@@ -185,6 +195,8 @@ async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Prom
         content: opts.content,
         taskId: opts.taskId,
         messageId: opts.messageId,
+        channelId: opts.channelId,
+        fromHandle: opts.fromHandle,
       });
     } catch {
       // swallow — notifications are best-effort
@@ -254,6 +266,55 @@ export async function tryDeliverInboxTaskNotification(
 }
 
 /**
+ * Live push when a task is approved.
+ * Notifies the assignees so they can update their internal state.
+ */
+export async function tryDeliverTaskApprovedNotification(
+  agentIds: string[],
+  opts: { taskTitle: string; taskId: string; reviewerName: string },
+): Promise<void> {
+  if (!agentIds.length) return;
+  await sendNotifyToAgents(agentIds, {
+    kind: "task_approved",
+    content: `Your task "${opts.taskTitle.slice(0, 200)}" (task ID: ${opts.taskId}) was approved by ${opts.reviewerName}. Mark it complete in your records per your PLAYBOOK.`,
+    taskId: opts.taskId,
+  });
+}
+
+/**
+ * Live push when a task is rejected.
+ * Notifies the assignees so they can begin rework immediately.
+ */
+export async function tryDeliverTaskRejectedNotification(
+  agentIds: string[],
+  opts: { taskTitle: string; taskId: string; reviewerName: string; rejectionReason: string },
+): Promise<void> {
+  if (!agentIds.length) return;
+  await sendNotifyToAgents(agentIds, {
+    kind: "task_rejected",
+    content: `Your task "${opts.taskTitle.slice(0, 200)}" (task ID: ${opts.taskId}) was rejected by ${opts.reviewerName}: ${opts.rejectionReason.slice(0, 500)}. Rework and resubmit per your PLAYBOOK.`,
+    taskId: opts.taskId,
+  });
+}
+
+/**
+ * Live push when clarification is requested on a task.
+ * Notifies the assignees so they can respond immediately.
+ */
+export async function tryDeliverClarificationNotification(
+  agentIds: string[],
+  opts: { taskTitle: string; taskId: string; reviewerName: string; questions: string[] },
+): Promise<void> {
+  if (!agentIds.length) return;
+  const questionText = opts.questions.slice(0, 3).join(" | ").slice(0, 400);
+  await sendNotifyToAgents(agentIds, {
+    kind: "task_clarification",
+    content: `${opts.reviewerName} requested clarification on task "${opts.taskTitle.slice(0, 200)}" (task ID: ${opts.taskId}): ${questionText}. Respond per your PLAYBOOK.`,
+    taskId: opts.taskId,
+  });
+}
+
+/**
  * Live push when a task moves to review status.
  * Notifies squad lead agents who are active members of the task's project.
  */
@@ -296,4 +357,59 @@ export async function tryDeliverReviewNotification(
       taskId,
     },
   );
+}
+
+// ─── Channel / DM notification delivery ──────────────────────────────────────
+//
+// Fire-and-forget — no DB queue. If the agent is offline the SSE stream or
+// next heartbeat handles catch-up. The live push is a fast-path wakeup only.
+// Self-message guard: callers must exclude the sending agent's profileId before
+// passing agentIds here.
+
+/**
+ * Live push when a DM is received by an agent.
+ * agentIds = agent members of the DM channel excluding the sender.
+ */
+export async function tryDeliverDmNotification(
+  agentIds: string[],
+  opts: {
+    channelId: string;
+    messageId: string;
+    content: string;
+    fromHandle: string;
+  },
+): Promise<void> {
+  if (!agentIds.length) return;
+  await sendNotifyToAgents(agentIds, {
+    kind: "dm",
+    content: `DM from @${opts.fromHandle}: ${opts.content.slice(0, 400)}. Reply via POST /api/channels/${opts.channelId}/messages per your PLAYBOOK.`,
+    messageId: opts.messageId,
+    channelId: opts.channelId,
+    fromHandle: opts.fromHandle,
+  });
+}
+
+/**
+ * Live push when an agent is @mentioned in a team channel.
+ * agentIds = mentioned agent members excluding the sender.
+ */
+export async function tryDeliverChannelMentionNotification(
+  agentIds: string[],
+  opts: {
+    channelId: string;
+    messageId: string;
+    content: string;
+    fromHandle: string;
+    channelName?: string;
+  },
+): Promise<void> {
+  if (!agentIds.length) return;
+  const where = opts.channelName ? `in #${opts.channelName}` : "in a channel";
+  await sendNotifyToAgents(agentIds, {
+    kind: "channel_mention",
+    content: `@${opts.fromHandle} mentioned you ${where}: ${opts.content.slice(0, 400)}. Reply via POST /api/channels/${opts.channelId}/messages per your PLAYBOOK.`,
+    messageId: opts.messageId,
+    channelId: opts.channelId,
+    fromHandle: opts.fromHandle,
+  });
 }

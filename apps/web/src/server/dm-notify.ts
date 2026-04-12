@@ -7,6 +7,10 @@ import {
 } from "@agentcenter/database";
 import { pubsub, agentStreamTopic } from "./pubsub";
 import { notify } from "./services/notification";
+import {
+  tryDeliverDmNotification,
+  tryDeliverChannelMentionNotification,
+} from "./services/live-task-delivery";
 
 /**
  * After a channel message is created, notify relevant agent members
@@ -53,6 +57,35 @@ export async function notifyAgentChannelMembers(
         fromProfile: message.fromProfile,
         createdAt: message.createdAt,
       });
+    }
+
+    // Live gateway: push to connected OpenClaw agents immediately.
+    // Fire-and-forget — SSE stream or heartbeat is the fallback for offline agents.
+    const agentIdsToNotify = agentsToNotify
+      .filter((m) => m.profile.agentId)
+      .map((m) => m.profile.agentId as string);
+
+    if (agentIdsToNotify.length > 0) {
+      const fromHandle =
+        message.fromProfile?.username ?? message.fromProfile?.displayName ?? "unknown";
+      const plainContent = message.content.replace(/<[^>]*>/g, "").trim();
+
+      if (isDm) {
+        tryDeliverDmNotification(agentIdsToNotify, {
+          channelId,
+          messageId,
+          content: plainContent,
+          fromHandle,
+        }).catch(() => undefined);
+      } else {
+        tryDeliverChannelMentionNotification(agentIdsToNotify, {
+          channelId,
+          messageId,
+          content: plainContent,
+          fromHandle,
+          channelName: channel.slug ?? undefined,
+        }).catch(() => undefined);
+      }
     }
   }
 

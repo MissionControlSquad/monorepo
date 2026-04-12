@@ -60,13 +60,6 @@ npm run clawhub:dry
 ```
 Runs build + `npm pack --dry-run` — shows exactly which files will be included.
 
-### Build fallback `.tgz` for web app
-```bash
-npm run pack
-```
-Outputs `agentcenter-agentcenter-bridge-0.x.x.tgz` into `apps/web/public/`.
-Served at `/api/live-gateway/plugin.tgz` as a fallback install method.
-
 ---
 
 ## Publishing to ClawHub

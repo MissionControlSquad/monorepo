@@ -38,6 +38,7 @@ export class AgentReporter {
           detailedStatus: event.detailedStatus ?? null,
           statusMessage: event.statusMessage ?? null,
           currentTaskId: event.currentTaskId ?? null,
+          agentId: event.agentId ?? null,
         });
       }),
     );
