@@ -39,7 +39,6 @@
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --define:process.env.WS_NO_BUFFER_UTIL='\"1\"' --define:process.env.WS_NO_UTF_8_VALIDATE='\"1\"' --log-level=info",
     "typecheck": "tsc --noEmit",
-    "pack": "npm run build && npm pack --pack-destination ../../apps/web/public",
     "clawhub:setup": "npm install -g clawhub && clawhub auth login",
     "clawhub:dry": "npm run build && npm pack --dry-run",
     "clawhub:publish": "npm run typecheck && npm run build && rm -rf .turbo && clawhub package publish . --family code-plugin --name @agentcenter/agentcenter-bridge --display-name \"AgentCenter Bridge\" --source-repo MissionControlSquad/monorepo --source-commit $(git rev-parse HEAD) --source-path packages/mc-bridge-plugin",
