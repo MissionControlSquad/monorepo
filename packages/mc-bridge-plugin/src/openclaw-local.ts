@@ -36,25 +36,60 @@ async function readAgentIdFromIdentity(slug: string): Promise<string | null> {
   }
 }
 
+/**
+ * List agents from the filesystem by scanning ~/.openclaw/agents/.
+ * Used as a fallback when the OpenClaw runtime API is not available.
+ */
+async function listAgentsFromFilesystem(): Promise<AgentInfo[]> {
+  try {
+    const os = await import("node:os");
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const agentsDir = path.join(os.homedir(), ".openclaw", "agents");
+    const entries = fs.readdirSync(agentsDir, { withFileTypes: true });
+    const agents: AgentInfo[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const slug = entry.name;
+      const agentId = await readAgentIdFromIdentity(slug);
+      agents.push({
+        slug,
+        name: slug,
+        status: "idle",
+        agentId,
+      });
+    }
+    return agents;
+  } catch {
+    return [];
+  }
+}
+
 /** List agents currently running in this OpenClaw instance. */
 export async function listLocalAgents(): Promise<AgentInfo[]> {
   const oc = (globalThis as any).openclaw;
-  if (typeof oc?.agents?.list !== "function") return [];
-  const raw: any[] = await oc.agents.list();
-  return Promise.all(
-    raw.map(async (a: any) => {
-      const slug = a.slug ?? a.id ?? a.name;
-      return {
-        slug,
-        name: a.name,
-        status: (a.status ?? "idle") as "idle" | "active" | "blocked",
-        detailedStatus: a.detailedStatus ?? null,
-        statusMessage: a.statusMessage ?? null,
-        currentTaskId: a.currentTaskId ?? null,
-        agentId: a.agentId ?? (await readAgentIdFromIdentity(slug)),
-      };
-    }),
-  );
+
+  // Primary path: use OpenClaw runtime API
+  if (typeof oc?.agents?.list === "function") {
+    const raw: any[] = await oc.agents.list();
+    return Promise.all(
+      raw.map(async (a: any) => {
+        const slug = a.slug ?? a.id ?? a.name;
+        return {
+          slug,
+          name: a.name,
+          status: (a.status ?? "idle") as "idle" | "active" | "blocked",
+          detailedStatus: a.detailedStatus ?? null,
+          statusMessage: a.statusMessage ?? null,
+          currentTaskId: a.currentTaskId ?? null,
+          agentId: a.agentId ?? (await readAgentIdFromIdentity(slug)),
+        };
+      }),
+    );
+  }
+
+  // Fallback: scan ~/.openclaw/agents/ directory
+  return listAgentsFromFilesystem();
 }
 
 /**
