@@ -51,7 +51,7 @@ class TaskModel extends Model<Task> {
   // ── Emit helpers ─────────────────────────────────────────
 
   async emitCreated(
-    task: Pick<Task, "id" | "taskNumber" | "title">,
+    task: Pick<Task, "id" | "taskNumber" | "title" | "description" | "priority">,
     ctx: {
       createdBy?: string;
       creatorName?: string;
@@ -65,6 +65,8 @@ class TaskModel extends Model<Task> {
       taskId: task.id,
       taskNumber: task.taskNumber,
       title: task.title,
+      description: task.description,
+      priority: task.priority,
       ...ctx,
     });
   }
@@ -89,7 +91,7 @@ class TaskModel extends Model<Task> {
   }
 
   async emitAssigneesChanged(
-    task: Pick<Task, "id" | "taskNumber" | "title">,
+    task: Pick<Task, "id" | "taskNumber" | "title" | "description" | "priority">,
     ctx: {
       addedIds: string[];
       removedIds: string[];
@@ -104,6 +106,8 @@ class TaskModel extends Model<Task> {
       taskId: task.id,
       taskNumber: task.taskNumber,
       title: task.title,
+      description: task.description,
+      priority: task.priority,
       ...ctx,
     });
   }

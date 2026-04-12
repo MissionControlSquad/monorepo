@@ -57,6 +57,8 @@ export type TaskCreatedEvent = {
   taskId: string;
   taskNumber?: number;
   title: string;
+  description?: string | null;
+  priority?: string | null;
   createdBy?: string;
   creatorName?: string;
   /** Direct profile ID of the creator (used for human/dashboard tasks instead of agentId resolution) */
@@ -84,6 +86,8 @@ export type TaskAssigneesChangedEvent = {
   taskId: string;
   taskNumber?: number;
   title: string;
+  description?: string | null;
+  priority?: string | null;
   addedIds: string[];
   removedIds: string[];
   addedNames: string[];

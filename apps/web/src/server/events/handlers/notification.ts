@@ -3,7 +3,10 @@ import { pubsub, notificationTopic } from "../../pubsub";
 import { subscriberCache } from "../../cache";
 import { EventTypes } from "../../constants";
 import { notificationModel, subscriptionModel } from "../../models";
-import { tryDeliverMentionNotification } from "../../services/live-task-delivery";
+import {
+  tryDeliverMentionNotification,
+  tryDeliverTaskToLiveAgents,
+} from "../../services/live-task-delivery";
 
 async function notify(
   mentionedAgentId: string,
@@ -56,6 +59,16 @@ on(EventTypes.TASK_CREATED, async (e) => {
       ),
     ),
   );
+
+  // Live gateway: push task delivery immediately to connected agents.
+  // Fire-and-forget — LivePendingDelivery queue handles durability + reconnect drain.
+  tryDeliverTaskToLiveAgents(e.assigneeIds, {
+    taskId: e.taskId,
+    taskTitle: e.title,
+    taskDescription: e.description,
+    priority: e.priority ?? "medium",
+    assignedBy: e.creatorName,
+  }).catch(() => undefined);
 });
 
 on(EventTypes.TASK_ASSIGNEES_CHANGED, async (e) => {
@@ -67,6 +80,18 @@ on(EventTypes.TASK_ASSIGNEES_CHANGED, async (e) => {
       notify(agentId, `You were removed from task "${e.title}"`, e.taskId),
     ),
   ]);
+
+  // Live gateway: push task delivery to newly added assignees.
+  // idempotency key in enqueuePendingDelivery prevents double-delivery if REST path
+  // also called tryDeliverTaskToLiveAgents directly for the same task+agent.
+  if (e.addedIds.length > 0) {
+    tryDeliverTaskToLiveAgents(e.addedIds, {
+      taskId: e.taskId,
+      taskTitle: e.title,
+      taskDescription: e.description,
+      priority: e.priority ?? "medium",
+    }).catch(() => undefined);
+  }
 });
 
 // Notify subscribers when task status changes
