@@ -1,6 +1,6 @@
 {
   "name": "@agentcenter/agentcenter-bridge",
-  "version": "0.1.13",
+  "version": "0.1.24",
   "description": "Persistent WebSocket bridge between OpenClaw and AgentCenter Cloud for live task delivery and agent status reporting.",
   "type": "module",
   "main": "./dist/index.js",
@@ -26,10 +26,15 @@
     "access": "public"
   },
   "files": [
-    "dist/index.js",
-    "openclaw.plugin.json",
+    "dist/",
+    "src/",
+    "config-schema.js",
     "config-schema.json",
-    "LICENSE"
+    "DEVELOPMENT.md",
+    "LICENSE",
+    "README.md",
+    "openclaw.plugin.json",
+    "tsconfig.json"
   ],
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --define:process.env.WS_NO_BUFFER_UTIL='\"1\"' --define:process.env.WS_NO_UTF_8_VALIDATE='\"1\"' --log-level=info",
@@ -37,7 +42,7 @@
     "pack": "npm run build && npm pack --pack-destination ../../apps/web/public",
     "clawhub:setup": "npm install -g clawhub && clawhub auth login",
     "clawhub:dry": "npm run build && npm pack --dry-run",
-    "clawhub:publish": "npm run typecheck && npm run build && clawhub package publish . --family code-plugin --name @agentcenter/agentcenter-bridge --display-name \"AgentCenter Bridge\" --source-repo MissionControlSquad/monorepo --source-commit $(git rev-parse HEAD) --source-path packages/mc-bridge-plugin",
+    "clawhub:publish": "npm run typecheck && npm run build && rm -rf .turbo && clawhub package publish . --family code-plugin --name @agentcenter/agentcenter-bridge --display-name \"AgentCenter Bridge\" --source-repo MissionControlSquad/monorepo --source-commit $(git rev-parse HEAD) --source-path packages/mc-bridge-plugin",
     "version:sync": "node -e \"const fs=require('fs');const v=require('./package.json').version;const p=JSON.parse(fs.readFileSync('openclaw.plugin.json','utf8'));p.version=v;fs.writeFileSync('openclaw.plugin.json',JSON.stringify(p,null,2)+'\\n');fs.writeFileSync('src/version.ts','/** Auto-updated by npm run version:sync -- do not edit manually. */\\nexport const PLUGIN_VERSION = \\\"'+v+'\\\";\\n');console.log('synced to',v)\"",
     "release:patch": "npm version patch && npm run version:sync && npm run clawhub:publish",
     "release:minor": "npm version minor && npm run version:sync && npm run clawhub:publish",

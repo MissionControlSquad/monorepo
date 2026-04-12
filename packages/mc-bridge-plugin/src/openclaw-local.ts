@@ -57,16 +57,15 @@ async function resolveAgentsDir(): Promise<string | null> {
   ];
 
   if (process.platform === "win32") {
-    const appData = process.env["APPDATA"];
-    if (appData) candidates.push(path.join(appData, "OpenClaw", "agents"));
-    const localAppData = process.env["LOCALAPPDATA"];
-    if (localAppData) candidates.push(path.join(localAppData, "OpenClaw", "agents"));
+    // Derive AppData paths from homedir to avoid env var access
+    const home = os.homedir();
+    candidates.push(path.join(home, "AppData", "Roaming", "OpenClaw", "agents"));
+    candidates.push(path.join(home, "AppData", "Local", "OpenClaw", "agents"));
   } else if (process.platform === "darwin") {
     candidates.push(path.join(os.homedir(), "Library", "Application Support", "OpenClaw", "agents"));
   } else {
-    // Linux XDG
-    const xdgConfig = process.env["XDG_CONFIG_HOME"] ?? path.join(os.homedir(), ".config");
-    candidates.push(path.join(xdgConfig, "openclaw", "agents"));
+    // Linux: standard XDG location derived from homedir
+    candidates.push(path.join(os.homedir(), ".config", "openclaw", "agents"));
   }
 
   for (const dir of candidates) {
