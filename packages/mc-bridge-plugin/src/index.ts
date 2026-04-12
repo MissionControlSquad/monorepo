@@ -1,11 +1,11 @@
 /**
- * mc-bridge OpenClaw plugin entry point.
+ * agentcenter-bridge OpenClaw plugin entry point.
  *
  * Exports a plain OpenClawPluginDefinition object — no import from
  * "openclaw/plugin-sdk" needed. OpenClaw loads this module and calls
  * register(api) to wire up the service lifecycle.
  *
- * On start:  opens a persistent WebSocket to Mission Control and starts the
+ * On start:  opens a persistent WebSocket to AgentCenter Cloud and starts the
  *            agent reporter (reads pluginConfig for mcUrl + token).
  * On stop:   tears down the WS client and agent reporter cleanly.
  */
@@ -19,26 +19,26 @@ let reporter: AgentReporter | null = null;
 
 // eslint-disable-next-line import/no-default-export
 export default {
-  id: "mc-bridge",
-  name: "Mission Control Bridge",
+  id: "agentcenter-bridge",
+  name: "AgentCenter Bridge",
   description:
-    "Persistent WebSocket bridge between this OpenClaw instance and Mission Control for live task delivery and agent status reporting.",
+    "Persistent WebSocket bridge between this OpenClaw instance and AgentCenter Cloud for live task delivery and agent status reporting.",
 
   // api is typed as `any` to avoid a hard dependency on openclaw/plugin-sdk
   // at bundle time. The shape matches OpenClawPluginApi at runtime.
   register(api: any) {
     api.registerService({
-      id: "mc-bridge-ws",
+      id: "agentcenter-bridge-ws",
 
       async start() {
         const config = api.pluginConfig as MCBridgeConfig | undefined;
 
         if (!config?.mcUrl) {
-          api.logger.warn("[mc-bridge] mcUrl not set in plugin config — bridge not started");
+          api.logger.warn("[agentcenter-bridge] mcUrl not set in plugin config — bridge not started");
           return;
         }
         if (!config?.token) {
-          api.logger.warn("[mc-bridge] token not set in plugin config — bridge not started");
+          api.logger.warn("[agentcenter-bridge] token not set in plugin config — bridge not started");
           return;
         }
 
@@ -49,7 +49,7 @@ export default {
         client.onConnect(() => reporter!.start());
 
         await client.start();
-        api.logger.info("[mc-bridge] Bridge started →", config.mcUrl);
+        api.logger.info("[agentcenter-bridge] Bridge started →", config.mcUrl);
       },
 
       async stop() {
@@ -57,7 +57,7 @@ export default {
         client?.stop();
         reporter = null;
         client = null;
-        api.logger.info("[mc-bridge] Bridge stopped.");
+        api.logger.info("[agentcenter-bridge] Bridge stopped.");
       },
     });
   },

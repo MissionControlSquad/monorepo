@@ -1,7 +1,7 @@
 /**
  * ws-client.ts
  *
- * Persistent WebSocket client that connects to Mission Control's live gateway.
+ * Persistent WebSocket client that connects to AgentCenter Cloud's live gateway.
  * Handles authentication (vm.hello), reconnect with exponential backoff,
  * ping/pong keepalive, task delivery, and deduplication.
  */
@@ -69,7 +69,7 @@ export class MCBridgeWsClient {
     try {
       this.ws = new WebSocket(this.config.mcUrl);
     } catch (err) {
-      console.error("[mc-bridge] Failed to create WebSocket:", err);
+      console.error("[agentcenter-bridge] Failed to create WebSocket:", err);
       this.scheduleReconnect();
       return;
     }
@@ -77,7 +77,7 @@ export class MCBridgeWsClient {
     this.ws.on("open", () => this.handleOpen().catch(console.error));
     this.ws.on("message", (raw) => this.handleMessage(raw.toString()));
     this.ws.on("close", () => this.handleClose());
-    this.ws.on("error", (err) => console.error("[mc-bridge] WS error:", err.message));
+    this.ws.on("error", (err) => console.error("[agentcenter-bridge] WS error:", err.message));
   }
 
   private async handleOpen(): Promise<void> {
@@ -120,7 +120,7 @@ export class MCBridgeWsClient {
           // First-time registration: persist new per-machine connectionToken
           this.connectionToken = msg.vmToken;
           console.log(
-            "[mc-bridge] Registered with Mission Control.",
+            "[agentcenter-bridge] Registered with AgentCenter Cloud.",
             "\n  connectionId:", this.connectionId,
             "\n  connectionToken (save to config as 'token'):", msg.vmToken,
           );
@@ -142,9 +142,9 @@ export class MCBridgeWsClient {
         break;
 
       case "mc.error":
-        console.error(`[mc-bridge] MC error [${msg.code}]: ${msg.message}`);
+        console.error(`[agentcenter-bridge] MC error [${msg.code}]: ${msg.message}`);
         if (msg.code === "auth_failed" || msg.code === "token_revoked") {
-          console.error("[mc-bridge] Fatal auth error — stopping reconnect. Check your token.");
+          console.error("[agentcenter-bridge] Fatal auth error — stopping reconnect. Check your token.");
           this.running = false;
         }
         break;
@@ -168,7 +168,7 @@ export class MCBridgeWsClient {
       try {
         await deliverToLocalAgent(msg.agentSlug, msg.message);
       } catch (err) {
-        console.error(`[mc-bridge] Failed to deliver task to agent ${msg.agentSlug}:`, err);
+        console.error(`[agentcenter-bridge] Failed to deliver task to agent ${msg.agentSlug}:`, err);
       }
     }
 
@@ -194,7 +194,7 @@ export class MCBridgeWsClient {
       this.reconnectMs * 2,
       this.config.reconnectMaxMs ?? 30_000,
     );
-    console.log(`[mc-bridge] Reconnecting in ${delay}ms…`);
+    console.log(`[agentcenter-bridge] Reconnecting in ${delay}ms…`);
     this.reconnectTimer = setTimeout(() => this.connect(), delay);
   }
 

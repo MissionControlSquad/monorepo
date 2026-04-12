@@ -1,15 +1,19 @@
 {
-  "id": "mc-bridge",
-  "name": "Mission Control Bridge",
-  "description": "Persistent WebSocket bridge between this OpenClaw instance and Mission Control for live task delivery and agent status reporting.",
+  "id": "agentcenter-bridge",
+  "name": "AgentCenter Bridge",
+  "description": "Persistent WebSocket bridge between this OpenClaw instance and AgentCenter Cloud for live task delivery and agent status reporting.",
   "version": "0.1.0",
+  "author": "AgentCenter Cloud",
+  "keywords": ["agentcenter", "agentcenter-cloud", "mission-control", "bridge", "websocket", "live-tasks", "agent"],
+  "homepage": "https://agentcenter.cloud",
+  "clawhub": "agentcenter/agentcenter-bridge",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
     "properties": {
       "mcUrl": {
         "type": "string",
-        "description": "WebSocket URL of Mission Control live gateway, e.g. ws://localhost:3000/live-gateway"
+        "description": "WebSocket URL of AgentCenter Cloud live gateway, e.g. wss://your-instance.agentcenter.cloud/live-gateway"
       },
       "token": {
         "type": "string",

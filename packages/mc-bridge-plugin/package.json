@@ -1,9 +1,21 @@
 {
-  "name": "mc-bridge",
+  "name": "agentcenter-bridge",
   "version": "0.1.0",
-  "private": true,
+  "description": "Persistent WebSocket bridge between OpenClaw and AgentCenter Cloud for live task delivery and agent status reporting.",
   "type": "module",
   "main": "./dist/index.js",
+  "license": "MIT",
+  "keywords": ["openclaw", "mission-control", "agentcenter", "agentcenter-cloud", "bridge", "websocket", "live-tasks", "agent"],
+  "author": "AgentCenter Cloud",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MissionControlSquad/monorepo",
+    "directory": "packages/mc-bridge-plugin"
+  },
+  "publishConfig": {
+    "registry": "https://registry.clawhub.ai",
+    "access": "public"
+  },
   "files": [
     "dist/index.js",
     "openclaw.plugin.json",
@@ -12,6 +24,7 @@
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --define:process.env.WS_NO_BUFFER_UTIL='\"1\"' --define:process.env.WS_NO_UTF_8_VALIDATE='\"1\"' --log-level=info",
     "pack": "npm run build && npm pack --pack-destination ../../apps/web/public",
+    "publish:clawhub": "npm run build && clawhub package publish agentcenter/agentcenter-bridge",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
@@ -21,6 +34,9 @@
     "ws": "^8.20.0"
   },
   "openclaw": {
-    "extensions": ["./dist/index.js"]
+    "extensions": ["./dist/index.js"],
+    "compatibility": {
+      "openclaw": ">=1.0.0"
+    }
   }
 }
