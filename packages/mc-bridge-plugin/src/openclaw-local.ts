@@ -27,7 +27,9 @@ export async function listLocalAgents(): Promise<
     currentTaskId?: string | null;
   }>
 > {
-  const raw: any[] = await (globalThis as any).openclaw.agents.list();
+  const oc = (globalThis as any).openclaw;
+  if (typeof oc?.agents?.list !== "function") return [];
+  const raw: any[] = await oc.agents.list();
   return raw.map((a: any) => ({
     slug: a.slug ?? a.name,
     name: a.name,

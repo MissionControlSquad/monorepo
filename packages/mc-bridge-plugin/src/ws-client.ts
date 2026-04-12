@@ -18,6 +18,7 @@ import type {
 import { LIVE_GATEWAY } from "@agentcenter/types";
 import type { MCBridgeConfig } from "./config-schema";
 import { deriveMachineFingerprint, deliverToLocalAgent, listLocalAgents } from "./openclaw-local";
+import { PLUGIN_VERSION } from "./version";
 
 type SendHandler = (msg: PluginToMC) => void;
 
@@ -95,7 +96,7 @@ export class MCBridgeWsClient {
       fingerprint: this.fingerprint,
       nonce,
       timestamp: Date.now(),
-      pluginVersion: "0.1.0",
+      pluginVersion: PLUGIN_VERSION,
       meta: {
         hostname: os.hostname(),
         platform: os.platform(),
