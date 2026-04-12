@@ -138,10 +138,14 @@ export interface MsgDeliverTask {
 export interface MsgNotify {
   type: "mc.notify";
   agentSlug: string;
-  kind: "mention" | "inbox_task" | "review_needed";
+  kind: "mention" | "inbox_task" | "review_needed" | "task_approved" | "task_rejected" | "task_clarification" | "dm" | "channel_mention";
   content: string;   // human-readable + includes taskId so agent can call MC APIs
   taskId?: string;
   messageId?: string;
+  /** channelId — present for dm and channel_mention kinds so agent knows where to reply. */
+  channelId?: string;
+  /** fromHandle — sender's username/handle for dm and channel_mention kinds. */
+  fromHandle?: string;
 }
 
 /** Authentication / protocol error — connection will be closed after this. */
