@@ -79,7 +79,9 @@ export function onAgentStatusChange(
     currentTaskId?: string | null;
   }) => void,
 ): () => void {
-  return (globalThis as any).openclaw.events.on("agent:statusChange", handler);
+  const oc = (globalThis as any).openclaw;
+  if (typeof oc?.events?.on !== "function") return () => {};
+  return oc.events.on("agent:statusChange", handler);
 }
 
 /** Subscribe to agent message events (outgoing). */
@@ -90,14 +92,18 @@ export function onAgentMessage(
     content: string;
   }) => void,
 ): () => void {
-  return (globalThis as any).openclaw.events.on("agent:message", handler);
+  const oc = (globalThis as any).openclaw;
+  if (typeof oc?.events?.on !== "function") return () => {};
+  return oc.events.on("agent:message", handler);
 }
 
 /** Subscribe to task done events. */
 export function onTaskDone(
   handler: (event: { slug: string; taskId: string; summary?: string }) => void,
 ): () => void {
-  return (globalThis as any).openclaw.events.on("agent:taskDone", handler);
+  const oc = (globalThis as any).openclaw;
+  if (typeof oc?.events?.on !== "function") return () => {};
+  return oc.events.on("agent:taskDone", handler);
 }
 
 /** Derive a stable machine fingerprint (hostname + first non-loopback MAC). */
