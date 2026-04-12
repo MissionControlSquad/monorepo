@@ -1,6 +1,6 @@
 {
   "name": "@agentcenter/agentcenter-bridge",
-  "version": "0.1.9",
+  "version": "0.1.11",
   "description": "Persistent WebSocket bridge between OpenClaw and AgentCenter Cloud for live task delivery and agent status reporting.",
   "type": "module",
   "main": "./dist/index.js",
