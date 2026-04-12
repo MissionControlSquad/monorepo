@@ -16,28 +16,45 @@
  * based on the OpenClaw plugin runtime contract.
  */
 
+import type { AgentInfo } from "@agentcenter/types";
+
+/**
+ * Read the Agent ID from an agent's IDENTITY.md workspace file.
+ * Returns null if the file doesn't exist or the field isn't present.
+ */
+async function readAgentIdFromIdentity(slug: string): Promise<string | null> {
+  try {
+    const os = await import("node:os");
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const identityPath = path.join(os.homedir(), ".openclaw", "agents", slug, "workspace", "IDENTITY.md");
+    const content = fs.readFileSync(identityPath, "utf8");
+    const match = content.match(/\*\*Agent ID\*\*:\s*(\S+)/);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** List agents currently running in this OpenClaw instance. */
-export async function listLocalAgents(): Promise<
-  Array<{
-    slug: string;
-    name: string;
-    status: string;
-    detailedStatus?: string | null;
-    statusMessage?: string | null;
-    currentTaskId?: string | null;
-  }>
-> {
+export async function listLocalAgents(): Promise<AgentInfo[]> {
   const oc = (globalThis as any).openclaw;
   if (typeof oc?.agents?.list !== "function") return [];
   const raw: any[] = await oc.agents.list();
-  return raw.map((a: any) => ({
-    slug: a.slug ?? a.name,
-    name: a.name,
-    status: a.status ?? "idle",
-    detailedStatus: a.detailedStatus ?? null,
-    statusMessage: a.statusMessage ?? null,
-    currentTaskId: a.currentTaskId ?? null,
-  }));
+  return Promise.all(
+    raw.map(async (a: any) => {
+      const slug = a.slug ?? a.id ?? a.name;
+      return {
+        slug,
+        name: a.name,
+        status: (a.status ?? "idle") as "idle" | "active" | "blocked",
+        detailedStatus: a.detailedStatus ?? null,
+        statusMessage: a.statusMessage ?? null,
+        currentTaskId: a.currentTaskId ?? null,
+        agentId: a.agentId ?? (await readAgentIdFromIdentity(slug)),
+      };
+    }),
+  );
 }
 
 /**
@@ -79,11 +96,22 @@ export function onAgentStatusChange(
     detailedStatus?: string | null;
     statusMessage?: string | null;
     currentTaskId?: string | null;
+    agentId?: string | null;
   }) => void,
 ): () => void {
   const oc = (globalThis as any).openclaw;
   if (typeof oc?.events?.on !== "function") return () => {};
-  return oc.events.on("agent:statusChange", handler);
+  return oc.events.on("agent:statusChange", async (event: any) => {
+    const slug = event.slug ?? event.id ?? event.name;
+    handler({
+      slug,
+      status: event.status,
+      detailedStatus: event.detailedStatus ?? null,
+      statusMessage: event.statusMessage ?? null,
+      currentTaskId: event.currentTaskId ?? null,
+      agentId: event.agentId ?? (await readAgentIdFromIdentity(slug)),
+    });
+  });
 }
 
 /** Subscribe to agent message events (outgoing). */

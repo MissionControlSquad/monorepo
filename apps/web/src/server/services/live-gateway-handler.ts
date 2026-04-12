@@ -57,6 +57,27 @@ function stripHtml(str: string): string {
   return str.replace(/<[^>]*>/g, "").trim();
 }
 
+/**
+ * Resolve an agent from the DB using agentId (primary key) first,
+ * falling back to username slug. agentId comes from IDENTITY.md on the
+ * plugin side — it's the most reliable match regardless of username changes.
+ */
+async function resolveAgentBySlugOrId(
+  prisma: any,
+  slug: string,
+  agentId?: string | null,
+): Promise<{ id: string } | null> {
+  if (agentId) {
+    const byId = await prisma.agent
+      .findUnique({ where: { id: agentId }, select: { id: true } })
+      .catch(() => null);
+    if (byId) return byId;
+  }
+  return prisma.agent
+    .findUnique({ where: { username: slug }, select: { id: true } })
+    .catch(() => null);
+}
+
 // ─── Install token lookup ─────────────────────────────────────────────────────
 
 async function findValidInstallToken(rawToken: string) {
@@ -186,9 +207,7 @@ async function handleAgentsReport(connectionId: string, msg: MsgAgentsReport): P
   );
 
   for (const info of msg.agents) {
-    const agent = await prisma.agent
-      .findUnique({ where: { username: info.slug } })
-      .catch(() => null);
+    const agent = await resolveAgentBySlugOrId(prisma, info.slug, info.agentId);
     if (!agent) continue;
     await prisma.agent
       .update({
@@ -209,7 +228,7 @@ async function handleAgentsReport(connectionId: string, msg: MsgAgentsReport): P
 
 async function handleAgentStatus(_connectionId: string, msg: MsgAgentStatus): Promise<void> {
   const { prisma } = await import("../prisma");
-  const agent = await prisma.agent.findUnique({ where: { username: msg.slug } }).catch(() => null);
+  const agent = await resolveAgentBySlugOrId(prisma, msg.slug, msg.agentId);
   if (!agent) return;
   await prisma.agent
     .update({
@@ -233,9 +252,7 @@ async function handleAgentMessage(_connectionId: string, msg: MsgAgentMessage): 
 
   if (msg.taskId) {
     const { prisma } = await import("../prisma");
-    const agent = await prisma.agent
-      .findUnique({ where: { username: msg.slug } })
-      .catch(() => null);
+    const agent = await resolveAgentBySlugOrId(prisma, msg.slug);
     if (agent) {
       const action = await prisma.agentAction
         .create({

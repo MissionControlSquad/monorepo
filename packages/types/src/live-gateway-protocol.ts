@@ -20,6 +20,8 @@ export interface AgentInfo {
   detailedStatus?: string | null;
   statusMessage?: string | null;
   currentTaskId?: string | null;
+  /** DB primary key from IDENTITY.md — used for reliable agent lookup server-side. */
+  agentId?: string | null;
 }
 
 export type VMErrorCode =
@@ -69,6 +71,8 @@ export interface MsgAgentStatus {
   detailedStatus?: string | null;
   statusMessage?: string | null;
   currentTaskId?: string | null;
+  /** DB primary key from IDENTITY.md — used for reliable agent lookup server-side. */
+  agentId?: string | null;
 }
 
 /** Agent sent a chat/activity message. */
