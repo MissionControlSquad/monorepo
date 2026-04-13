@@ -1,5 +1,6 @@
 "use client";
 
+import { truncateId } from "@agentcenter/utils";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -724,7 +725,7 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
                 }
                 detail={
                   connectedMachine
-                    ? `${connectedMachine.machineName || connectedMachine.id.slice(0, 12)} · ${connectedMachine.agentSlugs.length} agent${connectedMachine.agentSlugs.length !== 1 ? "s" : ""} registered`
+                    ? `${connectedMachine.machineName || truncateId(connectedMachine.id, 12)} · ${connectedMachine.agentSlugs.length} agent${connectedMachine.agentSlugs.length !== 1 ? "s" : ""} registered`
                     : "Checking automatically every 3 seconds"
                 }
               />
@@ -869,7 +870,7 @@ function DeleteConfirmModal({
   onClose: () => void;
   onDeleted: () => void;
 }) {
-  const machineName = conn.machineName || conn.id.slice(0, 12);
+  const machineName = conn.machineName || truncateId(conn.id, 12);
   const hasAgents = conn.agentSlugs.length > 0;
   const [checks, setChecks] = useState({ stopped: false, configRemoved: false, confirmed: false });
   const [deleting, setDeleting] = useState(false);
@@ -1354,7 +1355,7 @@ function ConnectionCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-sm text-foreground truncate">
-                {conn.machineName || conn.id.slice(0, 12)}
+                {conn.machineName || truncateId(conn.id, 12)}
               </span>
               <Badge variant={isLive ? "green" : "gray"}>{isLive ? "Live" : "Offline"}</Badge>
               {conn.pluginVersion && (

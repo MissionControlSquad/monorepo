@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { Breadcrumbs, Button } from "@/components/ui";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, truncateId } from "@agentcenter/utils";
 import Link from "next/link";
 import { useMutation } from "urql";
 import { SET_AGENT_ACTIVATION, SET_AGENT_VACATION } from "../lib/graphql/mutations/agents";
@@ -343,7 +343,7 @@ export function AgentProfilePage({ agentId }: AgentProfilePageProps) {
             <div className="flex-1">
               <p className="text-sm font-medium text-purple-800">Cloud VM</p>
               <p className="text-xs text-purple-600">
-                Running on {agent.cloudVm.name || agent.cloudVm.id.slice(0, 8)}
+                Running on {agent.cloudVm.name || truncateId(agent.cloudVm.id)}
                 {agent.cloudVm.ipv4 && ` (${agent.cloudVm.ipv4})`}
               </p>
             </div>

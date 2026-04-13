@@ -15,7 +15,7 @@ import { generateApiKey } from "../api-key";
 import { randomBytes } from "crypto";
 import { computeCronSchedule } from "../agent-config-generator";
 import { isFeatureEnabled } from "../feature-flags";
-import { FLAG_KEYS, CloudVmStatus } from "@agentcenter/utils";
+import { FLAG_KEYS, CloudVmStatus, getAgentSlug } from "@agentcenter/utils";
 import {
   createServer,
   getServer,
@@ -33,7 +33,6 @@ import { VM_USER, VM_HOME, VM_CONFIG_DIR, VM_CONFIG_PATH, VM_WORKSPACE } from ".
 import { ensureHeartbeatCron, removeAgentCrons } from "./cloud-vm-cron";
 import {
   getVMSSHConfig,
-  getAgentSlug,
   restartGateway,
   waitForGateway,
   readVMConfig,

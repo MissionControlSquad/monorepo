@@ -3,6 +3,44 @@
  */
 
 /**
+ * Derive the agent slug used for workspace dirs, cron names, and openclaw agent IDs.
+ * Prefers the explicit username; falls back to lowercased name with spaces replaced by hyphens.
+ */
+export function getAgentSlug(agent: { username?: string | null; name: string }): string {
+  return agent.username || agent.name.toLowerCase().replace(/\s+/g, "-");
+}
+
+/**
+ * Resolve a profile's display name with graceful fallback.
+ *   displayName → username → fallback ("")
+ */
+export function getDisplayName(
+  profile: { displayName?: string | null; username?: string | null } | null | undefined,
+  fallback = "",
+): string {
+  return profile?.displayName ?? profile?.username ?? fallback;
+}
+
+/**
+ * Resolve an agent's display name with graceful fallback.
+ *   username → name → fallback ("Unknown")
+ */
+export function getAgentDisplayName(
+  agent: { username?: string | null; name?: string | null } | null | undefined,
+  fallback = "Unknown",
+): string {
+  return agent?.username ?? agent?.name ?? fallback;
+}
+
+/**
+ * Truncate an ID to a short display prefix — e.g. for showing VM/connection IDs in UI.
+ * Default length is 8 characters.
+ */
+export function truncateId(id: string, length = 8): string {
+  return id.slice(0, length);
+}
+
+/**
  * Trims whitespace and caps a value to maxLength characters.
  * Returns undefined (or null when returnNull=true) for empty/null input.
  * Use for sanitising user-supplied or agent-supplied strings before DB writes.

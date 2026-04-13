@@ -128,6 +128,12 @@ export const COLUMN_EMPTY_STATES: Record<string, { message: string; hint: string
 // Heartbeat timeout: 2 minutes
 export const HEARTBEAT_TIMEOUT_MS = 2 * 60 * 1000;
 
+// Maximum file size for channel attachments: 25 MB
+export const MAX_FILE_SIZE = 25 * 1024 * 1024;
+
+// Maximum byte length for live-gateway task delivery messages
+export const MAX_MESSAGE_BYTES = 4096;
+
 // Platform-agnostic hex colors for status values (usable by mobile, charts, Electron)
 export const STATUS_HEX_COLORS: Record<string, string> = {
   // Task statuses

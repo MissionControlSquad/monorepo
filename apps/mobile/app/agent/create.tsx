@@ -36,6 +36,7 @@ import {
   SetupStatus,
   CloudVmStatus,
   Priority,
+  truncateId,
 } from "@agentcenter/utils";
 import {
   AGENTS_FOR_DELEGATE_QUERY,
@@ -1062,7 +1063,7 @@ export default function CreateAgentScreen() {
                         </View>
                         <View className="flex-1">
                           <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">
-                            {vm.name || vm.serverName || vm.id.slice(0, 8)}
+                            {vm.name || vm.serverName || truncateId(vm.id)}
                           </Text>
                           <Text className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
                             {vm.serverType} / {vm.region}

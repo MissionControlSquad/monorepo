@@ -18,6 +18,7 @@ import { ProfileAvatar } from "../../../ui/ProfileAvatar";
 import { ProfilePickerDialog } from "../../../ui/ProfilePickerDialog";
 import type { ProfilePickerItem } from "../../../ui/ProfilePickerDialog";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
+import { getDisplayName } from "@agentcenter/utils";
 import { ProfileKind, ChannelVisibility, type ProfileKindValue } from "@/server/constants";
 import { Button } from "../../../ui";
 import type { Channel, ChannelMember } from "@agentcenter/types";
@@ -55,7 +56,7 @@ export function ChannelsPanel() {
   const dms = search
     ? allDms.filter((ch: Channel) => {
         const other = ch.members?.find((m: ChannelMember) => m.profileId !== profileId);
-        const otherName = other?.profile?.displayName ?? other?.profile?.username ?? "";
+        const otherName = getDisplayName(other?.profile);
         return otherName.toLowerCase().includes(q);
       })
     : allDms;
@@ -217,8 +218,7 @@ export function ChannelsPanel() {
                   const other = ch.members?.find(
                     (m: { profileId: string }) => m.profileId !== profileId,
                   );
-                  const otherName =
-                    other?.profile?.displayName ?? other?.profile?.username ?? "Unknown";
+                  const otherName = getDisplayName(other?.profile, "Unknown");
                   const otherRole = other?.profile?.agent?.role;
                   return (
                     <li key={ch.id}>

@@ -3,6 +3,7 @@ import { join } from "path";
 import { env } from "./env";
 import { CURRENT_CONFIG_VERSION } from "./config-version";
 import { AgentLevel } from "./constants";
+import { getAgentSlug } from "@agentcenter/utils";
 
 const AGENT_TEMPLATES_DIR = join(process.cwd(), "src", "server", "agent-templates");
 const TEMPLATES_DIR = join(AGENT_TEMPLATES_DIR, "configs");
@@ -254,7 +255,7 @@ export function getConfigBundleForAgent(agent: AgentForConfig): {
   files: { filename: string; content: string }[];
 } {
   const mcUrl = getMcUrl();
-  const agentSlug = agent.username || agent.name.toLowerCase().replace(/\s+/g, "-");
+  const agentSlug = getAgentSlug(agent);
   const configFiles = generateAgentConfig(
     {
       id: agent.id,

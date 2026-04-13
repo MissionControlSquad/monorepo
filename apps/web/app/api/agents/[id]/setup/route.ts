@@ -11,6 +11,7 @@ import { workspacePathUnix } from "@/server/workspace-paths";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { AgentLevel } from "@/server/constants";
+import { getAgentSlug } from "@agentcenter/utils";
 import type { RouteContext } from "../../../_lib/route-context";
 
 /**
@@ -29,7 +30,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     const mcUrl = getMcUrl();
 
     // Compute slug once and reuse everywhere
-    const agentSlug = agent.username || agent.name.toLowerCase().replace(/\s+/g, "-");
+    const agentSlug = getAgentSlug(agent);
     const resolvedWorkspacePath = agent.workspacePath ?? workspacePathUnix(agentSlug);
 
     // Count agents created before this one for cron scheduling

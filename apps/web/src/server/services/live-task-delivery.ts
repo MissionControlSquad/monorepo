@@ -21,6 +21,7 @@
 import { findConnectionByAgentSlug, enqueuePendingDelivery } from "@agentcenter/database";
 import { connectionRegistry } from "./live-connection-registry";
 import { LIVE_GATEWAY } from "@agentcenter/types";
+import { MAX_MESSAGE_BYTES } from "@agentcenter/utils";
 import {
   Roles,
   ProfileKind,
@@ -47,8 +48,6 @@ interface DeliverOptions {
   priority: string;
   assignedBy?: string;
 }
-
-const MAX_MESSAGE_BYTES = 4096;
 
 function buildTaskMessage(opts: DeliverOptions): string {
   // Task ID is included so the agent can call MC APIs (status updates, action logs, etc.)

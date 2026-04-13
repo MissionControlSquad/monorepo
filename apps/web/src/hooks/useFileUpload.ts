@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+import { MAX_FILE_SIZE } from "@agentcenter/utils";
 const MAX_FILES = 10;
 
 const BLOCKED_MIME_TYPES = new Set([

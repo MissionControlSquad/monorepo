@@ -14,6 +14,7 @@ import { ensureAgentProfile } from "@/server/agent-profile";
 import type { z } from "zod/v4";
 import type { createAgentSchema } from "../../_lib/validation";
 import type { AgentConfigFile, AgentSetupResult } from "@agentcenter/utils";
+import { getAgentSlug } from "@agentcenter/utils";
 import { AgentStatus, SetupStatus, AgentLevel } from "@/server/constants";
 
 type CreateAgentInput = z.infer<typeof createAgentSchema>;
@@ -62,7 +63,7 @@ export async function createSingleAgent(
   invalidateAgentListCache();
   pubsub.publish(PubSubEvent.AGENT.STATUS_CHANGED, { agentId: agent.id });
 
-  const agentSlug = agent.username || name.toLowerCase().replace(/\s+/g, "-");
+  const agentSlug = getAgentSlug({ username: agent.username, name });
   const resolvedWorkspacePath = workspacePath || workspacePathUnix(agentSlug);
 
   if (!workspacePath) {

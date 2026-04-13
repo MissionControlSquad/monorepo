@@ -34,6 +34,7 @@ import {
   PROVIDER_COLORS,
   formatUptime,
   formatCost,
+  truncateId,
 } from "@agentcenter/utils";
 import { toast } from "sonner";
 import { CloudVmStatus } from "@/server/constants";
@@ -596,7 +597,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
             ) : (
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold text-foreground">
-                  {vm.name || vm.serverName || vm.id.slice(0, 8)}
+                  {vm.name || vm.serverName || truncateId(vm.id)}
                 </h1>
                 <Button
                   variant="ghost"

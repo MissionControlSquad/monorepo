@@ -2,13 +2,11 @@ import { NextResponse } from "next/server";
 import { findProfileByAgentId, createFileDocument } from "@agentcenter/database";
 import { uploadFileToR2 } from "@/server/storage/r2";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, MAX_FILE_SIZE } from "@agentcenter/utils";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
-
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
 const BLOCKED_MIME_TYPES = new Set([
   "application/x-msdownload",

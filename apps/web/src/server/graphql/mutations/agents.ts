@@ -6,7 +6,8 @@ import { applyAgentStatusUpdate } from "../../agent-status";
 import { ensureAgentProfile } from "../../agent-profile";
 import { pubsub, PubSubEvent } from "../../pubsub";
 import { findCloudVMForSSH, findProfileForAgentId } from "@agentcenter/database";
-import { getVMSSHConfig, getAgentSlug, computeAgentCronIndex } from "../../services/cloud-vm-utils";
+import { getAgentSlug } from "@agentcenter/utils";
+import { getVMSSHConfig, computeAgentCronIndex } from "../../services/cloud-vm-utils";
 import { removeAgentCrons, ensureHeartbeatCron } from "../../services/cloud-vm-cron";
 import { computeCronSchedule } from "../../agent-config-generator";
 

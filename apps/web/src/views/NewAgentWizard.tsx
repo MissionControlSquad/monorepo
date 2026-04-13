@@ -29,7 +29,7 @@ import { Roles, SetupStatus, AgentLevel, CloudVmStatus, Priority } from "@/serve
 import { CREATE_TASK_FROM_DASHBOARD } from "../lib/graphql/mutations/tasks";
 import { Button, Badge } from "../components/ui";
 import { useFeatureFlag } from "../components/context/FeatureFlagContext";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, truncateId } from "@agentcenter/utils";
 import { CopyButton } from "../components/common/CopyButton";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -1201,7 +1201,7 @@ export function NewAgentWizard() {
                           <option value="">Choose a VM...</option>
                           {existingVMs.map((vm) => (
                             <option key={vm.id} value={vm.id}>
-                              {vm.name || vm.serverName || vm.id.slice(0, 8)} — {vm.serverType} /{" "}
+                              {vm.name || vm.serverName || truncateId(vm.id)} — {vm.serverType} /{" "}
                               {vm.region}
                               {vm.ipv4 ? ` (${vm.ipv4})` : ""}
                             </option>

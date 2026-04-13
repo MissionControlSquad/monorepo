@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Server, Plus, Loader2, Globe, Cpu, Clock, Search } from "lucide-react";
 import { CreateVMDialog } from "../components/cloud/CreateVMDialog";
 import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout } from "../components/ui";
-import { formatUptime, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
+import { formatUptime, CLOUD_VM_TRANSITIONAL_STATUSES, truncateId } from "@agentcenter/utils";
 import { CloudVmStatus } from "@/server/constants";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 
@@ -178,7 +178,7 @@ export function CloudPage() {
                   <div className="flex items-center gap-3 min-w-0 w-[220px] flex-shrink-0">
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot}`} />
                     <span className="font-medium text-foreground truncate group-hover:text-indigo-600 transition-colors">
-                      {vm.name || vm.serverName || vm.id.slice(0, 8)}
+                      {vm.name || vm.serverName || truncateId(vm.id)}
                     </span>
                   </div>
 

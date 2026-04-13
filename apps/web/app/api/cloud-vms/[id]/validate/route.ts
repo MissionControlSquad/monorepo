@@ -5,9 +5,9 @@ import { successResponse, errorResponse, handleError } from "../../../_lib/json-
 import { ERR } from "../../../_lib/error-messages";
 import { computeCronSchedule } from "@/server/agent-config-generator";
 import { ensureHeartbeatCron } from "@/server/services/cloud-vm-cron";
+import { getAgentSlug } from "@agentcenter/utils";
 import {
   getVMSSHConfig,
-  getAgentSlug,
   ocExec,
   readVMConfig,
   listAgentsOnVM,

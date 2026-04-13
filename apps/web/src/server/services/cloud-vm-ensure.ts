@@ -16,9 +16,9 @@ import { computeCronSchedule } from "@/server/agent-config-generator";
 import { sshExec } from "./ssh";
 import { ensureHeartbeatCron } from "./cloud-vm-cron";
 import { VM_USER, VM_HOME } from "./cloud-vm-paths";
+import { getAgentSlug } from "@agentcenter/utils";
 import {
   getVMSSHConfig,
-  getAgentSlug,
   restartGateway,
   isAgentRegistered,
   computeAgentCronIndex,
