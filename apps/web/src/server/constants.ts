@@ -25,6 +25,34 @@ export const Priority = {
 
 export type PriorityValue = (typeof Priority)[keyof typeof Priority];
 
+// ─── Agent Setup Statuses ────────────────────────────────
+export const SetupStatus = {
+  PENDING_SETUP: "pending_setup",
+  ACTIVE: "active",
+  DEACTIVATED: "deactivated",
+} as const;
+
+export type SetupStatusValue = (typeof SetupStatus)[keyof typeof SetupStatus];
+
+// ─── Profile Kinds ───────────────────────────────────────
+export const ProfileKind = {
+  AGENT: "agent",
+  HUMAN: "human",
+} as const;
+
+export type ProfileKindValue = (typeof ProfileKind)[keyof typeof ProfileKind];
+
+// ─── Queue Item Statuses ─────────────────────────────────
+export const QueueItemStatus = {
+  PENDING: "pending",
+  IN_PROGRESS: "in_progress",
+  COMPLETED: "completed",
+  BLOCKED: "blocked",
+  SKIPPED: "skipped",
+} as const;
+
+export type QueueItemStatusValue = (typeof QueueItemStatus)[keyof typeof QueueItemStatus];
+
 // ─── Event Types ─────────────────────────────────────────
 export const EventTypes = {
   // Agent

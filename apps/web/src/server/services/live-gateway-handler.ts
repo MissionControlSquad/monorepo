@@ -41,6 +41,7 @@ import type {
   VMErrorCode,
 } from "@agentcenter/types";
 import { LIVE_GATEWAY } from "@agentcenter/types";
+import { TaskStatus } from "../constants";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -222,7 +223,9 @@ async function handleAgentsReport(connectionId: string, msg: MsgAgentsReport): P
           currentTaskId: info.currentTaskId ?? null,
         } as any,
       })
-      .catch(() => undefined);
+      .catch((err) =>
+        console.error(`[live-gateway] Failed to update agent status for ${info.slug}:`, err),
+      );
     pubsub.publish(PubSubEvent.AGENT.STATUS_CHANGED, { agentId: agent.id });
   }
 }
@@ -243,7 +246,9 @@ async function handleAgentStatus(_connectionId: string, msg: MsgAgentStatus): Pr
         currentTaskId: msg.currentTaskId ?? null,
       } as any,
     })
-    .catch(() => undefined);
+    .catch((err) =>
+      console.error(`[live-gateway] Failed to update agent status for ${msg.slug}:`, err),
+    );
   pubsub.publish(PubSubEvent.AGENT.STATUS_CHANGED, { agentId: agent.id });
 }
 
@@ -307,13 +312,35 @@ async function handleTaskDone(connectionId: string, msg: MsgTaskDone): Promise<v
     return;
   }
 
-  await prisma.task
-    .updateMany({
+  // Fetch the task to get current status (needed for fromStatus in the event).
+  const task = await prisma.task
+    .findUnique({
       where: { id: msg.taskId },
-      data: { status: "done" },
+      select: { id: true, taskNumber: true, title: true, status: true, projectId: true },
     })
-    .catch(() => undefined);
+    .catch(() => null);
+  if (!task) return;
+
+  if (task.status === TaskStatus.DONE) return; // already done — idempotent
+
+  await prisma.task
+    .update({ where: { id: msg.taskId }, data: { status: TaskStatus.DONE } })
+    .catch((err) => console.error(`[live-gateway] Failed to mark task ${msg.taskId} done:`, err));
+
   pubsub.publish(PubSubEvent.TASK.UPDATED, { taskId: msg.taskId });
+
+  // Emit TASK_STATUS_CHANGED so task subscribers get notified and live delivery
+  // fires (tryDeliverTaskDoneNotification in notification.ts handles this event).
+  const { taskModel } = await import("../models/task");
+  await taskModel
+    .emitStatusChanged(task, {
+      fromStatus: task.status,
+      toStatus: TaskStatus.DONE,
+      changedBy: agent.id,
+    })
+    .catch((err) =>
+      console.error(`[live-gateway] emitStatusChanged failed for task ${msg.taskId}:`, err),
+    );
 }
 
 // ─── vm.task_ack handler ──────────────────────────────────────────────────────
