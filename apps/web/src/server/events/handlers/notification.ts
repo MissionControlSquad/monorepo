@@ -11,6 +11,7 @@ import {
   tryDeliverTaskApprovedNotification,
   tryDeliverTaskRejectedNotification,
   tryDeliverClarificationNotification,
+  tryDeliverTaskDoneNotification,
 } from "../../services/live-task-delivery";
 
 async function notify(
@@ -118,6 +119,11 @@ on(EventTypes.TASK_STATUS_CHANGED, async (e) => {
   // Covers GraphQL updateTask path — REST PATCH already calls this directly.
   if (e.toStatus === "review") {
     tryDeliverReviewNotification(e.taskId, e.projectId ?? null, e.title).catch(() => undefined);
+  }
+
+  // Live gateway: notify assignees when task is marked done.
+  if (e.toStatus === "done") {
+    tryDeliverTaskDoneNotification(e.taskId, e.title).catch(() => undefined);
   }
 });
 
