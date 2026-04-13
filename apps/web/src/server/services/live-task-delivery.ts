@@ -213,18 +213,54 @@ async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Prom
  * Live push for @mention events.
  * Called after notification.ts creates the Notification DB record.
  * agentIds = the mentionedAgentIds from the MESSAGE_CREATED event.
+ *
+ * Splits agents into assigned vs unassigned so each group receives
+ * appropriate instructions:
+ *  - Assigned agents: full PLAYBOOK instruction (they own the task).
+ *  - Unassigned agents: read/reply only (no ownership — just a heads-up).
  */
 export async function tryDeliverMentionNotification(
   agentIds: string[],
   opts: { fromName: string; taskTitle: string; taskId: string; messageId?: string },
 ): Promise<void> {
   if (!agentIds.length) return;
-  await sendNotifyToAgents(agentIds, {
-    kind: "mention",
-    content: `${opts.fromName} mentioned you in task "${opts.taskTitle.slice(0, 200)}" (task ID: ${opts.taskId}). Check the task, respond if needed, and follow your PLAYBOOK.`,
-    taskId: opts.taskId,
-    messageId: opts.messageId,
-  });
+
+  const { prisma } = await import("../prisma");
+
+  // Find which of the mentioned agents are actually assigned to this task.
+  const assignments = await prisma.taskAssignee
+    .findMany({
+      where: { taskId: opts.taskId, profile: { agentId: { in: agentIds } } },
+      select: { profile: { select: { agentId: true } } },
+    })
+    .catch(() => []);
+
+  const assignedSet = new Set(
+    assignments.map((a) => a.profile?.agentId).filter(Boolean) as string[],
+  );
+
+  const assignedIds = agentIds.filter((id) => assignedSet.has(id));
+  const unassignedIds = agentIds.filter((id) => !assignedSet.has(id));
+
+  // Assigned agents: full PLAYBOOK context — they are expected to act on this task.
+  if (assignedIds.length) {
+    await sendNotifyToAgents(assignedIds, {
+      kind: "mention",
+      content: `${opts.fromName} mentioned you in task "${opts.taskTitle.slice(0, 200)}" (task ID: ${opts.taskId}). Check the message and respond if needed, then continue your PLAYBOOK for this task.`,
+      taskId: opts.taskId,
+      messageId: opts.messageId,
+    });
+  }
+
+  // Unassigned agents: read/reply only — they are not responsible for the task.
+  if (unassignedIds.length) {
+    await sendNotifyToAgents(unassignedIds, {
+      kind: "mention",
+      content: `${opts.fromName} mentioned you in task "${opts.taskTitle.slice(0, 200)}" (task ID: ${opts.taskId}). You are not assigned to this task — read the message and reply if needed via POST /api/tasks/${opts.taskId}/messages. Do not take ownership or run your task PLAYBOOK.`,
+      taskId: opts.taskId,
+      messageId: opts.messageId,
+    });
+  }
 }
 
 /**

@@ -74,11 +74,13 @@ on(EventTypes.TASK_CREATED, async (e) => {
       taskDescription: e.description,
       priority: e.priority ?? "medium",
       assignedBy: e.creatorName,
-    }).catch(() => undefined);
+    }).catch((err) => console.error("[notification] tryDeliverTaskToLiveAgents failed:", err));
   } else if (e.projectId) {
     // Unassigned inbox task — notify all active project agents so they can pick it up.
     // idempotency: REST POST also calls this directly; duplicate is safe (no-op on miss).
-    tryDeliverInboxTaskNotification(e.taskId, e.projectId, e.title).catch(() => undefined);
+    tryDeliverInboxTaskNotification(e.taskId, e.projectId, e.title).catch((err) =>
+      console.error("[notification] tryDeliverInboxTaskNotification failed:", err),
+    );
   }
 });
 
@@ -101,7 +103,9 @@ on(EventTypes.TASK_ASSIGNEES_CHANGED, async (e) => {
       taskTitle: e.title,
       taskDescription: e.description,
       priority: e.priority ?? "medium",
-    }).catch(() => undefined);
+    }).catch((err) =>
+      console.error("[notification] tryDeliverTaskToLiveAgents (assignees changed) failed:", err),
+    );
   }
 });
 
@@ -118,12 +122,16 @@ on(EventTypes.TASK_STATUS_CHANGED, async (e) => {
   // Live gateway: notify squad leads when task enters review.
   // Covers GraphQL updateTask path — REST PATCH already calls this directly.
   if (e.toStatus === "review") {
-    tryDeliverReviewNotification(e.taskId, e.projectId ?? null, e.title).catch(() => undefined);
+    tryDeliverReviewNotification(e.taskId, e.projectId ?? null, e.title).catch((err) =>
+      console.error("[notification] tryDeliverReviewNotification failed:", err),
+    );
   }
 
   // Live gateway: notify assignees when task is marked done.
   if (e.toStatus === "done") {
-    tryDeliverTaskDoneNotification(e.taskId, e.title).catch(() => undefined);
+    tryDeliverTaskDoneNotification(e.taskId, e.title).catch((err) =>
+      console.error("[notification] tryDeliverTaskDoneNotification failed:", err),
+    );
   }
 });
 
@@ -148,7 +156,7 @@ on(EventTypes.MESSAGE_CREATED, async (e) => {
       taskTitle: e.taskTitle,
       taskId: e.taskId,
       messageId: e.messageId,
-    }).catch(() => undefined);
+    }).catch((err) => console.error("[notification] tryDeliverMentionNotification failed:", err));
   }
 
   // Notify subscribers (excluding sender and mentioned)
@@ -193,7 +201,9 @@ on(EventTypes.TASK_APPROVED, async (e) => {
     taskTitle: e.title,
     taskId: e.taskId,
     reviewerName: e.reviewerName,
-  }).catch(() => undefined);
+  }).catch((err) =>
+    console.error("[notification] tryDeliverTaskApprovedNotification failed:", err),
+  );
 });
 
 on(EventTypes.TASK_REJECTED, async (e) => {
@@ -212,7 +222,9 @@ on(EventTypes.TASK_REJECTED, async (e) => {
     taskId: e.taskId,
     reviewerName: e.reviewerName,
     rejectionReason: e.rejectionReason,
-  }).catch(() => undefined);
+  }).catch((err) =>
+    console.error("[notification] tryDeliverTaskRejectedNotification failed:", err),
+  );
 });
 
 on(EventTypes.TASK_CLARIFICATION_REQUESTED, async (e) => {
@@ -227,7 +239,9 @@ on(EventTypes.TASK_CLARIFICATION_REQUESTED, async (e) => {
     taskId: e.taskId,
     reviewerName: e.reviewerName,
     questions: e.questions,
-  }).catch(() => undefined);
+  }).catch((err) =>
+    console.error("[notification] tryDeliverClarificationNotification failed:", err),
+  );
 });
 
 // Notify assignees when a task they were assigned to is deleted
@@ -247,5 +261,7 @@ on(EventTypes.TASK_DELETED, async (e) => {
     taskId: e.taskId,
     reviewerName: e.agentName,
     rejectionReason: "This task has been deleted.",
-  }).catch(() => undefined);
+  }).catch((err) =>
+    console.error("[notification] tryDeliverTaskRejectedNotification (task deleted) failed:", err),
+  );
 });
