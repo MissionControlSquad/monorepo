@@ -15,6 +15,7 @@ import { parseMentionIds } from "@agentcenter/utils";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
+import { parsePaginationParams } from "../../../_lib/pagination";
 import { validateBody, createChannelMessageSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
 import { apiLimiters, checkRateLimit } from "../../../_lib/rate-limit-check";
@@ -36,7 +37,7 @@ export async function GET(request: Request, ctx: RouteContext) {
 
     const { searchParams } = new URL(request.url);
     const unreadOnly = searchParams.get("unreadOnly") !== "false";
-    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 1), 200);
+    const { limit } = parsePaginationParams(searchParams, { defaultLimit: 50, maxLimit: 200 });
 
     const sinceDate = membership.lastReadAt ?? membership.joinedAt;
 

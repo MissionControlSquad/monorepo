@@ -2,6 +2,7 @@ import { projectModel, agentModel } from "@/server/models";
 import { resolveAgent } from "../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
 import { validateBody, createProjectSchema } from "../_lib/validation";
+import { parsePaginationParams } from "../_lib/pagination";
 import { ProjectStatus, ProjectMemberStatus } from "@/server/constants";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { squadLeadRequired } from "../_lib/project-access";
@@ -12,8 +13,10 @@ export async function GET(request: Request) {
     const agent = await resolveAgent(request);
 
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(parseInt(searchParams.get("limit") ?? "100", 10) || 100, 500);
-    const offset = Math.max(parseInt(searchParams.get("offset") ?? "0", 10) || 0, 0);
+    const { limit, offset } = parsePaginationParams(searchParams, {
+      defaultLimit: 100,
+      maxLimit: 500,
+    });
 
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
     const projects = await projectModel.findMany({

@@ -9,6 +9,7 @@ import { log } from "../_lib/logger";
 import { isSystemShutdown } from "@/server/system-settings";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS, QueueItemStatus, Priority, QueueItemType } from "@agentcenter/utils";
+import { parsePaginationParams } from "../_lib/pagination";
 
 export async function GET(request: Request) {
   try {
@@ -31,8 +32,10 @@ export async function GET(request: Request) {
       where.status = status;
     }
 
-    const limit = Math.min(parseInt(searchParams.get("limit") ?? "200", 10) || 200, 500);
-    const offset = Math.max(parseInt(searchParams.get("offset") ?? "0", 10) || 0, 0);
+    const { limit, offset } = parsePaginationParams(searchParams, {
+      defaultLimit: 200,
+      maxLimit: 500,
+    });
 
     const items = await agentQueueItemModel.findMany({
       where,

@@ -3,14 +3,17 @@ export const dynamic = "force-dynamic";
 import { listUserNotifications } from "@agentcenter/database";
 import { resolveUserId } from "../_lib/resolve-session";
 import { successResponse, handleError } from "../_lib/json-response";
+import { parsePaginationParams } from "../_lib/pagination";
 
 export async function GET(request: Request) {
   try {
     const { userId } = await resolveUserId(request);
     const { searchParams } = new URL(request.url);
 
-    const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 100);
-    const offset = Math.max(parseInt(searchParams.get("offset") ?? "0", 10) || 0, 0);
+    const { limit, offset } = parsePaginationParams(searchParams, {
+      defaultLimit: 50,
+      maxLimit: 100,
+    });
     const status = searchParams.get("status"); // pending | sent | read
     const channel = searchParams.get("channel"); // in_app | push | email
 
