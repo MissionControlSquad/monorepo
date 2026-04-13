@@ -66,6 +66,7 @@ import {
 import { ProfileAvatar } from "../components/ui/ProfileAvatar";
 import { MarkdownEditor } from "../components/common/MarkdownEditor";
 import { MarkdownWithMentions } from "../components/common/MarkdownWithMentions";
+import { Roles } from "@/server/constants";
 import { TimeAgo } from "../components/common/TimeAgo";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 import { WhenFeatureEnabled } from "../components/context/FeatureFlagContext";
@@ -754,7 +755,7 @@ function ProjectDetailPanel({
 
   const memberProfileIds = project.members?.map((m) => m.profileId) ?? [];
   const squadLeadProfileId = allProfiles.find(
-    (p: ProfileResult) => p.agent?.role === "Squad Lead",
+    (p: ProfileResult) => p.agent?.role === Roles.SQUAD_LEAD,
   )?.id;
 
   const handleSave = async () => {

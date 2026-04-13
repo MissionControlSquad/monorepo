@@ -23,6 +23,7 @@ import { AgentStatusBadge, StatusDot } from "./AgentStatusBadge";
 import { StatusHistoryTimeline } from "./StatusHistoryTimeline";
 import { useAgentStatus } from "../context/AgentStatusContext";
 import type { AgentDetailedStatus } from "../../lib/constants";
+import { Roles } from "@/server/constants";
 import { MentionTextArea } from "../common/MentionTextArea";
 import { useMentionData, useMentionSuggestions } from "../context/MentionDataContext";
 import { CopyButton } from "../common/CopyButton";
@@ -112,9 +113,9 @@ function AgentDetailContent({
   );
   const isDeactivated = agent?.setupStatus === "deactivated";
   const isLastLead =
-    agent?.role === "Squad Lead" &&
+    agent?.role === Roles.SQUAD_LEAD &&
     !isDeactivated &&
-    (agents?.filter((a: Agent) => a.role === "Squad Lead" && a.setupStatus !== "deactivated")
+    (agents?.filter((a: Agent) => a.role === Roles.SQUAD_LEAD && a.setupStatus !== "deactivated")
       .length ?? 0) <= 1;
 
   const startEditing = useCallback(() => {

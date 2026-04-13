@@ -18,6 +18,23 @@
 
 import type { AgentInfo } from "@agentcenter/types";
 
+const DELIVER_TIMEOUT_MS = 10_000;
+const LIST_AGENTS_TIMEOUT_MS = 5_000;
+
+/** Rejects after `ms` milliseconds with a timeout error. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`[openclaw-local] ${label} timed out after ${ms}ms`)),
+      ms,
+    );
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
+
 /**
  * Read the Agent ID from an agent's IDENTITY.md workspace file.
  * Returns null if the file doesn't exist or the field isn't present.
@@ -112,7 +129,7 @@ export async function listLocalAgents(): Promise<AgentInfo[]> {
 
   // Primary path: use OpenClaw runtime API
   if (typeof oc?.agents?.list === "function") {
-    const raw: any[] = await oc.agents.list();
+    const raw: any[] = await withTimeout(oc.agents.list(), LIST_AGENTS_TIMEOUT_MS, "listLocalAgents");
     return Promise.all(
       raw.map(async (a: any) => {
         const slug = a.slug ?? a.id ?? a.name;
@@ -155,13 +172,21 @@ export async function deliverToLocalAgent(agentSlug: string, taskNotification: s
   // Equivalent to: openclaw system event --text "..." --mode now --to <slug>
   const oc = (globalThis as any).openclaw;
   if (typeof oc.system?.event === "function") {
-    await oc.system.event({ text: taskNotification, to: agentSlug, mode: "now" });
+    await withTimeout(
+      oc.system.event({ text: taskNotification, to: agentSlug, mode: "now" }),
+      DELIVER_TIMEOUT_MS,
+      `deliverToLocalAgent(${agentSlug})`,
+    );
     return;
   }
 
   // Fallback: direct agent message (older OpenClaw runtimes).
   // openclaw agent -m "message" --to <slug>
-  await oc.agents.sendMessage(agentSlug, taskNotification);
+  await withTimeout(
+    oc.agents.sendMessage(agentSlug, taskNotification),
+    DELIVER_TIMEOUT_MS,
+    `deliverToLocalAgent:sendMessage(${agentSlug})`,
+  );
 }
 
 /** Subscribe to agent status change events. */

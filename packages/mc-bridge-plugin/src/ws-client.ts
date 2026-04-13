@@ -144,7 +144,7 @@ export class MCBridgeWsClient {
 
       case "mc.error":
         console.error(`[agentcenter-bridge] MC error [${msg.code}]: ${msg.message}`);
-        if (msg.code === "auth_failed" || msg.code === "token_revoked") {
+        if (msg.code === "auth_failed" || msg.code === "token_revoked" || msg.code === "nonce_replay") {
           console.error("[agentcenter-bridge] Fatal auth error — stopping reconnect. Check your token.");
           this.running = false;
         }

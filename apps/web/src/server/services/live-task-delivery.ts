@@ -21,6 +21,7 @@
 import { findConnectionByAgentSlug, enqueuePendingDelivery } from "@agentcenter/database";
 import { connectionRegistry } from "./live-connection-registry";
 import { LIVE_GATEWAY } from "@agentcenter/types";
+import { Roles } from "../constants";
 
 /** Same threshold as heartbeat-preflight overlapping check. */
 const OVERLAPPING_TTL_MS = 5 * 60 * 1000;
@@ -188,7 +189,7 @@ async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Prom
     try {
       const connection = await findConnectionByAgentSlug(slug);
       if (!connection) continue; // offline — heartbeat handles it
-      connectionRegistry.send(connection.id, {
+      const sent = connectionRegistry.send(connection.id, {
         type: "mc.notify",
         agentSlug: slug,
         kind: opts.kind,
@@ -198,8 +199,16 @@ async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Prom
         channelId: opts.channelId,
         fromHandle: opts.fromHandle,
       });
-    } catch {
-      // swallow — notifications are best-effort
+      if (!sent) {
+        console.warn(
+          `[live-delivery] Notification "${opts.kind}" not delivered to ${slug} — heartbeat fallback applies`,
+        );
+      }
+    } catch (err) {
+      console.error(
+        `[live-delivery] Unexpected error delivering "${opts.kind}" to agent ${slug}:`,
+        err,
+      );
     }
   }
 }
@@ -208,18 +217,54 @@ async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Prom
  * Live push for @mention events.
  * Called after notification.ts creates the Notification DB record.
  * agentIds = the mentionedAgentIds from the MESSAGE_CREATED event.
+ *
+ * Splits agents into assigned vs unassigned so each group receives
+ * appropriate instructions:
+ *  - Assigned agents: full PLAYBOOK instruction (they own the task).
+ *  - Unassigned agents: read/reply only (no ownership — just a heads-up).
  */
 export async function tryDeliverMentionNotification(
   agentIds: string[],
   opts: { fromName: string; taskTitle: string; taskId: string; messageId?: string },
 ): Promise<void> {
   if (!agentIds.length) return;
-  await sendNotifyToAgents(agentIds, {
-    kind: "mention",
-    content: `${opts.fromName} mentioned you in task "${opts.taskTitle.slice(0, 200)}" (task ID: ${opts.taskId}). Check the task, respond if needed, and follow your PLAYBOOK.`,
-    taskId: opts.taskId,
-    messageId: opts.messageId,
-  });
+
+  const { prisma } = await import("../prisma");
+
+  // Find which of the mentioned agents are actually assigned to this task.
+  const assignments = await prisma.taskAssignee
+    .findMany({
+      where: { taskId: opts.taskId, profile: { agentId: { in: agentIds } } },
+      select: { profile: { select: { agentId: true } } },
+    })
+    .catch(() => []);
+
+  const assignedSet = new Set(
+    assignments.map((a) => a.profile?.agentId).filter(Boolean) as string[],
+  );
+
+  const assignedIds = agentIds.filter((id) => assignedSet.has(id));
+  const unassignedIds = agentIds.filter((id) => !assignedSet.has(id));
+
+  // Assigned agents: full PLAYBOOK context — they are expected to act on this task.
+  if (assignedIds.length) {
+    await sendNotifyToAgents(assignedIds, {
+      kind: "mention",
+      content: `${opts.fromName} mentioned you in task "${opts.taskTitle.slice(0, 200)}" (task ID: ${opts.taskId}). Check the message and respond if needed, then continue your PLAYBOOK for this task.`,
+      taskId: opts.taskId,
+      messageId: opts.messageId,
+    });
+  }
+
+  // Unassigned agents: read/reply only — they are not responsible for the task.
+  if (unassignedIds.length) {
+    await sendNotifyToAgents(unassignedIds, {
+      kind: "mention",
+      content: `${opts.fromName} mentioned you in task "${opts.taskTitle.slice(0, 200)}" (task ID: ${opts.taskId}). You are not assigned to this task — read the message and reply if needed via POST /api/tasks/${opts.taskId}/messages. Do not take ownership or run your task PLAYBOOK.`,
+      taskId: opts.taskId,
+      messageId: opts.messageId,
+    });
+  }
 }
 
 /**
@@ -238,7 +283,9 @@ export async function tryDeliverInboxTaskNotification(
   let agentIds: string[];
 
   if (projectId) {
-    // Find all profiles that are active members of the project
+    // Find squad lead agents who are active members of the project.
+    // Regular members don't need to act on unassigned inbox tasks —
+    // squad leads triage and assign them, triggering the normal assignment flow.
     const members = await prisma.projectMember
       .findMany({
         where: { projectId, status: "active" },
@@ -246,14 +293,33 @@ export async function tryDeliverInboxTaskNotification(
       })
       .catch(() => []);
 
-    agentIds = members
+    const projectAgentIds = members
       .filter((m) => m.profile?.kind === "agent" && m.profile?.agentId)
       .map((m) => m.profile!.agentId as string)
       .filter((id) => !excludeAgentIds.includes(id));
+
+    if (!projectAgentIds.length) {
+      agentIds = [];
+    } else {
+      const squadLeads = await prisma.agent
+        .findMany({
+          where: { id: { in: projectAgentIds }, role: Roles.SQUAD_LEAD },
+          select: { id: true },
+        })
+        .catch(() => []);
+      agentIds = squadLeads.map((a) => a.id);
+    }
   } else {
-    // No project scope — avoid broadcasting to all agents (too noisy).
-    // Heartbeat handles global inbox visibility. Only project-scoped inbox gets live push.
-    return;
+    // No project scope — only squad leads handle unassigned/unscoped tasks.
+    // Once they assign to specific agents the normal assignment flow takes over.
+    const squadLeads = await prisma.agent
+      .findMany({
+        where: { setupStatus: "active", role: Roles.SQUAD_LEAD },
+        select: { id: true },
+      })
+      .catch(() => []);
+
+    agentIds = squadLeads.map((a) => a.id).filter((id) => !excludeAgentIds.includes(id));
   }
 
   if (!agentIds.length) return;
@@ -261,6 +327,33 @@ export async function tryDeliverInboxTaskNotification(
   await sendNotifyToAgents(agentIds, {
     kind: "inbox_task",
     content: `New task in inbox: "${taskTitle.slice(0, 200)}" (task ID: ${taskId}). Check the inbox and pick it up if appropriate per your PLAYBOOK.`,
+    taskId,
+  });
+}
+
+/**
+ * Live push when a task moves to "done".
+ * Looks up current assignees from the DB and notifies them.
+ */
+export async function tryDeliverTaskDoneNotification(
+  taskId: string,
+  taskTitle: string,
+): Promise<void> {
+  const { prisma } = await import("../prisma");
+
+  const assignments = await prisma.taskAssignee
+    .findMany({
+      where: { taskId },
+      select: { profile: { select: { agentId: true } } },
+    })
+    .catch(() => []);
+
+  const agentIds = assignments.map((a) => a.profile?.agentId).filter(Boolean) as string[];
+  if (!agentIds.length) return;
+
+  await sendNotifyToAgents(agentIds, {
+    kind: "task_approved",
+    content: `Task "${taskTitle.slice(0, 200)}" (task ID: ${taskId}) is now done. Update your records per your PLAYBOOK.`,
     taskId,
   });
 }
@@ -344,7 +437,7 @@ export async function tryDeliverReviewNotification(
   // Filter to squad leads only
   const squadLeads = await prisma.agent
     .findMany({
-      where: { id: { in: agentIds }, role: "Squad Lead" },
+      where: { id: { in: agentIds }, role: Roles.SQUAD_LEAD },
       select: { id: true },
     })
     .catch(() => []);

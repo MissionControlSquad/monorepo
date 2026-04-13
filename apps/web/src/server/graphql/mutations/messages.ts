@@ -7,6 +7,7 @@ import {
 } from "@agentcenter/database";
 import { pubsub, messageTopic } from "../../pubsub";
 import { parseMentionIds } from "@agentcenter/utils";
+import { tryMentionAutoAssign } from "../../services/mention-auto-assign";
 
 builder.mutationField("createMessage", (t) =>
   t.prismaField({
@@ -97,6 +98,14 @@ builder.mutationField("createMessage", (t) =>
       const mentionedAgentIds = mentionedProfiles
         .map((p) => p.agentId)
         .filter((id): id is string => id != null);
+
+      // Auto-assign mentioned agents if sender is a Squad Lead.
+      // Must run BEFORE emitCreated so the mention notification handler already
+      // sees the correct assignment state when it checks it.
+      const fromAgentId = fromProfile?.agentId;
+      if (fromAgentId) {
+        await tryMentionAutoAssign({ taskId: args.taskId, fromAgentId, mentionedAgentIds });
+      }
 
       await messageModel.emitCreated(message, {
         taskNumber: task?.taskNumber,

@@ -10,6 +10,7 @@ import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { validateBody, createMessageSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
+import { tryMentionAutoAssign } from "@/server/services/mention-auto-assign";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -146,6 +147,11 @@ export async function POST(request: Request, ctx: RouteContext) {
         },
       },
     });
+
+    // Auto-assign mentioned agents if sender is a Squad Lead.
+    // Must run BEFORE emitCreated so the mention notification handler already
+    // sees the correct assignment state when it checks it.
+    await tryMentionAutoAssign({ taskId, fromAgentId: agent.id, mentionedAgentIds });
 
     await messageModel.emitCreated(message, {
       taskNumber: task?.taskNumber,

@@ -41,6 +41,7 @@ import type {
   VMErrorCode,
 } from "@agentcenter/types";
 import { LIVE_GATEWAY } from "@agentcenter/types";
+import { TaskStatus } from "../constants";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -72,6 +73,9 @@ async function resolveAgentBySlugOrId(
       .findUnique({ where: { id: agentId }, select: { id: true } })
       .catch(() => null);
     if (byId) return byId;
+    console.warn(
+      `[live-gateway] Agent ID "${agentId}" not found, falling back to username lookup for slug "${slug}"`,
+    );
   }
   return prisma.agent
     .findUnique({ where: { username: slug }, select: { id: true } })
@@ -219,7 +223,9 @@ async function handleAgentsReport(connectionId: string, msg: MsgAgentsReport): P
           currentTaskId: info.currentTaskId ?? null,
         } as any,
       })
-      .catch(() => undefined);
+      .catch((err) =>
+        console.error(`[live-gateway] Failed to update agent status for ${info.slug}:`, err),
+      );
     pubsub.publish(PubSubEvent.AGENT.STATUS_CHANGED, { agentId: agent.id });
   }
 }
@@ -240,7 +246,9 @@ async function handleAgentStatus(_connectionId: string, msg: MsgAgentStatus): Pr
         currentTaskId: msg.currentTaskId ?? null,
       } as any,
     })
-    .catch(() => undefined);
+    .catch((err) =>
+      console.error(`[live-gateway] Failed to update agent status for ${msg.slug}:`, err),
+    );
   pubsub.publish(PubSubEvent.AGENT.STATUS_CHANGED, { agentId: agent.id });
 }
 
@@ -277,20 +285,84 @@ async function handleAgentMessage(_connectionId: string, msg: MsgAgentMessage): 
 
 // ─── vm.task_done handler ─────────────────────────────────────────────────────
 
-async function handleTaskDone(_connectionId: string, msg: MsgTaskDone): Promise<void> {
+async function handleTaskDone(connectionId: string, msg: MsgTaskDone): Promise<void> {
   const { prisma } = await import("../prisma");
-  await prisma.task
-    .updateMany({
-      where: { id: msg.taskId },
-      data: { status: "done" },
+
+  // Security: verify the reporting agent is actually assigned to the task.
+  // A malicious or misconfigured plugin cannot mark arbitrary tasks as done.
+  const agent = await resolveAgentBySlugOrId(prisma, msg.slug);
+  if (!agent) {
+    console.warn(
+      `[live-gateway] vm.task_done: unknown agent slug "${msg.slug}" from connection ${connectionId} — rejected`,
+    );
+    return;
+  }
+
+  const isAssigned = await prisma.taskAssignee
+    .findFirst({
+      where: { taskId: msg.taskId, profile: { agentId: agent.id } },
+      select: { id: true },
     })
-    .catch(() => undefined);
+    .catch(() => null);
+
+  if (!isAssigned) {
+    console.warn(
+      `[live-gateway] vm.task_done: agent "${msg.slug}" is not assigned to task ${msg.taskId} — rejected`,
+    );
+    return;
+  }
+
+  // Fetch the task to get current status (needed for fromStatus in the event).
+  const task = await prisma.task
+    .findUnique({
+      where: { id: msg.taskId },
+      select: { id: true, taskNumber: true, title: true, status: true, projectId: true },
+    })
+    .catch(() => null);
+  if (!task) return;
+
+  if (task.status === TaskStatus.DONE) return; // already done — idempotent
+
+  await prisma.task
+    .update({ where: { id: msg.taskId }, data: { status: TaskStatus.DONE } })
+    .catch((err) => console.error(`[live-gateway] Failed to mark task ${msg.taskId} done:`, err));
+
   pubsub.publish(PubSubEvent.TASK.UPDATED, { taskId: msg.taskId });
+
+  // Emit TASK_STATUS_CHANGED so task subscribers get notified and live delivery
+  // fires (tryDeliverTaskDoneNotification in notification.ts handles this event).
+  const { taskModel } = await import("../models/task");
+  await taskModel
+    .emitStatusChanged(task, {
+      fromStatus: task.status,
+      toStatus: TaskStatus.DONE,
+      changedBy: agent.id,
+    })
+    .catch((err) =>
+      console.error(`[live-gateway] emitStatusChanged failed for task ${msg.taskId}:`, err),
+    );
 }
 
 // ─── vm.task_ack handler ──────────────────────────────────────────────────────
 
-async function handleTaskAck(msg: MsgTaskAck): Promise<void> {
+async function handleTaskAck(connectionId: string, msg: MsgTaskAck): Promise<void> {
+  const { prisma } = await import("../prisma");
+
+  // Security: only the connection that owns the delivery may ack it.
+  // Prevents a malicious plugin from clearing another agent's pending delivery.
+  const delivery = await prisma.livePendingDelivery
+    .findUnique({ where: { id: msg.deliveryId }, select: { connectionId: true } })
+    .catch(() => null);
+
+  if (!delivery) return; // already received or expired — no-op
+
+  if (delivery.connectionId !== connectionId) {
+    console.warn(
+      `[live-gateway] vm.task_ack: connection ${connectionId} attempted to ack delivery ${msg.deliveryId} owned by ${delivery.connectionId} — rejected`,
+    );
+    return;
+  }
+
   await markDeliveryReceived(msg.deliveryId);
 }
 
@@ -389,7 +461,8 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
         }
 
         case "vm.task_ack": {
-          await handleTaskAck(msg);
+          if (!connectionId) return;
+          await handleTaskAck(connectionId, msg);
           break;
         }
 

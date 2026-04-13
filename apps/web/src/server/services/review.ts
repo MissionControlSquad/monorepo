@@ -49,12 +49,21 @@ export async function performApproveTask(params: {
 
   const reviewerProfileId = await getOrCreateAgentProfileId(reviewer.id);
 
+  const fromStatusApprove = task.status;
   await Promise.all([
     taskModel.update(taskId, { data: { status: TaskStatus.DONE } }),
     messageModel.create({
       data: { taskId, fromProfileId: reviewerProfileId, content: comment },
     }),
   ]);
+
+  await taskModel
+    .emitStatusChanged(task, {
+      fromStatus: fromStatusApprove,
+      toStatus: TaskStatus.DONE,
+      changedBy: reviewer.id,
+    })
+    .catch((err) => console.error("[review] emitStatusChanged (approve) failed", err));
 
   // Create child tasks
   const childTaskIds: string[] = [];
@@ -150,6 +159,7 @@ export async function performRejectTask(params: {
 
   const reviewerProfileId = await getOrCreateAgentProfileId(reviewer.id);
 
+  const fromStatusReject = task.status;
   await Promise.all([
     taskModel.update(taskId, { data: { status: TaskStatus.ASSIGNED } }),
     messageModel.create({
@@ -160,6 +170,14 @@ export async function performRejectTask(params: {
       },
     }),
   ]);
+
+  await taskModel
+    .emitStatusChanged(task, {
+      fromStatus: fromStatusReject,
+      toStatus: TaskStatus.ASSIGNED,
+      changedBy: reviewer.id,
+    })
+    .catch((err) => console.error("[review] emitStatusChanged (reject) failed", err));
 
   const assigneeAgentIds = task.assignees
     .map((a: any) => a.profile?.agentId)
@@ -198,6 +216,13 @@ export async function performRequestClarification(params: {
   // Ensure task stays in review status
   if (task.status !== TaskStatus.REVIEW) {
     await taskModel.update(taskId, { data: { status: TaskStatus.REVIEW } });
+    await taskModel
+      .emitStatusChanged(task, {
+        fromStatus: task.status,
+        toStatus: TaskStatus.REVIEW,
+        changedBy: reviewer.id,
+      })
+      .catch((err) => console.error("[review] emitStatusChanged (clarification) failed", err));
   }
 
   const questionList = questions.map((q, i) => `${i + 1}. ${q}`).join("\n");
