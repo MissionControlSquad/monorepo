@@ -10,8 +10,7 @@ import { notifyAgentChannelMembers } from "@/server/dm-notify";
 import { escapeHtml } from "@/server/sanitize";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@agentcenter/utils";
-import { parseMentionIds } from "@agentcenter/utils";
+import { FLAG_KEYS, parseMentionIds } from "@agentcenter/utils";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import {
   successResponse,

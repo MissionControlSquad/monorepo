@@ -13,8 +13,7 @@ import { pubsub, PubSubEvent } from "@/server/pubsub";
 import { ensureAgentProfile } from "@/server/agent-profile";
 import type { z } from "zod/v4";
 import type { createAgentSchema } from "../../_lib/validation";
-import type { AgentConfigFile, AgentSetupResult } from "@agentcenter/utils";
-import { getAgentSlug } from "@agentcenter/utils";
+import { getAgentSlug, type AgentConfigFile, type AgentSetupResult } from "@agentcenter/utils";
 import { AgentStatus, SetupStatus, AgentLevel } from "@/server/constants";
 
 type CreateAgentInput = z.infer<typeof createAgentSchema>;
