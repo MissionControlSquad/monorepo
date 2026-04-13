@@ -229,3 +229,23 @@ on(EventTypes.TASK_CLARIFICATION_REQUESTED, async (e) => {
     questions: e.questions,
   }).catch(() => undefined);
 });
+
+// Notify assignees when a task they were assigned to is deleted
+on(EventTypes.TASK_DELETED, async (e) => {
+  if (!e.assigneeIds?.length) return;
+
+  await Promise.all(
+    e.assigneeIds.map((agentId) =>
+      notify(agentId, `Task "${e.title}" was deleted by ${e.agentName}`, e.taskId),
+    ),
+  );
+
+  // Live push — use task_rejected kind as the closest semantic match
+  // (agent should stop working on the task immediately)
+  tryDeliverTaskRejectedNotification(e.assigneeIds, {
+    taskTitle: e.title,
+    taskId: e.taskId,
+    reviewerName: e.agentName,
+    rejectionReason: "This task has been deleted.",
+  }).catch(() => undefined);
+});

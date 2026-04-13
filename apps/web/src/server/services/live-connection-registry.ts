@@ -47,8 +47,14 @@ export class LiveConnectionRegistry {
   send(connectionId: string, msg: MCToPlugin): boolean {
     const conn = this.map.get(connectionId);
     if (!conn || conn.ws.readyState !== 1 /* OPEN */) return false;
-    conn.ws.send(JSON.stringify(msg));
-    return true;
+    try {
+      conn.ws.send(JSON.stringify(msg));
+      return true;
+    } catch (err) {
+      console.error(`[live-registry] WS send failed for ${connectionId}:`, err);
+      this.remove(connectionId);
+      return false;
+    }
   }
 
   /** Returns connectionIds that have not sent a message within ttlMs. */

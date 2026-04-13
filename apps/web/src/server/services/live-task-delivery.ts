@@ -188,7 +188,7 @@ async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Prom
     try {
       const connection = await findConnectionByAgentSlug(slug);
       if (!connection) continue; // offline — heartbeat handles it
-      connectionRegistry.send(connection.id, {
+      const sent = connectionRegistry.send(connection.id, {
         type: "mc.notify",
         agentSlug: slug,
         kind: opts.kind,
@@ -198,6 +198,11 @@ async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Prom
         channelId: opts.channelId,
         fromHandle: opts.fromHandle,
       });
+      if (!sent) {
+        console.warn(
+          `[live-delivery] Notification "${opts.kind}" not delivered to ${slug} — heartbeat fallback applies`,
+        );
+      }
     } catch {
       // swallow — notifications are best-effort
     }
