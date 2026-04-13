@@ -30,4 +30,8 @@ export const ERR = {
   NOT_CHANNEL_MEMBER: "Not a member of this channel",
   NOT_YOUR_QUEUE_ITEM: "Not your queue item",
   NOT_YOUR_DELIVERABLE: "Not your deliverable",
+
+  // 403 — feature unavailable
+  FEATURE_REVIEWS_UNAVAILABLE: "Reviews feature is not available on your current plan",
+  FEATURE_CHANNELS_UNAVAILABLE: "Channels feature is not available on your current plan",
 } as const;

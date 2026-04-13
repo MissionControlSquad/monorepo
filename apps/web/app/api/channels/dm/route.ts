@@ -59,7 +59,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     if (!(await isFeatureEnabled(FLAG_KEYS.CHANNELS))) {
-      return errorResponse("Channels feature is not available on your current plan", 403);
+      return errorResponse(ERR.FEATURE_CHANNELS_UNAVAILABLE, 403);
     }
     const v = await validateBody(request, createDMSchema);
     if (v.error) return v.error;

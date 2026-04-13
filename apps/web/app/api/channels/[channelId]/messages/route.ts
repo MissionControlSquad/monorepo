@@ -60,7 +60,7 @@ export async function GET(request: Request, ctx: RouteContext) {
 
 export async function POST(request: Request, ctx: RouteContext) {
   if (!(await isFeatureEnabled(FLAG_KEYS.CHANNELS))) {
-    return errorResponse("Channels feature is not available on your current plan", 403);
+    return errorResponse(ERR.FEATURE_CHANNELS_UNAVAILABLE, 403);
   }
   const limited = await checkRateLimit(apiLimiters.channels, request);
   if (limited) return limited;

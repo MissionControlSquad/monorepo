@@ -27,7 +27,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const { id: taskId } = await ctx.params;
 
     if (!(await isFeatureEnabled(FLAG_KEYS.REVIEWS))) {
-      return errorResponse("Reviews feature is not available on your current plan", 403);
+      return errorResponse(ERR.FEATURE_REVIEWS_UNAVAILABLE, 403);
     }
     if (await isSystemShutdown()) {
       return errorResponse("System is in shutdown mode. No task approvals allowed.", 503);
