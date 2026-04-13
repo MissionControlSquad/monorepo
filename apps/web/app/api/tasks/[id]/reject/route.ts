@@ -1,11 +1,10 @@
-import { Roles } from "@/server/constants";
 import { taskModel } from "@/server/models/task";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { validateBody, rejectTaskSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
-import { assertProjectMember } from "../../../_lib/project-access";
+import { assertProjectMember, squadLeadRequired } from "../../../_lib/project-access";
 import { isSystemShutdown } from "@/server/system-settings";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
@@ -26,9 +25,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (await isSystemShutdown()) {
       return errorResponse("System is in shutdown mode. No task rejections allowed.", 503);
     }
-    if (reviewer.role !== Roles.SQUAD_LEAD) {
-      return errorResponse("Only Squad Lead can reject tasks", 403);
-    }
+    const guard = squadLeadRequired(reviewer);
+    if (guard) return guard;
 
     const task = await taskModel.findById(taskId, {
       select: { projectId: true, taskNumber: true },

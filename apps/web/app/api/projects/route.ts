@@ -2,8 +2,9 @@ import { projectModel, agentModel } from "@/server/models";
 import { resolveAgent } from "../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
 import { validateBody, createProjectSchema } from "../_lib/validation";
-import { Roles, ProjectStatus, ProjectMemberStatus } from "@/server/constants";
+import { ProjectStatus, ProjectMemberStatus } from "@/server/constants";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
+import { squadLeadRequired } from "../_lib/project-access";
 import { checkLicenseLimit } from "@/server/license";
 
 export async function GET(request: Request) {
@@ -44,9 +45,8 @@ export async function POST(request: Request) {
     if (v.error) return v.error;
     const agent = await resolveAgent(request);
 
-    if (agent.role !== Roles.SQUAD_LEAD) {
-      return errorResponse("Only Squad Lead can create projects", 403);
-    }
+    const guard = squadLeadRequired(agent);
+    if (guard) return guard;
 
     const { name, description, memberIds } = v.data;
 

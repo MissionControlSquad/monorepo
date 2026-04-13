@@ -2,6 +2,18 @@ import { projectMemberModel } from "@/server/models";
 import { memberCache, projectIdsCache } from "@/server/cache";
 import { Roles, ProjectStatus, ProjectMemberStatus } from "@/server/constants";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
+import { errorResponse } from "./json-response";
+
+/**
+ * Returns a 403 Response if the agent is not a Squad Lead, otherwise null.
+ * Use as an early-return guard in route handlers.
+ */
+export function squadLeadRequired(agent: { role: string }): Response | null {
+  if (agent.role !== Roles.SQUAD_LEAD) {
+    return errorResponse("Only Squad Lead can perform this action", 403);
+  }
+  return null;
+}
 
 /**
  * Throws { error, status: 403 } if agent is not an ACTIVE member of projectId.
