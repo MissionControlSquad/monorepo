@@ -8,12 +8,8 @@
  */
 
 import { prisma } from "../src/server/prisma";
-import {
-  agentCache,
-  agentListCache,
-  memberCache,
-  projectIdsCache,
-} from "../src/server/cache";
+import { SetupStatus, DeliverableKind, Priority } from "../src/server/constants";
+import { agentCache, agentListCache, memberCache, projectIdsCache } from "../src/server/cache";
 import { adminSetup, adminLogin, buildRequest, callRoute } from "../tests/helpers";
 
 import { POST as createAgent } from "../app/api/agents/create/route";
@@ -41,17 +37,30 @@ const numChildTasks = CONFIG.numTasks - CONFIG.numRootTasks - CONFIG.numParentTa
 type AgentCred = { agentId: string; apiKey: string };
 
 const TITLES = [
-  "Implement auth flow", "Refactor API layer", "Add unit tests", "Fix responsive layout",
-  "Document API", "Optimize queries", "Setup CI pipeline", "Design system tokens",
-  "E2E test checkout", "Migrate to React 19", "Accessibility audit", "Deploy to staging",
+  "Implement auth flow",
+  "Refactor API layer",
+  "Add unit tests",
+  "Fix responsive layout",
+  "Document API",
+  "Optimize queries",
+  "Setup CI pipeline",
+  "Design system tokens",
+  "E2E test checkout",
+  "Migrate to React 19",
+  "Accessibility audit",
+  "Deploy to staging",
 ];
 const DESCRIPTIONS = [
   "As a user I need to complete the flow so that we meet the acceptance criteria.",
   "Technical approach: we will iterate and test. Acceptance criteria: covered by specs.",
 ];
 const COMMENT_BODIES = [
-  "LGTM, just one nit on the naming.", "I'll take this one.", "Waiting on design.",
-  "Done in branch feature/seed.", "Let's sync tomorrow on this.", "Moved to review.",
+  "LGTM, just one nit on the naming.",
+  "I'll take this one.",
+  "Waiting on design.",
+  "Done in branch feature/seed.",
+  "Let's sync tomorrow on this.",
+  "Moved to review.",
 ];
 const DELIVERABLE_TITLES = ["Summary doc", "API spec", "Screenshots", "Test report", "README"];
 
@@ -96,12 +105,13 @@ async function run() {
         'Agent username "seed-lead" already exists. Delete that agent or use a fresh DB if you need to re-seed from scratch.',
       );
     }
-    if (res.status !== 201) throw new Error(`Create agent failed: ${res.status} ${await res.text()}`);
+    if (res.status !== 201)
+      throw new Error(`Create agent failed: ${res.status} ${await res.text()}`);
     const data = await res.json();
     squadLeadCred = { agentId: data.agent.id, apiKey: data.apiKey };
     await prisma.agent.update({
       where: { id: squadLeadCred.agentId },
-      data: { setupStatus: "active" },
+      data: { setupStatus: SetupStatus.ACTIVE },
     });
     agentCache.clear();
   }
@@ -124,7 +134,7 @@ async function run() {
     agentCreds.push({ agentId: data.agent.id, apiKey: data.apiKey });
     await prisma.agent.update({
       where: { id: data.agent.id },
-      data: { setupStatus: "active" },
+      data: { setupStatus: SetupStatus.ACTIVE },
     });
   }
   agentCache.clear();
@@ -165,7 +175,7 @@ async function run() {
         description: pick(DESCRIPTIONS),
         projectId,
         assigneeIds,
-        priority: pick(["low", "medium", "high"]),
+        priority: pick([Priority.LOW, Priority.MEDIUM, Priority.HIGH]),
       },
     });
     const res = await callRoute(createTaskHandler, req);
@@ -220,7 +230,7 @@ async function run() {
         apiKey: pick(agentCreds).apiKey,
         body: {
           title: `${pick(DELIVERABLE_TITLES)} ${int(1, 999)}`,
-          kind: pick(["markdown", "code", "file", "link"]),
+          kind: pick(Object.values(DeliverableKind)),
           content: "Seed content via API",
         },
       });
@@ -229,7 +239,9 @@ async function run() {
       delCount++;
     }
     if ((ti + 1) % 200 === 0) {
-      console.log(`   Tasks ${ti + 1}/${tasks.length} → messages ${msgCount}, deliverables ${delCount}`);
+      console.log(
+        `   Tasks ${ti + 1}/${tasks.length} → messages ${msgCount}, deliverables ${delCount}`,
+      );
     }
   }
 

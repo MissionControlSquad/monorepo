@@ -26,7 +26,7 @@ import {
   PROJECTS_QUERY,
   PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
-import { formatDate, PRIORITY_VALUES } from "@agentcenter/utils";
+import { formatDate, PRIORITY_VALUES, RecurringFrequency } from "@agentcenter/utils";
 import { EmptyState } from "../src/components/EmptyState";
 import { FormField } from "../src/components/FormField";
 import { StatusPill } from "../src/components/StatusPill";
@@ -68,13 +68,13 @@ function parseFreqLabel(config: unknown): string {
       frequency?: string; interval?: number; daysOfWeek?: number[]; dayOfMonth?: number;
       time?: string; type?: string;
     };
-    if (c.frequency === "daily") return "Daily";
-    if (c.frequency === "weekly") {
+    if (c.frequency === RecurringFrequency.DAILY) return "Daily";
+    if (c.frequency === RecurringFrequency.WEEKLY) {
       const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const dayNames = (c.daysOfWeek ?? []).map((d) => days[d]).join(", ");
       return c.interval ? `Every ${c.interval}w · ${dayNames}` : `Weekly · ${dayNames}`;
     }
-    if (c.frequency === "monthly") return `Monthly · day ${c.dayOfMonth ?? 1}`;
+    if (c.frequency === RecurringFrequency.MONTHLY) return `Monthly · day ${c.dayOfMonth ?? 1}`;
     if (c.type) return String(c.type);
     return typeof config === "string" ? config : JSON.stringify(config);
   } catch {

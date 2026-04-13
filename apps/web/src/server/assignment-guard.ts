@@ -1,6 +1,7 @@
 import { agentModel } from "./models";
 import { findProfilesWithAgentId, findAgentsUnavailableByIds } from "@agentcenter/database";
 import { isSystemShutdown, isProjectShutdown } from "./system-settings";
+import { SetupStatus } from "./constants";
 
 /**
  * Prisma where-clause that matches agents who CANNOT receive tasks.
@@ -9,8 +10,8 @@ import { isSystemShutdown, isProjectShutdown } from "./system-settings";
  */
 export const UNAVAILABLE_AGENT_WHERE = {
   OR: [
-    { setupStatus: "pending_setup" as const },
-    { setupStatus: "deactivated" as const },
+    { setupStatus: SetupStatus.PENDING_SETUP },
+    { setupStatus: SetupStatus.DEACTIVATED },
     { isOnVacation: true },
   ],
 };
@@ -23,9 +24,9 @@ function unavailableReason(agent: {
   setupStatus: string;
   isOnVacation: boolean;
 }): string | undefined {
-  if (agent.setupStatus === "deactivated")
+  if (agent.setupStatus === SetupStatus.DEACTIVATED)
     return "Deactivated agents cannot be assigned. Reactivate them first.";
-  if (agent.setupStatus === "pending_setup")
+  if (agent.setupStatus === SetupStatus.PENDING_SETUP)
     return "Agents with incomplete setup cannot be assigned. Complete setup first.";
   if (agent.isOnVacation) return "Agent is on vacation.";
   return undefined;

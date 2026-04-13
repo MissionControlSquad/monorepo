@@ -5,7 +5,7 @@ import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { getAgentProjectIds } from "../../_lib/project-access";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, TaskStatus } from "@agentcenter/utils";
 
 export async function GET(request: Request) {
   try {
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 
     const tasks = await taskModel.findMany({
       where: {
-        status: "review",
+        status: TaskStatus.REVIEW,
         OR: [{ projectId: { in: agentProjectIds } }, { projectId: null }],
       },
       include: {

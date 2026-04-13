@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "../client";
+import { ChannelVisibility, ChannelMemberRole } from "@agentcenter/utils";
 
 export async function createDmChannel(
   creatorProfileId: string,
@@ -15,13 +16,13 @@ export async function createDmChannel(
     data: {
       name: "Direct message",
       slug,
-      visibility: "dm",
+      visibility: ChannelVisibility.DM,
       projectId: null,
       createdByProfileId: creatorProfileId,
       members: {
         create: [
-          { profileId: creatorProfileId, role: "creator" },
-          { profileId: otherProfileId, role: "member" },
+          { profileId: creatorProfileId, role: ChannelMemberRole.CREATOR },
+          { profileId: otherProfileId, role: ChannelMemberRole.MEMBER },
         ],
       },
     },

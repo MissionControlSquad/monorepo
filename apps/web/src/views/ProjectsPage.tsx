@@ -10,6 +10,7 @@ import { ProjectCard } from "../components/project/ProjectCard";
 import { CreateProjectModal } from "../components/project/CreateProjectModal";
 import { Breadcrumbs, Button, Input, EmptyState, SkeletonList, PageLayout } from "../components/ui";
 import type { Project } from "@agentcenter/types";
+import { ProjectStatus } from "@/server/constants";
 
 export function ProjectsPage() {
   const router = useRouter();
@@ -25,8 +26,8 @@ export function ProjectsPage() {
   } = useSearch(projects, (p: Project, q) => p.name.toLowerCase().includes(q));
 
   const filtered = searchFiltered?.slice().sort((a: Project, b: Project) => {
-    const aWeight = a.status === "archived" ? 2 : a.shutdownActive ? 1 : 0;
-    const bWeight = b.status === "archived" ? 2 : b.shutdownActive ? 1 : 0;
+    const aWeight = a.status === ProjectStatus.ARCHIVED ? 2 : a.shutdownActive ? 1 : 0;
+    const bWeight = b.status === ProjectStatus.ARCHIVED ? 2 : b.shutdownActive ? 1 : 0;
     return aWeight - bWeight;
   });
 

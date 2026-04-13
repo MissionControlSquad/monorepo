@@ -10,6 +10,7 @@ import {
 } from "@agentcenter/database";
 
 export type { OnboardingProgress };
+import { ProjectStatus } from "./constants";
 
 export async function isSystemShutdown(): Promise<boolean> {
   const row = await getOrCreateSystemSettings();
@@ -52,7 +53,7 @@ export async function setProjectShutdown(projectId: string, active: boolean): Pr
 export async function assertProjectWritable(projectId: string): Promise<void> {
   const project = await getProjectStatus(projectId);
   if (!project) throw new Error("Project not found");
-  if (project.status === "archived") {
+  if (project.status === ProjectStatus.ARCHIVED) {
     throw new Error("This project is archived. No modifications allowed.");
   }
   if (project.shutdownActive) {

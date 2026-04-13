@@ -17,7 +17,7 @@
  *  - Never throws — all errors are caught and logged.
  */
 
-import { Roles } from "../constants";
+import { Roles, ProjectMemberStatus } from "../constants";
 import { getOrCreateAgentProfileId } from "../agent-profile";
 import { taskModel } from "../models";
 
@@ -109,7 +109,7 @@ export async function tryMentionAutoAssign(opts: MentionAutoAssignOpts): Promise
             .upsert({
               where: { projectId_profileId: { projectId: task.projectId!, profileId } },
               create: { projectId: task.projectId!, profileId },
-              update: { status: "active" },
+              update: { status: ProjectMemberStatus.ACTIVE },
             })
             .catch(() => undefined),
         ),

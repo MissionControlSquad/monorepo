@@ -3,6 +3,7 @@ import { generateUploadUrl } from "@/server/storage/r2";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
 import { storageUploadSchema } from "../../_lib/validation";
+import { StoragePrefix } from "@/server/constants";
 
 /**
  * POST /api/storage/upload
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
   }
 
   const { fileName, mimeType, prefix } = parsed.data;
-  const storagePrefix = prefix === "attachments" ? "attachments" : "deliverables";
+  const storagePrefix =
+    prefix === StoragePrefix.ATTACHMENTS ? StoragePrefix.ATTACHMENTS : StoragePrefix.DELIVERABLES;
 
   try {
     const result = await generateUploadUrl(fileName, mimeType, storagePrefix);

@@ -5,6 +5,8 @@ import { agentModel, agentActionModel, taskModel } from "../models";
 import { applyAgentStatusUpdate } from "../agent-status";
 import { ensureAgentProfile } from "../agent-profile";
 import { isSystemShutdown } from "../system-settings";
+import { SetupStatus, AgentStatus, type AgentStatusValue } from "../constants";
+import { trimAndCap } from "@agentcenter/utils";
 
 const ACTION_TO_DETAILED_STATUS: Record<string, string> = {
   file_edited: "coding",
@@ -40,7 +42,7 @@ const syncIdentitySchema = baseEventSchema.extend({
 
 const statusChangedSchema = baseEventSchema.extend({
   type: z.literal("agent.status_changed"),
-  status: z.enum(["idle", "active", "blocked"]),
+  status: z.enum(Object.values(AgentStatus) as [AgentStatusValue, ...AgentStatusValue[]]),
   detailedStatus: z.string().nullish(),
   statusMessage: z.string().nullish(),
   currentTaskId: z.string().nullish(),
@@ -115,18 +117,16 @@ export async function processEvent(event: unknown, apiKey: string): Promise<unkn
 
       // Agents cannot self-assign role or level — those are admin-only fields.
       // Normalize and cap string lengths to avoid abuse/DoS
-      const trimCap = (s: unknown, max: number): string | undefined =>
-        s !== undefined && s !== null ? String(s).trim().slice(0, max) || undefined : undefined;
       const rawVersion =
         e.configVersion !== undefined && e.configVersion !== null ? String(e.configVersion) : null;
-      const configVersion = rawVersion != null ? rawVersion.trim().slice(0, 64) || null : null;
+      const configVersion = rawVersion != null ? trimAndCap(rawVersion, 64, true) : null;
 
-      const nameVal = trimCap(e.name, 500);
-      const avatar = trimCap(e.avatar, 2048);
-      const usernameVal = trimCap(e.username, 64);
-      const personality = trimCap(e.personality, 5000);
-      const workspacePath = trimCap(e.workspacePath, 500);
-      const identityEmoji = trimCap(e.identityEmoji, 16);
+      const nameVal = trimAndCap(e.name, 500);
+      const avatar = trimAndCap(e.avatar, 2048);
+      const usernameVal = trimAndCap(e.username, 64);
+      const personality = trimAndCap(e.personality, 5000);
+      const workspacePath = trimAndCap(e.workspacePath, 500);
+      const identityEmoji = trimAndCap(e.identityEmoji, 16);
       const resolvedName = nameVal && nameVal.length > 0 ? nameVal : agent.name;
       const updates = {
         name: resolvedName ?? agent.name,
@@ -137,14 +137,14 @@ export async function processEvent(event: unknown, apiKey: string): Promise<unkn
         ...(identityEmoji !== undefined && { identityEmoji }),
         lastHeartbeat: new Date(),
         ...(configVersion !== null && { configVersion }),
-        ...(agent.setupStatus === "pending_setup" && { setupStatus: "active" as const }),
+        ...(agent.setupStatus === SetupStatus.PENDING_SETUP && { setupStatus: SetupStatus.ACTIVE }),
       };
 
       await applyAgentStatusUpdate(agent.id, updates);
 
       await ensureAgentProfile(agent.id);
 
-      if (agent.setupStatus === "pending_setup") {
+      if (agent.setupStatus === SetupStatus.PENDING_SETUP) {
         await agentModel.emitJoined({ id: agent.id, name: resolvedName ?? agent.name });
       }
 
@@ -163,7 +163,7 @@ export async function processEvent(event: unknown, apiKey: string): Promise<unkn
       await agentModel.emitStatusChanged(agent, {
         toStatus: e.status as any,
         toDetailedStatus:
-          e.status === "idle" ? undefined : ((e.detailedStatus as any) ?? undefined),
+          e.status === AgentStatus.IDLE ? undefined : ((e.detailedStatus as any) ?? undefined),
         statusMessage: e.statusMessage ?? undefined,
         currentTaskId: e.currentTaskId ?? undefined,
         currentTask: e.currentTask ?? undefined,

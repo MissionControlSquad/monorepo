@@ -9,6 +9,7 @@ import {
 } from "@/server/agent-config-generator";
 import { workspacePathUnix } from "@/server/workspace-paths";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { AgentLevel } from "@/server/constants";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -44,7 +45,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
       username: agentSlug,
       identityEmoji: agent.identityEmoji || "🤖",
       personality: agent.personality || "",
-      level: agent.level || "specialist",
+      level: agent.level || AgentLevel.SPECIALIST,
       capabilities: template?.capabilities,
       templateId: agent.templateId || undefined,
     };

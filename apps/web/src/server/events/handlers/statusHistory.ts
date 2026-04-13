@@ -1,7 +1,7 @@
 import { on } from "../bus";
 import { invalidateTransitionIds } from "../../cache";
 import { statusHistoryModel } from "../../models";
-import { EventTypes } from "../../constants";
+import { EventTypes, AgentStatus } from "../../constants";
 
 /** Direct status updates (cron auto-sleep, deactivate, etc.) — same row shape as agent.status_changed */
 on(EventTypes.AGENT_STATUS_APPLIED, async (e) => {
@@ -19,14 +19,14 @@ on(EventTypes.AGENT_STATUS_APPLIED, async (e) => {
   invalidateTransitionIds();
 });
 
-on("agent.woke_up", async (e) => {
-  if (e.type !== "agent.woke_up") return;
-  if (e.previousStatus === "active") return; // No-op if already active
+on(EventTypes.AGENT_WOKE_UP, async (e) => {
+  if (e.type !== EventTypes.AGENT_WOKE_UP) return;
+  if (e.previousStatus === AgentStatus.ACTIVE) return; // No-op if already active
   await statusHistoryModel.create({
     data: {
       agentId: e.agentId,
       fromStatus: e.previousStatus as any,
-      toStatus: "active",
+      toStatus: AgentStatus.ACTIVE,
       fromDetailedStatus: (e.previousDetailedStatus as any) ?? undefined,
       toDetailedStatus: (e.detailedStatus as any) ?? "thinking",
     },
@@ -34,14 +34,14 @@ on("agent.woke_up", async (e) => {
   invalidateTransitionIds();
 });
 
-on("agent.went_to_sleep", async (e) => {
-  if (e.type !== "agent.went_to_sleep") return;
-  if (e.previousStatus === "idle") return; // No-op
+on(EventTypes.AGENT_WENT_TO_SLEEP, async (e) => {
+  if (e.type !== EventTypes.AGENT_WENT_TO_SLEEP) return;
+  if (e.previousStatus === AgentStatus.IDLE) return; // No-op
   await statusHistoryModel.create({
     data: {
       agentId: e.agentId,
       fromStatus: e.previousStatus as any,
-      toStatus: "idle",
+      toStatus: AgentStatus.IDLE,
       fromDetailedStatus: (e.previousDetailedStatus as any) ?? undefined,
       toDetailedStatus: undefined,
     },
@@ -49,8 +49,8 @@ on("agent.went_to_sleep", async (e) => {
   invalidateTransitionIds();
 });
 
-on("agent.status_changed", async (e) => {
-  if (e.type !== "agent.status_changed") return;
+on(EventTypes.AGENT_STATUS_CHANGED, async (e) => {
+  if (e.type !== EventTypes.AGENT_STATUS_CHANGED) return;
   await statusHistoryModel.create({
     data: {
       agentId: e.agentId,

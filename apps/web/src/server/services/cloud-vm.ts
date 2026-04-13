@@ -15,7 +15,7 @@ import { generateApiKey } from "../api-key";
 import { randomBytes } from "crypto";
 import { computeCronSchedule } from "../agent-config-generator";
 import { isFeatureEnabled } from "../feature-flags";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, CloudVmStatus } from "@agentcenter/utils";
 import {
   createServer,
   getServer,
@@ -63,7 +63,7 @@ async function setStep(vmId: string, status: string, setupStep: string, setupPro
 
 async function failVM(vmId: string, step: string, error: string) {
   await updateVM(vmId, {
-    status: "error",
+    status: CloudVmStatus.ERROR,
     errorMessage: `Failed at step "${step}": ${error}`,
     errorAt: new Date(),
     setupStep: null,
@@ -159,7 +159,7 @@ export async function createCloudVM(params: CreateCloudVMParams): Promise<{ vmId
   const vm = await createCloudVMRecord({
     name: name || null,
     provider: "hetzner",
-    status: "provisioning",
+    status: CloudVmStatus.PROVISIONING,
     serverName,
     region,
     serverType,
@@ -221,13 +221,13 @@ export async function provisionVM(vmId: string): Promise<void> {
 
   try {
     // Step 3: Poll Hetzner until server = running
-    await setStep(vmId, "waiting_for_ssh", "waiting_for_hetzner", 15);
+    await setStep(vmId, CloudVmStatus.WAITING_FOR_SSH, "waiting_for_hetzner", 15);
     await log(vmId, "Waiting for Hetzner server to be ready...");
 
     let serverReady = false;
     for (let i = 0; i < 60; i++) {
       const serverInfo = await getServer(vm.externalServerId);
-      if (serverInfo.status === "running") {
+      if (serverInfo.status === CloudVmStatus.RUNNING) {
         serverReady = true;
         break;
       }
@@ -239,7 +239,7 @@ export async function provisionVM(vmId: string): Promise<void> {
     }
 
     // Step 4: Poll SSH until connection succeeds
-    await setStep(vmId, "waiting_for_ssh", "waiting_for_ssh", 20);
+    await setStep(vmId, CloudVmStatus.WAITING_FOR_SSH, CloudVmStatus.WAITING_FOR_SSH, 20);
     await log(vmId, "Server running, waiting for SSH to become available...");
 
     const sshConfig = getVMSSHConfig(vm);
@@ -259,7 +259,7 @@ export async function provisionVM(vmId: string): Promise<void> {
     await log(vmId, "SSH connection established");
 
     // Step 5: apt-get update + install system deps + security packages
-    await setStep(vmId, "installing_deps", "apt_update", 30);
+    await setStep(vmId, CloudVmStatus.INSTALLING_DEPS, "apt_update", 30);
     await log(vmId, "Installing system dependencies and security packages...");
 
     let result = await sshExec(
@@ -282,7 +282,7 @@ export async function provisionVM(vmId: string): Promise<void> {
     }
 
     // Step 6: Install Node.js 22 (required by OpenClaw)
-    await setStep(vmId, "installing_deps", "install_nodejs", 45);
+    await setStep(vmId, CloudVmStatus.INSTALLING_DEPS, "install_nodejs", 45);
     await log(vmId, "Installing Node.js 22...");
 
     result = await sshExec(
@@ -304,7 +304,7 @@ export async function provisionVM(vmId: string): Promise<void> {
     }
 
     // Step 6b: Security hardening — dedicated user, firewall, SSH, auto-updates
-    await setStep(vmId, "installing_deps", "security_hardening", 50);
+    await setStep(vmId, CloudVmStatus.INSTALLING_DEPS, "security_hardening", 50);
     await log(vmId, "Applying security hardening...");
 
     // Create dedicated non-root user for OpenClaw
@@ -420,7 +420,7 @@ export async function provisionVM(vmId: string): Promise<void> {
     );
 
     // Step 7: Install OpenClaw globally via npm
-    await setStep(vmId, "installing_openclaw", "install_openclaw", 60);
+    await setStep(vmId, CloudVmStatus.INSTALLING_OPENCLAW, "install_openclaw", 60);
     await log(vmId, "Installing OpenClaw...");
 
     result = await sshExec(sshConfig, "npm install -g openclaw@latest", { timeoutMs: 300_000 });
@@ -435,7 +435,7 @@ export async function provisionVM(vmId: string): Promise<void> {
     }
 
     // Step 7b: Install Docker for sandbox isolation
-    await setStep(vmId, "installing_deps", "install_docker", 68);
+    await setStep(vmId, CloudVmStatus.INSTALLING_DEPS, "install_docker", 68);
     await log(vmId, "Installing Docker for sandbox isolation...");
 
     result = await sshExec(
@@ -492,7 +492,7 @@ export async function provisionVM(vmId: string): Promise<void> {
     }
 
     // Step 8: Set up OpenClaw home + workspace directories and write initial config
-    await setStep(vmId, "configuring", "setup_workspace", 75);
+    await setStep(vmId, CloudVmStatus.CONFIGURING, "setup_workspace", 75);
     await log(vmId, "Setting up OpenClaw workspace...");
 
     const gatewayToken = generateSecureToken();
@@ -568,7 +568,7 @@ export async function provisionVM(vmId: string): Promise<void> {
     await sshExec(sshConfig, `chown ${VM_USER}:${VM_USER} ${VM_CONFIG_PATH}`);
 
     // Step 9: Start OpenClaw daemon via systemd
-    await setStep(vmId, "starting_service", "start_daemon", 85);
+    await setStep(vmId, CloudVmStatus.STARTING_SERVICE, "start_daemon", 85);
     await log(vmId, "Starting OpenClaw daemon...");
 
     // Create a systemd service for OpenClaw — runs as dedicated non-root user
@@ -611,7 +611,7 @@ export async function provisionVM(vmId: string): Promise<void> {
     }
 
     // Step 10: Run security audit
-    await setStep(vmId, "configuring", "security_audit", 95);
+    await setStep(vmId, CloudVmStatus.CONFIGURING, "security_audit", 95);
     await log(vmId, "Running OpenClaw security audit...");
 
     const auditResult = await sshExec(
@@ -625,7 +625,7 @@ export async function provisionVM(vmId: string): Promise<void> {
 
     // Step 11: Done!
     await updateVM(vmId, {
-      status: "running",
+      status: CloudVmStatus.RUNNING,
       setupStep: null,
       setupProgress: 100,
       installedAt: new Date(),
@@ -648,7 +648,7 @@ async function cleanupAgentFromVM(
   agent: { id: string; name: string; username: string | null },
 ): Promise<void> {
   const oldVm = await getCloudVMOrThrow(oldVmId).catch(() => null);
-  if (!oldVm || oldVm.status !== "running" || !oldVm.ipv4 || !oldVm.sshPrivateKey) {
+  if (!oldVm || oldVm.status !== CloudVmStatus.RUNNING || !oldVm.ipv4 || !oldVm.sshPrivateKey) {
     // Old VM is not reachable — just clear the DB reference
     await log(oldVmId, `Skipping cleanup for agent "${agent.name}" — old VM not reachable`);
     return;
@@ -702,7 +702,7 @@ export async function assignAgentToVM(params: AssignAgentParams): Promise<void> 
   const { agentId, cloudVmId } = params;
 
   const vm = await getCloudVMOrThrow(cloudVmId);
-  if (vm.status !== "running") {
+  if (vm.status !== CloudVmStatus.RUNNING) {
     throw new Error("Can only assign agents to a running VM");
   }
 
@@ -829,11 +829,11 @@ export async function unassignAgentFromVM(agentId: string): Promise<void> {
 
 export async function destroyCloudVM(vmId: string): Promise<void> {
   const vm = await getCloudVMOrThrow(vmId);
-  if (vm.status === "destroyed") {
+  if (vm.status === CloudVmStatus.DESTROYED) {
     throw new Error("VM is already destroyed");
   }
 
-  await updateVM(vmId, { status: "destroying" });
+  await updateVM(vmId, { status: CloudVmStatus.DESTROYING });
 
   // Unassign all agents
   await updateManyAgentsByVm(vmId, { cloudVmId: null, hostingType: "selfHosted" });
@@ -861,7 +861,7 @@ export async function destroyCloudVM(vmId: string): Promise<void> {
   }
 
   await updateVM(vmId, {
-    status: "destroyed",
+    status: CloudVmStatus.DESTROYED,
     destroyedAt: new Date(),
     sshPrivateKey: null,
   });
@@ -873,7 +873,7 @@ export async function destroyCloudVM(vmId: string): Promise<void> {
 
 export async function stopCloudVM(vmId: string): Promise<void> {
   const vm = await getCloudVMOrThrow(vmId);
-  if (vm.status !== "running") {
+  if (vm.status !== CloudVmStatus.RUNNING) {
     throw new Error("Can only stop a running VM");
   }
   if (!vm.externalServerId) {
@@ -881,13 +881,13 @@ export async function stopCloudVM(vmId: string): Promise<void> {
   }
 
   await powerOff(vm.externalServerId);
-  await updateVM(vmId, { status: "stopped", stoppedAt: new Date() });
+  await updateVM(vmId, { status: CloudVmStatus.STOPPED, stoppedAt: new Date() });
   await log(vmId, "Server powered off");
 }
 
 export async function startCloudVM(vmId: string): Promise<void> {
   const vm = await getCloudVMOrThrow(vmId);
-  if (vm.status !== "stopped") {
+  if (vm.status !== CloudVmStatus.STOPPED) {
     throw new Error("Can only start a stopped VM");
   }
   if (!vm.externalServerId) {
@@ -895,7 +895,7 @@ export async function startCloudVM(vmId: string): Promise<void> {
   }
 
   await powerOn(vm.externalServerId);
-  await updateVM(vmId, { status: "running", stoppedAt: null });
+  await updateVM(vmId, { status: CloudVmStatus.RUNNING, stoppedAt: null });
   await log(vmId, "Server powered on");
 }
 
@@ -1008,7 +1008,7 @@ export async function configureLLMOnVM(params: ConfigureLLMParams): Promise<void
   await validateApiKey(providerId, apiKey);
 
   const vm = await getCloudVMOrThrow(vmId);
-  if (vm.status !== "running") {
+  if (vm.status !== CloudVmStatus.RUNNING) {
     throw new Error("Can only configure LLM on a running VM");
   }
 
@@ -1138,7 +1138,7 @@ export async function configureLLMOnVM(params: ConfigureLLMParams): Promise<void
  */
 export async function setVMDefaultModel(vmId: string, model: string): Promise<void> {
   const vm = await getCloudVMOrThrow(vmId);
-  if (vm.status !== "running") {
+  if (vm.status !== CloudVmStatus.RUNNING) {
     throw new Error("Can only change model on a running VM");
   }
 
@@ -1183,7 +1183,7 @@ export async function setAgentModelOnVM(
   model: string | null,
 ): Promise<void> {
   const vm = await getCloudVMOrThrow(vmId);
-  if (vm.status !== "running") {
+  if (vm.status !== CloudVmStatus.RUNNING) {
     throw new Error("Can only change agent model on a running VM");
   }
 
@@ -1247,7 +1247,7 @@ export async function setAgentModelOnVM(
  */
 export async function repairOpenClawService(vmId: string): Promise<void> {
   const vm = await getCloudVMOrThrow(vmId);
-  if (vm.status !== "running") {
+  if (vm.status !== CloudVmStatus.RUNNING) {
     throw new Error("Can only repair a running VM");
   }
 

@@ -5,14 +5,15 @@ import { useMutation } from "urql";
 import { TOGGLE_CHANNEL_MESSAGE_REACTION } from "../../lib/graphql/mutations";
 import { Smile } from "lucide-react";
 import { Button } from "@/components/ui";
+import { MessageReactionEmoji } from "@/server/constants";
 
 export const EMOJI_MAP: Record<string, string> = {
-  "thumbs-up": "\ud83d\udc4d",
-  heart: "\u2764\ufe0f",
-  eyes: "\ud83d\udc40",
-  checkmark: "\u2705",
-  party: "\ud83c\udf89",
-  think: "\ud83e\udd14",
+  [MessageReactionEmoji.THUMBS_UP]: "\ud83d\udc4d",
+  [MessageReactionEmoji.HEART]: "\u2764\ufe0f",
+  [MessageReactionEmoji.EYES]: "\ud83d\udc40",
+  [MessageReactionEmoji.CHECKMARK]: "\u2705",
+  [MessageReactionEmoji.PARTY]: "\ud83c\udf89",
+  [MessageReactionEmoji.THINK]: "\ud83e\udd14",
 };
 
 export const EMOJI_KEYS = Object.keys(EMOJI_MAP);

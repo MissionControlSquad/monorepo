@@ -1,6 +1,7 @@
 import { agentModel } from "@/server/models";
 import { resolveAgent } from "../_lib/resolve-agent";
 import { successResponse, handleError } from "../_lib/json-response";
+import { ProjectMemberStatus } from "@/server/constants";
 
 /** Fields safe to expose via the REST API */
 const SAFE_AGENT_SELECT = {
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
 
     const agents = await agentModel.findMany({
       where: projectId
-        ? { projectMemberships: { some: { projectId, status: "active" } } }
+        ? { projectMemberships: { some: { projectId, status: ProjectMemberStatus.ACTIVE } } }
         : undefined,
       select: SAFE_AGENT_SELECT,
       orderBy: { name: "asc" },

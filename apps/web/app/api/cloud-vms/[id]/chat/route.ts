@@ -1,6 +1,7 @@
 import { findCloudVMConnection } from "@agentcenter/database";
 import { sshUploadFile } from "@/server/services/ssh";
 import { getVMSSHConfig, ocExecStream } from "@/server/services/cloud-vm-utils";
+import { CloudVmStatus } from "@/server/constants";
 
 /**
  * POST /api/cloud-vms/[id]/chat
@@ -30,7 +31,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
   }
 
-  if (vm.status !== "running" || !vm.ipv4 || !vm.sshPrivateKey) {
+  if (vm.status !== CloudVmStatus.RUNNING || !vm.ipv4 || !vm.sshPrivateKey) {
     return new Response(JSON.stringify({ error: "VM is not running" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },

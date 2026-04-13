@@ -8,6 +8,7 @@ import { SidebarPanelHeader } from "../SidebarPanelHeader";
 import { SidebarSkeleton } from "../SidebarSkeleton";
 import { SidebarEmptyState } from "../SidebarEmptyState";
 import { CLOUD_VM_STATUS_LABELS } from "@agentcenter/utils";
+import { CloudVmStatus } from "@/server/constants";
 
 interface CloudVM {
   id: string;
@@ -64,23 +65,22 @@ export function CloudPanel() {
 
   // Poll while transitional
   useEffect(() => {
-    const hasTransitional = vms.some((vm) =>
-      [
-        "provisioning",
-        "waiting_for_ssh",
-        "installing_deps",
-        "installing_openclaw",
-        "configuring",
-        "starting_service",
-        "destroying",
-      ].includes(vm.status),
-    );
+    const TRANSITIONAL: string[] = [
+      CloudVmStatus.PROVISIONING,
+      CloudVmStatus.WAITING_FOR_SSH,
+      CloudVmStatus.INSTALLING_DEPS,
+      CloudVmStatus.INSTALLING_OPENCLAW,
+      CloudVmStatus.CONFIGURING,
+      CloudVmStatus.STARTING_SERVICE,
+      CloudVmStatus.DESTROYING,
+    ];
+    const hasTransitional = vms.some((vm) => TRANSITIONAL.includes(vm.status));
     if (!hasTransitional) return;
     const interval = setInterval(fetchVMs, 5000);
     return () => clearInterval(interval);
   }, [vms, fetchVMs]);
 
-  const runningCount = vms.filter((vm) => vm.status === "running").length;
+  const runningCount = vms.filter((vm) => vm.status === CloudVmStatus.RUNNING).length;
 
   return (
     <div className="h-full flex flex-col">

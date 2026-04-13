@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../src/context/AuthContext";
 import { makeRequest } from "../../src/api/request";
-import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatUptime, formatCost, formatDate, CLOUD_VM_STATUS_LABELS, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatUptime, formatCost, formatDate, CLOUD_VM_STATUS_LABELS, CLOUD_VM_TRANSITIONAL_STATUSES, CloudVmStatus } from "@agentcenter/utils";
 import { InfoRow } from "../../src/components/InfoRow";
 import { ScreenLoading } from "../../src/components/ScreenLoading";
 
@@ -239,11 +239,11 @@ export default function CloudVMDetailScreen() {
   const statusColor = STATUS_HEX_COLORS[vm.status] ?? DEFAULT_COLOR;
   const statusLabel = STATUS_LABELS[vm.status] ?? vm.status;
   const displayName = vm.name || vm.serverName || vm.id.slice(0, 8);
-  const isRunning = vm.status === "running";
-  const isStopped = vm.status === "stopped";
-  const isError = vm.status === "error";
+  const isRunning = vm.status === CloudVmStatus.RUNNING;
+  const isStopped = vm.status === CloudVmStatus.STOPPED;
+  const isError = vm.status === CloudVmStatus.ERROR;
   const isTransitional = TRANSITIONAL.includes(vm.status);
-  const isDestroyed = vm.status === "destroyed";
+  const isDestroyed = vm.status === CloudVmStatus.DESTROYED;
 
   return (
     <>

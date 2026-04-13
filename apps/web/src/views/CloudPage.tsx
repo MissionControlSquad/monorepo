@@ -7,6 +7,7 @@ import { Server, Plus, Loader2, Globe, Cpu, Clock, Search } from "lucide-react";
 import { CreateVMDialog } from "../components/cloud/CreateVMDialog";
 import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout } from "../components/ui";
 import { formatUptime, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
+import { CloudVmStatus } from "@/server/constants";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 
 interface CloudVMAgent {
@@ -162,9 +163,9 @@ export function CloudPage() {
             {filtered.map((vm) => {
               const badgeInfo = STATUS_BADGE_VARIANT[vm.status] || STATUS_BADGE_VARIANT.error;
               const statusDot =
-                vm.status === "running"
+                vm.status === CloudVmStatus.RUNNING
                   ? "bg-success"
-                  : vm.status === "error"
+                  : vm.status === CloudVmStatus.ERROR
                     ? "bg-destructive"
                     : "bg-gray-400";
               return (

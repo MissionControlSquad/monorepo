@@ -9,7 +9,7 @@ import { useQuery } from "urql";
 import { useRouter, useNavigation } from "expo-router";
 import { useState, useEffect } from "react";
 import { PROJECTS_QUERY } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, DEFAULT_COLOR } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, DEFAULT_COLOR, ProjectStatus } from "@agentcenter/utils";
 import type { Project, ProjectMember } from "@agentcenter/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/hooks/useTheme";
@@ -73,8 +73,8 @@ export default function ProjectsScreen() {
 
   const filters: { key: StatusFilter; label: string }[] = [
     { key: "all", label: "All" },
-    { key: "active", label: "Active" },
-    { key: "archived", label: "Archived" },
+    { key: ProjectStatus.ACTIVE, label: "Active" },
+    { key: ProjectStatus.ARCHIVED, label: "Archived" },
   ];
 
   if (fetching && allProjects.length === 0) return <ScreenLoading />;

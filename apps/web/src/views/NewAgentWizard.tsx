@@ -25,7 +25,7 @@ import {
   MonitorDown,
 } from "lucide-react";
 import { AGENTS_QUERY } from "../lib/graphql/queries";
-import { Roles } from "@/server/constants";
+import { Roles, SetupStatus, AgentLevel, CloudVmStatus, Priority } from "@/server/constants";
 import { CREATE_TASK_FROM_DASHBOARD } from "../lib/graphql/mutations/tasks";
 import { Button, Badge } from "../components/ui";
 import { useFeatureFlag } from "../components/context/FeatureFlagContext";
@@ -127,7 +127,7 @@ const INITIAL_FORM: AgentWizardValues = {
   role: "",
   emoji: "",
   personality: "",
-  level: "specialist",
+  level: AgentLevel.SPECIALIST,
   workspacePath: "",
 };
 
@@ -142,7 +142,7 @@ export function NewAgentWizard() {
   const squadLeads =
     agentsResult.data?.agents?.filter(
       (a: { role?: string; setupStatus?: string }) =>
-        a.role === Roles.SQUAD_LEAD && a.setupStatus !== "deactivated",
+        a.role === Roles.SQUAD_LEAD && a.setupStatus !== SetupStatus.DEACTIVATED,
     ) ?? [];
   const hasSquadLead = squadLeads.length > 0;
   const cloudVmsEnabled = useFeatureFlag(FLAG_KEYS.CLOUD_VMS);
@@ -196,7 +196,7 @@ export function NewAgentWizard() {
           role: t.role ?? "",
           emoji: t.emoji ?? "",
           personality: t.personality ?? "",
-          level: t.level ?? "specialist",
+          level: t.level ?? AgentLevel.SPECIALIST,
         });
       } else {
         form.reset(INITIAL_FORM);
@@ -437,7 +437,7 @@ export function NewAgentWizard() {
                 {/* Action */}
                 <div className="pt-4 border-t border-border flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
-                    {previewTemplate.level === "lead"
+                    {previewTemplate.level === AgentLevel.LEAD
                       ? "Lead"
                       : previewTemplate.level === "intern"
                         ? "Intern"
@@ -696,7 +696,7 @@ export function NewAgentWizard() {
                 <Wrench className="w-4 h-4" />
                 Manual Setup
               </button>
-              {hasSquadLead && result?.agent?.level !== "lead" && (
+              {hasSquadLead && result?.agent?.level !== AgentLevel.LEAD && (
                 <button
                   onClick={() => setSetupMode("delegate")}
                   className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition ${
@@ -726,7 +726,7 @@ export function NewAgentWizard() {
                                 status: string;
                                 llmConfigured: boolean;
                                 name?: string;
-                              }) => vm.status === "running" && vm.llmConfigured,
+                              }) => vm.status === CloudVmStatus.RUNNING && vm.llmConfigured,
                             ),
                           );
                         }
@@ -1122,7 +1122,7 @@ export function NewAgentWizard() {
                             title: `Set up new agent: ${result.agent.name} (${result.agent.role})`,
                             description: taskDescription,
                             assigneeIds: [squadLeads[0].id],
-                            priority: "high",
+                            priority: Priority.HIGH,
                             tags: ["agent-setup"],
                           });
 

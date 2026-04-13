@@ -3,7 +3,7 @@ import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { validateBody, projectMemberSchema } from "../../../_lib/validation";
 import { assertProjectLead } from "../../../_lib/project-access";
-import { Roles } from "@/server/constants";
+import { Roles, ProjectMemberStatus } from "@/server/constants";
 import { invalidateProjectsList } from "@/server/cache";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 
@@ -49,7 +49,7 @@ export async function POST(request: Request, context: RouteContext) {
         projectId_profileId: { projectId, profileId },
       },
       create: { projectId, profileId },
-      update: { status: "active" },
+      update: { status: ProjectMemberStatus.ACTIVE },
     });
 
     await projectModel.emitMemberAdded({
@@ -107,7 +107,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       where: {
         projectId_profileId: { projectId, profileId },
       },
-      data: { status: "deactivated" },
+      data: { status: ProjectMemberStatus.DEACTIVATED },
     });
 
     await projectModel.emitMemberRemoved({

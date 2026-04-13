@@ -7,6 +7,7 @@
  */
 
 import { prisma } from "../client";
+import { ProfileKind } from "@agentcenter/utils";
 
 /** Human profile username suffix to avoid clashing with agent usernames (Profile.username is unique). */
 const HUMAN_USERNAME_SUFFIX = "_u";
@@ -43,7 +44,7 @@ export async function ensureUserAndProfileForAdmin(
   if (!profile) {
     profile = await prisma.profile.create({
       data: {
-        kind: "human",
+        kind: ProfileKind.HUMAN,
         displayName: config.displayName,
         username: config.profileUsername,
         userId: user.id,

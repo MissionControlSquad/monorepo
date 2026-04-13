@@ -1,4 +1,5 @@
 import { HEARTBEAT_TIMEOUT_MS, AGENT_DETAILED_STATUSES, STATUS_HEX_COLORS } from "./constants";
+import { SetupStatus } from "./domain-constants";
 import { DEFAULT_COLOR } from "./defaults";
 import { humanizeLabel } from "./format";
 
@@ -64,9 +65,9 @@ export function filterAgentsBySetup<
   T extends { name: string; role?: string | null; setupStatus: string },
 >(agents: T[], filter: AgentSetupFilter, search: string): T[] {
   let list = agents;
-  if (filter === "active") list = list.filter((a) => a.setupStatus === "active");
-  else if (filter === "pending") list = list.filter((a) => a.setupStatus === "pending_setup");
-  else if (filter === "deactivated") list = list.filter((a) => a.setupStatus === "deactivated");
+  if (filter === "active") list = list.filter((a) => a.setupStatus === SetupStatus.ACTIVE);
+  else if (filter === "pending") list = list.filter((a) => a.setupStatus === SetupStatus.PENDING_SETUP);
+  else if (filter === "deactivated") list = list.filter((a) => a.setupStatus === SetupStatus.DEACTIVATED);
   if (search.trim()) {
     const q = search.trim().toLowerCase();
     list = list.filter(

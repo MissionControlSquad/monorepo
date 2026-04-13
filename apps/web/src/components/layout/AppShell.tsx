@@ -21,6 +21,7 @@ import type { Agent } from "@agentcenter/types";
 import { Button } from "../ui";
 import { KeyboardShortcutsOverlay } from "../common/KeyboardShortcutsOverlay";
 import { useGoShortcuts } from "../../hooks/useGoShortcuts";
+import { SetupStatus } from "@/server/constants";
 const CreateTaskModal = lazy(() =>
   import("../task/CreateTaskModal").then((m) => ({ default: m.CreateTaskModal })),
 );
@@ -128,8 +129,8 @@ export function AppShell({ children, modal }: AppShellProps) {
   }
 
   // Show a "waiting" banner when all agents are pending_setup (none active yet)
-  const hasActiveAgent = agents!.some((a: Agent) => a.setupStatus === "active");
-  const hasPendingAgent = agents!.some((a: Agent) => a.setupStatus === "pending_setup");
+  const hasActiveAgent = agents!.some((a: Agent) => a.setupStatus === SetupStatus.ACTIVE);
+  const hasPendingAgent = agents!.some((a: Agent) => a.setupStatus === SetupStatus.PENDING_SETUP);
   const showWaitingBanner = hasPendingAgent && !hasActiveAgent;
 
   const isOnboarding = pathname === "/onboarding";

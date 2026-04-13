@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "../client";
+import { ProjectMemberStatus, ProfileKind } from "@agentcenter/utils";
 
 export async function getProjectHumanUserIds(taskId: string): Promise<string[]> {
   const task = await prisma.task.findUnique({
@@ -18,7 +19,7 @@ export async function getProjectHumanUserIds(taskId: string): Promise<string[]> 
 
 export async function getProjectHumanUserIdsByProjectId(projectId: string): Promise<string[]> {
   const members = await prisma.projectMember.findMany({
-    where: { projectId, status: "active" },
+    where: { projectId, status: ProjectMemberStatus.ACTIVE },
     select: {
       profile: {
         select: { userId: true, kind: true },
@@ -27,6 +28,6 @@ export async function getProjectHumanUserIdsByProjectId(projectId: string): Prom
   });
 
   return members
-    .filter((m) => m.profile.kind === "human" && m.profile.userId)
+    .filter((m) => m.profile.kind === ProfileKind.HUMAN && m.profile.userId)
     .map((m) => m.profile.userId!);
 }

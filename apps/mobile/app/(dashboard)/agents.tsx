@@ -17,6 +17,7 @@ import {
   getAgentStatusLabel,
   isAgentOnline,
   filterAgentsBySetup,
+  SetupStatus,
   type AgentSetupFilter,
 } from "@agentcenter/utils";
 import type { Agent } from "@agentcenter/types";
@@ -72,9 +73,9 @@ export default function AgentsScreen() {
 
   const counts = useMemo(() => ({
     all: allAgents.length,
-    active: allAgents.filter((a) => a.setupStatus === "active").length,
-    pending: allAgents.filter((a) => a.setupStatus === "pending_setup").length,
-    deactivated: allAgents.filter((a) => a.setupStatus === "deactivated").length,
+    active: allAgents.filter((a) => a.setupStatus === SetupStatus.ACTIVE).length,
+    pending: allAgents.filter((a) => a.setupStatus === SetupStatus.PENDING_SETUP).length,
+    deactivated: allAgents.filter((a) => a.setupStatus === SetupStatus.DEACTIVATED).length,
   }), [allAgents]);
 
   if (fetching && allAgents.length === 0) return <ScreenLoading />;
@@ -129,8 +130,8 @@ export default function AgentsScreen() {
         renderItem={({ item }) => {
           const online = isAgentOnline(item.lastHeartbeat);
           const statusColor = getAgentStatusColor(item);
-          const isPending = item.setupStatus === "pending_setup";
-          const isDeactivated = item.setupStatus === "deactivated";
+          const isPending = item.setupStatus === SetupStatus.PENDING_SETUP;
+          const isDeactivated = item.setupStatus === SetupStatus.DEACTIVATED;
 
           return (
             <TouchableOpacity

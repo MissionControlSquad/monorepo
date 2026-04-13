@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/shadcn/input";
 import { Button } from "@/components/ui";
 import { Loader2 } from "lucide-react";
+import { LicenseStatusCode } from "@/server/constants";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -42,10 +43,10 @@ export default function LoginPage() {
         if (!data.setupComplete) {
           router.replace("/setup");
         } else if (
-          data.license?.status === "none" ||
-          data.license?.status === "expired" ||
-          data.license?.status === "invalid" ||
-          data.license?.status === "revoked"
+          data.license?.status === LicenseStatusCode.NONE ||
+          data.license?.status === LicenseStatusCode.EXPIRED ||
+          data.license?.status === LicenseStatusCode.INVALID ||
+          data.license?.status === LicenseStatusCode.REVOKED
         ) {
           // License not active — redirect to activation
           router.replace("/activate");

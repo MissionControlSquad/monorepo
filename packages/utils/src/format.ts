@@ -2,6 +2,24 @@
  * Platform-agnostic formatting utilities shared across web, mobile, and Electron.
  */
 
+/**
+ * Trims whitespace and caps a value to maxLength characters.
+ * Returns undefined (or null when returnNull=true) for empty/null input.
+ * Use for sanitising user-supplied or agent-supplied strings before DB writes.
+ */
+export function trimAndCap(s: unknown, maxLength: number): string | undefined;
+export function trimAndCap(s: unknown, maxLength: number, returnNull: true): string | null;
+export function trimAndCap(
+  s: unknown,
+  maxLength: number,
+  returnNull?: boolean,
+): string | undefined | null {
+  if (s === undefined || s === null) return returnNull ? null : undefined;
+  const trimmed = String(s).trim().slice(0, maxLength);
+  if (!trimmed) return returnNull ? null : undefined;
+  return trimmed;
+}
+
 /** "just now", "5m ago", "2h ago", "3d ago", else "Jan 1" */
 export function formatRelativeTime(iso: string): string {
   const d = new Date(iso);

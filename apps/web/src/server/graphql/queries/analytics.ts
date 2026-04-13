@@ -1,6 +1,7 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
+import { TaskStatus } from "../../constants";
 import {
   getAgentTasksAssignedRaw,
   getAgentTasksCompletedRaw,
@@ -61,12 +62,12 @@ builder.queryField("taskStatusCounts", (t) =>
         total += c._count;
       }
 
-      const inbox = map["inbox"] ?? 0;
-      const assigned = map["assigned"] ?? 0;
-      const inProgress = map["in_progress"] ?? 0;
-      const review = map["review"] ?? 0;
-      const done = map["done"] ?? 0;
-      const blocked = map["blocked"] ?? 0;
+      const inbox = map[TaskStatus.INBOX] ?? 0;
+      const assigned = map[TaskStatus.ASSIGNED] ?? 0;
+      const inProgress = map[TaskStatus.IN_PROGRESS] ?? 0;
+      const review = map[TaskStatus.REVIEW] ?? 0;
+      const done = map[TaskStatus.DONE] ?? 0;
+      const blocked = map[TaskStatus.BLOCKED] ?? 0;
 
       const result = {
         inbox,

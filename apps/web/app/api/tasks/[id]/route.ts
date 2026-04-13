@@ -14,6 +14,7 @@ import {
   tryDeliverTaskToLiveAgents,
   tryDeliverReviewNotification,
 } from "@/server/services/live-task-delivery";
+import { TaskStatus, Priority } from "@/server/constants";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -155,7 +156,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
             taskId: task.id,
             taskTitle: task.title,
             taskDescription: (task as any).description ?? null,
-            priority: (task as any).priority ?? "medium",
+            priority: (task as any).priority ?? Priority.MEDIUM,
             assignedBy: agent.name,
           }).catch((err) => console.error("[live-task-delivery] error:", err));
         }
@@ -177,7 +178,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
       // Live gateway: notify squad leads immediately when task enters review.
       // Fire-and-forget — heartbeat (hasPendingReview) is the fallback.
-      if (body.status === "review") {
+      if (body.status === TaskStatus.REVIEW) {
         tryDeliverReviewNotification(task.id, task.projectId ?? null, task.title).catch(
           () => undefined,
         );

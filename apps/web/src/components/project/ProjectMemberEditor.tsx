@@ -7,6 +7,7 @@ import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { ProfilePickerDialog } from "../ui/ProfilePickerDialog";
 import type { ProfilePickerItem } from "../ui/ProfilePickerDialog";
 import type { ProfileWithAgent } from "@agentcenter/types";
+import { ProfileKind } from "@/server/constants";
 
 interface ProjectMemberEditorProps {
   profiles: ProfileWithAgent[];
@@ -49,8 +50,8 @@ export function ProjectMemberEditor({
   const pickerItems: ProfilePickerItem[] = availableProfiles.map((p) => ({
     id: p.id,
     name: p.displayName || p.username || p.id,
-    subtitle: p.agent?.role || (p.kind === "agent" ? "Agent" : null),
-    kind: p.kind === "agent" ? "agent" : "human",
+    subtitle: p.agent?.role || (p.kind === ProfileKind.AGENT ? "Agent" : null),
+    kind: p.kind === ProfileKind.AGENT ? ProfileKind.AGENT : ProfileKind.HUMAN,
     profileId: p.id,
   }));
 
@@ -99,7 +100,7 @@ export function ProjectMemberEditor({
                     <p className="text-xs text-muted-foreground truncate">{profile.agent.role}</p>
                   )}
                 </div>
-                {profile.kind === "agent" && <Badge variant="yellow">Agent</Badge>}
+                {profile.kind === ProfileKind.AGENT && <Badge variant="yellow">Agent</Badge>}
               </div>
             ))}
           </div>
@@ -147,7 +148,7 @@ export function ProjectMemberEditor({
                       <span className="text-sm font-medium text-foreground truncate">
                         {profile.displayName}
                       </span>
-                      {profile.kind === "agent" && <Badge variant="blue">Agent</Badge>}
+                      {profile.kind === ProfileKind.AGENT && <Badge variant="blue">Agent</Badge>}
                     </div>
                     {profile.agent?.role && (
                       <p className="text-xs text-muted-foreground truncate">{profile.agent.role}</p>

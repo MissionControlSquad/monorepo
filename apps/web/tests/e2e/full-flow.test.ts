@@ -27,6 +27,12 @@ import {
   callRoute,
   runGraphQL,
 } from "../helpers";
+import {
+  SetupStatus,
+  TaskStatus,
+  QueueItemStatus,
+  NotificationKind,
+} from "../../src/server/constants";
 
 // ─── Shared state across the sequential flow ───────────────────────
 let sessionCookie: string;
@@ -246,7 +252,7 @@ describe("3. Agent Management", () => {
     const data = await res.json();
     expect(data.agent.name).toBe("Rex");
     expect(data.agent.role).toBe("Frontend Developer");
-    expect(data.agent.setupStatus).toBe("pending_setup");
+    expect(data.agent.setupStatus).toBe(SetupStatus.PENDING_SETUP);
     expect(data.apiKey).toMatch(/^mc_/);
     expect(data.apiKey.length).toBe(67); // mc_ + 64 hex chars
     expect(data.configFiles).toBeDefined();
@@ -300,7 +306,7 @@ describe("3. Agent Management", () => {
     // Here we flip the status directly so Rex can use the API.
     await prisma.agent.update({
       where: { id: rexAgentId },
-      data: { setupStatus: "active" },
+      data: { setupStatus: SetupStatus.ACTIVE },
     });
     // Clear the agent cache so resolveAgent picks up the new status
     agentCache.clear();
@@ -309,7 +315,7 @@ describe("3. Agent Management", () => {
   it("activates Nova", async () => {
     await prisma.agent.update({
       where: { id: novaAgentId },
-      data: { setupStatus: "active" },
+      data: { setupStatus: SetupStatus.ACTIVE },
     });
     agentCache.clear();
   });
@@ -371,7 +377,7 @@ describe("3. Agent Management", () => {
   it("deactivated agent gets 403", async () => {
     await prisma.agent.update({
       where: { id: rexAgentId },
-      data: { setupStatus: "deactivated" },
+      data: { setupStatus: SetupStatus.DEACTIVATED },
     });
     agentCache.clear();
 
@@ -385,7 +391,7 @@ describe("3. Agent Management", () => {
     // Re-activate for subsequent tests
     await prisma.agent.update({
       where: { id: rexAgentId },
-      data: { setupStatus: "active" },
+      data: { setupStatus: SetupStatus.ACTIVE },
     });
     agentCache.clear();
   });
@@ -393,7 +399,7 @@ describe("3. Agent Management", () => {
   it("pending_setup agent gets 403", async () => {
     await prisma.agent.update({
       where: { id: rexAgentId },
-      data: { setupStatus: "pending_setup" },
+      data: { setupStatus: SetupStatus.PENDING_SETUP },
     });
     agentCache.clear();
 
@@ -407,7 +413,7 @@ describe("3. Agent Management", () => {
     // Re-activate
     await prisma.agent.update({
       where: { id: rexAgentId },
-      data: { setupStatus: "active" },
+      data: { setupStatus: SetupStatus.ACTIVE },
     });
     agentCache.clear();
   });
@@ -564,7 +570,7 @@ describe("4. Task Workflow", () => {
 
   it("assignment logged in activity feed", async () => {
     const activity = await prisma.activity.findFirst({
-      where: { taskId, type: "task_assigned" },
+      where: { taskId, type: NotificationKind.TASK_ASSIGNED },
     });
     expect(activity).toBeDefined();
     expect(activity!.message).toContain("+Nova");
@@ -599,7 +605,7 @@ describe("4. Task Workflow", () => {
   it("returns 404 when updating nonexistent task", async () => {
     const req = buildRequest("PATCH", "/api/tasks/nonexistent", {
       apiKey: rexApiKey,
-      body: { status: "done" },
+      body: { status: TaskStatus.DONE },
     });
     const res = await callRoute(updateTask, req, { id: "nonexistent" });
     expect(res.status).toBe(404);
@@ -1859,7 +1865,7 @@ describe("9. Project-Scoped Collaboration", () => {
 
     await prisma.agent.update({
       where: { id: kiaAgentId },
-      data: { setupStatus: "active" },
+      data: { setupStatus: SetupStatus.ACTIVE },
     });
     agentCache.clear();
   });
@@ -1876,7 +1882,7 @@ describe("9. Project-Scoped Collaboration", () => {
 
     await prisma.agent.update({
       where: { id: sageAgentId },
-      data: { setupStatus: "active" },
+      data: { setupStatus: SetupStatus.ACTIVE },
     });
     agentCache.clear();
   });
@@ -2330,13 +2336,13 @@ describe("10. Task Review Cycle", () => {
 
     const data = await res.json();
     expect(data.success).toBe(true);
-    expect(data.newStatus).toBe("done");
+    expect(data.newStatus).toBe(TaskStatus.DONE);
     expect(data.childTaskIds).toHaveLength(2);
 
     // Verify task is actually done
     const taskReq = buildRequest("GET", `/api/tasks/${projectTaskId}`, { apiKey: kiaApiKey });
     const taskRes = await callRoute(getTask, taskReq, { id: projectTaskId });
-    expect((await taskRes.json()).status).toBe("done");
+    expect((await taskRes.json()).status).toBe(TaskStatus.DONE);
 
     // Verify child tasks were created
     for (const childId of data.childTaskIds) {
@@ -2375,7 +2381,7 @@ describe("10. Task Review Cycle", () => {
     const data = await res.json();
     const rejectionItem = data.find((i: any) => i.generatedFrom === "review_rejection");
     expect(rejectionItem).toBeDefined();
-    expect(rejectionItem.status).toBe("completed");
+    expect(rejectionItem.status).toBe(QueueItemStatus.COMPLETED);
   });
 
   it("approving nonexistent task — 404", async () => {
@@ -2676,7 +2682,7 @@ describe("13. Agent Queue", () => {
     expect(autoItem).toBeDefined();
     expect(autoItem.title).toContain("Address review feedback");
     expect(autoItem.priority).toBe("high");
-    expect(autoItem.status).toBe("completed"); // approved event completed it
+    expect(autoItem.status).toBe(QueueItemStatus.COMPLETED); // approved event completed it
 
     // Clean up so we can test fresh queue creation with order=1
     await prisma.agentQueueItem.deleteMany({ where: { agentId: rexAgentId } });
@@ -2699,7 +2705,7 @@ describe("13. Agent Queue", () => {
     const data = await res.json();
     expect(data.title).toBe("Implement hero gradient animation");
     expect(data.priority).toBe("high");
-    expect(data.status).toBe("pending");
+    expect(data.status).toBe(QueueItemStatus.PENDING);
     expect(data.order).toBe(1);
     expect(data.relatedTaskId).toBe(projectTaskId);
     queueItemId = data.id;
@@ -2770,13 +2776,13 @@ describe("13. Agent Queue", () => {
   it("Rex completes the queue item — completedAt set", async () => {
     const req = buildRequest("PATCH", `/api/queue/${queueItemId}`, {
       apiKey: rexApiKey,
-      body: { status: "completed" },
+      body: { status: QueueItemStatus.COMPLETED },
     });
     const res = await callRoute(updateQueueItem, req, { id: queueItemId });
     expect(res.status).toBe(200);
 
     const data = await res.json();
-    expect(data.status).toBe("completed");
+    expect(data.status).toBe(QueueItemStatus.COMPLETED);
     expect(data.completedAt).toBeTruthy();
   });
 
@@ -2839,9 +2845,7 @@ describe("14. Kanban Board", () => {
 
     const board = await res.json();
     // Board should have all 6 status columns
-    expect(Object.keys(board)).toEqual(
-      expect.arrayContaining(["inbox", "assigned", "in_progress", "review", "blocked", "done"]),
-    );
+    expect(Object.keys(board)).toEqual(expect.arrayContaining(Object.values(TaskStatus)));
 
     // The approved project task should be in "done"
     const doneTasks = board.done;
@@ -3641,7 +3645,7 @@ describe("A. Agent Full Lifecycle Flow", () => {
     const activity = await prisma.activity.findFirst({
       where: {
         taskId: lifecycleTaskId,
-        type: "task_assigned",
+        type: NotificationKind.TASK_ASSIGNED,
         message: { contains: "+Nova" },
       },
     });
@@ -4189,7 +4193,7 @@ describe("D. Assignment & Subscription Edge Cases", () => {
     const activity = await prisma.activity.findFirst({
       where: {
         taskId: edgeTaskId,
-        type: "task_assigned",
+        type: NotificationKind.TASK_ASSIGNED,
         message: { contains: "-Nova" },
       },
     });
@@ -4242,7 +4246,7 @@ describe("D. Assignment & Subscription Edge Cases", () => {
     const activity = await prisma.activity.findFirst({
       where: {
         taskId: edgeTaskId,
-        type: "task_assigned",
+        type: NotificationKind.TASK_ASSIGNED,
         message: { contains: "+Nova" },
       },
       orderBy: { createdAt: "desc" },
@@ -4321,7 +4325,7 @@ describe("E. Activity & Notification Completeness", () => {
   it("moving task directly to 'done' creates task_completed activity", async () => {
     const req = buildRequest("PATCH", `/api/tasks/${actTaskId}`, {
       apiKey: rexApiKey,
-      body: { status: "done" },
+      body: { status: TaskStatus.DONE },
     });
     const res = await callRoute(updateTask, req, { id: actTaskId });
     expect(res.status).toBe(200);
@@ -4784,7 +4788,7 @@ describe("G. Pending Review, Events Ingest & Additional Routes", () => {
     // Task should be done now
     const taskReq = buildRequest("GET", `/api/tasks/${reviewTaskId}`, { apiKey: rexApiKey });
     const taskRes = await callRoute(getTask, taskReq, { id: reviewTaskId });
-    expect((await taskRes.json()).status).toBe("done");
+    expect((await taskRes.json()).status).toBe(TaskStatus.DONE);
   });
 
   // ── Project Context ───────────────────────────────────────────
@@ -4850,7 +4854,7 @@ describe("G. Pending Review, Events Ingest & Additional Routes", () => {
     // Activate the agent
     await prisma.agent.update({
       where: { id: tempAgent.id },
-      data: { setupStatus: "active" },
+      data: { setupStatus: SetupStatus.ACTIVE },
     });
     agentCache.clear();
 
@@ -4947,7 +4951,7 @@ describe("G. Pending Review, Events Ingest & Additional Routes", () => {
       updateQueueItem,
       buildRequest("PATCH", `/api/queue/${item.id}`, {
         apiKey: rexApiKey,
-        body: { status: "pending" },
+        body: { status: QueueItemStatus.PENDING },
       }),
       { id: item.id },
     );

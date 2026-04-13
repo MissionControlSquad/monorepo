@@ -1,6 +1,6 @@
 import { agentModel, taskModel } from "@/server/models";
 import { pubsub, PubSubEvent, taskTopic } from "@/server/pubsub";
-import { TaskStatus } from "@/server/constants";
+import { TaskStatus, Priority } from "@/server/constants";
 import { UPGRADE_CONFIG_TASK } from "@/server/upgrade-task";
 import { errorResponse, successResponse, handleError } from "../../../_lib/json-response";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
@@ -31,7 +31,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
         title: UPGRADE_CONFIG_TASK.title,
         description: UPGRADE_CONFIG_TASK.description,
         status: TaskStatus.INBOX,
-        priority: "high",
+        priority: Priority.HIGH,
         projectId: null,
         assignees: {
           create: [{ profileId }],

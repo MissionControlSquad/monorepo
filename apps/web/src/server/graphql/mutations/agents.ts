@@ -1,7 +1,7 @@
 import { builder } from "../builder";
 import { agentModel, activityModel } from "../../models";
 import { hashApiKey } from "../../api-key";
-import { Roles } from "../../constants";
+import { Roles, SetupStatus, AgentStatus } from "../../constants";
 import { applyAgentStatusUpdate } from "../../agent-status";
 import { ensureAgentProfile } from "../../agent-profile";
 import { pubsub, PubSubEvent } from "../../pubsub";
@@ -41,7 +41,9 @@ builder.mutationField("updateAgentStatus", (t) =>
       await agentModel.emitStatusChanged(agent, {
         toStatus: args.status as any,
         toDetailedStatus:
-          args.status === "idle" ? undefined : ((args.detailedStatus as any) ?? undefined),
+          args.status === AgentStatus.IDLE
+            ? undefined
+            : ((args.detailedStatus as any) ?? undefined),
         statusMessage: args.statusMessage ?? undefined,
         currentTaskId: args.currentTaskId ?? undefined,
         currentTask: args.currentTask ?? undefined,
@@ -181,7 +183,7 @@ builder.mutationField("setAgentActivation", (t) =>
           const activeLeadCount = await agentModel.count({
             where: {
               role: Roles.SQUAD_LEAD,
-              setupStatus: { not: "deactivated" },
+              setupStatus: { not: SetupStatus.DEACTIVATED },
               id: { not: args.id },
             },
           });
@@ -193,8 +195,8 @@ builder.mutationField("setAgentActivation", (t) =>
         }
 
         await applyAgentStatusUpdate(args.id, {
-          setupStatus: "deactivated",
-          status: "idle",
+          setupStatus: SetupStatus.DEACTIVATED,
+          status: AgentStatus.IDLE,
           currentTask: null,
           currentTaskId: null,
           detailedStatus: null,
@@ -202,7 +204,7 @@ builder.mutationField("setAgentActivation", (t) =>
         });
         return agentModel.delegate.findUniqueOrThrow({ ...query, where: { id: args.id } });
       } else {
-        await applyAgentStatusUpdate(args.id, { setupStatus: "active" });
+        await applyAgentStatusUpdate(args.id, { setupStatus: SetupStatus.ACTIVE });
         return agentModel.delegate.findUniqueOrThrow({ ...query, where: { id: args.id } });
       }
     },
@@ -234,13 +236,13 @@ builder.mutationField("syncAgentIdentity", (t) =>
         identityEmoji: args.identityEmoji ?? undefined,
         username: args.username ?? undefined,
         lastHeartbeat: new Date(),
-        ...(agent.setupStatus === "pending_setup" && { setupStatus: "active" as const }),
+        ...(agent.setupStatus === SetupStatus.PENDING_SETUP && { setupStatus: SetupStatus.ACTIVE }),
       };
 
       await applyAgentStatusUpdate(agent.id, updates);
       await ensureAgentProfile(agent.id);
 
-      if (agent.setupStatus === "pending_setup") {
+      if (agent.setupStatus === SetupStatus.PENDING_SETUP) {
         await agentModel.emitJoined({ id: agent.id, name: args.name });
       }
 
@@ -267,7 +269,7 @@ builder.mutationField("setAgentVacation", (t) =>
         // Going on vacation: clear current task and set idle
         await applyAgentStatusUpdate(args.id, {
           isOnVacation: true,
-          status: "idle",
+          status: AgentStatus.IDLE,
           currentTask: null,
           currentTaskId: null,
           detailedStatus: null,

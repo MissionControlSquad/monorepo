@@ -83,6 +83,12 @@ import type {
   TaskStatus,
   Priority,
 } from "@agentcenter/types";
+import {
+  TaskStatus as TaskStatusValues,
+  ProjectStatus,
+  SetupStatus,
+  ProfileKind,
+} from "@/server/constants";
 
 interface TaskDetailModalProps {
   task: TaskDetail | null;
@@ -489,7 +495,7 @@ export function TaskDetailModal({
     agents?.filter((a: Agent) => {
       if (assigneeIds.includes(a.id)) return false;
       if (projectMemberIds && !projectMemberIds.includes(a.id)) return false;
-      if (a.setupStatus !== "active") return false;
+      if (a.setupStatus !== SetupStatus.ACTIVE) return false;
       if (a.isOnVacation) return false;
       return true;
     }) || [];
@@ -502,7 +508,7 @@ export function TaskDetailModal({
       id: agent.id,
       name: agent.name,
       subtitle: isOffline ? "Offline" : "Online",
-      kind: "agent" as const,
+      kind: ProfileKind.AGENT,
       agentId: agent.id,
       isOnline: !isOffline,
       isOffline,
@@ -656,7 +662,9 @@ export function TaskDetailModal({
               <span className="truncate max-w-[120px]">{taskProject.name}</span>
             </Badge>
           )}
-          {task.dueDate && <DueDatePill dueDate={task.dueDate} isDone={task.status === "done"} />}
+          {task.dueDate && (
+            <DueDatePill dueDate={task.dueDate} isDone={task.status === TaskStatusValues.DONE} />
+          )}
         </div>
 
         {/* ===== MOBILE TAB BAR ===== */}
@@ -879,7 +887,7 @@ export function TaskDetailModal({
                     </SelectTrigger>
                     <SelectContent>
                       {allProjects
-                        ?.filter((p: Project) => p.status === "active")
+                        ?.filter((p: Project) => p.status === ProjectStatus.ACTIVE)
                         .map((p: Project) => (
                           <SelectItem key={p.id} value={p.id}>
                             {p.name}
@@ -996,7 +1004,10 @@ export function TaskDetailModal({
                     className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition-colors"
                   />
                 ) : task.dueDate ? (
-                  <DueDatePill dueDate={task.dueDate} isDone={task.status === "done"} />
+                  <DueDatePill
+                    dueDate={task.dueDate}
+                    isDone={task.status === TaskStatusValues.DONE}
+                  />
                 ) : (
                   <span className="text-xs text-muted-foreground italic">Not set</span>
                 )}
@@ -1068,11 +1079,11 @@ export function TaskDetailModal({
                     >
                       <span
                         className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                          task.blockedByTask.status === "done"
+                          task.blockedByTask.status === TaskStatusValues.DONE
                             ? "bg-success"
-                            : task.blockedByTask.status === "in_progress"
+                            : task.blockedByTask.status === TaskStatusValues.IN_PROGRESS
                               ? "bg-blue-400"
-                              : task.blockedByTask.status === "blocked"
+                              : task.blockedByTask.status === TaskStatusValues.BLOCKED
                                 ? "bg-destructive"
                                 : "bg-gray-300"
                         }`}
@@ -1158,11 +1169,11 @@ export function TaskDetailModal({
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                              child.status === "done"
+                              child.status === TaskStatusValues.DONE
                                 ? "bg-success"
-                                : child.status === "in_progress"
+                                : child.status === TaskStatusValues.IN_PROGRESS
                                   ? "bg-blue-400"
-                                  : child.status === "blocked"
+                                  : child.status === TaskStatusValues.BLOCKED
                                     ? "bg-destructive"
                                     : "bg-gray-300"
                             }`}
@@ -1172,7 +1183,7 @@ export function TaskDetailModal({
                           </span>
                           <span
                             className={`text-xs truncate flex-1 ${
-                              child.status === "done"
+                              child.status === TaskStatusValues.DONE
                                 ? "text-muted-foreground line-through"
                                 : "text-foreground"
                             }`}
@@ -1308,7 +1319,7 @@ export function TaskDetailModal({
 
         {/* ===== REVIEW APPROVAL BAR ===== */}
         {/* Disabled: approval is handled by Squad Leader agent via comments */}
-        {task.status === "review" && (
+        {task.status === TaskStatusValues.REVIEW && (
           <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-t border-amber-200 bg-amber-50">
             <span className="text-xs font-semibold text-amber-700 mr-auto">Awaiting Review</span>
             <span className="text-xs text-amber-600">Squad Leader will review via comments</span>
@@ -1316,7 +1327,7 @@ export function TaskDetailModal({
         )}
 
         {/* Reject/Clarify/Approve Dialogs — disabled: Squad Leader handles via comments */}
-        {false && showRejectDialog && (
+        {showRejectDialog && (
           <div
             className="absolute inset-0 z-50 flex items-center justify-center bg-black/40"
             onClick={() => setShowRejectDialog(false)}
@@ -1377,7 +1388,7 @@ export function TaskDetailModal({
         )}
 
         {/* Clarify Dialog */}
-        {false && showClarifyDialog && (
+        {showClarifyDialog && (
           <div
             className="absolute inset-0 z-50 flex items-center justify-center bg-black/40"
             onClick={() => setShowClarifyDialog(false)}
@@ -1425,7 +1436,7 @@ export function TaskDetailModal({
         )}
 
         {/* Approve Dialog */}
-        {false && showApproveDialog && (
+        {showApproveDialog && (
           <div
             className="absolute inset-0 z-50 flex items-center justify-center bg-black/40"
             onClick={() => setShowApproveDialog(false)}

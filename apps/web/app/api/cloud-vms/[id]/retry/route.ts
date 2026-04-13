@@ -1,6 +1,7 @@
 import { findCloudVMRaw, retryCloudVMProvisioning, logCloudVMEvent } from "@agentcenter/database";
 import { provisionVM } from "@/server/services/cloud-vm";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { CloudVmStatus } from "@/server/constants";
 
 /**
  * POST /api/cloud-vms/[id]/retry
@@ -15,7 +16,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       return errorResponse("VM not found", 404);
     }
 
-    if (vm.status !== "error") {
+    if (vm.status !== CloudVmStatus.ERROR) {
       return errorResponse("Can only retry VMs in error state", 400);
     }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { forwardRef, useCallback, useLayoutEffect, useRef as useInternalRef } from "react";
+import { ProfileKind } from "@/server/constants";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 
 /** Shared UI for @mention suggestion dropdowns (composer, search filter, etc.). */
@@ -186,7 +187,7 @@ export function renderProfileSuggestion(
   _index: number,
   _isSelected: boolean,
 ): React.ReactNode {
-  const isAgent = profile.kind === "agent";
+  const isAgent = profile.kind === ProfileKind.AGENT;
   return (
     <>
       <ProfileAvatar src={profile.avatarUrl} name={profile.displayName} size="sm" />

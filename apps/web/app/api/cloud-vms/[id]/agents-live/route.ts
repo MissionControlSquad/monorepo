@@ -1,5 +1,6 @@
 import { findCloudVMConnection } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { CloudVmStatus } from "@/server/constants";
 import {
   getVMSSHConfig,
   ocExec,
@@ -18,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const vm = await findCloudVMConnection(id);
 
     if (!vm) return errorResponse("VM not found", 404);
-    if (vm.status !== "running" || !vm.ipv4 || !vm.sshPrivateKey) {
+    if (vm.status !== CloudVmStatus.RUNNING || !vm.ipv4 || !vm.sshPrivateKey) {
       return errorResponse("VM is not running", 400);
     }
 

@@ -60,6 +60,7 @@ import {
   Smile,
 } from "lucide-react";
 import { TimeAgo } from "../common/TimeAgo";
+import { ProfileKind, ChannelMemberRole, ChannelVisibility } from "@/server/constants";
 
 interface ChannelViewProps {
   channelId: string;
@@ -193,7 +194,7 @@ export function ChannelView({ channelId, suggestionCategories }: ChannelViewProp
 
   // Close channel info sidebar when viewing a Direct message
   useEffect(() => {
-    if (channel?.visibility === "dm" && channelsLayout?.infoSidebarOpen) {
+    if (channel?.visibility === ChannelVisibility.DM && channelsLayout?.infoSidebarOpen) {
       channelsLayout.closeInfoSidebar();
     }
   }, [
@@ -395,7 +396,7 @@ export function ChannelView({ channelId, suggestionCategories }: ChannelViewProp
     (m: ChannelMember) => m.profileId === postingProfile?.id,
   );
   const isMember = !!currentMembership;
-  const isChannelCreator = currentMembership?.role === "creator";
+  const isChannelCreator = currentMembership?.role === ChannelMemberRole.CREATOR;
   const lastReadAt = currentMembership?.lastReadAt
     ? new Date(currentMembership.lastReadAt).getTime()
     : null;
@@ -438,16 +439,20 @@ export function ChannelView({ channelId, suggestionCategories }: ChannelViewProp
   }
 
   const Icon =
-    channel.visibility === "private" ? Lock : channel.visibility === "dm" ? MessageCircle : Hash;
+    channel.visibility === ChannelVisibility.PRIVATE
+      ? Lock
+      : channel.visibility === ChannelVisibility.DM
+        ? MessageCircle
+        : Hash;
 
   // For DM channels, find the other member and extract agent status
   const dmOtherMember =
-    channel.visibility === "dm" && channel.members?.length
+    channel.visibility === ChannelVisibility.DM && channel.members?.length
       ? channel.members.find((m: ChannelMember) => m.profileId !== postingProfile?.id)
       : null;
 
   const headerTitle =
-    channel.visibility === "dm" && dmOtherMember
+    channel.visibility === ChannelVisibility.DM && dmOtherMember
       ? (dmOtherMember?.profile?.displayName ??
         dmOtherMember?.profile?.username ??
         "Direct message")
@@ -469,20 +474,20 @@ export function ChannelView({ channelId, suggestionCategories }: ChannelViewProp
               <Menu className="w-5 h-5" />
             </Button>
           )}
-          {channel.visibility === "dm" && dmOtherMember ? (
+          {channel.visibility === ChannelVisibility.DM && dmOtherMember ? (
             <ProfileAvatar profileId={dmOtherMember.profileId} size="md" />
           ) : (
             <Icon className="w-5 h-5 text-muted-foreground shrink-0" />
           )}
           <div className="min-w-0 flex-1">
             <h1 className="text-base font-semibold text-foreground truncate">{headerTitle}</h1>
-            {channel.visibility !== "dm" && channel.description && (
+            {channel.visibility !== ChannelVisibility.DM && channel.description && (
               <p className="text-xs text-muted-foreground truncate">{channel.description}</p>
             )}
-            {channel.visibility === "dm" && dmOtherMember && (
+            {channel.visibility === ChannelVisibility.DM && dmOtherMember && (
               <p className="text-xs text-muted-foreground truncate">
                 {[
-                  dmOtherMember.profile?.kind === "agent" ? "Agent" : "Human",
+                  dmOtherMember.profile?.kind === ProfileKind.AGENT ? "Agent" : "Human",
                   dmOtherMember.profile?.agent?.role,
                 ]
                   .filter(Boolean)
@@ -1064,7 +1069,7 @@ export function ChannelView({ channelId, suggestionCategories }: ChannelViewProp
                   ? "You're not a member. Join the channel to post."
                   : "Select an agent (in the app) to post messages."}
               </p>
-              {channel.visibility === "public" && postingProfile && (
+              {channel.visibility === ChannelVisibility.PUBLIC && postingProfile && (
                 <Button
                   size="sm"
                   onClick={async () => {

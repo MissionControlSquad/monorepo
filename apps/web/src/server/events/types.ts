@@ -1,4 +1,5 @@
 import { EventTypes } from "../constants";
+import type { AgentStatusValue } from "../constants";
 
 // Agent domain events
 export type AgentWokeUpEvent = {
@@ -8,7 +9,7 @@ export type AgentWokeUpEvent = {
   currentTaskId?: string;
   currentTask?: string;
   detailedStatus?: string;
-  previousStatus: "idle" | "active" | "blocked";
+  previousStatus: AgentStatusValue;
   previousDetailedStatus?: string;
 };
 
@@ -16,7 +17,7 @@ export type AgentWentToSleepEvent = {
   type: typeof EventTypes.AGENT_WENT_TO_SLEEP;
   agentId: string;
   agentName: string;
-  previousStatus: "idle" | "active" | "blocked";
+  previousStatus: AgentStatusValue;
   previousDetailedStatus?: string;
 };
 
@@ -24,8 +25,8 @@ export type AgentStatusChangedEvent = {
   type: typeof EventTypes.AGENT_STATUS_CHANGED;
   agentId: string;
   agentName: string;
-  fromStatus: "idle" | "active" | "blocked";
-  toStatus: "idle" | "active" | "blocked";
+  fromStatus: AgentStatusValue;
+  toStatus: AgentStatusValue;
   fromDetailedStatus?: string;
   toDetailedStatus?: string;
   statusMessage?: string;
@@ -38,8 +39,8 @@ export type AgentStatusAppliedEvent = {
   type: typeof EventTypes.AGENT_STATUS_APPLIED;
   agentId: string;
   agentName: string;
-  fromStatus: "idle" | "active" | "blocked";
-  toStatus: "idle" | "active" | "blocked";
+  fromStatus: AgentStatusValue;
+  toStatus: AgentStatusValue;
   fromDetailedStatus?: string;
   toDetailedStatus?: string;
   statusMessage?: string;

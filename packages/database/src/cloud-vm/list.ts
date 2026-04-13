@@ -7,10 +7,11 @@
  */
 
 import { prisma } from "../client";
+import { CloudVmStatus } from "@agentcenter/utils";
 
 export async function listCloudVMs() {
   return prisma.cloudVM.findMany({
-    where: { status: { notIn: ["destroyed"] } },
+    where: { status: { notIn: [CloudVmStatus.DESTROYED] } },
     include: {
       agents: {
         select: { id: true, name: true, identityEmoji: true, username: true, status: true },
@@ -22,12 +23,12 @@ export async function listCloudVMs() {
 }
 
 export async function listRunningCloudVMs() {
-  return prisma.cloudVM.findMany({ where: { status: "running" } });
+  return prisma.cloudVM.findMany({ where: { status: CloudVmStatus.RUNNING } });
 }
 
 export async function listRunningCloudVMsWithAgents() {
   return prisma.cloudVM.findMany({
-    where: { status: "running" },
+    where: { status: CloudVmStatus.RUNNING },
     select: {
       id: true,
       name: true,

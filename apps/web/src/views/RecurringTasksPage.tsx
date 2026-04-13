@@ -67,6 +67,14 @@ import {
 } from "../lib/graphql/mutations/recurring-tasks";
 import { AGENTS_QUERY, PROJECTS_QUERY } from "../lib/graphql/queries";
 import { useCurrentProject } from "../components/context/AppContext";
+import {
+  Priority,
+  SetupStatus,
+  RecurringFrequency,
+  ProfileKind,
+  type RecurringFrequencyValue,
+  type PriorityValue,
+} from "@/server/constants";
 
 const DAYS_OF_WEEK = [
   { value: 0, label: "Sun" },
@@ -97,7 +105,7 @@ interface RecurringTask {
   id: string;
   title: string;
   description?: string;
-  priority?: "low" | "medium" | "high" | "urgent";
+  priority?: PriorityValue;
   isActive: boolean;
   nextDueAt?: string | null;
   recurrenceConfig: RecurrenceConfig;
@@ -151,9 +159,9 @@ function describeRecurrence(config: RecurrenceConfig | null | undefined): string
   const interval = config.interval ?? 1;
 
   switch (config.type) {
-    case "daily":
+    case RecurringFrequency.DAILY:
       return interval === 1 ? `Daily at ${time}` : `Every ${interval} days at ${time}`;
-    case "weekly": {
+    case RecurringFrequency.WEEKLY: {
       const days = config.daysOfWeek as number[] | undefined;
       if (days && days.length > 0) {
         const dayNames = days.map((d: number) => DAYS_OF_WEEK[d]?.label).join(", ");
@@ -163,7 +171,7 @@ function describeRecurrence(config: RecurrenceConfig | null | undefined): string
       }
       return interval === 1 ? `Weekly at ${time}` : `Every ${interval} weeks at ${time}`;
     }
-    case "monthly": {
+    case RecurringFrequency.MONTHLY: {
       const day = config.dayOfMonth;
       const suffix = day === 1 ? "st" : day === 2 ? "nd" : day === 3 ? "rd" : "th";
       return day
@@ -329,11 +337,11 @@ export function RecurringTasksPage() {
                     {rt.priority && (
                       <Badge
                         variant={
-                          rt.priority === "urgent"
+                          rt.priority === Priority.URGENT
                             ? "red"
-                            : rt.priority === "high"
+                            : rt.priority === Priority.HIGH
                               ? "orange"
-                              : rt.priority === "medium"
+                              : rt.priority === Priority.MEDIUM
                                 ? "yellow"
                                 : "gray"
                         }
@@ -470,8 +478,12 @@ interface RecurringTaskModalProps {
 const recurringTaskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
-  priority: z.enum(["low", "medium", "high", "urgent"]),
-  recurrenceType: z.enum(["daily", "weekly", "monthly"]),
+  priority: z.enum(Object.values(Priority) as [PriorityValue, ...PriorityValue[]]),
+  recurrenceType: z.enum([
+    RecurringFrequency.DAILY,
+    RecurringFrequency.WEEKLY,
+    RecurringFrequency.MONTHLY,
+  ]),
   interval: z.number().min(1),
   daysOfWeek: z.array(z.number()),
   dayOfMonth: z.number().min(1).max(31),
@@ -493,7 +505,7 @@ function RecurringTaskModal({
   const [agentsResult] = useQuery({ query: AGENTS_QUERY });
   const agents =
     agentsResult.data?.agents?.filter(
-      (a: AgentResult) => a.setupStatus === "active" && !a.isOnVacation,
+      (a: AgentResult) => a.setupStatus === SetupStatus.ACTIVE && !a.isOnVacation,
     ) ?? [];
   const [projectsResult] = useQuery({ query: PROJECTS_QUERY });
   const projects = projectsResult.data?.projects ?? [];
@@ -508,8 +520,8 @@ function RecurringTaskModal({
     defaultValues: {
       title: "",
       description: "",
-      priority: "medium",
-      recurrenceType: "daily",
+      priority: Priority.MEDIUM,
+      recurrenceType: RecurringFrequency.DAILY,
       interval: 1,
       daysOfWeek: [1, 2, 3, 4, 5],
       dayOfMonth: 1,
@@ -531,8 +543,8 @@ function RecurringTaskModal({
         form.reset({
           title: editing.title,
           description: editing.description,
-          priority: editing.priority ?? "medium",
-          recurrenceType: config?.type ?? "daily",
+          priority: editing.priority ?? Priority.MEDIUM,
+          recurrenceType: config?.type ?? RecurringFrequency.DAILY,
           interval: config?.interval ?? 1,
           daysOfWeek: config?.daysOfWeek ?? [1, 2, 3, 4, 5],
           dayOfMonth: config?.dayOfMonth ?? 1,
@@ -549,8 +561,8 @@ function RecurringTaskModal({
         form.reset({
           title: "",
           description: "",
-          priority: "medium",
-          recurrenceType: "daily",
+          priority: Priority.MEDIUM,
+          recurrenceType: RecurringFrequency.DAILY,
           interval: 1,
           daysOfWeek: [1, 2, 3, 4, 5],
           dayOfMonth: 1,
@@ -578,10 +590,10 @@ function RecurringTaskModal({
 
   const buildConfig = () => {
     const config: RecurrenceConfig = { type: recurrenceType, interval, time };
-    if (recurrenceType === "weekly" && daysOfWeek.length > 0) {
+    if (recurrenceType === RecurringFrequency.WEEKLY && daysOfWeek.length > 0) {
       config.daysOfWeek = daysOfWeek;
     }
-    if (recurrenceType === "monthly") {
+    if (recurrenceType === RecurringFrequency.MONTHLY) {
       config.dayOfMonth = dayOfMonth;
     }
     return config;
@@ -630,7 +642,7 @@ function RecurringTaskModal({
     id: a.id,
     name: a.name || a.id,
     subtitle: a.role || "Agent",
-    kind: "agent" as const,
+    kind: ProfileKind.AGENT,
     agentId: a.id,
   }));
 
@@ -772,7 +784,7 @@ function RecurringTaskModal({
 
                 {/* Recurrence type */}
                 <div className="flex gap-1 bg-muted rounded-lg p-0.5">
-                  {(["daily", "weekly", "monthly"] as const).map((type) => (
+                  {(Object.values(RecurringFrequency) as RecurringFrequencyValue[]).map((type) => (
                     <button
                       key={type}
                       type="button"
@@ -804,11 +816,11 @@ function RecurringTaskModal({
                         className="w-16 text-center"
                       />
                       <span className="text-sm text-muted-foreground">
-                        {recurrenceType === "daily"
+                        {recurrenceType === RecurringFrequency.DAILY
                           ? interval === 1
                             ? "day"
                             : "days"
-                          : recurrenceType === "weekly"
+                          : recurrenceType === RecurringFrequency.WEEKLY
                             ? interval === 1
                               ? "week"
                               : "weeks"
@@ -821,7 +833,7 @@ function RecurringTaskModal({
                 />
 
                 {/* Days of week (weekly only) */}
-                {recurrenceType === "weekly" && (
+                {recurrenceType === RecurringFrequency.WEEKLY && (
                   <div className="space-y-1.5">
                     <span className="text-xs text-muted-foreground">On these days:</span>
                     <div className="flex gap-1">
@@ -844,7 +856,7 @@ function RecurringTaskModal({
                 )}
 
                 {/* Day of month (monthly only) */}
-                {recurrenceType === "monthly" && (
+                {recurrenceType === RecurringFrequency.MONTHLY && (
                   <FormField
                     control={form.control}
                     name="dayOfMonth"

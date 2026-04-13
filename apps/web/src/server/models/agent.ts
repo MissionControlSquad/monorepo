@@ -2,6 +2,7 @@ import type { Agent } from "@agentcenter/database";
 import { agentDelegate } from "@agentcenter/database";
 import { emit } from "../events";
 import { EventTypes } from "../constants";
+import type { AgentStatusValue } from "../constants";
 import { Model } from "./base";
 
 class AgentModel extends Model<Agent> {
@@ -16,7 +17,7 @@ class AgentModel extends Model<Agent> {
   async emitStatusChanged(
     agent: Pick<Agent, "id" | "name" | "status" | "detailedStatus">,
     ctx: {
-      toStatus: "idle" | "active" | "blocked";
+      toStatus: AgentStatusValue;
       toDetailedStatus?: string;
       statusMessage?: string;
       currentTaskId?: string;
@@ -27,7 +28,7 @@ class AgentModel extends Model<Agent> {
       type: EventTypes.AGENT_STATUS_CHANGED,
       agentId: agent.id,
       agentName: agent.name,
-      fromStatus: agent.status as "idle" | "active" | "blocked",
+      fromStatus: agent.status as AgentStatusValue,
       fromDetailedStatus: agent.detailedStatus ?? undefined,
       ...ctx,
     });
@@ -41,7 +42,7 @@ class AgentModel extends Model<Agent> {
       type: EventTypes.AGENT_WOKE_UP,
       agentId: agent.id,
       agentName: agent.name,
-      previousStatus: agent.status as "idle" | "active" | "blocked",
+      previousStatus: agent.status as AgentStatusValue,
       previousDetailedStatus: agent.detailedStatus ?? undefined,
       ...ctx,
     });
@@ -52,7 +53,7 @@ class AgentModel extends Model<Agent> {
       type: EventTypes.AGENT_WENT_TO_SLEEP,
       agentId: agent.id,
       agentName: agent.name,
-      previousStatus: agent.status as "idle" | "active" | "blocked",
+      previousStatus: agent.status as AgentStatusValue,
       previousDetailedStatus: agent.detailedStatus ?? undefined,
     });
   }

@@ -12,7 +12,7 @@ import { useRouter, useNavigation } from "expo-router";
 import { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { TASKS_QUERY } from "@agentcenter/graphql-client";
-import { PAGE_SIZE_DEFAULT, PRIORITY_FILTER_OPTIONS, DUE_DATE_FILTER_OPTIONS, matchesDueDateFilter } from "@agentcenter/utils";
+import { PAGE_SIZE_DEFAULT, PRIORITY_FILTER_OPTIONS, DUE_DATE_FILTER_OPTIONS, matchesDueDateFilter, TaskStatus } from "@agentcenter/utils";
 import type { DueDateFilter, PriorityFilter } from "@agentcenter/utils";
 import { TaskCard } from "../../src/components/TaskCard";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
@@ -54,12 +54,12 @@ const DUE_DATE_OPTIONS = DUE_DATE_FILTER_OPTIONS as { key: DueDateFilter; label:
 
 const FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "inbox", label: "Inbox" },
-  { key: "assigned", label: "Assigned" },
-  { key: "in_progress", label: "In Progress" },
-  { key: "review", label: "Review" },
-  { key: "done", label: "Done" },
-  { key: "blocked", label: "Blocked" },
+  { key: TaskStatus.INBOX, label: "Inbox" },
+  { key: TaskStatus.ASSIGNED, label: "Assigned" },
+  { key: TaskStatus.IN_PROGRESS, label: "In Progress" },
+  { key: TaskStatus.REVIEW, label: "Review" },
+  { key: TaskStatus.DONE, label: "Done" },
+  { key: TaskStatus.BLOCKED, label: "Blocked" },
 ];
 
 

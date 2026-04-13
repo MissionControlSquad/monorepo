@@ -11,6 +11,7 @@ import { TimeAgo } from "../common/TimeAgo";
 import { Button, Badge, Input } from "../ui";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import type { Agent, AgentQueueItem } from "@agentcenter/types";
+import { QueueItemStatus, Priority } from "@/server/constants";
 
 interface AgentQueueDialogProps {
   agentId: string | null;
@@ -68,13 +69,13 @@ export function AgentQueueDialog({ agentId, isOpen, onClose }: AgentQueueDialogP
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "completed":
+      case QueueItemStatus.COMPLETED:
         return <CheckCircle2 className="w-5 h-5 text-success" />;
-      case "in_progress":
+      case QueueItemStatus.IN_PROGRESS:
         return <Play className="w-5 h-5 text-blue-600 animate-pulse" />;
-      case "blocked":
+      case QueueItemStatus.BLOCKED:
         return <AlertCircle className="w-5 h-5 text-destructive" />;
-      case "skipped":
+      case QueueItemStatus.SKIPPED:
         return <SkipForward className="w-5 h-5 text-muted-foreground" />;
       default:
         return <Circle className="w-5 h-5 text-muted-foreground" />;
@@ -83,13 +84,13 @@ export function AgentQueueDialog({ agentId, isOpen, onClose }: AgentQueueDialogP
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "completed":
+      case QueueItemStatus.COMPLETED:
         return "bg-success-muted border-success/30";
-      case "in_progress":
+      case QueueItemStatus.IN_PROGRESS:
         return "bg-blue-50 border-blue-200";
-      case "blocked":
+      case QueueItemStatus.BLOCKED:
         return "bg-destructive-muted border-destructive/30";
-      case "skipped":
+      case QueueItemStatus.SKIPPED:
         return "bg-muted border-border";
       default:
         return "bg-background border-border";
@@ -97,10 +98,10 @@ export function AgentQueueDialog({ agentId, isOpen, onClose }: AgentQueueDialogP
   };
 
   const PRIORITY_BADGE_VARIANT: Record<string, "red" | "orange" | "yellow" | "gray"> = {
-    urgent: "red",
-    high: "orange",
-    medium: "yellow",
-    low: "gray",
+    [Priority.URGENT]: "red",
+    [Priority.HIGH]: "orange",
+    [Priority.MEDIUM]: "yellow",
+    [Priority.LOW]: "gray",
   };
 
   const getPriorityBadge = (priority: string) => {
@@ -111,15 +112,17 @@ export function AgentQueueDialog({ agentId, isOpen, onClose }: AgentQueueDialogP
 
   // Group items by status
   const pendingItems =
-    queueItems?.filter((item: AgentQueueItem) => item.status === "pending") || [];
+    queueItems?.filter((item: AgentQueueItem) => item.status === QueueItemStatus.PENDING) || [];
   const inProgressItems =
-    queueItems?.filter((item: AgentQueueItem) => item.status === "in_progress") || [];
+    queueItems?.filter((item: AgentQueueItem) => item.status === QueueItemStatus.IN_PROGRESS) || [];
   const completedItems =
-    queueItems?.filter((item: AgentQueueItem) => item.status === "completed") || [];
+    queueItems?.filter((item: AgentQueueItem) => item.status === QueueItemStatus.COMPLETED) || [];
   const otherItems =
     queueItems?.filter(
       (item: AgentQueueItem) =>
-        item.status !== "pending" && item.status !== "in_progress" && item.status !== "completed",
+        item.status !== QueueItemStatus.PENDING &&
+        item.status !== QueueItemStatus.IN_PROGRESS &&
+        item.status !== QueueItemStatus.COMPLETED,
     ) || [];
 
   return (
@@ -332,7 +335,7 @@ function QueueItem({
           <div className="flex items-start justify-between mb-2">
             <h4
               className={`text-sm font-medium ${
-                item.status === "completed"
+                item.status === QueueItemStatus.COMPLETED
                   ? "line-through text-muted-foreground"
                   : "text-foreground"
               }`}
@@ -372,19 +375,22 @@ function QueueItem({
           </div>
 
           {/* Actions */}
-          {item.status !== "completed" && (
+          {item.status !== QueueItemStatus.COMPLETED && (
             <div className="flex items-center flex-wrap gap-2">
               {!isActive ? (
                 <>
-                  {item.status === "pending" && (
-                    <Button size="sm" onClick={() => handleStatusChange(item.id, "in_progress")}>
+                  {item.status === QueueItemStatus.PENDING && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleStatusChange(item.id, QueueItemStatus.IN_PROGRESS)}
+                    >
                       Start
                     </Button>
                   )}
-                  {item.status === "in_progress" && (
+                  {item.status === QueueItemStatus.IN_PROGRESS && (
                     <Button
                       size="sm"
-                      onClick={() => handleStatusChange(item.id, "completed")}
+                      onClick={() => handleStatusChange(item.id, QueueItemStatus.COMPLETED)}
                       className="bg-success hover:bg-success"
                     >
                       Complete

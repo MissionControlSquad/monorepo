@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "../client";
+import { ProfileKind } from "@agentcenter/utils";
 
 const PROFILE_USERNAME_MAX_LEN = 64;
 
@@ -68,7 +69,7 @@ export async function ensureAgentProfile(agentId: string): Promise<void> {
     }
     await prisma.profile.create({
       data: {
-        kind: "agent",
+        kind: ProfileKind.AGENT,
         displayName,
         username,
         avatarUrl: normalizeAvatarUrl(agent.avatar) ?? undefined,

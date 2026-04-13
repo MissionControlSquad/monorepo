@@ -15,6 +15,7 @@ import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import { Button } from "../ui";
 import { Popover, PopoverContent, PopoverAnchor } from "@/components/ui/shadcn/popover";
 import type { TaskStatus } from "@agentcenter/types";
+import { DeliverableKind } from "@/server/constants";
 
 interface SearchTask {
   _id: string;
@@ -45,10 +46,10 @@ type ResultItem =
   | { type: "deliverable"; id: string; data: SearchDeliverable };
 
 const KIND_BADGE_VARIANT: Record<string, "blue" | "purple" | "green" | "orange"> = {
-  markdown: "blue",
-  code: "purple",
-  file: "green",
-  link: "orange",
+  [DeliverableKind.MARKDOWN]: "blue",
+  [DeliverableKind.CODE]: "purple",
+  [DeliverableKind.FILE]: "green",
+  [DeliverableKind.LINK]: "orange",
 };
 
 export function GlobalSearch() {

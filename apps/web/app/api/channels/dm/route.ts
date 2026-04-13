@@ -7,7 +7,7 @@ import {
 } from "@agentcenter/database";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, ChannelVisibility } from "@agentcenter/utils";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { validateBody, createDMSchema } from "../../_lib/validation";
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
     // Find all DM channels the agent is a member of
-    const memberships = await listMemberChannels(agentProfileId, "dm");
+    const memberships = await listMemberChannels(agentProfileId, ChannelVisibility.DM);
 
     // Build response with unread counts
     const channels = await Promise.all(

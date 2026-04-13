@@ -1,4 +1,5 @@
 import { agentQueueItemModel, agentModel } from "@/server/models";
+import { QueueItemStatus } from "@/server/constants";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { validateBody, updateQueueItemSchema } from "../../_lib/validation";
@@ -29,10 +30,10 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     // Status update with timestamp logic
     if (body.status !== undefined) {
       data.status = body.status;
-      if (body.status === "in_progress" && !item.startedAt) {
+      if (body.status === QueueItemStatus.IN_PROGRESS && !item.startedAt) {
         data.startedAt = now;
       }
-      if (body.status === "completed" || body.status === "skipped") {
+      if (body.status === QueueItemStatus.COMPLETED || body.status === QueueItemStatus.SKIPPED) {
         data.completedAt = now;
       }
     }

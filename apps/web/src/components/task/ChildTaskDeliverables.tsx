@@ -7,6 +7,7 @@ import { useDeliverableNavigation } from "../../hooks/useDeliverableNavigation";
 import { GitBranch, ChevronDown, ChevronRight } from "lucide-react";
 import { DeliverableCard } from "./DeliverableCard";
 import type { Deliverable, Agent, TaskRef } from "@agentcenter/types";
+import { TaskStatus } from "@/server/constants";
 
 interface ChildTaskDeliverableGroup {
   task: TaskRef & { taskNumber?: number; status?: string };
@@ -98,11 +99,11 @@ export function ChildTaskDeliverables({ parentTaskId }: ChildTaskDeliverablesPro
                 )}
                 <span
                   className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    task.status === "done"
+                    task.status === TaskStatus.DONE
                       ? "bg-success"
-                      : task.status === "in_progress"
+                      : task.status === TaskStatus.IN_PROGRESS
                         ? "bg-blue-400"
-                        : task.status === "blocked"
+                        : task.status === TaskStatus.BLOCKED
                           ? "bg-destructive"
                           : "bg-gray-300"
                   }`}

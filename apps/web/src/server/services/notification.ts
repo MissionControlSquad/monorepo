@@ -18,6 +18,7 @@ import { sendEmail } from "./email";
 import { renderEmailTemplate } from "./email-templates";
 import { logError, logWarn, log } from "../logger";
 import { incrementCounter } from "./notification-metrics";
+import { QueueItemStatus } from "../constants";
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -297,7 +298,7 @@ export async function notify(params: NotifyParams): Promise<void> {
         userId,
         type,
         channel,
-        status: "pending",
+        status: QueueItemStatus.PENDING,
         title,
         body,
         taskId,

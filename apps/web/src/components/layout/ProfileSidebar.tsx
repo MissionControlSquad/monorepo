@@ -16,6 +16,7 @@ import { MentionText } from "../common/MarkdownWithMentions";
 import { Badge } from "@/components/ui";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/shadcn/sheet";
 import { TASK_STATUSES } from "@agentcenter/utils";
+import { ProfileKind } from "@/server/constants";
 
 interface ProfileSidebarProps {
   onClose: () => void;
@@ -51,7 +52,7 @@ export function ProfileSidebar({ onClose, mounted }: ProfileSidebarProps) {
 
   const profile = result.data?.profile;
   const channelsInCommon = channelsResult.data?.channelsInCommon ?? [];
-  const isAgentProfile = profile?.kind === "agent" && profile?.agent?.id;
+  const isAgentProfile = profile?.kind === ProfileKind.AGENT && profile?.agent?.id;
 
   const [tasksResult] = useQuery({
     query: TASKS_BY_ASSIGNEE_QUERY,
@@ -104,7 +105,7 @@ export function ProfileSidebar({ onClose, mounted }: ProfileSidebarProps) {
                     <p className="text-sm text-muted-foreground truncate">@{profile.username}</p>
                   )}
                   <span className="inline-flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                    {profile.kind === "agent" ? (
+                    {profile.kind === ProfileKind.AGENT ? (
                       <>
                         <Bot className="w-3.5 h-3.5" />
                         Agent
@@ -131,7 +132,7 @@ export function ProfileSidebar({ onClose, mounted }: ProfileSidebarProps) {
                 </div>
               )}
 
-              {profile.kind === "agent" && profile.agent?.name && (
+              {profile.kind === ProfileKind.AGENT && profile.agent?.name && (
                 <div>
                   <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                     Agent

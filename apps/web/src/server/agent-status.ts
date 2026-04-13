@@ -23,6 +23,7 @@ import {
 import { pubsub, PubSubEvent } from "./pubsub";
 import { emit } from "./events/bus";
 import { EventTypes } from "./constants";
+import type { AgentStatusValue, SetupStatusValue } from "./constants";
 import { invalidateAgentCache } from "./cache";
 
 /**
@@ -41,8 +42,8 @@ const SEMANTIC_STATUS_KEYS = [
 ] as const;
 
 export type AgentStatusUpdate = {
-  status?: "idle" | "active" | "blocked";
-  setupStatus?: "pending_setup" | "active" | "deactivated";
+  status?: AgentStatusValue;
+  setupStatus?: SetupStatusValue;
   detailedStatus?: string | null;
   statusMessage?: string | null;
   currentTaskId?: string | null;
@@ -96,8 +97,8 @@ export async function applyAgentStatusUpdate(
       type: EventTypes.AGENT_STATUS_APPLIED,
       agentId,
       agentName: previous.name,
-      fromStatus: previous.status as "idle" | "active" | "blocked",
-      toStatus: data.status as "idle" | "active" | "blocked",
+      fromStatus: previous.status as AgentStatusValue,
+      toStatus: data.status as AgentStatusValue,
       fromDetailedStatus: previous.detailedStatus ?? undefined,
       toDetailedStatus:
         data.detailedStatus !== undefined ? (data.detailedStatus as string | undefined) : undefined,

@@ -1,6 +1,6 @@
 import { projectMemberModel } from "@/server/models";
 import { memberCache, projectIdsCache } from "@/server/cache";
-import { Roles } from "@/server/constants";
+import { Roles, ProjectStatus, ProjectMemberStatus } from "@/server/constants";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 
 /**
@@ -23,7 +23,7 @@ export async function assertProjectMember(agentId: string, projectId: string) {
     select: { status: true },
   });
 
-  const isActive = member?.status === "active";
+  const isActive = member?.status === ProjectMemberStatus.ACTIVE;
   memberCache.set(cacheKey, isActive);
 
   if (!isActive) {
@@ -58,7 +58,7 @@ export async function assertAllMembersOfProject(agentIds: string[], projectId: s
   const profileIds = await Promise.all(agentIds.map((id) => getOrCreateAgentProfileId(id)));
 
   const activeMembers = await projectMemberModel.findMany({
-    where: { projectId, profileId: { in: profileIds }, status: "active" },
+    where: { projectId, profileId: { in: profileIds }, status: ProjectMemberStatus.ACTIVE },
     select: { profileId: true },
   });
 
@@ -84,8 +84,8 @@ export async function getAgentProjectIds(agentId: string): Promise<string[]> {
   const memberships = await projectMemberModel.findMany({
     where: {
       profileId,
-      status: "active",
-      project: { shutdownActive: false, status: "active" },
+      status: ProjectMemberStatus.ACTIVE,
+      project: { shutdownActive: false, status: ProjectStatus.ACTIVE },
     },
     select: { projectId: true },
   });

@@ -3,6 +3,7 @@ import { projectContextCache } from "@/server/cache";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { isProjectShutdown } from "@/server/system-settings";
+import { ProjectStatus } from "@/server/constants";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -28,7 +29,7 @@ export async function GET(request: Request, ctx: RouteContext) {
     });
 
     if (!project) return errorResponse("Project not found", 404);
-    if (project.status === "archived") return errorResponse("Project is archived", 404);
+    if (project.status === ProjectStatus.ARCHIVED) return errorResponse("Project is archived", 404);
     if (await isProjectShutdown(id)) return errorResponse("Project not found or is shutdown", 404);
     projectContextCache.set(id, project);
     return successResponse(project);

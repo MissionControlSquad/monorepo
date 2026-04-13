@@ -10,12 +10,21 @@ import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/shadcn/sheet";
 import type { FilterState, DueDateFilter } from "./FilterBar";
 import type { Agent, ProjectMember } from "@agentcenter/types";
+import { Priority } from "@/server/constants";
 
 const PRIORITIES = [
-  { id: "low", label: "Low", color: "bg-muted text-foreground border-border" },
-  { id: "medium", label: "Medium", color: "bg-warning/15 text-warning border-warning/30" },
-  { id: "high", label: "High", color: "bg-destructive/15 text-destructive border-destructive/30" },
-  { id: "urgent", label: "Urgent", color: "bg-purple-100 text-purple-700 border-purple-200" },
+  { id: Priority.LOW, label: "Low", color: "bg-muted text-foreground border-border" },
+  { id: Priority.MEDIUM, label: "Medium", color: "bg-warning/15 text-warning border-warning/30" },
+  {
+    id: Priority.HIGH,
+    label: "High",
+    color: "bg-destructive/15 text-destructive border-destructive/30",
+  },
+  {
+    id: Priority.URGENT,
+    label: "Urgent",
+    color: "bg-purple-100 text-purple-700 border-purple-200",
+  },
 ];
 
 const DUE_DATE_OPTIONS: { id: DueDateFilter; label: string; color: string }[] = [

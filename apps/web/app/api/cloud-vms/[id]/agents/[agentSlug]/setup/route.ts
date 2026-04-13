@@ -8,6 +8,7 @@ import {
   restartGateway,
 } from "@/server/services/cloud-vm-utils";
 import { successResponse, errorResponse, handleError } from "../../../../../_lib/json-response";
+import { CloudVmStatus } from "@/server/constants";
 
 /**
  * GET /api/cloud-vms/[id]/agents/[agentSlug]/setup
@@ -23,7 +24,7 @@ export async function GET(
     const vm = await findCloudVMConnection(id);
 
     if (!vm) return errorResponse("VM not found", 404);
-    if (vm.status !== "running" || !vm.ipv4 || !vm.sshPrivateKey) {
+    if (vm.status !== CloudVmStatus.RUNNING || !vm.ipv4 || !vm.sshPrivateKey) {
       return errorResponse("VM is not running", 400);
     }
 
@@ -80,7 +81,7 @@ export async function POST(
     const vm = await findCloudVMConnection(id);
 
     if (!vm) return errorResponse("VM not found", 404);
-    if (vm.status !== "running" || !vm.ipv4 || !vm.sshPrivateKey) {
+    if (vm.status !== CloudVmStatus.RUNNING || !vm.ipv4 || !vm.sshPrivateKey) {
       return errorResponse("VM is not running", 400);
     }
 

@@ -12,6 +12,7 @@ import { USE_CASES } from "@/lib/onboarding-use-cases";
 import { getAgentName } from "@/lib/agent-default-names";
 import type { OnboardingUseCase } from "@/lib/onboarding-use-cases";
 import { useAgentStatus } from "../context/AgentStatusContext";
+import { type AgentLevelValue } from "@/server/constants";
 
 type Step = "welcome" | "use-case" | "preview" | "creating" | "success";
 
@@ -156,7 +157,7 @@ export function OnboardingWizard() {
       username: a.username,
       identityEmoji: a.emoji,
       personality: a.personality,
-      level: a.level as "junior" | "specialist" | "senior" | "lead",
+      level: a.level as AgentLevelValue,
       templateId: a.templateId,
     }));
 

@@ -5,12 +5,13 @@
  */
 
 import { prisma } from "../client";
+import { AgentStatus } from "@agentcenter/utils";
 
 export async function findStaleAgents(thresholdMs: number) {
   const threshold = new Date(Date.now() - thresholdMs);
   return prisma.agent.findMany({
     where: {
-      status: { not: "idle" },
+      status: { not: AgentStatus.IDLE },
       OR: [{ lastHeartbeat: { lt: threshold } }, { lastHeartbeat: null }],
     },
     select: { id: true, name: true, status: true, detailedStatus: true },
@@ -23,7 +24,7 @@ export async function isAgentStill(agentId: string, thresholdMs: number): Promis
   const agent = await prisma.agent.findFirst({
     where: {
       id: agentId,
-      status: { not: "idle" },
+      status: { not: AgentStatus.IDLE },
       OR: [{ lastHeartbeat: { lt: threshold } }, { lastHeartbeat: null }],
     },
   });

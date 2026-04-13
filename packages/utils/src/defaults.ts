@@ -1,16 +1,17 @@
 import type { SetupMode } from "./agent-creation";
+import { AgentLevel, Priority, TaskStatus } from "./domain-constants";
 
 // ── Agent defaults ─────────────────────────────────────────────────────────────
 
-export const DEFAULT_AGENT_LEVEL = "specialist";
+export const DEFAULT_AGENT_LEVEL = AgentLevel.SPECIALIST;
 export const DEFAULT_AGENT_EMOJI = "🤖";
 export const DEFAULT_SETUP_MODE: SetupMode = "auto";
 export const SQUAD_LEAD_ROLE = "Squad Lead";
 
 // ── Task defaults ──────────────────────────────────────────────────────────────
 
-export const DEFAULT_TASK_PRIORITY = "medium";
-export const DEFAULT_TASK_STATUS = "inbox";
+export const DEFAULT_TASK_PRIORITY = Priority.MEDIUM;
+export const DEFAULT_TASK_STATUS = TaskStatus.INBOX;
 
 // ── Color fallbacks ────────────────────────────────────────────────────────────
 

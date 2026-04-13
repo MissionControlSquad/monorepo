@@ -1,6 +1,7 @@
 import { stopCloudVM, startCloudVM } from "@/server/services/cloud-vm";
 import { findCloudVMRaw } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { CloudVmStatus } from "@/server/constants";
 
 /**
  * POST /api/cloud-vms/[id]/restart
@@ -13,14 +14,14 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const vm = await findCloudVMRaw(id);
     if (!vm) return errorResponse("VM not found", 404);
 
-    if (!["running", "stopped"].includes(vm.status)) {
+    if (![CloudVmStatus.RUNNING, CloudVmStatus.STOPPED].includes(vm.status as any)) {
       return errorResponse(
         `Cannot restart a VM in "${vm.status}" state. VM must be running or stopped.`,
         400,
       );
     }
 
-    if (vm.status === "running") {
+    if (vm.status === CloudVmStatus.RUNNING) {
       await stopCloudVM(id);
     }
     await startCloudVM(id);

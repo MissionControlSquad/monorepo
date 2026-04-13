@@ -12,6 +12,7 @@ import { findAgentsByVMId, updateAgent } from "@agentcenter/database";
 import { generateApiKey } from "../api-key";
 import { generateAgentConfig, getMcUrl } from "../agent-config-generator";
 import { VM_CONFIG_PATH, VM_WORKSPACE, VM_USER, OPENCLAW_CMD_PREFIX } from "./cloud-vm-paths";
+import { AgentLevel } from "../constants";
 
 // ─── OpenClaw CLI ───────────────────────────────────────────────────
 
@@ -307,7 +308,7 @@ export async function uploadAgentConfigFiles(
       username: agentSlug,
       identityEmoji: agent.identityEmoji || "🤖",
       personality: agent.personality || "",
-      level: agent.level || "specialist",
+      level: agent.level || AgentLevel.SPECIALIST,
       templateId: agent.templateId || undefined,
     },
     mcUrl,

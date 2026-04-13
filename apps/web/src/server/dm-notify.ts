@@ -6,6 +6,7 @@ import {
   getChannelHumanMembers,
 } from "@agentcenter/database";
 import { pubsub, agentStreamTopic } from "./pubsub";
+import { ChannelVisibility, NotificationKind } from "./constants";
 import { notify } from "./services/notification";
 import {
   tryDeliverDmNotification,
@@ -30,7 +31,7 @@ export async function notifyAgentChannelMembers(
   const channel = await getChannelVisibility(channelId);
   if (!channel) return;
 
-  const isDm = channel.visibility === "dm";
+  const isDm = channel.visibility === ChannelVisibility.DM;
 
   // Fetch the message with sender profile for the push payload
   const message = await getChannelMessageForNotify(messageId);
@@ -110,7 +111,7 @@ export async function notifyAgentChannelMembers(
     humanUserIds.map((userId) =>
       notify({
         userId,
-        type: "new_comment",
+        type: NotificationKind.NEW_COMMENT,
         title: isDm ? `Message from ${senderName}` : `${senderName} mentioned you`,
         body: message.content.slice(0, 200),
         url: channelUrl,

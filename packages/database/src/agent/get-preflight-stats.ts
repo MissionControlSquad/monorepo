@@ -6,6 +6,7 @@
  */
 
 import { prisma, notDeleted } from "../client";
+import { TaskStatus } from "@agentcenter/utils";
 
 export interface AgentPreflightStats {
   activeTaskAssignments: number;
@@ -31,14 +32,14 @@ export async function getAgentPreflightStats(
     prisma.taskAssignee.count({
       where: {
         profileId,
-        task: { status: { notIn: ["done"] }, ...notDeleted },
+        task: { status: { notIn: [TaskStatus.DONE] }, ...notDeleted },
       },
     }),
 
     // Inbox tasks visible to this agent (by project or unassigned)
     prisma.task.count({
       where: {
-        status: "inbox",
+        status: TaskStatus.INBOX,
         ...notDeleted,
         OR: [
           ...(projectIds.length > 0 ? [{ projectId: { in: projectIds } }] : []),
@@ -50,7 +51,7 @@ export async function getAgentPreflightStats(
     // Tasks in review visible to this agent
     prisma.task.count({
       where: {
-        status: "review",
+        status: TaskStatus.REVIEW,
         ...notDeleted,
         ...(projectIds.length > 0 ? { projectId: { in: projectIds } } : {}),
       },

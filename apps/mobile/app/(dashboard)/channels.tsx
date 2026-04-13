@@ -15,7 +15,7 @@ import { useRouter, useNavigation } from "expo-router";
 import { useState, useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CHANNELS_QUERY, PROFILES_QUERY, START_CONVERSATION, CREATE_CHANNEL } from "@agentcenter/graphql-client";
-import { PAGE_SIZE_CHANNELS, DEFAULT_AGENT_EMOJI } from "@agentcenter/utils";
+import { PAGE_SIZE_CHANNELS, DEFAULT_AGENT_EMOJI, ProfileKind, ChannelVisibility } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 import { useTheme } from "../../src/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
@@ -41,7 +41,7 @@ interface Channel {
 }
 
 function channelDisplayName(channel: Channel, myProfileId: string | null): string {
-  if (channel.visibility === "dm" && myProfileId) {
+  if (channel.visibility === ChannelVisibility.DM && myProfileId) {
     const other = channel.members.find((m) => m.profileId !== myProfileId);
     if (other) return other.profile.displayName;
   }
@@ -53,8 +53,8 @@ function toSlug(name: string): string {
 }
 
 function channelIcon(channel: Channel): string {
-  if (channel.visibility === "dm") return "💬";
-  if (channel.visibility === "private") return "🔒";
+  if (channel.visibility === ChannelVisibility.DM) return "💬";
+  if (channel.visibility === ChannelVisibility.PRIVATE) return "🔒";
   return "#";
 }
 
@@ -71,7 +71,7 @@ export default function ChannelsScreen() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createSlug, setCreateSlug] = useState("");
-  const [createVisibility, setCreateVisibility] = useState<"public" | "private">("public");
+  const [createVisibility, setCreateVisibility] = useState<"public" | "private">(ChannelVisibility.PUBLIC);
   const [createDescription, setCreateDescription] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -81,7 +81,7 @@ export default function ChannelsScreen() {
       headerRight: () => (
         <TouchableOpacity
           onPress={() => {
-            setCreateName(""); setCreateSlug(""); setCreateVisibility("public"); setCreateDescription(""); setCreateOpen(true);
+            setCreateName(""); setCreateSlug(""); setCreateVisibility(ChannelVisibility.PUBLIC); setCreateDescription(""); setCreateOpen(true);
           }}
           style={{ padding: 8 }}
         >
@@ -107,7 +107,7 @@ export default function ChannelsScreen() {
 
   const [dmsResult, reexecuteDms] = useQuery<{ channels: Channel[] }>({
     query: CHANNELS_QUERY,
-    variables: { profileId: profileId ?? undefined, visibility: "dm", limit: 100 },
+    variables: { profileId: profileId ?? undefined, visibility: ChannelVisibility.DM, limit: 100 },
     requestPolicy: "cache-and-network",
     pause: !mounted || !profileId,
   });
@@ -135,7 +135,7 @@ export default function ChannelsScreen() {
     }
     const channel = res.data?.createChannel;
     setCreateOpen(false);
-    setCreateName(""); setCreateSlug(""); setCreateVisibility("public"); setCreateDescription("");
+    setCreateName(""); setCreateSlug(""); setCreateVisibility(ChannelVisibility.PUBLIC); setCreateDescription("");
     reexecute({ requestPolicy: "network-only" });
     if (channel?.id) router.push(`/channels/${channel.id}` as Parameters<typeof router.push>[0]);
   }
@@ -217,19 +217,19 @@ export default function ChannelsScreen() {
               <Text className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Visibility</Text>
               <View className="flex-row gap-2">
                 <TouchableOpacity
-                  onPress={() => setCreateVisibility("public")}
-                  className={`flex-1 py-2.5 rounded-xl border items-center ${createVisibility === "public" ? "bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700" : "bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700"}`}
+                  onPress={() => setCreateVisibility(ChannelVisibility.PUBLIC)}
+                  className={`flex-1 py-2.5 rounded-xl border items-center ${createVisibility === ChannelVisibility.PUBLIC ? "bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700" : "bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700"}`}
                   activeOpacity={0.7}
                 >
-                  <Text className={`text-sm font-semibold ${createVisibility === "public" ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}># Public</Text>
+                  <Text className={`text-sm font-semibold ${createVisibility === ChannelVisibility.PUBLIC ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}># Public</Text>
                   <Text className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Anyone can join</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => setCreateVisibility("private")}
-                  className={`flex-1 py-2.5 rounded-xl border items-center ${createVisibility === "private" ? "bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700" : "bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700"}`}
+                  onPress={() => setCreateVisibility(ChannelVisibility.PRIVATE)}
+                  className={`flex-1 py-2.5 rounded-xl border items-center ${createVisibility === ChannelVisibility.PRIVATE ? "bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700" : "bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700"}`}
                   activeOpacity={0.7}
                 >
-                  <Text className={`text-sm font-semibold ${createVisibility === "private" ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}>🔒 Private</Text>
+                  <Text className={`text-sm font-semibold ${createVisibility === ChannelVisibility.PRIVATE ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-400"}`}>🔒 Private</Text>
                   <Text className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Invite only</Text>
                 </TouchableOpacity>
               </View>
@@ -312,7 +312,7 @@ export default function ChannelsScreen() {
                   }}
                 >
                   <View className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 justify-center items-center">
-                    <Text className="text-lg">{item.kind === "agent" ? DEFAULT_AGENT_EMOJI : item.displayName.charAt(0).toUpperCase()}</Text>
+                    <Text className="text-lg">{item.kind === ProfileKind.AGENT ? DEFAULT_AGENT_EMOJI : item.displayName.charAt(0).toUpperCase()}</Text>
                   </View>
                   <View className="flex-1">
                     <Text className="text-base font-semibold text-gray-900 dark:text-slate-100">{item.displayName}</Text>
@@ -368,7 +368,7 @@ export default function ChannelsScreen() {
                 if (section.isDm) {
                   setDmSearch(""); setDmPickerOpen(true);
                 } else {
-                  setCreateName(""); setCreateSlug(""); setCreateVisibility("public"); setCreateDescription(""); setCreateOpen(true);
+                  setCreateName(""); setCreateSlug(""); setCreateVisibility(ChannelVisibility.PUBLIC); setCreateDescription(""); setCreateOpen(true);
                 }
               }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -380,7 +380,7 @@ export default function ChannelsScreen() {
         renderItem={({ item }) => {
           const displayName = channelDisplayName(item, profileId);
           const icon = channelIcon(item);
-          const isDm = item.visibility === "dm";
+          const isDm = item.visibility === ChannelVisibility.DM;
           return (
             <TouchableOpacity
               className="bg-white dark:bg-slate-800 rounded-xl p-3.5 border border-gray-200 dark:border-slate-700 flex-row items-center gap-3 mb-2"

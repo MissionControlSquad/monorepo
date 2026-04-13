@@ -6,6 +6,7 @@
 
 import { prisma } from "../client";
 import type { CloudVM } from "@prisma/client";
+import { CloudVmStatus } from "@agentcenter/utils";
 
 export async function updateCloudVM(id: string, data: Partial<CloudVM>) {
   return prisma.cloudVM.update({
@@ -24,7 +25,7 @@ export async function markCloudVMError(
 ): Promise<void> {
   await prisma.cloudVM.update({
     where: { id },
-    data: { status: "error", errorMessage, errorAt: now, setupStep: null },
+    data: { status: CloudVmStatus.ERROR, errorMessage, errorAt: now, setupStep: null },
   });
 }
 
@@ -43,7 +44,7 @@ export async function retryCloudVMProvisioning(id: string): Promise<void> {
   await prisma.cloudVM.update({
     where: { id },
     data: {
-      status: "provisioning",
+      status: CloudVmStatus.PROVISIONING,
       errorMessage: null,
       errorAt: null,
       setupStep: "retrying",

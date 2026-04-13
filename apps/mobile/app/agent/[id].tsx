@@ -32,7 +32,7 @@ import {
   SET_AGENT_VACATION,
   SET_AGENT_ACTIVATION,
 } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS, formatRelativeTime, isAgentOnline, formatDuration, getAgentStatusColor } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS, formatRelativeTime, isAgentOnline, formatDuration, getAgentStatusColor, SetupStatus, QueueItemStatus } from "@agentcenter/utils";
 import { getStoredCookie } from "../../src/api/session";
 import { useAuth } from "../../src/context/AuthContext";
 import { useTheme } from "../../src/hooks/useTheme";
@@ -182,7 +182,7 @@ export default function AgentDetailScreen() {
 
   const online = isAgentOnline(agent.lastHeartbeat);
   const dotColor = getAgentStatusColor(agent);
-  const isDeactivated = agent.setupStatus === "deactivated";
+  const isDeactivated = agent.setupStatus === SetupStatus.DEACTIVATED;
 
   const handleVacationToggle = () => {
     const next = !agent.isOnVacation;
@@ -296,7 +296,7 @@ export default function AgentDetailScreen() {
         contentContainerStyle={{ flexDirection: "row", alignItems: "stretch" }}
         bounces={false}
       >
-        {(["overview", "tasks", "deliverables", "queue", "activity", "history", ...(agent.setupStatus !== "deactivated" ? ["setup"] : [])] as Tab[]).map((tab) => (
+        {(["overview", "tasks", "deliverables", "queue", "activity", "history", ...(agent.setupStatus !== SetupStatus.DEACTIVATED ? ["setup"] : [])] as Tab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             className={`items-center justify-center py-3.5 px-3.5 border-b-2 ${activeTab === tab ? "border-blue-600" : "border-transparent"}`}
@@ -586,7 +586,7 @@ function QueueTab({
   };
 
   const handleStatusChange = (item: QueueItem) => {
-    const options = ["pending", "in_progress", "completed", "cancelled", "blocked"]
+    const options = [QueueItemStatus.PENDING, QueueItemStatus.IN_PROGRESS, QueueItemStatus.COMPLETED, "cancelled", QueueItemStatus.BLOCKED]
       .filter((s) => s !== item.status)
       .map((s) => ({
         text: humanizeLabel(s),
@@ -606,10 +606,10 @@ function QueueTab({
   };
 
   const grouped = {
-    in_progress: items.filter((i) => i.status === "in_progress"),
-    pending: items.filter((i) => i.status === "pending"),
-    completed: items.filter((i) => i.status === "completed"),
-    other: items.filter((i) => !["in_progress", "pending", "completed"].includes(i.status)),
+    in_progress: items.filter((i) => i.status === QueueItemStatus.IN_PROGRESS),
+    pending: items.filter((i) => i.status === QueueItemStatus.PENDING),
+    completed: items.filter((i) => i.status === QueueItemStatus.COMPLETED),
+    other: items.filter((i) => ![QueueItemStatus.IN_PROGRESS, QueueItemStatus.PENDING, QueueItemStatus.COMPLETED].includes(i.status as any)),
   };
 
   return (

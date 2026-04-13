@@ -15,13 +15,14 @@ import {
 import { TaskCard } from "./TaskCard";
 import { Button } from "../ui";
 import type { TaskCard as TaskCardType, Agent } from "@agentcenter/types";
+import { TaskStatus } from "@/server/constants";
 const COLUMN_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  inbox: Inbox,
-  assigned: UserCheck,
-  in_progress: PlayCircle,
-  review: Eye,
-  done: CheckCircle2,
-  blocked: AlertTriangle,
+  [TaskStatus.INBOX]: Inbox,
+  [TaskStatus.ASSIGNED]: UserCheck,
+  [TaskStatus.IN_PROGRESS]: PlayCircle,
+  [TaskStatus.REVIEW]: Eye,
+  [TaskStatus.DONE]: CheckCircle2,
+  [TaskStatus.BLOCKED]: AlertTriangle,
 };
 
 const ICON_COLOR_MAP: Record<string, string> = {
@@ -71,7 +72,7 @@ export const StatusRow = memo(function StatusRow({
   onTaskClick,
   hasActiveFilters,
 }: StatusRowProps) {
-  const [collapsed, setCollapsed] = useState(id === "done");
+  const [collapsed, setCollapsed] = useState(id === TaskStatus.DONE);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
 

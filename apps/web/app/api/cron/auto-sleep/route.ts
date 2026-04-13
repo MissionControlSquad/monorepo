@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { findStaleAgents, isAgentStill } from "@agentcenter/database";
 import { env } from "@/server/env";
 import { applyAgentStatusUpdate } from "@/server/agent-status";
+import { AgentStatus } from "@/server/constants";
 
 // 5 minutes — heartbeat timeout threshold
 const HEARTBEAT_TIMEOUT_MS = 5 * 60 * 1000;
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
     const stillStale = await isAgentStill(agent.id, HEARTBEAT_TIMEOUT_MS);
     if (stillStale) {
       await applyAgentStatusUpdate(agent.id, {
-        status: "idle",
+        status: AgentStatus.IDLE,
         detailedStatus: null,
         statusMessage: null,
         currentTaskId: null,

@@ -1,6 +1,7 @@
 import { GraphQLError } from "graphql";
 import { builder } from "../builder";
 import { findProfileForUpdate, updateProfile } from "@agentcenter/database";
+import { ProfileKind } from "../../constants";
 
 builder.mutationField("updateMyProfile", (t) =>
   t.prismaField({
@@ -21,7 +22,7 @@ builder.mutationField("updateMyProfile", (t) =>
         throw new GraphQLError("Profile not found");
       }
 
-      if (profile.kind !== "human") {
+      if (profile.kind !== ProfileKind.HUMAN) {
         throw new GraphQLError("Only human profiles can be updated this way");
       }
 

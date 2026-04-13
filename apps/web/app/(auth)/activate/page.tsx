@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui";
+import { LicenseStatusCode } from "@/server/constants";
 import {
   Loader2,
   KeyRound,
@@ -35,7 +36,7 @@ export default function ActivateLicensePage() {
     fetch("/api/license")
       .then((r) => r.json())
       .then((data: LicenseInfo) => {
-        if (data.status === "active") {
+        if (data.status === LicenseStatusCode.ACTIVE) {
           // Already activated — go to login
           router.replace("/login");
           return;
@@ -97,37 +98,39 @@ export default function ActivateLicensePage() {
             className="w-12 h-12 rounded-xl mb-5 inline-block"
           />
           <h1 className="text-xl font-semibold text-foreground">
-            {currentLicense?.status === "none" ? "Activate AgentCenter" : "License Update Required"}
+            {currentLicense?.status === LicenseStatusCode.NONE
+              ? "Activate AgentCenter"
+              : "License Update Required"}
           </h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            {currentLicense?.status === "none"
+            {currentLicense?.status === LicenseStatusCode.NONE
               ? "Enter your license key to get started"
               : "Your license needs attention"}
           </p>
         </div>
 
         {/* Current license status banner (if expired/revoked/invalid) */}
-        {currentLicense && currentLicense.status !== "none" && (
+        {currentLicense && currentLicense.status !== LicenseStatusCode.NONE && (
           <div className="mb-4 p-3 sm:rounded-xl sm:border sm:border-border sm:bg-card sm:p-4">
             <div className="flex items-center gap-3">
-              {currentLicense.status === "expired" && (
+              {currentLicense.status === LicenseStatusCode.EXPIRED && (
                 <Clock className="h-5 w-5 text-amber-500 shrink-0" />
               )}
-              {currentLicense.status === "revoked" && (
+              {currentLicense.status === LicenseStatusCode.REVOKED && (
                 <XCircle className="h-5 w-5 text-destructive shrink-0" />
               )}
-              {currentLicense.status === "invalid" && (
+              {currentLicense.status === LicenseStatusCode.INVALID && (
                 <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
               )}
-              {currentLicense.status === "grace" && (
+              {currentLicense.status === LicenseStatusCode.GRACE && (
                 <ShieldCheck className="h-5 w-5 text-amber-500 shrink-0" />
               )}
               <div>
                 <p className="text-sm font-medium text-foreground">
-                  {currentLicense.status === "expired" && "License Expired"}
-                  {currentLicense.status === "revoked" && "License Revoked"}
-                  {currentLicense.status === "invalid" && "Invalid License"}
-                  {currentLicense.status === "grace" && "License Grace Period"}
+                  {currentLicense.status === LicenseStatusCode.EXPIRED && "License Expired"}
+                  {currentLicense.status === LicenseStatusCode.REVOKED && "License Revoked"}
+                  {currentLicense.status === LicenseStatusCode.INVALID && "Invalid License"}
+                  {currentLicense.status === LicenseStatusCode.GRACE && "License Grace Period"}
                 </p>
                 {currentLicense.org && (
                   <p className="text-xs text-muted-foreground">
@@ -171,7 +174,7 @@ export default function ActivateLicensePage() {
                 />
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {currentLicense?.status === "none"
+                {currentLicense?.status === LicenseStatusCode.NONE
                   ? "Paste the license key provided by your administrator"
                   : "Enter a new license key to re-activate"}
               </p>

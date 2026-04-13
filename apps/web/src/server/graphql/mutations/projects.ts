@@ -1,7 +1,7 @@
 import { builder } from "../builder";
 import { agentModel, projectModel, projectMemberModel } from "../../models";
 import { invalidateProjectsList } from "../../cache";
-import { Roles } from "../../constants";
+import { Roles, ProjectStatus, ProjectMemberStatus } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 import { findProfilesWithAgentIdsByIds, findProfileAgentId } from "@agentcenter/database";
 import { checkLicenseLimit } from "../../license";
@@ -17,7 +17,7 @@ builder.mutationField("createProject", (t) =>
     },
     resolve: async (query, _root, args) => {
       // Enforce license limit on project count
-      const projectCount = await projectModel.count({ where: { status: "active" } });
+      const projectCount = await projectModel.count({ where: { status: ProjectStatus.ACTIVE } });
       const limitCheck = await checkLicenseLimit("projects", projectCount);
       if (!limitCheck.allowed) {
         throw new Error(
@@ -58,7 +58,7 @@ builder.mutationField("createProject", (t) =>
         data: {
           name: args.name,
           description: args.description ?? undefined,
-          status: "active",
+          status: ProjectStatus.ACTIVE,
           members: {
             create: profileIds.map((profileId) => ({ profileId })),
           },
@@ -110,7 +110,7 @@ builder.mutationField("archiveProject", (t) =>
     resolve: async (query, _root, args) => {
       const result = await projectModel.update(args.id, {
         ...query,
-        data: { status: "archived" },
+        data: { status: ProjectStatus.ARCHIVED },
       });
       invalidateProjectsList();
       return result;
@@ -125,7 +125,7 @@ builder.mutationField("restoreProject", (t) =>
     resolve: async (query, _root, args) => {
       const result = await projectModel.update(args.id, {
         ...query,
-        data: { status: "active" },
+        data: { status: ProjectStatus.ACTIVE },
       });
       invalidateProjectsList();
       return result;
@@ -143,7 +143,7 @@ builder.mutationField("addProjectMember", (t) =>
     },
     resolve: async (query, _root, args) => {
       const project = await projectModel.findById(args.projectId, { select: { status: true } });
-      if (project?.status === "archived") {
+      if (project?.status === ProjectStatus.ARCHIVED) {
         throw new Error("Cannot modify members of an archived project");
       }
 
@@ -166,7 +166,7 @@ builder.mutationField("addProjectMember", (t) =>
           },
         },
         create: { projectId: args.projectId, profileId: resolvedProfileId },
-        update: { status: "active" },
+        update: { status: ProjectStatus.ACTIVE },
       });
 
       // Look up agent info for events (if this profile is an agent)
@@ -220,7 +220,7 @@ builder.mutationField("removeProjectMember", (t) =>
       const projectForCheck = await projectModel.findById(args.projectId, {
         select: { status: true },
       });
-      if (projectForCheck?.status === "archived") {
+      if (projectForCheck?.status === ProjectStatus.ARCHIVED) {
         throw new Error("Cannot modify members of an archived project");
       }
 
@@ -257,7 +257,7 @@ builder.mutationField("removeProjectMember", (t) =>
             profileId: resolvedProfileId,
           },
         },
-        data: { status: "deactivated" },
+        data: { status: ProjectMemberStatus.DEACTIVATED },
       });
 
       const project = await projectModel.findById(args.projectId, {

@@ -20,7 +20,7 @@ import { CHANNEL_MESSAGES_QUERY, CHANNEL_QUERY, CHANNEL_PINNED_MESSAGES_QUERY, O
 import { CREATE_CHANNEL_MESSAGE, MARK_CHANNEL_READ, TOGGLE_CHANNEL_MESSAGE_REACTION, UPDATE_CHANNEL_MESSAGE, DELETE_CHANNEL_MESSAGE, PIN_CHANNEL_MESSAGE, UNPIN_CHANNEL_MESSAGE, ADD_CHANNEL_MEMBER, REMOVE_CHANNEL_MEMBER, JOIN_CHANNEL, LEAVE_CHANNEL, DELETE_CHANNEL } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
 import { useTheme } from "../../src/hooks/useTheme";
-import { formatChatTime, appendDeduped } from "@agentcenter/utils";
+import { formatChatTime, appendDeduped, ProfileKind, ChannelVisibility } from "@agentcenter/utils";
 import { MentionInput } from "../../src/components/MentionInput";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
 
@@ -175,7 +175,7 @@ export default function ChannelDetailScreen() {
       navigation.setOptions({
         headerBackTitle: "",
         headerBackTitleVisible: false,
-        title: channel.visibility === "dm"
+        title: channel.visibility === ChannelVisibility.DM
           ? (channel.members.find((m) => m.profileId !== profileId)?.profile.displayName ?? channel.name)
           : channel.name,
         headerRight: () => (
@@ -559,12 +559,12 @@ export default function ChannelDetailScreen() {
 
           {/* Join / Leave row */}
           <View className="flex-row gap-2.5 px-4 py-2.5 border-b border-gray-100 dark:border-slate-700">
-            {isMember && (channel?.visibility === "dm" || channel?.createdByProfileId !== profileId) ? (
+            {isMember && (channel?.visibility === ChannelVisibility.DM || channel?.createdByProfileId !== profileId) ? (
               <TouchableOpacity
                 className="flex-1 py-2.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 items-center"
                 onPress={() => {
                   if (!profileId) return;
-                  const isDm = channel?.visibility === "dm";
+                  const isDm = channel?.visibility === ChannelVisibility.DM;
                   Alert.alert(
                     isDm ? "Leave Conversation" : "Leave Channel",
                     isDm
@@ -586,10 +586,10 @@ export default function ChannelDetailScreen() {
                 activeOpacity={0.7}
               >
                 <Text className="text-red-600 font-semibold text-sm">
-                  {channel?.visibility === "dm" ? "Leave Conversation" : "Leave Channel"}
+                  {channel?.visibility === ChannelVisibility.DM ? "Leave Conversation" : "Leave Channel"}
                 </Text>
               </TouchableOpacity>
-            ) : !isMember && channel?.visibility === "public" ? (
+            ) : !isMember && channel?.visibility === ChannelVisibility.PUBLIC ? (
               <TouchableOpacity
                 className="flex-1 py-2.5 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 items-center"
                 onPress={async () => {
@@ -603,7 +603,7 @@ export default function ChannelDetailScreen() {
               </TouchableOpacity>
             ) : null}
             {/* Add Member — private channels only, creator only */}
-            {channel?.visibility === "private" && channel?.createdByProfileId === profileId && (
+            {channel?.visibility === ChannelVisibility.PRIVATE && channel?.createdByProfileId === profileId && (
               <TouchableOpacity
                 className="flex-1 py-2.5 rounded-lg border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 items-center"
                 onPress={() => { setMembersOpen(false); setTimeout(() => setAddMemberOpen(true), 300); }}
@@ -615,7 +615,7 @@ export default function ChannelDetailScreen() {
           </View>
 
           {/* Delete channel — non-DM, creator only */}
-          {channel?.visibility !== "dm" && channel?.createdByProfileId === profileId && (
+          {channel?.visibility !== ChannelVisibility.DM && channel?.createdByProfileId === profileId && (
             <TouchableOpacity
               className="mx-4 mt-2.5 py-2.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 items-center"
               onPress={() => {
@@ -658,12 +658,12 @@ export default function ChannelDetailScreen() {
                 <View className="flex-1">
                   <Text className="text-base font-medium text-gray-900 dark:text-slate-100">{m.profile.displayName}</Text>
                   <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">
-                    {m.profile.kind === "agent" ? "🤖 Agent" : "👤 Human"} · @{m.profile.username}
+                    {m.profile.kind === ProfileKind.AGENT ? "🤖 Agent" : "👤 Human"} · @{m.profile.username}
                   </Text>
                 </View>
                 {m.profileId === profileId ? (
                   <Text className="text-xs text-blue-600 font-semibold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-xl">you</Text>
-                ) : channel?.visibility === "private" && channel?.createdByProfileId === profileId ? (
+                ) : channel?.visibility === ChannelVisibility.PRIVATE && channel?.createdByProfileId === profileId ? (
                   <TouchableOpacity
                     onPress={() => {
                       if (!profileId) return;
@@ -755,7 +755,7 @@ export default function ChannelDetailScreen() {
                   <View className="flex-1">
                     <Text className="text-base font-medium text-gray-900 dark:text-slate-100">{p.displayName}</Text>
                     <Text className="text-xs text-gray-400 dark:text-slate-500 mt-px">
-                      {p.kind === "agent" ? "🤖 Agent" : "👤 Human"}{p.username ? ` · @${p.username}` : ""}
+                      {p.kind === ProfileKind.AGENT ? "🤖 Agent" : "👤 Human"}{p.username ? ` · @${p.username}` : ""}
                     </Text>
                   </View>
                   <Ionicons name="add-circle-outline" size={22} color="#2563eb" />
@@ -836,11 +836,11 @@ export default function ChannelDetailScreen() {
           style={{ paddingBottom: insets.bottom + 8 }}
         >
           <Text className="text-sm text-gray-500 dark:text-slate-400 text-center">
-            {channel?.visibility === "public"
+            {channel?.visibility === ChannelVisibility.PUBLIC
               ? "You're not a member. Join to post."
               : "You're not a member of this private channel."}
           </Text>
-          {channel?.visibility === "public" && (
+          {channel?.visibility === ChannelVisibility.PUBLIC && (
             <TouchableOpacity
               className="px-6 py-2 bg-green-500 dark:bg-green-600 rounded-lg"
               onPress={async () => {

@@ -2,7 +2,7 @@ import { projectModel, agentModel } from "@/server/models";
 import { resolveAgent } from "../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
 import { validateBody, createProjectSchema } from "../_lib/validation";
-import { Roles } from "@/server/constants";
+import { Roles, ProjectStatus, ProjectMemberStatus } from "@/server/constants";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { checkLicenseLimit } from "@/server/license";
 
@@ -17,13 +17,13 @@ export async function GET(request: Request) {
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
     const projects = await projectModel.findMany({
       where: {
-        status: "active",
+        status: ProjectStatus.ACTIVE,
         shutdownActive: false,
-        members: { some: { profileId: agentProfileId, status: "active" } },
+        members: { some: { profileId: agentProfileId, status: ProjectMemberStatus.ACTIVE } },
       },
       include: {
         members: {
-          where: { status: "active" },
+          where: { status: ProjectMemberStatus.ACTIVE },
           include: { profile: true },
         },
       },
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     const { name, description, memberIds } = v.data;
 
     // Enforce license limit on project count
-    const projectCount = await projectModel.count({ where: { status: "active" } });
+    const projectCount = await projectModel.count({ where: { status: ProjectStatus.ACTIVE } });
     const limitCheck = await checkLicenseLimit("projects", projectCount);
     if (!limitCheck.allowed) {
       return errorResponse(
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       data: {
         name,
         description: description ?? undefined,
-        status: "active",
+        status: ProjectStatus.ACTIVE,
         members: {
           create: memberProfileIds.map((profileId) => ({ profileId })),
         },

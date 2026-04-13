@@ -26,6 +26,7 @@ import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS, type AgentConfigFile } from "@agentcenter/utils";
 import { useIsElectron } from "@agentcenter/hooks/browser";
 import { DesktopBootstrapButton } from "@/components/common/DesktopBootstrapButton";
+import { SetupStatus } from "@/server/constants";
 
 interface CloudVMAgent {
   id: string;
@@ -378,12 +379,14 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
           </Button>
           <div>
             <h1 className="text-xl font-bold text-foreground">
-              {setupData.agent.setupStatus === "pending_setup" ? "Setup" : "Configuration"} —{" "}
-              {setupData.agent.name}
+              {setupData.agent.setupStatus === SetupStatus.PENDING_SETUP
+                ? "Setup"
+                : "Configuration"}{" "}
+              — {setupData.agent.name}
             </h1>
             <p className="text-sm text-muted-foreground">
               {setupData.agent.role}
-              {setupData.agent.setupStatus === "pending_setup" && (
+              {setupData.agent.setupStatus === SetupStatus.PENDING_SETUP && (
                 <Badge variant="yellow" className="ml-2">
                   Pending Setup
                 </Badge>

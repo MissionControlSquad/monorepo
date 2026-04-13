@@ -5,6 +5,7 @@ import { useQuery } from "urql";
 import { TASKS_BY_ASSIGNEE_QUERY, PROJECTS_QUERY } from "../../lib/graphql/queries";
 import { useTaskNavigation } from "../../hooks/useTaskNavigation";
 import { TASK_STATUSES } from "../../lib/constants";
+import { TaskStatus, Priority } from "@/server/constants";
 import { TimeAgo } from "../common/TimeAgo";
 import { ClipboardList, FolderKanban } from "lucide-react";
 import { Card, Badge, SkeletonList } from "../ui";
@@ -19,21 +20,28 @@ const STATUS_BADGE_VARIANT: Record<
   string,
   "gray" | "blue" | "yellow" | "purple" | "green" | "red"
 > = {
-  inbox: "gray",
-  assigned: "blue",
-  in_progress: "yellow",
-  review: "purple",
-  done: "green",
-  blocked: "red",
+  [TaskStatus.INBOX]: "gray",
+  [TaskStatus.ASSIGNED]: "blue",
+  [TaskStatus.IN_PROGRESS]: "yellow",
+  [TaskStatus.REVIEW]: "purple",
+  [TaskStatus.DONE]: "green",
+  [TaskStatus.BLOCKED]: "red",
 };
 
 const PRIORITY_DOT: Record<string, string> = {
-  high: "bg-destructive",
-  medium: "bg-warning",
-  low: "bg-gray-300",
+  [Priority.HIGH]: "bg-destructive",
+  [Priority.MEDIUM]: "bg-warning",
+  [Priority.LOW]: "bg-gray-300",
 };
 
-const STATUS_ORDER = ["in_progress", "review", "blocked", "assigned", "inbox", "done"];
+const STATUS_ORDER = [
+  TaskStatus.IN_PROGRESS,
+  TaskStatus.REVIEW,
+  TaskStatus.BLOCKED,
+  TaskStatus.ASSIGNED,
+  TaskStatus.INBOX,
+  TaskStatus.DONE,
+];
 
 export function AssignedTasksList({ agentId, projectId }: AssignedTasksListProps) {
   const [tasksResult] = useQuery({
@@ -149,7 +157,7 @@ export function AssignedTasksList({ agentId, projectId }: AssignedTasksListProps
               >
                 {/* Priority dot */}
                 <span
-                  className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[task.priority ?? "medium"] ?? PRIORITY_DOT.medium}`}
+                  className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[task.priority ?? Priority.MEDIUM] ?? PRIORITY_DOT[Priority.MEDIUM]}`}
                 />
 
                 {/* Status pill — only show in "All" view */}

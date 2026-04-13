@@ -14,7 +14,8 @@ export const PRIORITY_COLORS = {
   urgent: "bg-purple-200 text-purple-800",
 };
 
-export type TaskStatus = (typeof TASK_STATUSES)[number]["id"];
+/** @deprecated Use TaskStatus from domain-constants (imported via @agentcenter/utils) for comparisons. This type is kept for UI list typing only. */
+export type TaskStatusId = (typeof TASK_STATUSES)[number]["id"];
 
 // Agent base statuses
 export const AGENT_STATUSES = {
@@ -52,7 +53,7 @@ export const AGENT_DETAILED_STATUSES = {
   },
 } as const;
 
-export type AgentStatus = keyof typeof AGENT_STATUSES;
+export type AgentStatusId = keyof typeof AGENT_STATUSES;
 export type AgentDetailedStatus = keyof typeof AGENT_DETAILED_STATUSES;
 
 // Tailwind classes for status dots (with animations for active states)
@@ -102,7 +103,7 @@ export const AGENT_LEVELS = {
   lead: { label: "Lead", color: "purple", description: "Full autonomy, can review and delegate" },
 } as const;
 
-export type AgentLevel = keyof typeof AGENT_LEVELS;
+export type AgentLevelId = keyof typeof AGENT_LEVELS;
 
 // Column icons (lucide icon names)
 export const COLUMN_ICONS: Record<string, string> = {

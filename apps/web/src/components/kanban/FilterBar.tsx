@@ -5,6 +5,7 @@ import { Search, X, SlidersHorizontal } from "lucide-react";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import { Button } from "../ui";
 import type { Agent } from "@agentcenter/types";
+import { Priority } from "@/server/constants";
 
 export type DueDateFilter = "overdue" | "today" | "this_week" | "no_due_date";
 
@@ -30,10 +31,10 @@ interface FilterBarProps {
 }
 
 const PRIORITY_LABELS: Record<string, { label: string; color: string }> = {
-  low: { label: "Low", color: "bg-muted text-muted-foreground" },
-  medium: { label: "Medium", color: "bg-warning/15 text-warning" },
-  high: { label: "High", color: "bg-destructive/15 text-destructive" },
-  urgent: { label: "Urgent", color: "bg-purple-100 text-purple-700" },
+  [Priority.LOW]: { label: "Low", color: "bg-muted text-muted-foreground" },
+  [Priority.MEDIUM]: { label: "Medium", color: "bg-warning/15 text-warning" },
+  [Priority.HIGH]: { label: "High", color: "bg-destructive/15 text-destructive" },
+  [Priority.URGENT]: { label: "Urgent", color: "bg-purple-100 text-purple-700" },
 };
 
 const DUE_DATE_LABELS: Record<DueDateFilter, { label: string; color: string }> = {

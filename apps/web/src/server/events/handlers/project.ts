@@ -1,9 +1,10 @@
 import { ProjectMemberStatus, findProfilesWithAgentIds } from "@agentcenter/database";
 import { on } from "../bus";
+import { EventTypes } from "../../constants";
 import { invalidateMemberCaches } from "../../cache";
 import { notificationModel, projectMemberModel } from "../../models";
 
-on("project.member_added", async (e) => {
+on(EventTypes.PROJECT_MEMBER_ADDED, async (e) => {
   if (e.type !== "project.member_added") return;
 
   invalidateMemberCaches(e.projectId, e.agentId);
@@ -42,7 +43,7 @@ on("project.member_added", async (e) => {
   );
 });
 
-on("project.member_removed", async (e) => {
+on(EventTypes.PROJECT_MEMBER_REMOVED, async (e) => {
   if (e.type !== "project.member_removed") return;
 
   invalidateMemberCaches(e.projectId, e.agentId);
