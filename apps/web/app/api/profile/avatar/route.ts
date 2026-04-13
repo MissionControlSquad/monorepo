@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { updateProfileAvatar } from "@agentcenter/database";
 import { uploadFileToR2 } from "@/server/storage/r2";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
+import { successResponse, errorResponse } from "../../_lib/json-response";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 
@@ -32,34 +32,28 @@ export async function POST(request: Request) {
   }
 
   if (!profileId) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    return errorResponse("Authentication required", 401);
   }
 
   let formData: FormData;
   try {
     formData = await request.formData();
   } catch {
-    return NextResponse.json(
-      { error: "Expected multipart/form-data with a 'file' field" },
-      { status: 400 },
-    );
+    return errorResponse("Expected multipart/form-data with a 'file' field", 400);
   }
 
   const file = formData.get("file");
   if (!file || !(file instanceof File)) {
-    return NextResponse.json({ error: "'file' field is required" }, { status: 400 });
+    return errorResponse("'file' field is required", 400);
   }
 
   if (file.size > MAX_AVATAR_SIZE) {
-    return NextResponse.json({ error: "Avatar must be under 5 MB" }, { status: 400 });
+    return errorResponse("Avatar must be under 5 MB", 400);
   }
 
   const mimeType = file.type || "application/octet-stream";
   if (!ALLOWED_MIME_TYPES.has(mimeType)) {
-    return NextResponse.json(
-      { error: "Only PNG, JPEG, GIF, and WebP images are allowed" },
-      { status: 400 },
-    );
+    return errorResponse("Only PNG, JPEG, GIF, and WebP images are allowed", 400);
   }
 
   const fileName = file.name || "avatar";
@@ -90,5 +84,5 @@ export async function POST(request: Request) {
   // Update the profile
   await updateProfileAvatar(profileId, avatarUrl);
 
-  return NextResponse.json({ avatarUrl });
+  return successResponse({ avatarUrl });
 }

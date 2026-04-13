@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { generateUploadUrl } from "@/server/storage/r2";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
+import { successResponse, errorResponse } from "../../_lib/json-response";
 import { storageUploadSchema } from "../../_lib/validation";
 import { StoragePrefix } from "@/server/constants";
 
@@ -42,23 +42,20 @@ export async function POST(request: Request) {
   }
 
   if (!authenticated) {
-    return NextResponse.json(
-      { error: "Authentication required (Bearer token or session cookie)" },
-      { status: 401 },
-    );
+    return errorResponse("Authentication required (Bearer token or session cookie)", 401);
   }
 
   let rawBody: unknown;
   try {
     rawBody = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return errorResponse("Invalid JSON body", 400);
   }
 
   const parsed = storageUploadSchema.safeParse(rawBody);
   if (!parsed.success) {
     const messages = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
-    return NextResponse.json({ error: messages.join("; ") }, { status: 400 });
+    return errorResponse(messages.join("; "), 400);
   }
 
   const { fileName, mimeType, prefix } = parsed.data;
@@ -70,15 +67,15 @@ export async function POST(request: Request) {
     console.info(
       `[storage/upload] Presigned URL issued: fileName="${fileName}" mimeType="${mimeType}" prefix="${storagePrefix}" key="${result.key}"`,
     );
-    return NextResponse.json(result);
+    return successResponse(result);
   } catch (err) {
     console.error(
       `[storage/upload] Failed to generate presigned URL: fileName="${fileName}" mimeType="${mimeType}" prefix="${storagePrefix}"`,
       err,
     );
-    return NextResponse.json(
-      { error: "Failed to generate upload URL — check R2 credentials and bucket permissions" },
-      { status: 502 },
+    return errorResponse(
+      "Failed to generate upload URL — check R2 credentials and bucket permissions",
+      502,
     );
   }
 }
