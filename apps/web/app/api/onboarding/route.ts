@@ -5,6 +5,7 @@ import {
 } from "@/server/system-settings";
 import { agentModel } from "@/server/models";
 import { successResponse, handleError } from "../_lib/json-response";
+import { validateBody, onboardingCategorySchema } from "../_lib/validation";
 
 /**
  * GET /api/onboarding — Get onboarding progress.
@@ -31,10 +32,10 @@ export async function GET() {
 /** PUT /api/onboarding — Save selected category */
 export async function PUT(request: Request) {
   try {
-    const body = await request.json();
-    const { categoryId } = body as { categoryId?: string };
-    if (categoryId) {
-      await setOnboardingCategory(categoryId);
+    const v = await validateBody(request, onboardingCategorySchema);
+    if (v.error) return v.error;
+    if (v.data.categoryId) {
+      await setOnboardingCategory(v.data.categoryId);
     }
     return successResponse({ ok: true });
   } catch (err) {

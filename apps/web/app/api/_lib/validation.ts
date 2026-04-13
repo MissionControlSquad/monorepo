@@ -284,3 +284,41 @@ export const storageUploadSchema = z.object({
   mimeType: z.string().min(1, "mimeType is required").max(200),
   prefix: z.enum(Object.values(StoragePrefix) as [string, ...string[]]).optional(),
 });
+
+// ─── Notification mark-delivered (POST /api/notifications/mark-delivered) ─
+export const markDeliveredSchema = z.object({
+  id: idStr().optional(),
+  ids: z.array(idStr()).optional(),
+});
+
+// ─── Recurring task update (PATCH /api/recurring-tasks/[id]) ──────
+export const updateRecurringTaskSchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  description: z.string().max(10000).optional(),
+  status: z.string().max(50).optional(),
+  priority: z.enum(Object.values(Priority) as [string, ...string[]]).optional(),
+  tags: tags().nullable(),
+  timezone: z.string().max(50).optional(),
+  projectId: idStr().nullable().optional(),
+  assigneeIds: z.array(idStr()).optional(),
+  recurrenceConfig: z.record(z.string(), z.unknown()).optional(),
+});
+
+// ─── Onboarding category (PUT /api/onboarding) ───────────────────
+export const onboardingCategorySchema = z.object({
+  categoryId: z.string().max(200).optional(),
+});
+
+// ─── Push subscription (POST /api/user-notifications/subscribe) ───
+export const pushSubscribeSchema = z.object({
+  endpoint: z.string().min(1).max(2000),
+  keys: z.object({
+    p256dh: z.string().min(1).max(200),
+    auth: z.string().min(1).max(200),
+  }),
+});
+
+// ─── Push unsubscribe (DELETE /api/user-notifications/subscribe) ──
+export const pushUnsubscribeSchema = z.object({
+  endpoint: z.string().min(1).max(2000),
+});

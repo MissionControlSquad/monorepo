@@ -2,6 +2,7 @@ import { recurringTaskModel } from "@/server/models";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { ERR } from "../../_lib/error-messages";
+import { validateBody, updateRecurringTaskSchema } from "../../_lib/validation";
 import { assertProjectMember } from "../../_lib/project-access";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertAssignableAgents } from "@/server/assignment-guard";
@@ -29,7 +30,9 @@ export async function GET(request: Request, ctx: RouteContext) {
 
 export async function PATCH(request: Request, ctx: RouteContext) {
   try {
-    const body = await request.json();
+    const v = await validateBody(request, updateRecurringTaskSchema);
+    if (v.error) return v.error;
+    const body = v.data;
     const agent = await resolveAgent(request);
     const { id } = await ctx.params;
 
