@@ -4,6 +4,7 @@ import { agentModel } from "@/server/models";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "@/server/pubsub";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { ERR } from "../../_lib/error-messages";
 import { validateBody, updateTaskSchema } from "../../_lib/validation";
 import { log } from "../../_lib/logger";
 import { assertProjectMember, assertAllMembersOfProject } from "../../_lib/project-access";
@@ -26,10 +27,10 @@ export async function GET(request: Request, ctx: RouteContext) {
       include: { assignees: { include: { profile: true } } },
     });
 
-    if (!task) return errorResponse("Task not found", 404);
+    if (!task) return errorResponse(ERR.TASK_NOT_FOUND, 404);
     if (task.projectId) {
       if (await isProjectShutdown(task.projectId)) {
-        return errorResponse("Task not found", 404);
+        return errorResponse(ERR.TASK_NOT_FOUND, 404);
       }
       await assertProjectMember(agent.id, task.projectId);
     }
@@ -54,10 +55,10 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const oldTask = await taskModel.findById(id, {
       include: { assignees: { include: { profile: true } } },
     });
-    if (!oldTask) return errorResponse("Task not found", 404);
+    if (!oldTask) return errorResponse(ERR.TASK_NOT_FOUND, 404);
     if (oldTask.projectId) {
       if (await isProjectShutdown(oldTask.projectId)) {
-        return errorResponse("Task not found", 404);
+        return errorResponse(ERR.TASK_NOT_FOUND, 404);
       }
       await assertProjectMember(agent.id, oldTask.projectId);
     }
@@ -218,7 +219,7 @@ export async function DELETE(request: Request, ctx: RouteContext) {
     const task = await taskModel.findById(id, {
       include: { assignees: { include: { profile: true } } },
     });
-    if (!task) return errorResponse("Task not found", 404);
+    if (!task) return errorResponse(ERR.TASK_NOT_FOUND, 404);
     if (task.projectId) await assertProjectMember(agent.id, task.projectId);
 
     // Resolve profileId → agentId for notification compat

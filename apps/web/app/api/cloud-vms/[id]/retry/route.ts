@@ -1,6 +1,7 @@
 import { findCloudVMRaw, retryCloudVMProvisioning, logCloudVMEvent } from "@agentcenter/database";
 import { provisionVM } from "@/server/services/cloud-vm";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { CloudVmStatus } from "@/server/constants";
 
 /**
@@ -13,7 +14,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
     const vm = await findCloudVMRaw(id);
     if (!vm) {
-      return errorResponse("VM not found", 404);
+      return errorResponse(ERR.VM_NOT_FOUND, 404);
     }
 
     if (vm.status !== CloudVmStatus.ERROR) {

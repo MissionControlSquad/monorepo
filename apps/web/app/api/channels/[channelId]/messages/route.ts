@@ -14,6 +14,7 @@ import { FLAG_KEYS } from "@agentcenter/utils";
 import { parseMentionIds } from "@agentcenter/utils";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { validateBody, createChannelMessageSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
 import { apiLimiters, checkRateLimit } from "../../../_lib/rate-limit-check";
@@ -30,7 +31,7 @@ export async function GET(request: Request, ctx: RouteContext) {
 
     const membership = await findChannelMember(channelId, agentProfileId);
     if (!membership) {
-      return errorResponse("Not a member of this channel", 403);
+      return errorResponse(ERR.NOT_CHANNEL_MEMBER, 403);
     }
 
     const { searchParams } = new URL(request.url);
@@ -72,7 +73,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const membership = await findChannelMember(channelId, agentProfileId);
     if (!membership) {
-      return errorResponse("Not a member of this channel", 403);
+      return errorResponse(ERR.NOT_CHANNEL_MEMBER, 403);
     }
 
     const { content: rawContent, attachmentIds } = v.data;

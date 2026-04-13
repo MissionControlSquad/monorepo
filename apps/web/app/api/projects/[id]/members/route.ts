@@ -1,6 +1,7 @@
 import { projectModel, agentModel, projectMemberModel } from "@/server/models";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { validateBody, projectMemberSchema } from "../../../_lib/validation";
 import { assertProjectLead } from "../../../_lib/project-access";
 import { Roles, ProjectMemberStatus } from "@/server/constants";
@@ -37,10 +38,10 @@ export async function POST(request: Request, context: RouteContext) {
       getOrCreateAgentProfileId(agentId),
     ]);
     if (!project) {
-      return errorResponse("Project not found", 404);
+      return errorResponse(ERR.PROJECT_NOT_FOUND, 404);
     }
     if (!targetAgent) {
-      return errorResponse("Agent not found", 404);
+      return errorResponse(ERR.AGENT_NOT_FOUND, 404);
     }
 
     const member = await projectMemberModel.upsert({
@@ -92,13 +93,13 @@ export async function DELETE(request: Request, context: RouteContext) {
       getOrCreateAgentProfileId(agentId),
     ]);
     if (!targetAgent) {
-      return errorResponse("Agent not found", 404);
+      return errorResponse(ERR.AGENT_NOT_FOUND, 404);
     }
     if (targetAgent.role === Roles.SQUAD_LEAD) {
       return errorResponse("Cannot remove Squad Lead from a project", 403);
     }
     if (!project) {
-      return errorResponse("Project not found", 404);
+      return errorResponse(ERR.PROJECT_NOT_FOUND, 404);
     }
 
     // Soft-delete: mark as deactivated instead of deleting

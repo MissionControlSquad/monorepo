@@ -10,6 +10,7 @@ import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS, ChannelVisibility } from "@agentcenter/utils";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { ERR } from "../../_lib/error-messages";
 import { validateBody, createDMSchema } from "../../_lib/validation";
 import { log } from "../../_lib/logger";
 
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
     // Verify the other profile exists
     const otherProfile = await findProfileForDisplay(otherProfileId);
     if (!otherProfile) {
-      return errorResponse("Profile not found", 404);
+      return errorResponse(ERR.PROFILE_NOT_FOUND, 404);
     }
 
     // Deterministic slug ensures idempotency (same as GraphQL startConversation)

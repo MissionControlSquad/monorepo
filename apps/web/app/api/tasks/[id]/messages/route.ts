@@ -8,6 +8,7 @@ import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { parseMentions } from "@agentcenter/utils";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { validateBody, createMessageSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
 import { tryMentionAutoAssign } from "@/server/services/mention-auto-assign";
@@ -122,7 +123,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       taskNumber: true,
       projectId: true,
     });
-    if (!task) return errorResponse("Task not found", 404);
+    if (!task) return errorResponse(ERR.TASK_NOT_FOUND, 404);
 
     const message = await messageModel.create({
       data: {

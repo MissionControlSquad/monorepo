@@ -5,6 +5,7 @@
 
 import { deleteLiveGatewayConnection, listLiveGatewayConnections } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { resolveSession } from "../../../_lib/resolve-session";
 import { connectionRegistry } from "@/server/services/live-connection-registry";
 import { apiLimiters } from "../../../_lib/rate-limit-check";
@@ -27,7 +28,7 @@ async function deleteHandler(request: Request, ctx: RouteContext) {
     // Confirm the record exists before deleting.
     const connections = await listLiveGatewayConnections();
     const conn = connections.find((c) => c.id === id);
-    if (!conn) return errorResponse("Connection not found", 404);
+    if (!conn) return errorResponse(ERR.CONNECTION_NOT_FOUND, 404);
 
     await deleteLiveGatewayConnection(id);
     return successResponse({ success: true });

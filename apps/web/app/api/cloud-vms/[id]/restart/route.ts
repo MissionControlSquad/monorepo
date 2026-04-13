@@ -1,6 +1,7 @@
 import { stopCloudVM, startCloudVM } from "@/server/services/cloud-vm";
 import { findCloudVMRaw } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { CloudVmStatus } from "@/server/constants";
 
 /**
@@ -12,7 +13,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const { id } = await params;
 
     const vm = await findCloudVMRaw(id);
-    if (!vm) return errorResponse("VM not found", 404);
+    if (!vm) return errorResponse(ERR.VM_NOT_FOUND, 404);
 
     if (![CloudVmStatus.RUNNING, CloudVmStatus.STOPPED].includes(vm.status as any)) {
       return errorResponse(

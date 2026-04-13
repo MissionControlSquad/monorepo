@@ -2,6 +2,7 @@ import { taskModel } from "@/server/models/task";
 import { deliverableModel } from "@/server/models";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { validateBody, createDeliverableSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
@@ -46,7 +47,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       taskNumber: true,
       projectId: true,
     });
-    if (!task) return errorResponse("Task not found", 404);
+    if (!task) return errorResponse(ERR.TASK_NOT_FOUND, 404);
 
     const profileId = await getOrCreateAgentProfileId(agent.id);
     const deliverable = await deliverableModel.create({

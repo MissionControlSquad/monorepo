@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { successResponse, errorResponse } from "../../../../_lib/json-response";
+import { ERR } from "../../../../_lib/error-messages";
 import { TEMPLATES } from "@/lib/agent-wizard-templates";
 
 const SKILLS_DIR = join(process.cwd(), "src", "server", "agent-templates", "skills");
@@ -30,6 +31,6 @@ export async function GET(
 
     return successResponse({ content });
   } catch {
-    return errorResponse("Skill guide not found", 404);
+    return errorResponse(ERR.SKILL_GUIDE_NOT_FOUND, 404);
   }
 }

@@ -9,6 +9,7 @@ import {
 } from "@/server/agent-config-generator";
 import { workspacePathUnix } from "@/server/workspace-paths";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { AgentLevel } from "@/server/constants";
 import type { RouteContext } from "../../../_lib/route-context";
 
@@ -22,7 +23,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
 
     const agent = await agentModel.findById(id);
-    if (!agent) return errorResponse("Agent not found", 404);
+    if (!agent) return errorResponse(ERR.AGENT_NOT_FOUND, 404);
 
     const template = agent.templateId ? getTemplate(agent.templateId) : undefined;
     const mcUrl = getMcUrl();

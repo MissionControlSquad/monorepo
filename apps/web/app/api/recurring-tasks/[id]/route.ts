@@ -1,6 +1,7 @@
 import { recurringTaskModel } from "@/server/models";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { ERR } from "../../_lib/error-messages";
 import { assertProjectMember } from "../../_lib/project-access";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertAssignableAgents } from "@/server/assignment-guard";
@@ -19,7 +20,7 @@ export async function GET(request: Request, ctx: RouteContext) {
       },
     });
 
-    if (!rt) return errorResponse("Recurring task not found", 404);
+    if (!rt) return errorResponse(ERR.RECURRING_TASK_NOT_FOUND, 404);
     return successResponse(rt);
   } catch (err) {
     return handleError(err);
@@ -33,7 +34,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
 
     const existing = await recurringTaskModel.findById(id);
-    if (!existing) return errorResponse("Recurring task not found", 404);
+    if (!existing) return errorResponse(ERR.RECURRING_TASK_NOT_FOUND, 404);
     if (existing.projectId) await assertProjectMember(agent.id, existing.projectId);
 
     const data: Record<string, unknown> = {};
@@ -87,7 +88,7 @@ export async function DELETE(request: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
 
     const existing = await recurringTaskModel.findById(id);
-    if (!existing) return errorResponse("Recurring task not found", 404);
+    if (!existing) return errorResponse(ERR.RECURRING_TASK_NOT_FOUND, 404);
     if (existing.projectId) await assertProjectMember(agent.id, existing.projectId);
 
     await recurringTaskModel.deleteById(id);

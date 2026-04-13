@@ -2,6 +2,7 @@ import { Roles } from "@/server/constants";
 import { taskModel } from "@/server/models/task";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { validateBody, requestClarificationSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
 import { assertProjectMember } from "../../../_lib/project-access";
@@ -32,7 +33,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const task = await taskModel.findById(taskId, {
       select: { projectId: true, taskNumber: true },
     });
-    if (!task) return errorResponse("Task not found", 404);
+    if (!task) return errorResponse(ERR.TASK_NOT_FOUND, 404);
     if (task.projectId) await assertProjectMember(reviewer.id, task.projectId);
 
     const result = await performRequestClarification({

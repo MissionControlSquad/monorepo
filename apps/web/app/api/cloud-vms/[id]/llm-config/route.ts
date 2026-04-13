@@ -1,6 +1,7 @@
 import { findCloudVMRaw } from "@agentcenter/database";
 import { configureLLMOnVM } from "@/server/services/cloud-vm";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 
 /**
  * POST /api/cloud-vms/[id]/llm-config
@@ -20,7 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const vm = await findCloudVMRaw(id);
     if (!vm) {
-      return errorResponse("VM not found", 404);
+      return errorResponse(ERR.VM_NOT_FOUND, 404);
     }
 
     await configureLLMOnVM({ vmId: id, providerId, apiKey, model });

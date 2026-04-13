@@ -1,6 +1,7 @@
 import { findCloudVMById, findCloudVMRaw, updateCloudVM } from "@agentcenter/database";
 import { destroyCloudVM } from "@/server/services/cloud-vm";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { ERR } from "../../_lib/error-messages";
 import { resolveSession } from "../../_lib/resolve-session";
 
 /**
@@ -15,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const vm = await findCloudVMById(id);
 
     if (!vm) {
-      return errorResponse("VM not found", 404);
+      return errorResponse(ERR.VM_NOT_FOUND, 404);
     }
 
     return successResponse(vm);
@@ -35,7 +36,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { name } = body as { name?: string };
 
     const vm = await findCloudVMRaw(id);
-    if (!vm) return errorResponse("VM not found", 404);
+    if (!vm) return errorResponse(ERR.VM_NOT_FOUND, 404);
 
     const updated = await updateCloudVM(id, {
       ...(name !== undefined ? { name: name.trim() || null } : {}),
@@ -57,7 +58,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
     const vm = await findCloudVMRaw(id);
     if (!vm) {
-      return errorResponse("VM not found", 404);
+      return errorResponse(ERR.VM_NOT_FOUND, 404);
     }
 
     await destroyCloudVM(id);

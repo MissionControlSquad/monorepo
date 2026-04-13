@@ -2,6 +2,7 @@ import { projectDocModel, projectDocRevisionModel } from "@/server/models";
 import { invalidateProjectContext } from "@/server/cache";
 import { resolveAgent } from "../../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../../_lib/json-response";
+import { ERR } from "../../../../_lib/error-messages";
 import { validateBody, updateProjectDocSchema } from "../../../../_lib/validation";
 import { assertProjectMember } from "../../../../_lib/project-access";
 import type { RouteContext as _RouteContext } from "../../../../_lib/route-context";
@@ -13,8 +14,8 @@ export async function GET(request: Request, ctx: RouteContext) {
     const { id: projectId, docId } = await ctx.params;
 
     const doc = await projectDocModel.findById(docId);
-    if (!doc || doc.archivedAt) return errorResponse("Doc not found", 404);
-    if (doc.projectId !== projectId) return errorResponse("Doc not found", 404);
+    if (!doc || doc.archivedAt) return errorResponse(ERR.DOC_NOT_FOUND, 404);
+    if (doc.projectId !== projectId) return errorResponse(ERR.DOC_NOT_FOUND, 404);
 
     await assertProjectMember(agent.id, doc.projectId);
     return successResponse(doc);
@@ -29,8 +30,8 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const { id: projectId, docId } = await ctx.params;
 
     const current = await projectDocModel.findById(docId);
-    if (!current || current.archivedAt) return errorResponse("Doc not found", 404);
-    if (current.projectId !== projectId) return errorResponse("Doc not found", 404);
+    if (!current || current.archivedAt) return errorResponse(ERR.DOC_NOT_FOUND, 404);
+    if (current.projectId !== projectId) return errorResponse(ERR.DOC_NOT_FOUND, 404);
 
     await assertProjectMember(agent.id, current.projectId);
 
@@ -71,8 +72,8 @@ export async function DELETE(request: Request, ctx: RouteContext) {
     const { id: projectId, docId } = await ctx.params;
 
     const doc = await projectDocModel.findById(docId);
-    if (!doc || doc.archivedAt) return errorResponse("Doc not found", 404);
-    if (doc.projectId !== projectId) return errorResponse("Doc not found", 404);
+    if (!doc || doc.archivedAt) return errorResponse(ERR.DOC_NOT_FOUND, 404);
+    if (doc.projectId !== projectId) return errorResponse(ERR.DOC_NOT_FOUND, 404);
 
     await assertProjectMember(agent.id, doc.projectId);
 
