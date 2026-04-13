@@ -9,7 +9,7 @@ import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS, ChannelVisibility } from "@agentcenter/utils";
 import { resolveAgent } from "../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { successResponse, errorResponse, handleError, assertFound } from "../../_lib/json-response";
 import { ERR } from "../../_lib/error-messages";
 import { validateBody, createDMSchema } from "../../_lib/validation";
 import { log } from "../../_lib/logger";
@@ -73,9 +73,7 @@ export async function POST(request: Request) {
 
     // Verify the other profile exists
     const otherProfile = await findProfileForDisplay(otherProfileId);
-    if (!otherProfile) {
-      return errorResponse(ERR.PROFILE_NOT_FOUND, 404);
-    }
+    assertFound(otherProfile, ERR.PROFILE_NOT_FOUND);
 
     // Deterministic slug ensures idempotency (same as GraphQL startConversation)
     const [id1, id2] = [agentProfileId, otherProfileId].sort();

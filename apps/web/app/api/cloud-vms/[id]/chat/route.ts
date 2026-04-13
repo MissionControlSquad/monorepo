@@ -2,7 +2,7 @@ import { findCloudVMConnection } from "@agentcenter/database";
 import { sshUploadFile } from "@/server/services/ssh";
 import { getVMSSHConfig, ocExecStream } from "@/server/services/cloud-vm-utils";
 import { CloudVmStatus } from "@/server/constants";
-import { errorResponse } from "../../../_lib/json-response";
+import { errorResponse, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 
 /**
@@ -23,9 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const vm = await findCloudVMConnection(id);
 
-  if (!vm) {
-    return errorResponse(ERR.VM_NOT_FOUND, 404);
-  }
+  assertFound(vm, ERR.VM_NOT_FOUND);
 
   if (vm.status !== CloudVmStatus.RUNNING || !vm.ipv4 || !vm.sshPrivateKey) {
     return errorResponse(ERR.VM_NOT_RUNNING, 400);
