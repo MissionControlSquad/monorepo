@@ -1,6 +1,6 @@
 import { agentModel } from "@/server/models";
 import { generateApiKey } from "@/server/api-key";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { successResponse, handleError, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { invalidateAgentCache } from "@/server/cache";
 import type { RouteContext } from "../../../_lib/route-context";
@@ -14,7 +14,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
 
     const agent = await agentModel.findById(id);
-    if (!agent) return errorResponse(ERR.AGENT_NOT_FOUND, 404);
+    assertFound(agent, ERR.AGENT_NOT_FOUND);
 
     // Invalidate cached entry for the old API key
     if (agent.apiKeyHash) invalidateAgentCache(agent.apiKeyHash);

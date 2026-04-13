@@ -1,7 +1,7 @@
 import { agentQueueItemModel, agentModel } from "@/server/models";
 import { QueueItemStatus } from "@/server/constants";
 import { resolveAgent } from "../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { successResponse, errorResponse, handleError, assertFound } from "../../_lib/json-response";
 import { ERR } from "../../_lib/error-messages";
 import { validateBody, updateQueueItemSchema } from "../../_lib/validation";
 import { log } from "../../_lib/logger";
@@ -16,7 +16,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
 
     const item = await agentQueueItemModel.findById(id);
-    if (!item) return errorResponse(ERR.QUEUE_ITEM_NOT_FOUND, 404);
+    assertFound(item, ERR.QUEUE_ITEM_NOT_FOUND);
     if (item.agentId !== agent.id) return errorResponse(ERR.NOT_YOUR_QUEUE_ITEM, 403);
 
     const now = new Date();
@@ -73,7 +73,7 @@ export async function DELETE(request: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
 
     const item = await agentQueueItemModel.findById(id);
-    if (!item) return errorResponse(ERR.QUEUE_ITEM_NOT_FOUND, 404);
+    assertFound(item, ERR.QUEUE_ITEM_NOT_FOUND);
     if (item.agentId !== agent.id) return errorResponse(ERR.NOT_YOUR_QUEUE_ITEM, 403);
 
     await agentQueueItemModel.deleteById(id);

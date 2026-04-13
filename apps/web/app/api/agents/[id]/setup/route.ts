@@ -8,7 +8,7 @@ import {
   getMcUrl,
 } from "@/server/agent-config-generator";
 import { workspacePathUnix } from "@/server/workspace-paths";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { successResponse, handleError, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { AgentLevel } from "@/server/constants";
 import { getAgentSlug } from "@agentcenter/utils";
@@ -24,7 +24,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
 
     const agent = await agentModel.findById(id);
-    if (!agent) return errorResponse(ERR.AGENT_NOT_FOUND, 404);
+    assertFound(agent, ERR.AGENT_NOT_FOUND);
 
     const template = agent.templateId ? getTemplate(agent.templateId) : undefined;
     const mcUrl = getMcUrl();

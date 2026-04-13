@@ -1,7 +1,12 @@
 import { taskModel } from "@/server/models/task";
 import { deliverableModel, deliverableVersionModel } from "@/server/models";
 import { resolveAgent } from "../../../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../../../_lib/json-response";
+import {
+  successResponse,
+  errorResponse,
+  handleError,
+  assertFound,
+} from "../../../../_lib/json-response";
 import { ERR } from "../../../../_lib/error-messages";
 import { validateBody, updateDeliverableSchema } from "../../../../_lib/validation";
 import { log } from "../../../../_lib/logger";
@@ -22,7 +27,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     const current = await deliverableModel.findById(deliverableId);
-    if (!current) return errorResponse(ERR.DELIVERABLE_NOT_FOUND, 404);
+    assertFound(current, ERR.DELIVERABLE_NOT_FOUND);
     if (current.taskId !== taskId)
       return errorResponse("Deliverable does not belong to this task", 400);
     const profileId = await getOrCreateAgentProfileId(agent.id);
