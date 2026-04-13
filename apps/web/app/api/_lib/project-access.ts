@@ -4,6 +4,11 @@ import { Roles, ProjectStatus, ProjectMemberStatus } from "@/server/constants";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { errorResponse } from "./json-response";
 
+/** Returns true if agent has the Squad Lead role. */
+export function isSquadLead(agent: { role: string }): boolean {
+  return agent.role === Roles.SQUAD_LEAD;
+}
+
 /**
  * Returns a 403 Response if the agent is not a Squad Lead, otherwise null.
  * Use as an early-return guard in route handlers.

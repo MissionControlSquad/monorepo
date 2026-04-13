@@ -4,8 +4,7 @@ import { log } from "../../../_lib/logger";
 import { isSystemShutdown } from "@/server/system-settings";
 import { CURRENT_CONFIG_VERSION } from "@/server/config-version";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
-import { getAgentProjectIds } from "../../../_lib/project-access";
-import { Roles } from "@/server/constants";
+import { getAgentProjectIds, isSquadLead } from "../../../_lib/project-access";
 import { getAgentPreflightStats } from "@agentcenter/database";
 import { applyAgentStatusUpdate } from "@/server/agent-status";
 
@@ -101,7 +100,7 @@ export async function GET(request: Request) {
     const hasInboxTasks = inboxTaskCount > 0;
     const hasUnreadMessages = unreadChannelMessages > 0;
     const hasNotifications = undeliveredMentions > 0;
-    const hasPendingReview = agent.role === Roles.SQUAD_LEAD && reviewTaskCount > 0;
+    const hasPendingReview = isSquadLead(agent) && reviewTaskCount > 0;
 
     const shouldWork =
       hasAssignedTasks ||
