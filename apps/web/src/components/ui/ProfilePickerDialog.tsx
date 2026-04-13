@@ -6,6 +6,8 @@ import { Button } from "./Button";
 import { Badge } from "@/components/ui/Badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/shadcn/dialog";
 import { ProfileAvatar } from "./ProfileAvatar";
+import { ProfileKind } from "@/server/constants";
+import type { ProfileKindValue } from "@/server/constants";
 
 export interface ProfilePickerItem {
   /** Unique identifier — could be profileId or agentId */
@@ -15,7 +17,7 @@ export interface ProfilePickerItem {
   /** Optional subtitle (e.g. "@username", role, "Online") */
   subtitle?: string | null;
   /** Drives the Agent/Human badge */
-  kind?: "agent" | "human";
+  kind?: ProfileKindValue;
   /** For ProfileAvatar lookup by profile */
   profileId?: string;
   /** For ProfileAvatar lookup by agent */
@@ -143,11 +145,11 @@ export function ProfilePickerDialog({
                           <p className="font-medium text-foreground truncate">{item.name}</p>
                           {item.kind && (
                             <Badge
-                              variant={item.kind === "agent" ? "indigo" : "gray"}
+                              variant={item.kind === ProfileKind.AGENT ? "indigo" : "gray"}
                               size="sm"
                               className="shrink-0"
                             >
-                              {item.kind === "agent" ? "Agent" : "Human"}
+                              {item.kind === ProfileKind.AGENT ? "Agent" : "Human"}
                             </Badge>
                           )}
                         </div>

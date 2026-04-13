@@ -34,8 +34,10 @@ import {
   PROVIDER_COLORS,
   formatUptime,
   formatCost,
+  truncateId,
 } from "@agentcenter/utils";
 import { toast } from "sonner";
+import { CloudVmStatus } from "@/server/constants";
 import { Breadcrumbs, Button, Badge, Card, ConfirmDialog, Input } from "../components/ui";
 
 interface VMAgent {
@@ -91,13 +93,13 @@ const STATUS_BADGE_VARIANT: Record<
   destroyed: { label: "Destroyed", variant: "gray" },
 };
 
-const SETUP_STATES = [
-  "provisioning",
-  "waiting_for_ssh",
-  "installing_deps",
-  "installing_openclaw",
-  "configuring",
-  "starting_service",
+const SETUP_STATES: string[] = [
+  CloudVmStatus.PROVISIONING,
+  CloudVmStatus.WAITING_FOR_SSH,
+  CloudVmStatus.INSTALLING_DEPS,
+  CloudVmStatus.INSTALLING_OPENCLAW,
+  CloudVmStatus.CONFIGURING,
+  CloudVmStatus.STARTING_SERVICE,
 ];
 
 const STEP_LABELS: Record<string, string> = {
@@ -270,7 +272,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
 
   // Auto-fetch containers when VM is running and section is shown
   useEffect(() => {
-    if (vm?.status === "running" && showContainerLogs) {
+    if (vm?.status === CloudVmStatus.RUNNING && showContainerLogs) {
       fetchContainers();
     }
   }, [vm?.status, showContainerLogs, fetchContainers]);
@@ -287,7 +289,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
   // Poll while in transitional states
   useEffect(() => {
     if (!vm) return;
-    const transitional = [...SETUP_STATES, "destroying"];
+    const transitional = [...SETUP_STATES, CloudVmStatus.DESTROYING];
     if (!transitional.includes(vm.status)) return;
     const interval = setInterval(() => {
       fetchVM();
@@ -298,7 +300,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
 
   // Daemon log streaming via SSE
   useEffect(() => {
-    if (!showDaemonLogs || vm?.status !== "running") return;
+    if (!showDaemonLogs || vm?.status !== CloudVmStatus.RUNNING) return;
 
     setDaemonLines([]);
     setDaemonConnected(false);
@@ -595,7 +597,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
             ) : (
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold text-foreground">
-                  {vm.name || vm.serverName || vm.id.slice(0, 8)}
+                  {vm.name || vm.serverName || truncateId(vm.id)}
                 </h1>
                 <Button
                   variant="ghost"
@@ -638,7 +640,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
       </div>
 
       {/* Setup Progress */}
-      {(isSetupState || (vm.status === "running" && progress === 100)) && (
+      {(isSetupState || (vm.status === CloudVmStatus.RUNNING && progress === 100)) && (
         <Card padding="md" className="space-y-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-foreground font-medium">
@@ -656,7 +658,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
       )}
 
       {/* Error message */}
-      {vm.status === "error" && vm.errorMessage && (
+      {vm.status === CloudVmStatus.ERROR && vm.errorMessage && (
         <div className="flex items-start gap-2 px-4 py-3 bg-destructive-muted border border-destructive/30 rounded-lg">
           <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
           <p className="text-sm text-destructive">{vm.errorMessage}</p>
@@ -700,7 +702,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
 
       {/* VM Actions */}
       <div className="flex items-center gap-2">
-        {vm.status === "running" && (
+        {vm.status === CloudVmStatus.RUNNING && (
           <>
             <Button
               size="sm"
@@ -726,7 +728,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
             </Button>
           </>
         )}
-        {vm.status === "stopped" && (
+        {vm.status === CloudVmStatus.STOPPED && (
           <Button
             size="sm"
             variant="success"
@@ -740,7 +742,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
         )}
 
         {/* Retry button for error state */}
-        {vm.status === "error" && (
+        {vm.status === CloudVmStatus.ERROR && (
           <Button
             size="sm"
             variant="primary"
@@ -816,7 +818,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
       )}
 
       {/* Live Daemon Logs — only when running */}
-      {vm.status === "running" && (
+      {vm.status === CloudVmStatus.RUNNING && (
         <Card padding="md">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -941,7 +943,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
       )}
 
       {/* Container Logs — only when running */}
-      {vm.status === "running" && (
+      {vm.status === CloudVmStatus.RUNNING && (
         <Card padding="md">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -1027,7 +1029,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
       )}
 
       {/* LLM Configuration — only show when running */}
-      {vm.status === "running" &&
+      {vm.status === CloudVmStatus.RUNNING &&
         (() => {
           const showGrid = llmView === "grid" || (!vm.llmConfigured && llmView !== "form");
           const showForm = llmView === "form" && llmSelectedProvider;
@@ -1323,7 +1325,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
         })()}
 
       {/* Validate Config */}
-      {vm.status === "running" && (
+      {vm.status === CloudVmStatus.RUNNING && (
         <Card padding="md">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -1429,7 +1431,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
         {vm.agents.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No agents assigned to this VM.
-            {vm.status === "running" && ' Click "Assign Agent" to add one.'}
+            {vm.status === CloudVmStatus.RUNNING && ' Click "Assign Agent" to add one.'}
           </p>
         ) : (
           <div className="space-y-3">
@@ -1461,7 +1463,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
 
                     <div className="flex items-center gap-2">
                       {/* Per-agent model selector */}
-                      {vm.status === "running" &&
+                      {vm.status === CloudVmStatus.RUNNING &&
                         vm.llmConfigured &&
                         (() => {
                           const currentProvider = vm.llmProvider
@@ -1614,7 +1616,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
                         </Badge>
                       )}
 
-                      {vm.status === "running" && (
+                      {vm.status === CloudVmStatus.RUNNING && (
                         <>
                           <Button
                             size="sm"

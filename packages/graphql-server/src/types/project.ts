@@ -1,4 +1,5 @@
 import { builder } from "../builder";
+import { ProjectMemberStatus } from "@agentcenter/utils";
 
 builder.prismaObject("Project", {
   fields: (t) => ({
@@ -11,7 +12,7 @@ builder.prismaObject("Project", {
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
 
     members: t.relation("members", {
-      query: () => ({ where: { status: "active" } }),
+      query: () => ({ where: { status: ProjectMemberStatus.ACTIVE } }),
     }),
     tasks: t.relation("tasks"),
     projectDocs: t.relation("projectDocs"),

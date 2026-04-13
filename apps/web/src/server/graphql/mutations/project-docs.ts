@@ -3,6 +3,7 @@ import { projectModel, projectDocModel, projectDocRevisionModel } from "../../mo
 import { invalidateProjectContext } from "../../cache";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
+import { ProjectStatus } from "../../constants";
 
 builder.mutationField("createProjectDoc", (t) =>
   t.prismaField({
@@ -17,7 +18,7 @@ builder.mutationField("createProjectDoc", (t) =>
     resolve: async (query, _root, args) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
       const project = await projectModel.findById(args.projectId, { select: { status: true } });
-      if (project?.status === "archived") {
+      if (project?.status === ProjectStatus.ARCHIVED) {
         throw new Error("Cannot modify docs of an archived project");
       }
 
@@ -68,7 +69,7 @@ builder.mutationField("updateProjectDoc", (t) =>
       });
 
       const project = await projectModel.findById(current.projectId, { select: { status: true } });
-      if (project?.status === "archived") {
+      if (project?.status === ProjectStatus.ARCHIVED) {
         throw new Error("Cannot modify docs of an archived project");
       }
 
@@ -110,7 +111,7 @@ builder.mutationField("deleteProjectDoc", (t) =>
       });
 
       const project = await projectModel.findById(doc.projectId, { select: { status: true } });
-      if (project?.status === "archived") {
+      if (project?.status === ProjectStatus.ARCHIVED) {
         throw new Error("Cannot modify docs of an archived project");
       }
 

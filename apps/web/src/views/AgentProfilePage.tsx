@@ -25,11 +25,12 @@ import {
 } from "lucide-react";
 import { Breadcrumbs, Button } from "@/components/ui";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, truncateId } from "@agentcenter/utils";
 import Link from "next/link";
 import { useMutation } from "urql";
 import { SET_AGENT_ACTIVATION, SET_AGENT_VACATION } from "../lib/graphql/mutations/agents";
 import { useCurrentProject } from "../components/context/AppContext";
+import { SetupStatus } from "@/server/constants";
 
 type MobileTab = "tasks" | "deliverables" | "activity";
 
@@ -100,7 +101,7 @@ export function AgentProfilePage({ agentId }: AgentProfilePageProps) {
 
       {/* Top section -- does not scroll */}
       <div className="flex-shrink-0 px-3 @xl:px-4 @3xl:px-6 pt-0 pb-2 space-y-3 @xl:space-y-4">
-        {agent.setupStatus === "pending_setup" && (
+        {agent.setupStatus === SetupStatus.PENDING_SETUP && (
           <Link
             href={`/agents/${agent.id}/setup`}
             className="flex items-center gap-3 px-4 py-3 bg-warning-muted border border-warning/30 rounded-lg hover:bg-warning/15 transition"
@@ -114,7 +115,7 @@ export function AgentProfilePage({ agentId }: AgentProfilePageProps) {
             </div>
           </Link>
         )}
-        {agent.setupStatus === "deactivated" && (
+        {agent.setupStatus === SetupStatus.DEACTIVATED && (
           <div className="flex items-center gap-3 px-4 py-3 bg-muted border border-border rounded-lg">
             <PowerOff className="w-5 h-5 text-muted-foreground flex-shrink-0" />
             <div className="flex-1">
@@ -185,49 +186,51 @@ export function AgentProfilePage({ agentId }: AgentProfilePageProps) {
             )}
           </div>
         )}
-        {!agent.isOnVacation && agent.setupStatus === "active" && !agent.upgradeAvailable && (
-          <div className="flex justify-end">
-            {vacationConfirm === "start" ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Put agent on vacation?</span>
-                <Button
-                  size="xs"
-                  disabled={vacationLoading}
-                  onClick={async () => {
-                    setVacationLoading(true);
-                    try {
-                      const result = await executeSetVacation({ id: agent.id, onVacation: true });
-                      if (result.error) throw result.error;
-                    } catch {
-                      // error handled by urql
-                    } finally {
-                      setVacationLoading(false);
-                      setVacationConfirm(null);
-                    }
-                  }}
-                  className="bg-warning hover:bg-warning"
-                >
-                  {vacationLoading && <Loader2 className="w-3 h-3 animate-spin" />}
-                  {vacationLoading ? "Updating..." : "Confirm"}
+        {!agent.isOnVacation &&
+          agent.setupStatus === SetupStatus.ACTIVE &&
+          !agent.upgradeAvailable && (
+            <div className="flex justify-end">
+              {vacationConfirm === "start" ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Put agent on vacation?</span>
+                  <Button
+                    size="xs"
+                    disabled={vacationLoading}
+                    onClick={async () => {
+                      setVacationLoading(true);
+                      try {
+                        const result = await executeSetVacation({ id: agent.id, onVacation: true });
+                        if (result.error) throw result.error;
+                      } catch {
+                        // error handled by urql
+                      } finally {
+                        setVacationLoading(false);
+                        setVacationConfirm(null);
+                      }
+                    }}
+                    className="bg-warning hover:bg-warning"
+                  >
+                    {vacationLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+                    {vacationLoading ? "Updating..." : "Confirm"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    disabled={vacationLoading}
+                    onClick={() => setVacationConfirm(null)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="warning" size="xs" onClick={() => setVacationConfirm("start")}>
+                  <Palmtree className="w-3.5 h-3.5" />
+                  Put on vacation
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  disabled={vacationLoading}
-                  onClick={() => setVacationConfirm(null)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            ) : (
-              <Button variant="warning" size="xs" onClick={() => setVacationConfirm("start")}>
-                <Palmtree className="w-3.5 h-3.5" />
-                Put on vacation
-              </Button>
-            )}
-          </div>
-        )}
-        {agent.upgradeAvailable && agent.setupStatus === "active" && (
+              )}
+            </div>
+          )}
+        {agent.upgradeAvailable && agent.setupStatus === SetupStatus.ACTIVE && (
           <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 space-y-3">
             <div className="flex items-center gap-3">
               <Download className="w-5 h-5 text-blue-600 flex-shrink-0" />
@@ -340,7 +343,7 @@ export function AgentProfilePage({ agentId }: AgentProfilePageProps) {
             <div className="flex-1">
               <p className="text-sm font-medium text-purple-800">Cloud VM</p>
               <p className="text-xs text-purple-600">
-                Running on {agent.cloudVm.name || agent.cloudVm.id.slice(0, 8)}
+                Running on {agent.cloudVm.name || truncateId(agent.cloudVm.id)}
                 {agent.cloudVm.ipv4 && ` (${agent.cloudVm.ipv4})`}
               </p>
             </div>

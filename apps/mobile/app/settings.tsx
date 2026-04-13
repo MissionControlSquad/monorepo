@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { CHANGE_PASSWORD, SET_SYSTEM_SHUTDOWN, SYSTEM_SETTINGS_QUERY } from "@agentcenter/graphql-client";
 import { useAuth } from "../src/context/AuthContext";
-import { DEFAULT_COLOR, formatDate } from "@agentcenter/utils";
+import { DEFAULT_COLOR, formatDate, LicenseStatusCode } from "@agentcenter/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -228,7 +228,7 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
     none: DEFAULT_COLOR,
   };
 
-  const status = license?.status ?? "none";
+  const status = license?.status ?? LicenseStatusCode.NONE;
   const color = statusColor[status] ?? DEFAULT_COLOR;
 
   return (
@@ -289,7 +289,7 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
       {/* Activate / update license */}
       <View className="h-px bg-gray-100 dark:bg-slate-700" />
       <View className="gap-1.5">
-        <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">{license?.status === "active" ? "Update License Key" : "Activate License"}</Text>
+        <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">{license?.status === LicenseStatusCode.ACTIVE ? "Update License Key" : "Activate License"}</Text>
         <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
           <TextInput
             className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
@@ -313,7 +313,7 @@ function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
           <ActivityIndicator color="#fff" size="small" />
         ) : (
           <Text className="text-white text-base font-semibold">
-            {license?.status === "active" ? "Update License" : "Activate License"}
+            {license?.status === LicenseStatusCode.ACTIVE ? "Update License" : "Activate License"}
           </Text>
         )}
       </TouchableOpacity>

@@ -10,15 +10,21 @@ import { notifyAgentChannelMembers } from "@/server/dm-notify";
 import { escapeHtml } from "@/server/sanitize";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@agentcenter/utils";
-import { parseMentionIds } from "@agentcenter/utils";
+import { FLAG_KEYS, parseMentionIds } from "@agentcenter/utils";
 import { resolveAgent } from "../../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import {
+  successResponse,
+  errorResponse,
+  handleError,
+  assertFound,
+} from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
+import { parsePaginationParams } from "../../../_lib/pagination";
 import { validateBody, createChannelMessageSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
 import { apiLimiters, checkRateLimit } from "../../../_lib/rate-limit-check";
-
-type RouteContext = { params: Promise<{ channelId: string }> };
+import type { RouteContext as _RouteContext } from "../../../_lib/route-context";
+type RouteContext = _RouteContext<{ channelId: string }>;
 
 // ---------- GET — Fetch messages ----------
 
@@ -29,13 +35,11 @@ export async function GET(request: Request, ctx: RouteContext) {
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
     const membership = await findChannelMember(channelId, agentProfileId);
-    if (!membership) {
-      return errorResponse("Not a member of this channel", 403);
-    }
+    assertFound(membership, ERR.NOT_CHANNEL_MEMBER, 403);
 
     const { searchParams } = new URL(request.url);
     const unreadOnly = searchParams.get("unreadOnly") !== "false";
-    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 1), 200);
+    const { limit } = parsePaginationParams(searchParams, { defaultLimit: 50, maxLimit: 200 });
 
     const sinceDate = membership.lastReadAt ?? membership.joinedAt;
 
@@ -58,7 +62,7 @@ export async function GET(request: Request, ctx: RouteContext) {
 
 export async function POST(request: Request, ctx: RouteContext) {
   if (!(await isFeatureEnabled(FLAG_KEYS.CHANNELS))) {
-    return errorResponse("Channels feature is not available on your current plan", 403);
+    return errorResponse(ERR.FEATURE_CHANNELS_UNAVAILABLE, 403);
   }
   const limited = await checkRateLimit(apiLimiters.channels, request);
   if (limited) return limited;
@@ -71,9 +75,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
     const membership = await findChannelMember(channelId, agentProfileId);
-    if (!membership) {
-      return errorResponse("Not a member of this channel", 403);
-    }
+    assertFound(membership, ERR.NOT_CHANNEL_MEMBER, 403);
 
     const { content: rawContent, attachmentIds } = v.data;
     const content = escapeHtml(rawContent.trim());

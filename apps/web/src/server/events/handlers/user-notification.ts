@@ -1,5 +1,5 @@
 import { on } from "../bus";
-import { EventTypes } from "../../constants";
+import { EventTypes, TaskStatus, ProfileKind, NotificationKind } from "../../constants";
 import {
   getTaskCreatorProfile,
   getTaskProjectId,
@@ -15,7 +15,7 @@ import { notify } from "../../services/notification";
 async function getTaskCreatorUserId(taskId: string): Promise<string | null> {
   const profile = await getTaskCreatorProfile(taskId);
   if (!profile) return null;
-  if (profile.kind !== "human") return null;
+  if (profile.kind !== ProfileKind.HUMAN) return null;
   return profile.userId;
 }
 
@@ -56,7 +56,7 @@ on(EventTypes.TASK_CREATED, async (e) => {
       .map((userId) =>
         notify({
           userId,
-          type: "task_assigned",
+          type: NotificationKind.TASK_ASSIGNED,
           title: `Assigned: ${e.title}`,
           body: `You were assigned to "${e.title}".`,
           taskId: e.taskId,
@@ -77,7 +77,7 @@ on(EventTypes.TASK_ASSIGNEES_CHANGED, async (e) => {
     userIds.map((userId) =>
       notify({
         userId,
-        type: "task_assigned",
+        type: NotificationKind.TASK_ASSIGNED,
         title: `Assigned: ${e.title}`,
         body: `You were assigned to "${e.title}".`,
         taskId: e.taskId,
@@ -90,12 +90,12 @@ on(EventTypes.TASK_ASSIGNEES_CHANGED, async (e) => {
 // ─── Task done → notify creator ──────────────────────────────────────
 
 on(EventTypes.TASK_STATUS_CHANGED, async (e) => {
-  if (e.toStatus === "done") {
+  if (e.toStatus === TaskStatus.DONE) {
     const userId = await getTaskCreatorUserId(e.taskId);
     if (!userId) return;
     await notify({
       userId,
-      type: "task_done",
+      type: NotificationKind.TASK_DONE,
       title: `Task completed: ${e.title}`,
       body: `"${e.title}" has been marked as done.`,
       taskId: e.taskId,
@@ -103,7 +103,7 @@ on(EventTypes.TASK_STATUS_CHANGED, async (e) => {
     });
   }
 
-  if (e.toStatus === "review") {
+  if (e.toStatus === TaskStatus.REVIEW) {
     // Notify task creator + project human members
     const [creatorId, memberIds] = await Promise.all([
       getTaskCreatorUserId(e.taskId),
@@ -115,7 +115,7 @@ on(EventTypes.TASK_STATUS_CHANGED, async (e) => {
       uniqueIds.map((userId) =>
         notify({
           userId,
-          type: "task_needs_review",
+          type: NotificationKind.TASK_NEEDS_REVIEW,
           title: `Review needed: ${e.title}`,
           body: `"${e.title}" is ready for review.`,
           taskId: e.taskId,
@@ -133,7 +133,7 @@ on(EventTypes.TASK_CLARIFICATION_REQUESTED, async (e) => {
   if (!userId) return;
   await notify({
     userId,
-    type: "task_clarification_requested",
+    type: NotificationKind.TASK_CLARIFICATION_REQUESTED,
     title: `Clarification needed: ${e.title}`,
     body: `${e.reviewerName} requested clarification on "${e.title}".`,
     taskId: e.taskId,
@@ -148,7 +148,7 @@ on(EventTypes.TASK_APPROVED, async (e) => {
   if (!userId) return;
   await notify({
     userId,
-    type: "task_approved",
+    type: NotificationKind.TASK_APPROVED,
     title: `Approved: ${e.title}`,
     body: `"${e.title}" was approved by ${e.reviewerName}.`,
     taskId: e.taskId,
@@ -163,7 +163,7 @@ on(EventTypes.TASK_REJECTED, async (e) => {
   if (!userId) return;
   await notify({
     userId,
-    type: "task_rejected",
+    type: NotificationKind.TASK_REJECTED,
     title: `Rejected: ${e.title}`,
     body: `"${e.title}" was rejected by ${e.reviewerName}: ${e.rejectionReason}`,
     taskId: e.taskId,
@@ -181,7 +181,7 @@ on(EventTypes.MESSAGE_CREATED, async (e) => {
     userIds.map((userId) =>
       notify({
         userId,
-        type: "mention",
+        type: NotificationKind.MENTION,
         title: `Mentioned in: ${e.taskTitle}`,
         body: `${e.fromAgentName} mentioned you in "${e.taskTitle}".`,
         taskId: e.taskId,
@@ -204,7 +204,7 @@ on(EventTypes.MESSAGE_CREATED, async (e) => {
 
   await notify({
     userId: creatorUserId,
-    type: "new_comment",
+    type: NotificationKind.NEW_COMMENT,
     title: `New comment on: ${e.taskTitle}`,
     body: `${e.fromAgentName} commented on "${e.taskTitle}".`,
     taskId: e.taskId,
@@ -220,7 +220,7 @@ on(EventTypes.DELIVERABLE_SUBMITTED, async (e) => {
   if (!userId) return;
   await notify({
     userId,
-    type: "deliverable_submitted",
+    type: NotificationKind.DELIVERABLE_SUBMITTED,
     title: `Deliverable: ${e.title}`,
     body: `${e.agentName} submitted "${e.title}" for "${e.taskTitle}".`,
     taskId: e.taskId,
@@ -242,7 +242,7 @@ on(EventTypes.DOCUMENT_CREATED, async (e) => {
 
   await notify({
     userId: creatorUserId,
-    type: "document_added",
+    type: NotificationKind.DOCUMENT_ADDED,
     title: `New ${e.docType}: ${e.title}`,
     body: `${e.creatorName} added ${e.docType} "${e.title}" to "${e.taskTitle}".`,
     taskId: e.taskId,
@@ -260,7 +260,7 @@ on(EventTypes.PROJECT_MEMBER_ADDED, async (e) => {
     humanUserIds.map((userId) =>
       notify({
         userId,
-        type: "team_update",
+        type: NotificationKind.TEAM_UPDATE,
         title: `New team member: ${e.agentName}`,
         body: `${e.agentName} joined project "${e.projectName}".`,
         url: `/projects/${e.projectId}`,
@@ -279,7 +279,7 @@ on(EventTypes.PROJECT_MEMBER_REMOVED, async (e) => {
     humanUserIds.map((userId) =>
       notify({
         userId,
-        type: "team_update",
+        type: NotificationKind.TEAM_UPDATE,
         title: `Team member left: ${e.agentName}`,
         body: `${e.agentName} was removed from project "${e.projectName}".`,
         url: `/projects/${e.projectId}`,

@@ -30,11 +30,15 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Project } from "@agentcenter/types";
+import { ChannelVisibility, ProjectStatus } from "@/server/constants";
 
 const createChannelSchema = z.object({
   name: z.string().min(1, "Channel name is required"),
   slug: z.string().min(1, "Slug is required"),
-  visibility: z.enum(["public", "private"]),
+  visibility: z.enum([ChannelVisibility.PUBLIC, ChannelVisibility.PRIVATE] as [
+    string,
+    ...string[],
+  ]),
   description: z.string().optional(),
   projectId: z.string().nullable(),
 });
@@ -61,7 +65,7 @@ export function CreateChannelModal({ isOpen, onClose, onCreated }: CreateChannel
     defaultValues: {
       name: "",
       slug: "",
-      visibility: "public",
+      visibility: ChannelVisibility.PUBLIC,
       description: "",
       projectId: null,
     },
@@ -171,8 +175,12 @@ export function CreateChannelModal({ isOpen, onClose, onCreated }: CreateChannel
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="public">Public — anyone can join</SelectItem>
-                        <SelectItem value="private">Private — invite only</SelectItem>
+                        <SelectItem value={ChannelVisibility.PUBLIC}>
+                          Public — anyone can join
+                        </SelectItem>
+                        <SelectItem value={ChannelVisibility.PRIVATE}>
+                          Private — invite only
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -201,10 +209,10 @@ export function CreateChannelModal({ isOpen, onClose, onCreated }: CreateChannel
                             <SelectItem
                               key={p.id}
                               value={p.id}
-                              disabled={p.status === "archived" || p.shutdownActive}
+                              disabled={p.status === ProjectStatus.ARCHIVED || p.shutdownActive}
                             >
                               {p.name}
-                              {p.status === "archived"
+                              {p.status === ProjectStatus.ARCHIVED
                                 ? " (Archived)"
                                 : p.shutdownActive
                                   ? " (Paused)"

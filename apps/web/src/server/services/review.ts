@@ -9,6 +9,7 @@ import { taskModel } from "../models/task";
 import { TaskStatus } from "../constants";
 import { assertAssignableAgents } from "../assignment-guard";
 import { getOrCreateAgentProfileId } from "../agent-profile";
+import { getDisplayName } from "@agentcenter/utils";
 
 export interface ReviewerInfo {
   id: string;
@@ -40,8 +41,8 @@ export async function performApproveTask(params: {
   });
   if (!task) throw Object.assign(new Error("Task not found"), { status: 404 });
 
-  const assigneeNames: string[] = task.assignees.map(
-    (a: any) => a.profile?.displayName ?? "Unknown",
+  const assigneeNames: string[] = task.assignees.map((a: any) =>
+    getDisplayName(a.profile, "Unknown"),
   );
   const comment =
     approvalComment ||
@@ -187,7 +188,7 @@ export async function performRejectTask(params: {
     reviewerId: reviewer.id,
     reviewerName: reviewer.name,
     assigneeIds: assigneeAgentIds,
-    assigneeNames: task.assignees.map((a: any) => a.profile?.displayName ?? "Unknown"),
+    assigneeNames: task.assignees.map((a: any) => getDisplayName(a.profile, "Unknown")),
     rejectionReason,
     changesNeeded,
   });
@@ -248,7 +249,7 @@ export async function performRequestClarification(params: {
     reviewerId: reviewer.id,
     reviewerName: reviewer.name,
     assigneeIds: assigneeAgentIds,
-    assigneeNames: task.assignees.map((a: any) => a.profile?.displayName ?? "Unknown"),
+    assigneeNames: task.assignees.map((a: any) => getDisplayName(a.profile, "Unknown")),
     questions,
   });
 

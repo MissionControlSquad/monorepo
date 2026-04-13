@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "../client";
+import { DeliverableKind } from "@agentcenter/utils";
 
 export interface CreateFileDocumentInput {
   title: string;
@@ -21,7 +22,7 @@ export async function createFileDocument(input: CreateFileDocumentInput) {
     data: {
       title: input.title,
       content: "",
-      type: "file",
+      type: DeliverableKind.FILE,
       storageKey: input.storageKey,
       fileName: input.fileName,
       mimeType: input.mimeType,

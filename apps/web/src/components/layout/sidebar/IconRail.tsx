@@ -21,6 +21,7 @@ import {
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
+import { API_ROUTES } from "@/lib/api-routes";
 import { Button } from "../../ui";
 import { ProfileAvatar } from "../../ui/ProfileAvatar";
 
@@ -54,7 +55,7 @@ export function IconRail({ onCreateTask }: IconRailProps) {
 
   const handleLogout = useCallback(async () => {
     setUserMenuOpen(false);
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch(API_ROUTES.auth.logout, { method: "POST" });
     router.push("/login");
   }, [router]);
 

@@ -6,8 +6,16 @@
  */
 
 import { prisma } from "../client";
+import { CloudVmStatus } from "@agentcenter/utils";
 
-const SETUP_STATUSES = ["provisioning", "waiting_for_ssh", "installing_deps", "installing_openclaw", "configuring", "starting_service"] as const;
+const SETUP_STATUSES = [
+  CloudVmStatus.PROVISIONING,
+  CloudVmStatus.WAITING_FOR_SSH,
+  CloudVmStatus.INSTALLING_DEPS,
+  CloudVmStatus.INSTALLING_OPENCLAW,
+  CloudVmStatus.CONFIGURING,
+  CloudVmStatus.STARTING_SERVICE,
+] as const;
 
 export async function findStaleSetupCloudVMs(timeoutMs: number) {
   const threshold = new Date(Date.now() - timeoutMs);

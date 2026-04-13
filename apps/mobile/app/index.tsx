@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, View } from "react-native";
 import { useAuth } from "../src/context/AuthContext";
 import { getStoredCookie } from "../src/api/session";
 import { useEffect, useState } from "react";
-import { fetchLicenseStatus, fetchOnboardingStatus } from "@agentcenter/utils";
+import { fetchLicenseStatus, fetchOnboardingStatus, LicenseStatusCode } from "@agentcenter/utils";
 
 export default function Index() {
   const { isLoading, isSignedIn, serverUrl } = useAuth();
@@ -21,11 +21,11 @@ export default function Index() {
     // Check license first, then onboarding
     fetchLicenseStatus(serverUrl, headers)
       .then(({ status }) => {
-        if (status === "none" || status === "expired") {
+        if (status === LicenseStatusCode.NONE || status === LicenseStatusCode.EXPIRED) {
           router.replace("/(dashboard)");
           Alert.alert(
-            status === "none" ? "License Required" : "License Expired",
-            status === "none"
+            status === LicenseStatusCode.NONE ? "License Required" : "License Expired",
+            status === LicenseStatusCode.NONE
               ? "This server has no active license. Please activate a license in Settings."
               : "Your license has expired. Please renew it in Settings.",
             [{ text: "Go to Settings", onPress: () => router.push("/settings" as Parameters<typeof router.push>[0]) }],

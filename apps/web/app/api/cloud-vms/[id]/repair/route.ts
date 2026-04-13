@@ -1,6 +1,13 @@
 import { repairOpenClawService } from "@/server/services/cloud-vm";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import {
+  successResponse,
+  errorResponse,
+  handleError,
+  assertFound,
+} from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { findCloudVMRaw } from "@agentcenter/database";
+import { CloudVmStatus } from "@/server/constants";
 
 /**
  * POST /api/cloud-vms/[id]/repair
@@ -11,8 +18,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const { id } = await params;
 
     const vm = await findCloudVMRaw(id);
-    if (!vm) return errorResponse("VM not found", 404);
-    if (vm.status !== "running") return errorResponse("VM must be running", 400);
+    assertFound(vm, ERR.VM_NOT_FOUND);
+    if (vm.status !== CloudVmStatus.RUNNING) return errorResponse("VM must be running", 400);
 
     await repairOpenClawService(id);
 

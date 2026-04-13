@@ -2,8 +2,10 @@ import { projectModel, agentModel } from "@/server/models";
 import { resolveAgent } from "../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
 import { validateBody, createProjectSchema } from "../_lib/validation";
-import { Roles } from "@/server/constants";
+import { parsePaginationParams } from "../_lib/pagination";
+import { ProjectStatus, ProjectMemberStatus } from "@/server/constants";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
+import { squadLeadRequired } from "../_lib/project-access";
 import { checkLicenseLimit } from "@/server/license";
 
 export async function GET(request: Request) {
@@ -11,19 +13,21 @@ export async function GET(request: Request) {
     const agent = await resolveAgent(request);
 
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(parseInt(searchParams.get("limit") ?? "100", 10) || 100, 500);
-    const offset = Math.max(parseInt(searchParams.get("offset") ?? "0", 10) || 0, 0);
+    const { limit, offset } = parsePaginationParams(searchParams, {
+      defaultLimit: 100,
+      maxLimit: 500,
+    });
 
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
     const projects = await projectModel.findMany({
       where: {
-        status: "active",
+        status: ProjectStatus.ACTIVE,
         shutdownActive: false,
-        members: { some: { profileId: agentProfileId, status: "active" } },
+        members: { some: { profileId: agentProfileId, status: ProjectMemberStatus.ACTIVE } },
       },
       include: {
         members: {
-          where: { status: "active" },
+          where: { status: ProjectMemberStatus.ACTIVE },
           include: { profile: true },
         },
       },
@@ -44,14 +48,13 @@ export async function POST(request: Request) {
     if (v.error) return v.error;
     const agent = await resolveAgent(request);
 
-    if (agent.role !== Roles.SQUAD_LEAD) {
-      return errorResponse("Only Squad Lead can create projects", 403);
-    }
+    const guard = squadLeadRequired(agent);
+    if (guard) return guard;
 
     const { name, description, memberIds } = v.data;
 
     // Enforce license limit on project count
-    const projectCount = await projectModel.count({ where: { status: "active" } });
+    const projectCount = await projectModel.count({ where: { status: ProjectStatus.ACTIVE } });
     const limitCheck = await checkLicenseLimit("projects", projectCount);
     if (!limitCheck.allowed) {
       return errorResponse(
@@ -83,7 +86,7 @@ export async function POST(request: Request) {
       data: {
         name,
         description: description ?? undefined,
-        status: "active",
+        status: ProjectStatus.ACTIVE,
         members: {
           create: memberProfileIds.map((profileId) => ({ profileId })),
         },

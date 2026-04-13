@@ -15,7 +15,7 @@ import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useQuery } from "urql";
 import { useEffect, useState } from "react";
 import { DELIVERABLE_QUERY, DELIVERABLE_VERSIONS_QUERY } from "@agentcenter/graphql-client";
-import { DEFAULT_COLOR, formatDateWithTime, formatDate, formatFileSize, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS } from "@agentcenter/utils";
+import { DEFAULT_COLOR, formatDateWithTime, formatDate, formatFileSize, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS, DeliverableKind } from "@agentcenter/utils";
 import { SimpleMarkdown } from "../../src/components/SimpleMarkdown";
 import { InfoRow } from "../../src/components/InfoRow";
 import { ScreenLoading } from "../../src/components/ScreenLoading";
@@ -79,7 +79,7 @@ function DeliverableContent({
   mimeType: string | null;
   width: number;
 }) {
-  if (kind === "link" && url) {
+  if (kind === DeliverableKind.LINK && url) {
     return (
       <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
         <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">URL</Text>
@@ -89,7 +89,7 @@ function DeliverableContent({
       </View>
     );
   }
-  if (kind === "code" && content) {
+  if (kind === DeliverableKind.CODE && content) {
     return (
       <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
         <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">
@@ -106,7 +106,7 @@ function DeliverableContent({
       </View>
     );
   }
-  if (kind === "markdown" && content) {
+  if (kind === DeliverableKind.MARKDOWN && content) {
     return (
       <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
         <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Content</Text>
@@ -114,7 +114,7 @@ function DeliverableContent({
       </View>
     );
   }
-  if (kind === "file" && url && isImageMime(mimeType)) {
+  if (kind === DeliverableKind.FILE && url && isImageMime(mimeType)) {
     return (
       <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
         <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.6px]">Preview</Text>

@@ -1,13 +1,19 @@
 import { taskModel } from "@/server/models/task";
 import { deliverableModel, deliverableVersionModel } from "@/server/models";
 import { resolveAgent } from "../../../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../../../_lib/json-response";
+import {
+  successResponse,
+  errorResponse,
+  handleError,
+  assertFound,
+} from "../../../../_lib/json-response";
+import { ERR } from "../../../../_lib/error-messages";
 import { validateBody, updateDeliverableSchema } from "../../../../_lib/validation";
 import { log } from "../../../../_lib/logger";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isSystemShutdown } from "@/server/system-settings";
-
-type RouteContext = { params: Promise<{ id: string; deliverableId: string }> };
+import type { RouteContext as _RouteContext } from "../../../../_lib/route-context";
+type RouteContext = _RouteContext<{ id: string; deliverableId: string }>;
 
 export async function PATCH(request: Request, ctx: RouteContext) {
   try {
@@ -21,11 +27,11 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     const current = await deliverableModel.findById(deliverableId);
-    if (!current) return errorResponse("Deliverable not found", 404);
+    assertFound(current, ERR.DELIVERABLE_NOT_FOUND);
     if (current.taskId !== taskId)
       return errorResponse("Deliverable does not belong to this task", 400);
     const profileId = await getOrCreateAgentProfileId(agent.id);
-    if (current.profileId !== profileId) return errorResponse("Not your deliverable", 403);
+    if (current.profileId !== profileId) return errorResponse(ERR.NOT_YOUR_DELIVERABLE, 403);
 
     const { title, content, language, storageKey, fileName, mimeType, fileSize, url } = v.data;
 

@@ -59,11 +59,18 @@ import {
 import { useTaskNavigation } from "../../hooks/useTaskNavigation";
 import { useCurrentProject } from "../context/AppContext";
 import type { Agent, ProjectMember, TaskTemplate, Project } from "@agentcenter/types";
+import {
+  Priority,
+  SetupStatus,
+  ProjectStatus,
+  ProfileKind,
+  type PriorityValue,
+} from "@/server/constants";
 
 const blankFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
-  priority: z.enum(["low", "medium", "high"]),
+  priority: z.enum(Object.values(Priority) as [PriorityValue, ...PriorityValue[]]),
   dueDate: z.string().optional(),
   selectedProjectId: z.string().nullable(),
   selectedAgentIds: z.array(z.string()),
@@ -99,7 +106,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
     defaultValues: {
       title: "",
       description: "",
-      priority: "medium",
+      priority: Priority.MEDIUM,
       dueDate: "",
       selectedProjectId: null,
       selectedAgentIds: [],
@@ -137,7 +144,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
           ),
         )
       : allAgents
-    )?.filter((a: Agent) => a.setupStatus === "active" && !a.isOnVacation) ?? undefined;
+    )?.filter((a: Agent) => a.setupStatus === SetupStatus.ACTIVE && !a.isOnVacation) ?? undefined;
 
   const agentPickerItems: ProfilePickerItem[] = useMemo(
     () =>
@@ -145,7 +152,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
         id: agent.id,
         name: agent.name,
         subtitle: agent.role || undefined,
-        kind: "agent" as const,
+        kind: ProfileKind.AGENT,
         agentId: agent.id,
       })),
     [agents],
@@ -160,7 +167,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
   // Template tab state
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [templateTitleOverride, setTemplateTitleOverride] = useState("");
-  const [templatePriority, setTemplatePriority] = useState<"low" | "medium" | "high">("medium");
+  const [templatePriority, setTemplatePriority] = useState<PriorityValue>(Priority.MEDIUM);
   const [templateAgentIds, setTemplateAgentIds] = useState<string[]>([]);
   const [templateTagInput, setTemplateTagInput] = useState("");
   const [templateTags, setTemplateTags] = useState<string[]>([]);
@@ -173,7 +180,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
   const [newTemplateName, setNewTemplateName] = useState("");
   const [newTemplateDesc, setNewTemplateDesc] = useState("");
   const [newSubtasks, setNewSubtasks] = useState<
-    { title: string; description: string; priority?: "low" | "medium" | "high" }[]
+    { title: string; description: string; priority?: PriorityValue }[]
   >([{ title: "", description: "", priority: "medium" }]);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
 
@@ -530,10 +537,10 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
                                 <SelectItem
                                   key={p.id}
                                   value={p.id}
-                                  disabled={p.status === "archived" || p.shutdownActive}
+                                  disabled={p.status === ProjectStatus.ARCHIVED || p.shutdownActive}
                                 >
                                   {p.name}
-                                  {p.status === "archived"
+                                  {p.status === ProjectStatus.ARCHIVED
                                     ? " (Archived)"
                                     : p.shutdownActive
                                       ? " (Paused)"
@@ -578,7 +585,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
                             <PrioritySelect
                               value={field.value}
                               interactive={true}
-                              onChange={(p) => field.onChange(p as "low" | "medium" | "high")}
+                              onChange={(p) => field.onChange(p as PriorityValue)}
                             />
                             <FormMessage />
                           </FormItem>
@@ -768,16 +775,16 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
                                 className="flex-1"
                               />
                               <Select
-                                value={subtask.priority || "medium"}
+                                value={subtask.priority || Priority.MEDIUM}
                                 onValueChange={(v) => updateSubtask(idx, "priority", v)}
                               >
                                 <SelectTrigger className="w-24">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="low">Low</SelectItem>
-                                  <SelectItem value="medium">Medium</SelectItem>
-                                  <SelectItem value="high">High</SelectItem>
+                                  <SelectItem value={Priority.LOW}>Low</SelectItem>
+                                  <SelectItem value={Priority.MEDIUM}>Medium</SelectItem>
+                                  <SelectItem value={Priority.HIGH}>High</SelectItem>
                                 </SelectContent>
                               </Select>
                               {newSubtasks.length > 1 && (
@@ -936,10 +943,10 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
                               <SelectItem
                                 key={p.id}
                                 value={p.id}
-                                disabled={p.status === "archived"}
+                                disabled={p.status === ProjectStatus.ARCHIVED}
                               >
                                 {p.name}
-                                {p.status === "archived" ? " (Archived)" : ""}
+                                {p.status === ProjectStatus.ARCHIVED ? " (Archived)" : ""}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -970,9 +977,9 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
                               {subtask.priority && (
                                 <span
                                   className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
-                                    subtask.priority === "high"
+                                    subtask.priority === Priority.HIGH
                                       ? "bg-destructive-muted text-destructive"
-                                      : subtask.priority === "medium"
+                                      : subtask.priority === Priority.MEDIUM
                                         ? "bg-warning-muted text-warning"
                                         : "bg-muted text-muted-foreground"
                                   }`}
@@ -1013,7 +1020,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
                           <PrioritySelect
                             value={templatePriority}
                             interactive={true}
-                            onChange={(p) => setTemplatePriority(p as "low" | "medium" | "high")}
+                            onChange={(p) => setTemplatePriority(p as PriorityValue)}
                           />
                         </div>
 

@@ -3,7 +3,8 @@
  */
 
 import { prisma } from "../client";
-import type { ChannelMemberRole } from "@prisma/client";
+import { ChannelMemberRole, ChannelVisibility } from "@agentcenter/utils";
+import type { ChannelMemberRoleValue } from "@agentcenter/utils";
 
 // ─── Channel CRUD ────────────────────────────────────────────────────
 
@@ -31,7 +32,7 @@ export async function createTeamChannel(
       members: {
         create: {
           profileId: data.createdByProfileId,
-          role: "creator",
+          role: ChannelMemberRole.CREATOR,
         },
       },
     },
@@ -60,13 +61,13 @@ export async function createDmChannelFull(
     data: {
       name: "Direct message",
       slug: data.slug,
-      visibility: "dm",
+      visibility: ChannelVisibility.DM,
       projectId: null,
       createdByProfileId: data.createdByProfileId,
       members: {
         create: [
-          { profileId: data.createdByProfileId, role: "creator" },
-          { profileId: data.otherProfileId, role: "member" },
+          { profileId: data.createdByProfileId, role: ChannelMemberRole.CREATOR },
+          { profileId: data.otherProfileId, role: ChannelMemberRole.MEMBER },
         ],
       },
     },
@@ -137,7 +138,7 @@ export async function findChannelMemberRole(channelId: string, profileId: string
 export async function createChannelMember(
   channelId: string,
   profileId: string,
-  role: ChannelMemberRole = "member",
+  role: ChannelMemberRoleValue = ChannelMemberRole.MEMBER,
   query?: Record<string, unknown>,
 ) {
   return prisma.channelMember.create({
@@ -437,7 +438,7 @@ export async function listChannelsInCommon(
   return prisma.channel.findMany({
     ...query,
     where: {
-      visibility: "private",
+      visibility: ChannelVisibility.PRIVATE,
       AND: [
         { members: { some: { profileId: myProfileId } } },
         { members: { some: { profileId: otherProfileId } } },

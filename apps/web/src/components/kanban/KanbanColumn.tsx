@@ -14,13 +14,14 @@ import {
 import { TaskCard } from "./TaskCard";
 import { Badge } from "../ui";
 import type { TaskCard as TaskCardType, Agent } from "@agentcenter/types";
+import { TaskStatus } from "@/server/constants";
 const COLUMN_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  inbox: Inbox,
-  assigned: UserCheck,
-  in_progress: PlayCircle,
-  review: Eye,
-  done: CheckCircle2,
-  blocked: AlertTriangle,
+  [TaskStatus.INBOX]: Inbox,
+  [TaskStatus.ASSIGNED]: UserCheck,
+  [TaskStatus.IN_PROGRESS]: PlayCircle,
+  [TaskStatus.REVIEW]: Eye,
+  [TaskStatus.DONE]: CheckCircle2,
+  [TaskStatus.BLOCKED]: AlertTriangle,
 };
 
 const COLOR_CLASSES = {

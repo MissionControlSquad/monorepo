@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { agentQueueItemModel } from "../../models";
+import { QueueItemStatus } from "../../constants";
 
 builder.queryField("agentQueueByAgent", (t) =>
   t.prismaField({
@@ -34,7 +35,7 @@ builder.queryField("agentQueueActive", (t) =>
         ...query,
         where: {
           agentId: args.agentId,
-          status: { in: ["pending", "in_progress"] },
+          status: { in: [QueueItemStatus.PENDING, QueueItemStatus.IN_PROGRESS] },
         },
         orderBy: [{ status: "desc" }, { priority: "desc" }, { order: "asc" }],
       });

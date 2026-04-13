@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "../env";
+import { StoragePrefix as StoragePrefixConst } from "../constants";
 
 // Use globalThis to survive HMR but allow config changes to take effect on full restart
 const globalForR2 = globalThis as unknown as { __r2Client_v2?: S3Client };
@@ -37,7 +38,7 @@ function getS3Client(): S3Client {
   return globalForR2.__r2Client_v2;
 }
 
-const ALLOWED_PREFIXES = ["deliverables", "attachments", "avatars"] as const;
+const ALLOWED_PREFIXES = Object.values(StoragePrefixConst);
 type StoragePrefix = (typeof ALLOWED_PREFIXES)[number];
 
 /**

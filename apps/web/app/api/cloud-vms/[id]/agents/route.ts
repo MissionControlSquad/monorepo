@@ -1,7 +1,13 @@
 import { findCloudVMRaw, listAgentsByVM, findAgentById } from "@agentcenter/database";
 import { assignAgentToVM } from "@/server/services/cloud-vm";
 import { ensureAgentOnVM } from "@/server/services/cloud-vm-ensure";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import {
+  successResponse,
+  errorResponse,
+  handleError,
+  assertFound,
+} from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 
 /**
  * GET /api/cloud-vms/[id]/agents
@@ -13,9 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { id } = await params;
 
     const vm = await findCloudVMRaw(id);
-    if (!vm) {
-      return errorResponse("VM not found", 404);
-    }
+    assertFound(vm, ERR.VM_NOT_FOUND);
 
     const agents = await listAgentsByVM(id);
 
@@ -45,9 +49,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const agent = await findAgentById(agentId);
-    if (!agent) {
-      return errorResponse("Agent not found", 404);
-    }
+    assertFound(agent, ERR.AGENT_NOT_FOUND);
 
     // Agent already on THIS VM — run self-healing instead of erroring
     if (agent.cloudVmId === id) {

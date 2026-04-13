@@ -23,9 +23,10 @@ import {
 } from "lucide-react";
 import { Button, Badge, Card } from "@/components/ui";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
-import { FLAG_KEYS, type AgentConfigFile } from "@agentcenter/utils";
+import { FLAG_KEYS, type AgentConfigFile, truncateId } from "@agentcenter/utils";
 import { useIsElectron } from "@agentcenter/hooks/browser";
 import { DesktopBootstrapButton } from "@/components/common/DesktopBootstrapButton";
+import { SetupStatus } from "@/server/constants";
 
 interface CloudVMAgent {
   id: string;
@@ -378,12 +379,14 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
           </Button>
           <div>
             <h1 className="text-xl font-bold text-foreground">
-              {setupData.agent.setupStatus === "pending_setup" ? "Setup" : "Configuration"} —{" "}
-              {setupData.agent.name}
+              {setupData.agent.setupStatus === SetupStatus.PENDING_SETUP
+                ? "Setup"
+                : "Configuration"}{" "}
+              — {setupData.agent.name}
             </h1>
             <p className="text-sm text-muted-foreground">
               {setupData.agent.role}
-              {setupData.agent.setupStatus === "pending_setup" && (
+              {setupData.agent.setupStatus === SetupStatus.PENDING_SETUP && (
                 <Badge variant="yellow" className="ml-2">
                   Pending Setup
                 </Badge>
@@ -501,7 +504,7 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
                       >
                         {setupData.cloudVms.map((vm) => (
                           <option key={vm.id} value={vm.id}>
-                            {vm.name} — {vm.ipv4 || vm.id.slice(0, 8)} — {vm.region} (
+                            {vm.name} — {vm.ipv4 || truncateId(vm.id)} — {vm.region} (
                             {vm.serverType})
                             {setupData.agent.cloudVmId === vm.id ? " ✓ current" : ""}
                           </option>

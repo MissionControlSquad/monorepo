@@ -1,13 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { LiveConnectionRegistry } from "../../src/server/services/live-connection-registry";
 import type { LiveConnection } from "../../src/server/services/live-connection-registry";
+import { MAX_MESSAGE_BYTES } from "@agentcenter/utils";
 
 // ─── buildTaskMessage (via module internals) ──────────────────────────────────
 // We test the observable output of buildTaskMessage by re-implementing the same
 // logic here to keep the test file self-contained and avoid importing the
 // module (which pulls in heavy Prisma/DB dependencies at import time).
-
-const MAX_MESSAGE_BYTES = 4096;
 
 function buildTaskMessage(opts: {
   taskId: string;

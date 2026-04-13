@@ -3,6 +3,7 @@ import { hashApiKey } from "@/server/api-key";
 import { agentCache } from "@/server/cache";
 import { isLicenseActive } from "@/server/license";
 import { log, logWarn } from "./logger";
+import { SetupStatus } from "@/server/constants";
 
 interface ResolveOptions {
   allowPendingSetup?: boolean;
@@ -50,11 +51,11 @@ export async function resolveAgent(request: Request, options?: ResolveOptions) {
     source = "cache";
   }
 
-  if (agent.setupStatus === "deactivated") {
+  if (agent.setupStatus === SetupStatus.DEACTIVATED) {
     logWarn("auth", `Agent deactivated: agent="${agent.name}"`, request);
     throw { error: "Agent is deactivated", status: 403 };
   }
-  if (agent.setupStatus === "pending_setup" && !options?.allowPendingSetup) {
+  if (agent.setupStatus === SetupStatus.PENDING_SETUP && !options?.allowPendingSetup) {
     logWarn("auth", `Agent setup incomplete: agent="${agent.name}"`, request);
     throw { error: "Agent setup is not complete", status: 403 };
   }

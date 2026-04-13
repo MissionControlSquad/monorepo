@@ -9,9 +9,11 @@ import { BatchCreateStep } from "./BatchCreateStep";
 import { SuccessStep } from "./SuccessStep";
 import { TEMPLATES } from "@/lib/agent-wizard-templates";
 import { USE_CASES } from "@/lib/onboarding-use-cases";
+import { API_ROUTES } from "@/lib/api-routes";
 import { getAgentName } from "@/lib/agent-default-names";
 import type { OnboardingUseCase } from "@/lib/onboarding-use-cases";
 import { useAgentStatus } from "../context/AgentStatusContext";
+import { type AgentLevelValue } from "@/server/constants";
 
 type Step = "welcome" | "use-case" | "preview" | "creating" | "success";
 
@@ -57,7 +59,7 @@ export function OnboardingWizard() {
 
   const fetchLicenseLimit = useCallback(async () => {
     try {
-      const res = await fetch("/api/license");
+      const res = await fetch(API_ROUTES.license.get);
       if (res.ok) {
         const data = await res.json();
         const limit = data.maxAgents;
@@ -77,7 +79,7 @@ export function OnboardingWizard() {
   useEffect(() => {
     if (resolved) return;
 
-    fetch("/api/onboarding")
+    fetch(API_ROUTES.onboarding.get)
       .then((r) => r.json())
       .then((data) => {
         if (data.completed) {
@@ -120,7 +122,7 @@ export function OnboardingWizard() {
       setTeam(templateIdsToTeam(teamIds));
       goToStep("preview");
 
-      fetch("/api/onboarding", {
+      fetch(API_ROUTES.onboarding.get, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ categoryId: useCase.id }),
@@ -135,7 +137,7 @@ export function OnboardingWizard() {
     (to: Step) => {
       goToStep(to);
       if (to === "welcome" || to === "use-case") {
-        fetch("/api/onboarding", {
+        fetch(API_ROUTES.onboarding.get, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ categoryId: null }),
@@ -156,12 +158,12 @@ export function OnboardingWizard() {
       username: a.username,
       identityEmoji: a.emoji,
       personality: a.personality,
-      level: a.level as "junior" | "specialist" | "senior" | "lead",
+      level: a.level as AgentLevelValue,
       templateId: a.templateId,
     }));
 
     try {
-      const res = await fetch("/api/agents/batch-create", {
+      const res = await fetch(API_ROUTES.agents.batchCreate, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ agents: payload }),
@@ -184,7 +186,7 @@ export function OnboardingWizard() {
         }
       }
 
-      await fetch("/api/onboarding", { method: "POST" }).catch(() => {});
+      await fetch(API_ROUTES.onboarding.get, { method: "POST" }).catch(() => {});
       refetchAgents();
       setStep("success");
     } catch {

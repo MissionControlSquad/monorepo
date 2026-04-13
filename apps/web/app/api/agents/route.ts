@@ -1,6 +1,8 @@
 import { agentModel } from "@/server/models";
 import { resolveAgent } from "../_lib/resolve-agent";
 import { successResponse, handleError } from "../_lib/json-response";
+import { parsePaginationParams } from "../_lib/pagination";
+import { ProjectMemberStatus } from "@/server/constants";
 
 /** Fields safe to expose via the REST API */
 const SAFE_AGENT_SELECT = {
@@ -26,12 +28,14 @@ export async function GET(request: Request) {
 
     const projectId = searchParams.get("projectId");
 
-    const limit = Math.min(parseInt(searchParams.get("limit") ?? "100", 10) || 100, 500);
-    const offset = Math.max(parseInt(searchParams.get("offset") ?? "0", 10) || 0, 0);
+    const { limit, offset } = parsePaginationParams(searchParams, {
+      defaultLimit: 100,
+      maxLimit: 500,
+    });
 
     const agents = await agentModel.findMany({
       where: projectId
-        ? { projectMemberships: { some: { projectId, status: "active" } } }
+        ? { projectMemberships: { some: { projectId, status: ProjectMemberStatus.ACTIVE } } }
         : undefined,
       select: SAFE_AGENT_SELECT,
       orderBy: { name: "asc" },

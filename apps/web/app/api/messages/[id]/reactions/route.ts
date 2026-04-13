@@ -1,7 +1,8 @@
 import { messageModel, messageReactionModel } from "@/server/models";
 import { pubsub, messageReactionTopic } from "@/server/pubsub";
 import { resolveAgent } from "../../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { successResponse, handleError, assertFound } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { validateBody, messageReactionSchema } from "../../../_lib/validation";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 
@@ -16,9 +17,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const message = await messageModel.findById(messageId, {
       select: { id: true, taskId: true },
     });
-    if (!message) {
-      return errorResponse("Message not found", 404);
-    }
+    assertFound(message, ERR.MESSAGE_NOT_FOUND);
 
     const profileId = await getOrCreateAgentProfileId(agent.id);
     const existing = await messageReactionModel.findOne({

@@ -13,6 +13,7 @@ import {
 } from "../../models";
 import { profileStatsCache, transitionIdsCache } from "../../cache";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
+import { QueueItemStatus } from "../../constants";
 
 builder.queryField("agents", (t) =>
   t.prismaField({
@@ -118,7 +119,7 @@ builder.queryField("agentProfileStats", (t) =>
         }),
         agentQueueItemModel.count({ where: { agentId } }),
         agentQueueItemModel.count({
-          where: { agentId, status: "completed" },
+          where: { agentId, status: QueueItemStatus.COMPLETED },
         }),
       ]);
 

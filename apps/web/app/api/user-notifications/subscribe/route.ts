@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { upsertPushSubscription, deletePushSubscription } from "@agentcenter/database";
 import { resolveUserId } from "../../_lib/resolve-session";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { validateBody, pushSubscribeSchema, pushUnsubscribeSchema } from "../../_lib/validation";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 
@@ -13,12 +14,9 @@ export async function POST(request: Request) {
     if (!(await isFeatureEnabled(FLAG_KEYS.NOTIFICATIONS))) {
       return errorResponse("Notifications feature is not available on your current plan", 403);
     }
-    const body = await request.json();
-
-    const { endpoint, keys } = body;
-    if (!endpoint || !keys?.p256dh || !keys?.auth) {
-      return errorResponse("Invalid push subscription", 400);
-    }
+    const v = await validateBody(request, pushSubscribeSchema);
+    if (v.error) return v.error;
+    const { endpoint, keys } = v.data;
 
     await upsertPushSubscription({
       userId,
@@ -37,13 +35,10 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { userId } = await resolveUserId(request);
-    const body = await request.json();
+    const v = await validateBody(request, pushUnsubscribeSchema);
+    if (v.error) return v.error;
 
-    if (!body.endpoint) {
-      return errorResponse("endpoint is required", 400);
-    }
-
-    await deletePushSubscription(userId, body.endpoint);
+    await deletePushSubscription(userId, v.data.endpoint);
 
     return successResponse({ success: true });
   } catch (err) {

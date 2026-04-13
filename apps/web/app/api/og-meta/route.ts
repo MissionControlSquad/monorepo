@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "../_lib/json-response";
 
 /**
  * Block private/internal IP ranges to prevent SSRF attacks.
@@ -55,17 +56,17 @@ export async function GET(request: Request) {
   const url = searchParams.get("url");
 
   if (!url) {
-    return NextResponse.json({ error: "url parameter required" }, { status: 400 });
+    return errorResponse("url parameter required", 400);
   }
 
   try {
     new URL(url); // validate
   } catch {
-    return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+    return errorResponse("Invalid URL", 400);
   }
 
   if (isPrivateUrl(url)) {
-    return NextResponse.json({ error: "URL not allowed" }, { status: 403 });
+    return errorResponse("URL not allowed", 403);
   }
 
   try {
@@ -83,13 +84,13 @@ export async function GET(request: Request) {
     clearTimeout(timeout);
 
     if (!res.ok || !res.headers.get("content-type")?.includes("text/html")) {
-      return NextResponse.json({ error: "Not an HTML page" }, { status: 422 });
+      return errorResponse("Not an HTML page", 422);
     }
 
     // Only read first 50KB to extract meta tags
     const reader = res.body?.getReader();
     if (!reader) {
-      return NextResponse.json({ error: "No body" }, { status: 422 });
+      return errorResponse("No body", 422);
     }
 
     let html = "";
@@ -108,17 +109,14 @@ export async function GET(request: Request) {
     const meta = extractOgMeta(html, url);
 
     if (!meta.title && !meta.description && !meta.image) {
-      return NextResponse.json({ error: "No metadata found" }, { status: 422 });
+      return errorResponse("No metadata found", 422);
     }
 
     return NextResponse.json(meta, {
       headers: { "Cache-Control": "public, max-age=86400, s-maxage=86400" },
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err?.name === "AbortError" ? "Timeout" : "Failed to fetch" },
-      { status: 502 },
-    );
+    return errorResponse(err?.name === "AbortError" ? "Timeout" : "Failed to fetch", 502);
   }
 }
 

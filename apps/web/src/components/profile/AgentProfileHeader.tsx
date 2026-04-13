@@ -11,8 +11,8 @@ import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { useAgentDetail } from "../context/AgentDetailContext";
 import { useAgentStatus } from "../context/AgentStatusContext";
 import { AGENT_LEVELS } from "../../lib/constants";
-import type { AgentDetailedStatus, AgentLevel } from "../../lib/constants";
-import { Roles } from "@/server/constants";
+import type { AgentDetailedStatus, AgentLevelId } from "../../lib/constants";
+import { Roles, SetupStatus, type AgentStatusValue } from "@/server/constants";
 import { Button } from "../ui";
 import type { Agent } from "@agentcenter/types";
 
@@ -25,16 +25,17 @@ export function AgentProfileHeader({ agent }: AgentProfileHeaderProps) {
   const router = useRouter();
   const { openAgent } = useAgentDetail();
   const [, executeSetActivation] = useMutation(SET_AGENT_ACTIVATION);
-  const isDeactivated = agent.setupStatus === "deactivated";
+  const isDeactivated = agent.setupStatus === SetupStatus.DEACTIVATED;
   const { getOnlineInfo, agents } = useAgentStatus();
   const isLastLead =
     agent.role === Roles.SQUAD_LEAD &&
     !isDeactivated &&
-    (agents?.filter((a: Agent) => a.role === Roles.SQUAD_LEAD && a.setupStatus !== "deactivated")
-      .length ?? 0) <= 1;
+    (agents?.filter(
+      (a: Agent) => a.role === Roles.SQUAD_LEAD && a.setupStatus !== SetupStatus.DEACTIVATED,
+    ).length ?? 0) <= 1;
   const { isOnline, lastSeenFormatted } = getOnlineInfo(agent._id ?? agent.id);
   const detailedStatus = agent.detailedStatus as AgentDetailedStatus | undefined;
-  const level = agent.level as AgentLevel | undefined;
+  const level = agent.level as AgentLevelId | undefined;
   const levelConfig = level ? AGENT_LEVELS[level] : undefined;
 
   return (
@@ -58,7 +59,7 @@ export function AgentProfileHeader({ agent }: AgentProfileHeaderProps) {
             className="w-14 h-14 @xl:w-16 @xl:h-16 ring-2 ring-white/30"
           />
           <StatusDot
-            status={agent.status as "idle" | "active" | "blocked"}
+            status={agent.status as AgentStatusValue}
             detailedStatus={detailedStatus}
             isOnline={isOnline}
             className="absolute -bottom-0.5 -right-0.5 ring-2 ring-white"
@@ -69,7 +70,7 @@ export function AgentProfileHeader({ agent }: AgentProfileHeaderProps) {
           <div className="flex items-center gap-1.5 @xl:gap-2 flex-wrap">
             <h2 className="text-lg @xl:text-2xl font-bold truncate">{agent.name}</h2>
             <AgentStatusBadge
-              status={agent.status as "idle" | "active" | "blocked"}
+              status={agent.status as AgentStatusValue}
               detailedStatus={detailedStatus}
               isOnline={isOnline}
               size="sm"

@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "urql";
 import { CREATE_TASK_FROM_DASHBOARD, PROFILES_QUERY, PROJECTS_QUERY, TASKS_QUERY, TASK_TEMPLATES_QUERY, INSTANTIATE_TEMPLATE } from "@agentcenter/graphql-client";
 import { Avatar } from "../../src/components/Avatar";
-import { PRIORITY_HEX_COLORS, PRIORITY_VALUES } from "@agentcenter/utils";
+import { PRIORITY_HEX_COLORS, PRIORITY_VALUES, ProjectStatus } from "@agentcenter/utils";
 import type { Priority } from "@agentcenter/types";
 import { FormField } from "../../src/components/FormField";
 import { ModalSheetHeader } from "../../src/components/ModalSheetHeader";
@@ -608,7 +608,7 @@ export default function CreateTaskScreen() {
                 }
                 renderItem={({ item }) => {
                   const selected = selectedProjectId === item.id;
-                  const disabled = item.status === "archived" || item.shutdownActive;
+                  const disabled = item.status === ProjectStatus.ARCHIVED || item.shutdownActive;
                   return (
                     <Pressable
                       className={`flex-row items-center p-3.5 gap-3 border-b border-gray-100 dark:border-slate-700 ${selected ? "bg-blue-50 dark:bg-blue-900/20" : "bg-white dark:bg-slate-800"}`}
@@ -622,7 +622,7 @@ export default function CreateTaskScreen() {
                       <View className="flex-1">
                         <Text className={`text-base font-medium ${disabled ? "text-gray-400 dark:text-slate-500" : "text-gray-900 dark:text-slate-100"}`}>
                           {item.name}
-                          {item.status === "archived" ? " (Archived)" : item.shutdownActive ? " (Paused)" : ""}
+                          {item.status === ProjectStatus.ARCHIVED ? " (Archived)" : item.shutdownActive ? " (Paused)" : ""}
                         </Text>
                       </View>
                       {selected && <Text className="text-lg text-blue-600 dark:text-blue-400 font-bold">✓</Text>}

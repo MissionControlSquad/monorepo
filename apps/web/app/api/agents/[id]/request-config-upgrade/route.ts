@@ -1,12 +1,17 @@
 import { agentModel, taskModel } from "@/server/models";
 import { pubsub, PubSubEvent, taskTopic } from "@/server/pubsub";
-import { TaskStatus } from "@/server/constants";
+import { TaskStatus, Priority } from "@/server/constants";
 import { UPGRADE_CONFIG_TASK } from "@/server/upgrade-task";
-import { errorResponse, successResponse, handleError } from "../../../_lib/json-response";
+import {
+  errorResponse,
+  successResponse,
+  handleError,
+  assertFound,
+} from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertAssignableAgents } from "@/server/assignment-guard";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../../_lib/route-context";
 
 /**
  * POST /api/agents/:id/request-config-upgrade
@@ -17,7 +22,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
   try {
     const { id } = await ctx.params;
     const agent = await agentModel.findById(id);
-    if (!agent) return errorResponse("Agent not found", 404);
+    assertFound(agent, ERR.AGENT_NOT_FOUND);
 
     try {
       await assertAssignableAgents([agent.id]);
@@ -31,7 +36,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
         title: UPGRADE_CONFIG_TASK.title,
         description: UPGRADE_CONFIG_TASK.description,
         status: TaskStatus.INBOX,
-        priority: "high",
+        priority: Priority.HIGH,
         projectId: null,
         assignees: {
           create: [{ profileId }],

@@ -9,11 +9,13 @@ import { addDays, addWeeks, addMonths } from "date-fns";
 import { taskModel } from "./models/task";
 import { isSystemShutdown } from "./system-settings";
 import { filterAvailableAssignees } from "./assignment-guard";
+import { ProjectStatus, RecurringFrequency } from "./constants";
+import type { RecurringFrequencyValue } from "./constants";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
 export interface RecurrenceConfig {
-  type: "daily" | "weekly" | "monthly";
+  type: RecurringFrequencyValue;
   interval: number; // every N days/weeks/months
   daysOfWeek?: number[]; // 0-6 (Sun-Sat), for weekly
   dayOfMonth?: number; // 1-31, for monthly
@@ -29,7 +31,7 @@ export function validateRecurrenceConfig(input: unknown): RecurrenceConfig {
 
   const obj = input as Record<string, unknown>;
 
-  if (!["daily", "weekly", "monthly"].includes(obj.type as string)) {
+  if (!Object.values(RecurringFrequency).includes(obj.type as any)) {
     throw new Error('recurrenceConfig.type must be "daily", "weekly", or "monthly"');
   }
 
@@ -43,7 +45,7 @@ export function validateRecurrenceConfig(input: unknown): RecurrenceConfig {
     interval,
   };
 
-  if (obj.type === "weekly") {
+  if (obj.type === RecurringFrequency.WEEKLY) {
     if (obj.daysOfWeek !== undefined) {
       if (
         !Array.isArray(obj.daysOfWeek) ||
@@ -55,7 +57,7 @@ export function validateRecurrenceConfig(input: unknown): RecurrenceConfig {
     }
   }
 
-  if (obj.type === "monthly") {
+  if (obj.type === RecurringFrequency.MONTHLY) {
     if (obj.dayOfMonth !== undefined) {
       const day = Number(obj.dayOfMonth);
       if (!Number.isInteger(day) || day < 1 || day > 31) {
@@ -158,11 +160,11 @@ export function calculateNextDueDate(
   const time = config.time ?? "09:00";
 
   switch (config.type) {
-    case "daily": {
+    case RecurringFrequency.DAILY: {
       return applyTime(addDays(currentDue, config.interval), time, timezone);
     }
 
-    case "weekly": {
+    case RecurringFrequency.WEEKLY: {
       if (config.daysOfWeek && config.daysOfWeek.length > 0) {
         // Find the next applicable day of week
         const sortedDays = [...config.daysOfWeek].sort((a, b) => a - b);
@@ -184,7 +186,7 @@ export function calculateNextDueDate(
       return applyTime(addWeeks(currentDue, config.interval), time, timezone);
     }
 
-    case "monthly": {
+    case RecurringFrequency.MONTHLY: {
       const nextMonth = addMonths(currentDue, config.interval);
       if (config.dayOfMonth) {
         const { year, month } = getDateInTz(nextMonth, timezone);
@@ -211,14 +213,14 @@ export function calculateInitialDueDate(
   const time = config.time ?? "09:00";
 
   switch (config.type) {
-    case "daily": {
+    case RecurringFrequency.DAILY: {
       // Next occurrence is tomorrow (or today if time hasn't passed)
       const todayWithTime = applyTime(now, time, timezone);
       if (todayWithTime > now) return todayWithTime;
       return applyTime(addDays(now, 1), time, timezone);
     }
 
-    case "weekly": {
+    case RecurringFrequency.WEEKLY: {
       if (config.daysOfWeek && config.daysOfWeek.length > 0) {
         const sortedDays = [...config.daysOfWeek].sort((a, b) => a - b);
         const currentDay = getDayOfWeekInTz(now, timezone);
@@ -240,7 +242,7 @@ export function calculateInitialDueDate(
       return applyTime(addWeeks(now, 1), time, timezone);
     }
 
-    case "monthly": {
+    case RecurringFrequency.MONTHLY: {
       if (config.dayOfMonth) {
         const { year, month } = getDateInTz(now, timezone);
         const maxDay = new Date(year, month, 0).getDate();
@@ -279,7 +281,7 @@ export async function triggerRecurringTaskNow(recurringTaskId: string): Promise<
 
   if (rt.projectId) {
     const project = await getProjectStatus(rt.projectId);
-    if (project?.status === "archived") {
+    if (project?.status === ProjectStatus.ARCHIVED) {
       throw new Error("This project is archived. Cannot trigger recurring tasks.");
     }
     if (project?.shutdownActive) {
@@ -351,7 +353,7 @@ export async function generateRecurringTasks(opts?: { projectId?: string }): Pro
     isActive: true,
     nextDueAt: { not: null, lte: now },
     // Exclude recurring tasks belonging to archived or shutdown projects
-    OR: [{ projectId: null }, { project: { status: "active", shutdownActive: false } }],
+    OR: [{ projectId: null }, { project: { status: ProjectStatus.ACTIVE, shutdownActive: false } }],
   };
 
   if (opts?.projectId) {

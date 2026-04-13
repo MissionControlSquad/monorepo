@@ -22,6 +22,8 @@ import {
   FormMessage,
 } from "@/components/ui/shadcn/form";
 import { Input } from "@/components/ui/shadcn/input";
+import { LicenseStatusCode } from "@/server/constants";
+import { API_ROUTES } from "@/lib/api-routes";
 
 const changePasswordSchema = z
   .object({
@@ -56,7 +58,7 @@ export function SettingsPage() {
   } | null>(null);
 
   useEffect(() => {
-    fetch("/api/license")
+    fetch(API_ROUTES.license.get)
       .then((r) => r.json())
       .then(setLicenseInfo)
       .catch(() => {});
@@ -178,7 +180,7 @@ export function SettingsPage() {
       </Card>
 
       {/* License */}
-      {licenseInfo && licenseInfo.status !== "none" && (
+      {licenseInfo && licenseInfo.status !== LicenseStatusCode.NONE && (
         <Card padding="lg" className="space-y-4">
           <div className="flex items-start gap-4">
             <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-muted">
@@ -190,9 +192,9 @@ export function SettingsPage() {
             </div>
             <span
               className={`text-xs px-2 py-1 rounded-full font-medium ${
-                licenseInfo.status === "active"
+                licenseInfo.status === LicenseStatusCode.ACTIVE
                   ? "bg-success-muted text-success"
-                  : licenseInfo.status === "grace"
+                  : licenseInfo.status === LicenseStatusCode.GRACE
                     ? "bg-warning-muted text-warning"
                     : "bg-destructive/10 text-destructive"
               }`}

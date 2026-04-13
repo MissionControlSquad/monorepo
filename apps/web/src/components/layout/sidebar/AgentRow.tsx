@@ -25,6 +25,7 @@ import { AGENT_DETAILED_STATUSES, type AgentDetailedStatus } from "../../../lib/
 import { ProfileAvatar } from "../../ui/ProfileAvatar";
 import type { Agent, WorkSummary, StatusHistoryEntry } from "@agentcenter/types";
 import { formatDurationLong, formatDuration } from "@agentcenter/utils";
+import { SetupStatus, AgentStatus } from "@/server/constants";
 
 export function useWorkTimer(taskId: string | undefined) {
   const [workSummaryResult] = useQuery({
@@ -86,7 +87,7 @@ export const AgentRow = memo(function AgentRow({
   const router = useRouter();
   const { getOnlineInfo } = useAgentStatus();
   const { isOnline, lastSeenFormatted } = getOnlineInfo(agent.id);
-  const isPending = agent.setupStatus === "pending_setup";
+  const isPending = agent.setupStatus === SetupStatus.PENDING_SETUP;
   const isVacation = agent.isOnVacation === true;
   const isWorking = !!agent.currentTaskId;
   const elapsed = useWorkTimer(agent.currentTaskId ?? undefined);
@@ -108,7 +109,11 @@ export const AgentRow = memo(function AgentRow({
     subtitle = detailedConfig.label;
   } else if (transition?.timestamp) {
     const statusLabel =
-      agent.status === "active" ? "Active" : agent.status === "idle" ? "Idle" : "Blocked";
+      agent.status === AgentStatus.ACTIVE
+        ? "Active"
+        : agent.status === AgentStatus.IDLE
+          ? "Idle"
+          : "Blocked";
     subtitle = `${statusLabel} for ${formatDuration(Date.now() - new Date(transition.timestamp).getTime())}`;
   } else {
     subtitle = lastSeenFormatted;

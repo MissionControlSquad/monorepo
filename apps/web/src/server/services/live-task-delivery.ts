@@ -21,7 +21,14 @@
 import { findConnectionByAgentSlug, enqueuePendingDelivery } from "@agentcenter/database";
 import { connectionRegistry } from "./live-connection-registry";
 import { LIVE_GATEWAY } from "@agentcenter/types";
-import { Roles } from "../constants";
+import { MAX_MESSAGE_BYTES } from "@agentcenter/utils";
+import {
+  Roles,
+  ProfileKind,
+  ProjectMemberStatus,
+  SetupStatus,
+  ChannelVisibility,
+} from "../constants";
 
 /** Same threshold as heartbeat-preflight overlapping check. */
 const OVERLAPPING_TTL_MS = 5 * 60 * 1000;
@@ -41,8 +48,6 @@ interface DeliverOptions {
   priority: string;
   assignedBy?: string;
 }
-
-const MAX_MESSAGE_BYTES = 4096;
 
 function buildTaskMessage(opts: DeliverOptions): string {
   // Task ID is included so the agent can call MC APIs (status updates, action logs, etc.)
@@ -288,13 +293,13 @@ export async function tryDeliverInboxTaskNotification(
     // squad leads triage and assign them, triggering the normal assignment flow.
     const members = await prisma.projectMember
       .findMany({
-        where: { projectId, status: "active" },
+        where: { projectId, status: ProjectMemberStatus.ACTIVE },
         select: { profile: { select: { agentId: true, kind: true } } },
       })
       .catch(() => []);
 
     const projectAgentIds = members
-      .filter((m) => m.profile?.kind === "agent" && m.profile?.agentId)
+      .filter((m) => m.profile?.kind === ProfileKind.AGENT && m.profile?.agentId)
       .map((m) => m.profile!.agentId as string)
       .filter((id) => !excludeAgentIds.includes(id));
 
@@ -314,7 +319,7 @@ export async function tryDeliverInboxTaskNotification(
     // Once they assign to specific agents the normal assignment flow takes over.
     const squadLeads = await prisma.agent
       .findMany({
-        where: { setupStatus: "active", role: Roles.SQUAD_LEAD },
+        where: { setupStatus: SetupStatus.ACTIVE, role: Roles.SQUAD_LEAD },
         select: { id: true },
       })
       .catch(() => []);
@@ -423,13 +428,13 @@ export async function tryDeliverReviewNotification(
   // Find squad lead agents in the project
   const members = await prisma.projectMember
     .findMany({
-      where: { projectId, status: "active" },
+      where: { projectId, status: ProjectMemberStatus.ACTIVE },
       select: { profile: { select: { agentId: true, kind: true } } },
     })
     .catch(() => []);
 
   const agentIds = members
-    .filter((m) => m.profile?.kind === "agent" && m.profile?.agentId)
+    .filter((m) => m.profile?.kind === ProfileKind.AGENT && m.profile?.agentId)
     .map((m) => m.profile!.agentId as string);
 
   if (!agentIds.length) return;
@@ -474,7 +479,7 @@ export async function tryDeliverDmNotification(
 ): Promise<void> {
   if (!agentIds.length) return;
   await sendNotifyToAgents(agentIds, {
-    kind: "dm",
+    kind: ChannelVisibility.DM,
     content: `DM from @${opts.fromHandle}: ${opts.content.slice(0, 400)}. Reply via POST /api/channels/${opts.channelId}/messages per your PLAYBOOK.`,
     messageId: opts.messageId,
     channelId: opts.channelId,

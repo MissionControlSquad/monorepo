@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { Badge } from "../ui";
 import type { Project, ProjectMember } from "@agentcenter/types";
+import { ProjectStatus } from "@/server/constants";
 
 interface ProjectCardProps {
   project: Project;
@@ -29,7 +30,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
   const taskCount = projectTasks?.length ?? 0;
   const members = projectDetail?.members ?? [];
 
-  const isArchived = project.status === "archived";
+  const isArchived = project.status === ProjectStatus.ARCHIVED;
   const isShutdown = project.shutdownActive === true;
 
   const className = `block w-full text-left rounded-xl border shadow-sm p-5 transition-all group ${

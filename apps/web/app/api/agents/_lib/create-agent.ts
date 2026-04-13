@@ -13,7 +13,8 @@ import { pubsub, PubSubEvent } from "@/server/pubsub";
 import { ensureAgentProfile } from "@/server/agent-profile";
 import type { z } from "zod/v4";
 import type { createAgentSchema } from "../../_lib/validation";
-import type { AgentConfigFile, AgentSetupResult } from "@agentcenter/utils";
+import { getAgentSlug, type AgentConfigFile, type AgentSetupResult } from "@agentcenter/utils";
+import { AgentStatus, SetupStatus, AgentLevel } from "@/server/constants";
 
 type CreateAgentInput = z.infer<typeof createAgentSchema>;
 
@@ -46,10 +47,10 @@ export async function createSingleAgent(
       username: username || undefined,
       identityEmoji: identityEmoji || template?.emoji || "🤖",
       personality: personality || template?.personality || undefined,
-      level: (level || template?.level || "specialist") as any,
+      level: (level || template?.level || AgentLevel.SPECIALIST) as any,
       workspacePath: workspacePath || undefined,
-      status: "idle",
-      setupStatus: "pending_setup",
+      status: AgentStatus.IDLE,
+      setupStatus: SetupStatus.PENDING_SETUP,
       apiKeyHash: hash,
       apiKeyPrefix: prefix,
       apiKeyCreatedAt: new Date(),
@@ -61,7 +62,7 @@ export async function createSingleAgent(
   invalidateAgentListCache();
   pubsub.publish(PubSubEvent.AGENT.STATUS_CHANGED, { agentId: agent.id });
 
-  const agentSlug = agent.username || name.toLowerCase().replace(/\s+/g, "-");
+  const agentSlug = getAgentSlug({ username: agent.username, name });
   const resolvedWorkspacePath = workspacePath || workspacePathUnix(agentSlug);
 
   if (!workspacePath) {
@@ -81,7 +82,7 @@ export async function createSingleAgent(
     username: agentSlug,
     identityEmoji: agent.identityEmoji || "🤖",
     personality: agent.personality || "",
-    level: agent.level || "specialist",
+    level: agent.level || AgentLevel.SPECIALIST,
     capabilities: template?.capabilities,
     templateId: templateId || undefined,
   };

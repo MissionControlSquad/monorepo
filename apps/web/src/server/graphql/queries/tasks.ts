@@ -2,7 +2,7 @@ import { builder } from "../builder";
 import { taskModel, agentModel, workSessionModel } from "../../models";
 import { groupTasksByStatus } from "@agentcenter/database";
 import { workSummaryCache } from "../../cache";
-import { Roles } from "../../constants";
+import { Roles, TaskStatus } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 import { generateRecurringTasks } from "../../recurring-tasks";
 import { buildTaskFilterWhere } from "./task-filters";
@@ -144,7 +144,7 @@ builder.queryField("tasksByAssignee", (t) =>
         ...query,
         where: {
           assignees: { some: { profileId } },
-          ...(args.includeDone ? {} : { status: { not: "done" } }),
+          ...(args.includeDone ? {} : { status: { not: TaskStatus.DONE } }),
           ...projectFilter(args.projectId),
         },
         orderBy: { createdAt: "desc" },
@@ -172,7 +172,14 @@ builder.queryField("tasksByStatusForAgent", (t) =>
         ...(profileId ? { assignees: { some: { profileId } } } : {}),
       };
 
-      const statuses = ["inbox", "assigned", "in_progress", "review", "done", "blocked"] as const;
+      const statuses = [
+        TaskStatus.INBOX,
+        TaskStatus.ASSIGNED,
+        TaskStatus.IN_PROGRESS,
+        TaskStatus.REVIEW,
+        TaskStatus.DONE,
+        TaskStatus.BLOCKED,
+      ] as const;
 
       const results = await Promise.all(
         statuses.map((status) =>

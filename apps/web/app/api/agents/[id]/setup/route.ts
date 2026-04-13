@@ -8,9 +8,11 @@ import {
   getMcUrl,
 } from "@/server/agent-config-generator";
 import { workspacePathUnix } from "@/server/workspace-paths";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import { successResponse, handleError, assertFound } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
+import { AgentLevel } from "@/server/constants";
+import { getAgentSlug } from "@agentcenter/utils";
+import type { RouteContext } from "../../../_lib/route-context";
 
 /**
  * GET /api/agents/:id/setup
@@ -22,13 +24,13 @@ export async function GET(_request: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
 
     const agent = await agentModel.findById(id);
-    if (!agent) return errorResponse("Agent not found", 404);
+    assertFound(agent, ERR.AGENT_NOT_FOUND);
 
     const template = agent.templateId ? getTemplate(agent.templateId) : undefined;
     const mcUrl = getMcUrl();
 
     // Compute slug once and reuse everywhere
-    const agentSlug = agent.username || agent.name.toLowerCase().replace(/\s+/g, "-");
+    const agentSlug = getAgentSlug(agent);
     const resolvedWorkspacePath = agent.workspacePath ?? workspacePathUnix(agentSlug);
 
     // Count agents created before this one for cron scheduling
@@ -44,7 +46,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
       username: agentSlug,
       identityEmoji: agent.identityEmoji || "🤖",
       personality: agent.personality || "",
-      level: agent.level || "specialist",
+      level: agent.level || AgentLevel.SPECIALIST,
       capabilities: template?.capabilities,
       templateId: agent.templateId || undefined,
     };

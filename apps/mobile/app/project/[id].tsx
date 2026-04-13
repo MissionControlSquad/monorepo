@@ -35,7 +35,7 @@ import {
   DELETE_PROJECT_DOC,
   PROFILES_QUERY,
 } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, formatDate } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, DEFAULT_COLOR, formatDate, ProjectStatus, TaskStatus } from "@agentcenter/utils";
 import { useTheme } from "../../src/hooks/useTheme";
 import { TabFilterStrip } from "../../src/components/TabFilterStrip";
 import { KanbanBoard } from "../../src/components/KanbanBoard";
@@ -308,9 +308,9 @@ function TasksTab({ projectId }: { projectId: string }) {
 
   const filters: { key: TaskFilter; label: string }[] = [
     { key: "all", label: "All" },
-    { key: "in_progress", label: "In Progress" },
-    { key: "review", label: "Review" },
-    { key: "done", label: "Done" },
+    { key: TaskStatus.IN_PROGRESS, label: "In Progress" },
+    { key: TaskStatus.REVIEW, label: "Review" },
+    { key: TaskStatus.DONE, label: "Done" },
   ];
 
   return (
@@ -1093,7 +1093,7 @@ export default function ProjectDetailScreen() {
 
   function handleMoreActions() {
     if (!project) return;
-    const isArchived = project.status === "archived";
+    const isArchived = project.status === ProjectStatus.ARCHIVED;
     const isShutdown = project.shutdownActive;
 
     Alert.alert("Project Actions", undefined, [

@@ -1,16 +1,20 @@
-import { Roles } from "@/server/constants";
 import { taskModel } from "@/server/models/task";
 import { resolveAgent } from "../../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import {
+  successResponse,
+  errorResponse,
+  handleError,
+  assertFound,
+} from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { validateBody, rejectTaskSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
-import { assertProjectMember } from "../../../_lib/project-access";
+import { assertProjectMember, squadLeadRequired } from "../../../_lib/project-access";
 import { isSystemShutdown } from "@/server/system-settings";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { performRejectTask } from "@/server/services/review";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../../_lib/route-context";
 
 export async function POST(request: Request, ctx: RouteContext) {
   try {
@@ -21,19 +25,18 @@ export async function POST(request: Request, ctx: RouteContext) {
     const { id: taskId } = await ctx.params;
 
     if (!(await isFeatureEnabled(FLAG_KEYS.REVIEWS))) {
-      return errorResponse("Reviews feature is not available on your current plan", 403);
+      return errorResponse(ERR.FEATURE_REVIEWS_UNAVAILABLE, 403);
     }
     if (await isSystemShutdown()) {
       return errorResponse("System is in shutdown mode. No task rejections allowed.", 503);
     }
-    if (reviewer.role !== Roles.SQUAD_LEAD) {
-      return errorResponse("Only Squad Lead can reject tasks", 403);
-    }
+    const guard = squadLeadRequired(reviewer);
+    if (guard) return guard;
 
     const task = await taskModel.findById(taskId, {
       select: { projectId: true, taskNumber: true },
     });
-    if (!task) return errorResponse("Task not found", 404);
+    assertFound(task, ERR.TASK_NOT_FOUND);
     if (task.projectId) await assertProjectMember(reviewer.id, task.projectId);
 
     const result = await performRejectTask({

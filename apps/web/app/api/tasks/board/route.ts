@@ -1,10 +1,10 @@
 export const dynamic = "force-dynamic";
 
 import { taskModel } from "@/server/models/task";
-import { Roles, TaskStatus } from "@/server/constants";
+import { TaskStatus } from "@/server/constants";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, handleError } from "../../_lib/json-response";
-import { assertProjectMember, getAgentProjectIds } from "../../_lib/project-access";
+import { assertProjectMember, getAgentProjectIds, isSquadLead } from "../../_lib/project-access";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 
 const STATUS_COLUMNS = [
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     const agent = await resolveAgent(request);
     const projectId = searchParams.get("projectId");
 
-    const isLead = agent.role === Roles.SQUAD_LEAD;
+    const isLead = isSquadLead(agent);
 
     const where: Record<string, unknown> = {};
     if (projectId) {

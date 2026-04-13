@@ -7,12 +7,13 @@
  */
 
 import { prisma } from "../src/server/prisma";
+import { TaskStatus, Priority } from "../src/server/constants";
 
 const COUNT = parseInt(process.env.SEED_LOAD_COUNT ?? "5000", 10);
 const BATCH_SIZE = 500;
 
-const STATUSES = ["inbox", "assigned", "in_progress", "review", "done", "blocked"] as const;
-const PRIORITIES = ["low", "medium", "high"] as const;
+const STATUSES = Object.values(TaskStatus);
+const PRIORITIES = [Priority.LOW, Priority.MEDIUM, Priority.HIGH];
 
 const TITLES = [
   "Implement auth flow",
@@ -53,7 +54,8 @@ async function run() {
     const profile = await prisma.profile.findFirst({ where: { agentId: firstAgent.id } });
     createdByProfileId = profile?.id ?? null;
   }
-  if (!createdByProfileId) console.log("   No agent/profile found; tasks will have createdByProfileId = null.");
+  if (!createdByProfileId)
+    console.log("   No agent/profile found; tasks will have createdByProfileId = null.");
 
   let created = 0;
   const start = Date.now();

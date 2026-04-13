@@ -7,7 +7,7 @@ import { useHighlightedHtml } from "../../lib/useHighlight";
 import { Badge, Button } from "../ui";
 import { MentionText } from "../common/MarkdownWithMentions";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
-import { getAssetUrl, formatFileSize, stripMarkdown } from "@agentcenter/utils";
+import { getAssetUrl, formatFileSize, stripMarkdown, DeliverableKind } from "@agentcenter/utils";
 import type { Deliverable, Agent } from "@agentcenter/types";
 
 interface DeliverableCardProps {
@@ -17,10 +17,10 @@ interface DeliverableCardProps {
 }
 
 const KIND_CONFIG = {
-  markdown: { label: "Markdown", variant: "purple" as const, icon: FileText },
-  code: { label: "Code", variant: "blue" as const, icon: Code2 },
-  file: { label: "File", variant: "orange" as const, icon: File },
-  link: { label: "Link", variant: "green" as const, icon: Link },
+  [DeliverableKind.MARKDOWN]: { label: "Markdown", variant: "purple" as const, icon: FileText },
+  [DeliverableKind.CODE]: { label: "Code", variant: "blue" as const, icon: Code2 },
+  [DeliverableKind.FILE]: { label: "File", variant: "orange" as const, icon: File },
+  [DeliverableKind.LINK]: { label: "Link", variant: "green" as const, icon: Link },
 };
 
 function CodePreview({ content, language }: { content: string; language?: string }) {
@@ -41,13 +41,14 @@ export const DeliverableCard = memo(function DeliverableCard({
 }: DeliverableCardProps) {
   const config = KIND_CONFIG[deliverable.kind as keyof typeof KIND_CONFIG];
 
-  const isImageFile = deliverable.kind === "file" && deliverable.mimeType?.startsWith("image/");
+  const isImageFile =
+    deliverable.kind === DeliverableKind.FILE && deliverable.mimeType?.startsWith("image/");
 
   const fileUrl = isImageFile
     ? (getAssetUrl(deliverable.storageKey) ?? deliverable.url ?? null)
     : null;
 
-  const isLink = deliverable.kind === "link";
+  const isLink = deliverable.kind === DeliverableKind.LINK;
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -72,7 +73,7 @@ export const DeliverableCard = memo(function DeliverableCard({
         <Badge variant={config.variant} size="sm">
           {config.label}
         </Badge>
-        {deliverable.kind === "code" && deliverable.language && (
+        {deliverable.kind === DeliverableKind.CODE && deliverable.language && (
           <Badge variant="gray" size="sm">
             {deliverable.language}
           </Badge>
@@ -100,17 +101,17 @@ export const DeliverableCard = memo(function DeliverableCard({
       )}
 
       {/* Preview by kind */}
-      {deliverable.kind === "markdown" && deliverable.content && (
+      {deliverable.kind === DeliverableKind.MARKDOWN && deliverable.content && (
         <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
           <MentionText content={stripMarkdown(deliverable.content).slice(0, 150)} />
         </p>
       )}
 
-      {deliverable.kind === "code" && deliverable.content && (
+      {deliverable.kind === DeliverableKind.CODE && deliverable.content && (
         <CodePreview content={deliverable.content} language={deliverable.language ?? undefined} />
       )}
 
-      {deliverable.kind === "file" &&
+      {deliverable.kind === DeliverableKind.FILE &&
         (isImageFile && fileUrl ? (
           <div className="mt-2 rounded overflow-hidden bg-muted">
             <img
@@ -137,7 +138,7 @@ export const DeliverableCard = memo(function DeliverableCard({
           </div>
         ))}
 
-      {deliverable.kind === "link" && deliverable.url && (
+      {deliverable.kind === DeliverableKind.LINK && deliverable.url && (
         <div className="flex items-center gap-2 mt-2">
           <span className="text-xs text-muted-foreground truncate flex-1">{deliverable.url}</span>
           <a

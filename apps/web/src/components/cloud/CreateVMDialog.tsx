@@ -1,6 +1,7 @@
 "use client";
 
 import { X, Server } from "lucide-react";
+import { API_ROUTES } from "@/lib/api-routes";
 import { toast } from "sonner";
 import { Button } from "../ui";
 import { Input } from "@/components/ui/shadcn/input";
@@ -44,7 +45,7 @@ export function CreateVMDialog({ onClose, onCreated }: CreateVMDialogProps) {
 
   const onSubmit = async (values: CreateVMValues) => {
     try {
-      const res = await fetch("/api/cloud-vms", {
+      const res = await fetch(API_ROUTES.cloudVms.list, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

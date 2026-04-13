@@ -2,6 +2,62 @@
  * Platform-agnostic formatting utilities shared across web, mobile, and Electron.
  */
 
+/**
+ * Derive the agent slug used for workspace dirs, cron names, and openclaw agent IDs.
+ * Prefers the explicit username; falls back to lowercased name with spaces replaced by hyphens.
+ */
+export function getAgentSlug(agent: { username?: string | null; name: string }): string {
+  return agent.username || agent.name.toLowerCase().replace(/\s+/g, "-");
+}
+
+/**
+ * Resolve a profile's display name with graceful fallback.
+ *   displayName → username → fallback ("")
+ */
+export function getDisplayName(
+  profile: { displayName?: string | null; username?: string | null } | null | undefined,
+  fallback = "",
+): string {
+  return profile?.displayName ?? profile?.username ?? fallback;
+}
+
+/**
+ * Resolve an agent's display name with graceful fallback.
+ *   username → name → fallback ("Unknown")
+ */
+export function getAgentDisplayName(
+  agent: { username?: string | null; name?: string | null } | null | undefined,
+  fallback = "Unknown",
+): string {
+  return agent?.username ?? agent?.name ?? fallback;
+}
+
+/**
+ * Truncate an ID to a short display prefix — e.g. for showing VM/connection IDs in UI.
+ * Default length is 8 characters.
+ */
+export function truncateId(id: string, length = 8): string {
+  return id.slice(0, length);
+}
+
+/**
+ * Trims whitespace and caps a value to maxLength characters.
+ * Returns undefined (or null when returnNull=true) for empty/null input.
+ * Use for sanitising user-supplied or agent-supplied strings before DB writes.
+ */
+export function trimAndCap(s: unknown, maxLength: number): string | undefined;
+export function trimAndCap(s: unknown, maxLength: number, returnNull: true): string | null;
+export function trimAndCap(
+  s: unknown,
+  maxLength: number,
+  returnNull?: boolean,
+): string | undefined | null {
+  if (s === undefined || s === null) return returnNull ? null : undefined;
+  const trimmed = String(s).trim().slice(0, maxLength);
+  if (!trimmed) return returnNull ? null : undefined;
+  return trimmed;
+}
+
 /** "just now", "5m ago", "2h ago", "3d ago", else "Jan 1" */
 export function formatRelativeTime(iso: string): string {
   const d = new Date(iso);

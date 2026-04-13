@@ -6,7 +6,9 @@ import Link from "next/link";
 import { Server, Plus, Loader2, Globe, Cpu, Clock, Search } from "lucide-react";
 import { CreateVMDialog } from "../components/cloud/CreateVMDialog";
 import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout } from "../components/ui";
-import { formatUptime, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
+import { formatUptime, CLOUD_VM_TRANSITIONAL_STATUSES, truncateId } from "@agentcenter/utils";
+import { CloudVmStatus } from "@/server/constants";
+import { API_ROUTES } from "@/lib/api-routes";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 
 interface CloudVMAgent {
@@ -54,7 +56,7 @@ export function CloudPage() {
 
   const fetchVMs = useCallback(async () => {
     try {
-      const res = await fetch("/api/cloud-vms");
+      const res = await fetch(API_ROUTES.cloudVms.list);
       if (res.ok) {
         const data = await res.json();
         setVMs(data.vms || []);
@@ -162,9 +164,9 @@ export function CloudPage() {
             {filtered.map((vm) => {
               const badgeInfo = STATUS_BADGE_VARIANT[vm.status] || STATUS_BADGE_VARIANT.error;
               const statusDot =
-                vm.status === "running"
+                vm.status === CloudVmStatus.RUNNING
                   ? "bg-success"
-                  : vm.status === "error"
+                  : vm.status === CloudVmStatus.ERROR
                     ? "bg-destructive"
                     : "bg-gray-400";
               return (
@@ -177,7 +179,7 @@ export function CloudPage() {
                   <div className="flex items-center gap-3 min-w-0 w-[220px] flex-shrink-0">
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot}`} />
                     <span className="font-medium text-foreground truncate group-hover:text-indigo-600 transition-colors">
-                      {vm.name || vm.serverName || vm.id.slice(0, 8)}
+                      {vm.name || vm.serverName || truncateId(vm.id)}
                     </span>
                   </div>
 

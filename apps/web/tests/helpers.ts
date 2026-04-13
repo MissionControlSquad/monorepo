@@ -1,6 +1,7 @@
 import { prisma } from "../src/server/prisma";
 import { generateApiKey } from "../src/server/api-key";
 import type { Agent, Task, Project } from "@agentcenter/database";
+import { AgentStatus, SetupStatus, TaskStatus } from "../src/server/constants";
 
 // ─── Admin Auth Helpers ────────────────────────────────────────────
 
@@ -80,8 +81,8 @@ export async function createTestAgent(
       name: overrides.name ?? "Test Agent",
       role: overrides.role ?? "Developer",
       username: overrides.username ?? `test-${hash.slice(0, 8)}`,
-      status: (overrides.status as any) ?? "idle",
-      setupStatus: (overrides.setupStatus as any) ?? "active",
+      status: (overrides.status as any) ?? AgentStatus.IDLE,
+      setupStatus: (overrides.setupStatus as any) ?? SetupStatus.ACTIVE,
       apiKeyHash: hash,
       apiKeyPrefix: prefix,
     },
@@ -119,7 +120,7 @@ export async function createTestTask(
     data: {
       title: overrides.title ?? "Test Task",
       description: overrides.description ?? "Test task description",
-      status: (overrides.status as any) ?? "inbox",
+      status: (overrides.status as any) ?? TaskStatus.INBOX,
       createdByProfileId: profile.id,
       projectId: overrides.projectId ?? undefined,
     },

@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "../client";
+import { LicenseStatusCode } from "@agentcenter/utils";
 
 export async function getStoredLicense(id: string) {
   return prisma.license.findUnique({ where: { id } });
@@ -59,7 +60,7 @@ export async function markLicenseRecordRevoked(id: string): Promise<void> {
       where: { id },
       data: {
         instanceId: null,
-        plan: "revoked",
+        plan: LicenseStatusCode.REVOKED,
         features: [],
         maxAgents: 0,
         maxProjects: 0,

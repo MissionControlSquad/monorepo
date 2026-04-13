@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveAgent } from "../../_lib/resolve-agent";
+import { errorResponse } from "../../_lib/json-response";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
 import { generateDownloadUrl } from "@/server/storage/r2";
 import { env } from "@/server/env";
@@ -36,7 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
   const { key } = await params;
 
   if (!key || key.length === 0) {
-    return NextResponse.json({ error: "key is required" }, { status: 400 });
+    return errorResponse("key is required", 400);
   }
 
   // Join path segments back into the original storage key
@@ -45,7 +46,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
 
   // Path traversal protection: reject keys with ".." or that don't match valid prefixes
   if (storageKey.includes("..") || !hasValidPrefix(storageKey)) {
-    return NextResponse.json({ error: "Invalid storage key" }, { status: 400 });
+    return errorResponse("Invalid storage key", 400);
   }
 
   const { searchParams } = new URL(request.url);
@@ -53,10 +54,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
 
   // ?public=1 only allowed for specific prefixes (e.g. avatars)
   if (isPublic && !allowsPublicAccess(storageKey)) {
-    return NextResponse.json(
-      { error: "Public access not allowed for this asset type" },
-      { status: 403 },
-    );
+    return errorResponse("Public access not allowed for this asset type", 403);
   }
 
   if (!isPublic) {
@@ -86,10 +84,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
     }
 
     if (!authenticated) {
-      return NextResponse.json(
-        { error: "Authentication required (Bearer token or session cookie)" },
-        { status: 401 },
-      );
+      return errorResponse("Authentication required (Bearer token or session cookie)", 401);
     }
   }
 
@@ -172,9 +167,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
     });
   } catch (err) {
     console.error(`[storage/download] Failed to generate download URL: key="${storageKey}"`, err);
-    return NextResponse.json(
-      { error: "Failed to generate download URL — check R2 credentials and bucket permissions" },
-      { status: 502 },
+    return errorResponse(
+      "Failed to generate download URL — check R2 credentials and bucket permissions",
+      502,
     );
   }
 }

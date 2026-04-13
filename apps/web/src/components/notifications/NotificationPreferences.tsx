@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
+import { API_ROUTES } from "@/lib/api-routes";
 
 interface Prefs {
   taskDone: boolean;
@@ -46,7 +47,7 @@ export function NotificationPreferences() {
   const { isSupported, permission, subscribe } = usePushNotifications();
 
   useEffect(() => {
-    fetch("/api/user-notifications/preferences")
+    fetch(API_ROUTES.userNotifications.preferences)
       .then((r) => r.json())
       .then(setPrefs)
       .catch((err) => console.error("[prefs] Failed to load notification preferences:", err));
@@ -64,7 +65,7 @@ export function NotificationPreferences() {
         await subscribe();
       }
 
-      await fetch("/api/user-notifications/preferences", {
+      await fetch(API_ROUTES.userNotifications.preferences, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [key]: updated[key] }),

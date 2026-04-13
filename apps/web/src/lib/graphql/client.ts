@@ -12,14 +12,15 @@ import {
   AGENT_ACTIONS_BY_AGENT_QUERY,
   NOTIFICATIONS_BY_AGENT_QUERY,
 } from "@agentcenter/graphql-client";
+import { TaskStatus } from "@/server/constants";
 
 const KANBAN_STATUS_KEYS = [
-  "inbox",
-  "assigned",
-  "in_progress",
-  "review",
-  "blocked",
-  "done",
+  TaskStatus.INBOX,
+  TaskStatus.ASSIGNED,
+  TaskStatus.IN_PROGRESS,
+  TaskStatus.REVIEW,
+  TaskStatus.BLOCKED,
+  TaskStatus.DONE,
 ] as const;
 
 /** Set by DndBoardWrapper before updateTask mutation; read by cache update to insert at position. */

@@ -3,6 +3,7 @@
  */
 
 import { prisma } from "../client";
+import { CloudVmStatus } from "@agentcenter/utils";
 
 // ─── VM queries ──────────────────────────────────────────────────────
 
@@ -14,7 +15,7 @@ export async function getCloudVMOrThrow(id: string) {
 /** Count VMs not in destroyed/error states (for limit check). */
 export async function countActiveCloudVMs(): Promise<number> {
   return prisma.cloudVM.count({
-    where: { status: { notIn: ["destroyed", "error"] } },
+    where: { status: { notIn: [CloudVmStatus.DESTROYED, CloudVmStatus.ERROR] } },
   });
 }
 
@@ -73,6 +74,6 @@ export async function findAgentByVmAndSlug(vmId: string, agentSlug: string) {
 /** List running VMs that have both ipv4 and sshPrivateKey (for repair/maintenance). */
 export async function listRunningCloudVMsForRepair() {
   return prisma.cloudVM.findMany({
-    where: { status: "running", ipv4: { not: null }, sshPrivateKey: { not: null } },
+    where: { status: CloudVmStatus.RUNNING, ipv4: { not: null }, sshPrivateKey: { not: null } },
   });
 }

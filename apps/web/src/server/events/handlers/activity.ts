@@ -1,6 +1,6 @@
 import { on } from "../bus";
 import { pubsub, PubSubEvent, activityProjectTopic } from "../../pubsub";
-import { EventTypes, TaskStatus } from "../../constants";
+import { EventTypes, TaskStatus, AgentStatus, NotificationKind } from "../../constants";
 import { taskModel, activityModel } from "../../models";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 import type { ActivityType } from "@agentcenter/database";
@@ -72,11 +72,11 @@ on(EventTypes.AGENT_STATUS_APPLIED, async (e) => {
   const profileId = await resolveAgentProfile(e.agentId);
   const detail = e.toDetailedStatus ? ` (${e.toDetailedStatus})` : "";
   const message =
-    e.toStatus === "idle"
+    e.toStatus === AgentStatus.IDLE
       ? `${e.agentName} went to sleep`
       : `${e.agentName} changed status: ${e.fromStatus} → ${e.toStatus}${detail}`;
   await log({
-    type: e.toStatus === "idle" ? "agent_went_to_sleep" : "agent_status_changed",
+    type: e.toStatus === AgentStatus.IDLE ? "agent_went_to_sleep" : "agent_status_changed",
     message,
     profileId,
     metadata: { fromStatus: e.fromStatus, toStatus: e.toStatus },
@@ -125,7 +125,7 @@ on(EventTypes.TASK_ASSIGNEES_CHANGED, async (e) => {
   if (e.addedNames.length) parts.push(`+${e.addedNames.join(", ")}`);
   if (e.removedNames.length) parts.push(`-${e.removedNames.join(", ")}`);
   await log({
-    type: "task_assigned",
+    type: NotificationKind.TASK_ASSIGNED,
     message: `Task "${e.title}" assignees: ${parts.join("; ")}`,
     profileId: e.profileId,
     taskId: e.taskId,

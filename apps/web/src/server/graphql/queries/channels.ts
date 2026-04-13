@@ -14,6 +14,8 @@ import {
   listChannelsInCommon,
 } from "@agentcenter/database";
 import { ChannelMessageConnectionRef } from "@agentcenter/graphql-server";
+import { ChannelVisibility } from "@agentcenter/utils";
+import type { ChannelVisibilityValue } from "@agentcenter/utils";
 
 /** List channels. If profileId is provided, returns public channels + channels where this profile is a member. If projectId is provided, only channels scoped to that project. If visibility is provided, only that visibility (e.g. "dm" for direct messages). */
 builder.queryField("channels", (t) =>
@@ -43,8 +45,8 @@ builder.queryField("channels", (t) =>
         OR?: Array<object>;
         members?: { some: { profileId: string } };
       } = {};
-      if (args.visibility === "dm") {
-        where.visibility = "dm";
+      if (args.visibility === ChannelVisibility.DM) {
+        where.visibility = ChannelVisibility.DM;
         where.projectId = null; // DMs are global, not scoped to a project
         if (args.profileId) {
           where.members = { some: { profileId: args.profileId } };
@@ -52,13 +54,13 @@ builder.queryField("channels", (t) =>
       } else {
         if (args.projectId) where.projectId = args.projectId;
         if (args.visibility) {
-          where.visibility = args.visibility as "public" | "private";
+          where.visibility = args.visibility as ChannelVisibilityValue;
         } else {
-          where.visibility = { in: ["public", "private"] };
+          where.visibility = { in: [ChannelVisibility.PUBLIC, ChannelVisibility.PRIVATE] };
         }
         if (args.profileId) {
           where.OR = [
-            { visibility: "public" },
+            { visibility: ChannelVisibility.PUBLIC },
             { members: { some: { profileId: args.profileId } } },
           ];
         }

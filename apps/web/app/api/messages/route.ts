@@ -10,6 +10,7 @@ import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { resolveAgent } from "../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
 import { validateBody, createMessageSchema } from "../_lib/validation";
+import { parsePaginationParams } from "../_lib/pagination";
 import { apiLimiters, checkRateLimit } from "../_lib/rate-limit-check";
 import { isSystemShutdown } from "@/server/system-settings";
 
@@ -21,8 +22,10 @@ export async function GET(request: Request) {
     const taskId = searchParams.get("taskId");
     if (!taskId) return errorResponse("taskId query parameter is required", 400);
 
-    const limit = Math.min(parseInt(searchParams.get("limit") ?? "200", 10) || 200, 500);
-    const offset = Math.max(parseInt(searchParams.get("offset") ?? "0", 10) || 0, 0);
+    const { limit, offset } = parsePaginationParams(searchParams, {
+      defaultLimit: 200,
+      maxLimit: 500,
+    });
 
     const messages = await messageModel.findMany({
       where: { taskId },

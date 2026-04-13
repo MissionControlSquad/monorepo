@@ -15,13 +15,12 @@ import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CREATE_CHANNEL } from "@agentcenter/graphql-client";
 import { useAuth } from "../../src/context/AuthContext";
+import { ChannelVisibility, type ChannelVisibilityValue } from "@agentcenter/utils";
 
-type Visibility = "public" | "private" | "dm";
-
-const VISIBILITY_OPTIONS: { key: Visibility; label: string; desc: string }[] = [
-  { key: "public", label: "Public", desc: "Anyone can join" },
-  { key: "private", label: "Private", desc: "Invite only" },
-  { key: "dm", label: "DM", desc: "Direct message" },
+const VISIBILITY_OPTIONS: { key: ChannelVisibilityValue; label: string; desc: string }[] = [
+  { key: ChannelVisibility.PUBLIC, label: "Public", desc: "Anyone can join" },
+  { key: ChannelVisibility.PRIVATE, label: "Private", desc: "Invite only" },
+  { key: ChannelVisibility.DM, label: "DM", desc: "Direct message" },
 ];
 
 function slugify(name: string): string {
@@ -40,7 +39,7 @@ export default function CreateChannelScreen() {
   const { profileId } = useAuth();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [visibility, setVisibility] = useState<Visibility>("public");
+  const [visibility, setVisibility] = useState<ChannelVisibilityValue>(ChannelVisibility.PUBLIC);
   const [saving, setSaving] = useState(false);
 
   const [, createChannel] = useMutation(CREATE_CHANNEL);

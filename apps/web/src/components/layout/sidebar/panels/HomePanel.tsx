@@ -14,6 +14,7 @@ import { SidebarEmptyState } from "../SidebarEmptyState";
 import { useFeatureFlags } from "../../../context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { Agent, ProjectMember, StatusHistoryEntry } from "@agentcenter/types";
+import { SetupStatus } from "@/server/constants";
 
 const NAV_LINKS: { href: string; icon: typeof LayoutDashboard; label: string; flag?: string }[] = [
   { href: "/", icon: LayoutDashboard, label: "Kanban Board" },
@@ -45,7 +46,7 @@ export function HomePanel() {
             ),
           )
         : agents
-      ).filter((a: Agent) => a.setupStatus !== "deactivated")
+      ).filter((a: Agent) => a.setupStatus !== SetupStatus.DEACTIVATED)
     : undefined;
 
   return (

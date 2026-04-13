@@ -1,6 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import {
+  ProfileKind,
+  ChannelMemberRole,
+  ChannelVisibility,
+  type ProfileKindValue,
+} from "@/server/constants";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "urql";
 import {
@@ -96,11 +102,13 @@ export function ChannelInfoSidebar({
           subtitle:
             [
               p.username ? `@${p.username}` : null,
-              p.kind === "agent" && p.agent?.role ? p.agent.role : null,
+              p.kind === ProfileKind.AGENT && p.agent?.role ? p.agent.role : null,
             ]
               .filter(Boolean)
               .join(" · ") || null,
-          kind: (p.kind === "agent" ? "agent" : "human") as "agent" | "human" | undefined,
+          kind: (p.kind === ProfileKind.AGENT ? ProfileKind.AGENT : ProfileKind.HUMAN) as
+            | ProfileKindValue
+            | undefined,
           profileId: p.id,
         }),
       ),
@@ -109,10 +117,10 @@ export function ChannelInfoSidebar({
 
   const isMember = channel.members.some((m) => m.profileId === currentProfileId);
   const currentMembership = channel.members.find((m) => m.profileId === currentProfileId);
-  const isCreator = currentMembership?.role === "creator";
+  const isCreator = currentMembership?.role === ChannelMemberRole.CREATOR;
   const canLeave = isMember && !isCreator;
-  const isPrivate = channel.visibility === "private";
-  const isDm = channel.visibility === "dm";
+  const isPrivate = channel.visibility === ChannelVisibility.PRIVATE;
+  const isDm = channel.visibility === ChannelVisibility.DM;
   const canAddMembers = isPrivate && isCreator && !isDm;
   const canRemoveMembers = isPrivate && isCreator && !isDm;
 
@@ -123,7 +131,7 @@ export function ChannelInfoSidebar({
       await executeLeave({ channelId: channel.id, profileId: currentProfileId });
       toast.success(`Left #${channel.slug}`);
       onChannelUpdated();
-      if (channel.visibility === "private") {
+      if (channel.visibility === ChannelVisibility.PRIVATE) {
         router.push("/channels");
       }
     } catch (err) {
@@ -183,7 +191,7 @@ export function ChannelInfoSidebar({
     }
   };
 
-  const Icon = channel.visibility === "private" ? Lock : Hash;
+  const Icon = channel.visibility === ChannelVisibility.PRIVATE ? Lock : Hash;
 
   return (
     <div
@@ -260,12 +268,12 @@ export function ChannelInfoSidebar({
                     )}
                   </div>
                 </button>
-                {m.role === "creator" && (
+                {m.role === ChannelMemberRole.CREATOR && (
                   <Badge variant="indigo" size="sm" className="shrink-0">
                     Creator
                   </Badge>
                 )}
-                {canRemoveMembers && m.role !== "creator" && (
+                {canRemoveMembers && m.role !== ChannelMemberRole.CREATOR && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -317,7 +325,7 @@ export function ChannelInfoSidebar({
           </div>
         )}
 
-        {isCreator && channel.visibility !== "dm" && (
+        {isCreator && channel.visibility !== ChannelVisibility.DM && (
           <div className="pt-2 border-t border-border">
             {!deleteChannelConfirm ? (
               <Button

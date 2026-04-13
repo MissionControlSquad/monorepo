@@ -1,6 +1,12 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import {
+  FLAG_KEYS,
+  ChannelVisibility,
+  ChannelMemberRole,
+  MessageReactionEmoji,
+} from "@agentcenter/utils";
+import type { ChannelVisibilityValue } from "@agentcenter/utils";
 import {
   createChannelActivityMessage,
   createTeamChannel,
@@ -32,15 +38,8 @@ import { assertProjectWritable } from "../../system-settings";
 import { notifyAgentChannelMembers } from "../../dm-notify";
 import { parseMentionIds } from "@agentcenter/utils";
 
-const CHANNEL_VISIBILITY = ["public", "private", "dm"] as const;
-const CHANNEL_MESSAGE_REACTION_EMOJIS = [
-  "thumbs-up",
-  "heart",
-  "eyes",
-  "checkmark",
-  "party",
-  "think",
-] as const;
+const CHANNEL_VISIBILITY_VALUES = Object.values(ChannelVisibility);
+const CHANNEL_MESSAGE_REACTION_EMOJIS = Object.values(MessageReactionEmoji) as string[];
 
 builder.mutationField("createChannel", (t) =>
   t.prismaField({
@@ -55,11 +54,11 @@ builder.mutationField("createChannel", (t) =>
     },
     resolve: async (query, _root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
-      const visibility = args.visibility as "public" | "private" | "dm";
-      if (!CHANNEL_VISIBILITY.includes(visibility)) {
-        throw new Error(`visibility must be one of: ${CHANNEL_VISIBILITY.join(", ")}`);
+      const visibility = args.visibility as ChannelVisibilityValue;
+      if (!CHANNEL_VISIBILITY_VALUES.includes(visibility)) {
+        throw new Error(`visibility must be one of: ${CHANNEL_VISIBILITY_VALUES.join(", ")}`);
       }
-      if (visibility === "dm") {
+      if (visibility === ChannelVisibility.DM) {
         throw new Error("Use startConversation to create a DM.");
       }
       const slug = args.slug.trim().toLowerCase().replace(/\s+/g, "-");
@@ -100,7 +99,7 @@ builder.mutationField("startConversation", (t) =>
 
       const existing = await findChannelBySlugNullable(slug, query);
       if (existing) {
-        if (existing.visibility === "dm") return existing;
+        if (existing.visibility === ChannelVisibility.DM) return existing;
         throw new Error("A channel already exists for this conversation.");
       }
 
@@ -126,12 +125,12 @@ builder.mutationField("joinChannel", (t) =>
     resolve: async (query, _root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
       const channel = await getChannelVisibilityOrThrow(args.channelId);
-      if (channel.visibility === "dm") {
+      if (channel.visibility === ChannelVisibility.DM) {
         throw new Error(
           "Direct messages cannot be joined. Start a conversation with that person instead.",
         );
       }
-      if (channel.visibility !== "public") {
+      if (channel.visibility !== ChannelVisibility.PUBLIC) {
         throw new Error(
           "Only public channels can be joined directly. Ask the channel creator to add you.",
         );
@@ -139,7 +138,12 @@ builder.mutationField("joinChannel", (t) =>
       const existing = await findChannelMemberRecord(args.channelId, args.profileId);
       if (existing) return existing;
 
-      const member = await createChannelMember(args.channelId, args.profileId, "member", query);
+      const member = await createChannelMember(
+        args.channelId,
+        args.profileId,
+        ChannelMemberRole.MEMBER,
+        query,
+      );
       const msg = await createChannelActivityMessage(
         args.channelId,
         args.profileId,
@@ -165,7 +169,7 @@ builder.mutationField("addChannelMember", (t) =>
     resolve: async (query, _root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
       const channel = await getChannelVisibilityOrThrow(args.channelId);
-      if (channel.visibility !== "private") {
+      if (channel.visibility !== ChannelVisibility.PRIVATE) {
         throw new Error(
           "addChannelMember is only for private channels. Use joinChannel for public channels.",
         );
@@ -176,7 +180,12 @@ builder.mutationField("addChannelMember", (t) =>
       const existing = await findChannelMemberRecord(args.channelId, args.profileId);
       if (existing) return existing;
 
-      const member = await createChannelMember(args.channelId, args.profileId, "member", query);
+      const member = await createChannelMember(
+        args.channelId,
+        args.profileId,
+        ChannelMemberRole.MEMBER,
+        query,
+      );
       const msg = await createChannelActivityMessage(
         args.channelId,
         args.addedByProfileId,
@@ -203,12 +212,12 @@ builder.mutationField("removeChannelMember", (t) =>
     resolve: async (_root, args) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
       const channel = await getChannelVisibilityOrThrow(args.channelId);
-      if (channel.visibility === "dm") {
+      if (channel.visibility === ChannelVisibility.DM) {
         throw new Error(
           "Cannot remove participants from a direct message. They can leave the conversation.",
         );
       }
-      if (channel.visibility !== "private") {
+      if (channel.visibility !== ChannelVisibility.PRIVATE) {
         throw new Error("removeChannelMember is only for private channels.");
       }
       if (args.removedByProfileId !== channel.createdByProfileId) {
@@ -216,7 +225,7 @@ builder.mutationField("removeChannelMember", (t) =>
       }
       const member = await findChannelMemberRole(args.channelId, args.profileId);
       if (!member) return true;
-      if (member.role === "creator") {
+      if (member.role === ChannelMemberRole.CREATOR) {
         throw new Error("Cannot remove the channel creator.");
       }
       await deleteChannelMember(args.channelId, args.profileId);
@@ -246,7 +255,7 @@ builder.mutationField("leaveChannel", (t) =>
       await requireFeature(FLAG_KEYS.CHANNELS);
       const member = await findChannelMemberRole(args.channelId, args.profileId);
       if (!member) return true;
-      if (member.role === "creator") {
+      if (member.role === ChannelMemberRole.CREATOR) {
         throw new Error(
           "Channel creator cannot leave. Transfer ownership or delete the channel first.",
         );
@@ -352,12 +361,15 @@ builder.mutationField("createChannelMessage", (t) =>
       // Must happen before createChannelMessageFull so notifyAgentChannelMembers
       // picks them up as members when deciding who to notify.
       const channelForMention = await getChannelVisibilityOrThrow(args.channelId);
-      if (channelForMention.visibility === "public" && mentionedProfileIds.length > 0) {
+      if (
+        channelForMention.visibility === ChannelVisibility.PUBLIC &&
+        mentionedProfileIds.length > 0
+      ) {
         await Promise.all(
           mentionedProfileIds.map(async (pid) => {
             const existing = await findChannelMemberRecord(args.channelId, pid);
             if (!existing) {
-              await createChannelMember(args.channelId, pid, "member", {});
+              await createChannelMember(args.channelId, pid, ChannelMemberRole.MEMBER, {});
             }
           }),
         );
@@ -472,7 +484,7 @@ builder.mutationField("deleteChannelMessage", (t) =>
       const membership = await findChannelMemberRole(message.channelId, args.profileId);
       if (!membership) throw new Error("You must be a member of the channel.");
       const isAuthor = message.fromProfileId === args.profileId;
-      const isCreator = membership.role === "creator";
+      const isCreator = membership.role === ChannelMemberRole.CREATOR;
       if (!isAuthor && !isCreator) {
         throw new Error("Only the message author or channel creator can delete this message.");
       }
@@ -531,11 +543,11 @@ builder.mutationField("deleteChannel", (t) =>
       if (!channel) {
         throw new Error("Channel not found.");
       }
-      if (channel.visibility === "dm") {
+      if (channel.visibility === ChannelVisibility.DM) {
         throw new Error("Direct message conversations cannot be deleted.");
       }
       const member = await findChannelMemberRole(args.channelId, args.profileId);
-      if (!member || member.role !== "creator") {
+      if (!member || member.role !== ChannelMemberRole.CREATOR) {
         throw new Error("Only the channel creator can delete the channel.");
       }
       await deleteChannel(args.channelId);

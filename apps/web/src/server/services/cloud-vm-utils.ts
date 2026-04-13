@@ -12,6 +12,8 @@ import { findAgentsByVMId, updateAgent } from "@agentcenter/database";
 import { generateApiKey } from "../api-key";
 import { generateAgentConfig, getMcUrl } from "../agent-config-generator";
 import { VM_CONFIG_PATH, VM_WORKSPACE, VM_USER, OPENCLAW_CMD_PREFIX } from "./cloud-vm-paths";
+import { AgentLevel } from "../constants";
+import { getAgentSlug } from "@agentcenter/utils";
 
 // ─── OpenClaw CLI ───────────────────────────────────────────────────
 
@@ -54,13 +56,6 @@ export function getVMSSHConfig(vm: {
     ? decryptPrivateKey(vm.sshPrivateKey, env.SSH_KEY_ENCRYPTION_SECRET)
     : vm.sshPrivateKey;
   return { host: vm.ipv4, privateKey };
-}
-
-// ─── Agent Slug ─────────────────────────────────────────────────────
-
-/** Derive the agent slug used everywhere (workspace dirs, cron names, openclaw agent id). */
-export function getAgentSlug(agent: { username?: string | null; name: string }): string {
-  return agent.username || agent.name.toLowerCase().replace(/\s+/g, "-");
 }
 
 // ─── Workspace Paths ────────────────────────────────────────────────
@@ -307,7 +302,7 @@ export async function uploadAgentConfigFiles(
       username: agentSlug,
       identityEmoji: agent.identityEmoji || "🤖",
       personality: agent.personality || "",
-      level: agent.level || "specialist",
+      level: agent.level || AgentLevel.SPECIALIST,
       templateId: agent.templateId || undefined,
     },
     mcUrl,

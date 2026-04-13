@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { TimeAgo } from "../common/TimeAgo";
 import { Card, Button, SkeletonList } from "../ui";
+import { DeliverableKind } from "@agentcenter/utils";
 import type { Deliverable } from "@agentcenter/types";
 
 interface RecentDeliverablesListProps {
@@ -26,24 +27,24 @@ interface RecentDeliverablesListProps {
 const PAGE_SIZE = 20;
 
 const KIND_ICONS: Record<string, any> = {
-  markdown: FileText,
-  code: Code,
-  link: LinkIcon,
-  file: File,
+  [DeliverableKind.MARKDOWN]: FileText,
+  [DeliverableKind.CODE]: Code,
+  [DeliverableKind.LINK]: LinkIcon,
+  [DeliverableKind.FILE]: File,
 };
 
 const KIND_COLORS: Record<string, string> = {
-  markdown: "text-blue-600 bg-blue-50",
-  code: "text-purple-600 bg-purple-50",
-  link: "text-green-600 bg-green-50",
-  file: "text-gray-600 bg-gray-100",
+  [DeliverableKind.MARKDOWN]: "text-blue-600 bg-blue-50",
+  [DeliverableKind.CODE]: "text-purple-600 bg-purple-50",
+  [DeliverableKind.LINK]: "text-green-600 bg-green-50",
+  [DeliverableKind.FILE]: "text-gray-600 bg-gray-100",
 };
 
 const KIND_LABELS: Record<string, string> = {
-  markdown: "Markdown",
-  code: "Code",
-  link: "Link",
-  file: "File",
+  [DeliverableKind.MARKDOWN]: "Markdown",
+  [DeliverableKind.CODE]: "Code",
+  [DeliverableKind.LINK]: "Link",
+  [DeliverableKind.FILE]: "File",
 };
 
 export function RecentDeliverablesList({ agentId, projectId }: RecentDeliverablesListProps) {

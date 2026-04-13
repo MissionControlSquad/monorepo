@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { LicenseStatusCode } from "../../src/server/constants";
 import crypto from "crypto";
 
 // ── Generate a test RSA key pair ────────────────────────────────
@@ -257,14 +258,14 @@ describe("license module", () => {
     it("returns 'none' when no license in DB", async () => {
       mockFindUnique.mockResolvedValue(null);
       const status = await getLicenseStatus();
-      expect(status.status).toBe("none");
+      expect(status.status).toBe(LicenseStatusCode.NONE);
       expect(status.plan).toBeNull();
     });
 
     it("returns 'active' for valid non-expired license", async () => {
       mockFindUnique.mockResolvedValue(makeStoredLicense());
       const status = await getLicenseStatus();
-      expect(status.status).toBe("active");
+      expect(status.status).toBe(LicenseStatusCode.ACTIVE);
       expect(status.plan).toBe("pro");
       expect(status.features).toEqual(["channels", "documents", "agent_queue"]);
     });
@@ -275,7 +276,7 @@ describe("license module", () => {
         plan: "revoked",
       });
       const status = await getLicenseStatus();
-      expect(status.status).toBe("revoked");
+      expect(status.status).toBe(LicenseStatusCode.REVOKED);
     });
 
     it("returns 'invalid' when no access token stored", async () => {
@@ -284,7 +285,7 @@ describe("license module", () => {
         instanceId: null,
       });
       const status = await getLicenseStatus();
-      expect(status.status).toBe("invalid");
+      expect(status.status).toBe(LicenseStatusCode.INVALID);
     });
 
     it("returns 'active' within grace period (expired < 3 days)", async () => {
@@ -292,7 +293,7 @@ describe("license module", () => {
       // Expired 1 day ago — within 3-day grace period
       mockFindUnique.mockResolvedValue(makeStoredLicense({ exp: now - 86400 }));
       const status = await getLicenseStatus();
-      expect(status.status).toBe("active");
+      expect(status.status).toBe(LicenseStatusCode.ACTIVE);
       expect(status.message).toContain("renewal pending");
     });
 
@@ -301,7 +302,7 @@ describe("license module", () => {
       // Expired 4 days ago — past 3-day grace period
       mockFindUnique.mockResolvedValue(makeStoredLicense({ exp: now - 4 * 86400 }));
       const status = await getLicenseStatus();
-      expect(status.status).toBe("expired");
+      expect(status.status).toBe(LicenseStatusCode.EXPIRED);
     });
 
     it("includes correct limits in status", async () => {

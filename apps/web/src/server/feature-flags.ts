@@ -1,5 +1,6 @@
 import { listAllFeatureFlags } from "@agentcenter/database";
 import { isFeatureLicensed, getLicenseStatus } from "./license";
+import { LicenseStatusCode } from "./constants";
 
 interface FlagEntry {
   key: string;
@@ -47,7 +48,7 @@ export async function isFeatureEnabled(key: string): Promise<boolean> {
 
   // When no license is configured, rely only on the feature flag.
   const licenseStatus = await getLicenseStatus();
-  if (licenseStatus.status === "none") return true;
+  if (licenseStatus.status === LicenseStatusCode.NONE) return true;
 
   // In development, skip license feature check — flag being enabled is enough.
   if (process.env.NODE_ENV === "development") return true;

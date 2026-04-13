@@ -2,6 +2,8 @@ import crypto from "crypto";
 import os from "os";
 import fs from "fs";
 import path from "path";
+import { LicenseStatusCode } from "./constants";
+import type { LicenseStatusCodeValue } from "./constants";
 import {
   getStoredLicense as dbGetStoredLicense,
   upsertLicenseRecord,
@@ -27,8 +29,8 @@ export interface AccessTokenPayload {
   iss: string;
 }
 
-export interface LicenseStatus {
-  status: "active" | "expired" | "invalid" | "revoked" | "none";
+export interface LicenseInfo {
+  status: LicenseStatusCodeValue;
   plan: string | null;
   org: string | null;
   features: string[];
@@ -238,7 +240,7 @@ async function markLicenseRevoked(reason: string) {
  */
 export async function activateLicenseKey(
   refreshToken: string,
-): Promise<{ success: boolean; message: string; status?: LicenseStatus }> {
+): Promise<{ success: boolean; message: string; status?: LicenseInfo }> {
   if (!LICENSE_SERVER_URL) {
     return { success: false, message: "License server not configured (LICENSE_SERVER_URL)" };
   }
@@ -301,7 +303,7 @@ export async function activateLicenseKey(
     // Start auto-refresh
     startTokenRefresh();
 
-    const status = buildStatus("active", payload, "License activated successfully");
+    const status = buildStatus(LicenseStatusCode.ACTIVE, payload, "License activated successfully");
     logLicense("info", `License activated: plan=${payload.plan} org="${payload.org}"`);
 
     return { success: true, message: "License activated successfully", status };
@@ -509,28 +511,28 @@ export async function forceTokenRefresh(): Promise<{
 
 // ── Get License Status ──────────────────────────────────────────
 
-export async function getLicenseStatus(): Promise<LicenseStatus> {
+export async function getLicenseStatus(): Promise<LicenseInfo> {
   const stored = await getStoredLicense();
 
   if (!stored) {
-    return buildStatus("none", null, "No license activated");
+    return buildStatus(LicenseStatusCode.NONE, null, "No license activated");
   }
 
   // Check if explicitly revoked
-  if (stored.plan === "revoked") {
-    return buildStatus("revoked", null, "License has been revoked");
+  if (stored.plan === LicenseStatusCode.REVOKED) {
+    return buildStatus(LicenseStatusCode.REVOKED, null, "License has been revoked");
   }
 
   // Verify access token from DB
   const accessToken = stored.instanceId; // we store access token here
   if (!accessToken) {
-    return buildStatus("invalid", null, "No access token stored");
+    return buildStatus(LicenseStatusCode.INVALID, null, "No access token stored");
   }
 
   // ignoreExpiry: getLicenseStatus handles expiry itself with grace period logic
   const payload = verifyAccessToken(accessToken, { ignoreExpiry: true });
   if (!payload) {
-    return buildStatus("invalid", null, "Stored access token is invalid");
+    return buildStatus(LicenseStatusCode.INVALID, null, "Stored access token is invalid");
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -540,21 +542,29 @@ export async function getLicenseStatus(): Promise<LicenseStatus> {
     // Check grace period — allow up to 3 days past expiry
     const expiredMs = (now - payload.exp) * 1000;
     if (expiredMs < GRACE_PERIOD_MS) {
-      return buildStatus("active", payload, "Access token expired — renewal pending");
+      return buildStatus(
+        LicenseStatusCode.ACTIVE,
+        payload,
+        "Access token expired — renewal pending",
+      );
     }
-    return buildStatus("expired", payload, "License expired — please check your subscription");
+    return buildStatus(
+      LicenseStatusCode.EXPIRED,
+      payload,
+      "License expired — please check your subscription",
+    );
   }
 
-  return buildStatus("active", payload, "License is active");
+  return buildStatus(LicenseStatusCode.ACTIVE, payload, "License is active");
 }
 
 // ── Cached Status ───────────────────────────────────────────────
 
-let cachedStatus: LicenseStatus | null = null;
+let cachedStatus: LicenseInfo | null = null;
 let cacheTime = 0;
 const CACHE_TTL_MS = 60_000;
 
-async function getCachedLicenseStatus(): Promise<LicenseStatus> {
+async function getCachedLicenseStatus(): Promise<LicenseInfo> {
   const now = Date.now();
   if (cachedStatus && now - cacheTime < CACHE_TTL_MS) {
     return cachedStatus;
@@ -572,13 +582,13 @@ export function invalidateLicenseCache() {
 export async function isLicenseActive(): Promise<boolean> {
   if (IS_TEST) return true;
   const status = await getCachedLicenseStatus();
-  return status.status === "active";
+  return status.status === LicenseStatusCode.ACTIVE;
 }
 
 export async function isFeatureLicensed(featureKey: string): Promise<boolean> {
   if (IS_TEST) return true;
   const status = await getCachedLicenseStatus();
-  if (status.status === "active") {
+  if (status.status === LicenseStatusCode.ACTIVE) {
     return status.features.includes(featureKey);
   }
   return false;
@@ -711,10 +721,10 @@ export async function initLicense(): Promise<void> {
 // ── Helpers ─────────────────────────────────────────────────────
 
 function buildStatus(
-  status: LicenseStatus["status"],
+  status: LicenseInfo["status"],
   payload: AccessTokenPayload | null,
   message: string,
-): LicenseStatus {
+): LicenseInfo {
   return {
     status,
     plan: payload?.plan ?? null,

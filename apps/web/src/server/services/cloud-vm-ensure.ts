@@ -11,13 +11,14 @@
  */
 
 import { findCloudVMForEnsure, findAgentById } from "@agentcenter/database";
+import { CloudVmStatus } from "@/server/constants";
 import { computeCronSchedule } from "@/server/agent-config-generator";
 import { sshExec } from "./ssh";
 import { ensureHeartbeatCron } from "./cloud-vm-cron";
 import { VM_USER, VM_HOME } from "./cloud-vm-paths";
+import { getAgentSlug } from "@agentcenter/utils";
 import {
   getVMSSHConfig,
-  getAgentSlug,
   restartGateway,
   isAgentRegistered,
   computeAgentCronIndex,
@@ -42,7 +43,7 @@ interface EnsureResult {
 export async function ensureAgentOnVM(vmId: string, agentId: string): Promise<EnsureResult> {
   const vm = await findCloudVMForEnsure(vmId);
 
-  if (vm.status !== "running") {
+  if (vm.status !== CloudVmStatus.RUNNING) {
     throw new Error("VM is not running");
   }
 

@@ -18,6 +18,8 @@ import { ProfileAvatar } from "../../../ui/ProfileAvatar";
 import { ProfilePickerDialog } from "../../../ui/ProfilePickerDialog";
 import type { ProfilePickerItem } from "../../../ui/ProfilePickerDialog";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
+import { getDisplayName } from "@agentcenter/utils";
+import { ProfileKind, ChannelVisibility, type ProfileKindValue } from "@/server/constants";
 import { Button } from "../../../ui";
 import type { Channel, ChannelMember } from "@agentcenter/types";
 
@@ -42,7 +44,7 @@ export function ChannelsPanel() {
   });
   const [dmsResult, reexecuteDms] = useQuery({
     query: CHANNELS_QUERY,
-    variables: { profileId, visibility: "dm", limit: 100 },
+    variables: { profileId, visibility: ChannelVisibility.DM, limit: 100 },
     requestPolicy: "cache-and-network",
   });
   const allChannels = result.data?.channels ?? [];
@@ -54,7 +56,7 @@ export function ChannelsPanel() {
   const dms = search
     ? allDms.filter((ch: Channel) => {
         const other = ch.members?.find((m: ChannelMember) => m.profileId !== profileId);
-        const otherName = other?.profile?.displayName ?? other?.profile?.username ?? "";
+        const otherName = getDisplayName(other?.profile);
         return otherName.toLowerCase().includes(q);
       })
     : allDms;
@@ -84,11 +86,13 @@ export function ChannelsPanel() {
         name: p.displayName,
         subtitle: [
           p.username ? `@${p.username}` : null,
-          p.kind === "agent" && p.agent?.role ? p.agent.role : null,
+          p.kind === ProfileKind.AGENT && p.agent?.role ? p.agent.role : null,
         ]
           .filter(Boolean)
           .join(" · "),
-        kind: (p.kind === "agent" ? "agent" : "human") as "agent" | "human",
+        kind: (p.kind === ProfileKind.AGENT
+          ? ProfileKind.AGENT
+          : ProfileKind.HUMAN) as ProfileKindValue,
         profileId: p.id,
       }),
     );
@@ -214,8 +218,7 @@ export function ChannelsPanel() {
                   const other = ch.members?.find(
                     (m: { profileId: string }) => m.profileId !== profileId,
                   );
-                  const otherName =
-                    other?.profile?.displayName ?? other?.profile?.username ?? "Unknown";
+                  const otherName = getDisplayName(other?.profile, "Unknown");
                   const otherRole = other?.profile?.agent?.role;
                   return (
                     <li key={ch.id}>
@@ -279,7 +282,7 @@ export function ChannelsPanel() {
             <ul className="space-y-0.5 px-2">
               {channels.map((ch: Channel) => {
                 const isActive = channelParamFromPath === ch.slug || channelParamFromPath === ch.id;
-                const Icon = ch.visibility === "private" ? Lock : Hash;
+                const Icon = ch.visibility === ChannelVisibility.PRIVATE ? Lock : Hash;
                 return (
                   <li key={ch.id}>
                     <Link

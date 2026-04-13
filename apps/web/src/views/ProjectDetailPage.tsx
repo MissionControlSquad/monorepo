@@ -66,7 +66,7 @@ import {
 import { ProfileAvatar } from "../components/ui/ProfileAvatar";
 import { MarkdownEditor } from "../components/common/MarkdownEditor";
 import { MarkdownWithMentions } from "../components/common/MarkdownWithMentions";
-import { Roles } from "@/server/constants";
+import { Roles, ProjectStatus } from "@/server/constants";
 import { TimeAgo } from "../components/common/TimeAgo";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 import { WhenFeatureEnabled } from "../components/context/FeatureFlagContext";
@@ -810,7 +810,7 @@ function ProjectDetailPanel({
     }
   };
 
-  const isArchived = project.status === "archived";
+  const isArchived = project.status === ProjectStatus.ARCHIVED;
   const isShutdown = project.shutdownActive === true;
 
   const handleToggleMember = async (profileId: string) => {

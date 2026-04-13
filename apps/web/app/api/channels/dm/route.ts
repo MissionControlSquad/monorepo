@@ -7,9 +7,10 @@ import {
 } from "@agentcenter/database";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, ChannelVisibility } from "@agentcenter/utils";
 import { resolveAgent } from "../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { successResponse, errorResponse, handleError, assertFound } from "../../_lib/json-response";
+import { ERR } from "../../_lib/error-messages";
 import { validateBody, createDMSchema } from "../../_lib/validation";
 import { log } from "../../_lib/logger";
 
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
     // Find all DM channels the agent is a member of
-    const memberships = await listMemberChannels(agentProfileId, "dm");
+    const memberships = await listMemberChannels(agentProfileId, ChannelVisibility.DM);
 
     // Build response with unread counts
     const channels = await Promise.all(
@@ -58,7 +59,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     if (!(await isFeatureEnabled(FLAG_KEYS.CHANNELS))) {
-      return errorResponse("Channels feature is not available on your current plan", 403);
+      return errorResponse(ERR.FEATURE_CHANNELS_UNAVAILABLE, 403);
     }
     const v = await validateBody(request, createDMSchema);
     if (v.error) return v.error;
@@ -72,9 +73,7 @@ export async function POST(request: Request) {
 
     // Verify the other profile exists
     const otherProfile = await findProfileForDisplay(otherProfileId);
-    if (!otherProfile) {
-      return errorResponse("Profile not found", 404);
-    }
+    assertFound(otherProfile, ERR.PROFILE_NOT_FOUND);
 
     // Deterministic slug ensures idempotency (same as GraphQL startConversation)
     const [id1, id2] = [agentProfileId, otherProfileId].sort();

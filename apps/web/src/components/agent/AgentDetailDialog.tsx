@@ -23,7 +23,7 @@ import { AgentStatusBadge, StatusDot } from "./AgentStatusBadge";
 import { StatusHistoryTimeline } from "./StatusHistoryTimeline";
 import { useAgentStatus } from "../context/AgentStatusContext";
 import type { AgentDetailedStatus } from "../../lib/constants";
-import { Roles } from "@/server/constants";
+import { Roles, SetupStatus, AgentStatus } from "@/server/constants";
 import { MentionTextArea } from "../common/MentionTextArea";
 import { useMentionData, useMentionSuggestions } from "../context/MentionDataContext";
 import { CopyButton } from "../common/CopyButton";
@@ -111,12 +111,13 @@ function AgentDetailContent({
     () => ({ profileById, agentById, taskById, projectById }),
     [profileById, agentById, taskById, projectById],
   );
-  const isDeactivated = agent?.setupStatus === "deactivated";
+  const isDeactivated = agent?.setupStatus === SetupStatus.DEACTIVATED;
   const isLastLead =
     agent?.role === Roles.SQUAD_LEAD &&
     !isDeactivated &&
-    (agents?.filter((a: Agent) => a.role === Roles.SQUAD_LEAD && a.setupStatus !== "deactivated")
-      .length ?? 0) <= 1;
+    (agents?.filter(
+      (a: Agent) => a.role === Roles.SQUAD_LEAD && a.setupStatus !== SetupStatus.DEACTIVATED,
+    ).length ?? 0) <= 1;
 
   const startEditing = useCallback(() => {
     setEditName(agent?.name ?? "");
@@ -149,7 +150,7 @@ function AgentDetailContent({
           <div className="relative">
             <ProfileAvatar agentId={agentId!} size="xl" />
             <StatusDot
-              status={agent?.status || "idle"}
+              status={agent?.status || AgentStatus.IDLE}
               detailedStatus={agent?.detailedStatus as AgentDetailedStatus | undefined}
               isOnline={isOnline}
               className="absolute -bottom-0.5 -right-0.5 ring-2 ring-white"
@@ -283,22 +284,22 @@ function AgentDetailContent({
                 </span>
                 <span
                   className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                    agent.setupStatus === "active"
+                    agent.setupStatus === SetupStatus.ACTIVE
                       ? "text-success bg-success/15"
-                      : agent.setupStatus === "pending_setup"
+                      : agent.setupStatus === SetupStatus.PENDING_SETUP
                         ? "text-warning bg-warning/15"
                         : "text-muted-foreground bg-muted"
                   }`}
                 >
-                  {agent.setupStatus === "pending_setup"
+                  {agent.setupStatus === SetupStatus.PENDING_SETUP
                     ? "Pending Setup"
-                    : agent.setupStatus === "active"
+                    : agent.setupStatus === SetupStatus.ACTIVE
                       ? "Active"
                       : "Deactivated"}
                 </span>
               </div>
             )}
-            {agent?.setupStatus !== "pending_setup" && (
+            {agent?.setupStatus !== SetupStatus.PENDING_SETUP && (
               <div className="pt-2">
                 {isDeactivated ? (
                   <Button
@@ -341,7 +342,7 @@ function AgentDetailContent({
                 Status
               </span>
               <AgentStatusBadge
-                status={agent?.status || "idle"}
+                status={agent?.status || AgentStatus.IDLE}
                 detailedStatus={agent?.detailedStatus as AgentDetailedStatus | undefined}
                 isOnline={isOnline}
                 size="md"

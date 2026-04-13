@@ -9,42 +9,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/shadcn/select";
-
-type Priority = "low" | "medium" | "high" | "urgent";
+import { Priority, type PriorityValue } from "@/server/constants";
 
 interface PrioritySelectProps {
-  value?: Priority;
-  onChange?: (priority: Priority) => void;
+  value?: PriorityValue;
+  onChange?: (priority: PriorityValue) => void;
   interactive?: boolean;
   disabled?: boolean;
 }
 
 const PRIORITIES: {
-  id: Priority;
+  id: PriorityValue;
   label: string;
   color: string;
   activeColor: string;
 }[] = [
   {
-    id: "low",
+    id: Priority.LOW,
     label: "Low",
     color: "text-muted-foreground",
     activeColor: "bg-muted text-foreground",
   },
   {
-    id: "medium",
+    id: Priority.MEDIUM,
     label: "Medium",
     color: "text-warning",
     activeColor: "bg-warning-muted text-warning",
   },
   {
-    id: "high",
+    id: Priority.HIGH,
     label: "High",
     color: "text-destructive",
     activeColor: "bg-destructive-muted text-destructive",
   },
   {
-    id: "urgent",
+    id: Priority.URGENT,
     label: "Urgent",
     color: "text-rose-600",
     activeColor: "bg-rose-100 text-rose-800",
@@ -56,7 +55,7 @@ export function PrioritySelect({ value, onChange, interactive, disabled }: Prior
 
   if (interactive && onChange && !disabled) {
     return (
-      <Select value={value} onValueChange={(v) => onChange(v as Priority)}>
+      <Select value={value} onValueChange={(v) => onChange(v as PriorityValue)}>
         <SelectTrigger
           className={cn(
             "inline-flex items-center gap-1.5 rounded-full border-0 px-2.5 py-1 text-xs font-medium shadow-none h-auto w-fit",

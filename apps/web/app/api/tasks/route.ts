@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { taskModel } from "@/server/models/task";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "@/server/pubsub";
-import { TaskStatus } from "@/server/constants";
+import { TaskStatus, Priority } from "@/server/constants";
 import { resolveAgent } from "../_lib/resolve-agent";
 import { assertAssignableAgents } from "@/server/assignment-guard";
 import { isSystemShutdown, assertProjectWritable } from "@/server/system-settings";
@@ -163,7 +163,7 @@ export async function POST(request: Request) {
         taskId: task.id,
         taskTitle: task.title,
         taskDescription: (task as any).description ?? null,
-        priority: (task as any).priority ?? "medium",
+        priority: (task as any).priority ?? Priority.MEDIUM,
         assignedBy: agent.name,
       }).catch(() => undefined);
     } else if (projectId) {

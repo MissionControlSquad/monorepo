@@ -1,11 +1,18 @@
 import { findCloudVMConnection, findAgentBySlug } from "@agentcenter/database";
+import { CloudVmStatus } from "@/server/constants";
 import { sshExec } from "@/server/services/ssh";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import {
+  successResponse,
+  errorResponse,
+  handleError,
+  assertFound,
+} from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 import { computeCronSchedule } from "@/server/agent-config-generator";
 import { ensureHeartbeatCron } from "@/server/services/cloud-vm-cron";
+import { getAgentSlug } from "@agentcenter/utils";
 import {
   getVMSSHConfig,
-  getAgentSlug,
   ocExec,
   readVMConfig,
   listAgentsOnVM,
@@ -51,9 +58,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const vm = await findCloudVMConnection(id);
 
-    if (!vm) return errorResponse("VM not found", 404);
-    if (vm.status !== "running" || !vm.ipv4 || !vm.sshPrivateKey) {
-      return errorResponse("VM is not running", 400);
+    assertFound(vm, ERR.VM_NOT_FOUND);
+    if (vm.status !== CloudVmStatus.RUNNING || !vm.ipv4 || !vm.sshPrivateKey) {
+      return errorResponse(ERR.VM_NOT_RUNNING, 400);
     }
 
     const sshConfig = getVMSSHConfig(vm);

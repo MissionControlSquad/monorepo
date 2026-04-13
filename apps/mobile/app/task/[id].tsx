@@ -30,7 +30,7 @@ import {
   ON_NEW_MESSAGE,
 } from "@agentcenter/graphql-client";
 import { UPDATE_TASK, CREATE_MESSAGE, TOGGLE_MESSAGE_REACTION, REQUEST_CLARIFICATION, APPROVE_TASK, REJECT_TASK, SAVE_TASK_AS_TEMPLATE } from "@agentcenter/graphql-client";
-import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, TASK_STATUSES, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatRelativeTime, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS, formatDuration } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, PRIORITY_HEX_COLORS, TASK_STATUSES, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatRelativeTime, formatDate, humanizeLabel, DELIVERABLE_KIND_HEX_COLORS, DELIVERABLE_KIND_ICONS, formatDuration, TaskStatus, ProjectStatus } from "@agentcenter/utils";
 import { useAuth } from "../../src/context/AuthContext";
 import { useTheme } from "../../src/hooks/useTheme";
 import { MentionInput } from "../../src/components/MentionInput";
@@ -440,7 +440,7 @@ function OverviewTab({ task, onStatusChange, onProjectAssign }: { task: Task; on
   });
 
   function openProjectPicker() {
-    const projects = (projectsResult.data?.projects ?? []).filter((p) => p.status === "active");
+    const projects = (projectsResult.data?.projects ?? []).filter((p) => p.status === ProjectStatus.ACTIVE);
     if (projects.length === 0) { Alert.alert("No Projects", "No active projects available."); return; }
     Alert.alert(
       "Assign Project",
@@ -1184,7 +1184,7 @@ export default function TaskDetailScreen() {
     );
   }
 
-  const showApproveReject = task.status === "review";
+  const showApproveReject = task.status === TaskStatus.REVIEW;
 
   return (
     <View className="flex-1 bg-gray-50 dark:bg-slate-900">

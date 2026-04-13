@@ -11,6 +11,7 @@ import { useChannelsLayout } from "./ChannelsLayoutContext";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { Hash, Lock, Plus, MessageSquare, FolderKanban } from "lucide-react";
 import { CreateChannelModal } from "@/components/channels/CreateChannelModal";
+import { ChannelVisibility } from "@/server/constants";
 import { toast } from "sonner";
 import { Button, SkeletonList } from "@/components/ui";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/shadcn/dialog";
@@ -102,7 +103,7 @@ export function ChannelListSidebar() {
   });
   const [dmsResult, reexecuteDms] = useQuery({
     query: CHANNELS_QUERY,
-    variables: { profileId, visibility: "dm", limit: 100 },
+    variables: { profileId, visibility: ChannelVisibility.DM, limit: 100 },
     requestPolicy: "cache-and-network",
   });
   const channels = result.data?.channels ?? [];
@@ -295,7 +296,7 @@ export function ChannelListSidebar() {
             <ul className="space-y-0.5 px-2">
               {channels.map((ch: Channel) => {
                 const isActive = channelParamFromPath === ch.slug || channelParamFromPath === ch.id;
-                const Icon = ch.visibility === "private" ? Lock : Hash;
+                const Icon = ch.visibility === ChannelVisibility.PRIVATE ? Lock : Hash;
                 return (
                   <li key={ch.id}>
                     <Link

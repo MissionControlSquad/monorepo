@@ -1,14 +1,13 @@
-import { NextResponse } from "next/server";
 import { findProfileByAgentId, createFileDocument } from "@agentcenter/database";
 import { uploadFileToR2 } from "@/server/storage/r2";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, MAX_FILE_SIZE } from "@agentcenter/utils";
 import { resolveAgent } from "../../_lib/resolve-agent";
+import { successResponse, errorResponse } from "../../_lib/json-response";
+import { ERR } from "../../_lib/error-messages";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
-
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
 const BLOCKED_MIME_TYPES = new Set([
   "application/x-msdownload",
@@ -28,10 +27,7 @@ const BLOCKED_MIME_TYPES = new Set([
  */
 export async function POST(request: Request) {
   if (!(await isFeatureEnabled(FLAG_KEYS.CHANNELS))) {
-    return NextResponse.json(
-      { error: "Channels feature is not available on your current plan" },
-      { status: 403 },
-    );
+    return errorResponse(ERR.FEATURE_CHANNELS_UNAVAILABLE, 403);
   }
 
   let profileId: string | null = null;
@@ -64,22 +60,19 @@ export async function POST(request: Request) {
   }
 
   if (!profileId && !agentId) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    return errorResponse("Authentication required", 401);
   }
 
   let formData: FormData;
   try {
     formData = await request.formData();
   } catch {
-    return NextResponse.json(
-      { error: "Expected multipart/form-data with a 'file' field" },
-      { status: 400 },
-    );
+    return errorResponse("Expected multipart/form-data with a 'file' field", 400);
   }
 
   const file = formData.get("file");
   if (!file || !(file instanceof File)) {
-    return NextResponse.json({ error: "'file' field is required" }, { status: 400 });
+    return errorResponse("'file' field is required", 400);
   }
 
   const fileName = file.name || "untitled";
@@ -87,10 +80,10 @@ export async function POST(request: Request) {
   const fileSize = file.size;
 
   if (fileSize > MAX_FILE_SIZE) {
-    return NextResponse.json({ error: "File size exceeds 25 MB limit" }, { status: 400 });
+    return errorResponse("File size exceeds 25 MB limit", 400);
   }
   if (BLOCKED_MIME_TYPES.has(mimeType)) {
-    return NextResponse.json({ error: "Executable file types are not allowed" }, { status: 400 });
+    return errorResponse("Executable file types are not allowed", 400);
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -132,7 +125,7 @@ export async function POST(request: Request) {
     createdByProfileId: profileId ?? null,
   });
 
-  return NextResponse.json({
+  return successResponse({
     documentId: document.id,
     storageKey,
   });

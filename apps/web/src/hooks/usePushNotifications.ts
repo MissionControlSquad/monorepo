@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getClientEnv } from "@/lib/client-env";
 import { urlBase64ToUint8Array } from "@agentcenter/utils";
+import { API_ROUTES } from "@/lib/api-routes";
 
 export function usePushNotifications() {
   const [isSupported, setIsSupported] = useState(false);
@@ -44,7 +45,7 @@ export function usePushNotifications() {
       });
 
       const json = subscription.toJSON();
-      const res = await fetch("/api/user-notifications/subscribe", {
+      const res = await fetch(API_ROUTES.userNotifications.subscribe, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -77,7 +78,7 @@ export function usePushNotifications() {
       const subscription = await reg.pushManager.getSubscription();
       if (!subscription) return;
 
-      await fetch("/api/user-notifications/subscribe", {
+      await fetch(API_ROUTES.userNotifications.subscribe, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ endpoint: subscription.endpoint }),

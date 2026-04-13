@@ -13,6 +13,7 @@ import { SidebarPanelHeader } from "../SidebarPanelHeader";
 import { SidebarSkeleton } from "../SidebarSkeleton";
 import { SidebarEmptyState } from "../SidebarEmptyState";
 import type { Agent, ProjectMember, StatusHistoryEntry } from "@agentcenter/types";
+import { SetupStatus } from "@/server/constants";
 
 interface AgentsPanelProps {
   onTaskClick?: (taskId: string) => void;
@@ -41,7 +42,7 @@ export function AgentsPanel({ onTaskClick }: AgentsPanelProps) {
             ),
           )
         : agents
-      ).filter((a: Agent) => a.setupStatus !== "deactivated")
+      ).filter((a: Agent) => a.setupStatus !== SetupStatus.DEACTIVATED)
     : undefined;
 
   return (

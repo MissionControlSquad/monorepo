@@ -9,6 +9,7 @@ import { useCurrentProject } from "../context/AppContext";
 import { CreateProjectModal } from "../project/CreateProjectModal";
 import { Button } from "@/components/ui";
 import type { Project } from "@agentcenter/types";
+import { ProjectStatus } from "@/server/constants";
 
 export function ProjectSwitcher({ fullWidth }: { fullWidth?: boolean } = {}) {
   const { projectId, setProjectId } = useCurrentProject();
@@ -119,12 +120,12 @@ export function ProjectSwitcher({ fullWidth }: { fullWidth?: boolean } = {}) {
                 >
                   <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="flex-1 min-w-0 truncate text-left">{p.name}</span>
-                  {p.status === "archived" && (
+                  {p.status === ProjectStatus.ARCHIVED && (
                     <span className="text-[10px] font-medium text-muted-foreground shrink-0">
                       Archived
                     </span>
                   )}
-                  {p.status !== "archived" && p.shutdownActive && (
+                  {p.status !== ProjectStatus.ARCHIVED && p.shutdownActive && (
                     <span className="text-[10px] font-medium text-warning shrink-0">Paused</span>
                   )}
                   {projectId === p.id && (

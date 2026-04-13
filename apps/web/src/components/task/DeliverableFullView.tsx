@@ -21,7 +21,7 @@ import { TimeAgo } from "../common/TimeAgo";
 import { Badge, Button } from "../ui";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { DELIVERABLE_VERSIONS_QUERY } from "../../lib/graphql/queries";
-import { getAssetUrl, formatFileSize } from "@agentcenter/utils";
+import { getAssetUrl, formatFileSize, DeliverableKind } from "@agentcenter/utils";
 import type { Deliverable, Agent, DeliverableVersion } from "@agentcenter/types";
 
 interface DeliverableFullViewProps {
@@ -37,10 +37,10 @@ interface DeliverableFullViewProps {
 }
 
 const KIND_CONFIG = {
-  markdown: { label: "Markdown", variant: "purple" as const },
-  code: { label: "Code", variant: "blue" as const },
-  file: { label: "File", variant: "orange" as const },
-  link: { label: "Link", variant: "green" as const },
+  [DeliverableKind.MARKDOWN]: { label: "Markdown", variant: "purple" as const },
+  [DeliverableKind.CODE]: { label: "Code", variant: "blue" as const },
+  [DeliverableKind.FILE]: { label: "File", variant: "orange" as const },
+  [DeliverableKind.LINK]: { label: "Link", variant: "green" as const },
 };
 
 function getVideoEmbedUrl(url: string): string | null {
@@ -194,7 +194,9 @@ export function DeliverableFullView({
     ? { name: deliverableProfile.displayName, avatar: deliverableProfile.avatarUrl }
     : agents.find((a: Agent) => a.id === deliverable.profileId);
   const videoEmbedUrl =
-    deliverable.kind === "link" && deliverable.url ? getVideoEmbedUrl(deliverable.url) : null;
+    deliverable.kind === DeliverableKind.LINK && deliverable.url
+      ? getVideoEmbedUrl(deliverable.url)
+      : null;
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [viewingVersion, setViewingVersion] = useState<DeliverableVersion | null>(null);
@@ -222,7 +224,7 @@ export function DeliverableFullView({
                   <Badge variant={config.variant} size="sm">
                     {config.label}
                   </Badge>
-                  {deliverable.kind === "code" && deliverable.language && (
+                  {deliverable.kind === DeliverableKind.CODE && deliverable.language && (
                     <Badge variant="gray" size="sm">
                       {deliverable.language}
                     </Badge>
@@ -312,7 +314,7 @@ export function DeliverableFullView({
 
             <div className="px-4 sm:px-6 py-4 sm:py-5">
               {/* Markdown */}
-              {displayData.kind === "markdown" && displayData.content && (
+              {displayData.kind === DeliverableKind.MARKDOWN && displayData.content && (
                 <div className="prose-sm max-w-none">
                   <MarkdownWithMentions
                     content={displayData.content}
@@ -322,7 +324,7 @@ export function DeliverableFullView({
               )}
 
               {/* Code */}
-              {displayData.kind === "code" && displayData.content && (
+              {displayData.kind === DeliverableKind.CODE && displayData.content && (
                 <CodeBlock
                   content={displayData.content}
                   language={displayData.language ?? undefined}
@@ -330,10 +332,10 @@ export function DeliverableFullView({
               )}
 
               {/* File */}
-              {displayData.kind === "file" && <FileBody deliverable={displayData} />}
+              {displayData.kind === DeliverableKind.FILE && <FileBody deliverable={displayData} />}
 
               {/* Link — video embed or plain URL */}
-              {displayData.kind === "link" &&
+              {displayData.kind === DeliverableKind.LINK &&
                 displayData.url &&
                 (videoEmbedUrl ? (
                   <div className="space-y-3">

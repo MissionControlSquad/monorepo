@@ -1,8 +1,9 @@
 import { builder } from "../builder";
 import { messageReactionModel, messageModel } from "../../models";
 import { pubsub, messageReactionTopic } from "../../pubsub";
+import { MessageReactionEmoji } from "../../constants";
 
-const VALID_EMOJIS = ["thumbs-up", "heart", "eyes", "checkmark", "party", "think"];
+const VALID_EMOJIS: string[] = Object.values(MessageReactionEmoji);
 
 builder.mutationField("toggleMessageReaction", (t) =>
   t.prismaField({

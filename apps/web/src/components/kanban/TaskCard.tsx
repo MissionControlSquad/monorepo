@@ -18,6 +18,7 @@ import {
 } from "../../lib/constants";
 import { useAgentStatus } from "../context/AgentStatusContext";
 import type { TaskCard as TaskCardType, TaskAssignee, Agent } from "@agentcenter/types";
+import { TaskStatus, Priority } from "@/server/constants";
 
 interface ResolvedAssignee {
   id: string;
@@ -77,11 +78,11 @@ export const TaskCard = memo(function TaskCard({ task, agents: _agents, onClick 
   const hasActiveWork = workingAgents.length > 0;
 
   const priorityBorder =
-    task.priority === "urgent"
+    task.priority === Priority.URGENT
       ? "border-l-rose-500"
-      : task.priority === "high"
+      : task.priority === Priority.HIGH
         ? "border-l-red-400"
-        : task.priority === "medium"
+        : task.priority === Priority.MEDIUM
           ? "border-l-amber-400"
           : "border-l-transparent";
 
@@ -225,7 +226,9 @@ export const TaskCard = memo(function TaskCard({ task, agents: _agents, onClick 
               blocked
             </span>
           )}
-          {task.dueDate && <DueDatePill dueDate={task.dueDate} isDone={task.status === "done"} />}
+          {task.dueDate && (
+            <DueDatePill dueDate={task.dueDate} isDone={task.status === TaskStatus.DONE} />
+          )}
           {task.priority && (
             <span
               className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${PRIORITY_COLORS[task.priority as keyof typeof PRIORITY_COLORS]}`}

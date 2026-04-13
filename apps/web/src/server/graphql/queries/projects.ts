@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { projectModel } from "../../models";
 import { projectContextCache, projectsListCache } from "../../cache";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
+import { ProjectStatus } from "../../constants";
 
 builder.queryField("projects", (t) =>
   t.prismaField({
@@ -32,7 +33,9 @@ builder.queryField("project", (t) =>
       projectModel.delegate.findUnique({
         ...query,
         where: { id: args.id },
-        include: { members: { where: { status: "active" }, include: { profile: true } } },
+        include: {
+          members: { where: { status: ProjectStatus.ACTIVE }, include: { profile: true } },
+        },
       }),
   }),
 );
@@ -46,7 +49,7 @@ builder.queryField("projectsByAgent", (t) =>
       return projectModel.findMany({
         ...query,
         where: {
-          status: "active",
+          status: ProjectStatus.ACTIVE,
           members: { some: { profileId } },
         },
         orderBy: { createdAt: "desc" },

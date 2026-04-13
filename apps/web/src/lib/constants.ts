@@ -14,4 +14,9 @@ export {
   PRIORITY_ICONS,
 } from "@agentcenter/utils";
 
-export type { TaskStatus, AgentStatus, AgentDetailedStatus, AgentLevel } from "@agentcenter/utils";
+export type {
+  TaskStatus,
+  AgentStatus,
+  AgentDetailedStatus,
+  AgentLevelId,
+} from "@agentcenter/utils";

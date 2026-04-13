@@ -23,6 +23,7 @@ import {
   STATUS_DOT_CLASSES,
   type AgentDetailedStatus,
 } from "../../lib/constants";
+import type { AgentStatusValue } from "@/server/constants";
 
 const ICON_MAP: Record<string, any> = {
   Brain,
@@ -41,7 +42,7 @@ const ICON_MAP: Record<string, any> = {
 };
 
 interface AgentStatusBadgeProps {
-  status: "idle" | "active" | "blocked";
+  status: AgentStatusValue;
   detailedStatus?: AgentDetailedStatus;
   isOnline: boolean;
   size?: "sm" | "md";
@@ -96,7 +97,7 @@ export function AgentStatusBadge({
 }
 
 interface StatusDotProps {
-  status: "idle" | "active" | "blocked";
+  status: AgentStatusValue;
   detailedStatus?: AgentDetailedStatus;
   isOnline: boolean;
   className?: string;

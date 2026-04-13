@@ -1,12 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import { listMemberChannels, getChannelUnreadCount } from "@agentcenter/database";
-import type { ChannelVisibility } from "@agentcenter/database";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { resolveAgent } from "../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
+import { ChannelVisibility, type ChannelVisibilityValue } from "@/server/constants";
 
-const VALID_VISIBILITY = new Set<string>(["public", "private", "dm"]);
+const VALID_VISIBILITY = new Set<string>(Object.values(ChannelVisibility));
 
 /**
  * GET /api/channels — List all channels the agent is a member of.
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     if (visibilityParam && !VALID_VISIBILITY.has(visibilityParam)) {
       return errorResponse("visibility must be one of: public, private, dm", 400);
     }
-    const visibility = visibilityParam as ChannelVisibility | null;
+    const visibility = visibilityParam as ChannelVisibilityValue | null;
 
     const memberships = await listMemberChannels(agentProfileId, visibility ?? undefined);
 
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
         // For DMs, extract the other person's profile
         const otherProfile =
-          channel.visibility === "dm"
+          channel.visibility === ChannelVisibility.DM
             ? (channel.members.find((m) => m.profileId !== agentProfileId)?.profile ?? null)
             : null;
 

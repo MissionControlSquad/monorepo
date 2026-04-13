@@ -3,7 +3,8 @@ import { taskModel } from "@/server/models/task";
 import { agentModel } from "@/server/models";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "@/server/pubsub";
 import { resolveAgent } from "../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { successResponse, errorResponse, handleError, assertFound } from "../../_lib/json-response";
+import { ERR } from "../../_lib/error-messages";
 import { validateBody, updateTaskSchema } from "../../_lib/validation";
 import { log } from "../../_lib/logger";
 import { assertProjectMember, assertAllMembersOfProject } from "../../_lib/project-access";
@@ -14,8 +15,8 @@ import {
   tryDeliverTaskToLiveAgents,
   tryDeliverReviewNotification,
 } from "@/server/services/live-task-delivery";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import { TaskStatus, Priority } from "@/server/constants";
+import type { RouteContext } from "../../_lib/route-context";
 
 export async function GET(request: Request, ctx: RouteContext) {
   try {
@@ -26,10 +27,10 @@ export async function GET(request: Request, ctx: RouteContext) {
       include: { assignees: { include: { profile: true } } },
     });
 
-    if (!task) return errorResponse("Task not found", 404);
+    assertFound(task, ERR.TASK_NOT_FOUND);
     if (task.projectId) {
       if (await isProjectShutdown(task.projectId)) {
-        return errorResponse("Task not found", 404);
+        return errorResponse(ERR.TASK_NOT_FOUND, 404);
       }
       await assertProjectMember(agent.id, task.projectId);
     }
@@ -54,10 +55,10 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const oldTask = await taskModel.findById(id, {
       include: { assignees: { include: { profile: true } } },
     });
-    if (!oldTask) return errorResponse("Task not found", 404);
+    assertFound(oldTask, ERR.TASK_NOT_FOUND);
     if (oldTask.projectId) {
       if (await isProjectShutdown(oldTask.projectId)) {
-        return errorResponse("Task not found", 404);
+        return errorResponse(ERR.TASK_NOT_FOUND, 404);
       }
       await assertProjectMember(agent.id, oldTask.projectId);
     }
@@ -155,7 +156,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
             taskId: task.id,
             taskTitle: task.title,
             taskDescription: (task as any).description ?? null,
-            priority: (task as any).priority ?? "medium",
+            priority: (task as any).priority ?? Priority.MEDIUM,
             assignedBy: agent.name,
           }).catch((err) => console.error("[live-task-delivery] error:", err));
         }
@@ -177,7 +178,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
       // Live gateway: notify squad leads immediately when task enters review.
       // Fire-and-forget — heartbeat (hasPendingReview) is the fallback.
-      if (body.status === "review") {
+      if (body.status === TaskStatus.REVIEW) {
         tryDeliverReviewNotification(task.id, task.projectId ?? null, task.title).catch(
           () => undefined,
         );
@@ -218,7 +219,7 @@ export async function DELETE(request: Request, ctx: RouteContext) {
     const task = await taskModel.findById(id, {
       include: { assignees: { include: { profile: true } } },
     });
-    if (!task) return errorResponse("Task not found", 404);
+    assertFound(task, ERR.TASK_NOT_FOUND);
     if (task.projectId) await assertProjectMember(agent.id, task.projectId);
 
     // Resolve profileId → agentId for notification compat

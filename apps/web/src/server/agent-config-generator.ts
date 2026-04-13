@@ -2,6 +2,8 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { env } from "./env";
 import { CURRENT_CONFIG_VERSION } from "./config-version";
+import { AgentLevel } from "./constants";
+import { getAgentSlug } from "@agentcenter/utils";
 
 const AGENT_TEMPLATES_DIR = join(process.cwd(), "src", "server", "agent-templates");
 const TEMPLATES_DIR = join(AGENT_TEMPLATES_DIR, "configs");
@@ -66,7 +68,7 @@ function buildVars(agent: AgentInfo, mcUrl: string, apiKey: string): Record<stri
 
 /** Determine which role folder to use */
 function getRoleDir(level: string): string {
-  return level === "lead" ? "lead" : "worker";
+  return level === AgentLevel.LEAD ? "lead" : "worker";
 }
 
 /**
@@ -253,7 +255,7 @@ export function getConfigBundleForAgent(agent: AgentForConfig): {
   files: { filename: string; content: string }[];
 } {
   const mcUrl = getMcUrl();
-  const agentSlug = agent.username || agent.name.toLowerCase().replace(/\s+/g, "-");
+  const agentSlug = getAgentSlug(agent);
   const configFiles = generateAgentConfig(
     {
       id: agent.id,
@@ -262,7 +264,7 @@ export function getConfigBundleForAgent(agent: AgentForConfig): {
       username: agentSlug,
       identityEmoji: agent.identityEmoji || "🤖",
       personality: agent.personality || "",
-      level: agent.level || "specialist",
+      level: agent.level || AgentLevel.SPECIALIST,
       capabilities: agent.capabilities,
       templateId: agent.templateId || undefined,
     },

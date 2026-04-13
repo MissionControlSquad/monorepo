@@ -1,12 +1,13 @@
 import { recurringTaskModel } from "@/server/models";
 import { resolveAgent } from "../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { successResponse, errorResponse, handleError, assertFound } from "../../_lib/json-response";
+import { ERR } from "../../_lib/error-messages";
+import { validateBody, updateRecurringTaskSchema } from "../../_lib/validation";
 import { assertProjectMember } from "../../_lib/project-access";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertAssignableAgents } from "@/server/assignment-guard";
 import { validateRecurrenceConfig, calculateInitialDueDate } from "@/server/recurring-tasks";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../_lib/route-context";
 
 export async function GET(request: Request, ctx: RouteContext) {
   try {
@@ -20,7 +21,7 @@ export async function GET(request: Request, ctx: RouteContext) {
       },
     });
 
-    if (!rt) return errorResponse("Recurring task not found", 404);
+    assertFound(rt, ERR.RECURRING_TASK_NOT_FOUND);
     return successResponse(rt);
   } catch (err) {
     return handleError(err);
@@ -29,12 +30,14 @@ export async function GET(request: Request, ctx: RouteContext) {
 
 export async function PATCH(request: Request, ctx: RouteContext) {
   try {
-    const body = await request.json();
+    const v = await validateBody(request, updateRecurringTaskSchema);
+    if (v.error) return v.error;
+    const body = v.data;
     const agent = await resolveAgent(request);
     const { id } = await ctx.params;
 
     const existing = await recurringTaskModel.findById(id);
-    if (!existing) return errorResponse("Recurring task not found", 404);
+    assertFound(existing, ERR.RECURRING_TASK_NOT_FOUND);
     if (existing.projectId) await assertProjectMember(agent.id, existing.projectId);
 
     const data: Record<string, unknown> = {};
@@ -88,7 +91,7 @@ export async function DELETE(request: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
 
     const existing = await recurringTaskModel.findById(id);
-    if (!existing) return errorResponse("Recurring task not found", 404);
+    assertFound(existing, ERR.RECURRING_TASK_NOT_FOUND);
     if (existing.projectId) await assertProjectMember(agent.id, existing.projectId);
 
     await recurringTaskModel.deleteById(id);

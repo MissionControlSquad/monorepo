@@ -33,6 +33,10 @@ import {
   DEFAULT_AGENT_LEVEL,
   DEFAULT_SETUP_MODE,
   SQUAD_LEAD_ROLE,
+  SetupStatus,
+  CloudVmStatus,
+  Priority,
+  truncateId,
 } from "@agentcenter/utils";
 import {
   AGENTS_FOR_DELEGATE_QUERY,
@@ -89,7 +93,7 @@ export default function CreateAgentScreen() {
   const squadLeads = useMemo(() =>
     (agentsResult.data?.agents ?? []).filter(
       (a: { role?: string; setupStatus?: string }) =>
-        a.role === SQUAD_LEAD_ROLE && a.setupStatus !== "deactivated",
+        a.role === SQUAD_LEAD_ROLE && a.setupStatus !== SetupStatus.DEACTIVATED,
     ),
     [agentsResult.data],
   );
@@ -127,7 +131,7 @@ export default function CreateAgentScreen() {
     setRole(t.role ?? "");
     setEmoji(t.emoji ?? DEFAULT_AGENT_EMOJI);
     setPersonality(t.personality ?? "");
-    const lvl = AGENT_LEVEL_KEYS.includes(t.level as Level) ? (t.level as Level) : "specialist";
+    const lvl = AGENT_LEVEL_KEYS.includes(t.level as Level) ? (t.level as Level) : DEFAULT_AGENT_LEVEL;
     setLevel(lvl);
     setStep("details");
   }
@@ -207,7 +211,7 @@ export default function CreateAgentScreen() {
         title: `Set up new agent: ${result.agent.name} (${result.agent.role})`,
         description,
         assigneeIds: [squadLeads[0].id],
-        priority: "high",
+        priority: Priority.HIGH,
         tags: ["agent-setup"],
       });
 
@@ -703,7 +707,7 @@ export default function CreateAgentScreen() {
                           setCloudVms(
                             (d.vms || []).filter(
                               (vm: { status: string; llmConfigured: boolean }) =>
-                                vm.status === "running" && vm.llmConfigured,
+                                vm.status === CloudVmStatus.RUNNING && vm.llmConfigured,
                             ),
                           );
                         }
@@ -1059,7 +1063,7 @@ export default function CreateAgentScreen() {
                         </View>
                         <View className="flex-1">
                           <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">
-                            {vm.name || vm.serverName || vm.id.slice(0, 8)}
+                            {vm.name || vm.serverName || truncateId(vm.id)}
                           </Text>
                           <Text className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
                             {vm.serverType} / {vm.region}

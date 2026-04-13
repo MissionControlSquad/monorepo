@@ -22,7 +22,7 @@ import { useTheme } from "../src/hooks/useTheme";
 import { SearchBar } from "../src/components/SearchBar";
 import { FAB } from "../src/components/FAB";
 import { makeRequest, ApiError } from "../src/api/request";
-import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatUptime, formatCost, CLOUD_VM_STATUS_LABELS, CLOUD_VM_TRANSITIONAL_STATUSES } from "@agentcenter/utils";
+import { STATUS_HEX_COLORS, DEFAULT_COLOR, DEFAULT_AGENT_EMOJI, formatUptime, formatCost, CLOUD_VM_STATUS_LABELS, CLOUD_VM_TRANSITIONAL_STATUSES, truncateId } from "@agentcenter/utils";
 
 interface CloudVMAgent {
   id: string;
@@ -194,7 +194,7 @@ function CreateVMModal({ visible, onClose, onCreated }: {
 function VMCard({ vm, onPress }: { vm: CloudVM; onPress: () => void }) {
   const statusColor = STATUS_HEX_COLORS[vm.status] ?? DEFAULT_COLOR;
   const statusLabel = STATUS_LABELS[vm.status] ?? vm.status;
-  const displayName = vm.name || vm.serverName || vm.id.slice(0, 8);
+  const displayName = vm.name || vm.serverName || truncateId(vm.id);
 
   return (
     <TouchableOpacity

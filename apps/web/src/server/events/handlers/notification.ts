@@ -1,7 +1,7 @@
 import { on } from "../bus";
 import { pubsub, notificationTopic } from "../../pubsub";
 import { subscriberCache } from "../../cache";
-import { EventTypes } from "../../constants";
+import { EventTypes, TaskStatus, Priority } from "../../constants";
 import { notificationModel, subscriptionModel } from "../../models";
 import {
   tryDeliverMentionNotification,
@@ -72,7 +72,7 @@ on(EventTypes.TASK_CREATED, async (e) => {
       taskId: e.taskId,
       taskTitle: e.title,
       taskDescription: e.description,
-      priority: e.priority ?? "medium",
+      priority: e.priority ?? Priority.MEDIUM,
       assignedBy: e.creatorName,
     }).catch((err) => console.error("[notification] tryDeliverTaskToLiveAgents failed:", err));
   } else if (e.projectId) {
@@ -102,7 +102,7 @@ on(EventTypes.TASK_ASSIGNEES_CHANGED, async (e) => {
       taskId: e.taskId,
       taskTitle: e.title,
       taskDescription: e.description,
-      priority: e.priority ?? "medium",
+      priority: e.priority ?? Priority.MEDIUM,
     }).catch((err) =>
       console.error("[notification] tryDeliverTaskToLiveAgents (assignees changed) failed:", err),
     );
@@ -121,14 +121,14 @@ on(EventTypes.TASK_STATUS_CHANGED, async (e) => {
 
   // Live gateway: notify squad leads when task enters review.
   // Covers GraphQL updateTask path — REST PATCH already calls this directly.
-  if (e.toStatus === "review") {
+  if (e.toStatus === TaskStatus.REVIEW) {
     tryDeliverReviewNotification(e.taskId, e.projectId ?? null, e.title).catch((err) =>
       console.error("[notification] tryDeliverReviewNotification failed:", err),
     );
   }
 
   // Live gateway: notify assignees when task is marked done.
-  if (e.toStatus === "done") {
+  if (e.toStatus === TaskStatus.DONE) {
     tryDeliverTaskDoneNotification(e.taskId, e.title).catch((err) =>
       console.error("[notification] tryDeliverTaskDoneNotification failed:", err),
     );

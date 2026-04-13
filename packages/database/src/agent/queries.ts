@@ -3,6 +3,7 @@
  */
 
 import { prisma } from "../client";
+import { TaskStatus } from "@agentcenter/utils";
 
 /** Get the latest status history entry IDs (one per agent) via DISTINCT ON. */
 export async function getLatestAgentActionIds(): Promise<{ id: string }[]> {
@@ -34,7 +35,7 @@ export async function countCompletedTaskAssigneesByProfile(
   return prisma.taskAssignee.count({
     where: {
       profileId,
-      task: { status: "done", ...(projectId ? { projectId } : {}) },
+      task: { status: TaskStatus.DONE, ...(projectId ? { projectId } : {}) },
     },
   });
 }

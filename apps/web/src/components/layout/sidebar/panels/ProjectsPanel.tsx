@@ -13,6 +13,7 @@ import { SidebarEmptyState } from "../SidebarEmptyState";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import { Button } from "../../../ui";
 import type { Project } from "@agentcenter/types";
+import { ProjectStatus } from "@/server/constants";
 
 export function ProjectsPanel() {
   const pathname = usePathname();
@@ -30,8 +31,8 @@ export function ProjectsPanel() {
       return true;
     })
     .sort((a: Project, b: Project) => {
-      const aWeight = a.status === "archived" ? 2 : a.shutdownActive ? 1 : 0;
-      const bWeight = b.status === "archived" ? 2 : b.shutdownActive ? 1 : 0;
+      const aWeight = a.status === ProjectStatus.ARCHIVED ? 2 : a.shutdownActive ? 1 : 0;
+      const bWeight = b.status === ProjectStatus.ARCHIVED ? 2 : b.shutdownActive ? 1 : 0;
       return aWeight - bWeight;
     });
 
@@ -103,12 +104,12 @@ export function ProjectsPanel() {
                   >
                     <FolderKanban className="w-4 h-4 shrink-0 text-muted-foreground" />
                     <span className="truncate flex-1 min-w-0">{p.name}</span>
-                    {p.status === "archived" && (
+                    {p.status === ProjectStatus.ARCHIVED && (
                       <span className="text-[10px] font-medium text-muted-foreground shrink-0">
                         Archived
                       </span>
                     )}
-                    {p.status !== "archived" && p.shutdownActive && (
+                    {p.status !== ProjectStatus.ARCHIVED && p.shutdownActive && (
                       <span className="text-[10px] font-medium text-warning shrink-0">Paused</span>
                     )}
                   </Link>

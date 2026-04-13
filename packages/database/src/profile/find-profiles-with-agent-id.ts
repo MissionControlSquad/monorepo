@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "../client";
+import { ProfileKind } from "@agentcenter/utils";
 
 export async function findProfilesWithAgentId(profileIds: string[]) {
   return prisma.profile.findMany({
@@ -26,7 +27,7 @@ export async function findAgentsUnavailableByIds(
 export async function getHumanUserIdsFromProfileIds(profileIds: string[]): Promise<string[]> {
   if (!profileIds.length) return [];
   const profiles = await prisma.profile.findMany({
-    where: { id: { in: profileIds }, kind: "human" },
+    where: { id: { in: profileIds }, kind: ProfileKind.HUMAN },
     select: { userId: true },
   });
   return profiles.filter((p) => p.userId).map((p) => p.userId!);
