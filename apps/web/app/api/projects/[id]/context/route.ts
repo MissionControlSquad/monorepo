@@ -1,7 +1,12 @@
 import { projectModel } from "@/server/models";
 import { projectContextCache } from "@/server/cache";
 import { resolveAgent } from "../../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import {
+  successResponse,
+  errorResponse,
+  handleError,
+  assertFound,
+} from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { isProjectShutdown } from "@/server/system-settings";
 import { ProjectStatus } from "@/server/constants";
@@ -28,7 +33,7 @@ export async function GET(request: Request, ctx: RouteContext) {
       },
     });
 
-    if (!project) return errorResponse(ERR.PROJECT_NOT_FOUND, 404);
+    assertFound(project, ERR.PROJECT_NOT_FOUND);
     if (project.status === ProjectStatus.ARCHIVED) return errorResponse("Project is archived", 404);
     if (await isProjectShutdown(id)) return errorResponse("Project not found or is shutdown", 404);
     projectContextCache.set(id, project);

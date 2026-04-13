@@ -3,7 +3,7 @@ import { taskModel } from "@/server/models/task";
 import { agentModel } from "@/server/models";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "@/server/pubsub";
 import { resolveAgent } from "../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { successResponse, errorResponse, handleError, assertFound } from "../../_lib/json-response";
 import { ERR } from "../../_lib/error-messages";
 import { validateBody, updateTaskSchema } from "../../_lib/validation";
 import { log } from "../../_lib/logger";
@@ -27,7 +27,7 @@ export async function GET(request: Request, ctx: RouteContext) {
       include: { assignees: { include: { profile: true } } },
     });
 
-    if (!task) return errorResponse(ERR.TASK_NOT_FOUND, 404);
+    assertFound(task, ERR.TASK_NOT_FOUND);
     if (task.projectId) {
       if (await isProjectShutdown(task.projectId)) {
         return errorResponse(ERR.TASK_NOT_FOUND, 404);
@@ -55,7 +55,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const oldTask = await taskModel.findById(id, {
       include: { assignees: { include: { profile: true } } },
     });
-    if (!oldTask) return errorResponse(ERR.TASK_NOT_FOUND, 404);
+    assertFound(oldTask, ERR.TASK_NOT_FOUND);
     if (oldTask.projectId) {
       if (await isProjectShutdown(oldTask.projectId)) {
         return errorResponse(ERR.TASK_NOT_FOUND, 404);
@@ -219,7 +219,7 @@ export async function DELETE(request: Request, ctx: RouteContext) {
     const task = await taskModel.findById(id, {
       include: { assignees: { include: { profile: true } } },
     });
-    if (!task) return errorResponse(ERR.TASK_NOT_FOUND, 404);
+    assertFound(task, ERR.TASK_NOT_FOUND);
     if (task.projectId) await assertProjectMember(agent.id, task.projectId);
 
     // Resolve profileId → agentId for notification compat

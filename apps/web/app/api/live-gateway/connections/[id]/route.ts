@@ -4,7 +4,12 @@
  */
 
 import { deleteLiveGatewayConnection, listLiveGatewayConnections } from "@agentcenter/database";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import {
+  successResponse,
+  errorResponse,
+  handleError,
+  assertFound,
+} from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { resolveSession } from "../../../_lib/resolve-session";
 import { connectionRegistry } from "@/server/services/live-connection-registry";
@@ -28,7 +33,7 @@ async function deleteHandler(request: Request, ctx: RouteContext) {
     // Confirm the record exists before deleting.
     const connections = await listLiveGatewayConnections();
     const conn = connections.find((c) => c.id === id);
-    if (!conn) return errorResponse(ERR.CONNECTION_NOT_FOUND, 404);
+    assertFound(conn, ERR.CONNECTION_NOT_FOUND);
 
     await deleteLiveGatewayConnection(id);
     return successResponse({ success: true });

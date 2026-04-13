@@ -7,7 +7,12 @@ import {
   computeAgentCronIndex,
   restartGateway,
 } from "@/server/services/cloud-vm-utils";
-import { successResponse, errorResponse, handleError } from "../../../../../_lib/json-response";
+import {
+  successResponse,
+  errorResponse,
+  handleError,
+  assertFound,
+} from "../../../../../_lib/json-response";
 import { ERR } from "../../../../../_lib/error-messages";
 import { CloudVmStatus } from "@/server/constants";
 
@@ -24,7 +29,7 @@ export async function GET(
 
     const vm = await findCloudVMConnection(id);
 
-    if (!vm) return errorResponse(ERR.VM_NOT_FOUND, 404);
+    assertFound(vm, ERR.VM_NOT_FOUND);
     if (vm.status !== CloudVmStatus.RUNNING || !vm.ipv4 || !vm.sshPrivateKey) {
       return errorResponse(ERR.VM_NOT_RUNNING, 400);
     }
@@ -81,7 +86,7 @@ export async function POST(
 
     const vm = await findCloudVMConnection(id);
 
-    if (!vm) return errorResponse(ERR.VM_NOT_FOUND, 404);
+    assertFound(vm, ERR.VM_NOT_FOUND);
     if (vm.status !== CloudVmStatus.RUNNING || !vm.ipv4 || !vm.sshPrivateKey) {
       return errorResponse(ERR.VM_NOT_RUNNING, 400);
     }

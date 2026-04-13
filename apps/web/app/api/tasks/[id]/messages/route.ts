@@ -7,7 +7,7 @@ import { escapeHtml } from "@/server/sanitize";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { parseMentions } from "@agentcenter/utils";
 import { resolveAgent } from "../../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { successResponse, handleError, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { validateBody, createMessageSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
@@ -123,7 +123,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       taskNumber: true,
       projectId: true,
     });
-    if (!task) return errorResponse(ERR.TASK_NOT_FOUND, 404);
+    assertFound(task, ERR.TASK_NOT_FOUND);
 
     const message = await messageModel.create({
       data: {

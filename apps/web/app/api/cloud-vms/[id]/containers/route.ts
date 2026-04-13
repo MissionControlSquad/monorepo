@@ -1,5 +1,10 @@
 import { findCloudVMConnection } from "@agentcenter/database";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import {
+  successResponse,
+  errorResponse,
+  handleError,
+  assertFound,
+} from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { getVMSSHConfig } from "@/server/services/cloud-vm-utils";
 import { sshExec } from "@/server/services/ssh";
@@ -15,7 +20,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
     const vm = await findCloudVMConnection(id);
 
-    if (!vm) return errorResponse(ERR.VM_NOT_FOUND, 404);
+    assertFound(vm, ERR.VM_NOT_FOUND);
     if (vm.status !== CloudVmStatus.RUNNING || !vm.ipv4 || !vm.sshPrivateKey) {
       return errorResponse(ERR.VM_NOT_RUNNING, 400);
     }
