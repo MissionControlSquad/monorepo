@@ -8,6 +8,7 @@ import { CreateVMDialog } from "../components/cloud/CreateVMDialog";
 import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout } from "../components/ui";
 import { formatUptime, CLOUD_VM_TRANSITIONAL_STATUSES, truncateId } from "@agentcenter/utils";
 import { CloudVmStatus } from "@/server/constants";
+import { API_ROUTES } from "@/lib/api-routes";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 
 interface CloudVMAgent {
@@ -55,7 +56,7 @@ export function CloudPage() {
 
   const fetchVMs = useCallback(async () => {
     try {
-      const res = await fetch("/api/cloud-vms");
+      const res = await fetch(API_ROUTES.cloudVms.list);
       if (res.ok) {
         const data = await res.json();
         setVMs(data.vms || []);

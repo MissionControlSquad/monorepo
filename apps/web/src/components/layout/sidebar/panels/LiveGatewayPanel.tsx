@@ -6,6 +6,7 @@ import { Radio } from "lucide-react";
 import { SidebarPanelHeader } from "../SidebarPanelHeader";
 import { SidebarSkeleton } from "../SidebarSkeleton";
 import { SidebarEmptyState } from "../SidebarEmptyState";
+import { API_ROUTES } from "@/lib/api-routes";
 
 interface LiveConnection {
   id: string;
@@ -20,7 +21,7 @@ export function LiveGatewayPanel() {
 
   const fetchConnections = useCallback(async () => {
     try {
-      const res = await fetch("/api/live-gateway/connections");
+      const res = await fetch(API_ROUTES.liveGateway.connections);
       if (res.ok) {
         const data = await res.json();
         setConnections(data.connections || []);

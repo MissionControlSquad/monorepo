@@ -9,6 +9,7 @@ import { SidebarSkeleton } from "../SidebarSkeleton";
 import { SidebarEmptyState } from "../SidebarEmptyState";
 import { CLOUD_VM_STATUS_LABELS } from "@agentcenter/utils";
 import { CloudVmStatus } from "@/server/constants";
+import { API_ROUTES } from "@/lib/api-routes";
 
 interface CloudVM {
   id: string;
@@ -47,7 +48,7 @@ export function CloudPanel() {
 
   const fetchVMs = useCallback(async () => {
     try {
-      const res = await fetch("/api/cloud-vms");
+      const res = await fetch(API_ROUTES.cloudVms.list);
       if (res.ok) {
         const data = await res.json();
         setVMs(data.vms || []);

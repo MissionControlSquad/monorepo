@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/shadcn/form";
 import { Input } from "@/components/ui/shadcn/input";
 import { LicenseStatusCode } from "@/server/constants";
+import { API_ROUTES } from "@/lib/api-routes";
 
 const changePasswordSchema = z
   .object({
@@ -57,7 +58,7 @@ export function SettingsPage() {
   } | null>(null);
 
   useEffect(() => {
-    fetch("/api/license")
+    fetch(API_ROUTES.license.get)
       .then((r) => r.json())
       .then(setLicenseInfo)
       .catch(() => {});

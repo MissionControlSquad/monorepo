@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { MAX_FILE_SIZE } from "@agentcenter/utils";
+import { API_ROUTES } from "@/lib/api-routes";
 const MAX_FILES = 10;
 
 const BLOCKED_MIME_TYPES = new Set([
@@ -86,7 +87,7 @@ export function useFileUpload(): UseFileUploadReturn {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch("/api/channels/attachments", {
+      const res = await fetch(API_ROUTES.channels.attachments, {
         method: "POST",
         body: formData,
       });

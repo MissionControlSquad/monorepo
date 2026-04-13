@@ -30,6 +30,7 @@ import { CREATE_TASK_FROM_DASHBOARD } from "../lib/graphql/mutations/tasks";
 import { Button, Badge } from "../components/ui";
 import { useFeatureFlag } from "../components/context/FeatureFlagContext";
 import { FLAG_KEYS, truncateId } from "@agentcenter/utils";
+import { API_ROUTES } from "@/lib/api-routes";
 import { CopyButton } from "../components/common/CopyButton";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -210,7 +211,7 @@ export function NewAgentWizard() {
     async (values: AgentWizardValues) => {
       setIsCreating(true);
       try {
-        const res = await fetch("/api/agents/create", {
+        const res = await fetch(API_ROUTES.agents.create, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -716,7 +717,7 @@ export function NewAgentWizard() {
                     if (existingVMs.length === 0) {
                       setVmListLoading(true);
                       try {
-                        const res = await fetch("/api/cloud-vms");
+                        const res = await fetch(API_ROUTES.cloudVms.list);
                         if (res.ok) {
                           const data = await res.json();
                           setExistingVMs(

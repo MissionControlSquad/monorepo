@@ -1,6 +1,7 @@
 "use client";
 
 import { truncateId } from "@agentcenter/utils";
+import { API_ROUTES } from "@/lib/api-routes";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -295,7 +296,7 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
     if (step !== "waiting") return;
     pollRef.current = setInterval(async () => {
       try {
-        const res = await fetch("/api/live-gateway/connections");
+        const res = await fetch(API_ROUTES.liveGateway.connections);
         if (!res.ok) return;
         const data = await res.json();
         const connections: LiveConnection[] = data.connections ?? [];
@@ -318,7 +319,7 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
   async function handleCreateToken() {
     setCreating(true);
     try {
-      const res = await fetch("/api/live-gateway/tokens", {
+      const res = await fetch(API_ROUTES.liveGateway.tokens, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: tokenName.trim() || undefined }),
@@ -1084,7 +1085,7 @@ function TokenPanel() {
 
   const fetchTokens = useCallback(async () => {
     try {
-      const res = await fetch("/api/live-gateway/tokens");
+      const res = await fetch(API_ROUTES.liveGateway.tokens);
       if (res.ok) {
         setTokens((await res.json()).tokens ?? []);
         setErr(false);
@@ -1103,7 +1104,7 @@ function TokenPanel() {
   async function handleCreate() {
     setCreating(true);
     try {
-      const res = await fetch("/api/live-gateway/tokens", {
+      const res = await fetch(API_ROUTES.liveGateway.tokens, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newName.trim() || undefined }),
@@ -1454,7 +1455,7 @@ export function LiveGatewayPage() {
 
   const fetchConnections = useCallback(async () => {
     try {
-      const res = await fetch("/api/live-gateway/connections");
+      const res = await fetch(API_ROUTES.liveGateway.connections);
       if (res.ok) setConnections((await res.json()).connections || []);
     } catch {
       /* ignore */

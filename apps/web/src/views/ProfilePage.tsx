@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { User, Mail, Camera, Loader2, Trash2 } from "lucide-react";
 import { useAppContext } from "../components/context/AppContext";
+import { API_ROUTES } from "@/lib/api-routes";
 import { UPDATE_MY_PROFILE } from "../lib/graphql/mutations/profile";
 import { Breadcrumbs, Card, Button, PageLayout } from "../components/ui";
 import { AvatarCropDialog } from "../components/ui/AvatarCropDialog";
@@ -95,7 +96,7 @@ export function ProfilePage() {
         const formData = new FormData();
         formData.append("file", croppedBlob, "avatar.png");
 
-        const res = await fetch("/api/profile/avatar", {
+        const res = await fetch(API_ROUTES.profile.avatar, {
           method: "POST",
           body: formData,
         });
