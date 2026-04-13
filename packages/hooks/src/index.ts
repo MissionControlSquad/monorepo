@@ -7,3 +7,4 @@ export * from "./NotificationContext";
 export * from "./createPanelContext";
 export * from "./FeatureFlagContext";
 export * from "./AgentStatusContext";
+export * from "./resolveNotificationRoute";
