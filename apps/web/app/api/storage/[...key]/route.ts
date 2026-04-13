@@ -88,8 +88,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
     }
   }
 
-  // R2 objects are immutable once uploaded — cache aggressively
-  const cacheControl = isPublic
+  // Redirect cache TTL must stay below the presigned URL expiry (3600 s).
+  // If the browser caches the redirect longer than the signature lives,
+  // it will re-use a 302 pointing at an expired URL and get 403 from R2.
+  // 3300 s (55 min) gives a 5-min safety margin before the 60-min signature expires.
+  // Local-filesystem responses (dev fallback) serve actual bytes so they can
+  // use a longer immutable cache.
+  const redirectCacheControl = isPublic ? "public, max-age=3300" : "private, max-age=3300";
+  const fileCacheControl = isPublic
     ? "public, max-age=86400, immutable"
     : "private, max-age=86400, immutable";
 
@@ -143,7 +149,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
           "Content-Range": `bytes ${start}-${end}/${fileSize}`,
           "Content-Length": String(chunkSize),
           "Accept-Ranges": "bytes",
-          "Cache-Control": cacheControl,
+          "Cache-Control": fileCacheControl,
         },
       });
     }
@@ -154,16 +160,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
         "Content-Type": contentType,
         "Content-Length": String(fileSize),
         "Accept-Ranges": "bytes",
-        "Cache-Control": cacheControl,
+        "Cache-Control": fileCacheControl,
       },
     });
   }
 
-  // Otherwise serve from R2
+  // Redirect to a presigned R2 download URL.
+  // The redirect TTL (3300 s) is intentionally shorter than the presigned URL
+  // expiry (3600 s) so the browser always re-fetches a fresh redirect before
+  // the signature can expire.
   try {
     const downloadUrl = await generateDownloadUrl(storageKey);
     return NextResponse.redirect(downloadUrl, {
-      headers: { "Cache-Control": cacheControl },
+      headers: { "Cache-Control": redirectCacheControl },
     });
   } catch (err) {
     console.error(`[storage/download] Failed to generate download URL: key="${storageKey}"`, err);
