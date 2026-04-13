@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { successResponse, errorResponse } from "../_lib/json-response";
 
 // ── Config ─────────────────────────────────────────────────────────────────
 // Set RELEASES_BASE_URL in your deployment env (no trailing slash).
@@ -170,9 +170,9 @@ export async function GET() {
   try {
     const release = RELEASES_BASE_URL ? await fromS3(RELEASES_BASE_URL) : await fromGitHub();
 
-    return NextResponse.json(release);
+    return successResponse(release);
   } catch (err) {
     console.error("[desktop-release]", err);
-    return NextResponse.json({ error: "Could not load release info" }, { status: 502 });
+    return errorResponse("Could not load release info", 502);
   }
 }
