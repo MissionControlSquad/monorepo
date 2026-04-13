@@ -2,6 +2,8 @@ import { findCloudVMConnection } from "@agentcenter/database";
 import { sshUploadFile } from "@/server/services/ssh";
 import { getVMSSHConfig, ocExecStream } from "@/server/services/cloud-vm-utils";
 import { CloudVmStatus } from "@/server/constants";
+import { errorResponse } from "../../../_lib/json-response";
+import { ERR } from "../../../_lib/error-messages";
 
 /**
  * POST /api/cloud-vms/[id]/chat
@@ -16,26 +18,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { message, agentId } = body;
 
   if (!message || typeof message !== "string") {
-    return new Response(JSON.stringify({ error: "message is required" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return errorResponse("message is required", 400);
   }
 
   const vm = await findCloudVMConnection(id);
 
   if (!vm) {
-    return new Response(JSON.stringify({ error: "VM not found" }), {
-      status: 404,
-      headers: { "Content-Type": "application/json" },
-    });
+    return errorResponse(ERR.VM_NOT_FOUND, 404);
   }
 
   if (vm.status !== CloudVmStatus.RUNNING || !vm.ipv4 || !vm.sshPrivateKey) {
-    return new Response(JSON.stringify({ error: "VM is not running" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return errorResponse(ERR.VM_NOT_RUNNING, 400);
   }
 
   const sshConfig = getVMSSHConfig(vm);
