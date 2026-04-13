@@ -30,9 +30,9 @@ type FilterTab = AgentSetupFilter;
 
 const FILTER_LABELS: Record<FilterTab, string> = {
   all: "All",
-  active: "Active",
-  pending: "Pending",
-  deactivated: "Deactivated",
+  [SetupStatus.ACTIVE]: "Active",
+  [SetupStatus.PENDING_SETUP]: "Pending",
+  [SetupStatus.DEACTIVATED]: "Deactivated",
 };
 
 export default function AgentsScreen() {
@@ -73,9 +73,9 @@ export default function AgentsScreen() {
 
   const counts = useMemo(() => ({
     all: allAgents.length,
-    active: allAgents.filter((a) => a.setupStatus === SetupStatus.ACTIVE).length,
-    pending: allAgents.filter((a) => a.setupStatus === SetupStatus.PENDING_SETUP).length,
-    deactivated: allAgents.filter((a) => a.setupStatus === SetupStatus.DEACTIVATED).length,
+    [SetupStatus.ACTIVE]: allAgents.filter((a) => a.setupStatus === SetupStatus.ACTIVE).length,
+    [SetupStatus.PENDING_SETUP]: allAgents.filter((a) => a.setupStatus === SetupStatus.PENDING_SETUP).length,
+    [SetupStatus.DEACTIVATED]: allAgents.filter((a) => a.setupStatus === SetupStatus.DEACTIVATED).length,
   }), [allAgents]);
 
   if (fetching && allAgents.length === 0) return <ScreenLoading />;
@@ -91,7 +91,7 @@ export default function AgentsScreen() {
 
       {/* Filter tabs */}
       <View className="flex-row bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3">
-        {(["all", "active", "pending", "deactivated"] as FilterTab[]).map((tab) => (
+        {(["all", SetupStatus.ACTIVE, SetupStatus.PENDING_SETUP, SetupStatus.DEACTIVATED] as FilterTab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
             className={`flex-row items-center gap-1.5 py-2.5 px-2 border-b-2 ${filter === tab ? "border-blue-600" : "border-transparent"}`}
