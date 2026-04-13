@@ -2,8 +2,7 @@ import { recurringTaskModel } from "@/server/models";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { assertProjectMember } from "../../../_lib/project-access";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../../_lib/route-context";
 
 export async function POST(request: Request, ctx: RouteContext) {
   try {

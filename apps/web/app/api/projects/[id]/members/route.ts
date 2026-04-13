@@ -6,8 +6,7 @@ import { assertProjectLead } from "../../../_lib/project-access";
 import { Roles, ProjectMemberStatus } from "@/server/constants";
 import { invalidateProjectsList } from "@/server/cache";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../../_lib/route-context";
 
 export async function POST(request: Request, context: RouteContext) {
   try {

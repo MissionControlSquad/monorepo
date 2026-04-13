@@ -5,8 +5,7 @@ import { UPGRADE_CONFIG_TASK } from "@/server/upgrade-task";
 import { errorResponse, successResponse, handleError } from "../../../_lib/json-response";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertAssignableAgents } from "@/server/assignment-guard";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../../_lib/route-context";
 
 /**
  * POST /api/agents/:id/request-config-upgrade

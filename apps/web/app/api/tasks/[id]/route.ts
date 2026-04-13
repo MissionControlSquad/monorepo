@@ -15,8 +15,7 @@ import {
   tryDeliverReviewNotification,
 } from "@/server/services/live-task-delivery";
 import { TaskStatus, Priority } from "@/server/constants";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../_lib/route-context";
 
 export async function GET(request: Request, ctx: RouteContext) {
   try {

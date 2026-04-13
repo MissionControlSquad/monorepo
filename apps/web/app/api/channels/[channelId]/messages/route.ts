@@ -17,8 +17,8 @@ import { successResponse, errorResponse, handleError } from "../../../_lib/json-
 import { validateBody, createChannelMessageSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
 import { apiLimiters, checkRateLimit } from "../../../_lib/rate-limit-check";
-
-type RouteContext = { params: Promise<{ channelId: string }> };
+import type { RouteContext as _RouteContext } from "../../../_lib/route-context";
+type RouteContext = _RouteContext<{ channelId: string }>;
 
 // ---------- GET — Fetch messages ----------
 

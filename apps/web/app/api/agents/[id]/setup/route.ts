@@ -10,8 +10,7 @@ import {
 import { workspacePathUnix } from "@/server/workspace-paths";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { AgentLevel } from "@/server/constants";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../../_lib/route-context";
 
 /**
  * GET /api/agents/:id/setup

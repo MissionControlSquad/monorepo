@@ -4,8 +4,7 @@ import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { validateBody, updateQueueItemSchema } from "../../_lib/validation";
 import { log } from "../../_lib/logger";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../_lib/route-context";
 
 export async function PATCH(request: Request, ctx: RouteContext) {
   try {

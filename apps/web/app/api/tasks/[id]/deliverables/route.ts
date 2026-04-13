@@ -6,8 +6,7 @@ import { validateBody, createDeliverableSchema } from "../../../_lib/validation"
 import { log } from "../../../_lib/logger";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isSystemShutdown } from "@/server/system-settings";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../../_lib/route-context";
 
 export async function GET(request: Request, ctx: RouteContext) {
   try {

@@ -2,8 +2,8 @@ import { findChannelMember, markChannelRead } from "@agentcenter/database";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
-
-type RouteContext = { params: Promise<{ channelId: string }> };
+import type { RouteContext as _RouteContext } from "../../../_lib/route-context";
+type RouteContext = _RouteContext<{ channelId: string }>;
 
 /**
  * POST /api/channels/:channelId/read — Mark a channel as read without fetching messages.

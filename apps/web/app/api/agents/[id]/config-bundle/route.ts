@@ -2,8 +2,7 @@ import { agentModel } from "@/server/models";
 import { getTemplate } from "@/server/agent-templates";
 import { getConfigBundleForAgent } from "@/server/agent-config-generator";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../../_lib/route-context";
 
 /**
  * GET /api/agents/:id/config-bundle

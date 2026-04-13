@@ -2,8 +2,7 @@ import { agentModel } from "@/server/models";
 import { generateApiKey } from "@/server/api-key";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { invalidateAgentCache } from "@/server/cache";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../../_lib/route-context";
 
 /**
  * POST /api/agents/:id/regenerate-key

@@ -4,8 +4,7 @@ import { resolveAgent } from "../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
 import { isProjectShutdown } from "@/server/system-settings";
 import { ProjectStatus } from "@/server/constants";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../../_lib/route-context";
 
 export async function GET(request: Request, ctx: RouteContext) {
   try {

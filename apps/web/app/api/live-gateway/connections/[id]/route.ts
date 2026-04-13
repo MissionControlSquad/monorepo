@@ -11,8 +11,7 @@ import { apiLimiters } from "../../../_lib/rate-limit-check";
 import { withFeature } from "../../../_lib/with-feature";
 import { withRateLimit } from "../../../_lib/with-rate-limit";
 import { FLAG_KEYS } from "@agentcenter/utils";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../../_lib/route-context";
 
 async function deleteHandler(request: Request, ctx: RouteContext) {
   try {

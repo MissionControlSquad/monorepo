@@ -6,8 +6,8 @@ import { validateBody, updateDeliverableSchema } from "../../../../_lib/validati
 import { log } from "../../../../_lib/logger";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isSystemShutdown } from "@/server/system-settings";
-
-type RouteContext = { params: Promise<{ id: string; deliverableId: string }> };
+import type { RouteContext as _RouteContext } from "../../../../_lib/route-context";
+type RouteContext = _RouteContext<{ id: string; deliverableId: string }>;
 
 export async function PATCH(request: Request, ctx: RouteContext) {
   try {

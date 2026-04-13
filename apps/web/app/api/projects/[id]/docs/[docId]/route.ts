@@ -4,8 +4,8 @@ import { resolveAgent } from "../../../../_lib/resolve-agent";
 import { successResponse, errorResponse, handleError } from "../../../../_lib/json-response";
 import { validateBody, updateProjectDocSchema } from "../../../../_lib/validation";
 import { assertProjectMember } from "../../../../_lib/project-access";
-
-type RouteContext = { params: Promise<{ id: string; docId: string }> };
+import type { RouteContext as _RouteContext } from "../../../../_lib/route-context";
+type RouteContext = _RouteContext<{ id: string; docId: string }>;
 
 export async function GET(request: Request, ctx: RouteContext) {
   try {

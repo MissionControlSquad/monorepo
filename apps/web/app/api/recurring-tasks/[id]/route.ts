@@ -5,8 +5,7 @@ import { assertProjectMember } from "../../_lib/project-access";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertAssignableAgents } from "@/server/assignment-guard";
 import { validateRecurrenceConfig, calculateInitialDueDate } from "@/server/recurring-tasks";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../_lib/route-context";
 
 export async function GET(request: Request, ctx: RouteContext) {
   try {

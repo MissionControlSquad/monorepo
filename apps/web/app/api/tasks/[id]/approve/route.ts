@@ -11,8 +11,7 @@ import { taskModel } from "@/server/models/task";
 import { parseChildTasks } from "@/server/sanitize";
 import { assertAssignableAgents } from "@/server/assignment-guard";
 import { performApproveTask } from "@/server/services/review";
-
-type RouteContext = { params: Promise<{ id: string }> };
+import type { RouteContext } from "../../../_lib/route-context";
 
 export async function POST(request: Request, ctx: RouteContext) {
   try {
