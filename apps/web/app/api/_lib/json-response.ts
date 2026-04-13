@@ -2,16 +2,20 @@ import { NextResponse } from "next/server";
 import { captureError } from "@/server/error-tracking";
 
 /**
- * Assert that a value is non-null/undefined, throwing a structured 404 that
+ * Assert that a value is non-null/undefined, throwing a structured error that
  * handleError() converts to a proper error response. Use after findById():
  *
  *   const task = await taskModel.findById(id);
- *   assertFound(task, ERR.TASK_NOT_FOUND);
- *   // task is now T (non-null), 404 thrown if missing
+ *   assertFound(task, ERR.TASK_NOT_FOUND);            // → 404
+ *   assertFound(membership, ERR.NOT_CHANNEL_MEMBER, 403);  // → 403
  */
-export function assertFound<T>(value: T | null | undefined, message: string): asserts value is T {
+export function assertFound<T>(
+  value: T | null | undefined,
+  message: string,
+  status = 404,
+): asserts value is T {
   if (value == null) {
-    throw { error: message, status: 404 };
+    throw { error: message, status };
   }
 }
 

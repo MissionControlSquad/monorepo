@@ -13,7 +13,12 @@ import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { parseMentionIds } from "@agentcenter/utils";
 import { resolveAgent } from "../../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import {
+  successResponse,
+  errorResponse,
+  handleError,
+  assertFound,
+} from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { parsePaginationParams } from "../../../_lib/pagination";
 import { validateBody, createChannelMessageSchema } from "../../../_lib/validation";
@@ -31,9 +36,7 @@ export async function GET(request: Request, ctx: RouteContext) {
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
     const membership = await findChannelMember(channelId, agentProfileId);
-    if (!membership) {
-      return errorResponse(ERR.NOT_CHANNEL_MEMBER, 403);
-    }
+    assertFound(membership, ERR.NOT_CHANNEL_MEMBER, 403);
 
     const { searchParams } = new URL(request.url);
     const unreadOnly = searchParams.get("unreadOnly") !== "false";
@@ -73,9 +76,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
     const membership = await findChannelMember(channelId, agentProfileId);
-    if (!membership) {
-      return errorResponse(ERR.NOT_CHANNEL_MEMBER, 403);
-    }
+    assertFound(membership, ERR.NOT_CHANNEL_MEMBER, 403);
 
     const { content: rawContent, attachmentIds } = v.data;
     const content = escapeHtml(rawContent.trim());

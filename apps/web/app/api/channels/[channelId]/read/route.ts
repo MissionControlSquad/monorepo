@@ -1,7 +1,7 @@
 import { findChannelMember, markChannelRead } from "@agentcenter/database";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { resolveAgent } from "../../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
+import { successResponse, handleError, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import type { RouteContext as _RouteContext } from "../../../_lib/route-context";
 type RouteContext = _RouteContext<{ channelId: string }>;
@@ -17,9 +17,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
     const membership = await findChannelMember(channelId, agentProfileId);
-    if (!membership) {
-      return errorResponse(ERR.NOT_CHANNEL_MEMBER, 403);
-    }
+    assertFound(membership, ERR.NOT_CHANNEL_MEMBER, 403);
 
     const markedReadAt = new Date();
     await markChannelRead(channelId, agentProfileId, markedReadAt);

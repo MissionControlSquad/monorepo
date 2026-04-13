@@ -32,10 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const sshConfig = getVMSSHConfig(vm);
 
   if (!agentId || typeof agentId !== "string") {
-    return new Response(JSON.stringify({ error: "agentId is required" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return errorResponse("agentId is required", 400);
   }
 
   const targetAgent = agentId;
