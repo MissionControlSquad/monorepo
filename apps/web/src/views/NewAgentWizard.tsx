@@ -25,6 +25,7 @@ import {
   MonitorDown,
 } from "lucide-react";
 import { AGENTS_QUERY } from "../lib/graphql/queries";
+import { Roles } from "@/server/constants";
 import { CREATE_TASK_FROM_DASHBOARD } from "../lib/graphql/mutations/tasks";
 import { Button, Badge } from "../components/ui";
 import { useFeatureFlag } from "../components/context/FeatureFlagContext";
@@ -141,7 +142,7 @@ export function NewAgentWizard() {
   const squadLeads =
     agentsResult.data?.agents?.filter(
       (a: { role?: string; setupStatus?: string }) =>
-        a.role === "Squad Lead" && a.setupStatus !== "deactivated",
+        a.role === Roles.SQUAD_LEAD && a.setupStatus !== "deactivated",
     ) ?? [];
   const hasSquadLead = squadLeads.length > 0;
   const cloudVmsEnabled = useFeatureFlag(FLAG_KEYS.CLOUD_VMS);

@@ -21,6 +21,7 @@
 import { findConnectionByAgentSlug, enqueuePendingDelivery } from "@agentcenter/database";
 import { connectionRegistry } from "./live-connection-registry";
 import { LIVE_GATEWAY } from "@agentcenter/types";
+import { Roles } from "../constants";
 
 /** Same threshold as heartbeat-preflight overlapping check. */
 const OVERLAPPING_TTL_MS = 5 * 60 * 1000;
@@ -203,8 +204,11 @@ async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Prom
           `[live-delivery] Notification "${opts.kind}" not delivered to ${slug} — heartbeat fallback applies`,
         );
       }
-    } catch {
-      // swallow — notifications are best-effort
+    } catch (err) {
+      console.error(
+        `[live-delivery] Unexpected error delivering "${opts.kind}" to agent ${slug}:`,
+        err,
+      );
     }
   }
 }
@@ -299,7 +303,7 @@ export async function tryDeliverInboxTaskNotification(
     } else {
       const squadLeads = await prisma.agent
         .findMany({
-          where: { id: { in: projectAgentIds }, role: "Squad Lead" },
+          where: { id: { in: projectAgentIds }, role: Roles.SQUAD_LEAD },
           select: { id: true },
         })
         .catch(() => []);
@@ -310,7 +314,7 @@ export async function tryDeliverInboxTaskNotification(
     // Once they assign to specific agents the normal assignment flow takes over.
     const squadLeads = await prisma.agent
       .findMany({
-        where: { setupStatus: "active", role: "Squad Lead" },
+        where: { setupStatus: "active", role: Roles.SQUAD_LEAD },
         select: { id: true },
       })
       .catch(() => []);
@@ -433,7 +437,7 @@ export async function tryDeliverReviewNotification(
   // Filter to squad leads only
   const squadLeads = await prisma.agent
     .findMany({
-      where: { id: { in: agentIds }, role: "Squad Lead" },
+      where: { id: { in: agentIds }, role: Roles.SQUAD_LEAD },
       select: { id: true },
     })
     .catch(() => []);

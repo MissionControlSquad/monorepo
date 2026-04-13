@@ -12,6 +12,7 @@ import { useAgentDetail } from "../context/AgentDetailContext";
 import { useAgentStatus } from "../context/AgentStatusContext";
 import { AGENT_LEVELS } from "../../lib/constants";
 import type { AgentDetailedStatus, AgentLevel } from "../../lib/constants";
+import { Roles } from "@/server/constants";
 import { Button } from "../ui";
 import type { Agent } from "@agentcenter/types";
 
@@ -27,9 +28,9 @@ export function AgentProfileHeader({ agent }: AgentProfileHeaderProps) {
   const isDeactivated = agent.setupStatus === "deactivated";
   const { getOnlineInfo, agents } = useAgentStatus();
   const isLastLead =
-    agent.role === "Squad Lead" &&
+    agent.role === Roles.SQUAD_LEAD &&
     !isDeactivated &&
-    (agents?.filter((a: Agent) => a.role === "Squad Lead" && a.setupStatus !== "deactivated")
+    (agents?.filter((a: Agent) => a.role === Roles.SQUAD_LEAD && a.setupStatus !== "deactivated")
       .length ?? 0) <= 1;
   const { isOnline, lastSeenFormatted } = getOnlineInfo(agent._id ?? agent.id);
   const detailedStatus = agent.detailedStatus as AgentDetailedStatus | undefined;

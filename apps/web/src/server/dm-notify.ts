@@ -70,13 +70,16 @@ export async function notifyAgentChannelMembers(
         message.fromProfile?.username ?? message.fromProfile?.displayName ?? "unknown";
       const plainContent = message.content.replace(/<[^>]*>/g, "").trim();
 
+      // Skip live push if content stripped to nothing (e.g. attachment-only messages).
+      if (!plainContent) return;
+
       if (isDm) {
         tryDeliverDmNotification(agentIdsToNotify, {
           channelId,
           messageId,
           content: plainContent,
           fromHandle,
-        }).catch(() => undefined);
+        }).catch((err) => console.error("[dm-notify] tryDeliverDmNotification failed:", err));
       } else {
         tryDeliverChannelMentionNotification(agentIdsToNotify, {
           channelId,
@@ -84,7 +87,9 @@ export async function notifyAgentChannelMembers(
           content: plainContent,
           fromHandle,
           channelName: channel.slug ?? undefined,
-        }).catch(() => undefined);
+        }).catch((err) =>
+          console.error("[dm-notify] tryDeliverChannelMentionNotification failed:", err),
+        );
       }
     }
   }

@@ -10,6 +10,7 @@ import { ProjectMemberEditor } from "./ProjectMemberEditor";
 import { Button } from "../ui";
 import { Input } from "@/components/ui/shadcn/input";
 import type { ProfileWithAgent } from "@agentcenter/types";
+import { Roles } from "@/server/constants";
 import { useForm } from "react-hook-form";
 import {
   Form,
@@ -49,7 +50,7 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
 
   // Find the Squad Lead's profile ID by checking agent.role
   const squadLeadProfileId = profiles?.find(
-    (p: ProfileWithAgent) => p.agent?.role === "Squad Lead",
+    (p: ProfileWithAgent) => p.agent?.role === Roles.SQUAD_LEAD,
   )?.id;
 
   const handleToggleMember = (profileId: string) => {
