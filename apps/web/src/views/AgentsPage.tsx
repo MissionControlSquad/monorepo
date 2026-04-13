@@ -24,7 +24,6 @@ import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout } from 
 import { ProfileAvatar } from "../components/ui/ProfileAvatar";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 import type { AgentDetailedStatus } from "../lib/constants";
-import { SetupStatus } from "@/server/constants";
 import type { AgentStatusValue } from "@/server/constants";
 
 type AgentFromQuery = {
@@ -56,9 +55,9 @@ export function AgentsPage() {
   }
 
   const agentList = agents ?? ([] as AgentFromQuery[]);
-  const activeAgents = filterAgentsBySetup(agentList, SetupStatus.ACTIVE, search);
-  const pendingAgents = filterAgentsBySetup(agentList, SetupStatus.PENDING_SETUP, search);
-  const deactivatedAgents = filterAgentsBySetup(agentList, SetupStatus.DEACTIVATED, search);
+  const activeAgents = filterAgentsBySetup(agentList, "active", search);
+  const pendingAgents = filterAgentsBySetup(agentList, "pending", search);
+  const deactivatedAgents = filterAgentsBySetup(agentList, "deactivated", search);
   const isEmpty = agents && agents.length === 0;
   const visibleCount = activeAgents.length + pendingAgents.length;
 
