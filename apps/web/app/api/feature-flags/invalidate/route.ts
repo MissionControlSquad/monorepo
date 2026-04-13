@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { successResponse, errorResponse } from "../../_lib/json-response";
 import { invalidateFlagCache } from "@/server/feature-flags";
 import { pubsub, PubSubEvent } from "@/server/pubsub";
 
@@ -7,11 +8,11 @@ export async function POST(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
 
   if (!secret || auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   invalidateFlagCache();
   pubsub.publish(PubSubEvent.FEATURE_FLAGS.CHANGED, {});
 
-  return NextResponse.json({ ok: true });
+  return successResponse({ ok: true });
 }

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { successResponse, errorResponse } from "../../_lib/json-response";
 import {
   findStaleSetupCloudVMs,
   markCloudVMError,
@@ -18,7 +18,7 @@ const COST_CENTS_PER_HOUR = 0.6;
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const now = new Date();
@@ -74,7 +74,7 @@ export async function GET(request: Request) {
     uptimeUpdated++;
   }
 
-  return NextResponse.json({
+  return successResponse({
     ok: true,
     timedOut,
     uptimeUpdated,
