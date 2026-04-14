@@ -55,16 +55,19 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
+              // HubSpot widget loads sub-scripts from: hs-scripts, hs-banner, hstatic, hsappstatic,
+              // hsforms, hscollectedforms, hs-analytics, usemessages
               process.env.NODE_ENV === "development"
-                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-                : "script-src 'self' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com",
-              "font-src 'self'",
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.hs-scripts.com https://*.hs-banner.com https://*.hsforms.net https://*.hsforms.com https://*.hstatic.net https://*.hsappstatic.net https://*.usemessages.com https://*.hs-analytics.net https://*.hscollectedforms.net"
+                : "script-src 'self' 'unsafe-inline' https://*.hs-scripts.com https://*.hs-banner.com https://*.hsforms.net https://*.hsforms.com https://*.hstatic.net https://*.hsappstatic.net https://*.usemessages.com https://*.hs-analytics.net https://*.hscollectedforms.net",
+              "style-src 'self' 'unsafe-inline' https://*.hstatic.net https://*.hsappstatic.net",
+              "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.hubspot.com https://*.hubapi.com https://*.hstatic.net https://*.hsforms.com https://*.hsappstatic.net",
+              "font-src 'self' https://*.hstatic.net https://*.hsappstatic.net",
               "media-src 'self' blob: https://*.r2.cloudflarestorage.com",
               "object-src 'self' blob: https://*.r2.cloudflarestorage.com",
-              "frame-src 'self' blob: https://*.r2.cloudflarestorage.com",
-              "connect-src 'self' ws: wss: https://*.r2.cloudflarestorage.com",
+              "frame-src 'self' blob: https://*.r2.cloudflarestorage.com https://*.hubspot.com https://*.hsforms.com",
+              // HubSpot widget connects to: hubspot, hubapi, usemessages, hscollectedforms, hsforms, hsappstatic
+              "connect-src 'self' ws: wss: https://*.r2.cloudflarestorage.com https://*.hubspot.com https://*.hubapi.com https://*.usemessages.com https://*.hscollectedforms.net https://*.hsforms.com https://*.hsappstatic.net https://ipapi.co",
               "worker-src 'self' blob:",
               "frame-ancestors 'none'",
               "base-uri 'self'",

@@ -67,6 +67,17 @@ const serverSchema = z.object({
   // ── Redis (optional — only needed when using pub/sub or caching) ──
   REDIS_URL: z.string().url().optional(),
 
+  // ── Support ─────────────────────────────────────────────
+  SUPPORT_EMAIL: z
+    .union([z.string().email(), z.literal("")])
+    .optional()
+    .transform((v) => v || undefined)
+    .default("dharmendra@agentcenter.cloud"),
+  SLACK_SUPPORT_WEBHOOK_URL: z
+    .union([z.string().url(), z.literal("")])
+    .optional()
+    .transform((v) => v || undefined),
+
   // ── Optional ─────────────────────────────────────────────
   NEXT_PUBLIC_MC_URL: z
     .union([z.string().url(), z.literal("")])

@@ -9,6 +9,7 @@ export function RuntimeEnvScript() {
     VAPID_PUBLIC_KEY:
       process.env.VAPID_PUBLIC_KEY ||
       "BEAGuNNkK6E6ijU7Q8PrUwQB5E6yxVGGiPZtYd7jrLJlt19ge_9pYT76yrWgLr7WH4zrN33oWk-T_UEBoerEBus",
+    HUBSPOT_PORTAL_ID: process.env.HUBSPOT_PORTAL_ID ?? "245421601",
   };
 
   return (

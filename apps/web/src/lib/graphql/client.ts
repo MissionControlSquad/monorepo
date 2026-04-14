@@ -142,6 +142,7 @@ export const urqlClient = new Client({
         TasksByStatus: () => null,
         WorkSummary: () => null,
         MessageConnection: () => null,
+        FeatureFlag: () => null,
       },
       updates: {
         Mutation: {
