@@ -246,6 +246,7 @@ export async function tryDeliverMentionNotification(
   opts: { fromName: string; taskTitle: string; taskId: string; messageId?: string },
 ): Promise<void> {
   if (!agentIds.length) return;
+  if (!(await isLiveGatewayEnabled())) return;
 
   const assignedSet = await getTaskAssignedSubset(opts.taskId, agentIds);
   const assignedIds = agentIds.filter((id) => assignedSet.has(id));
@@ -283,6 +284,8 @@ export async function tryDeliverInboxTaskNotification(
   taskTitle: string,
   excludeAgentIds: string[] = [],
 ): Promise<void> {
+  if (!(await isLiveGatewayEnabled())) return;
+
   let agentIds: string[];
 
   if (projectId) {
@@ -309,6 +312,7 @@ export async function tryDeliverTaskDoneNotification(
   taskId: string,
   taskTitle: string,
 ): Promise<void> {
+  if (!(await isLiveGatewayEnabled())) return;
   const agentIds = await getTaskAssigneeAgentIds(taskId);
   if (!agentIds.length) return;
 
@@ -327,6 +331,7 @@ export async function tryDeliverTaskApprovedNotification(
   opts: { taskTitle: string; taskId: string; reviewerName: string },
 ): Promise<void> {
   if (!agentIds.length) return;
+  if (!(await isLiveGatewayEnabled())) return;
   await sendNotifyToAgents(agentIds, {
     kind: "task_approved",
     content: `Your task "${trunc(opts.taskTitle, 200)}" ${taskRef(opts.taskId)} was approved by ${opts.reviewerName}. Mark it complete in your records per your PLAYBOOK.`,
@@ -342,6 +347,7 @@ export async function tryDeliverTaskRejectedNotification(
   opts: { taskTitle: string; taskId: string; reviewerName: string; rejectionReason: string },
 ): Promise<void> {
   if (!agentIds.length) return;
+  if (!(await isLiveGatewayEnabled())) return;
   await sendNotifyToAgents(agentIds, {
     kind: "task_rejected",
     content: `Your task "${trunc(opts.taskTitle, 200)}" ${taskRef(opts.taskId)} was rejected by ${opts.reviewerName}: ${trunc(opts.rejectionReason, 500)}. Rework and resubmit per your PLAYBOOK.`,
@@ -357,6 +363,7 @@ export async function tryDeliverClarificationNotification(
   opts: { taskTitle: string; taskId: string; reviewerName: string; questions: string[] },
 ): Promise<void> {
   if (!agentIds.length) return;
+  if (!(await isLiveGatewayEnabled())) return;
   const questionText = trunc(opts.questions.slice(0, 3).join(" | "), 400);
   await sendNotifyToAgents(agentIds, {
     kind: "task_clarification",
@@ -375,6 +382,7 @@ export async function tryDeliverReviewNotification(
   taskTitle: string,
 ): Promise<void> {
   if (!projectId) return;
+  if (!(await isLiveGatewayEnabled())) return;
 
   const agentIds = await getProjectSquadLeadAgentIds(projectId);
   if (!agentIds.length) return;
@@ -395,6 +403,7 @@ export async function tryDeliverTaskActivityNotification(
   opts: { fromName: string; taskTitle: string; taskId: string; messageId: string },
 ): Promise<void> {
   if (!agentIds.length) return;
+  if (!(await isLiveGatewayEnabled())) return;
   await sendNotifyToAgents(agentIds, {
     kind: "task_clarification",
     content: `${opts.fromName} posted a message on task "${trunc(opts.taskTitle, 200)}" ${taskRef(opts.taskId)}. Check the message and respond if needed, then continue your PLAYBOOK.`,
@@ -410,6 +419,7 @@ export async function tryDeliverDocumentNotification(
   taskId: string,
   opts: { creatorName: string; docType: string; docTitle: string; taskTitle: string },
 ): Promise<void> {
+  if (!(await isLiveGatewayEnabled())) return;
   const agentIds = await getTaskAssigneeAgentIds(taskId);
   if (!agentIds.length) return;
   await sendNotifyToAgents(agentIds, {
@@ -426,6 +436,7 @@ export async function tryDeliverStatusChangeNotification(
   taskId: string,
   opts: { taskTitle: string; toStatus: string; changedBy?: string },
 ): Promise<void> {
+  if (!(await isLiveGatewayEnabled())) return;
   const agentIds = await getTaskAssigneeAgentIds(taskId);
   if (!agentIds.length) return;
   const by = opts.changedBy ? ` by ${opts.changedBy}` : "";
@@ -443,6 +454,7 @@ export async function tryDeliverTaskFieldsUpdatedNotification(
   taskId: string,
   opts: { taskTitle: string; changedFields: string[] },
 ): Promise<void> {
+  if (!(await isLiveGatewayEnabled())) return;
   const agentIds = await getTaskAssigneeAgentIds(taskId);
   if (!agentIds.length) return;
   const fields = opts.changedFields.slice(0, 5).join(", ");
@@ -463,6 +475,7 @@ export async function tryDeliverDmNotification(
   opts: { channelId: string; messageId: string; content: string; fromHandle: string },
 ): Promise<void> {
   if (!agentIds.length) return;
+  if (!(await isLiveGatewayEnabled())) return;
   await sendNotifyToAgents(agentIds, {
     kind: ChannelVisibility.DM,
     content: `DM from @${opts.fromHandle}: ${trunc(opts.content, 400)}. Reply via POST /api/channels/${opts.channelId}/messages per your PLAYBOOK.`,
@@ -486,6 +499,7 @@ export async function tryDeliverChannelMentionNotification(
   },
 ): Promise<void> {
   if (!agentIds.length) return;
+  if (!(await isLiveGatewayEnabled())) return;
   const where = opts.channelName ? `in #${opts.channelName}` : "in a channel";
   await sendNotifyToAgents(agentIds, {
     kind: "channel_mention",
