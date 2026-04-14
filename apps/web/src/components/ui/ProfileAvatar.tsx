@@ -140,7 +140,7 @@ function ProfileAvatarFromContext({
   if (lookupType === "profile") {
     const profile = profileById.get(lookupId);
     if (profile) {
-      src = getAssetUrl(profile.avatarUrl as string | undefined);
+      src = getAssetUrl(profile.avatarUrl as string | undefined, { public: true });
       emoji =
         (profile.agent as { identityEmoji?: string | null } | undefined)?.identityEmoji ?? null;
       name = profile.displayName ?? null;

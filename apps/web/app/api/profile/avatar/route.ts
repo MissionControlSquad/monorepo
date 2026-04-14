@@ -78,11 +78,9 @@ export async function POST(request: Request) {
     await writeFile(join(subDir, localFileName), buffer);
   }
 
-  // Build the serving URL
-  const avatarUrl = `/api/storage/${storageKey}?public=1`;
+  // Store the bare storage key — same pattern as deliverables.
+  // The proxy URL is computed at render time so it can never be a stale presigned URL.
+  await updateProfileAvatar(profileId, storageKey);
 
-  // Update the profile
-  await updateProfileAvatar(profileId, avatarUrl);
-
-  return successResponse({ avatarUrl });
+  return successResponse({ avatarUrl: storageKey });
 }

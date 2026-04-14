@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { User, Mail, Camera, Loader2, Trash2 } from "lucide-react";
+import { getAssetUrl } from "@agentcenter/utils";
 import { useAppContext } from "../components/context/AppContext";
 import { API_ROUTES } from "@/lib/api-routes";
 import { UPDATE_MY_PROFILE } from "../lib/graphql/mutations/profile";
@@ -177,7 +178,11 @@ export function ProfilePage() {
             >
               {avatarUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                <img
+                  src={getAssetUrl(avatarUrl, { public: true }) ?? undefined}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <span className="text-xl font-semibold text-muted-foreground">
                   {watchedDisplayName?.[0]?.toUpperCase() ?? "?"}

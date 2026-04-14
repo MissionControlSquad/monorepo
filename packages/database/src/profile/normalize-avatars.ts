@@ -8,7 +8,12 @@ import { prisma } from "../client";
 
 export async function findProfilesWithR2AvatarUrl() {
   return prisma.profile.findMany({
-    where: { avatarUrl: { contains: "r2.cloudflarestorage.com" } },
+    where: {
+      OR: [
+        { avatarUrl: { contains: "r2.cloudflarestorage.com" } },
+        { avatarUrl: { startsWith: "/api/storage/" } },
+      ],
+    },
     select: { id: true, avatarUrl: true },
   });
 }

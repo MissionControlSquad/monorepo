@@ -25,19 +25,27 @@ async function normalizeAvatarUrls() {
   let updated = 0;
   for (const profile of profiles) {
     const raw = profile.avatarUrl!;
+    let storageKey: string | null = null;
+
+    // Raw R2 presigned URL → bare key (strip bucket prefix from path)
     try {
       const url = new URL(raw);
-      if (!url.hostname.endsWith("r2.cloudflarestorage.com")) continue;
-      const segments = url.pathname.replace(/^\//, "").split("/");
-      const storageKey = segments.slice(1).join("/");
-      if (!storageKey) continue;
-
-      const normalized = `/api/storage/${storageKey}?public=1`;
-      await updateProfileAvatarUrl(profile.id, normalized);
-      updated++;
+      if (url.hostname.endsWith("r2.cloudflarestorage.com")) {
+        const segments = url.pathname.replace(/^\//, "").split("/");
+        storageKey = segments.slice(1).join("/") || null;
+      }
     } catch {
-      // Not a valid URL — skip
+      // Not a valid URL
     }
+
+    // Legacy proxy path /api/storage/avatars/uuid.png?public=1 → bare key
+    if (!storageKey && raw.startsWith("/api/storage/")) {
+      storageKey = raw.replace("/api/storage/", "").split("?")[0];
+    }
+
+    if (!storageKey) continue;
+    await updateProfileAvatarUrl(profile.id, storageKey);
+    updated++;
   }
 
   if (updated > 0) {
