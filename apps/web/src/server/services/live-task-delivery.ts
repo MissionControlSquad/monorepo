@@ -18,17 +18,18 @@
  *  agent.currentTaskId set + agent.lastHeartbeat within 5 min → agent is busy → defer.
  */
 
-import { findConnectionByAgentSlug, enqueuePendingDelivery } from "@agentcenter/database";
+import {
+  findConnectionByAgentSlug,
+  enqueuePendingDelivery,
+  getTaskAssigneeAgentIds,
+  getTaskAssignedSubset,
+  getProjectSquadLeadAgentIds,
+  getWorkspaceSquadLeadAgentIds,
+  getAgentsNotifyState,
+} from "@agentcenter/database";
 import { connectionRegistry } from "./live-connection-registry";
 import { LIVE_GATEWAY } from "@agentcenter/types";
-import { MAX_MESSAGE_BYTES } from "@agentcenter/utils";
-import {
-  Roles,
-  ProfileKind,
-  ProjectMemberStatus,
-  SetupStatus,
-  ChannelVisibility,
-} from "../constants";
+import { MAX_MESSAGE_BYTES, ChannelVisibility } from "@agentcenter/utils";
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
@@ -56,64 +57,6 @@ function trunc(str: string, max: number): string {
 /** Standard task reference appended to every content string so agents can call MC APIs. */
 function taskRef(taskId: string): string {
   return `(task ID: ${taskId})`;
-}
-
-/** Fetch all agent IDs assigned to a task. */
-async function getTaskAssigneeAgentIds(taskId: string): Promise<string[]> {
-  const { prisma } = await import("../prisma");
-  const rows = await prisma.taskAssignee
-    .findMany({
-      where: { taskId },
-      select: { profile: { select: { agentId: true } } },
-    })
-    .catch(() => []);
-  return rows.map((r) => r.profile?.agentId).filter(Boolean) as string[];
-}
-
-/**
- * From a candidate set of agent IDs, return the subset that are actually assigned
- * to the given task. Used by mention delivery to split assigned vs unassigned.
- */
-async function getAssignedSubset(taskId: string, agentIds: string[]): Promise<Set<string>> {
-  if (!agentIds.length) return new Set();
-  const { prisma } = await import("../prisma");
-  const rows = await prisma.taskAssignee
-    .findMany({
-      where: { taskId, profile: { agentId: { in: agentIds } } },
-      select: { profile: { select: { agentId: true } } },
-    })
-    .catch(() => []);
-  return new Set(rows.map((r) => r.profile?.agentId).filter(Boolean) as string[]);
-}
-
-/**
- * Fetch the agent IDs of all squad lead agents who are active members of a project.
- * Used by inbox and review notifications — both need the same set.
- */
-async function getProjectSquadLeadAgentIds(projectId: string): Promise<string[]> {
-  const { prisma } = await import("../prisma");
-
-  const members = await prisma.projectMember
-    .findMany({
-      where: { projectId, status: ProjectMemberStatus.ACTIVE },
-      select: { profile: { select: { agentId: true, kind: true } } },
-    })
-    .catch(() => []);
-
-  const projectAgentIds = members
-    .filter((m) => m.profile?.kind === ProfileKind.AGENT && m.profile?.agentId)
-    .map((m) => m.profile!.agentId as string);
-
-  if (!projectAgentIds.length) return [];
-
-  const squadLeads = await prisma.agent
-    .findMany({
-      where: { id: { in: projectAgentIds }, role: Roles.SQUAD_LEAD },
-      select: { id: true },
-    })
-    .catch(() => []);
-
-  return squadLeads.map((a) => a.id);
 }
 
 // ─── Task delivery (mc.deliver_task, with DB queue + ack) ─────────────────────
@@ -154,14 +97,7 @@ export async function tryDeliverTaskToLiveAgents(
 ): Promise<void> {
   if (!agentIds.length) return;
 
-  const { prisma } = await import("../prisma");
-
-  const agents = await prisma.agent
-    .findMany({
-      where: { id: { in: agentIds } },
-      select: { id: true, username: true, name: true, currentTaskId: true, lastHeartbeat: true },
-    })
-    .catch(() => []);
+  const agents = await getAgentsNotifyState(agentIds);
 
   for (const agent of agents) {
     const slug = agentSlug(agent);
@@ -240,14 +176,7 @@ interface NotifyOptions {
 async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Promise<void> {
   if (!agentIds.length) return;
 
-  const { prisma } = await import("../prisma");
-
-  const agents = await prisma.agent
-    .findMany({
-      where: { id: { in: agentIds } },
-      select: { id: true, username: true, name: true, currentTaskId: true, lastHeartbeat: true },
-    })
-    .catch(() => []);
+  const agents = await getAgentsNotifyState(agentIds);
 
   for (const agent of agents) {
     const slug = agentSlug(agent);
@@ -298,7 +227,7 @@ export async function tryDeliverMentionNotification(
 ): Promise<void> {
   if (!agentIds.length) return;
 
-  const assignedSet = await getAssignedSubset(opts.taskId, agentIds);
+  const assignedSet = await getTaskAssignedSubset(opts.taskId, agentIds);
   const assignedIds = agentIds.filter((id) => assignedSet.has(id));
   const unassignedIds = agentIds.filter((id) => !assignedSet.has(id));
 
@@ -334,21 +263,14 @@ export async function tryDeliverInboxTaskNotification(
   taskTitle: string,
   excludeAgentIds: string[] = [],
 ): Promise<void> {
-  const { prisma } = await import("../prisma");
-
   let agentIds: string[];
 
   if (projectId) {
     const ids = await getProjectSquadLeadAgentIds(projectId);
     agentIds = ids.filter((id) => !excludeAgentIds.includes(id));
   } else {
-    const squadLeads = await prisma.agent
-      .findMany({
-        where: { setupStatus: SetupStatus.ACTIVE, role: Roles.SQUAD_LEAD },
-        select: { id: true },
-      })
-      .catch(() => []);
-    agentIds = squadLeads.map((a) => a.id).filter((id) => !excludeAgentIds.includes(id));
+    const ids = await getWorkspaceSquadLeadAgentIds();
+    agentIds = ids.filter((id) => !excludeAgentIds.includes(id));
   }
 
   if (!agentIds.length) return;
