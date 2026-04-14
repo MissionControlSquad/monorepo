@@ -18,6 +18,7 @@ class MessageModel extends Model<Message> {
       fromProfileId: string;
       fromAgentId?: string;
       mentionedAgentIds: string[];
+      taskAssigneeIds: string[];
     },
   ) {
     await emit({
@@ -31,6 +32,7 @@ class MessageModel extends Model<Message> {
       taskTitle: ctx.taskTitle,
       fromAgentName: ctx.fromAgentName,
       mentionedAgentIds: ctx.mentionedAgentIds,
+      taskAssigneeIds: ctx.taskAssigneeIds,
     });
   }
 }

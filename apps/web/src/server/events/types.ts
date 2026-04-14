@@ -169,6 +169,8 @@ export type MessageCreatedEvent = {
   content: string;
   mentionedAgentIds: string[];
   mentionedProfileIds?: string[];
+  /** Agent IDs currently assigned to this task — used for live activity push */
+  taskAssigneeIds: string[];
 };
 
 export type DocumentCreatedEvent = {

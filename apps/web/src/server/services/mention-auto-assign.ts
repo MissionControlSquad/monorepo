@@ -17,9 +17,17 @@
  *  - Never throws — all errors are caught and logged.
  */
 
-import { Roles, ProjectMemberStatus } from "../constants";
+import { Roles } from "../constants";
 import { getOrCreateAgentProfileId } from "../agent-profile";
 import { taskModel } from "../models";
+import {
+  findAgentById,
+  findTaskByIdSelect,
+  getTaskAssigneeProfileIds,
+  getAgentsWithProfiles,
+  addTaskAssignees,
+  ensureProjectMember,
+} from "@agentcenter/database";
 
 export interface MentionAutoAssignOpts {
   taskId: string;
@@ -36,47 +44,29 @@ export async function tryMentionAutoAssign(opts: MentionAutoAssignOpts): Promise
   if (!opts.mentionedAgentIds.length) return [];
 
   try {
-    const { prisma } = await import("../prisma");
-
     // Only Squad Leaders trigger auto-assignment via mentions.
-    const sender = await prisma.agent
-      .findUnique({ where: { id: opts.fromAgentId }, select: { role: true } })
-      .catch(() => null);
+    const sender = await findAgentById(opts.fromAgentId);
     if (sender?.role !== Roles.SQUAD_LEAD) return [];
 
     // Load the task — need full fields to emit the assignees-changed event downstream.
-    const task = await prisma.task
-      .findUnique({
-        where: { id: opts.taskId },
-        select: {
-          id: true,
-          taskNumber: true,
-          title: true,
-          description: true,
-          priority: true,
-          projectId: true,
-        },
-      })
-      .catch(() => null);
+    const task = await findTaskByIdSelect(opts.taskId, {
+      id: true,
+      taskNumber: true,
+      title: true,
+      description: true,
+      priority: true,
+      projectId: true,
+    });
     if (!task) return [];
 
     // Current assignee profileIds — used to skip already-assigned agents.
-    const existing = await prisma.taskAssignee
-      .findMany({ where: { taskId: opts.taskId }, select: { profileId: true } })
-      .catch(() => []);
-    const existingProfileIds = new Set(existing.map((a) => a.profileId));
+    const existingProfileIds = new Set(await getTaskAssigneeProfileIds(opts.taskId));
 
     // Resolve mentioned agents and their profiles.
-    const agents = await prisma.agent
-      .findMany({
-        where: { id: { in: opts.mentionedAgentIds } },
-        select: { id: true, name: true, profile: { select: { id: true } } },
-      })
-      .catch(() => []);
+    const agents = await getAgentsWithProfiles(opts.mentionedAgentIds);
 
     const toAssign: Array<{ agentId: string; profileId: string; name: string }> = [];
     for (const agent of agents) {
-      // Use existing profile or create one on the fly.
       const profileId =
         agent.profile?.id ??
         (await getOrCreateAgentProfileId(agent.id).catch((err) => {
@@ -87,32 +77,21 @@ export async function tryMentionAutoAssign(opts: MentionAutoAssignOpts): Promise
           return null;
         }));
       if (!profileId) continue;
-      if (existingProfileIds.has(profileId)) continue; // already assigned — skip
+      if (existingProfileIds.has(profileId)) continue;
       toAssign.push({ agentId: agent.id, profileId, name: agent.name });
     }
 
     if (!toAssign.length) return [];
 
-    // Add task assignees — non-destructive (skipDuplicates, no deleteMany).
-    await prisma.taskAssignee
-      .createMany({
-        data: toAssign.map(({ profileId }) => ({ taskId: opts.taskId, profileId })),
-        skipDuplicates: true,
-      })
-      .catch(() => undefined);
+    await addTaskAssignees(
+      opts.taskId,
+      toAssign.map((a) => a.profileId),
+    );
 
     // Ensure each newly-assigned agent is an active member of the task's project.
     if (task.projectId) {
       await Promise.all(
-        toAssign.map(({ profileId }) =>
-          prisma.projectMember
-            .upsert({
-              where: { projectId_profileId: { projectId: task.projectId!, profileId } },
-              create: { projectId: task.projectId!, profileId },
-              update: { status: ProjectMemberStatus.ACTIVE },
-            })
-            .catch(() => undefined),
-        ),
+        toAssign.map(({ profileId }) => ensureProjectMember(task.projectId!, profileId)),
       );
     }
 

@@ -13,6 +13,7 @@
 import type { MCBridgeConfig } from "./config-schema";
 import { MCBridgeWsClient } from "./ws-client";
 import { AgentReporter } from "./agent-reporter";
+import { autoApprovePendingDevices } from "./openclaw-local";
 
 let client: MCBridgeWsClient | null = null;
 let reporter: AgentReporter | null = null;
@@ -41,6 +42,10 @@ export default {
           api.logger.warn("[agentcenter-bridge] token not set in plugin config — bridge not started");
           return;
         }
+
+        // Ensure the CLI device is approved in the gateway so `openclaw agent`
+        // uses the fast gateway path instead of falling back to embedded mode.
+        await autoApprovePendingDevices();
 
         client = new MCBridgeWsClient(config);
         reporter = new AgentReporter(client);

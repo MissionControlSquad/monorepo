@@ -121,7 +121,11 @@ export async function POST(request: Request) {
       title: true,
       taskNumber: true,
       projectId: true,
+      assignees: { select: { profile: { select: { agentId: true } } } },
     });
+    const taskAssigneeIds = (task?.assignees ?? [])
+      .map((a: any) => a.profile?.agentId)
+      .filter(Boolean) as string[];
 
     const message = await messageModel.create({
       data: {
@@ -153,6 +157,7 @@ export async function POST(request: Request) {
       fromProfileId: agentProfileId,
       fromAgentId: agent.id,
       mentionedAgentIds,
+      taskAssigneeIds,
     });
 
     pubsub.publish(messageTopic(taskId), { taskId, messageId: message.id });

@@ -69,8 +69,16 @@ builder.mutationField("createMessage", (t) =>
       }
 
       const task = await taskModel.findById(args.taskId, {
-        select: { title: true, taskNumber: true, projectId: true },
+        select: {
+          title: true,
+          taskNumber: true,
+          projectId: true,
+          assignees: { select: { profile: { select: { agentId: true } } } },
+        },
       });
+      const taskAssigneeIds = ((task as any)?.assignees ?? [])
+        .map((a: any) => a.profile?.agentId)
+        .filter(Boolean) as string[];
 
       const message = await messageModel.create({
         ...query,
@@ -114,6 +122,7 @@ builder.mutationField("createMessage", (t) =>
         fromProfileId: args.fromProfileId,
         fromAgentId: fromProfile?.agentId ?? undefined,
         mentionedAgentIds,
+        taskAssigneeIds,
       });
 
       pubsub.publish(messageTopic(args.taskId), { taskId: args.taskId, messageId: message.id });
