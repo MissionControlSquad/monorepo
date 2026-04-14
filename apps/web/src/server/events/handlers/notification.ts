@@ -12,6 +12,7 @@ import {
   tryDeliverTaskRejectedNotification,
   tryDeliverClarificationNotification,
   tryDeliverTaskDoneNotification,
+  tryDeliverTaskActivityNotification,
 } from "../../services/live-task-delivery";
 
 async function notify(
@@ -157,6 +158,25 @@ on(EventTypes.MESSAGE_CREATED, async (e) => {
       taskId: e.taskId,
       messageId: e.messageId,
     }).catch((err) => console.error("[notification] tryDeliverMentionNotification failed:", err));
+  }
+
+  // Live gateway: push activity notification to assigned agents who are NOT the
+  // sender and NOT already notified via mention. This covers the common case of
+  // a human (or squad lead) posting on a task without @mentioning anyone —
+  // agents respond immediately instead of waiting for the next heartbeat.
+  const alreadyNotifiedSet = new Set(e.mentionedAgentIds);
+  const activityTargets = (e.taskAssigneeIds ?? []).filter(
+    (id) => id !== e.fromAgentId && !alreadyNotifiedSet.has(id),
+  );
+  if (activityTargets.length > 0) {
+    tryDeliverTaskActivityNotification(activityTargets, {
+      fromName: e.fromAgentName,
+      taskTitle: e.taskTitle,
+      taskId: e.taskId,
+      messageId: e.messageId,
+    }).catch((err) =>
+      console.error("[notification] tryDeliverTaskActivityNotification failed:", err),
+    );
   }
 
   // Notify subscribers (excluding sender and mentioned)

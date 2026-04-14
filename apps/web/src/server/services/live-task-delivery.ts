@@ -488,6 +488,26 @@ export async function tryDeliverDmNotification(
 }
 
 /**
+ * Live push when any human or squad member posts a message on a task.
+ * Notifies all assigned agents who are NOT the sender so they can respond
+ * immediately without waiting for the next heartbeat cycle.
+ *
+ * agentIds = task assignee agent IDs excluding the message sender.
+ */
+export async function tryDeliverTaskActivityNotification(
+  agentIds: string[],
+  opts: { fromName: string; taskTitle: string; taskId: string; messageId: string },
+): Promise<void> {
+  if (!agentIds.length) return;
+  await sendNotifyToAgents(agentIds, {
+    kind: "task_clarification",
+    content: `${opts.fromName} posted a message on task "${opts.taskTitle.slice(0, 200)}" (task ID: ${opts.taskId}). Check the message and respond if needed, then continue your PLAYBOOK.`,
+    taskId: opts.taskId,
+    messageId: opts.messageId,
+  });
+}
+
+/**
  * Live push when an agent is @mentioned in a team channel.
  * agentIds = mentioned agent members excluding the sender.
  */

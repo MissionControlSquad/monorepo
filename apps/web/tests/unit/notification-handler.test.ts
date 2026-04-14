@@ -30,7 +30,13 @@ vi.mock("../../src/server/cache", () => ({
 describe("notification handler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCreate.mockResolvedValue({ id: "notif-1", mentionedAgentId: "agent-1", content: "", taskId: null, messageId: null });
+    mockCreate.mockResolvedValue({
+      id: "notif-1",
+      mentionedAgentId: "agent-1",
+      content: "",
+      taskId: null,
+      messageId: null,
+    });
     mockSubscriberCacheGet.mockReturnValue(undefined);
     mockFindMany.mockResolvedValue([]);
   });
@@ -101,7 +107,13 @@ describe("notification handler", () => {
   it("creates mention notifications and publishes when MESSAGE_CREATED has mentionedAgentIds", async () => {
     vi.resetModules();
     vi.clearAllMocks();
-    mockCreate.mockResolvedValue({ id: "msg-notif-1", mentionedAgentId: "agent-m", content: "", taskId: null, messageId: null });
+    mockCreate.mockResolvedValue({
+      id: "msg-notif-1",
+      mentionedAgentId: "agent-m",
+      content: "",
+      taskId: null,
+      messageId: null,
+    });
     mockSubscriberCacheGet.mockReturnValue(undefined);
     mockFindMany.mockResolvedValue([]);
 
@@ -118,6 +130,7 @@ describe("notification handler", () => {
       fromAgentName: "Sender",
       content: "Hello",
       mentionedAgentIds: ["agent-m"],
+      taskAssigneeIds: [],
     });
 
     expect(mockCreate).toHaveBeenCalledWith({
