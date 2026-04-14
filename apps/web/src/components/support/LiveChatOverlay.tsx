@@ -37,7 +37,7 @@ export function LiveChatOverlay() {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-          <span className="text-sm font-semibold text-foreground">Live Chat</span>
+          <span className="text-sm font-semibold text-foreground">Talk to Us</span>
           <button
             onClick={closeLiveChat}
             className="text-muted-foreground hover:text-foreground transition-colors"

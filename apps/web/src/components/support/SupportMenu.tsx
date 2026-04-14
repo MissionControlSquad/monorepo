@@ -53,7 +53,7 @@ export function SupportMenu() {
               className="flex items-center gap-2.5 w-full px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
             >
               <MessageSquare className="w-4 h-4 text-muted-foreground" />
-              Live Chat
+              Talk to Us
             </button>
             <button
               onClick={() => handle(openFeatureRequest)}
