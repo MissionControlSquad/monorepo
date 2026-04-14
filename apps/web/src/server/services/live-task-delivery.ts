@@ -30,6 +30,24 @@ import {
 import { connectionRegistry } from "./live-connection-registry";
 import { LIVE_GATEWAY } from "@agentcenter/types";
 import { MAX_MESSAGE_BYTES, ChannelVisibility } from "@agentcenter/utils";
+import { isFeatureEnabled } from "../feature-flags";
+import { FLAG_KEYS } from "@agentcenter/utils";
+
+// ─── Feature flag guard ───────────────────────────────────────────────────────
+// Cached for 60 s (same TTL as feature-flags.ts). Zero DB hits when flag is off.
+
+let _liveGatewayEnabled: boolean | null = null;
+let _liveGatewayCheckedAt = 0;
+const FLAG_CACHE_MS = 60_000;
+
+async function isLiveGatewayEnabled(): Promise<boolean> {
+  if (_liveGatewayEnabled !== null && Date.now() - _liveGatewayCheckedAt < FLAG_CACHE_MS) {
+    return _liveGatewayEnabled;
+  }
+  _liveGatewayEnabled = await isFeatureEnabled(FLAG_KEYS.LIVE_GATEWAY);
+  _liveGatewayCheckedAt = Date.now();
+  return _liveGatewayEnabled;
+}
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
@@ -96,6 +114,7 @@ export async function tryDeliverTaskToLiveAgents(
   opts: DeliverOptions,
 ): Promise<void> {
   if (!agentIds.length) return;
+  if (!(await isLiveGatewayEnabled())) return;
 
   const agents = await getAgentsNotifyState(agentIds);
 
@@ -175,6 +194,7 @@ interface NotifyOptions {
 
 async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Promise<void> {
   if (!agentIds.length) return;
+  if (!(await isLiveGatewayEnabled())) return;
 
   const agents = await getAgentsNotifyState(agentIds);
 
