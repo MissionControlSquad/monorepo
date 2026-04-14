@@ -15,7 +15,7 @@ export function HubSpotScript() {
   useEffect(() => {
     const win = window as Window & {
       __ENV__?: { HUBSPOT_PORTAL_ID?: string };
-      hsConversationsSettings?: { loadImmediately: boolean };
+      hsConversationsSettings?: { loadImmediately: boolean; inlineEmbedSelector?: string };
     };
 
     const portalId = win.__ENV__?.HUBSPOT_PORTAL_ID;
