@@ -87,3 +87,15 @@
   content-visibility: auto;
   contain-intrinsic-size: 0 120px;
 }
+
+/* HubSpot inline chat — fill the sidebar panel completely.
+   HubSpot injects #hubspot-conversations-inline-parent and
+   #hubspot-conversations-inline-iframe between our div and the actual iframe. */
+#hs-chat-inline,
+#hubspot-conversations-inline-parent,
+#hubspot-conversations-inline-iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  display: block !important;
+}

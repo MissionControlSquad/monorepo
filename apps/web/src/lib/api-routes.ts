@@ -35,4 +35,8 @@ export const API_ROUTES = {
     preferences: "/api/user-notifications/preferences",
     subscribe: "/api/user-notifications/subscribe",
   },
+  support: {
+    bugReport: "/api/support/bug-report",
+    featureRequest: "/api/support/feature-request",
+  },
 } as const;

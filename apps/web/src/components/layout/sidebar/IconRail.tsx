@@ -24,6 +24,7 @@ import { FLAG_KEYS } from "@agentcenter/utils";
 import { API_ROUTES } from "@/lib/api-routes";
 import { Button } from "../../ui";
 import { ProfileAvatar } from "../../ui/ProfileAvatar";
+import { SupportMenu } from "../../support/SupportMenu";
 
 interface IconRailProps {
   onCreateTask: () => void;
@@ -99,12 +100,17 @@ export function IconRail({ onCreateTask }: IconRailProps) {
 
       <div className="flex-1" />
 
+      {/* Support menu */}
+      <div className="mb-2">
+        <SupportMenu />
+      </div>
+
       {/* New Task */}
       <Button
         variant="primary"
         size="icon"
         onClick={onCreateTask}
-        className="rounded-xl mb-3"
+        className="rounded-xl mb-2"
         title="New Task"
         aria-label="New Task"
       >
