@@ -13,6 +13,9 @@ import {
   tryDeliverClarificationNotification,
   tryDeliverTaskDoneNotification,
   tryDeliverTaskActivityNotification,
+  tryDeliverDocumentNotification,
+  tryDeliverStatusChangeNotification,
+  tryDeliverTaskFieldsUpdatedNotification,
 } from "../../services/live-task-delivery";
 
 async function notify(
@@ -134,6 +137,18 @@ on(EventTypes.TASK_STATUS_CHANGED, async (e) => {
       console.error("[notification] tryDeliverTaskDoneNotification failed:", err),
     );
   }
+
+  // Live gateway: notify assignees for all other status transitions (BLOCKED, STALLED,
+  // IN_PROGRESS, etc.) so they adjust immediately without waiting for heartbeat.
+  if (e.toStatus !== TaskStatus.REVIEW && e.toStatus !== TaskStatus.DONE) {
+    tryDeliverStatusChangeNotification(e.taskId, {
+      taskTitle: e.title,
+      toStatus: e.toStatus,
+      changedBy: e.changedBy,
+    }).catch((err) =>
+      console.error("[notification] tryDeliverStatusChangeNotification failed:", err),
+    );
+  }
 });
 
 // Notify mentioned agents
@@ -206,6 +221,30 @@ on(EventTypes.DOCUMENT_CREATED, async (e) => {
           e.taskId,
         ),
       ),
+  );
+
+  // Live gateway: push to assigned agents immediately so they can review the
+  // new material without waiting for the next heartbeat.
+  if (e.taskTitle) {
+    tryDeliverDocumentNotification(e.taskId, {
+      creatorName: e.creatorName,
+      docType: e.docType,
+      docTitle: e.title,
+      taskTitle: e.taskTitle,
+    }).catch((err) => console.error("[notification] tryDeliverDocumentNotification failed:", err));
+  }
+});
+
+// Live gateway: push to assigned agents when task fields change (title, description,
+// priority, due date, etc.) so they work from the latest spec immediately.
+on(EventTypes.TASK_FIELDS_UPDATED, async (e) => {
+  const changedFields = (e.changes ?? []).map((c) => c.field);
+  if (!changedFields.length) return;
+  tryDeliverTaskFieldsUpdatedNotification(e.taskId, {
+    taskTitle: e.title,
+    changedFields,
+  }).catch((err) =>
+    console.error("[notification] tryDeliverTaskFieldsUpdatedNotification failed:", err),
   );
 });
 

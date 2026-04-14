@@ -508,6 +508,74 @@ export async function tryDeliverTaskActivityNotification(
 }
 
 /**
+ * Shared helper: fetch agent IDs assigned to a task.
+ * Used by delivery functions that don't receive assignee IDs from the event.
+ */
+async function getTaskAssigneeAgentIds(taskId: string): Promise<string[]> {
+  const { prisma } = await import("../prisma");
+  const rows = await prisma.taskAssignee
+    .findMany({
+      where: { taskId },
+      select: { profile: { select: { agentId: true } } },
+    })
+    .catch(() => []);
+  return rows.map((r) => r.profile?.agentId).filter(Boolean) as string[];
+}
+
+/**
+ * Live push when a document/file is attached to a task.
+ * Notifies assigned agents so they can review the new material immediately.
+ */
+export async function tryDeliverDocumentNotification(
+  taskId: string,
+  opts: { creatorName: string; docType: string; docTitle: string; taskTitle: string },
+): Promise<void> {
+  const agentIds = await getTaskAssigneeAgentIds(taskId);
+  if (!agentIds.length) return;
+  await sendNotifyToAgents(agentIds, {
+    kind: "task_clarification",
+    content: `${opts.creatorName} added ${opts.docType} "${opts.docTitle.slice(0, 100)}" to task "${opts.taskTitle.slice(0, 200)}" (task ID: ${taskId}). Review the new material and continue your PLAYBOOK.`,
+    taskId,
+  });
+}
+
+/**
+ * Live push when a task moves to a status other than REVIEW or DONE.
+ * Notifies assigned agents of the state transition so they can adapt immediately.
+ */
+export async function tryDeliverStatusChangeNotification(
+  taskId: string,
+  opts: { taskTitle: string; toStatus: string; changedBy?: string },
+): Promise<void> {
+  const agentIds = await getTaskAssigneeAgentIds(taskId);
+  if (!agentIds.length) return;
+  const by = opts.changedBy ? ` by ${opts.changedBy}` : "";
+  await sendNotifyToAgents(agentIds, {
+    kind: "task_clarification",
+    content: `Task "${opts.taskTitle.slice(0, 200)}" (task ID: ${taskId}) status changed to ${opts.toStatus}${by}. Adjust your work accordingly per your PLAYBOOK.`,
+    taskId,
+  });
+}
+
+/**
+ * Live push when a task's fields are updated (title, description, priority, due date, etc.).
+ * Notifies assigned agents so they are working from the latest task spec.
+ */
+export async function tryDeliverTaskFieldsUpdatedNotification(
+  taskId: string,
+  opts: { taskTitle: string; changedFields: string[] },
+): Promise<void> {
+  const agentIds = await getTaskAssigneeAgentIds(taskId);
+  if (!agentIds.length) return;
+  const fields = opts.changedFields.slice(0, 5).join(", ");
+  await sendNotifyToAgents(agentIds, {
+    kind: "task_clarification",
+    content: `Task "${opts.taskTitle.slice(0, 200)}" (task ID: ${taskId}) was updated (${fields}). Review the changes and continue your PLAYBOOK with the latest spec.`,
+    taskId,
+  });
+}
+
+/**
  * Live push when an agent is @mentioned in a team channel.
  * agentIds = mentioned agent members excluding the sender.
  */
