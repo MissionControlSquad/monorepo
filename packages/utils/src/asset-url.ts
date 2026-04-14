@@ -8,6 +8,20 @@ export function getAssetUrl(
   options?: { public?: boolean },
 ): string | null {
   if (!storageKey) return null;
+  // R2 presigned URL — extract bare key and route through proxy so it never expires
+  if (storageKey.includes("r2.cloudflarestorage.com")) {
+    try {
+      const url = new URL(storageKey);
+      const segments = url.pathname.replace(/^\//, "").split("/");
+      const key = segments.slice(1).join("/");
+      if (key) {
+        const base = `/api/storage/${key}`;
+        return options?.public ? `${base}?public=1` : base;
+      }
+    } catch {
+      // fall through to pass-through below
+    }
+  }
   // Already a full URL — pass through
   if (storageKey.startsWith("http://") || storageKey.startsWith("https://")) return storageKey;
   // Already a relative API path
