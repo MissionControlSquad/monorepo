@@ -77,7 +77,7 @@ export function CreateVMDialog({ onClose, onCreated }: CreateVMDialogProps) {
             <Server className="w-5 h-5 text-purple-600" />
             <h2 className="text-lg font-bold text-gray-900">Create VM</h2>
           </div>
-          <Button variant="ghost" size="sm" icon={<X />} onClick={onClose} />
+          <Button variant="ghost" size="sm" icon={<X />} onClick={onClose} aria-label="Close" />
         </div>
 
         <Form {...form}>

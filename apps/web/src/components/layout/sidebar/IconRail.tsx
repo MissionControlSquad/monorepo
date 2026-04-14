@@ -85,14 +85,17 @@ export function IconRail({ onCreateTask }: IconRailProps) {
             <Link
               key={href}
               href={href}
-              title={label}
-              className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
+              aria-label={label}
+              className={`relative group w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
                 isActive(pathname, href)
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
               <Icon className="w-[20px] h-[20px]" />
+              <span className="pointer-events-none absolute left-full ml-2.5 px-2 py-1 bg-foreground text-background text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-[200]">
+                {label}
+              </span>
             </Link>
           ),
         )}
@@ -106,16 +109,20 @@ export function IconRail({ onCreateTask }: IconRailProps) {
       </div>
 
       {/* New Task */}
-      <Button
-        variant="primary"
-        size="icon"
-        onClick={onCreateTask}
-        className="rounded-xl mb-2"
-        title="New Task"
-        aria-label="New Task"
-      >
-        <SquarePen className="w-[18px] h-[18px]" />
-      </Button>
+      <div className="relative group mb-2">
+        <Button
+          variant="primary"
+          size="icon"
+          onClick={onCreateTask}
+          className="rounded-xl"
+          aria-label="New Task"
+        >
+          <SquarePen className="w-[18px] h-[18px]" />
+        </Button>
+        <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2.5 px-2 py-1 bg-foreground text-background text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-[200]">
+          New Task
+        </span>
+      </div>
 
       {/* User avatar + menu */}
       <div className="relative" ref={menuRef}>

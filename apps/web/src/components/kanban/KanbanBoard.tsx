@@ -575,6 +575,8 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
                 : "text-muted-foreground hover:text-foreground"
             }`}
             title="Row view"
+            aria-label="Row view"
+            aria-pressed={viewMode === "rows"}
           >
             <LayoutList className="w-4 h-4" />
           </button>
@@ -587,6 +589,8 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
                 : "text-muted-foreground hover:text-foreground"
             }`}
             title="Column view"
+            aria-label="Column view"
+            aria-pressed={viewMode === "columns"}
           >
             <Columns3 className="w-4 h-4" />
           </button>

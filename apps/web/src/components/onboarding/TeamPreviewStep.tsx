@@ -118,6 +118,7 @@ export function TeamPreviewStep({
               <button
                 onClick={() => setDialogOpen(true)}
                 className="shrink-0 h-8 px-3 rounded-lg border border-dashed border-border hover:border-muted-foreground/40 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 text-xs sm:text-sm"
+                aria-label="Add agent"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Add Agent</span>

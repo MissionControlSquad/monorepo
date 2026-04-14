@@ -48,7 +48,7 @@ export function ProjectsPanel() {
             size="icon-xs"
             onClick={() => setCreateOpen(true)}
             className="text-muted-foreground hover:text-primary hover:bg-primary/10"
-            title="New project"
+            aria-label="New project"
           >
             <Plus className="w-4 h-4" />
           </Button>

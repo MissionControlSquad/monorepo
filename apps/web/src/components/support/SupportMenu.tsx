@@ -26,7 +26,7 @@ export function SupportMenu() {
   }
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative group" ref={menuRef}>
       <button
         onClick={() => setOpen((v) => !v)}
         className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
@@ -34,11 +34,15 @@ export function SupportMenu() {
             ? "bg-muted text-foreground"
             : "text-muted-foreground hover:text-foreground hover:bg-muted"
         }`}
-        title="Support"
         aria-label="Support"
       >
         <CircleHelp className="w-[20px] h-[20px]" />
       </button>
+      {!open && (
+        <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2.5 px-2 py-1 bg-foreground text-background text-xs font-medium rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-[200]">
+          Support
+        </span>
+      )}
 
       {open && (
         <div className="absolute bottom-0 left-full ml-2 w-52 bg-background rounded-lg border border-border shadow-lg z-[100] py-1">

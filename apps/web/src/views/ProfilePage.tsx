@@ -241,6 +241,7 @@ export function ProfilePage() {
                   type="button"
                   onClick={handleRemoveAvatar}
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors ml-2 flex-shrink-0"
+                  aria-label="Remove avatar"
                 >
                   <Trash2 className="w-3 h-3" />
                   Remove

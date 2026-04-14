@@ -67,7 +67,7 @@ function ProjectDetailContent({
     <>
       {/* Close button */}
       <div className="absolute top-3 right-3 z-10">
-        <Button variant="ghost" size="sm" icon={<X />} onClick={onClose} />
+        <Button variant="ghost" size="sm" icon={<X />} onClick={onClose} aria-label="Close" />
       </div>
 
       {/* Header */}

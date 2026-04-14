@@ -21,7 +21,7 @@ import {
   Server,
   MonitorDown,
 } from "lucide-react";
-import { Button, Badge, Card } from "@/components/ui";
+import { Button, Badge, Card, ConfirmDialog } from "@/components/ui";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS, type AgentConfigFile, truncateId } from "@agentcenter/utils";
 import { useIsElectron } from "@agentcenter/hooks/browser";
@@ -226,6 +226,7 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
   const [selectedVmId, setSelectedVmId] = useState<string>("");
   const [deploying, setDeploying] = useState(false);
   const [showDeployConfirm, setShowDeployConfirm] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
 
   const isAlreadyOnCloud = setupData?.agent.hostingType === "cloudVM";
   const hasApiKey = !!setupData?.agent.apiKeyPrefix;
@@ -374,6 +375,7 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
             size="icon"
             onClick={() => router.back()}
             className="text-muted-foreground hover:text-foreground rounded-lg"
+            aria-label="Go back"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -746,7 +748,7 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
                     <Button
                       variant="danger"
                       size="sm"
-                      onClick={handleRegenerateKey}
+                      onClick={() => setShowRegenerateConfirm(true)}
                       disabled={regenerating}
                     >
                       {regenerating ? (
@@ -759,6 +761,18 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
                   </div>
                 </Card>
               )}
+              <ConfirmDialog
+                isOpen={showRegenerateConfirm}
+                onClose={() => setShowRegenerateConfirm(false)}
+                onConfirm={() => {
+                  setShowRegenerateConfirm(false);
+                  handleRegenerateKey();
+                }}
+                title="Regenerate API key?"
+                description="The current key will be invalidated immediately. Any agent using it will lose connectivity until reconfigured with the new key."
+                confirmLabel="Regenerate"
+                variant="danger"
+              />
             </>
           )}
 

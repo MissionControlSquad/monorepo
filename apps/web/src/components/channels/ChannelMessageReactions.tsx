@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useMutation } from "urql";
 import { TOGGLE_CHANNEL_MESSAGE_REACTION } from "../../lib/graphql/mutations";
 import { Smile } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui";
 import { MessageReactionEmoji } from "@/server/constants";
 
@@ -77,7 +78,9 @@ export function ChannelMessageReactions({
         else next.add(emoji);
         return next;
       });
-      executeToggle({ messageId, profileId: currentProfileId, emoji });
+      executeToggle({ messageId, profileId: currentProfileId, emoji }).then((res) => {
+        if (res.error) toast.error("Failed to update reaction");
+      });
       setShowPicker(false);
     },
     [currentProfileId, messageId, executeToggle],
@@ -112,6 +115,7 @@ export function ChannelMessageReactions({
           onClick={() => setShowPicker((v) => !v)}
           className="rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
           title="Add reaction"
+          aria-label="Add reaction"
         >
           <Smile className="w-3.5 h-3.5" />
         </Button>
@@ -126,6 +130,7 @@ export function ChannelMessageReactions({
                 onClick={() => handleToggle(key)}
                 className="w-7 h-7 text-base"
                 title={key}
+                aria-label={key.replace(/_/g, " ")}
               >
                 {EMOJI_MAP[key]}
               </Button>

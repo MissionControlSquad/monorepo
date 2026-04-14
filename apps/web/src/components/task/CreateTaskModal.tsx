@@ -640,6 +640,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
                                   size="icon-xs"
                                   onClick={() => removeTag(tag)}
                                   className="text-muted-foreground hover:text-foreground"
+                                  aria-label={`Remove tag ${tag}`}
                                 >
                                   <X className="w-3 h-3" />
                                 </Button>
@@ -794,6 +795,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
                                   size="icon-xs"
                                   onClick={() => removeSubtask(idx)}
                                   className="text-muted-foreground hover:text-destructive hover:bg-destructive-muted transition-colors"
+                                  aria-label="Remove subtask"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
@@ -882,7 +884,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
                                   size="icon-xs"
                                   onClick={(e) => handleDeleteTemplate(template.id, e)}
                                   className="opacity-0 group-hover/template:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive-muted transition-all shrink-0"
-                                  title="Delete template"
+                                  aria-label="Delete template"
                                 >
                                   <X className="w-3.5 h-3.5" />
                                 </Button>

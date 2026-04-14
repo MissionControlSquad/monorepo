@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useState, useCallback, useMemo } from "react";
 import { useMutation } from "urql";
+import { toast } from "sonner";
 import { UPDATE_AGENT_PROFILE, SET_AGENT_ACTIVATION } from "../../lib/graphql/mutations/agents";
 import { AgentStatusBadge, StatusDot } from "./AgentStatusBadge";
 import { StatusHistoryTimeline } from "./StatusHistoryTimeline";
@@ -28,7 +29,7 @@ import { MentionTextArea } from "../common/MentionTextArea";
 import { useMentionData, useMentionSuggestions } from "../context/MentionDataContext";
 import { CopyButton } from "../common/CopyButton";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
-import { Button } from "../ui";
+import { Button, ConfirmDialog } from "../ui";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import type { Agent } from "@agentcenter/types";
 
@@ -102,6 +103,7 @@ function AgentDetailContent({
   const [editRole, setEditRole] = useState("");
   const [editEmoji, setEditEmoji] = useState("");
   const [editPersonality, setEditPersonality] = useState("");
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
   const [, updateProfile] = useMutation(UPDATE_AGENT_PROFILE);
   const [, executeSetActivation] = useMutation(SET_AGENT_ACTIVATION);
   const { agents } = useAgentStatus();
@@ -132,13 +134,18 @@ function AgentDetailContent({
   }, []);
 
   const saveEditing = useCallback(async () => {
-    await updateProfile({
+    const result = await updateProfile({
       id: agentId,
       name: editName || undefined,
       role: editRole || undefined,
       personality: editPersonality || null,
       identityEmoji: editEmoji || null,
     });
+    if (result.error) {
+      toast.error("Failed to save agent profile");
+      return;
+    }
+    toast.success("Agent profile updated");
     setIsEditing(false);
   }, [agentId, editName, editRole, editPersonality, editEmoji, updateProfile]);
 
@@ -170,7 +177,7 @@ function AgentDetailContent({
             <p className="text-sm text-muted-foreground">{agent?.role}</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
+        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
           <X className="w-6 h-6" />
         </Button>
       </div>
@@ -312,21 +319,35 @@ function AgentDetailContent({
                     Reactivate Agent
                   </Button>
                 ) : (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={() => executeSetActivation({ id: agentId, deactivated: true })}
-                    disabled={isLastLead}
-                    className={`w-full justify-center ${
-                      isLastLead
-                        ? "text-muted-foreground bg-muted cursor-not-allowed"
-                        : "text-destructive bg-destructive/15 hover:bg-destructive/25"
-                    }`}
-                    title={isLastLead ? "Cannot deactivate the last Squad Lead" : undefined}
-                  >
-                    <PowerOff className="w-3.5 h-3.5" />
-                    {isLastLead ? "Last Squad Lead" : "Deactivate Agent"}
-                  </Button>
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => setShowDeactivateConfirm(true)}
+                      disabled={isLastLead}
+                      className={`w-full justify-center ${
+                        isLastLead
+                          ? "text-muted-foreground bg-muted cursor-not-allowed"
+                          : "text-destructive bg-destructive/15 hover:bg-destructive/25"
+                      }`}
+                      title={isLastLead ? "Cannot deactivate the last Squad Lead" : undefined}
+                    >
+                      <PowerOff className="w-3.5 h-3.5" />
+                      {isLastLead ? "Last Squad Lead" : "Deactivate Agent"}
+                    </Button>
+                    <ConfirmDialog
+                      isOpen={showDeactivateConfirm}
+                      onClose={() => setShowDeactivateConfirm(false)}
+                      onConfirm={() => {
+                        executeSetActivation({ id: agentId, deactivated: true });
+                        setShowDeactivateConfirm(false);
+                      }}
+                      title="Deactivate agent?"
+                      description="The agent will stop receiving tasks. You can reactivate it at any time."
+                      confirmLabel="Deactivate"
+                      variant="danger"
+                    />
+                  </>
                 )}
               </div>
             )}

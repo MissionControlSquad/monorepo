@@ -1,6 +1,7 @@
 "use client";
 
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 import { useMemo } from "react";
 import "./MarkdownComment.css";
 import { TimeAgo } from "./TimeAgo";
@@ -28,13 +29,14 @@ export function MarkdownComment({
     gfm: true, // GitHub Flavored Markdown
   });
 
-  // Parse markdown to HTML
+  // Parse markdown to HTML and sanitize to prevent XSS
   const htmlContent = useMemo(() => {
     try {
-      return marked.parse(content, { async: false }) as string;
+      const raw = marked.parse(content, { async: false }) as string;
+      return DOMPurify.sanitize(raw);
     } catch (error) {
       console.error("Error parsing markdown:", error);
-      return `<p>${content}</p>`;
+      return DOMPurify.sanitize(`<p>${content}</p>`);
     }
   }, [content]);
 
@@ -58,10 +60,11 @@ export function MarkdownComment({
 export function InlineMarkdown({ content }: { content: string }) {
   const htmlContent = useMemo(() => {
     try {
-      return marked.parse(content, { async: false }) as string;
+      const raw = marked.parse(content, { async: false }) as string;
+      return DOMPurify.sanitize(raw);
     } catch (error) {
       console.error("Error parsing markdown:", error);
-      return `<p>${content}</p>`;
+      return DOMPurify.sanitize(`<p>${content}</p>`);
     }
   }, [content]);
 

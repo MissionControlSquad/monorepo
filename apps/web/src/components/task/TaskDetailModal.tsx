@@ -117,7 +117,7 @@ export function TaskDetailModal({
   const [, executeRequestClarification] = useMutation(REQUEST_CLARIFICATION);
 
   // Approval UI state
-  const [_approvalLoading, setApprovalLoading] = useState<"approve" | "reject" | "clarify" | null>(
+  const [approvalLoading, setApprovalLoading] = useState<"approve" | "reject" | "clarify" | null>(
     null,
   );
   const [showApproveDialog, setShowApproveDialog] = useState(false);
@@ -390,25 +390,22 @@ export function TaskDetailModal({
   };
 
   const handleStatusChange = (newStatus: string) => {
-    executeUpdateTask({
-      id: taskId,
-      status: newStatus,
+    executeUpdateTask({ id: taskId, status: newStatus }).then((res) => {
+      if (res.error) toast.error("Failed to update status");
     });
   };
 
   const handlePriorityChange = (newPriority: string) => {
-    executeUpdateTask({
-      id: taskId,
-      priority: newPriority,
+    executeUpdateTask({ id: taskId, priority: newPriority }).then((res) => {
+      if (res.error) toast.error("Failed to update priority");
     });
   };
 
   const handleAddAssignee = (agentId: string) => {
     const currentIds = [...assigneeIds];
     if (!currentIds.includes(agentId)) {
-      executeUpdateTask({
-        id: taskId,
-        assigneeIds: [...currentIds, agentId],
+      executeUpdateTask({ id: taskId, assigneeIds: [...currentIds, agentId] }).then((res) => {
+        if (res.error) toast.error("Failed to add assignee");
       });
     }
     setShowAgentDropdown(false);
@@ -419,15 +416,16 @@ export function TaskDetailModal({
     executeUpdateTask({
       id: taskId,
       assigneeIds: currentIds.filter((id) => id !== agentId),
+    }).then((res) => {
+      if (res.error) toast.error("Failed to remove assignee");
     });
   };
 
   const handleAddTag = () => {
     const newTag = tagInput.trim();
     if (newTag && !(task.tags || []).includes(newTag)) {
-      executeUpdateTask({
-        id: taskId,
-        tags: [...(task.tags || []), newTag],
+      executeUpdateTask({ id: taskId, tags: [...(task.tags || []), newTag] }).then((res) => {
+        if (res.error) toast.error("Failed to add tag");
       });
     }
     setTagInput("");
@@ -437,13 +435,14 @@ export function TaskDetailModal({
     executeUpdateTask({
       id: taskId,
       tags: (task.tags || []).filter((t: string) => t !== tag),
+    }).then((res) => {
+      if (res.error) toast.error("Failed to remove tag");
     });
   };
 
   const handleSetBlockedBy = (blockedByTaskId: string | null) => {
-    executeUpdateTask({
-      id: taskId,
-      blockedByTaskId,
+    executeUpdateTask({ id: taskId, blockedByTaskId }).then((res) => {
+      if (res.error) toast.error("Failed to update dependency");
     });
     setShowBlockedByPicker(false);
   };
@@ -454,6 +453,8 @@ export function TaskDetailModal({
       executeUpdateTask({
         id: taskId,
         dueDate: new Date(dateStr).getTime().toString(),
+      }).then((res) => {
+        if (res.error) toast.error("Failed to update due date");
       });
     }
   };
@@ -1378,7 +1379,8 @@ export function TaskDetailModal({
                   variant="danger"
                   size="sm"
                   onClick={handleRejectTask}
-                  disabled={!rejectReason.trim()}
+                  disabled={!rejectReason.trim() || approvalLoading === "reject"}
+                  loading={approvalLoading === "reject"}
                 >
                   Reject Task
                 </Button>
@@ -1426,7 +1428,8 @@ export function TaskDetailModal({
                   variant="primary"
                   size="sm"
                   onClick={handleClarifyTask}
-                  disabled={!clarifyQuestions.trim()}
+                  disabled={!clarifyQuestions.trim() || approvalLoading === "clarify"}
+                  loading={approvalLoading === "clarify"}
                 >
                   Send Questions
                 </Button>
@@ -1498,6 +1501,7 @@ export function TaskDetailModal({
                         <button
                           onClick={() => removeChildTask(i)}
                           className="text-muted-foreground hover:text-destructive text-xs shrink-0"
+                          aria-label="Remove child task"
                         >
                           ✕
                         </button>

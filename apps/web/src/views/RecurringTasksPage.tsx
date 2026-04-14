@@ -634,7 +634,7 @@ function RecurringTaskModal({
       }
       onClose();
     } catch {
-      toast.error(editing ? "Failed to update" : "Failed to create");
+      toast.error(editing ? "Failed to update recurring task" : "Failed to create recurring task");
     }
   };
 
