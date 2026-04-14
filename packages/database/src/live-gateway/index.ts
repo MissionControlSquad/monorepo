@@ -201,6 +201,18 @@ export async function deleteExpiredDeliveries(): Promise<number> {
   return count;
 }
 
+/**
+ * Find a pending delivery by ID, returning only connectionId for ownership validation.
+ * Used by the task ack handler to prevent one connection from acking another's delivery.
+ */
+export async function findPendingDeliveryConnection(
+  deliveryId: string,
+): Promise<{ connectionId: string } | null> {
+  return prisma.livePendingDelivery
+    .findUnique({ where: { id: deliveryId }, select: { connectionId: true } })
+    .catch(() => null);
+}
+
 // ── Read helpers (for UI) ─────────────────────────────────────────────────────
 
 export async function listLiveGatewayConnections() {

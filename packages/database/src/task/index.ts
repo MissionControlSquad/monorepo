@@ -1,5 +1,11 @@
 export { findTaskByNumber } from "./find-by-number";
 export { getTaskAssigneeAgentIds, getTaskAssignedSubset } from "./get-assignees";
+export {
+  isAgentAssignedToTask,
+  getTaskAssigneeProfileIds,
+  addTaskAssignees,
+  updateTaskStatus,
+} from "./task-assignee-ops";
 export { findTaskByIdSelect } from "./find-by-id-select";
 export { setTaskAssignees } from "./set-assignees";
 export { softDeleteTask } from "./soft-delete";
