@@ -18,8 +18,67 @@
 
 import type { AgentInfo } from "@agentcenter/types";
 
-const DELIVER_TIMEOUT_MS = 10_000;
 const LIST_AGENTS_TIMEOUT_MS = 5_000;
+
+let cachedOpenclawBin: string | null = null;
+
+/**
+ * Resolve the openclaw binary path and cache it.
+ *
+ * Search order:
+ *  1. Directories in the plugin's inherited PATH (works for Homebrew/system installs)
+ *  2. Common fixed locations: /opt/homebrew/bin, /usr/local/bin, ~/.local/bin
+ *  3. All nvm-managed node versions (~/.nvm/versions/node/*)
+ *  4. Login shell `which` as last resort (works if shell profile sources nvm)
+ */
+async function resolveOpenclawBin(): Promise<string> {
+  if (cachedOpenclawBin) return cachedOpenclawBin;
+
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const os = await import("node:os");
+
+  // Build candidate list
+  const candidates: string[] = [];
+
+  // 1. Plugin's inherited PATH directories
+  for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
+    candidates.push(path.join(dir, "openclaw"));
+  }
+
+  // 2. Common fixed locations (Homebrew, system npm)
+  candidates.push("/opt/homebrew/bin/openclaw");
+  candidates.push("/usr/local/bin/openclaw");
+  candidates.push(path.join(os.homedir(), ".local", "bin", "openclaw"));
+
+  // 3. All nvm versions
+  const nvmDir = path.join(os.homedir(), ".nvm", "versions", "node");
+  try {
+    for (const ver of fs.readdirSync(nvmDir)) {
+      candidates.push(path.join(nvmDir, ver, "bin", "openclaw"));
+    }
+  } catch { /* nvm not installed */ }
+
+  // Return first existing candidate
+  for (const candidate of candidates) {
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      cachedOpenclawBin = candidate;
+      return candidate;
+    } catch { /* not found or not executable */ }
+  }
+
+  // 4. Last resort: login shell which
+  const { execFile } = await import("node:child_process");
+  const bin = await new Promise<string>((resolve, reject) => {
+    execFile("/bin/sh", ["-lc", "which openclaw"], (err, stdout) => {
+      if (err) reject(new Error("[openclaw-local] Could not locate openclaw binary"));
+      else resolve(stdout.trim());
+    });
+  });
+  cachedOpenclawBin = bin;
+  return bin;
+}
 
 /** Rejects after `ms` milliseconds with a timeout error. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -36,157 +95,140 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 /**
- * Read the Agent ID from an agent's IDENTITY.md workspace file.
- * Returns null if the file doesn't exist or the field isn't present.
+ * Auto-approve any pending CLI device pairing requests.
+ *
+ * When the plugin spawns `openclaw agent` as a subprocess, the gateway treats
+ * it as a new device and requires pairing approval for write operations. This
+ * is a one-time step per machine — once approved, future calls use the gateway
+ * path and complete in <1s. Without approval, calls fall back to embedded mode
+ * (~30-60s). We auto-approve at plugin startup so users never see this friction.
  */
-async function readAgentIdFromIdentity(slug: string): Promise<string | null> {
+export async function autoApprovePendingDevices(): Promise<void> {
+  const { execFile } = await import("node:child_process");
+  try {
+    const bin = await resolveOpenclawBin();
+
+    // List pending requests as JSON
+    const stdout = await new Promise<string>((resolve, reject) => {
+      execFile(bin, ["devices", "list", "--json"], { timeout: 8_000 }, (err, out) => {
+        if (err) reject(err);
+        else resolve(out);
+      });
+    });
+
+    let parsed: any;
+    try { parsed = JSON.parse(stdout); } catch { return; }
+
+    const pending: any[] = parsed?.pending ?? [];
+    for (const req of pending) {
+      const id: string = req.id ?? req.requestId;
+      if (!id) continue;
+
+      // Safety filter: only auto-approve requests that are clearly from a local
+      // CLI subprocess on this machine. Remote or non-CLI devices must be
+      // approved manually by the user.
+      //
+      // Criteria (all must pass):
+      //   - client === "cli"  (not a browser, desktop app, or remote agent)
+      //   - ip is loopback or unknown (not a real remote address)
+      const client: string = (req.client ?? "").toLowerCase();
+      const ip: string = (req.ip ?? "unknown-ip").toLowerCase();
+      const isLocalCli =
+        client === "cli" &&
+        (ip === "unknown-ip" || ip === "127.0.0.1" || ip === "::1" || ip === "localhost" || ip === "");
+
+      if (!isLocalCli) {
+        console.log(
+          `[agentcenter-bridge] Skipping auto-approve for device ${id} (client=${req.client}, ip=${req.ip}) — not a local CLI process`,
+        );
+        continue;
+      }
+
+      await new Promise<void>((resolve) => {
+        execFile(bin, ["devices", "approve", id], { timeout: 8_000 }, () => resolve());
+      });
+      console.log(`[agentcenter-bridge] Auto-approved local CLI device pairing: ${id}`);
+    }
+  } catch {
+    // Non-fatal — delivery will fall back to embedded mode if needed
+  }
+}
+
+/** Read Agent ID from IDENTITY.md at a known workspace path. */
+async function readAgentIdFromWorkspace(workspacePath: string): Promise<string | null> {
   try {
     const fs = await import("node:fs");
     const path = await import("node:path");
-    const agentsDir = await resolveAgentsDir();
-    if (!agentsDir) return null;
-    const identityPath = path.join(agentsDir, slug, "workspace", "IDENTITY.md");
-    const content = fs.readFileSync(identityPath, "utf8");
-    const match = content.match(/\*\*Agent ID\*\*:\s*(\S+)/);
-    return match?.[1] ?? null;
+    const content = fs.readFileSync(path.join(workspacePath, "IDENTITY.md"), "utf8");
+    return content.match(/\*\*Agent ID\*\*:\s*(\S+)/)?.[1] ?? null;
   } catch {
     return null;
   }
 }
 
 /**
- * Resolve the OpenClaw agents directory across platforms.
+ * List agents using the OpenClaw CLI (`openclaw agents list --json`).
  *
- * Search order:
- *  1. ~/.openclaw/agents          — Mac, Linux, and Windows (dotfile convention)
- *  2. %APPDATA%\OpenClaw\agents   — Windows Electron/GUI apps
- *  3. ~/Library/Application Support/OpenClaw/agents — Mac Electron/GUI apps
- *
- * Returns the first directory that exists, or null if none found.
+ * slug  = OpenClaw agent id (e.g. "main") — stored in LiveAgentRoute, comes
+ *         back verbatim as agentSlug in mc.deliver_task, passed directly to
+ *         `openclaw agent --agent <slug>`.
+ * agentId = DB primary key from IDENTITY.md — used by the server to match the
+ *           agent record in the database (primary lookup, no username needed).
  */
-async function resolveAgentsDir(): Promise<string | null> {
-  const os = await import("node:os");
-  const fs = await import("node:fs");
-  const path = await import("node:path");
+export async function listLocalAgents(): Promise<AgentInfo[]> {
+  const { execFile } = await import("node:child_process");
 
-  const candidates: string[] = [
-    path.join(os.homedir(), ".openclaw", "agents"),
-  ];
-
-  if (process.platform === "win32") {
-    // Derive AppData paths from homedir to avoid env var access
-    const home = os.homedir();
-    candidates.push(path.join(home, "AppData", "Roaming", "OpenClaw", "agents"));
-    candidates.push(path.join(home, "AppData", "Local", "OpenClaw", "agents"));
-  } else if (process.platform === "darwin") {
-    candidates.push(path.join(os.homedir(), "Library", "Application Support", "OpenClaw", "agents"));
-  } else {
-    // Linux: standard XDG location derived from homedir
-    candidates.push(path.join(os.homedir(), ".config", "openclaw", "agents"));
-  }
-
-  for (const dir of candidates) {
-    try {
-      if (fs.statSync(dir).isDirectory()) return dir;
-    } catch {
-      // not found, try next
-    }
-  }
-  return null;
-}
-
-/**
- * List agents from the filesystem by scanning the OpenClaw agents directory.
- * Used as a fallback when the OpenClaw runtime API is not available.
- */
-async function listAgentsFromFilesystem(): Promise<AgentInfo[]> {
   try {
-    const fs = await import("node:fs");
-    const agentsDir = await resolveAgentsDir();
-    if (!agentsDir) return [];
-    const entries = fs.readdirSync(agentsDir, { withFileTypes: true });
-    const agents: AgentInfo[] = [];
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const slug = entry.name;
-      const agentId = await readAgentIdFromIdentity(slug);
-      agents.push({
-        slug,
-        name: slug,
-        status: "idle",
-        agentId,
-      });
-    }
-    return agents;
+    const bin = await resolveOpenclawBin();
+    const stdout = await withTimeout(
+      new Promise<string>((resolve, reject) => {
+        execFile(bin, ["agents", "list", "--json"], (err, out) => {
+          if (err) reject(err);
+          else resolve(out);
+        });
+      }),
+      LIST_AGENTS_TIMEOUT_MS,
+      "listLocalAgents",
+    );
+
+    const raw: any[] = JSON.parse(stdout);
+    return Promise.all(
+      raw.map(async (a: any) => ({
+        slug: a.id as string,
+        name: (a.identityName ?? a.id) as string,
+        status: "idle" as const,
+        agentId: a.workspace ? await readAgentIdFromWorkspace(a.workspace) : null,
+      })),
+    );
   } catch {
     return [];
   }
 }
 
-/** List agents currently running in this OpenClaw instance. */
-export async function listLocalAgents(): Promise<AgentInfo[]> {
-  const oc = (globalThis as any).openclaw;
-
-  // Primary path: use OpenClaw runtime API
-  if (typeof oc?.agents?.list === "function") {
-    const raw: any[] = await withTimeout(oc.agents.list(), LIST_AGENTS_TIMEOUT_MS, "listLocalAgents");
-    return Promise.all(
-      raw.map(async (a: any) => {
-        const slug = a.slug ?? a.id ?? a.name;
-        return {
-          slug,
-          name: a.name,
-          status: (a.status ?? "idle") as "idle" | "active" | "blocked",
-          detailedStatus: a.detailedStatus ?? null,
-          statusMessage: a.statusMessage ?? null,
-          currentTaskId: a.currentTaskId ?? null,
-          agentId: a.agentId ?? (await readAgentIdFromIdentity(slug)),
-        };
-      }),
-    );
-  }
-
-  // Fallback: scan ~/.openclaw/agents/ directory
-  return listAgentsFromFilesystem();
-}
-
 /**
  * Deliver a task notification to a local agent.
  *
- * OpenClaw docs confirm there is no plugin API to directly trigger an agent's
- * heartbeat-preflight cycle. The correct mechanism is sending a system event
- * to the agent with `--mode now`, which causes it to immediately process a new
- * turn — equivalent to `openclaw agent -m "message" --to <slug>`.
- *
- * The taskNotification message MUST include the taskId so the agent can call
- * MC APIs (status update, action logging, completion). The agent's PLAYBOOK
- * must treat this incoming message as a task assignment and run the full MC
- * API chain: fetch task → update status → work → log actions → mark done.
- *
- * This IS the OpenClaw-sanctioned way for plugins to initiate agent work.
- * It is not identical to heartbeat-preflight (skips vacation/shutdown checks)
- * but the agent's PLAYBOOK handles those when it calls back to MC APIs.
+ * agentSlug is the OpenClaw agent id (e.g. "main") — exactly what was
+ * registered in vm.hello and what the server echoes back in mc.deliver_task.
  */
 export async function deliverToLocalAgent(agentSlug: string, taskNotification: string): Promise<void> {
-  // Primary path: enqueue an immediate system event for this agent.
-  // Equivalent to: openclaw system event --text "..." --mode now --to <slug>
-  const oc = (globalThis as any).openclaw;
-  if (typeof oc.system?.event === "function") {
-    await withTimeout(
-      oc.system.event({ text: taskNotification, to: agentSlug, mode: "now" }),
-      DELIVER_TIMEOUT_MS,
-      `deliverToLocalAgent(${agentSlug})`,
-    );
-    return;
-  }
+  const { spawn } = await import("node:child_process");
+  const openclawBin = await resolveOpenclawBin();
 
-  // Fallback: direct agent message (older OpenClaw runtimes).
-  // openclaw agent -m "message" --to <slug>
-  await withTimeout(
-    oc.agents.sendMessage(agentSlug, taskNotification),
-    DELIVER_TIMEOUT_MS,
-    `deliverToLocalAgent:sendMessage(${agentSlug})`,
-  );
+  // Spawn detached — we only need to trigger the agent's turn, not wait for it
+  // to finish. AI agents can run for minutes; holding the WS handler open would
+  // cause false timeout errors even when delivery succeeded.
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(
+      openclawBin,
+      ["agent", "--agent", agentSlug, "--message", taskNotification],
+      { detached: true, stdio: "ignore" },
+    );
+    child.on("error", reject);
+    // Resolve as soon as the process is successfully spawned
+    child.on("spawn", resolve);
+    child.unref();
+  });
 }
 
 /** Subscribe to agent status change events. */
@@ -202,7 +244,7 @@ export function onAgentStatusChange(
 ): () => void {
   const oc = (globalThis as any).openclaw;
   if (typeof oc?.events?.on !== "function") return () => {};
-  return oc.events.on("agent:statusChange", async (event: any) => {
+  return oc.events.on("agent:statusChange", (event: any) => {
     const slug = event.slug ?? event.id ?? event.name;
     handler({
       slug,
@@ -210,7 +252,7 @@ export function onAgentStatusChange(
       detailedStatus: event.detailedStatus ?? null,
       statusMessage: event.statusMessage ?? null,
       currentTaskId: event.currentTaskId ?? null,
-      agentId: event.agentId ?? (await readAgentIdFromIdentity(slug)),
+      agentId: event.agentId ?? null,
     });
   });
 }

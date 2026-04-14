@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "next dev",
-    "dev:ws": "tsx server.ts",
+    "dev:ws": "NODE_OPTIONS=--max-old-space-size=8192 tsx server.ts",
     "build": "next build",
     "build:server": "esbuild server.ts --bundle --platform=node --target=node22 --format=cjs --outfile=server.cjs --external:next --external:@prisma/client --external:.prisma/client --external:ioredis --external:ssh2 --external:cpu-features --external:web-push",
     "start": "next start",
