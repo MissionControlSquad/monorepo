@@ -39,6 +39,7 @@ interface CloudVMAgent {
 interface CloudVMOption {
   id: string;
   name: string;
+  status: string;
   region: string;
   serverType: string;
   ipv4: string | null;
@@ -245,9 +246,10 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
           toast.error(data.error);
         } else {
           setSetupData(data);
-          // Default to the first VM if available
-          if (data.cloudVms?.length > 0) {
-            setSelectedVmId(data.cloudVms[0].id);
+          // Default to the first running VM if available
+          const firstRunning = data.cloudVms?.find((vm: CloudVMOption) => vm.status === "running");
+          if (firstRunning) {
+            setSelectedVmId(firstRunning.id);
           }
           // If already on cloud, show cloud tab; otherwise default to cloud
           if (data.agent.hostingType === "cloudVM") {
@@ -468,6 +470,18 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
                     Go to Cloud VMs
                   </Button>
                 </Card>
+              ) : !setupData.cloudVms.some((vm) => vm.status === "running") ? (
+                <Card padding="lg" className="text-center">
+                  <Server className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <h3 className="font-semibold text-foreground mb-1">No Running VMs</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Your VM is still provisioning. Wait for it to finish, then come back to deploy.
+                  </p>
+                  <Button onClick={() => router.push("/cloud")}>
+                    <Cloud className="w-4 h-4" />
+                    View Cloud VMs
+                  </Button>
+                </Card>
               ) : (
                 <>
                   {/* Already deployed banner */}
@@ -503,9 +517,9 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
                         className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${deploying ? "opacity-50 cursor-not-allowed bg-muted border-border" : selectedVmId === setupData.agent.cloudVmId ? "border-success/30 bg-success-muted" : "border-border"}`}
                       >
                         {setupData.cloudVms.map((vm) => (
-                          <option key={vm.id} value={vm.id}>
+                          <option key={vm.id} value={vm.id} disabled={vm.status !== "running"}>
                             {vm.name} — {vm.ipv4 || truncateId(vm.id)} — {vm.region} (
-                            {vm.serverType})
+                            {vm.serverType}){vm.status !== "running" ? ` (${vm.status})` : ""}
                             {setupData.agent.cloudVmId === vm.id ? " ✓ current" : ""}
                           </option>
                         ))}
