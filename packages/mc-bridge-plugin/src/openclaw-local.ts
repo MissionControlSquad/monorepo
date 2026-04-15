@@ -42,8 +42,14 @@ async function resolveOpenclawBin(): Promise<string> {
   const candidates: string[] = [];
 
   // 1. Plugin's inherited PATH directories
+  // On Windows, npm global installs produce openclaw.cmd (not openclaw), so
+  // check both the bare name and Windows extensions within each PATH entry.
   for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
     candidates.push(path.join(dir, "openclaw"));
+    if (process.platform === "win32") {
+      candidates.push(path.join(dir, "openclaw.cmd"));
+      candidates.push(path.join(dir, "openclaw.exe"));
+    }
   }
 
   // 2. Common fixed locations (Homebrew, system npm, Windows)
@@ -109,6 +115,21 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 /**
+ * Build the executable + args for a subprocess call, cross-platform.
+ *
+ * On Windows, .cmd files (produced by npm global installs) cannot be executed
+ * directly by execFile/spawn — they require cmd.exe to interpret them.
+ * This wrapper handles that transparently with no shell-string interpolation,
+ * so it is safe to use with untrusted argument values.
+ */
+function buildInvoke(bin: string, args: string[]): [string, string[]] {
+  if (process.platform === "win32" && bin.toLowerCase().endsWith(".cmd")) {
+    return ["cmd.exe", ["/c", bin, ...args]];
+  }
+  return [bin, args];
+}
+
+/**
  * Auto-approve any pending CLI device pairing requests.
  *
  * When the plugin spawns `openclaw agent` as a subprocess, the gateway treats
@@ -124,7 +145,8 @@ export async function autoApprovePendingDevices(): Promise<void> {
 
     // List pending requests as JSON
     const stdout = await new Promise<string>((resolve, reject) => {
-      execFile(bin, ["devices", "list", "--json"], { timeout: 8_000 }, (err, out) => {
+      const [cmd, cmdArgs] = buildInvoke(bin, ["devices", "list", "--json"]);
+      execFile(cmd, cmdArgs, { timeout: 8_000 }, (err, out) => {
         if (err) reject(err);
         else resolve(out);
       });
@@ -159,7 +181,8 @@ export async function autoApprovePendingDevices(): Promise<void> {
       }
 
       await new Promise<void>((resolve) => {
-        execFile(bin, ["devices", "approve", id], { timeout: 8_000 }, () => resolve());
+        const [cmd, cmdArgs] = buildInvoke(bin, ["devices", "approve", id]);
+        execFile(cmd, cmdArgs, { timeout: 8_000 }, () => resolve());
       });
       console.log(`[agentcenter-bridge] Auto-approved local CLI device pairing: ${id}`);
     }
@@ -194,9 +217,10 @@ export async function listLocalAgents(): Promise<AgentInfo[]> {
 
   try {
     const bin = await resolveOpenclawBin();
+    const [listCmd, listArgs] = buildInvoke(bin, ["agents", "list", "--json"]);
     const stdout = await withTimeout(
       new Promise<string>((resolve, reject) => {
-        execFile(bin, ["agents", "list", "--json"], (err, out) => {
+        execFile(listCmd, listArgs, (err, out) => {
           if (err) reject(err);
           else resolve(out);
         });
@@ -232,12 +256,9 @@ export async function deliverToLocalAgent(agentSlug: string, taskNotification: s
   // Spawn detached — we only need to trigger the agent's turn, not wait for it
   // to finish. AI agents can run for minutes; holding the WS handler open would
   // cause false timeout errors even when delivery succeeded.
+  const [spawnCmd, spawnArgs] = buildInvoke(openclawBin, ["agent", "--agent", agentSlug, "--message", taskNotification]);
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(
-      openclawBin,
-      ["agent", "--agent", agentSlug, "--message", taskNotification],
-      { detached: true, stdio: "ignore" },
-    );
+    const child = spawn(spawnCmd, spawnArgs, { detached: true, stdio: "ignore" });
     child.on("error", reject);
     // Resolve as soon as the process is successfully spawned
     child.on("spawn", resolve);
