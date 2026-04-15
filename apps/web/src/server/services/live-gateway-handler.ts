@@ -47,6 +47,7 @@ import type {
   MsgAgentMessage,
   MsgTaskDone,
   MsgTaskAck,
+  MsgSessionDone,
   VMErrorCode,
 } from "@agentcenter/types";
 import { LIVE_GATEWAY } from "@agentcenter/types";
@@ -461,6 +462,27 @@ async function handleTaskAck(
   );
 }
 
+// ─── vm.session_done handler ─────────────────────────────────────────────────
+
+function handleSessionDone(msg: MsgSessionDone, machineName: string | null): void {
+  const duration =
+    msg.durationMs < 1_000 ? `${msg.durationMs}ms` : `${(msg.durationMs / 1_000).toFixed(1)}s`;
+
+  if (msg.success) {
+    logVMActivity(
+      machineName,
+      `@${msg.agentSlug} handled ${msg.trigger} — completed in ${duration}`,
+      "info",
+    ).catch(() => undefined);
+  } else {
+    logVMActivity(
+      machineName,
+      `@${msg.agentSlug} failed ${msg.trigger} after ${duration}${msg.errorMessage ? `: ${msg.errorMessage}` : ""}`,
+      "error",
+    ).catch(() => undefined);
+  }
+}
+
 // ─── Pending task drain ───────────────────────────────────────────────────────
 
 async function drainAndDeliver(
@@ -574,6 +596,11 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
         case "vm.task_ack": {
           if (!connectionId) return;
           await handleTaskAck(connectionId, msg, machineName);
+          break;
+        }
+
+        case "vm.session_done": {
+          handleSessionDone(msg, machineName);
           break;
         }
 

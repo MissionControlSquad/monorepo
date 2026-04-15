@@ -51,6 +51,7 @@ export async function deliverToLocalAgent(
   const cfg = list.find((e: any) => (e.id ?? e.name) === agentSlug);
 
   if (!cfg) {
+    console.warn(`[agentcenter-bridge] deliverToLocalAgent: agent "${agentSlug}" not found in config list — falling back to subagent.run`);
     // Agent not found in config — fallback to subagent.run so delivery is attempted
     await api.runtime.subagent.run({
       sessionKey: `agent:${agentSlug}`,
@@ -63,10 +64,23 @@ export async function deliverToLocalAgent(
   const { join } = await import("node:path");
 
   const runId = randomUUID();
-  const workspaceDir = await api.runtime.agent.resolveAgentWorkspaceDir(cfg);
+  let baseDir: string;
+  try {
+    baseDir = await api.runtime.agent.resolveAgentWorkspaceDir(cfg);
+  } catch (err) {
+    console.error(`[agentcenter-bridge] deliverToLocalAgent: resolveAgentWorkspaceDir failed for "${agentSlug}":`, err);
+    return;
+  }
 
-  // Fire-and-forget: do NOT await — agent turns can take minutes
-  api.runtime.agent
+  // resolveAgentWorkspaceDir may return the root workspace; ensure we use an
+  // agent-specific subdirectory so agents don't share IDENTITY.md / sessions.
+  const workspaceDir = baseDir.endsWith(`/${agentSlug}`) ? baseDir : join(baseDir, agentSlug);
+
+  console.log(`[agentcenter-bridge] deliverToLocalAgent: starting runEmbeddedAgent for "${agentSlug}" runId=${runId} workspace=${workspaceDir}`);
+
+  // Return the promise so callers (runAgentSession) can track completion and
+  // enforce one-at-a-time per agent. Do NOT fire-and-forget here.
+  return api.runtime.agent
     .runEmbeddedAgent({
       sessionId: `mc-bridge:${agentSlug}:${runId}`,
       runId,
@@ -75,9 +89,13 @@ export async function deliverToLocalAgent(
       prompt: taskNotification,
       timeoutMs: api.runtime.agent.resolveAgentTimeoutMs(cfg),
     })
-    .catch((err: unknown) =>
-      console.error(`[agentcenter-bridge] runEmbeddedAgent failed for ${agentSlug}:`, err),
-    );
+    .then(() => {
+      console.log(`[agentcenter-bridge] deliverToLocalAgent: runEmbeddedAgent completed for "${agentSlug}" runId=${runId}`);
+    })
+    .catch((err: unknown) => {
+      console.error(`[agentcenter-bridge] deliverToLocalAgent: runEmbeddedAgent FAILED for "${agentSlug}" runId=${runId}:`, err);
+      throw err;
+    });
 }
 
 /** Subscribe to agent status change events. */

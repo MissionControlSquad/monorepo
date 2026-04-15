@@ -34,7 +34,8 @@ import {
 import { generateSSHKeyPair, encryptPrivateKey } from "./ssh-keys";
 import { sshExec, sshUploadFile, sshTestConnection } from "./ssh";
 import { env } from "../env";
-import { BRIDGE_PLUGIN_VERSION, OPENCLAW_VERSION } from "../bridge-plugin-version";
+import { BRIDGE_PLUGIN_VERSION } from "../bridge-plugin-version";
+import { OPENCLAW_VERSION } from "../openclaw-version";
 import { LLM_PROVIDERS_MAP } from "@agentcenter/utils";
 import { VM_USER, VM_HOME, VM_CONFIG_DIR, VM_CONFIG_PATH, VM_WORKSPACE } from "./cloud-vm-paths";
 import { ensureHeartbeatCron, removeAgentCrons } from "./cloud-vm-cron";
