@@ -37,7 +37,9 @@ import {
   formatUptime,
   formatCost,
   truncateId,
+  FLAG_KEYS,
 } from "@agentcenter/utils";
+import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 import { toast } from "sonner";
 import { CloudVmStatus } from "@/server/constants";
 import { Breadcrumbs, Button, Badge, Card, ConfirmDialog, Input } from "../components/ui";
@@ -128,6 +130,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
   const [logs, setLogs] = useState<VMLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const liveGatewayEnabled = useFeatureFlag(FLAG_KEYS.LIVE_GATEWAY);
   const [showLogs, setShowLogs] = useState(false);
   const [showDestroyConfirm, setShowDestroyConfirm] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -749,33 +752,34 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
             >
               Repair Service
             </Button>
-            {vm.liveGatewayTokenId ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={<WifiOff />}
-                loading={actionLoading === "live-gateway"}
-                disabled={actionLoading !== null}
-                onClick={handleLiveGatewayToggle}
-                className="text-orange-700 bg-orange-100 hover:bg-orange-200 border-orange-200"
-                title="Disable live gateway and revoke install token"
-              >
-                Disable Live Gateway
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={<Wifi />}
-                loading={actionLoading === "live-gateway"}
-                disabled={actionLoading !== null}
-                onClick={handleLiveGatewayToggle}
-                className="text-teal-700 bg-teal-100 hover:bg-teal-200 border-teal-200"
-                title="Install agentcenter-bridge plugin and enable live task delivery"
-              >
-                Enable Live Gateway
-              </Button>
-            )}
+            {liveGatewayEnabled &&
+              (vm.liveGatewayTokenId ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<WifiOff />}
+                  loading={actionLoading === "live-gateway"}
+                  disabled={actionLoading !== null}
+                  onClick={handleLiveGatewayToggle}
+                  className="text-orange-700 bg-orange-100 hover:bg-orange-200 border-orange-200"
+                  title="Disable live gateway and revoke install token"
+                >
+                  Disable Live Gateway
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Wifi />}
+                  loading={actionLoading === "live-gateway"}
+                  disabled={actionLoading !== null}
+                  onClick={handleLiveGatewayToggle}
+                  className="text-teal-700 bg-teal-100 hover:bg-teal-200 border-teal-200"
+                  title="Install agentcenter-bridge plugin and enable live task delivery"
+                >
+                  Enable Live Gateway
+                </Button>
+              ))}
           </>
         )}
         {vm.status === CloudVmStatus.STOPPED && (
