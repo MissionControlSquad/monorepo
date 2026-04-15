@@ -73,6 +73,11 @@ async function failVM(vmId: string, step: string, error: string) {
   if (failedVm && (failedVm as any).liveGatewayTokenId) {
     await revokeLiveGatewayToken((failedVm as any).liveGatewayTokenId).catch(() => undefined);
   }
+  // Delete any connection records that may have formed if the plugin partially
+  // installed and connected before the failure — prevents orphaned DB rows.
+  if (failedVm?.serverName) {
+    await deleteConnectionsByMachineName(failedVm.serverName).catch(() => undefined);
+  }
   await updateVM(vmId, {
     status: CloudVmStatus.ERROR,
     errorMessage: `Failed at step "${step}": ${error}`,
@@ -996,6 +1001,7 @@ export async function destroyCloudVM(vmId: string): Promise<void> {
     status: CloudVmStatus.DESTROYED,
     destroyedAt: new Date(),
     sshPrivateKey: null,
+    liveGatewayTokenId: null,
   });
 
   await log(vmId, "Server destroyed");
