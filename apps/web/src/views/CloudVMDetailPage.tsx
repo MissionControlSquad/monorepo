@@ -27,6 +27,8 @@ import {
   Pencil,
   ChevronDown,
   Box,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import {
   LLM_PROVIDERS,
@@ -65,6 +67,7 @@ interface CloudVM {
   llmConfigured: boolean;
   llmProvider?: string | null;
   llmModel?: string | null;
+  liveGatewayTokenId?: string | null;
   agents: VMAgent[];
   createdAt: string;
 }
@@ -506,6 +509,26 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
     }
   };
 
+  const handleLiveGatewayToggle = async () => {
+    const enabling = !vm?.liveGatewayTokenId;
+    setActionLoading("live-gateway");
+    try {
+      const action = enabling ? "enable" : "disable";
+      const res = await fetch(`/api/cloud-vms/${vmId}/live-gateway/${action}`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || `Failed to ${action} live gateway`);
+        return;
+      }
+      toast.success(enabling ? "Live gateway enabled" : "Live gateway disabled");
+      await fetchVM();
+    } catch {
+      toast.error("Failed to toggle live gateway");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -726,6 +749,33 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
             >
               Repair Service
             </Button>
+            {vm.liveGatewayTokenId ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<WifiOff />}
+                loading={actionLoading === "live-gateway"}
+                disabled={actionLoading !== null}
+                onClick={handleLiveGatewayToggle}
+                className="text-orange-700 bg-orange-100 hover:bg-orange-200 border-orange-200"
+                title="Disable live gateway and revoke install token"
+              >
+                Disable Live Gateway
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<Wifi />}
+                loading={actionLoading === "live-gateway"}
+                disabled={actionLoading !== null}
+                onClick={handleLiveGatewayToggle}
+                className="text-teal-700 bg-teal-100 hover:bg-teal-200 border-teal-200"
+                title="Install agentcenter-bridge plugin and enable live task delivery"
+              >
+                Enable Live Gateway
+              </Button>
+            )}
           </>
         )}
         {vm.status === CloudVmStatus.STOPPED && (

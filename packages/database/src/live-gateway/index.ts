@@ -140,6 +140,18 @@ export async function deleteConnectionsByMachineName(machineName: string): Promi
   await prisma.liveGatewayConnection.deleteMany({ where: { machineName } });
 }
 
+/**
+ * Return the IDs of all connections for a machine.
+ * Used to terminate in-memory WebSockets before deleting DB records.
+ */
+export async function findConnectionIdsByMachineName(machineName: string): Promise<string[]> {
+  const rows = await prisma.liveGatewayConnection.findMany({
+    where: { machineName },
+    select: { id: true },
+  });
+  return rows.map((r) => r.id);
+}
+
 // ── Agent routes ──────────────────────────────────────────────────────────────
 
 /**
