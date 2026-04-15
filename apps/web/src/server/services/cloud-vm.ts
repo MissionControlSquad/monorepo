@@ -139,15 +139,48 @@ async function createVMLiveGatewayToken(vmId: string): Promise<{ raw: string; to
 }
 
 /**
- * Install and configure the agentcenter-bridge plugin on a running VM.
- * Writes the plugin entry into openclaw.json then runs
- * `openclaw plugins install clawhub:@agentcenter/agentcenter-bridge`.
- * The daemon hot-reloads the config and starts the plugin automatically.
+ * Configure the agentcenter-bridge plugin on a running VM.
+ * The binary is pre-installed during provisioning (step 7a). If it's missing
+ * (older VM), we fall back to installing it on demand from ClawHub.
+ * Only the config write is needed for VMs provisioned after the pre-install step.
  */
 async function installBridgePlugin(
   sshConfig: { host: string; privateKey: string },
   rawToken: string,
 ): Promise<void> {
+  // Check if the plugin binary is already installed
+  const check = await ocExec(
+    sshConfig,
+    "openclaw plugins list 2>/dev/null | grep -q agentcenter-bridge && echo FOUND || echo MISSING",
+    { timeoutMs: 15_000 },
+  );
+  const isInstalled = check.stdout.trim() === "FOUND";
+
+  if (!isInstalled) {
+    // Fallback: binary not present (VM provisioned before step 7a was added).
+    // Install from ClawHub — retry on rate-limit.
+    let install: Awaited<ReturnType<typeof ocExec>> | null = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      install = await ocExec(
+        sshConfig,
+        "openclaw plugins install clawhub:@agentcenter/agentcenter-bridge",
+        { timeoutMs: 120_000 },
+      );
+      if (install.code === 0) break;
+      const output = (install.stderr + install.stdout).toLowerCase();
+      if ((output.includes("429") || output.includes("rate limit")) && attempt < 3) {
+        await sleep(attempt * 8_000);
+        continue;
+      }
+      break;
+    }
+    if (install!.code !== 0) {
+      const detail = (install!.stderr + "\n" + install!.stdout).trim().slice(0, 800);
+      throw new Error(`agentcenter-bridge install failed (exit ${install!.code}): ${detail}`);
+    }
+  }
+
+  // Write plugin config — daemon hot-reloads and starts the plugin.
   const config = await readVMConfig(sshConfig);
   const wssUrl = liveGatewayWssUrl();
 
@@ -162,18 +195,6 @@ async function installBridgePlugin(
   };
 
   await writeVMConfig(sshConfig, config);
-
-  // Install plugin from ClawHub — daemon picks up the config entry on hot-reload
-  const result = await ocExec(
-    sshConfig,
-    "plugins install clawhub:@agentcenter/agentcenter-bridge",
-    { timeoutMs: 60_000 },
-  );
-  if (result.code !== 0) {
-    throw new Error(
-      `openclaw plugins install failed (exit ${result.code}): ${result.stderr.slice(0, 300)}`,
-    );
-  }
 }
 
 /**
@@ -529,6 +550,25 @@ export async function provisionVM(vmId: string): Promise<void> {
         `Exit code ${result.code}: ${result.stderr.slice(0, 500)}`,
       );
       return;
+    }
+
+    // Step 7a: Pre-install agentcenter-bridge plugin binary so enable-gateway
+    // toggle only needs to write config (no ClawHub call at toggle time → no rate limits).
+    await log(vmId, "Pre-installing agentcenter-bridge plugin...");
+    const bridgeInstall = await ocExec(
+      sshConfig,
+      "openclaw plugins install clawhub:@agentcenter/agentcenter-bridge",
+      { timeoutMs: 120_000 },
+    );
+    if (bridgeInstall.code !== 0) {
+      // Non-fatal — plugin can be installed later when the user enables live gateway
+      await log(
+        vmId,
+        `Warning: agentcenter-bridge pre-install failed — live gateway toggle will install on demand. ${(bridgeInstall.stderr + bridgeInstall.stdout).trim().slice(0, 300)}`,
+        "warn",
+      );
+    } else {
+      await log(vmId, "agentcenter-bridge plugin installed");
     }
 
     // Step 7b: Install Docker for sandbox isolation

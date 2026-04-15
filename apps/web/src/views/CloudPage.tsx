@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { usePollingInterval, useSearch } from "@agentcenter/hooks";
 import Link from "next/link";
 import { Server, Plus, Loader2, Globe, Cpu, Clock, Search } from "lucide-react";
@@ -68,6 +68,12 @@ export function CloudPage() {
     }
   }, []);
 
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchVMs();
+  }, [fetchVMs]);
+
+  // Poll every 5s only while VMs are in transitional states (provisioning, destroying, etc.)
   const hasTransitional = vms.some((vm) => CLOUD_VM_TRANSITIONAL_STATUSES.includes(vm.status));
   usePollingInterval(fetchVMs, 5000, hasTransitional);
 
