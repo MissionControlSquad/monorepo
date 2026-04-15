@@ -80,8 +80,9 @@ export async function deliverToLocalAgent(
 
   // Signal to the bridge plugin that we're inside an embedded agent run so it
   // skips starting a competing WebSocket connection if openclaw reloads plugins.
+  const DEPTH_KEY = Symbol.for("agentcenter.bridge.embeddedDepth");
   const g = globalThis as any;
-  g.__mcBridgeEmbeddedDepth = (g.__mcBridgeEmbeddedDepth ?? 0) + 1;
+  g[DEPTH_KEY] = (g[DEPTH_KEY] ?? 0) + 1;
 
   // Return the promise so callers (runAgentSession) can track completion and
   // enforce one-at-a-time per agent. Do NOT fire-and-forget here.
@@ -102,7 +103,9 @@ export async function deliverToLocalAgent(
       throw err;
     })
     .finally(() => {
-      g.__mcBridgeEmbeddedDepth = Math.max(0, (g.__mcBridgeEmbeddedDepth ?? 1) - 1);
+      const DEPTH_KEY = Symbol.for("agentcenter.bridge.embeddedDepth");
+      const g = globalThis as any;
+      g[DEPTH_KEY] = Math.max(0, (g[DEPTH_KEY] ?? 1) - 1);
     });
 }
 

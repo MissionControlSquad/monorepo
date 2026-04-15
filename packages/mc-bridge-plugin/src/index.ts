@@ -36,7 +36,10 @@ export default {
         // runEmbeddedAgent reloads plugins inside the same process. Prevent the
         // bridge from opening a second competing WebSocket (same token/fingerprint)
         // which would cause the server to evict the real connection.
-        if ((globalThis as any).__mcBridgeEmbeddedDepth > 0) {
+        // Symbol.for() matches OpenClaw's own internal pattern and avoids
+        // collisions with other plugins using the same globalThis technique.
+        const DEPTH_KEY = Symbol.for("agentcenter.bridge.embeddedDepth");
+        if (((globalThis as any)[DEPTH_KEY] ?? 0) > 0) {
           api.logger.info("[agentcenter-bridge] Embedded agent context — bridge already running, skipping duplicate start");
           isRealBridge = false;
           return;
