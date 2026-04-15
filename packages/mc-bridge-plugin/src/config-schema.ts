@@ -25,4 +25,13 @@ export interface MCBridgeConfig {
 
   /** Maximum reconnect backoff (ms). Default: 30000 */
   reconnectMaxMs?: number;
+
+  /**
+   * When true, automatically approves pending local CLI device pairing requests
+   * on startup so `openclaw agent` uses the fast gateway path instead of the
+   * slower embedded fallback. Only loopback / local CLI devices are ever
+   * auto-approved — remote or non-CLI devices are always skipped regardless of
+   * this setting. Default: false (must be explicitly enabled).
+   */
+  autoApproveDevices?: boolean;
 }

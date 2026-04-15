@@ -43,9 +43,12 @@ export default {
           return;
         }
 
-        // Ensure the CLI device is approved in the gateway so `openclaw agent`
-        // uses the fast gateway path instead of falling back to embedded mode.
-        await autoApprovePendingDevices();
+        // Optionally auto-approve local CLI device pairing requests so
+        // `openclaw agent` uses the fast gateway path. Only runs when the user
+        // explicitly sets autoApproveDevices: true in the plugin config.
+        if (config.autoApproveDevices) {
+          await autoApprovePendingDevices();
+        }
 
         client = new MCBridgeWsClient(config);
         reporter = new AgentReporter(client);
