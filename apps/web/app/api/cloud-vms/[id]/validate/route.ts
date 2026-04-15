@@ -1,4 +1,9 @@
-import { findCloudVMConnection, findAgentBySlug } from "@agentcenter/database";
+import {
+  findCloudVMConnection,
+  findAgentBySlug,
+  findConnectionByAgentSlug,
+} from "@agentcenter/database";
+import { connectionRegistry } from "@/server/services/live-connection-registry";
 import { CloudVmStatus } from "@/server/constants";
 import { sshExec } from "@/server/services/ssh";
 import {
@@ -8,9 +13,10 @@ import {
   assertFound,
 } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
-import { computeCronSchedule } from "@/server/agent-config-generator";
+import { computeCronSchedule, getMcUrl } from "@/server/agent-config-generator";
 import { ensureHeartbeatCron } from "@/server/services/cloud-vm-cron";
-import { getAgentSlug } from "@agentcenter/utils";
+import { getAgentSlug, LLM_PROVIDERS, SetupStatus } from "@agentcenter/utils";
+import { applyAgentStatusUpdate } from "@/server/agent-status";
 import {
   getVMSSHConfig,
   ocExec,
@@ -24,6 +30,7 @@ import {
   ensureAgentInConfig,
   REQUIRED_AGENT_FILES,
 } from "@/server/services/cloud-vm-utils";
+import { VM_CONFIG_DIR, VM_WORKSPACE } from "@/server/services/cloud-vm-paths";
 
 interface CheckResult {
   name: string;
@@ -295,51 +302,229 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         });
       }
 
-      // ── 5. Agent sessions ──
-      const sessionsCheck = await ocExec(
-        sshConfig,
-        `openclaw sessions list --agent ${agentSlug} --json 2>/dev/null || echo '[]'`,
-        { timeoutMs: 15_000 },
-      );
-      let sessions: unknown[] = [];
-      try {
-        const parsed = JSON.parse(sessionsCheck.stdout.trim());
-        sessions = Array.isArray(parsed) ? parsed : [];
-      } catch {
-        // fallback
-      }
-      checks.push({
-        name: "Sessions",
-        status: sessions.length > 0 ? "pass" : "warn",
-        message:
-          sessions.length > 0
-            ? `${sessions.length} session(s) found`
-            : "No sessions — agent hasn't been active yet",
+      // ── 5. Auth profiles (which AI provider is configured) ──
+      const authProfilePath = `${VM_CONFIG_DIR}/agents/${agentSlug}/agent/auth-profiles.json`;
+      const authRead = await sshExec(sshConfig, `cat ${authProfilePath} 2>/dev/null`, {
+        timeoutMs: 10_000,
       });
+      const authFileExists = authRead.code === 0 && authRead.stdout.trim().length > 0;
 
-      // ── 6. LLM test ──
-      const testResult = await ocExec(
-        sshConfig,
-        `openclaw agent --agent ${agentSlug} --message "Reply with exactly: OK" --timeout 30 2>&1`,
-        { timeoutMs: 45_000 },
-      );
-      const output = testResult.stdout.trim();
-      const hasOk = output.toLowerCase().includes("ok");
-      const hasError = output.toLowerCase().includes("error") || testResult.code !== 0;
-
-      if (hasError && !hasOk) {
-        const errorLine =
-          output.split("\n").find((l) => l.toLowerCase().includes("error")) || output.slice(0, 200);
+      if (!authFileExists) {
         checks.push({
-          name: "LLM Response",
+          name: "AI Provider",
           status: "fail",
-          message: errorLine,
+          message:
+            "No auth-profiles.json found — go to AI Providers in settings and add an API key, then re-validate",
         });
       } else {
+        const configuredProviders: string[] = [];
+        let parseError = false;
+        try {
+          const parsed = JSON.parse(authRead.stdout.trim());
+          // Support both { profiles: { "provider:default": { key } } } and flat { "provider:default": { key } }
+          const entries: Record<string, unknown> =
+            parsed.profiles && typeof parsed.profiles === "object" ? parsed.profiles : parsed;
+
+          for (const [profileKey, value] of Object.entries(entries)) {
+            if (!profileKey.includes(":")) continue;
+            const profileVal = value as Record<string, unknown>;
+            const rawKey = profileVal.key as string | undefined;
+            if (!rawKey || rawKey.length < 8) continue; // skip missing/placeholder keys
+
+            // Match profile key (e.g. "anthropic:default") to a known provider name
+            const providerId = profileKey.split(":")[0];
+            const provider = LLM_PROVIDERS.find((p) => p.id === providerId);
+            const providerName = provider?.name ?? providerId;
+            configuredProviders.push(providerName);
+          }
+        } catch {
+          parseError = true;
+        }
+
+        if (parseError) {
+          checks.push({
+            name: "AI Provider",
+            status: "warn",
+            message:
+              "auth-profiles.json is malformed — re-save your API key in AI Providers settings",
+          });
+        } else if (configuredProviders.length === 0) {
+          checks.push({
+            name: "AI Provider",
+            status: "fail",
+            message:
+              "API key is missing or blank — go to AI Providers in settings and add your key, then re-validate",
+          });
+        } else {
+          checks.push({
+            name: "AI Provider",
+            status: "pass",
+            message: `Ready — using ${configuredProviders.join(", ")}`,
+          });
+        }
+      }
+
+      // ── 6. Heartbeat connectivity ──
+      // Read the agent's API key from IDENTITY.md and hit the heartbeat-preflight endpoint.
+      // This confirms: (a) IDENTITY.md is valid, (b) the key works, (c) the agent can reach AgentCenter.
+      // Much faster than an LLM test — no tokens used, completes in < 5 seconds.
+      const agentWorkspaceDir = `${VM_WORKSPACE}/${agentSlug}`;
+      const identityRead = await sshExec(
+        sshConfig,
+        `grep -oP '(?<=\\*\\*API Key\\*\\*: )\\S+' ${agentWorkspaceDir}/IDENTITY.md 2>/dev/null`,
+        { timeoutMs: 10_000 },
+      );
+      const agentApiKey = identityRead.stdout.trim();
+
+      if (!agentApiKey) {
         checks.push({
-          name: "LLM Response",
-          status: "pass",
-          message: "Agent responded successfully",
+          name: "Heartbeat",
+          status: "fail",
+          message:
+            "Could not read API key from IDENTITY.md — run Validate again or re-assign the agent",
+        });
+      } else {
+        const mcUrl = getMcUrl();
+        let heartbeatStatus: "pass" | "fail" | "warn" = "fail";
+        let heartbeatMessage = "Could not reach AgentCenter — check network or MC URL";
+        let heartbeatFixed = false;
+
+        const doHeartbeat = async () => {
+          const hbRes = await fetch(`${mcUrl}/api/agents/me/heartbeat-preflight`, {
+            headers: { Authorization: `Bearer ${agentApiKey}` },
+            signal: AbortSignal.timeout(8_000),
+          });
+
+          if (hbRes.status === 401) {
+            heartbeatStatus = "fail";
+            heartbeatMessage =
+              "API key rejected — the agent's key may have changed. Re-assign the agent to regenerate it";
+          } else if (hbRes.status === 403) {
+            // Three distinct 403 reasons — give user an actionable message for each
+            let errorText = "";
+            try {
+              errorText = (await hbRes.json()).error ?? "";
+            } catch {
+              /* ignore */
+            }
+
+            if (errorText === "Agent setup is not complete") {
+              if (autoFix) {
+                // Cloud VM workspace is already provisioned — the PENDING_SETUP status
+                // is a leftover from before the first ingest event. Mark active now.
+                await applyAgentStatusUpdate(agent.id, { setupStatus: SetupStatus.ACTIVE });
+                // Retry the heartbeat with the updated status
+                const retryRes = await fetch(`${mcUrl}/api/agents/me/heartbeat-preflight`, {
+                  headers: { Authorization: `Bearer ${agentApiKey}` },
+                  signal: AbortSignal.timeout(8_000),
+                });
+                if (retryRes.status === 200) {
+                  heartbeatFixed = true;
+                  const hbData = (await retryRes.json()) as {
+                    shouldWork?: boolean;
+                    shutdown?: boolean;
+                  };
+                  heartbeatStatus = "pass";
+                  heartbeatMessage = hbData.shouldWork
+                    ? "Agent activated and live — has tasks ready to pick up"
+                    : "Agent activated and live — resting (no tasks in queue)";
+                } else {
+                  heartbeatStatus = "fail";
+                  heartbeatMessage = "Agent activated but still can't check in — re-run Validate";
+                }
+              } else {
+                heartbeatStatus = "fail";
+                heartbeatMessage =
+                  "Agent setup is not marked complete — run Validate with auto-fix enabled to activate it";
+              }
+            } else if (errorText === "Agent is deactivated") {
+              heartbeatStatus = "fail";
+              heartbeatMessage =
+                "Agent is deactivated — go to the agent's settings and reactivate it, then re-validate";
+            } else if (errorText === "License not active") {
+              heartbeatStatus = "fail";
+              heartbeatMessage =
+                "Your AgentCenter license is not active — check your subscription in Settings → Billing";
+            } else {
+              heartbeatStatus = "fail";
+              heartbeatMessage = `Access denied (403)${errorText ? `: ${errorText}` : ""}`;
+            }
+          } else if (hbRes.status === 200) {
+            const hbData = (await hbRes.json()) as { shouldWork?: boolean; shutdown?: boolean };
+            if (hbData.shutdown) {
+              heartbeatStatus = "warn";
+              heartbeatMessage = "Agent is live but system is in shutdown mode — tasks are paused";
+            } else if (hbData.shouldWork) {
+              heartbeatStatus = "pass";
+              heartbeatMessage = "Agent is live and has tasks ready to pick up";
+            } else {
+              heartbeatStatus = "pass";
+              heartbeatMessage = "Agent is live and resting (no tasks in queue)";
+            }
+          } else {
+            heartbeatStatus = "warn";
+            heartbeatMessage = `Unexpected response from AgentCenter (HTTP ${hbRes.status}) — may be a temporary issue`;
+          }
+        };
+
+        try {
+          await doHeartbeat();
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes("timeout") || msg.includes("abort")) {
+            heartbeatMessage =
+              "Heartbeat timed out — AgentCenter may be slow or the agent can't reach it";
+            heartbeatStatus = "warn";
+          }
+        }
+
+        checks.push({
+          name: "Heartbeat",
+          status: heartbeatStatus,
+          message: heartbeatMessage,
+          ...(heartbeatFixed ? { fixed: true } : {}),
+        });
+      }
+
+      // ── 7. Live Gateway connection ──
+      // Verifies the mc-bridge plugin on the VM is connected to the live gateway.
+      // We check: (a) a DB connection record exists for this agent's slug, and
+      // (b) that connection is live in the in-memory WebSocket registry.
+      // This proves messages can be delivered instantly without waiting for heartbeat.
+      try {
+        const liveConn = await findConnectionByAgentSlug(agentSlug);
+
+        if (!liveConn) {
+          checks.push({
+            name: "Live Gateway",
+            status: "warn",
+            message:
+              "Plugin not connected — install the AgentCenter Bridge plugin on the VM and make sure OpenClaw is running",
+          });
+        } else if (!connectionRegistry.has(liveConn.id)) {
+          const disconnectedSince = liveConn.lastDisconnectedAt
+            ? `since ${new Date(liveConn.lastDisconnectedAt).toLocaleTimeString()}`
+            : "recently";
+          checks.push({
+            name: "Live Gateway",
+            status: "warn",
+            message: `Plugin registered but not connected (${disconnectedSince}) — it reconnects automatically; if this persists, restart OpenClaw on the VM`,
+          });
+        } else {
+          const pluginVersion = liveConn.pluginVersion
+            ? ` (plugin v${liveConn.pluginVersion})`
+            : "";
+          checks.push({
+            name: "Live Gateway",
+            status: "pass",
+            message: `Connected${pluginVersion} — tasks will be delivered to the agent instantly`,
+          });
+        }
+      } catch {
+        checks.push({
+          name: "Live Gateway",
+          status: "warn",
+          message: "Could not check live gateway status — database may be temporarily unavailable",
         });
       }
     }

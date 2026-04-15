@@ -13,7 +13,6 @@
 import type { MCBridgeConfig } from "./config-schema";
 import { MCBridgeWsClient } from "./ws-client";
 import { AgentReporter } from "./agent-reporter";
-import { autoApprovePendingDevices } from "./openclaw-local";
 
 let client: MCBridgeWsClient | null = null;
 let reporter: AgentReporter | null = null;
@@ -43,15 +42,8 @@ export default {
           return;
         }
 
-        // Optionally auto-approve local CLI device pairing requests so
-        // `openclaw agent` uses the fast gateway path. Only runs when the user
-        // explicitly sets autoApproveDevices: true in the plugin config.
-        if (config.autoApproveDevices) {
-          await autoApprovePendingDevices();
-        }
-
-        client = new MCBridgeWsClient(config);
-        reporter = new AgentReporter(client);
+        client = new MCBridgeWsClient(config, api);
+        reporter = new AgentReporter(client, api);
 
         // Start reporter once WS handshake completes (mc.welcome received)
         client.onConnect(() => reporter!.start());

@@ -6,7 +6,8 @@ import { applyAgentStatusUpdate } from "../agent-status";
 import { ensureAgentProfile } from "../agent-profile";
 import { isSystemShutdown } from "../system-settings";
 import { SetupStatus, AgentStatus, type AgentStatusValue } from "../constants";
-import { trimAndCap } from "@agentcenter/utils";
+import { trimAndCap, getAgentSlug } from "@agentcenter/utils";
+import { logCloudVMEvent } from "@agentcenter/database";
 
 const ACTION_TO_DETAILED_STATUS: Record<string, string> = {
   file_edited: "coding",
@@ -148,6 +149,15 @@ export async function processEvent(event: unknown, apiKey: string): Promise<unkn
         await agentModel.emitJoined({ id: agent.id, name: resolvedName ?? agent.name });
       }
 
+      // Log heartbeat to VM activity log so operators can see the agent is alive
+      if (agent.cloudVmId) {
+        logCloudVMEvent(
+          agent.cloudVmId,
+          `Agent "@${getAgentSlug(agent)}" checked in (heartbeat)`,
+          "info",
+        ).catch(() => undefined);
+      }
+
       return { agentId: agent.id, created: false, systemShutdown: await isSystemShutdown() };
     }
 
@@ -168,16 +178,41 @@ export async function processEvent(event: unknown, apiKey: string): Promise<unkn
         currentTaskId: e.currentTaskId ?? undefined,
         currentTask: e.currentTask ?? undefined,
       });
+
+      if (agent.cloudVmId) {
+        const detail = e.detailedStatus ? ` (${e.detailedStatus})` : "";
+        const task = e.currentTaskId ? ` on task ${e.currentTaskId}` : "";
+        logCloudVMEvent(
+          agent.cloudVmId,
+          `@${getAgentSlug(agent)} → ${e.status}${detail}${task}`,
+          "info",
+        ).catch(() => undefined);
+      }
+
       return { agentId: agent.id };
     }
 
     case "agent.woke_up": {
       if (await isSystemShutdown()) {
+        if (agent.cloudVmId) {
+          logCloudVMEvent(
+            agent.cloudVmId,
+            `@${getAgentSlug(agent)} tried to wake up but system is in shutdown mode`,
+            "warn",
+          ).catch(() => undefined);
+        }
         throw new Error(
           "System is in shutdown mode. Do not pick up any tasks. Reply HEARTBEAT_OK and stop.",
         );
       }
       if (agent.isOnVacation) {
+        if (agent.cloudVmId) {
+          logCloudVMEvent(
+            agent.cloudVmId,
+            `@${getAgentSlug(agent)} tried to wake up but is on vacation`,
+            "warn",
+          ).catch(() => undefined);
+        }
         throw new Error(
           "You are on vacation. Do not pick up any tasks. Reply HEARTBEAT_OK and stop.",
         );
@@ -195,6 +230,14 @@ export async function processEvent(event: unknown, apiKey: string): Promise<unkn
         currentTask: e.currentTask ?? undefined,
         detailedStatus: e.detailedStatus ?? undefined,
       });
+
+      if (agent.cloudVmId) {
+        const taskCtx = e.currentTaskId ? ` on task ${e.currentTaskId}` : "";
+        logCloudVMEvent(agent.cloudVmId, `@${getAgentSlug(agent)} woke up${taskCtx}`, "info").catch(
+          () => undefined,
+        );
+      }
+
       return { agentId: agent.id };
     }
 
@@ -207,6 +250,13 @@ export async function processEvent(event: unknown, apiKey: string): Promise<unkn
       }
 
       await agentModel.emitWentToSleep(agent);
+
+      if (agent.cloudVmId) {
+        logCloudVMEvent(agent.cloudVmId, `@${getAgentSlug(agent)} went to sleep`, "info").catch(
+          () => undefined,
+        );
+      }
+
       return { agentId: agent.id };
     }
 
@@ -224,6 +274,14 @@ export async function processEvent(event: unknown, apiKey: string): Promise<unkn
         ...(e.detailedStatus != null && { detailedStatus: e.detailedStatus }),
         ...(e.statusMessage != null && { statusMessage: e.statusMessage }),
       });
+
+      if (agent.cloudVmId && e.detailedStatus) {
+        logCloudVMEvent(
+          agent.cloudVmId,
+          `@${getAgentSlug(agent)} heartbeat [${e.detailedStatus}]`,
+          "info",
+        ).catch(() => undefined);
+      }
 
       return { agentId: agent.id, systemShutdown: await isSystemShutdown() };
     }
@@ -262,6 +320,15 @@ export async function processEvent(event: unknown, apiKey: string): Promise<unkn
         ...(inferredStatus && { detailedStatus: inferredStatus }),
       });
 
+      if (agent.cloudVmId) {
+        const taskCtx = e.taskId ? ` on task ${e.taskId}` : "";
+        logCloudVMEvent(
+          agent.cloudVmId,
+          `@${getAgentSlug(agent)} ${e.actionType}${taskCtx}`,
+          "info",
+        ).catch(() => undefined);
+      }
+
       const actionPayload = { agentId: agent.id, actionId: action.id, projectId: actionProjectId };
       pubsub.publish(agentActionAgentTopic(agent.id), actionPayload);
       if (actionProjectId) pubsub.publish(agentActionProjectTopic(actionProjectId), actionPayload);
@@ -271,6 +338,13 @@ export async function processEvent(event: unknown, apiKey: string): Promise<unkn
 
     default:
       // Forward-compatible: unknown event types return 200 instead of 500
+      if (agent.cloudVmId) {
+        logCloudVMEvent(
+          agent.cloudVmId,
+          `@${getAgentSlug(agent)} sent unknown event type: "${base.data.type}"`,
+          "warn",
+        ).catch(() => undefined);
+      }
       return { ignored: true, type: base.data.type };
   }
 }

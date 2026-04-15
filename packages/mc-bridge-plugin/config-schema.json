@@ -22,10 +22,6 @@
     "reconnectMaxMs": {
       "type": "number",
       "description": "Maximum reconnect backoff in milliseconds. Default: 30000"
-    },
-    "autoApproveDevices": {
-      "type": "boolean",
-      "description": "When true, automatically approves pending local CLI device pairing requests on startup so `openclaw agent` uses the fast gateway path. Only loopback/local CLI devices are ever auto-approved — remote or non-CLI devices are always skipped. Default: false (requires explicit opt-in)."
     }
   }
 }

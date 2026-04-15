@@ -203,10 +203,10 @@ async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Prom
     if (!slug) continue;
 
     // Overlapping guard: agent is busy → skip notification entirely.
-    // Heartbeat catches it when the agent goes idle (undeliveredMentions,
-    // hasInboxTasks, hasPendingReview). Unlike task delivery, notifications
-    // have no DB queue — the heartbeat IS the queue.
-    if (isAgentBusy(agent)) continue;
+    // Exception: DMs and channel mentions are direct human communication —
+    // always push them through so the agent can respond in real time.
+    // Heartbeat catches other kinds when the agent goes idle.
+    if (isAgentBusy(agent) && opts.kind !== "dm" && opts.kind !== "channel_mention") continue;
 
     try {
       const connection = await findConnectionByAgentSlug(slug);

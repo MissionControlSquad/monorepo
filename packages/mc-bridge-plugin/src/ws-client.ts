@@ -34,7 +34,7 @@ export class MCBridgeWsClient {
   private deliveredIds = new Set<string>(); // Dedup buffer (capped at PLUGIN_DEDUP_LIMIT)
   private onConnectCallbacks: Array<() => void> = [];
 
-  constructor(private config: MCBridgeConfig) {
+  constructor(private config: MCBridgeConfig, private api: any) {
     this.reconnectMs = config.reconnectBaseMs ?? 2_000;
     this.connectionToken = config.token;
   }
@@ -86,7 +86,7 @@ export class MCBridgeWsClient {
     this.reconnectMs = this.config.reconnectBaseMs ?? 2_000;
 
     // Gather agent slugs to register routes on MC side
-    const agents = await listLocalAgents().catch(() => []);
+    const agents = await listLocalAgents(this.api).catch(() => []);
     const agentSlugs = agents.map((a) => a.slug);
 
     const nonce = randomBytes(16).toString("hex");
@@ -167,7 +167,7 @@ export class MCBridgeWsClient {
       this.deliveredIds.add(msg.deliveryId);
 
       try {
-        await deliverToLocalAgent(msg.agentSlug, msg.message);
+        await deliverToLocalAgent(this.api, msg.agentSlug, msg.message);
       } catch (err) {
         console.error(`[agentcenter-bridge] Failed to deliver task to agent ${msg.agentSlug}:`, err);
       }
@@ -180,7 +180,7 @@ export class MCBridgeWsClient {
   private async handleNotify(msg: MsgNotify): Promise<void> {
     // No ack needed — notifications are fire-and-forget.
     // Trigger the agent's work cycle with the notification content.
-    await deliverToLocalAgent(msg.agentSlug, msg.content);
+    await deliverToLocalAgent(this.api, msg.agentSlug, msg.content);
   }
 
   private handleClose(): void {
