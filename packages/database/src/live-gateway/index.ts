@@ -152,6 +152,19 @@ export async function findConnectionIdsByMachineName(machineName: string): Promi
   return rows.map((r) => r.id);
 }
 
+/**
+ * Return the plugin version last reported by a machine when it connected.
+ * Returns null if the machine has never connected or has no version recorded.
+ */
+export async function getPluginVersionByMachineName(machineName: string): Promise<string | null> {
+  const row = await prisma.liveGatewayConnection.findFirst({
+    where: { machineName },
+    select: { pluginVersion: true },
+    orderBy: { connectedAt: "desc" },
+  });
+  return row?.pluginVersion ?? null;
+}
+
 // ── Agent routes ──────────────────────────────────────────────────────────────
 
 /**

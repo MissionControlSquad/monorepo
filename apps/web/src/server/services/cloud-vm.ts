@@ -163,7 +163,7 @@ async function installBridgePlugin(
     for (let attempt = 1; attempt <= 3; attempt++) {
       install = await ocExec(
         sshConfig,
-        "openclaw plugins install clawhub:@agentcenter/agentcenter-bridge",
+        "openclaw plugins install clawhub:@agentcenter/agentcenter-bridge --force",
         { timeoutMs: 120_000 },
       );
       if (install.code === 0) break;
@@ -557,7 +557,7 @@ export async function provisionVM(vmId: string): Promise<void> {
     await log(vmId, "Pre-installing agentcenter-bridge plugin...");
     const bridgeInstall = await ocExec(
       sshConfig,
-      "openclaw plugins install clawhub:@agentcenter/agentcenter-bridge",
+      "openclaw plugins install clawhub:@agentcenter/agentcenter-bridge --force",
       { timeoutMs: 120_000 },
     );
     if (bridgeInstall.code !== 0) {
@@ -1633,6 +1633,84 @@ export async function disableVMLiveGateway(vmId: string): Promise<void> {
 
   await updateVM(vmId, { liveGatewayTokenId: null });
   await log(vmId, "Live gateway disabled — agents will use heartbeat polling");
+}
+
+/**
+ * Sync (update) the agentcenter-bridge plugin binary on a running VM.
+ * Re-installs the plugin from ClawHub to get the latest version, then
+ * re-writes the plugin config with the existing token and restarts the daemon.
+ * No token rotation — active connections are not interrupted.
+ */
+export async function syncVMLiveGatewayPlugin(vmId: string): Promise<void> {
+  const vm = await getCloudVMOrThrow(vmId);
+  if (vm.status !== CloudVmStatus.RUNNING) {
+    throw new Error("VM must be running to sync the live gateway plugin");
+  }
+  if (!(vm as any).liveGatewayTokenId) {
+    throw new Error("Live gateway is not enabled — enable it first before syncing");
+  }
+
+  const sshConfig = getVMSSHConfig(vm);
+
+  await log(vmId, "Syncing agentcenter-bridge plugin — updating to latest version...");
+
+  // Try `update` first — already-installed plugins skip the security re-scan.
+  // Fall back to `install` if update command is not available.
+  let update: Awaited<ReturnType<typeof ocExec>> | null = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    update = await ocExec(sshConfig, "openclaw plugins update agentcenter-bridge", {
+      timeoutMs: 120_000,
+    });
+    if (update.code === 0) break;
+    const output = (update.stderr + update.stdout).toLowerCase();
+    if ((output.includes("429") || output.includes("rate limit")) && attempt < 3) {
+      await sleep(attempt * 8_000);
+      continue;
+    }
+    // If update command itself is unrecognised, fall through to install
+    if (output.includes("unknown command") || output.includes("not found")) break;
+    break;
+  }
+
+  if (update!.code !== 0) {
+    // Fallback: reinstall (requires plugin to be verified on ClawHub to pass security scan)
+    await log(vmId, "plugins update not available — falling back to install...", "warn");
+    let install: Awaited<ReturnType<typeof ocExec>> | null = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      install = await ocExec(
+        sshConfig,
+        "openclaw plugins install clawhub:@agentcenter/agentcenter-bridge --force",
+        { timeoutMs: 120_000 },
+      );
+      if (install.code === 0) break;
+      const output = (install.stderr + install.stdout).toLowerCase();
+      if ((output.includes("429") || output.includes("rate limit")) && attempt < 3) {
+        await sleep(attempt * 8_000);
+        continue;
+      }
+      break;
+    }
+    if (install!.code !== 0) {
+      const detail = (install!.stderr + "\n" + install!.stdout).trim().slice(0, 800);
+      throw new Error(
+        `Plugin sync failed — the plugin must be verified on ClawHub to allow reinstall.\n\n${detail}`,
+      );
+    }
+  }
+
+  // Ensure plugin is enabled in config (binary update may reset its state)
+  const config = await readVMConfig(sshConfig);
+  const entries = ((config.plugins as any)?.entries ?? {}) as Record<string, unknown>;
+  if (entries["agentcenter-bridge"]) {
+    (entries["agentcenter-bridge"] as any).enabled = true;
+    config.plugins = { allow: ["agentcenter-bridge"], entries };
+    await writeVMConfig(sshConfig, config);
+  }
+
+  // Restart daemon so it picks up the new binary
+  await restartGateway(sshConfig);
+
+  await log(vmId, "agentcenter-bridge plugin synced and daemon restarted");
 }
 
 /**
