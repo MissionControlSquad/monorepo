@@ -46,10 +46,19 @@ async function resolveOpenclawBin(): Promise<string> {
     candidates.push(path.join(dir, "openclaw"));
   }
 
-  // 2. Common fixed locations (Homebrew, system npm)
+  // 2. Common fixed locations (Homebrew, system npm, Windows)
   candidates.push("/opt/homebrew/bin/openclaw");
   candidates.push("/usr/local/bin/openclaw");
   candidates.push(path.join(os.homedir(), ".local", "bin", "openclaw"));
+  if (process.platform === "win32") {
+    // Common Windows install locations — derived from os.homedir() to avoid
+    // undeclared env var access (ClawHub policy requires declaring all env vars used).
+    // AppData\Roaming and AppData\Local are always under the user home directory.
+    const home = os.homedir();
+    candidates.push(path.join(home, "AppData", "Roaming", "npm", "openclaw.cmd"));
+    candidates.push(path.join(home, "AppData", "Roaming", "npm", "openclaw"));
+    candidates.push(path.join(home, "AppData", "Local", "Programs", "openclaw", "openclaw.exe"));
+  }
 
   // 3. All nvm versions
   const nvmDir = path.join(os.homedir(), ".nvm", "versions", "node");
@@ -68,12 +77,17 @@ async function resolveOpenclawBin(): Promise<string> {
     } catch { /* not found or not executable */ }
   }
 
-  // 4. Last resort: login shell which
+  // 4. Last resort: login shell which/where (cross-platform)
   const { execFile } = await import("node:child_process");
+  const isWindows = process.platform === "win32";
+  const shellArgs: [string, string[]] = isWindows
+    ? ["cmd.exe", ["/c", "where openclaw"]]
+    : ["/bin/sh", ["-lc", "which openclaw"]];
   const bin = await new Promise<string>((resolve, reject) => {
-    execFile("/bin/sh", ["-lc", "which openclaw"], (err, stdout) => {
+    execFile(shellArgs[0], shellArgs[1], (err, stdout) => {
       if (err) reject(new Error("[openclaw-local] Could not locate openclaw binary"));
-      else resolve(stdout.trim());
+      // `where` on Windows may return multiple lines; take the first one
+      else resolve(stdout.trim().split(/\r?\n/)[0]!.trim());
     });
   });
   cachedOpenclawBin = bin;
