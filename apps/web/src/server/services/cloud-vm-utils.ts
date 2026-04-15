@@ -426,8 +426,17 @@ export async function ensureGatewayConfig(
     logging.redactSensitive = "tools";
     config.logging = logging;
 
-    // Lock down plugins
-    config.plugins = { allow: [] };
+    // Lock down plugins — preserve agentcenter-bridge entry if already configured,
+    // wipe all other plugin entries for security.
+    const existingPluginEntries = ((config.plugins as any)?.entries ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const bridgeEntry = existingPluginEntries["agentcenter-bridge"];
+    config.plugins = {
+      allow: bridgeEntry ? ["agentcenter-bridge"] : [],
+      ...(bridgeEntry ? { entries: { "agentcenter-bridge": bridgeEntry } } : {}),
+    };
   }
 
   // hooks

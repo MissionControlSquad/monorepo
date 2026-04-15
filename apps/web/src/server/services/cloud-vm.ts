@@ -10,10 +10,15 @@ import {
   updateManyAgentsByVm,
   findAgentByVmAndSlug,
   listRunningCloudVMsForRepair,
+  createLiveGatewayToken,
+  revokeLiveGatewayToken,
+  deleteConnectionsByMachineName,
+  markConnectionsDisconnectedByMachineName,
 } from "@agentcenter/database";
 import { generateApiKey } from "../api-key";
 import { randomBytes } from "crypto";
-import { computeCronSchedule } from "../agent-config-generator";
+import bcrypt from "bcryptjs";
+import { computeCronSchedule, getMcUrl } from "../agent-config-generator";
 import { isFeatureEnabled } from "../feature-flags";
 import { FLAG_KEYS, CloudVmStatus, getAgentSlug } from "@agentcenter/utils";
 import {
@@ -33,6 +38,7 @@ import { VM_USER, VM_HOME, VM_CONFIG_DIR, VM_CONFIG_PATH, VM_WORKSPACE } from ".
 import { ensureHeartbeatCron, removeAgentCrons } from "./cloud-vm-cron";
 import {
   getVMSSHConfig,
+  ocExec,
   restartGateway,
   waitForGateway,
   readVMConfig,
@@ -61,11 +67,18 @@ async function setStep(vmId: string, status: string, setupStep: string, setupPro
 }
 
 async function failVM(vmId: string, step: string, error: string) {
+  // Revoke any live gateway token that was created during provisioning so it
+  // cannot be used by a partially-installed plugin on a failed VM.
+  const failedVm = await getCloudVMOrThrow(vmId).catch(() => null);
+  if (failedVm && (failedVm as any).liveGatewayTokenId) {
+    await revokeLiveGatewayToken((failedVm as any).liveGatewayTokenId).catch(() => undefined);
+  }
   await updateVM(vmId, {
     status: CloudVmStatus.ERROR,
     errorMessage: `Failed at step "${step}": ${error}`,
     errorAt: new Date(),
     setupStep: null,
+    liveGatewayTokenId: null, // Cleared so a retry gets a fresh token
   });
   await log(vmId, `Provisioning failed at "${step}": ${error}`, "error");
 }
@@ -76,6 +89,70 @@ function sleep(ms: number) {
 
 function generateSecureToken(): string {
   return randomBytes(32).toString("base64url");
+}
+
+/** Convert an http(s) MC URL to the wss live-gateway WebSocket URL. */
+function liveGatewayWssUrl(): string {
+  return (
+    getMcUrl()
+      .replace(/\/$/, "")
+      .replace(/^https/, "wss")
+      .replace(/^http:/, "ws:") + "/live-gateway"
+  );
+}
+
+/**
+ * Create a live gateway install token in the DB and return the raw token string
+ * plus the DB record ID. The raw token is written into openclaw.json on the VM;
+ * the ID is stored on the CloudVM record so it can be revoked on destroy.
+ */
+async function createVMLiveGatewayToken(vmId: string): Promise<{ raw: string; tokenId: string }> {
+  const raw = randomBytes(32).toString("hex");
+  const tokenHash = await bcrypt.hash(raw, 12);
+  const record = await createLiveGatewayToken({
+    tokenHash,
+    tokenPrefix: raw.slice(0, 8),
+    name: `cloud-vm-${vmId}`,
+  });
+  return { raw, tokenId: record.id };
+}
+
+/**
+ * Install and configure the agentcenter-bridge plugin on a running VM.
+ * Writes the plugin entry into openclaw.json then runs
+ * `openclaw plugins install clawhub:@agentcenter/agentcenter-bridge`.
+ * The daemon hot-reloads the config and starts the plugin automatically.
+ */
+async function installBridgePlugin(
+  sshConfig: { host: string; privateKey: string },
+  rawToken: string,
+): Promise<void> {
+  const config = await readVMConfig(sshConfig);
+  const wssUrl = liveGatewayWssUrl();
+
+  config.plugins = {
+    allow: ["agentcenter-bridge"],
+    entries: {
+      "agentcenter-bridge": {
+        enabled: true,
+        config: { agentCenterUrl: wssUrl, token: rawToken },
+      },
+    },
+  };
+
+  await writeVMConfig(sshConfig, config);
+
+  // Install plugin from ClawHub — daemon picks up the config entry on hot-reload
+  const result = await ocExec(
+    sshConfig,
+    "plugins install clawhub:@agentcenter/agentcenter-bridge",
+    { timeoutMs: 60_000 },
+  );
+  if (result.code !== 0) {
+    throw new Error(
+      `openclaw plugins install failed (exit ${result.code}): ${result.stderr.slice(0, 300)}`,
+    );
+  }
 }
 
 /**
@@ -496,6 +573,11 @@ export async function provisionVM(vmId: string): Promise<void> {
 
     const gatewayToken = generateSecureToken();
     const hooksToken = generateSecureToken();
+
+    // Generate a live gateway install token now so it can be embedded in the
+    // initial openclaw.json — the plugin reads it on first connect.
+    const { raw: liveRawToken, tokenId: liveTokenId } = await createVMLiveGatewayToken(vmId);
+
     const initialConfig = JSON.stringify(
       {
         gateway: {
@@ -531,7 +613,15 @@ export async function provisionVM(vmId: string): Promise<void> {
           token: hooksToken,
           allowedSessionKeyPrefixes: ["hook:", "external:"],
         },
-        plugins: { allow: [] },
+        plugins: {
+          allow: ["agentcenter-bridge"],
+          entries: {
+            "agentcenter-bridge": {
+              enabled: true,
+              config: { agentCenterUrl: liveGatewayWssUrl(), token: liveRawToken },
+            },
+          },
+        },
         discovery: { mdns: { mode: "off" } },
         logging: { redactSensitive: "tools" },
       },
@@ -539,8 +629,8 @@ export async function provisionVM(vmId: string): Promise<void> {
       2,
     );
 
-    // Store gateway token in DB for chat proxy access
-    await updateVM(vmId, { gatewayToken });
+    // Store gateway token + live gateway token ID in DB
+    await updateVM(vmId, { gatewayToken, liveGatewayTokenId: liveTokenId });
 
     result = await sshExec(
       sshConfig,
@@ -609,7 +699,35 @@ export async function provisionVM(vmId: string): Promise<void> {
       return;
     }
 
-    // Step 10: Run security audit
+    // Step 10: Install agentcenter-bridge plugin for live gateway support
+    // Non-fatal — VM still delivers tasks via heartbeat if this fails.
+    // Token and config are cleaned up so the next repair can retry fresh.
+    await setStep(vmId, CloudVmStatus.CONFIGURING, "install_bridge_plugin", 88);
+    await log(vmId, "Installing agentcenter-bridge plugin...");
+    try {
+      await installBridgePlugin(sshConfig, liveRawToken);
+      await log(vmId, "agentcenter-bridge plugin installed — live gateway active");
+    } catch (pluginErr) {
+      const pluginMsg = pluginErr instanceof Error ? pluginErr.message : String(pluginErr);
+      await log(
+        vmId,
+        `Warning: bridge plugin install failed (${pluginMsg}) — heartbeat delivery active, live gateway inactive`,
+        "warn",
+      );
+      // Revoke the token and wipe the plugin config so the daemon doesn't try
+      // to load it, and so the next repair can create a fresh token and retry.
+      await revokeLiveGatewayToken(liveTokenId).catch(() => undefined);
+      await updateVM(vmId, { liveGatewayTokenId: null });
+      try {
+        const cfg = await readVMConfig(sshConfig);
+        cfg.plugins = { allow: [] };
+        await writeVMConfig(sshConfig, cfg);
+      } catch {
+        /* best-effort config cleanup */
+      }
+    }
+
+    // Step 11: Run security audit
     await setStep(vmId, CloudVmStatus.CONFIGURING, "security_audit", 95);
     await log(vmId, "Running OpenClaw security audit...");
 
@@ -819,6 +937,10 @@ export async function unassignAgentFromVM(agentId: string): Promise<void> {
 
   const vmId = agent.cloudVmId;
 
+  // Clean up VM-side state: cron jobs, openclaw.json agents list, workspace,
+  // gateway restart (which forces plugin to re-report and removes LiveAgentRoute entry)
+  await cleanupAgentFromVM(vmId, agent);
+
   await updateAgent(agentId, { cloudVmId: null, hostingType: "selfHosted" });
 
   await log(vmId, `Agent "${agent.name}" unassigned from VM`);
@@ -836,6 +958,17 @@ export async function destroyCloudVM(vmId: string): Promise<void> {
 
   // Unassign all agents
   await updateManyAgentsByVm(vmId, { cloudVmId: null, hostingType: "selfHosted" });
+
+  // Revoke the live gateway install token so the plugin can no longer reconnect
+  if ((vm as any).liveGatewayTokenId) {
+    await revokeLiveGatewayToken((vm as any).liveGatewayTokenId).catch(() => undefined);
+  }
+
+  // Clean up the LiveGatewayConnection record (and cascaded routes + pending deliveries).
+  // Uses serverName as the machine hostname — Hetzner VMs use the server name as hostname.
+  if (vm.serverName) {
+    await deleteConnectionsByMachineName(vm.serverName).catch(() => undefined);
+  }
 
   await log(vmId, "Destroying server...");
 
@@ -881,6 +1014,15 @@ export async function stopCloudVM(vmId: string): Promise<void> {
 
   await powerOff(vm.externalServerId);
   await updateVM(vmId, { status: CloudVmStatus.STOPPED, stoppedAt: new Date() });
+
+  // Immediately mark the live gateway connection as disconnected so the DB reflects
+  // the offline state without waiting for the WebSocket close event to propagate.
+  // Pending deliveries are intentionally preserved — they will be drained once
+  // the VM restarts and the bridge plugin reconnects.
+  if (vm.serverName) {
+    await markConnectionsDisconnectedByMachineName(vm.serverName).catch(() => undefined);
+  }
+
   await log(vmId, "Server powered off");
 }
 
@@ -891,6 +1033,17 @@ export async function startCloudVM(vmId: string): Promise<void> {
   }
   if (!vm.externalServerId) {
     throw new Error("No server associated with this VM");
+  }
+
+  // If the live gateway token was somehow revoked or cleared while the VM was
+  // stopped, log a warning. The plugin will fail to authenticate on reconnect
+  // and the VM will need a repair to get a fresh token.
+  if (!(vm as any).liveGatewayTokenId) {
+    await log(
+      vmId,
+      "Warning: VM has no live gateway token — run repair to restore live gateway",
+      "warn",
+    );
   }
 
   await powerOn(vm.externalServerId);
@@ -1382,6 +1535,27 @@ export async function repairOpenClawService(vmId: string): Promise<void> {
           `Warning: failed to create heartbeat cron for "${slug}": ${cronResult.message}`,
           "warn",
         );
+      }
+    }
+  }
+
+  // ── 6. Install bridge plugin if not yet present (backfill for existing VMs) ──
+  if (!(vm as any).liveGatewayTokenId) {
+    let backfillTokenId: string | null = null;
+    try {
+      await log(vmId, "Installing agentcenter-bridge plugin (backfill)...");
+      const { raw: liveRawToken, tokenId } = await createVMLiveGatewayToken(vmId);
+      backfillTokenId = tokenId;
+      await updateVM(vmId, { liveGatewayTokenId: backfillTokenId });
+      await installBridgePlugin(sshConfig, liveRawToken);
+      await log(vmId, "agentcenter-bridge plugin installed — live gateway active");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await log(vmId, `Warning: bridge plugin backfill failed: ${message}`, "warn");
+      // Clean up the token so next repair can try again with a fresh one
+      if (backfillTokenId) {
+        await revokeLiveGatewayToken(backfillTokenId).catch(() => undefined);
+        await updateVM(vmId, { liveGatewayTokenId: null }).catch(() => undefined);
       }
     }
   }

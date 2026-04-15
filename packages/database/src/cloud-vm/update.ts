@@ -49,6 +49,7 @@ export async function retryCloudVMProvisioning(id: string): Promise<void> {
       errorAt: null,
       setupStep: "retrying",
       setupProgress: 5,
-    },
+      liveGatewayTokenId: null, // Fresh token will be created during re-provisioning
+    } as any,
   });
 }
