@@ -25,7 +25,6 @@ import {
   ensureAgentWorkspace,
   uploadAgentConfigFiles,
   ensureAgentInConfig,
-  REQUIRED_AGENT_FILES,
 } from "./cloud-vm-utils";
 
 interface EnsureCheck {
