@@ -13,10 +13,11 @@
 import type { MCBridgeConfig } from "./config-schema";
 import { MCBridgeWsClient } from "./ws-client";
 import { AgentReporter } from "./agent-reporter";
-import { autoApprovePendingDevices } from "./openclaw-local";
 
 let client: MCBridgeWsClient | null = null;
 let reporter: AgentReporter | null = null;
+/** True only when this service instance actually started the bridge (not a no-op embedded start). */
+let isRealBridge = false;
 
 // eslint-disable-next-line import/no-default-export
 export default {
@@ -32,6 +33,18 @@ export default {
       id: "agentcenter-bridge-ws",
 
       async start() {
+        // runEmbeddedAgent reloads plugins inside the same process. Prevent the
+        // bridge from opening a second competing WebSocket (same token/fingerprint)
+        // which would cause the server to evict the real connection.
+        // Symbol.for() matches OpenClaw's own internal pattern and avoids
+        // collisions with other plugins using the same globalThis technique.
+        const DEPTH_KEY = Symbol.for("agentcenter.bridge.embeddedDepth");
+        if (((globalThis as any)[DEPTH_KEY] ?? 0) > 0) {
+          api.logger.info("[agentcenter-bridge] Embedded agent context — bridge already running, skipping duplicate start");
+          isRealBridge = false;
+          return;
+        }
+
         const config = api.pluginConfig as MCBridgeConfig | undefined;
 
         if (!config?.agentCenterUrl) {
@@ -43,15 +56,9 @@ export default {
           return;
         }
 
-        // Optionally auto-approve local CLI device pairing requests so
-        // `openclaw agent` uses the fast gateway path. Only runs when the user
-        // explicitly sets autoApproveDevices: true in the plugin config.
-        if (config.autoApproveDevices) {
-          await autoApprovePendingDevices();
-        }
-
-        client = new MCBridgeWsClient(config);
-        reporter = new AgentReporter(client);
+        isRealBridge = true;
+        client = new MCBridgeWsClient(config, api);
+        reporter = new AgentReporter(client, api);
 
         // Start reporter once WS handshake completes (mc.welcome received)
         client.onConnect(() => reporter!.start());
@@ -61,6 +68,9 @@ export default {
       },
 
       async stop() {
+        // Don't tear down the real bridge when stop is called by the embedded context.
+        if (!isRealBridge) return;
+        isRealBridge = false;
         reporter?.stop();
         client?.stop();
         reporter = null;

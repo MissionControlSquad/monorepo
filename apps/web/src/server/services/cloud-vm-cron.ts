@@ -137,11 +137,12 @@ async function createCronWithRetry(
 
   // Token mismatch — restart gateway and retry
   if (errMsg.includes("unauthorized") || errMsg.includes("token mismatch")) {
+    console.warn("[cloud-vm-cron] Token mismatch on cron create — restarting gateway and retrying");
     await restartGateway(sshConfig);
 
     result = await ocExec(sshConfig, cronCmd, { timeoutMs: 15_000 });
     if (result.code === 0 && !result.stdout.includes("Invalid config")) {
-      return { ok: true, message: "ok (after gateway restart)" };
+      return { ok: true, message: "ok (after gateway restart due to token mismatch)" };
     }
     return {
       ok: false,
@@ -151,11 +152,14 @@ async function createCronWithRetry(
 
   // Invalid config — try openclaw doctor --fix
   if (errMsg.includes("Invalid config") || errMsg.includes("invalid")) {
+    console.warn(
+      "[cloud-vm-cron] Invalid config on cron create — running openclaw doctor --fix and retrying",
+    );
     await ocExec(sshConfig, "openclaw doctor --fix 2>&1", { timeoutMs: 15_000 });
 
     result = await ocExec(sshConfig, cronCmd, { timeoutMs: 15_000 });
     if (result.code === 0 && !result.stdout.includes("Invalid config")) {
-      return { ok: true, message: "ok (after doctor fix)" };
+      return { ok: true, message: "ok (after openclaw doctor --fix)" };
     }
     return {
       ok: false,

@@ -26,12 +26,30 @@ import {
   getProjectSquadLeadAgentIds,
   getWorkspaceSquadLeadAgentIds,
   getAgentsNotifyState,
+  findCloudVMIdByServerName,
+  logCloudVMEvent,
 } from "@agentcenter/database";
 import { connectionRegistry } from "./live-connection-registry";
 import { LIVE_GATEWAY } from "@agentcenter/types";
 import { MAX_MESSAGE_BYTES, ChannelVisibility } from "@agentcenter/utils";
 import { isFeatureEnabled } from "../feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
+
+// ─── VM event log helper ──────────────────────────────────────────────────────
+
+async function logVMActivity(
+  machineName: string | null | undefined,
+  message: string,
+  level: "info" | "warn" | "error" = "info",
+): Promise<void> {
+  if (!machineName) return;
+  try {
+    const vmId = await findCloudVMIdByServerName(machineName);
+    if (vmId) await logCloudVMEvent(vmId, message, level);
+  } catch {
+    // Never throw — logging is best-effort
+  }
+}
 
 // ─── Feature flag guard ───────────────────────────────────────────────────────
 // Cached for 60 s (same TTL as feature-flags.ts). Zero DB hits when flag is off.
@@ -203,14 +221,21 @@ async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Prom
     if (!slug) continue;
 
     // Overlapping guard: agent is busy → skip notification entirely.
-    // Heartbeat catches it when the agent goes idle (undeliveredMentions,
-    // hasInboxTasks, hasPendingReview). Unlike task delivery, notifications
-    // have no DB queue — the heartbeat IS the queue.
-    if (isAgentBusy(agent)) continue;
+    // Exception: DMs and channel mentions are direct human communication —
+    // always push them through so the agent can respond in real time.
+    // Heartbeat catches other kinds when the agent goes idle.
+    if (isAgentBusy(agent) && opts.kind !== "dm" && opts.kind !== "channel_mention") {
+      console.debug(`[live-delivery] Skipping "${opts.kind}" for ${slug} — agent is busy`);
+      continue;
+    }
 
     try {
       const connection = await findConnectionByAgentSlug(slug);
-      if (!connection) continue;
+      if (!connection) {
+        console.debug(`[live-delivery] No live gateway connection for agent ${slug}`);
+        continue;
+      }
+      const isLive = connectionRegistry.has(connection.id);
       const sent = connectionRegistry.send(connection.id, {
         type: "mc.notify",
         agentSlug: slug,
@@ -221,11 +246,14 @@ async function sendNotifyToAgents(agentIds: string[], opts: NotifyOptions): Prom
         channelId: opts.channelId,
         fromHandle: opts.fromHandle,
       });
-      if (!sent) {
-        console.warn(
-          `[live-delivery] Notification "${opts.kind}" not delivered to ${slug} — heartbeat fallback applies`,
-        );
-      }
+      console.debug(
+        `[live-delivery] mc.notify kind="${opts.kind}" → @${slug} | connection=${connection.id.slice(0, 8)} live=${isLive} sent=${sent}`,
+      );
+      logVMActivity(
+        connection.machineName,
+        `mc.notify → @${slug} (kind: ${opts.kind}) — ${sent ? "delivered" : "connection not open, heartbeat fallback"}`,
+        sent ? "info" : "warn",
+      ).catch(() => undefined);
     } catch (err) {
       console.error(
         `[live-delivery] Unexpected error delivering "${opts.kind}" to agent ${slug}:`,

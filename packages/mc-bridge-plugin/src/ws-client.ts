@@ -14,6 +14,7 @@ import type {
   MCToPlugin,
   MsgDeliverTask,
   MsgNotify,
+  MsgSessionDone,
 } from "@agentcenter/types";
 import { LIVE_GATEWAY } from "@agentcenter/types";
 import type { MCBridgeConfig } from "./config-schema";
@@ -21,6 +22,12 @@ import { deriveMachineFingerprint, deliverToLocalAgent, listLocalAgents } from "
 import { PLUGIN_VERSION } from "./version";
 
 type SendHandler = (msg: PluginToMC) => void;
+
+/** Pending notification held while the agent's session is active. */
+interface PendingNotify {
+  agentSlug: string;
+  content: string;
+}
 
 export class MCBridgeWsClient {
   private ws: WebSocket | null = null;
@@ -33,8 +40,12 @@ export class MCBridgeWsClient {
   private connectionToken = ""; // Updated after first mc.welcome (per-machine token, persisted in config)
   private deliveredIds = new Set<string>(); // Dedup buffer (capped at PLUGIN_DEDUP_LIMIT)
   private onConnectCallbacks: Array<() => void> = [];
+  /** Tracks which agents currently have a running runEmbeddedAgent session. */
+  private activeSessions = new Set<string>();
+  /** Pending notifications buffered while the agent is busy. One per agent (latest wins). */
+  private pendingNotify = new Map<string, PendingNotify>();
 
-  constructor(private config: MCBridgeConfig) {
+  constructor(private config: MCBridgeConfig, private api: any) {
     this.reconnectMs = config.reconnectBaseMs ?? 2_000;
     this.connectionToken = config.token;
   }
@@ -86,7 +97,7 @@ export class MCBridgeWsClient {
     this.reconnectMs = this.config.reconnectBaseMs ?? 2_000;
 
     // Gather agent slugs to register routes on MC side
-    const agents = await listLocalAgents().catch(() => []);
+    const agents = await listLocalAgents(this.api).catch(() => []);
     const agentSlugs = agents.map((a) => a.slug);
 
     const nonce = randomBytes(16).toString("hex");
@@ -139,7 +150,7 @@ export class MCBridgeWsClient {
         break;
 
       case "mc.notify":
-        this.handleNotify(msg).catch(console.error);
+        this.handleNotify(msg);
         break;
 
       case "mc.error":
@@ -166,21 +177,74 @@ export class MCBridgeWsClient {
       }
       this.deliveredIds.add(msg.deliveryId);
 
-      try {
-        await deliverToLocalAgent(msg.agentSlug, msg.message);
-      } catch (err) {
-        console.error(`[agentcenter-bridge] Failed to deliver task to agent ${msg.agentSlug}:`, err);
-      }
+      this.runAgentSession(msg.agentSlug, msg.message, "task_delivery", msg.deliveryId);
     }
 
     // Always ack — MC marks as delivered on ack
     this.send({ type: "vm.task_ack", deliveryId: msg.deliveryId });
   }
 
-  private async handleNotify(msg: MsgNotify): Promise<void> {
+  private handleNotify(msg: MsgNotify): void {
     // No ack needed — notifications are fire-and-forget.
-    // Trigger the agent's work cycle with the notification content.
-    await deliverToLocalAgent(msg.agentSlug, msg.content);
+    this.runAgentSession(msg.agentSlug, msg.content, msg.kind);
+  }
+
+  /**
+   * Starts a runEmbeddedAgent session for an agent.
+   * Enforces one active session per agent — concurrent calls are buffered
+   * (latest wins) and flushed automatically when the session completes.
+   * Sends vm.session_done on completion so MC can log the result.
+   * Non-async: returns immediately, manages the session via promise chain.
+   */
+  private runAgentSession(
+    agentSlug: string,
+    content: string,
+    trigger: MsgSessionDone["trigger"],
+    deliveryId?: string,
+  ): void {
+    if (this.activeSessions.has(agentSlug)) {
+      // Agent is mid-session — buffer so it's picked up immediately after
+      this.pendingNotify.set(agentSlug, { agentSlug, content });
+      console.log(`[agentcenter-bridge] @${agentSlug} is busy — buffered notification (${trigger}) for after session`);
+      return;
+    }
+    this.activeSessions.add(agentSlug);
+    const startedAt = Date.now();
+    deliverToLocalAgent(this.api, agentSlug, content)
+      .then(() => {
+        const durationMs = Date.now() - startedAt;
+        this.send({
+          type: "vm.session_done",
+          agentSlug,
+          trigger,
+          success: true,
+          durationMs,
+          ...(deliveryId ? { deliveryId } : {}),
+        });
+      })
+      .catch((err: unknown) => {
+        const durationMs = Date.now() - startedAt;
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.error(`[agentcenter-bridge] runAgentSession failed for @${agentSlug} (${trigger}):`, err);
+        this.send({
+          type: "vm.session_done",
+          agentSlug,
+          trigger,
+          success: false,
+          durationMs,
+          errorMessage,
+          ...(deliveryId ? { deliveryId } : {}),
+        });
+      })
+      .finally(() => {
+        this.activeSessions.delete(agentSlug);
+        const pending = this.pendingNotify.get(agentSlug);
+        if (pending) {
+          this.pendingNotify.delete(agentSlug);
+          console.log(`[agentcenter-bridge] flushing buffered notification for @${agentSlug}`);
+          this.runAgentSession(agentSlug, pending.content, trigger);
+        }
+      });
   }
 
   private handleClose(): void {

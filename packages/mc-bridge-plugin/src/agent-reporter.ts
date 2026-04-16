@@ -17,7 +17,7 @@ export class AgentReporter {
   private unsubscribers: Array<() => void> = [];
   private rosterInterval: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private client: MCBridgeWsClient) {}
+  constructor(private client: MCBridgeWsClient, private api: any) {}
 
   start(): void {
     // Send full roster immediately on start
@@ -78,7 +78,7 @@ export class AgentReporter {
   }
 
   private async sendFullRoster(): Promise<void> {
-    const agents = await listLocalAgents();
+    const agents = await listLocalAgents(this.api);
     this.client.send({ type: "vm.agents_report", agents });
   }
 }

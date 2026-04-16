@@ -543,8 +543,24 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
         toast.error(data.error || "Failed to sync plugin");
         return;
       }
-      toast.success("Plugin updated and daemon restarted");
+
+      // Poll until the plugin reconnects and writes its new version to the DB
+      // (daemon restart + WS reconnect typically takes 3–10s)
+      const versionBefore = vm?.pluginVersion;
+      let updated = false;
+      for (let i = 0; i < 10; i++) {
+        await new Promise((r) => setTimeout(r, 3_000));
+        const fresh = await fetch(`/api/cloud-vms/${vmId}`).then((r) => r.json());
+        if (fresh?.pluginVersion && fresh.pluginVersion !== versionBefore) {
+          updated = true;
+          break;
+        }
+      }
+
       await fetchVM();
+      toast.success(
+        updated ? "Plugin updated successfully" : "Plugin synced — waiting for reconnect",
+      );
     } catch {
       toast.error("Failed to sync live gateway plugin");
     } finally {
@@ -1790,7 +1806,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
                             loading={isValidatingThis}
                             disabled={isValidatingThis || isSettingUp}
                             onClick={() => runAgentValidation(slug)}
-                            title="Validate agent config, files, cron, and LLM"
+                            title="Validate agent config, files, cron, AI provider, and heartbeat"
                           >
                             {isValidatingThis ? "Checking..." : "Validate"}
                           </Button>
@@ -1816,7 +1832,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
                       <div className="flex items-center gap-2 py-4 justify-center text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span className="text-xs">
-                          Running agent checks — this may take up to a minute...
+                          Running agent checks — checking files, heartbeat &amp; AI provider...
                         </span>
                       </div>
                     </div>

@@ -80,23 +80,19 @@ export async function ensureAgentOnVM(vmId: string, agentId: string): Promise<En
       files.length === 0 ? "Created workspace + memory directory" : `${files.length} files present`,
   });
 
-  // ── 3. Ensure config files exist ──
-  const missingFiles = [...REQUIRED_AGENT_FILES].filter((f) => !files.includes(f));
-
-  if (missingFiles.length === 0) {
-    checks.push({ name: "Config Files", status: "pass", message: "All required files present" });
-  } else {
-    await uploadAgentConfigFiles(sshConfig, agent, agentSlug, {
-      agentId: agent.id,
-      onlyMissing: true,
-      existingFiles: files,
-    });
-    checks.push({
-      name: "Config Files",
-      status: "fixed",
-      message: `Restored: ${missingFiles.join(", ")}`,
-    });
-  }
+  // ── 3. Re-upload all config files (preserving MEMORY.md only) ──
+  // Always overwrite — this refreshes IDENTITY.md with a new API key and the
+  // current MC URL, fixes any corrupted files, and keeps config in sync.
+  await uploadAgentConfigFiles(sshConfig, agent, agentSlug, {
+    agentId: agent.id,
+    preserveMemory: true,
+    existingFiles: files,
+  });
+  checks.push({
+    name: "Config Files",
+    status: "fixed",
+    message: "Config files refreshed (IDENTITY.md, HEARTBEAT.md, PLAYBOOK.md)",
+  });
 
   // Fix ownership — SSH uploads as root, but gateway runs as agentcenter
   await sshExec(sshConfig, `chown -R ${VM_USER}:${VM_USER} ${VM_HOME}`);
