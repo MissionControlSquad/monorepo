@@ -307,6 +307,14 @@ export const CHANNEL_MESSAGE_CREATED_SUBSCRIPTION = gql`
       fromProfileId
       content
       createdAt
+      updatedAt
+      pinnedAt
+      pinnedByProfileId
+      pinnedByProfile {
+        id
+        displayName
+        username
+      }
       fromProfile {
         id
         kind
@@ -340,6 +348,7 @@ export const CHANNEL_MESSAGE_CREATED_SUBSCRIPTION = gql`
       }
       reactions {
         id
+        messageId
         profileId
         emoji
         profile {

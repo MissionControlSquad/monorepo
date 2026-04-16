@@ -45,8 +45,9 @@ model CloudVM {
   llmConfigured      Boolean            @default(false)
   llmProvider        String?
   llmModel           String?
-  gatewayToken       String?
-  createdAt          DateTime           @default(now())
+  gatewayToken         String?
+  liveGatewayTokenId   String?            @unique
+  createdAt            DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
   agents       Agent[]

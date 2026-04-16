@@ -1,6 +1,6 @@
 {
   "name": "@agentcenter/agentcenter-bridge",
-  "version": "0.1.26",
+  "version": "0.2.15",
   "description": "Persistent WebSocket bridge between OpenClaw and AgentCenter Cloud for live task delivery and agent status reporting.",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,12 +27,11 @@
   },
   "files": [
     "dist/",
-    "src/",
     "config-schema.js",
     "config-schema.json",
-    "DEVELOPMENT.md",
     "LICENSE",
     "README.md",
+    "SKILL.md",
     "openclaw.plugin.json",
     "tsconfig.json"
   ],
@@ -41,8 +40,8 @@
     "typecheck": "tsc --noEmit",
     "clawhub:setup": "npm install -g clawhub && clawhub auth login",
     "clawhub:dry": "npm run build && npm pack --dry-run",
-    "clawhub:publish": "npm run typecheck && npm run build && rm -rf .turbo && clawhub package publish . --family code-plugin --name @agentcenter/agentcenter-bridge --display-name \"AgentCenter Bridge\" --source-repo MissionControlSquad/monorepo --source-commit $(git rev-parse HEAD) --source-path packages/mc-bridge-plugin",
-    "version:sync": "node -e \"const fs=require('fs');const v=require('./package.json').version;const p=JSON.parse(fs.readFileSync('openclaw.plugin.json','utf8'));p.version=v;fs.writeFileSync('openclaw.plugin.json',JSON.stringify(p,null,2)+'\\n');fs.writeFileSync('src/version.ts','/** Auto-updated by npm run version:sync -- do not edit manually. */\\nexport const PLUGIN_VERSION = \\\"'+v+'\\\";\\n');console.log('synced to',v)\"",
+    "clawhub:publish": "npm run typecheck && npm run build && rm -rf .turbo && clawhub --workdir . package publish . --family code-plugin --name @agentcenter/agentcenter-bridge --display-name \"AgentCenter Bridge\" --version $(node -p \"require('./package.json').version\") --source-repo MissionControlSquad/monorepo --source-commit $(git rev-parse HEAD) --source-path packages/mc-bridge-plugin",
+    "version:sync": "node -e \"const fs=require('fs');const v=require('./package.json').version;const p=JSON.parse(fs.readFileSync('openclaw.plugin.json','utf8'));p.version=v;fs.writeFileSync('openclaw.plugin.json',JSON.stringify(p,null,2)+'\\n');fs.writeFileSync('src/version.ts','/** Auto-updated by npm run version:sync -- do not edit manually. */\\nexport const PLUGIN_VERSION = \\\"'+v+'\\\";\\n');fs.writeFileSync('../../apps/web/src/server/bridge-plugin-version.ts','/** Auto-updated by packages/mc-bridge-plugin/npm run version:sync -- do not edit manually. */\\nexport const BRIDGE_PLUGIN_VERSION = \\\"'+v+'\\\";\\n');console.log('synced to',v)\"",
     "release:patch": "npm version patch && npm run version:sync && npm run clawhub:publish",
     "release:minor": "npm version minor && npm run version:sync && npm run clawhub:publish",
     "release:major": "npm version major && npm run version:sync && npm run clawhub:publish"

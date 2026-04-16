@@ -1,4 +1,4 @@
-export { findCloudVMById, findCloudVMConnection, findCloudVMRaw } from "./find-by-id";
+export { findCloudVMById, findCloudVMConnection, findCloudVMRaw, findCloudVMIdByServerName } from "./find-by-id";
 export { listCloudVMs, listRunningCloudVMs, listRunningCloudVMsWithAgents } from "./list";
 export { updateCloudVM, markCloudVMError, updateCloudVMUptime, retryCloudVMProvisioning } from "./update";
 export { logCloudVMEvent, getCloudVMLogs } from "./log-event";

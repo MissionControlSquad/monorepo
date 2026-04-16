@@ -33,6 +33,8 @@ import {
   isAgentAssignedToTask,
   updateTaskStatus,
   findTaskByIdSelect,
+  findCloudVMIdByServerName,
+  logCloudVMEvent,
 } from "@agentcenter/database";
 import { connectionRegistry } from "./live-connection-registry";
 import { pubsub, PubSubEvent } from "@agentcenter/graphql-server";
@@ -45,6 +47,7 @@ import type {
   MsgAgentMessage,
   MsgTaskDone,
   MsgTaskAck,
+  MsgSessionDone,
   VMErrorCode,
 } from "@agentcenter/types";
 import { LIVE_GATEWAY } from "@agentcenter/types";
@@ -65,6 +68,26 @@ function stripHtml(str: string): string {
   return str.replace(/<[^>]*>/g, "").trim();
 }
 
+// ─── VM event logging ─────────────────────────────────────────────────────────
+
+/**
+ * Silently log an event to the CloudVM logs if the machineName maps to a
+ * managed CloudVM. No-ops for self-hosted / user VPS machines.
+ */
+async function logVMActivity(
+  machineName: string | null | undefined,
+  message: string,
+  level: "info" | "warn" | "error" = "info",
+): Promise<void> {
+  if (!machineName) return;
+  try {
+    const vmId = await findCloudVMIdByServerName(machineName);
+    if (vmId) await logCloudVMEvent(vmId, message, level);
+  } catch {
+    // Never throw — logging is best-effort
+  }
+}
+
 // ─── Install token lookup ─────────────────────────────────────────────────────
 
 async function findValidInstallToken(rawToken: string) {
@@ -78,21 +101,35 @@ async function findValidInstallToken(rawToken: string) {
 // ─── vm.hello handler ─────────────────────────────────────────────────────────
 
 async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null> {
+  const hostname = String(msg.meta?.hostname ?? "unknown").slice(0, 255);
   // 1. Clock-skew guard
   const delta = Math.abs(Date.now() - msg.timestamp);
   if (delta > LIVE_GATEWAY.MAX_CLOCK_SKEW_MS) {
     sendError(ws, "auth_failed", `Clock skew too large: ${delta}ms`);
+    logVMActivity(
+      hostname,
+      `Auth rejected: clock skew ${delta}ms (limit ${LIVE_GATEWAY.MAX_CLOCK_SKEW_MS}ms) from ${hostname}`,
+      "warn",
+    ).catch(() => undefined);
     return null;
   }
 
   // 2. Nonce format + atomic consumption — prevents replay attacks
   if (!/^[0-9a-f]{32}$/i.test(msg.nonce)) {
     sendError(ws, "auth_failed", "Invalid nonce format");
+    logVMActivity(hostname, `Auth rejected: invalid nonce format from ${hostname}`, "warn").catch(
+      () => undefined,
+    );
     return null;
   }
   const nonceOk = await consumeNonce(msg.nonce);
   if (!nonceOk) {
     sendError(ws, "nonce_replay", "Nonce already used");
+    logVMActivity(
+      hostname,
+      `Auth rejected: nonce replay attempt from ${hostname} — possible duplicate connection`,
+      "warn",
+    ).catch(() => undefined);
     return null;
   }
 
@@ -111,6 +148,10 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
       await markConnectionConnected(connectionId, msg.pluginVersion, hostMeta);
       if (msg.agents?.length) await syncAgentRoutes(connectionId, msg.agents);
       send(ws, { type: "mc.welcome", vmId: connectionId });
+      logVMActivity(
+        hostname,
+        `Plugin reconnected (permanent token) — v${msg.pluginVersion ?? "unknown"}, ${msg.agents?.length ?? 0} agent(s): ${(msg.agents ?? []).join(", ") || "none"}`,
+      ).catch(() => undefined);
       return connectionId;
     }
 
@@ -119,6 +160,11 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
     const installToken = await findValidInstallToken(msg.token);
     if (!installToken) {
       sendError(ws, "auth_failed", "Invalid connection token");
+      logVMActivity(
+        hostname,
+        `Auth rejected: invalid connection token from ${hostname} (fingerprint known, token mismatch)`,
+        "warn",
+      ).catch(() => undefined);
       return null;
     }
 
@@ -131,6 +177,10 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
 
     // Send fresh permanent token — plugin stores it in memory for this session
     send(ws, { type: "mc.welcome", vmId: connectionId, vmToken: rawConnectionToken });
+    logVMActivity(
+      hostname,
+      `Plugin reconnected — new permanent token issued (machine restarted without persisting token), ${msg.agents?.length ?? 0} agent(s)`,
+    ).catch(() => undefined);
     return connectionId;
   }
 
@@ -138,6 +188,11 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
   const installToken = await findValidInstallToken(msg.token);
   if (!installToken) {
     sendError(ws, "auth_failed", "Invalid install token");
+    logVMActivity(
+      hostname,
+      `Auth rejected: invalid install token from ${hostname} — check token configuration`,
+      "warn",
+    ).catch(() => undefined);
     return null;
   }
 
@@ -164,8 +219,18 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
   } catch (err: any) {
     if (err?.code === "P2002") {
       sendError(ws, "internal_error", "Fingerprint collision, please retry");
+      logVMActivity(
+        hostname,
+        `Registration failed: fingerprint collision for ${hostname} — please retry`,
+        "error",
+      ).catch(() => undefined);
     } else {
       sendError(ws, "internal_error", "Registration failed");
+      logVMActivity(
+        hostname,
+        `Registration failed for ${hostname}: ${err?.message ?? "unknown error"}`,
+        "error",
+      ).catch(() => undefined);
     }
     return null;
   }
@@ -179,20 +244,36 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
 
   // Send welcome with raw connectionToken (shown once — plugin must persist it)
   send(ws, { type: "mc.welcome", vmId: connectionId, vmToken: rawConnectionToken });
+  logVMActivity(
+    hostname,
+    `New machine registered — v${msg.pluginVersion ?? "unknown"}, ${msg.agents?.length ?? 0} agent(s): ${(msg.agents ?? []).join(", ") || "none"}`,
+  ).catch(() => undefined);
   return connectionId;
 }
 
 // ─── vm.agents_report handler ─────────────────────────────────────────────────
 
-async function handleAgentsReport(connectionId: string, msg: MsgAgentsReport): Promise<void> {
+async function handleAgentsReport(
+  connectionId: string,
+  msg: MsgAgentsReport,
+  machineName: string | null,
+): Promise<void> {
   await syncAgentRoutes(
     connectionId,
     msg.agents.map((a) => a.slug),
   );
 
+  const slugs: string[] = [];
   for (const info of msg.agents) {
     const agent = await resolveAgentBySlugOrId(info.slug, info.agentId);
-    if (!agent) continue;
+    if (!agent) {
+      logVMActivity(
+        machineName,
+        `Agent report: unknown slug "@${info.slug}" — not registered in DB`,
+        "warn",
+      ).catch(() => undefined);
+      continue;
+    }
     await updateAgent(agent.id, {
       status: info.status,
       detailedStatus: info.detailedStatus ?? null,
@@ -202,14 +283,28 @@ async function handleAgentsReport(connectionId: string, msg: MsgAgentsReport): P
       console.error(`[live-gateway] Failed to update agent status for ${info.slug}:`, err),
     );
     pubsub.publish(PubSubEvent.AGENT.STATUS_CHANGED, { agentId: agent.id });
+    slugs.push(`@${info.slug}(${info.status})`);
+  }
+
+  if (slugs.length > 0) {
+    logVMActivity(machineName, `Agent report: ${slugs.join(", ")}`).catch(() => undefined);
   }
 }
 
 // ─── vm.agent_status handler ──────────────────────────────────────────────────
 
-async function handleAgentStatus(_connectionId: string, msg: MsgAgentStatus): Promise<void> {
+async function handleAgentStatus(
+  _connectionId: string,
+  msg: MsgAgentStatus,
+  machineName: string | null,
+): Promise<void> {
   const agent = await resolveAgentBySlugOrId(msg.slug, msg.agentId);
-  if (!agent) return;
+  if (!agent) {
+    logVMActivity(machineName, `Agent status: unknown slug "@${msg.slug}"`, "warn").catch(
+      () => undefined,
+    );
+    return;
+  }
   await updateAgent(agent.id, {
     status: msg.status,
     detailedStatus: msg.detailedStatus ?? null,
@@ -219,11 +314,19 @@ async function handleAgentStatus(_connectionId: string, msg: MsgAgentStatus): Pr
     console.error(`[live-gateway] Failed to update agent status for ${msg.slug}:`, err),
   );
   pubsub.publish(PubSubEvent.AGENT.STATUS_CHANGED, { agentId: agent.id });
+
+  const detail = msg.detailedStatus ? ` (${msg.detailedStatus})` : "";
+  const task = msg.currentTaskId ? ` on task ${msg.currentTaskId}` : "";
+  logVMActivity(machineName, `@${msg.slug} → ${msg.status}${detail}${task}`).catch(() => undefined);
 }
 
 // ─── vm.agent_message handler ─────────────────────────────────────────────────
 
-async function handleAgentMessage(_connectionId: string, msg: MsgAgentMessage): Promise<void> {
+async function handleAgentMessage(
+  _connectionId: string,
+  msg: MsgAgentMessage,
+  machineName: string | null,
+): Promise<void> {
   const clean = stripHtml(msg.content);
   if (!clean) return;
 
@@ -242,29 +345,42 @@ async function handleAgentMessage(_connectionId: string, msg: MsgAgentMessage): 
           agentId: agent.id,
           actionId: action.id,
         });
+        logVMActivity(machineName, `@${msg.slug} posted message on task ${msg.taskId}`).catch(
+          () => undefined,
+        );
       }
+    } else {
+      logVMActivity(
+        machineName,
+        `Agent message: unknown slug "@${msg.slug}" for task ${msg.taskId}`,
+        "warn",
+      ).catch(() => undefined);
     }
   }
 }
 
 // ─── vm.task_done handler ─────────────────────────────────────────────────────
 
-async function handleTaskDone(connectionId: string, msg: MsgTaskDone): Promise<void> {
+async function handleTaskDone(
+  connectionId: string,
+  msg: MsgTaskDone,
+  machineName: string | null,
+): Promise<void> {
   // Security: verify the reporting agent is actually assigned to the task.
   // A malicious or misconfigured plugin cannot mark arbitrary tasks as done.
   const agent = await resolveAgentBySlugOrId(msg.slug);
   if (!agent) {
-    console.warn(
-      `[live-gateway] vm.task_done: unknown agent slug "${msg.slug}" from connection ${connectionId} — rejected`,
-    );
+    const warn = `vm.task_done: unknown agent slug "@${msg.slug}" from connection ${connectionId} — rejected`;
+    console.warn(`[live-gateway] ${warn}`);
+    logVMActivity(machineName, warn, "warn").catch(() => undefined);
     return;
   }
 
   const isAssigned = await isAgentAssignedToTask(msg.taskId, agent.id);
   if (!isAssigned) {
-    console.warn(
-      `[live-gateway] vm.task_done: agent "${msg.slug}" is not assigned to task ${msg.taskId} — rejected`,
-    );
+    const warn = `vm.task_done: @${msg.slug} is not assigned to task ${msg.taskId} — rejected`;
+    console.warn(`[live-gateway] ${warn}`);
+    logVMActivity(machineName, warn, "warn").catch(() => undefined);
     return;
   }
 
@@ -276,11 +392,27 @@ async function handleTaskDone(connectionId: string, msg: MsgTaskDone): Promise<v
     status: true,
     projectId: true,
   });
-  if (!task) return;
+  if (!task) {
+    logVMActivity(
+      machineName,
+      `vm.task_done: task ${msg.taskId} not found — @${msg.slug}`,
+      "warn",
+    ).catch(() => undefined);
+    return;
+  }
 
-  if (task.status === TaskStatus.DONE) return; // already done — idempotent
+  if (task.status === TaskStatus.DONE) {
+    logVMActivity(
+      machineName,
+      `@${msg.slug} reported task #${task.taskNumber} done (already done — idempotent)`,
+    ).catch(() => undefined);
+    return;
+  }
 
   await updateTaskStatus(msg.taskId, TaskStatus.DONE);
+  logVMActivity(machineName, `@${msg.slug} completed task #${task.taskNumber}`).catch(
+    () => undefined,
+  );
 
   pubsub.publish(PubSubEvent.TASK.UPDATED, { taskId: msg.taskId });
 
@@ -300,26 +432,64 @@ async function handleTaskDone(connectionId: string, msg: MsgTaskDone): Promise<v
 
 // ─── vm.task_ack handler ──────────────────────────────────────────────────────
 
-async function handleTaskAck(connectionId: string, msg: MsgTaskAck): Promise<void> {
+async function handleTaskAck(
+  connectionId: string,
+  msg: MsgTaskAck,
+  machineName: string | null,
+): Promise<void> {
   // Security: only the connection that owns the delivery may ack it.
   // Prevents a malicious plugin from clearing another agent's pending delivery.
   const delivery = await findPendingDeliveryConnection(msg.deliveryId);
 
-  if (!delivery) return; // already received or expired — no-op
+  if (!delivery) {
+    logVMActivity(
+      machineName,
+      `Task ack: delivery ${msg.deliveryId} not found (already received or expired)`,
+    ).catch(() => undefined);
+    return;
+  }
 
   if (delivery.connectionId !== connectionId) {
-    console.warn(
-      `[live-gateway] vm.task_ack: connection ${connectionId} attempted to ack delivery ${msg.deliveryId} owned by ${delivery.connectionId} — rejected`,
-    );
+    const warn = `vm.task_ack: connection ${connectionId} attempted to ack delivery ${msg.deliveryId} owned by ${delivery.connectionId} — rejected`;
+    console.warn(`[live-gateway] ${warn}`);
+    logVMActivity(machineName, warn, "warn").catch(() => undefined);
     return;
   }
 
   await markDeliveryReceived(msg.deliveryId);
+  logVMActivity(machineName, `Task delivery ${msg.deliveryId} acknowledged by plugin`).catch(
+    () => undefined,
+  );
+}
+
+// ─── vm.session_done handler ─────────────────────────────────────────────────
+
+function handleSessionDone(msg: MsgSessionDone, machineName: string | null): void {
+  const duration =
+    msg.durationMs < 1_000 ? `${msg.durationMs}ms` : `${(msg.durationMs / 1_000).toFixed(1)}s`;
+
+  if (msg.success) {
+    logVMActivity(
+      machineName,
+      `@${msg.agentSlug} handled ${msg.trigger} — completed in ${duration}`,
+      "info",
+    ).catch(() => undefined);
+  } else {
+    logVMActivity(
+      machineName,
+      `@${msg.agentSlug} failed ${msg.trigger} after ${duration}${msg.errorMessage ? `: ${msg.errorMessage}` : ""}`,
+      "error",
+    ).catch(() => undefined);
+  }
 }
 
 // ─── Pending task drain ───────────────────────────────────────────────────────
 
-async function drainAndDeliver(connectionId: string, ws: WebSocket): Promise<void> {
+async function drainAndDeliver(
+  connectionId: string,
+  ws: WebSocket,
+  machineName: string | null = null,
+): Promise<void> {
   const pending = await drainPendingDeliveries(connectionId);
   for (const task of pending) {
     send(ws, {
@@ -330,6 +500,10 @@ async function drainAndDeliver(connectionId: string, ws: WebSocket): Promise<voi
       message: task.message,
       priority: task.priority as any,
     });
+    logVMActivity(
+      machineName,
+      `Task delivered to agent @${task.agentSlug} (task: ${task.taskId})`,
+    ).catch(() => undefined);
   }
 }
 
@@ -338,6 +512,7 @@ async function drainAndDeliver(connectionId: string, ws: WebSocket): Promise<voi
 export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): void {
   let connectionId: string | null = null;
   let helloReceived = false;
+  let machineName: string | null = null;
 
   // Enforce hello timeout — close if no hello within 10s
   const helloTimer = setTimeout(() => {
@@ -368,6 +543,7 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
           }
 
           connectionId = resolvedId;
+          machineName = String(msg.meta?.hostname ?? "").slice(0, 255) || null;
           connectionRegistry.add({
             connectionId,
             ws,
@@ -376,8 +552,14 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
             pluginVersion: msg.pluginVersion,
           });
 
+          // Log plugin connect to VM activity log
+          logVMActivity(
+            machineName,
+            `Plugin connected — v${msg.pluginVersion ?? "unknown"} (${machineName ?? "unknown host"})`,
+          ).catch(() => undefined);
+
           // Drain queued tasks immediately
-          await drainAndDeliver(connectionId, ws);
+          await drainAndDeliver(connectionId, ws, machineName);
           break;
         }
 
@@ -389,35 +571,45 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
 
         case "vm.agents_report": {
           if (!connectionId) return;
-          await handleAgentsReport(connectionId, msg);
+          await handleAgentsReport(connectionId, msg, machineName);
           break;
         }
 
         case "vm.agent_status": {
           if (!connectionId) return;
-          await handleAgentStatus(connectionId, msg);
+          await handleAgentStatus(connectionId, msg, machineName);
           break;
         }
 
         case "vm.agent_message": {
           if (!connectionId) return;
-          await handleAgentMessage(connectionId, msg);
+          await handleAgentMessage(connectionId, msg, machineName);
           break;
         }
 
         case "vm.task_done": {
           if (!connectionId) return;
-          await handleTaskDone(connectionId, msg);
+          await handleTaskDone(connectionId, msg, machineName);
           break;
         }
 
         case "vm.task_ack": {
           if (!connectionId) return;
-          await handleTaskAck(connectionId, msg);
+          await handleTaskAck(connectionId, msg, machineName);
+          break;
+        }
+
+        case "vm.session_done": {
+          handleSessionDone(msg, machineName);
           break;
         }
 
         default:
+          logVMActivity(
+            machineName,
+            `Unknown message type received: "${(msg as any).type}"`,
+            "warn",
+          ).catch(() => undefined);
           break;
       }
     } catch (err) {
@@ -431,6 +623,9 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
       connectionRegistry.remove(connectionId);
       await markConnectionDisconnected(connectionId).catch(() => undefined);
       await clearAgentRoutes(connectionId).catch(() => undefined);
+      logVMActivity(machineName, `Plugin disconnected (${machineName ?? "unknown host"})`).catch(
+        () => undefined,
+      );
     }
   });
 
@@ -451,6 +646,11 @@ export function startEvictionLoop(): void {
       const conn = connectionRegistry.get(id);
       if (conn) {
         console.warn(`[live-gateway] Evicting stale connection: ${id}`);
+        logVMActivity(
+          null,
+          `Evicting stale connection ${id} — no activity for ${Math.round(LIVE_GATEWAY.MC_EVICT_TIMEOUT_MS / 1000)}s`,
+          "warn",
+        ).catch(() => undefined);
         conn.ws.terminate(); // triggers "close" which handles cleanup
       }
     }

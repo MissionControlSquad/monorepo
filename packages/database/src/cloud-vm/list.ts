@@ -28,10 +28,11 @@ export async function listRunningCloudVMs() {
 
 export async function listRunningCloudVMsWithAgents() {
   return prisma.cloudVM.findMany({
-    where: { status: CloudVmStatus.RUNNING },
+    where: { status: { notIn: [CloudVmStatus.DESTROYED] } },
     select: {
       id: true,
       name: true,
+      status: true,
       region: true,
       serverType: true,
       ipv4: true,

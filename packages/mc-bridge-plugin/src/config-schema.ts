@@ -25,4 +25,5 @@ export interface MCBridgeConfig {
 
   /** Maximum reconnect backoff (ms). Default: 30000 */
   reconnectMaxMs?: number;
+
 }

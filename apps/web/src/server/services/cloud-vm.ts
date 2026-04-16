@@ -10,10 +10,16 @@ import {
   updateManyAgentsByVm,
   findAgentByVmAndSlug,
   listRunningCloudVMsForRepair,
+  createLiveGatewayToken,
+  revokeLiveGatewayToken,
+  deleteConnectionsByMachineName,
+  findConnectionIdsByMachineName,
 } from "@agentcenter/database";
+import { connectionRegistry } from "./live-connection-registry";
 import { generateApiKey } from "../api-key";
 import { randomBytes } from "crypto";
-import { computeCronSchedule } from "../agent-config-generator";
+import bcrypt from "bcryptjs";
+import { computeCronSchedule, getMcUrl } from "../agent-config-generator";
 import { isFeatureEnabled } from "../feature-flags";
 import { FLAG_KEYS, CloudVmStatus, getAgentSlug } from "@agentcenter/utils";
 import {
@@ -28,11 +34,15 @@ import {
 import { generateSSHKeyPair, encryptPrivateKey } from "./ssh-keys";
 import { sshExec, sshUploadFile, sshTestConnection } from "./ssh";
 import { env } from "../env";
+import { BRIDGE_PLUGIN_VERSION } from "../bridge-plugin-version";
+import { OPENCLAW_VERSION } from "../openclaw-version";
 import { LLM_PROVIDERS_MAP } from "@agentcenter/utils";
 import { VM_USER, VM_HOME, VM_CONFIG_DIR, VM_CONFIG_PATH, VM_WORKSPACE } from "./cloud-vm-paths";
 import { ensureHeartbeatCron, removeAgentCrons } from "./cloud-vm-cron";
+import { type SSHConfig } from "./ssh";
 import {
   getVMSSHConfig,
+  ocExec,
   restartGateway,
   waitForGateway,
   readVMConfig,
@@ -61,11 +71,20 @@ async function setStep(vmId: string, status: string, setupStep: string, setupPro
 }
 
 async function failVM(vmId: string, step: string, error: string) {
+  // Revoke any live gateway token that was created during provisioning so it
+  // cannot be used by a partially-installed plugin on a failed VM.
+  const failedVm = await getCloudVMOrThrow(vmId).catch(() => null);
+  if (failedVm && (failedVm as any).liveGatewayTokenId) {
+    await revokeLiveGatewayToken((failedVm as any).liveGatewayTokenId).catch(() => undefined);
+  }
+  // Terminate any live WS and delete connection records (+ cascaded routes/deliveries).
+  await teardownLiveConnections(failedVm?.serverName);
   await updateVM(vmId, {
     status: CloudVmStatus.ERROR,
     errorMessage: `Failed at step "${step}": ${error}`,
     errorAt: new Date(),
     setupStep: null,
+    liveGatewayTokenId: null, // Cleared so a retry gets a fresh token
   });
   await log(vmId, `Provisioning failed at "${step}": ${error}`, "error");
 }
@@ -74,8 +93,128 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * Terminate any live WebSocket connections for a machine and delete their DB
+ * records (cascades LiveAgentRoute + LivePendingDelivery).
+ * Called on every VM stop/fail/destroy/disable-gateway event.
+ */
+async function teardownLiveConnections(serverName: string | null | undefined): Promise<void> {
+  if (!serverName) return;
+  // Find connection IDs before deleting so we can close the in-memory WS
+  const ids = await findConnectionIdsByMachineName(serverName).catch(() => [] as string[]);
+  for (const id of ids) {
+    const conn = connectionRegistry.get(id);
+    if (conn) {
+      conn.ws.terminate(); // fires "close" → registry.remove + DB cleanup (no-op after delete)
+    }
+  }
+  await deleteConnectionsByMachineName(serverName).catch(() => undefined);
+}
+
 function generateSecureToken(): string {
   return randomBytes(32).toString("base64url");
+}
+
+/** Convert an http(s) MC URL to the wss live-gateway WebSocket URL. */
+function liveGatewayWssUrl(): string {
+  return (
+    getMcUrl()
+      .replace(/\/$/, "")
+      .replace(/^https/, "wss")
+      .replace(/^http:/, "ws:") + "/live-gateway"
+  );
+}
+
+/**
+ * Create a live gateway install token in the DB and return the raw token string
+ * plus the DB record ID. The raw token is written into openclaw.json on the VM;
+ * the ID is stored on the CloudVM record so it can be revoked on destroy.
+ */
+async function createVMLiveGatewayToken(vmId: string): Promise<{ raw: string; tokenId: string }> {
+  const raw = randomBytes(32).toString("hex");
+  const tokenHash = await bcrypt.hash(raw, 12);
+  const record = await createLiveGatewayToken({
+    tokenHash,
+    tokenPrefix: raw.slice(0, 8),
+    name: `cloud-vm-${vmId}`,
+  });
+  return { raw, tokenId: record.id };
+}
+
+/**
+ * Configure the agentcenter-bridge plugin on a running VM.
+ * The binary is pre-installed during provisioning (step 7a). If it's missing
+ * (older VM), we fall back to installing it on demand from ClawHub.
+ * Only the config write is needed for VMs provisioned after the pre-install step.
+ */
+async function installBridgePlugin(
+  sshConfig: { host: string; privateKey: string },
+  rawToken: string,
+  logFn: (msg: string, level?: "info" | "warn" | "error") => Promise<void>,
+): Promise<void> {
+  // The plugin binary is pre-installed during provisioning (step 7a).
+  // For older VMs where it may be missing, fall back to installing from ClawHub.
+  // NOTE: We skip `openclaw plugins list` here because that command can hang
+  // when the OpenClaw gateway is not yet connected (same pattern as sessions list).
+  // Instead we check for the binary directly in the filesystem.
+  await logFn("Checking agentcenter-bridge binary...");
+  const binCheck = await ocExec(
+    sshConfig,
+    `ls ~/.openclaw/extensions/agentcenter-bridge 2>/dev/null && echo FOUND || echo MISSING`,
+    { timeoutMs: 10_000 },
+  );
+  const isInstalled = binCheck.stdout.trim().includes("FOUND");
+
+  if (!isInstalled) {
+    await logFn(
+      `agentcenter-bridge binary not found — installing v${BRIDGE_PLUGIN_VERSION} from ClawHub...`,
+    );
+    // Binary not present — install pinned version from ClawHub with retry on rate-limit.
+    let install: Awaited<ReturnType<typeof ocExec>> | null = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (attempt > 1) {
+        await logFn(`Plugin install attempt ${attempt}/3...`);
+      }
+      install = await ocExec(
+        sshConfig,
+        `openclaw plugins install clawhub:@agentcenter/agentcenter-bridge@${BRIDGE_PLUGIN_VERSION} --force`,
+        { timeoutMs: 120_000 },
+      );
+      if (install.code === 0) break;
+      const output = (install.stderr + install.stdout).toLowerCase();
+      if ((output.includes("429") || output.includes("rate limit")) && attempt < 3) {
+        await logFn(`Plugin install rate-limited — retrying in ${attempt * 8}s...`, "warn");
+        await sleep(attempt * 8_000);
+        continue;
+      }
+      break;
+    }
+    if (install!.code !== 0) {
+      const detail = (install!.stderr + "\n" + install!.stdout).trim().slice(0, 800);
+      throw new Error(`agentcenter-bridge install failed (exit ${install!.code}): ${detail}`);
+    }
+    await logFn(`agentcenter-bridge v${BRIDGE_PLUGIN_VERSION} installed successfully`);
+  } else {
+    await logFn(`agentcenter-bridge binary already present (v${BRIDGE_PLUGIN_VERSION})`);
+  }
+
+  // Write plugin config — daemon hot-reloads and starts the plugin.
+  await logFn("Writing plugin config and enabling agentcenter-bridge...");
+  const config = await readVMConfig(sshConfig);
+  const wssUrl = liveGatewayWssUrl();
+
+  config.plugins = {
+    allow: ["agentcenter-bridge"],
+    entries: {
+      "agentcenter-bridge": {
+        enabled: true,
+        config: { agentCenterUrl: wssUrl, token: rawToken },
+      },
+    },
+  };
+
+  await writeVMConfig(sshConfig, config);
+  await logFn("Plugin config written — agentcenter-bridge enabled");
 }
 
 /**
@@ -422,7 +561,9 @@ export async function provisionVM(vmId: string): Promise<void> {
     await setStep(vmId, CloudVmStatus.INSTALLING_OPENCLAW, "install_openclaw", 60);
     await log(vmId, "Installing OpenClaw...");
 
-    result = await sshExec(sshConfig, "npm install -g openclaw@latest", { timeoutMs: 300_000 });
+    result = await sshExec(sshConfig, `npm install -g openclaw@${OPENCLAW_VERSION}`, {
+      timeoutMs: 300_000,
+    });
 
     if (result.code !== 0) {
       await failVM(
@@ -431,6 +572,25 @@ export async function provisionVM(vmId: string): Promise<void> {
         `Exit code ${result.code}: ${result.stderr.slice(0, 500)}`,
       );
       return;
+    }
+
+    // Step 7a: Pre-install agentcenter-bridge plugin binary so enable-gateway
+    // toggle only needs to write config (no ClawHub call at toggle time → no rate limits).
+    await log(vmId, `Pre-installing agentcenter-bridge v${BRIDGE_PLUGIN_VERSION}...`);
+    const bridgeInstall = await ocExec(
+      sshConfig,
+      `openclaw plugins install clawhub:@agentcenter/agentcenter-bridge@${BRIDGE_PLUGIN_VERSION} --force`,
+      { timeoutMs: 120_000 },
+    );
+    if (bridgeInstall.code !== 0) {
+      // Non-fatal — plugin can be installed later when the user enables live gateway
+      await log(
+        vmId,
+        `Warning: agentcenter-bridge pre-install failed — live gateway toggle will install on demand. ${(bridgeInstall.stderr + bridgeInstall.stdout).trim().slice(0, 300)}`,
+        "warn",
+      );
+    } else {
+      await log(vmId, `agentcenter-bridge v${BRIDGE_PLUGIN_VERSION} installed`);
     }
 
     // Step 7b: Install Docker for sandbox isolation
@@ -496,6 +656,7 @@ export async function provisionVM(vmId: string): Promise<void> {
 
     const gatewayToken = generateSecureToken();
     const hooksToken = generateSecureToken();
+
     const initialConfig = JSON.stringify(
       {
         gateway: {
@@ -534,12 +695,14 @@ export async function provisionVM(vmId: string): Promise<void> {
         plugins: { allow: [] },
         discovery: { mdns: { mode: "off" } },
         logging: { redactSensitive: "tools" },
+        // Lock to the pinned version — prevent agents from self-upgrading to untested releases
+        autoUpdate: { enabled: false },
       },
       null,
       2,
     );
 
-    // Store gateway token in DB for chat proxy access
+    // Store gateway token in DB — live gateway is off by default (no liveGatewayTokenId)
     await updateVM(vmId, { gatewayToken });
 
     result = await sshExec(
@@ -690,6 +853,47 @@ async function cleanupAgentFromVM(
   }
 }
 
+// ─── Write auth-profiles.json for a single agent dir ────────────────
+
+/**
+ * Write (or update) auth-profiles.json for a specific agent directory.
+ * Reads existing profiles first to preserve other providers' credentials.
+ * Called both from configureLLMOnVM (all dirs) and assignAgentToVM (new agent dir).
+ */
+async function writeAgentAuthProfile(
+  sshConfig: SSHConfig,
+  agentDirPath: string,
+  providerId: string,
+  apiKey: string,
+): Promise<void> {
+  await sshExec(sshConfig, `mkdir -p ${agentDirPath}`);
+
+  const authProfilePath = `${agentDirPath}/auth-profiles.json`;
+  const authRead = await sshExec(sshConfig, `cat ${authProfilePath} 2>/dev/null`);
+  let existingFlat: Record<string, unknown> = {};
+  if (authRead.code === 0 && authRead.stdout.trim()) {
+    try {
+      const parsed = JSON.parse(authRead.stdout);
+      if (parsed.profiles && typeof parsed.profiles === "object") {
+        existingFlat = { ...parsed.profiles };
+      }
+      for (const [k, v] of Object.entries(parsed)) {
+        if (k.includes(":") && typeof v === "object") existingFlat[k] = v;
+      }
+    } catch {
+      /* start fresh */
+    }
+  }
+
+  existingFlat[`${providerId}:default`] = { type: "api_key", provider: providerId, key: apiKey };
+  await sshUploadFile(
+    sshConfig,
+    authProfilePath,
+    JSON.stringify({ profiles: existingFlat }, null, 2),
+  );
+  await sshExec(sshConfig, `chown -R ${VM_USER}:${VM_USER} ${agentDirPath}`);
+}
+
 // ─── Assign Agent to VM ─────────────────────────────────────────────
 
 interface AssignAgentParams {
@@ -738,6 +942,25 @@ export async function assignAgentToVM(params: AssignAgentParams): Promise<void> 
       apiKey: plainKey,
       agentId: agent.id,
     });
+
+    // Write auth-profiles.json for this agent's openclaw dir so the LLM works immediately.
+    // configureLLMOnVM only writes to dirs that exist at that moment — new agents get skipped.
+    const vmConfig = await readVMConfig(sshConfig);
+    const vmEnvVars = ((vmConfig.env as Record<string, unknown>)?.vars ?? {}) as Record<
+      string,
+      string
+    >;
+    for (const [envVar, envKey] of Object.entries(vmEnvVars)) {
+      const provider = Object.values(LLM_PROVIDERS_MAP).find((p) => p.envVar === envVar);
+      if (provider && envKey) {
+        await writeAgentAuthProfile(
+          sshConfig,
+          `${VM_CONFIG_DIR}/agents/${agentSlug}/agent`,
+          provider.id,
+          envKey,
+        );
+      }
+    }
 
     // Merge agent list into existing openclaw.json (preserving gateway.auth.token, env, etc.)
     const vmAgents = await findAgentsByCloudVmId(cloudVmId, {
@@ -819,6 +1042,10 @@ export async function unassignAgentFromVM(agentId: string): Promise<void> {
 
   const vmId = agent.cloudVmId;
 
+  // Clean up VM-side state: cron jobs, openclaw.json agents list, workspace,
+  // gateway restart (which forces plugin to re-report and removes LiveAgentRoute entry)
+  await cleanupAgentFromVM(vmId, agent);
+
   await updateAgent(agentId, { cloudVmId: null, hostingType: "selfHosted" });
 
   await log(vmId, `Agent "${agent.name}" unassigned from VM`);
@@ -836,6 +1063,14 @@ export async function destroyCloudVM(vmId: string): Promise<void> {
 
   // Unassign all agents
   await updateManyAgentsByVm(vmId, { cloudVmId: null, hostingType: "selfHosted" });
+
+  // Revoke the live gateway install token so the plugin can no longer reconnect
+  if ((vm as any).liveGatewayTokenId) {
+    await revokeLiveGatewayToken((vm as any).liveGatewayTokenId).catch(() => undefined);
+  }
+
+  // Terminate any live WS and delete connection records (+ cascaded routes/deliveries).
+  await teardownLiveConnections(vm.serverName);
 
   await log(vmId, "Destroying server...");
 
@@ -863,6 +1098,7 @@ export async function destroyCloudVM(vmId: string): Promise<void> {
     status: CloudVmStatus.DESTROYED,
     destroyedAt: new Date(),
     sshPrivateKey: null,
+    liveGatewayTokenId: null,
   });
 
   await log(vmId, "Server destroyed");
@@ -879,9 +1115,23 @@ export async function stopCloudVM(vmId: string): Promise<void> {
     throw new Error("No server associated with this VM");
   }
 
+  // Revoke live gateway token before powering off — live gateway is disabled on stop.
+  // Re-enabling after restart is a manual action via the toggle button.
+  if ((vm as any).liveGatewayTokenId) {
+    await revokeLiveGatewayToken((vm as any).liveGatewayTokenId).catch(() => undefined);
+  }
+  // Terminate any live WS and delete connection records (+ cascaded routes/deliveries).
+  // Heartbeat will re-sync any ASSIGNED tasks once the VM restarts.
+  await teardownLiveConnections(vm.serverName);
+
   await powerOff(vm.externalServerId);
-  await updateVM(vmId, { status: CloudVmStatus.STOPPED, stoppedAt: new Date() });
-  await log(vmId, "Server powered off");
+  await updateVM(vmId, {
+    status: CloudVmStatus.STOPPED,
+    stoppedAt: new Date(),
+    liveGatewayTokenId: null,
+  });
+
+  await log(vmId, "Server powered off — live gateway disabled");
 }
 
 export async function startCloudVM(vmId: string): Promise<void> {
@@ -895,7 +1145,7 @@ export async function startCloudVM(vmId: string): Promise<void> {
 
   await powerOn(vm.externalServerId);
   await updateVM(vmId, { status: CloudVmStatus.RUNNING, stoppedAt: null });
-  await log(vmId, "Server powered on");
+  await log(vmId, "Server powered on — use the Live Gateway toggle to re-enable if needed");
 }
 
 // ─── Configure LLM on VM ────────────────────────────────────────────
@@ -1041,7 +1291,7 @@ export async function configureLLMOnVM(params: ConfigureLLMParams): Promise<void
   // Write updated config back (single write — avoid redundant CLI set that triggers double hot-reload)
   await writeVMConfig(sshConfig, config);
 
-  // Write API key to auth-profiles.json for all agent dirs
+  // Write auth-profiles.json for main + all known agent dirs
   const findAgentDirs = await sshExec(
     sshConfig,
     `ls -d ${VM_CONFIG_DIR}/agents/*/agent 2>/dev/null || true`,
@@ -1056,48 +1306,8 @@ export async function configureLLMOnVM(params: ConfigureLLMParams): Promise<void
     if (aid) authDirPaths.add(`${VM_CONFIG_DIR}/agents/${aid}/agent`);
   }
 
-  // auth-profiles.json — write the credential in every known format variant to cover all versions:
-  // Docs show both flat and "profiles"-wrapped, with "type" or no "type" field
-  const authProfileEntry = {
-    type: "api_key",
-    provider: providerId,
-    key: apiKey,
-  };
-
   for (const dirPath of authDirPaths) {
-    const authProfilePath = `${dirPath}/auth-profiles.json`;
-    await sshExec(sshConfig, `mkdir -p ${dirPath}`);
-
-    // Read existing to preserve other providers' credentials
-    const authRead = await sshExec(sshConfig, `cat ${authProfilePath} 2>/dev/null`);
-    let existingFlat: Record<string, unknown> = {};
-    if (authRead.code === 0 && authRead.stdout.trim()) {
-      try {
-        const parsed = JSON.parse(authRead.stdout);
-        // Extract existing entries from either format
-        if (parsed.profiles && typeof parsed.profiles === "object") {
-          existingFlat = { ...parsed.profiles };
-        }
-        // Also grab any top-level provider entries (flat format)
-        for (const [k, v] of Object.entries(parsed)) {
-          if (k.includes(":") && typeof v === "object") existingFlat[k] = v;
-        }
-      } catch {
-        /* start fresh */
-      }
-    }
-
-    // Set our provider entry
-    existingFlat[`${providerId}:default`] = authProfileEntry;
-
-    // Write with "profiles" wrapper (model-failover docs say profiles are under "profiles" key)
-    const authContent = JSON.stringify({ profiles: existingFlat }, null, 2);
-    await sshUploadFile(sshConfig, authProfilePath, authContent);
-    await sshExec(sshConfig, `chown -R ${VM_USER}:${VM_USER} ${dirPath}`);
-
-    // Verify
-    const verify = await sshExec(sshConfig, `cat ${authProfilePath}`);
-    console.log(`[llm-config] Wrote ${authProfilePath}:`, verify.stdout.slice(0, 400));
+    await writeAgentAuthProfile(sshConfig, dirPath, providerId, apiKey);
   }
 
   // Set env var via systemd override as process-level fallback
@@ -1340,7 +1550,6 @@ export async function repairOpenClawService(vmId: string): Promise<void> {
       await ensureAgentWorkspace(sshConfig, slug);
       await uploadAgentConfigFiles(sshConfig, a, slug, {
         agentId: a.id,
-        apiKey: "$AGENT_KEY", // placeholder — agent already has key
         preserveMemory: true,
       });
       await log(vmId, `Updated config files for agent "${a.name}" (preserved MEMORY.md)`);
@@ -1387,6 +1596,201 @@ export async function repairOpenClawService(vmId: string): Promise<void> {
   }
 
   await log(vmId, "Repair complete");
+}
+
+// ─── Live Gateway Toggle ────────────────────────────────────────────
+
+/**
+ * Enable live gateway on a running VM.
+ * Creates a fresh install token, writes the agentcenter-bridge plugin config
+ * into openclaw.json, and installs the plugin. The daemon hot-reloads and
+ * the plugin connects to the live gateway automatically.
+ */
+export async function enableVMLiveGateway(vmId: string): Promise<void> {
+  const vm = await getCloudVMOrThrow(vmId);
+  if (vm.status !== CloudVmStatus.RUNNING) {
+    throw new Error("VM must be running to enable live gateway");
+  }
+  if ((vm as any).liveGatewayTokenId) {
+    throw new Error("Live gateway is already enabled on this VM");
+  }
+
+  const sshConfig = getVMSSHConfig(vm);
+  const { raw: liveRawToken, tokenId } = await createVMLiveGatewayToken(vmId);
+
+  try {
+    await installBridgePlugin(sshConfig, liveRawToken, (msg, level = "info") =>
+      log(vmId, msg, level),
+    );
+    await updateVM(vmId, { liveGatewayTokenId: tokenId });
+    await log(vmId, "Live gateway enabled — agentcenter-bridge plugin installed and configured");
+  } catch (err) {
+    // Clean up so next attempt gets a fresh token
+    await revokeLiveGatewayToken(tokenId).catch(() => undefined);
+    const message = err instanceof Error ? err.message : String(err);
+    await log(vmId, `Failed to enable live gateway: ${message}`, "error");
+    throw new Error(`Failed to enable live gateway: ${message}`);
+  }
+}
+
+/**
+ * Disable live gateway on a running VM.
+ * Revokes the install token, sets the plugin to disabled in openclaw.json,
+ * and clears liveGatewayTokenId. The daemon hot-reloads and the plugin stops.
+ * Agents fall back to heartbeat polling — no task data is lost.
+ */
+export async function disableVMLiveGateway(vmId: string): Promise<void> {
+  const vm = await getCloudVMOrThrow(vmId);
+  if (vm.status !== CloudVmStatus.RUNNING) {
+    throw new Error("VM must be running to disable live gateway");
+  }
+  if (!(vm as any).liveGatewayTokenId) {
+    throw new Error("Live gateway is not enabled on this VM");
+  }
+
+  // Revoke token first — plugin can no longer authenticate after this
+  await revokeLiveGatewayToken((vm as any).liveGatewayTokenId).catch(() => undefined);
+
+  // Disable plugin entry in config (set enabled: false so daemon stops it on hot-reload)
+  // Also delete connections so any active WS sessions are cleared from DB
+  const sshConfig = getVMSSHConfig(vm);
+  try {
+    const cfg = await readVMConfig(sshConfig);
+    const entries = ((cfg.plugins as any)?.entries ?? {}) as Record<string, unknown>;
+    if (entries["agentcenter-bridge"]) {
+      (entries["agentcenter-bridge"] as any).enabled = false;
+      cfg.plugins = { allow: [], entries };
+    } else {
+      cfg.plugins = { allow: [] };
+    }
+    await writeVMConfig(sshConfig, cfg);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await log(
+      vmId,
+      `Warning: could not update plugin config (${message}) — token is still revoked`,
+      "warn",
+    );
+  }
+
+  // Terminate any live WS and delete connection records (+ cascaded routes/deliveries).
+  await teardownLiveConnections(vm.serverName);
+
+  await updateVM(vmId, { liveGatewayTokenId: null });
+  await log(vmId, "Live gateway disabled — agents will use heartbeat polling");
+}
+
+/**
+ * Sync (update) the agentcenter-bridge plugin binary on a running VM.
+ * Re-installs the plugin from ClawHub to get the latest version, then
+ * re-writes the plugin config with the existing token and restarts the daemon.
+ * No token rotation — active connections are not interrupted.
+ */
+export async function syncVMLiveGatewayPlugin(vmId: string): Promise<void> {
+  const vm = await getCloudVMOrThrow(vmId);
+  if (vm.status !== CloudVmStatus.RUNNING) {
+    throw new Error("VM must be running to sync the live gateway plugin");
+  }
+  if (!(vm as any).liveGatewayTokenId) {
+    throw new Error("Live gateway is not enabled — enable it first before syncing");
+  }
+
+  const sshConfig = getVMSSHConfig(vm);
+
+  await log(vmId, `Syncing agentcenter-bridge plugin to v${BRIDGE_PLUGIN_VERSION}...`);
+
+  const pinnedRef = `clawhub:@agentcenter/agentcenter-bridge@${BRIDGE_PLUGIN_VERSION}`;
+
+  // Always use `install --force` with the pinned version ref.
+  // `openclaw plugins update` does not support version pinning — it exits 0 without
+  // actually changing the binary, making it unsafe to rely on for version control.
+  let install: Awaited<ReturnType<typeof ocExec>> | null = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    install = await ocExec(sshConfig, `openclaw plugins install ${pinnedRef} --force`, {
+      timeoutMs: 120_000,
+    });
+    if (install.code === 0) break;
+    const output = (install.stderr + install.stdout).toLowerCase();
+    if ((output.includes("429") || output.includes("rate limit")) && attempt < 3) {
+      await sleep(attempt * 8_000);
+      continue;
+    }
+    break;
+  }
+  if (install!.code !== 0) {
+    const detail = (install!.stderr + "\n" + install!.stdout).trim().slice(0, 800);
+    throw new Error(
+      `Plugin sync to v${BRIDGE_PLUGIN_VERSION} failed (exit ${install!.code}): ${detail}`,
+    );
+  }
+
+  // Verify the installed version via `openclaw plugins list`.
+  // Log the raw output so we can debug format issues if parsing fails.
+  const listResult = await ocExec(
+    sshConfig,
+    `openclaw plugins list --json 2>/dev/null || openclaw plugins list 2>/dev/null`,
+    { timeoutMs: 15_000 },
+  );
+  const listRaw = listResult.stdout.trim();
+
+  let installedVersion: string | null = null;
+
+  // Output is { workspaceDir, plugins: [...] } — extract the plugins array
+  if (listRaw) {
+    try {
+      const parsed = JSON.parse(listRaw);
+      const arr: Array<Record<string, unknown>> = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.plugins)
+          ? parsed.plugins
+          : [];
+      const entry = arr.find(
+        (p) => p["id"] === "agentcenter-bridge" || p["name"] === "AgentCenter Bridge",
+      );
+      installedVersion = (entry?.["version"] as string) ?? null;
+    } catch {
+      // Not JSON — try plain-text semver on the agentcenter-bridge line
+      const line = listRaw.split("\n").find((l) => l.toLowerCase().includes("agentcenter-bridge"));
+      if (line) {
+        const m = line.match(/(\d+\.\d+\.\d+)/);
+        installedVersion = m?.[1] ?? null;
+      }
+    }
+  }
+
+  if (installedVersion && installedVersion !== BRIDGE_PLUGIN_VERSION) {
+    // Version confirmed but wrong — hard error
+    throw new Error(
+      `Plugin update incomplete: installed version is ${installedVersion} but expected ${BRIDGE_PLUGIN_VERSION}. ` +
+        `Ensure @agentcenter/agentcenter-bridge@${BRIDGE_PLUGIN_VERSION} is published on ClawHub.`,
+    );
+  }
+
+  if (!installedVersion) {
+    // Cannot parse list output — log the raw output to help debug, but don't block:
+    // install command already exited 0 with the pinned version ref, so the binary is correct.
+    await log(
+      vmId,
+      `Could not parse plugin list output (install exit=0, version assumed ${BRIDGE_PLUGIN_VERSION}). Raw: ${listRaw.slice(0, 400)}`,
+      "warn",
+    );
+  } else {
+    await log(vmId, `agentcenter-bridge v${installedVersion} verified on VM`);
+  }
+
+  // Ensure plugin is enabled in config (binary update may reset its state)
+  const config = await readVMConfig(sshConfig);
+  const entries = ((config.plugins as any)?.entries ?? {}) as Record<string, unknown>;
+  if (entries["agentcenter-bridge"]) {
+    (entries["agentcenter-bridge"] as any).enabled = true;
+    config.plugins = { allow: ["agentcenter-bridge"], entries };
+    await writeVMConfig(sshConfig, config);
+  }
+
+  // Restart daemon so it picks up the new binary
+  await restartGateway(sshConfig);
+
+  await log(vmId, "agentcenter-bridge plugin synced and daemon restarted");
 }
 
 /**

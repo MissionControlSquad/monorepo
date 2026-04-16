@@ -229,7 +229,7 @@ export async function ensureAgentWorkspace(
 // ─── Upload Agent Config Files (B) ──────────────────────────────────
 
 export interface UploadAgentConfigOpts {
-  /** Plain API key to embed in IDENTITY.md. Auto-generates if not provided and IDENTITY.md needs uploading. */
+  /** Plain API key to embed in IDENTITY.md. Auto-generates if not provided. */
   apiKey?: string;
   /** DB agent ID — required for auto API key generation. */
   agentId: string;
@@ -278,9 +278,8 @@ export async function uploadAgentConfigFiles(
   // Determine the API key to embed
   let apiKeyForConfig = opts.apiKey || "";
   if (!apiKeyForConfig) {
-    // Check if IDENTITY.md needs uploading
-    const needsIdentity = !opts.onlyMissing || !existingFiles.has("IDENTITY.md");
-    if (needsIdentity) {
+    const identityWillBeWritten = !opts.onlyMissing || !existingFiles.has("IDENTITY.md");
+    if (identityWillBeWritten) {
       const { plainKey, hash, prefix } = generateApiKey();
       await updateAgent(opts.agentId, {
         apiKeyHash: hash,
@@ -289,11 +288,21 @@ export async function uploadAgentConfigFiles(
       });
       apiKeyForConfig = plainKey;
     } else {
-      apiKeyForConfig = "EXISTING_KEY"; // won't be used — IDENTITY.md already exists
+      apiKeyForConfig = "EXISTING_KEY"; // won't be used — IDENTITY.md already exists and onlyMissing=true
     }
   }
 
+  // Guard: IDENTITY.md must never be written with a missing or placeholder key.
+  // A bad key silently breaks all agent authentication — fail loudly instead.
   const mcUrl = getMcUrl();
+  const identityWillBeWritten = !opts.onlyMissing || !existingFiles.has("IDENTITY.md");
+  if (identityWillBeWritten && (!apiKeyForConfig || apiKeyForConfig === "EXISTING_KEY")) {
+    throw new Error(
+      `uploadAgentConfigFiles: cannot write IDENTITY.md for agent "${agentSlug}" — API key is missing. ` +
+        `Pass a real key via opts.apiKey, or ensure the agent exists in the DB for auto-generation.`,
+    );
+  }
+
   const configFiles = generateAgentConfig(
     {
       id: agent.id,
@@ -426,8 +435,20 @@ export async function ensureGatewayConfig(
     logging.redactSensitive = "tools";
     config.logging = logging;
 
-    // Lock down plugins
-    config.plugins = { allow: [] };
+    // Lock to pinned version — prevent agents from self-upgrading to untested releases
+    config.autoUpdate = { enabled: false };
+
+    // Lock down plugins — preserve agentcenter-bridge entry if already configured,
+    // wipe all other plugin entries for security.
+    const existingPluginEntries = ((config.plugins as any)?.entries ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const bridgeEntry = existingPluginEntries["agentcenter-bridge"];
+    config.plugins = {
+      allow: bridgeEntry ? ["agentcenter-bridge"] : [],
+      ...(bridgeEntry ? { entries: { "agentcenter-bridge": bridgeEntry } } : {}),
+    };
   }
 
   // hooks

@@ -27,6 +27,8 @@ import {
   Pencil,
   ChevronDown,
   Box,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import {
   LLM_PROVIDERS,
@@ -35,7 +37,9 @@ import {
   formatUptime,
   formatCost,
   truncateId,
+  FLAG_KEYS,
 } from "@agentcenter/utils";
+import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 import { toast } from "sonner";
 import { CloudVmStatus } from "@/server/constants";
 import { Breadcrumbs, Button, Badge, Card, ConfirmDialog, Input } from "../components/ui";
@@ -65,6 +69,9 @@ interface CloudVM {
   llmConfigured: boolean;
   llmProvider?: string | null;
   llmModel?: string | null;
+  liveGatewayTokenId?: string | null;
+  pluginVersion?: string | null;
+  latestPluginVersion?: string | null;
   agents: VMAgent[];
   createdAt: string;
 }
@@ -125,6 +132,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
   const [logs, setLogs] = useState<VMLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const liveGatewayEnabled = useFeatureFlag(FLAG_KEYS.LIVE_GATEWAY);
   const [showLogs, setShowLogs] = useState(false);
   const [showDestroyConfirm, setShowDestroyConfirm] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -501,6 +509,60 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
       await fetchVM();
     } catch {
       toast.error(`Failed to ${action} VM`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleLiveGatewayToggle = async () => {
+    const enabling = !vm?.liveGatewayTokenId;
+    setActionLoading("live-gateway");
+    try {
+      const action = enabling ? "enable" : "disable";
+      const res = await fetch(`/api/cloud-vms/${vmId}/live-gateway/${action}`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || `Failed to ${action} live gateway`);
+        return;
+      }
+      toast.success(enabling ? "Live gateway enabled" : "Live gateway disabled");
+      await fetchVM();
+    } catch {
+      toast.error("Failed to toggle live gateway");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleLiveGatewaySync = async () => {
+    setActionLoading("live-gateway-sync");
+    try {
+      const res = await fetch(`/api/cloud-vms/${vmId}/live-gateway/sync`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Failed to sync plugin");
+        return;
+      }
+
+      // Poll until the plugin reconnects and writes its new version to the DB
+      // (daemon restart + WS reconnect typically takes 3–10s)
+      const versionBefore = vm?.pluginVersion;
+      let updated = false;
+      for (let i = 0; i < 10; i++) {
+        await new Promise((r) => setTimeout(r, 3_000));
+        const fresh = await fetch(`/api/cloud-vms/${vmId}`).then((r) => r.json());
+        if (fresh?.pluginVersion && fresh.pluginVersion !== versionBefore) {
+          updated = true;
+          break;
+        }
+      }
+
+      await fetchVM();
+      toast.success(
+        updated ? "Plugin updated successfully" : "Plugin synced — waiting for reconnect",
+      );
+    } catch {
+      toast.error("Failed to sync live gateway plugin");
     } finally {
       setActionLoading(null);
     }
@@ -1324,6 +1386,125 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
           );
         })()}
 
+      {/* Live Gateway */}
+      {liveGatewayEnabled && vm.status === CloudVmStatus.RUNNING && (
+        <Card padding="md">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div
+                className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  vm.liveGatewayTokenId ? "bg-teal-100" : "bg-muted"
+                }`}
+              >
+                {vm.liveGatewayTokenId ? (
+                  <Wifi className="w-4 h-4 text-teal-600" />
+                ) : (
+                  <WifiOff className="w-4 h-4 text-muted-foreground" />
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-foreground">Live Gateway</h2>
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      vm.liveGatewayTokenId
+                        ? "bg-teal-100 text-teal-700"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {vm.liveGatewayTokenId ? "Enabled" : "Disabled"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {vm.liveGatewayTokenId
+                    ? "Agents receive tasks instantly via persistent WebSocket connection."
+                    : "Agents use heartbeat polling. Enable for real-time task delivery."}
+                </p>
+                {vm.liveGatewayTokenId && (
+                  <div className="flex items-center gap-3 mt-2">
+                    <span className="text-xs text-muted-foreground">
+                      Plugin:{" "}
+                      <span className="font-mono text-foreground">
+                        {vm.pluginVersion ?? "unknown"}
+                      </span>
+                    </span>
+                    {vm.latestPluginVersion && (
+                      <span className="text-xs text-muted-foreground">
+                        Latest:{" "}
+                        <span className="font-mono text-foreground">{vm.latestPluginVersion}</span>
+                      </span>
+                    )}
+                    {vm.pluginVersion &&
+                      vm.latestPluginVersion &&
+                      vm.pluginVersion !== vm.latestPluginVersion && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                          Update available
+                        </span>
+                      )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {vm.liveGatewayTokenId ? (
+                <>
+                  {(() => {
+                    const installed = vm.pluginVersion;
+                    const latest = vm.latestPluginVersion;
+                    const isOutdated = latest && installed && installed !== latest;
+                    const isUnknown = !installed;
+                    if (!isOutdated && !isUnknown) return null;
+                    return (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon={<RefreshCw />}
+                        loading={actionLoading === "live-gateway-sync"}
+                        disabled={actionLoading !== null}
+                        onClick={handleLiveGatewaySync}
+                        title={
+                          isUnknown
+                            ? "Plugin version unknown — sync to install latest"
+                            : `Update from ${installed} to ${latest}`
+                        }
+                      >
+                        {isOutdated ? "Update Plugin" : "Sync Plugin"}
+                      </Button>
+                    );
+                  })()}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={<WifiOff />}
+                    loading={actionLoading === "live-gateway"}
+                    disabled={actionLoading !== null}
+                    onClick={handleLiveGatewayToggle}
+                    className="text-orange-700 bg-orange-100 hover:bg-orange-200 border-orange-200"
+                    title="Disable live gateway and revoke install token"
+                  >
+                    Disable
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Wifi />}
+                  loading={actionLoading === "live-gateway"}
+                  disabled={actionLoading !== null}
+                  onClick={handleLiveGatewayToggle}
+                  className="text-teal-700 bg-teal-100 hover:bg-teal-200 border-teal-200"
+                  title="Install agentcenter-bridge plugin and enable live task delivery"
+                >
+                  Enable
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Validate Config */}
       {vm.status === CloudVmStatus.RUNNING && (
         <Card padding="md">
@@ -1625,7 +1806,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
                             loading={isValidatingThis}
                             disabled={isValidatingThis || isSettingUp}
                             onClick={() => runAgentValidation(slug)}
-                            title="Validate agent config, files, cron, and LLM"
+                            title="Validate agent config, files, cron, AI provider, and heartbeat"
                           >
                             {isValidatingThis ? "Checking..." : "Validate"}
                           </Button>
@@ -1651,7 +1832,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
                       <div className="flex items-center gap-2 py-4 justify-center text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span className="text-xs">
-                          Running agent checks — this may take up to a minute...
+                          Running agent checks — checking files, heartbeat &amp; AI provider...
                         </span>
                       </div>
                     </div>

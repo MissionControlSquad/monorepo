@@ -27,3 +27,12 @@ export async function findCloudVMConnection(id: string) {
 export async function findCloudVMRaw(id: string) {
   return prisma.cloudVM.findUnique({ where: { id } });
 }
+
+/** Look up a CloudVM ID by its server hostname (serverName field). Returns null if not a managed CloudVM. */
+export async function findCloudVMIdByServerName(serverName: string): Promise<string | null> {
+  const vm = await prisma.cloudVM.findFirst({
+    where: { serverName },
+    select: { id: true },
+  });
+  return vm?.id ?? null;
+}

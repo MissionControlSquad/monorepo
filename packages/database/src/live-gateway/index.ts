@@ -116,6 +116,55 @@ export async function deleteLiveGatewayConnection(id: string) {
   await prisma.liveGatewayConnection.delete({ where: { id } });
 }
 
+/**
+ * Mark all connections for a machine as disconnected without deleting them.
+ * Used when a VM is stopped so the DB reflects the offline state immediately,
+ * rather than waiting for the WebSocket close event to propagate.
+ * Pending deliveries are preserved — they will be drained when the VM restarts
+ * and the plugin reconnects.
+ */
+export async function markConnectionsDisconnectedByMachineName(machineName: string): Promise<void> {
+  await prisma.liveGatewayConnection.updateMany({
+    where: { machineName, connectionStatus: "connected" },
+    data: { connectionStatus: "disconnected", lastDisconnectedAt: new Date() },
+  });
+}
+
+/**
+ * Delete all gateway connections for a machine identified by its hostname.
+ * Cloud VMs use the Hetzner server name as their hostname; calling this on
+ * VM destroy ensures the DB connection record (and cascaded routes + deliveries)
+ * are cleaned up even if the WS close event never fired.
+ */
+export async function deleteConnectionsByMachineName(machineName: string): Promise<void> {
+  await prisma.liveGatewayConnection.deleteMany({ where: { machineName } });
+}
+
+/**
+ * Return the IDs of all connections for a machine.
+ * Used to terminate in-memory WebSockets before deleting DB records.
+ */
+export async function findConnectionIdsByMachineName(machineName: string): Promise<string[]> {
+  const rows = await prisma.liveGatewayConnection.findMany({
+    where: { machineName },
+    select: { id: true },
+  });
+  return rows.map((r) => r.id);
+}
+
+/**
+ * Return the plugin version last reported by a machine when it connected.
+ * Returns null if the machine has never connected or has no version recorded.
+ */
+export async function getPluginVersionByMachineName(machineName: string): Promise<string | null> {
+  const row = await prisma.liveGatewayConnection.findFirst({
+    where: { machineName },
+    select: { pluginVersion: true },
+    orderBy: { connectedAt: "desc" },
+  });
+  return row?.pluginVersion ?? null;
+}
+
 // ── Agent routes ──────────────────────────────────────────────────────────────
 
 /**

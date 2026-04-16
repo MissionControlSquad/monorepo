@@ -99,6 +99,26 @@ export interface MsgTaskAck {
   deliveryId: string;   // PendingTaskDelivery.id
 }
 
+/**
+ * Sent by plugin after a runEmbeddedAgent session triggered by mc.deliver_task
+ * or mc.notify completes (success or failure). Gives MC visibility into whether
+ * the agent actually worked on the notification, beyond just the delivery ack.
+ */
+export interface MsgSessionDone {
+  type: "vm.session_done";
+  agentSlug: string;
+  /** Trigger kind — mirrors MsgNotify.kind, or "task_delivery" for mc.deliver_task. */
+  trigger: "task_delivery" | "mention" | "inbox_task" | "review_needed" | "task_approved" | "task_rejected" | "task_clarification" | "dm" | "channel_mention";
+  /** Whether runEmbeddedAgent resolved without throwing. */
+  success: boolean;
+  /** Wall-clock duration of the session in milliseconds. */
+  durationMs: number;
+  /** Error message if success=false. */
+  errorMessage?: string;
+  /** deliveryId echoed from mc.deliver_task, if this was a task delivery session. */
+  deliveryId?: string;
+}
+
 export type PluginToMC =
   | MsgHello
   | MsgPing
@@ -106,7 +126,8 @@ export type PluginToMC =
   | MsgAgentStatus
   | MsgAgentMessage
   | MsgTaskDone
-  | MsgTaskAck;
+  | MsgTaskAck
+  | MsgSessionDone;
 
 // ── MC → Plugin messages ──────────────────────────────────────────────────────
 
