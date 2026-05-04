@@ -8,7 +8,27 @@ set -e
 export HOSTNAME=0.0.0.0
 
 echo "Running database migrations..."
-node /prisma-cli/node_modules/prisma/build/index.js migrate deploy
+
+# Try migrate deploy; on P3005 (non-empty DB with no migration history),
+# baseline all existing migrations then retry. This happens when a DB was
+# provisioned by an older workflow before migration tracking was introduced.
+# Migrations are at /app/prisma/migrations/ (copied from packages/database/prisma).
+if ! node /prisma-cli/node_modules/prisma/build/index.js migrate deploy 2>/tmp/migrate_err; then
+  if grep -q "P3005" /tmp/migrate_err; then
+    echo "Detected P3005 — baselining existing schema..."
+    for dir in prisma/migrations/*/; do
+      name=$(basename "$dir")
+      [ "$name" = "*" ] && continue
+      echo "  Resolving: $name"
+      node /prisma-cli/node_modules/prisma/build/index.js migrate resolve --applied "$name" 2>/dev/null || true
+    done
+    echo "Baseline complete — running migrate deploy..."
+    node /prisma-cli/node_modules/prisma/build/index.js migrate deploy
+  else
+    cat /tmp/migrate_err >&2
+    exit 1
+  fi
+fi
 
 echo "Starting server..."
 exec node apps/web/server.cjs
