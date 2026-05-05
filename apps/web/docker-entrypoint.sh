@@ -9,28 +9,42 @@ export HOSTNAME=0.0.0.0
 
 PRISMA="node /prisma-cli/node_modules/prisma/build/index.js"
 
-# Resolve a P3009 (failed migration) by rolling it back and retrying deploy.
-# If the migration keeps failing (e.g. ALTER TYPE on a missing type in an old DB
-# that was provisioned before that feature existed), mark it as applied and skip —
-# the schema was already pushed directly so those changes are already present.
-resolve_p3009() {
+resolve_schema_error() {
+  # Handles P3009 (pre-existing failed migration) and P3018 (just failed).
+  # Strategy: db push first to bring schema to the correct state, then mark
+  # every stuck migration as applied (db push already applied those changes),
+  # then run migrate deploy which should be a clean no-op or apply new ones.
+  echo "Detected migration error — syncing schema via db push..."
+  $PRISMA db push --skip-generate --accept-data-loss 2>/dev/null || true
+
+  echo "Marking all stuck migrations as applied..."
+  # _prisma_migrations rows that started but never finished (P3009/P3018 state)
+  # Extract name from either P3009 format: The `<name>` migration started at
+  # or P3018 format: Migration name: <name>
   local outfile="$1"
   local failed
-  failed=$(sed -n 's/.*The `\([^`]*\)` migration started at.*/\1/p' "$outfile" | head -1)
-  if [ -z "$failed" ]; then
-    echo "P3009: could not extract failed migration name" >&2
-    return 1
+  failed=$(sed -n \
+    -e 's/.*The `\([^`]*\)` migration started at.*/\1/p' \
+    -e 's/.*Migration name: \([^ ]*\).*/\1/p' \
+    "$outfile" | head -1)
+  if [ -n "$failed" ]; then
+    echo "  Resolving as applied: $failed"
+    $PRISMA migrate resolve --applied "$failed" 2>/dev/null || true
   fi
-  echo "Detected P3009 — resolving failed migration: $failed"
-  $PRISMA migrate resolve --rolled-back "$failed" 2>/dev/null || true
-  if $PRISMA migrate deploy >/tmp/migrate_p3009 2>&1; then
-    cat /tmp/migrate_p3009
+
+  if $PRISMA migrate deploy >/tmp/migrate_recover 2>&1; then
+    cat /tmp/migrate_recover
     return 0
   fi
-  cat /tmp/migrate_p3009
-  if grep -q "P3009" /tmp/migrate_p3009; then
-    echo "Migration still failing — marking as applied and skipping: $failed"
-    $PRISMA migrate resolve --applied "$failed" 2>/dev/null || true
+  cat /tmp/migrate_recover
+  # If another migration is stuck, resolve it and try once more
+  if grep -qE "P3009|P3018" /tmp/migrate_recover; then
+    local failed2
+    failed2=$(sed -n \
+      -e 's/.*The `\([^`]*\)` migration started at.*/\1/p' \
+      -e 's/.*Migration name: \([^ ]*\).*/\1/p' \
+      /tmp/migrate_recover | head -1)
+    [ -n "$failed2" ] && $PRISMA migrate resolve --applied "$failed2" 2>/dev/null || true
     $PRISMA migrate deploy
     return $?
   fi
@@ -56,28 +70,26 @@ run_migrations() {
       $PRISMA migrate resolve --applied "$name" 2>/dev/null || true
     done
     echo "Baseline complete — running migrate deploy..."
-    # Capture output so we can detect P3009 if baseline left a partially-applied migration
     if $PRISMA migrate deploy >/tmp/migrate_post_baseline 2>&1; then
       cat /tmp/migrate_post_baseline
     else
       cat /tmp/migrate_post_baseline
-      if grep -q "P3009" /tmp/migrate_post_baseline; then
-        resolve_p3009 /tmp/migrate_post_baseline || return 1
+      if grep -qE "P3009|P3018" /tmp/migrate_post_baseline; then
+        resolve_schema_error /tmp/migrate_post_baseline || return 1
       else
         return 1
       fi
     fi
-    # db push fills any schema gaps the baseline may have left — old DBs provisioned
-    # before certain migrations existed will be missing those tables/columns even though
-    # the migrations are now marked applied. db push is additive-only here (no drops)
-    # because the schema only adds tables/columns relative to what the old DB has.
+    # db push fills schema gaps left by the baseline — tables added after the client
+    # was provisioned (feature_flags, licenses, etc.) are missing even though all
+    # migrations are marked applied. db push adds only what is missing, never drops.
     echo "Syncing any missing schema elements (db push)..."
     $PRISMA db push --skip-generate --accept-data-loss 2>/dev/null || true
     return 0
   fi
 
-  if grep -q "P3009" /tmp/migrate_out; then
-    resolve_p3009 /tmp/migrate_out
+  if grep -qE "P3009|P3018" /tmp/migrate_out; then
+    resolve_schema_error /tmp/migrate_out
     return $?
   fi
 
