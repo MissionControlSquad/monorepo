@@ -15,7 +15,7 @@ resolve_schema_error() {
   # every stuck migration as applied (db push already applied those changes),
   # then run migrate deploy which should be a clean no-op or apply new ones.
   echo "Detected migration error — syncing schema via db push..."
-  $PRISMA db push --skip-generate --accept-data-loss 2>/dev/null || true
+  $PRISMA db push --skip-generate --accept-data-loss 2>&1 || true
 
   echo "Marking all stuck migrations as applied..."
   # _prisma_migrations rows that started but never finished (P3009/P3018 state)
@@ -89,7 +89,7 @@ run_migrations() {
   # provisioning, or any other path that left tables/columns missing). On a healthy
   # fully-migrated DB this is a fast no-op. Never drops existing data.
   echo "Syncing schema (db push)..."
-  $PRISMA db push --skip-generate --accept-data-loss 2>/dev/null || true
+  $PRISMA db push --skip-generate --accept-data-loss 2>&1 || true
 }
 
 echo "Running database migrations..."
