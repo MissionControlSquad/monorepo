@@ -9,6 +9,34 @@ export HOSTNAME=0.0.0.0
 
 PRISMA="node /prisma-cli/node_modules/prisma/build/index.js"
 
+# Resolve a P3009 (failed migration) by rolling it back and retrying deploy.
+# If the migration keeps failing (e.g. ALTER TYPE on a missing type in an old DB
+# that was provisioned before that feature existed), mark it as applied and skip —
+# the schema was already pushed directly so those changes are already present.
+resolve_p3009() {
+  local outfile="$1"
+  local failed
+  failed=$(sed -n 's/.*The `\([^`]*\)` migration started at.*/\1/p' "$outfile" | head -1)
+  if [ -z "$failed" ]; then
+    echo "P3009: could not extract failed migration name" >&2
+    return 1
+  fi
+  echo "Detected P3009 — resolving failed migration: $failed"
+  $PRISMA migrate resolve --rolled-back "$failed" 2>/dev/null || true
+  if $PRISMA migrate deploy >/tmp/migrate_p3009 2>&1; then
+    cat /tmp/migrate_p3009
+    return 0
+  fi
+  cat /tmp/migrate_p3009
+  if grep -q "P3009" /tmp/migrate_p3009; then
+    echo "Migration still failing — marking as applied and skipping: $failed"
+    $PRISMA migrate resolve --applied "$failed" 2>/dev/null || true
+    $PRISMA migrate deploy
+    return $?
+  fi
+  return 1
+}
+
 run_migrations() {
   if $PRISMA migrate deploy >/tmp/migrate_out 2>&1; then
     cat /tmp/migrate_out
@@ -28,36 +56,22 @@ run_migrations() {
       $PRISMA migrate resolve --applied "$name" 2>/dev/null || true
     done
     echo "Baseline complete — running migrate deploy..."
-    $PRISMA migrate deploy
-    return $?
-  fi
-
-  if grep -q "P3009" /tmp/migrate_out; then
-    # A previously attempted migration is recorded as failed — resolve it and retry.
-    # Happens when a migration's SQL failed (e.g. ALTER TYPE on a type that didn't
-    # exist in an older DB), leaving a failed row in _prisma_migrations.
-    failed=$(sed -n 's/.*The `\([^`]*\)` migration started at.*/\1/p' /tmp/migrate_out | head -1)
-    if [ -z "$failed" ]; then
-      echo "P3009: could not extract failed migration name" >&2
-      return 1
-    fi
-    echo "Detected P3009 — resolving failed migration: $failed"
-    $PRISMA migrate resolve --rolled-back "$failed" 2>/dev/null || true
-    echo "Retrying migrate deploy..."
-    if $PRISMA migrate deploy >/tmp/migrate_retry 2>&1; then
-      cat /tmp/migrate_retry
+    # Capture output so we can detect P3009 if baseline left a partially-applied migration
+    if $PRISMA migrate deploy >/tmp/migrate_post_baseline 2>&1; then
+      cat /tmp/migrate_post_baseline
       return 0
     fi
-    cat /tmp/migrate_retry
-    # Migration still failing — mark as applied and skip (schema likely already
-    # contains these changes from an earlier db push on this DB).
-    if grep -q "P3009" /tmp/migrate_retry; then
-      echo "Migration still failing — marking as applied and skipping: $failed"
-      $PRISMA migrate resolve --applied "$failed" 2>/dev/null || true
-      $PRISMA migrate deploy
+    cat /tmp/migrate_post_baseline
+    if grep -q "P3009" /tmp/migrate_post_baseline; then
+      resolve_p3009 /tmp/migrate_post_baseline
       return $?
     fi
     return 1
+  fi
+
+  if grep -q "P3009" /tmp/migrate_out; then
+    resolve_p3009 /tmp/migrate_out
+    return $?
   fi
 
   return 1
