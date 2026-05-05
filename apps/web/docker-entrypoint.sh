@@ -54,12 +54,8 @@ resolve_schema_error() {
 run_migrations() {
   if $PRISMA migrate deploy >/tmp/migrate_out 2>&1; then
     cat /tmp/migrate_out
-    return 0
-  fi
-
-  cat /tmp/migrate_out
-
-  if grep -q "P3005" /tmp/migrate_out; then
+  elif grep -q "P3005" /tmp/migrate_out; then
+    cat /tmp/migrate_out
     # Non-empty DB with no migration history — baseline all existing migrations then retry.
     # Happens when a DB was provisioned by an older workflow before migration tracking.
     echo "Detected P3005 — baselining existing schema..."
@@ -80,20 +76,20 @@ run_migrations() {
         return 1
       fi
     fi
-    # db push fills schema gaps left by the baseline — tables added after the client
-    # was provisioned (feature_flags, licenses, etc.) are missing even though all
-    # migrations are marked applied. db push adds only what is missing, never drops.
-    echo "Syncing any missing schema elements (db push)..."
-    $PRISMA db push --skip-generate --accept-data-loss 2>/dev/null || true
-    return 0
+  elif grep -qE "P3009|P3018" /tmp/migrate_out; then
+    cat /tmp/migrate_out
+    resolve_schema_error /tmp/migrate_out || return 1
+  else
+    cat /tmp/migrate_out
+    return 1
   fi
 
-  if grep -qE "P3009|P3018" /tmp/migrate_out; then
-    resolve_schema_error /tmp/migrate_out
-    return $?
-  fi
-
-  return 1
+  # Always run db push as a final safety net — fills any schema gaps that exist
+  # because migrations were marked applied without running (P3005 baseline, manual
+  # provisioning, or any other path that left tables/columns missing). On a healthy
+  # fully-migrated DB this is a fast no-op. Never drops existing data.
+  echo "Syncing schema (db push)..."
+  $PRISMA db push --skip-generate --accept-data-loss 2>/dev/null || true
 }
 
 echo "Running database migrations..."
