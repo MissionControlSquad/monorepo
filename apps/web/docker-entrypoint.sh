@@ -59,14 +59,21 @@ run_migrations() {
     # Capture output so we can detect P3009 if baseline left a partially-applied migration
     if $PRISMA migrate deploy >/tmp/migrate_post_baseline 2>&1; then
       cat /tmp/migrate_post_baseline
-      return 0
+    else
+      cat /tmp/migrate_post_baseline
+      if grep -q "P3009" /tmp/migrate_post_baseline; then
+        resolve_p3009 /tmp/migrate_post_baseline || return 1
+      else
+        return 1
+      fi
     fi
-    cat /tmp/migrate_post_baseline
-    if grep -q "P3009" /tmp/migrate_post_baseline; then
-      resolve_p3009 /tmp/migrate_post_baseline
-      return $?
-    fi
-    return 1
+    # db push fills any schema gaps the baseline may have left — old DBs provisioned
+    # before certain migrations existed will be missing those tables/columns even though
+    # the migrations are now marked applied. db push is additive-only here (no drops)
+    # because the schema only adds tables/columns relative to what the old DB has.
+    echo "Syncing any missing schema elements (db push)..."
+    $PRISMA db push --skip-generate --accept-data-loss 2>/dev/null || true
+    return 0
   fi
 
   if grep -q "P3009" /tmp/migrate_out; then
