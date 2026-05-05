@@ -12,37 +12,37 @@ const DEFAULT_FLAGS: {
     key: FLAG_KEYS.CHANNELS,
     enabled: true,
     managedBy: "system",
-    description: "Team messaging channels and DMs",
+    description: "Team channels & DMs",
   },
   {
     key: FLAG_KEYS.ANALYTICS,
     enabled: true,
     managedBy: "system",
-    description: "Analytics dashboard with charts and metrics",
+    description: "Advanced analytics",
   },
   {
     key: FLAG_KEYS.RECURRING_TASKS,
     enabled: true,
     managedBy: "system",
-    description: "Recurring/scheduled task templates",
+    description: "Recurring tasks",
   },
   {
     key: FLAG_KEYS.CLOUD_VMS,
     enabled: true,
     managedBy: "system",
-    description: "Cloud VM provisioning for agents",
+    description: "Cloud VM provisioning",
   },
   {
     key: FLAG_KEYS.REVIEWS,
     enabled: true,
     managedBy: "system",
-    description: "Task review workflow (approve/reject/clarify)",
+    description: "Approval workflows",
   },
   {
     key: FLAG_KEYS.DOCUMENTS,
     enabled: true,
     managedBy: "system",
-    description: "Document management and project docs",
+    description: "Document management",
   },
 
   // User-managed: client admins can toggle these themselves
@@ -50,19 +50,19 @@ const DEFAULT_FLAGS: {
     key: FLAG_KEYS.AGENT_QUEUE,
     enabled: true,
     managedBy: "user",
-    description: "Agent work queue management",
+    description: "Kanban task management",
   },
   {
     key: FLAG_KEYS.NOTIFICATIONS,
     enabled: true,
     managedBy: "user",
-    description: "Push and email notifications",
+    description: "@Mentions & notifications",
   },
   {
     key: FLAG_KEYS.LIVE_GATEWAY,
     enabled: false,
     managedBy: "system",
-    description: "Live WebSocket task delivery — AgentCenter Bridge plugin connects any machine for sub-second task assignment",
+    description: "Live Gateway",
   },
 ];
 
