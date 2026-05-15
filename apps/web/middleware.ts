@@ -94,6 +94,7 @@ const PUBLIC_PREFIXES = [
   "/api/cron/", // Cron jobs (CRON_SECRET auth in handler)
   "/api/health", // Health check (public)
   "/_next/", // Static assets
+  "/live-gateway", // WebSocket endpoint — auth handled by custom server
 ];
 
 /** Agent-scoped REST routes that use their own Bearer token auth in the handler. */
