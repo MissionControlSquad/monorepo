@@ -69,6 +69,14 @@ setupGraphQLWS(
   wss,
 );
 
+// Node.js only emits the 'upgrade' event when listenerCount('upgrade') > 0.
+// Without this, the socket is silently closed before our emit override runs.
+// In dev mode Next.js HMR adds its own listener (so it worked there);
+// in production standalone there are no other listeners — this one is the gate.
+server.on("upgrade", () => {
+  /* handled by the emit override below */
+});
+
 /**
  * Override server.emit to intercept "upgrade" events for /api/graphql
  * BEFORE any other listener (including Next.js HMR) can see them.
