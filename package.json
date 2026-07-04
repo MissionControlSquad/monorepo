@@ -29,6 +29,9 @@
     "node": ">=18"
   },
   "overrides": {
-    "expo-constants": "~18.0.13"
+    "expo-constants": "~18.0.13",
+    "@urql/exchange-graphcache": {
+      "@urql/core": "^6.0.3"
+    }
   }
 }

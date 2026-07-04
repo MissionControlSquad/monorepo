@@ -212,4 +212,4 @@
                                                                                                                                                                                                 
 Resume this session with:                                                                                                                                                                       
 claude --resume 75e2d9f3-5da7-4923-9c42-3f42c8de5b72                                                                                                                                            
-dharmikjagodana@Macmini AGENTCENTER.CLOUD % 
+dharmendra@Macmini AGENTCENTER.CLOUD % 

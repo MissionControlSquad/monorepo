@@ -47,7 +47,7 @@ const serverSchema = z.object({
       "BEAGuNNkK6E6ijU7Q8PrUwQB5E6yxVGGiPZtYd7jrLJlt19ge_9pYT76yrWgLr7WH4zrN33oWk-T_UEBoerEBus",
     ),
   VAPID_PRIVATE_KEY: z.string().optional(),
-  VAPID_SUBJECT: z.string().default("mailto:dharmik.jagodana@agentcenter.cloud"),
+  VAPID_SUBJECT: z.string().default("mailto:dharmendra@agentcenter.cloud"),
 
   // ── Email via Resend (optional — only needed for email notifications) ──
   RESEND_API_KEY: z.string().optional(),

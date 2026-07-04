@@ -144,7 +144,7 @@ export type PubSubEvents = {
 /**
  * Derive a per-client namespace from the database URL so that
  * multiple containers sharing one Redis never leak events to each other.
- * e.g. "postgresql://...@host/client_dharmik-jagodana" → "client_dharmik-jagodana:"
+ * e.g. "postgresql://...@host/client_dharmendra-jagodana" → "client_dharmendra-jagodana:"
  */
 function getRedisNamespace(): string {
   const url = process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL_NON_POOLING || "";

@@ -25,7 +25,7 @@ OpenClaw (manages agents, crons, heartbeats)
 ## Step 1: Set Up PostgreSQL Database
 
 ```bash
-cd /Users/dharmikjagodana/clawd/workstation/mission-control
+cd /Users/dharmendra/clawd/workstation/mission-control
 npx prisma generate
 npx prisma db push
 ```
@@ -132,7 +132,7 @@ Each workspace should have:
 ## Step 4: Launch the Web UI
 
 ```bash
-cd /Users/dharmikjagodana/clawd/workstation/mission-control/web
+cd /Users/dharmendra/clawd/workstation/mission-control/web
 npm install
 npm run dev
 ```

@@ -16,7 +16,7 @@ import type { ProfileLike, AgentLike, TaskLike, ProjectLike } from "./mentions";
 export const ZWS = "\u200B";
 
 export interface MentionMapEntry {
-  /** The display text shown in textarea, e.g. "@dharmikjagodana" */
+  /** The display text shown in textarea, e.g. "@dharmendra" */
   displayText: string;
   /** The raw storage token, e.g. "@[id:cmlnin9k10001adkbnrogta4d]" */
   rawToken: string;
