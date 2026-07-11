@@ -1,0 +1,232 @@
+import { builder } from "../builder";
+import { requireFeature } from "../require-feature";
+import { FLAG_KEYS } from "@agentcenter/utils";
+import type {
+  SkillTrustLevel,
+  SkillSharingScope,
+  TeamKind,
+  TeamTrustLevel,
+  CollisionStrategy,
+} from "@agentcenter/database";
+import { requireRole } from "@/server/tenancy";
+import {
+  createSkill,
+  updateSkill,
+  forkSkill,
+  starSkill,
+  unstarSkill,
+  assignSkillToAgent,
+  unassignSkillFromAgent,
+} from "@/server/services/skills";
+import { createTeam, addTeamMember, installTeam } from "@/server/services/teams";
+
+// Epic #10: skills + teams mutations. Skill authoring/assign is member; team install is admin
+// (it provisions agents in the workspace).
+builder.mutationField("createSkill", (t) =>
+  t.prismaField({
+    type: "Skill",
+    args: {
+      name: t.arg.string({ required: true }),
+      markdown: t.arg.string({ required: true }),
+      key: t.arg.string(),
+      description: t.arg.string(),
+      categories: t.arg.stringList(),
+      trustLevel: t.arg.string(),
+      sharingScope: t.arg.string(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      const s = await createSkill({
+        workspaceId: tenancy.workspaceId,
+        createdByProfileId: tenancy.userId,
+        name: args.name,
+        markdown: args.markdown,
+        key: args.key ?? null,
+        description: args.description ?? null,
+        categories: args.categories ?? null,
+        trustLevel: (args.trustLevel as SkillTrustLevel) ?? null,
+        sharingScope: (args.sharingScope as SkillSharingScope) ?? null,
+      });
+      return ctx.prisma.skill.findUniqueOrThrow({ ...query, where: { id: s.id } });
+    },
+  }),
+);
+
+builder.mutationField("updateSkill", (t) =>
+  t.prismaField({
+    type: "Skill",
+    args: {
+      id: t.arg.string({ required: true }),
+      name: t.arg.string(),
+      description: t.arg.string(),
+      markdown: t.arg.string(),
+      categories: t.arg.stringList(),
+      trustLevel: t.arg.string(),
+      sharingScope: t.arg.string(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      const s = await updateSkill(
+        tenancy.workspaceId,
+        args.id,
+        {
+          name: args.name ?? null,
+          description: args.description ?? undefined,
+          markdown: args.markdown ?? null,
+          categories: args.categories ?? null,
+          trustLevel: (args.trustLevel as SkillTrustLevel) ?? null,
+          sharingScope: (args.sharingScope as SkillSharingScope) ?? null,
+        },
+        tenancy.userId,
+      );
+      return ctx.prisma.skill.findUniqueOrThrow({ ...query, where: { id: s.id } });
+    },
+  }),
+);
+
+builder.mutationField("forkSkill", (t) =>
+  t.prismaField({
+    type: "Skill",
+    args: { id: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      const s = await forkSkill(tenancy.workspaceId, args.id, tenancy.userId);
+      return ctx.prisma.skill.findUniqueOrThrow({ ...query, where: { id: s.id } });
+    },
+  }),
+);
+
+builder.mutationField("starSkill", (t) =>
+  t.field({
+    type: "Int",
+    args: { id: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      return starSkill(tenancy.workspaceId, args.id, tenancy.userId);
+    },
+  }),
+);
+
+builder.mutationField("unstarSkill", (t) =>
+  t.field({
+    type: "Int",
+    args: { id: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      return unstarSkill(tenancy.workspaceId, args.id, tenancy.userId);
+    },
+  }),
+);
+
+builder.mutationField("assignSkill", (t) =>
+  t.prismaField({
+    type: "AgentSkill",
+    args: {
+      agentId: t.arg.string({ required: true }),
+      skillId: t.arg.string({ required: true }),
+      pinnedVersion: t.arg.int(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      const link = await assignSkillToAgent({
+        workspaceId: tenancy.workspaceId,
+        agentId: args.agentId,
+        skillId: args.skillId,
+        pinnedVersion: args.pinnedVersion ?? null,
+      });
+      return ctx.prisma.agentSkill.findUniqueOrThrow({ ...query, where: { id: link.id } });
+    },
+  }),
+);
+
+builder.mutationField("unassignSkill", (t) =>
+  t.field({
+    type: "Boolean",
+    args: { agentId: t.arg.string({ required: true }), skillId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      return unassignSkillFromAgent(tenancy.workspaceId, args.agentId, args.skillId);
+    },
+  }),
+);
+
+builder.mutationField("createTeam", (t) =>
+  t.prismaField({
+    type: "Team",
+    args: {
+      name: t.arg.string({ required: true }),
+      key: t.arg.string(),
+      description: t.arg.string(),
+      kind: t.arg.string(),
+      trustLevel: t.arg.string(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      const team = await createTeam({
+        workspaceId: tenancy.workspaceId,
+        createdByProfileId: tenancy.userId,
+        name: args.name,
+        key: args.key ?? null,
+        description: args.description ?? null,
+        kind: (args.kind as TeamKind) ?? null,
+        trustLevel: (args.trustLevel as TeamTrustLevel) ?? null,
+      });
+      return ctx.prisma.team.findUniqueOrThrow({ ...query, where: { id: team.id } });
+    },
+  }),
+);
+
+builder.mutationField("addTeamMember", (t) =>
+  t.prismaField({
+    type: "TeamMember",
+    args: {
+      teamId: t.arg.string({ required: true }),
+      name: t.arg.string({ required: true }),
+      role: t.arg.string({ required: true }),
+      templateId: t.arg.string(),
+      skills: t.arg.stringList(),
+      order: t.arg.int(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      const m = await addTeamMember(tenancy.workspaceId, args.teamId, {
+        name: args.name,
+        role: args.role,
+        templateId: args.templateId ?? null,
+        skills: args.skills ?? null,
+        order: args.order ?? null,
+      });
+      return ctx.prisma.teamMember.findUniqueOrThrow({ ...query, where: { id: m.id } });
+    },
+  }),
+);
+
+builder.mutationField("installTeam", (t) =>
+  t.prismaField({
+    type: "TeamInstall",
+    args: { teamId: t.arg.string({ required: true }), collisionStrategy: t.arg.string() },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "admin");
+      const strategy = ["rename", "skip", "replace"].includes(args.collisionStrategy ?? "")
+        ? (args.collisionStrategy as CollisionStrategy)
+        : "rename";
+      const res = await installTeam({
+        workspaceId: tenancy.workspaceId,
+        teamId: args.teamId,
+        collisionStrategy: strategy,
+        installedByProfileId: tenancy.userId,
+      });
+      return ctx.prisma.teamInstall.findUniqueOrThrow({ ...query, where: { id: res.installId } });
+    },
+  }),
+);
