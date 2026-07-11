@@ -22,3 +22,4 @@ import "./approvals";
 import "./finance";
 import "./ledger";
 import "./adapters";
+import "./secrets";

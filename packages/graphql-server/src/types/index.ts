@@ -24,3 +24,4 @@ import "./agent-trust";
 import "./finance";
 import "./ledger";
 import "./adapter";
+import "./secret";
