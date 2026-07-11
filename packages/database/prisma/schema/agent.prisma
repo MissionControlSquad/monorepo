@@ -139,6 +139,8 @@ model Agent {
   adapterConfig Json? // per-agent config, validated vs AgentAdapter.configSchema
   adapter       AgentAdapter? @relation("AgentAdapterType", fields: [adapterType], references: [type], onDelete: Restrict)
 
+  secretBindings SecretBinding[] // Epic #5
+
   @@index([username])
   @@index([cloudVmId])
   @@index([workspaceId])
