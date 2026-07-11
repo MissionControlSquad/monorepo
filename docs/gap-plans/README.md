@@ -35,7 +35,8 @@ Only hand a coding agent a spec marked **✅ READY**. Others will produce broken
   `orgId` columns; **#5 and #7 declare Prisma FKs to a deleted `Organization` model → they will not
   compile/migrate**). Must be upgraded to the 12-section template + audit fixes before use.
 - **🆕 PENDING (not written):** **#6, #9, #10, #11, #12, #13, #14, #15, #17.**
-- **Missing supporting doc:** `DESIGN-SYSTEM.md` (referenced by `CONVENTIONS.md §5`).
+- **Supporting docs in place:** `CONVENTIONS.md`, `DESIGN-SYSTEM.md`, and `.claude/skills/` (incl. the
+  mandatory `production-implementation-loop` — the per-functionality design/UI/coding/test/build gate).
 
 **Program status: 4 of 17 epics are implementation-ready (~25%).** The *method* (atomicity,
 reuse-maps, pure/functional helpers with unit tests, workspace isolation, migration safety, full
