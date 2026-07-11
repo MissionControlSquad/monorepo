@@ -15,6 +15,7 @@ export const FLAG_KEYS = {
   MULTI_PROVIDER_ADAPTERS: "multi_provider_adapters",
   SECRETS_VAULT: "secrets_vault",
   PIPELINES_ROUTINES: "pipelines_routines",
+  TASK_AUTONOMY: "task_autonomy",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -37,4 +38,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.MULTI_PROVIDER_ADAPTERS]: false,
   [FLAG_KEYS.SECRETS_VAULT]: true,
   [FLAG_KEYS.PIPELINES_ROUTINES]: true,
+  [FLAG_KEYS.TASK_AUTONOMY]: true,
 };
