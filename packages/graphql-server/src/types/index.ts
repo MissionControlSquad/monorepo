@@ -22,3 +22,4 @@ import "./cloud-vm";
 import "./approval";
 import "./agent-trust";
 import "./finance";
+import "./ledger";
