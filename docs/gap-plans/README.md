@@ -25,6 +25,23 @@ Root gap inventory: [`../../GAP-ANALYSIS.md`](../../GAP-ANALYSIS.md).
   (`deliverToLocalAgent`→`openclaw-local.ts`, use `resolveAgent`, `services/review.ts` `performApproveTask`).
 - **Completeness audit:** 4 new epics added (#14–#17); the folds below close the remaining parity gaps.
 
+## ⚠️ Implementation readiness (authoritative — read before giving anything to Codex)
+
+Only hand a coding agent a spec marked **✅ READY**. Others will produce broken code.
+
+- **✅ READY (12-section, audit-clean, enterprise techniques baked in):** **#1, #3, #4, #16.**
+- **⛔ DRAFT — NOT implementation-ready:** **#2, #5, #7, #8.** These are pre-buildbase drafts that
+  still carry the audit defects (stale `Organization`/`require-role.ts` deps, `License` gating,
+  `orgId` columns; **#5 and #7 declare Prisma FKs to a deleted `Organization` model → they will not
+  compile/migrate**). Must be upgraded to the 12-section template + audit fixes before use.
+- **🆕 PENDING (not written):** **#6, #9, #10, #11, #12, #13, #14, #15, #17.**
+- **Missing supporting doc:** `DESIGN-SYSTEM.md` (referenced by `CONVENTIONS.md §5`).
+
+**Program status: 4 of 17 epics are implementation-ready (~25%).** The *method* (atomicity,
+reuse-maps, pure/functional helpers with unit tests, workspace isolation, migration safety, full
+requirement→test→DoD→why traceability) is fully established in `CONVENTIONS.md`, `.claude/skills/`, and
+the 4 ready specs. The remaining 13 epics must be brought to that same bar before a full build.
+
 ## Build sequence — 17 epics (dependency-ordered)
 
 | Phase | # | Epic | File | Status |
