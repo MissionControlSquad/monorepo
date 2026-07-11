@@ -1,6 +1,14 @@
 // ─── Agent Budgets / Cost (Epic #4) ───────────────────────────────
 // Agent LLM/run cost + budget policies + auto-pause. Workspace-scoped (no FK, D5).
-// NOT the customer's business bookkeeping (that is Epic #16 finance ledger).
+// This is the AGENT AI-WORK QUOTA: how much an individual agent (or the workspace's agents)
+// may spend before it is warned (soft) and then paused (hard). It mirrors Paperclip's
+// per-agent budget guardrail (soft warn + hard stop + cancel + approval-gated resume).
+//
+// It is NOT:
+//   - the WORKSPACE/HUMAN PLAN QUOTA (max agents, projects, docs, tasks a customer may
+//     provision) — that is a buildbase subscription entitlement (human plane, D1), enforced
+//     when a HUMAN creates a resource, and is deliberately not modeled here.
+//   - the customer's business bookkeeping (double-entry ledger) — that is Epic #16.
 
 enum BudgetScope {
   workspace

@@ -22,6 +22,7 @@ export const BUDGET_POLICIES_QUERY = gql`
       limitCents
       window
       hardStop
+      warnPercent
       isActive
       createdAt
     }
@@ -35,9 +36,11 @@ export const BUDGET_INCIDENTS_QUERY = gql`
       policyId
       agentId
       status
+      thresholdType
       spendCents
       limitCents
       autoPaused
+      approvalId
       detail
       resolvedById
       resolvedAt

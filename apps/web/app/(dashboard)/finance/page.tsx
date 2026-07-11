@@ -12,6 +12,7 @@ import {
   CREATE_BUDGET_POLICY,
   DELETE_BUDGET_POLICY,
   RESOLVE_BUDGET_INCIDENT,
+  RAISE_BUDGET_AND_RESUME,
 } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 
@@ -33,6 +34,7 @@ interface Policy {
   limitCents: number;
   window: string;
   hardStop: boolean;
+  warnPercent: number;
   isActive: boolean;
 }
 interface Incident {
@@ -40,6 +42,7 @@ interface Incident {
   policyId: string;
   agentId: string | null;
   status: string;
+  thresholdType: string;
   spendCents: number;
   limitCents: number;
   autoPaused: boolean;
@@ -88,9 +91,17 @@ export default function FinancePage() {
   const [, createPolicy] = useMutation(CREATE_BUDGET_POLICY);
   const [, deletePolicy] = useMutation(DELETE_BUDGET_POLICY);
   const [, resolveIncident] = useMutation(RESOLVE_BUDGET_INCIDENT);
+  const [, raiseAndResume] = useMutation(RAISE_BUDGET_AND_RESUME);
 
   const [busy, setBusy] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", limit: "", window: "monthly", hardStop: true });
+  const [form, setForm] = useState({
+    name: "",
+    limit: "",
+    window: "monthly",
+    hardStop: true,
+    warn: "80",
+  });
+  const [raiseLimit, setRaiseLimit] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
   const summary = sumData?.financeSummary;
@@ -109,18 +120,20 @@ export default function FinancePage() {
       return setFormError("Enter a positive limit");
     setBusy("create");
     try {
+      const warnPercent = Math.round(Number(form.warn));
       const res = await createPolicy({
         scope: "workspace",
         name: form.name.trim(),
         limitCents,
         window: form.window,
         hardStop: form.hardStop,
+        warnPercent: Number.isFinite(warnPercent) ? warnPercent : 80,
       });
       if (res.error) {
         setFormError(res.error.graphQLErrors[0]?.message ?? "Failed to create policy");
         return;
       }
-      setForm({ name: "", limit: "", window: "monthly", hardStop: true });
+      setForm({ name: "", limit: "", window: "monthly", hardStop: true, warn: "80" });
       refetchPolicies({ requestPolicy: "network-only" });
       refetchSummary({ requestPolicy: "network-only" });
     } finally {
@@ -150,6 +163,29 @@ export default function FinancePage() {
     }
   }
 
+  async function onRaiseResume(inc: Incident) {
+    const dollars = Number(raiseLimit[inc.id]);
+    const newLimitCents = Math.round(dollars * 100);
+    if (!Number.isFinite(newLimitCents) || newLimitCents <= inc.spendCents) {
+      setFormError(`New limit must exceed current spend (${money(inc.spendCents)})`);
+      return;
+    }
+    setBusy(inc.id);
+    try {
+      const res = await raiseAndResume({ id: inc.id, newLimitCents });
+      if (res.error) {
+        setFormError(res.error.graphQLErrors[0]?.message ?? "Failed to raise & resume");
+        return;
+      }
+      setFormError(null);
+      refetchIncidents({ requestPolicy: "network-only" });
+      refetchPolicies({ requestPolicy: "network-only" });
+      refetchSummary({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
       <h1 className="text-lg font-semibold text-foreground">Finance &amp; Budgets</h1>
@@ -167,10 +203,17 @@ export default function FinancePage() {
         <section className="space-y-2">
           <h2 className="text-sm font-semibold text-foreground">Open incidents</h2>
           {incidents.map((inc) => (
-            <Card key={inc.id} className="flex items-start justify-between gap-4 p-4">
+            <Card
+              key={inc.id}
+              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between"
+            >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="red">breached</Badge>
+                  {inc.thresholdType === "hard" ? (
+                    <Badge variant="red">hard breach</Badge>
+                  ) : (
+                    <Badge variant="yellow">soft warning</Badge>
+                  )}
                   {inc.autoPaused && <Badge variant="orange">agent auto-paused</Badge>}
                   <span className="text-sm font-medium text-foreground">
                     {money(inc.spendCents)} / {money(inc.limitCents)}
@@ -178,19 +221,35 @@ export default function FinancePage() {
                 </div>
                 {inc.detail && <p className="mt-1 text-sm text-muted-foreground">{inc.detail}</p>}
               </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={busy === inc.id}
-                onClick={() => onResolve(inc.id)}
-              >
-                Resolve
-              </Button>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {inc.thresholdType === "hard" && inc.autoPaused && (
+                  <>
+                    <input
+                      className="w-28 rounded border border-border bg-background px-2 py-1.5 text-sm"
+                      placeholder="New limit ($)"
+                      inputMode="decimal"
+                      value={raiseLimit[inc.id] ?? ""}
+                      onChange={(e) => setRaiseLimit((m) => ({ ...m, [inc.id]: e.target.value }))}
+                    />
+                    <Button size="sm" disabled={busy === inc.id} onClick={() => onRaiseResume(inc)}>
+                      Raise &amp; resume
+                    </Button>
+                  </>
+                )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy === inc.id}
+                  onClick={() => onResolve(inc.id)}
+                >
+                  Resolve
+                </Button>
+              </div>
             </Card>
           ))}
           <p className="text-xs text-muted-foreground">
-            Resolving an incident does not reactivate a paused agent — reactivate it explicitly from
-            the agent&apos;s page.
+            Plain <em>Resolve</em> closes the incident but does NOT reactivate a paused agent.
+            <em> Raise &amp; resume</em> lifts the limit above current spend and restarts the agent.
           </p>
         </section>
       )}
@@ -251,6 +310,13 @@ export default function FinancePage() {
                 </option>
               ))}
             </select>
+            <input
+              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+              placeholder="Warn %"
+              inputMode="numeric"
+              value={form.warn}
+              onChange={(e) => setForm((f) => ({ ...f, warn: e.target.value }))}
+            />
           </div>
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 text-sm text-foreground">
@@ -284,7 +350,9 @@ export default function FinancePage() {
                 {p.hardStop && <Badge variant="orange">hard stop</Badge>}
                 {!p.isActive && <Badge variant="gray">inactive</Badge>}
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">Limit {money(p.limitCents)}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Limit {money(p.limitCents)} · warn at {p.warnPercent}%
+              </p>
             </div>
             <Button
               size="sm"

@@ -9,6 +9,7 @@ export const CREATE_BUDGET_POLICY = gql`
     $limitCents: Int!
     $window: String!
     $hardStop: Boolean
+    $warnPercent: Int
   ) {
     createBudgetPolicy(
       scope: $scope
@@ -17,6 +18,7 @@ export const CREATE_BUDGET_POLICY = gql`
       limitCents: $limitCents
       window: $window
       hardStop: $hardStop
+      warnPercent: $warnPercent
     ) {
       id
     }
@@ -55,6 +57,15 @@ export const DELETE_BUDGET_POLICY = gql`
 export const RESOLVE_BUDGET_INCIDENT = gql`
   mutation ResolveBudgetIncident($id: String!, $detail: String) {
     resolveBudgetIncident(id: $id, detail: $detail) {
+      id
+      status
+    }
+  }
+`;
+
+export const RAISE_BUDGET_AND_RESUME = gql`
+  mutation RaiseBudgetAndResume($id: String!, $newLimitCents: Int!) {
+    raiseBudgetAndResume(id: $id, newLimitCents: $newLimitCents) {
       id
       status
     }

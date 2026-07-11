@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
 import { recordCostEvent } from "../../src/server/services/cost";
 import { raiseBudgetAndResume } from "../../src/server/services/budgets";
-import { AUTO_PAUSE_MESSAGE } from "../../src/server/services/budget-enforcement";
 import { windowBounds } from "../../src/server/services/budget-window";
 import { createTestAgent, createTestTask } from "../helpers";
 import type { BudgetScope } from "@agentcenter/database";
