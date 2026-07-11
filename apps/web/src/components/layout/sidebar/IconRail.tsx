@@ -22,6 +22,8 @@ import {
   Repeat,
   ShieldCheck,
   Ticket,
+  Puzzle,
+  Users,
   Zap,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
@@ -51,6 +53,8 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   { href: "/pipelines", icon: Workflow, label: "Pipelines", flag: FLAG_KEYS.PIPELINES_ROUTINES },
   { href: "/reliability", icon: ShieldCheck, label: "Reliability", flag: FLAG_KEYS.TASK_AUTONOMY },
   { href: "/cases", icon: Ticket, label: "Cases", flag: FLAG_KEYS.CASES },
+  { href: "/skills", icon: Puzzle, label: "Skills", flag: FLAG_KEYS.SKILLS_TEAMS },
+  { href: "/teams", icon: Users, label: "Teams", flag: FLAG_KEYS.SKILLS_TEAMS },
 ];
 
 function isActive(pathname: string | null, href: string): boolean {

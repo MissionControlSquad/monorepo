@@ -150,3 +150,5 @@ export {
 } from "./task-autonomy";
 
 export { CASES_QUERY, LABELS_QUERY, CASE_EVENTS_QUERY } from "./cases";
+
+export { SKILLS_QUERY, TEAMS_QUERY } from "./skills";
