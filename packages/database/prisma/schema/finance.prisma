@@ -19,6 +19,12 @@ enum IncidentStatus {
   resolved
 }
 
+// Paperclip parity: an incident is either a soft warning (notify only) or a hard breach (pause).
+enum IncidentThreshold {
+  soft
+  hard
+}
+
 model CostEvent {
   id             String   @id @default(cuid())
   workspaceId    String // buildbase workspace _id; no FK (D5)
@@ -60,11 +66,13 @@ model BudgetPolicy {
   agentId     String? // required when scope=agent
   name        String
   limitCents  Int
-  window      BudgetWindow @default(monthly)
-  hardStop    Boolean      @default(false) // true = auto-pause on breach
-  isActive    Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  window       BudgetWindow @default(monthly)
+  hardStop     Boolean      @default(false) // true = auto-pause on hard breach
+  warnPercent  Int          @default(80) // soft-warn threshold as % of limit (Paperclip parity)
+  notifyEnabled Boolean     @default(true) // emit notification on incident open
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   agent     Agent?           @relation(fields: [agentId], references: [id], onDelete: Cascade)
   windows   QuotaWindow[]
@@ -84,7 +92,8 @@ model QuotaWindow {
   windowStart DateTime
   windowEnd   DateTime
   spendCents  Int      @default(0)
-  breached    Boolean  @default(false)
+  warned      Boolean  @default(false) // soft-warn incident already opened for this window
+  breached    Boolean  @default(false) // hard breach incident already opened for this window
   updatedAt   DateTime @updatedAt
 
   policy BudgetPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
@@ -102,10 +111,12 @@ model BudgetIncident {
   policyId      String
   quotaWindowId String?
   agentId       String?
-  status        IncidentStatus @default(open)
+  status        IncidentStatus    @default(open)
+  thresholdType IncidentThreshold @default(hard) // soft = warn only; hard = breach/pause
   spendCents    Int
   limitCents    Int
-  autoPaused    Boolean        @default(false)
+  autoPaused    Boolean           @default(false)
+  approvalId    String? // Paperclip parity: budget_override approval gating resume (no FK)
   detail        String?
   resolvedById  String?
   resolvedAt    DateTime?
