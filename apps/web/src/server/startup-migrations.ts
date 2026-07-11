@@ -143,6 +143,12 @@ async function ensureFeatureFlags() {
       managedBy: "system",
       description: "Encrypted secrets vault with versioning + bindings (Epic #5)",
     },
+    {
+      key: FLAG_KEYS.PIPELINES_ROUTINES,
+      enabled: true,
+      managedBy: "user",
+      description: "Routines (scheduled workflows) + Pipelines (multi-stage cases) (Epic #7)",
+    },
   ];
 
   let created = 0;
