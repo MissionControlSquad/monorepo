@@ -23,3 +23,4 @@ import "./finance";
 import "./ledger";
 import "./adapters";
 import "./secrets";
+import "./pipelines";
