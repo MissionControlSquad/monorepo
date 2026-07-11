@@ -20,6 +20,7 @@ export default defineConfig({
       "tests/unit/trust.test.ts",
       "tests/unit/budget-window.test.ts",
       "tests/unit/ledger-bucket.test.ts",
+      "tests/unit/adapters-registry.test.ts",
     ],
   },
   resolve: {

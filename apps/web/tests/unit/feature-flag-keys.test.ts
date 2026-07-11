@@ -16,10 +16,11 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.GOVERNANCE).toBe("governance");
     expect(FLAG_KEYS.BUDGETS).toBe("budgets");
     expect(FLAG_KEYS.LEDGER).toBe("ledger");
+    expect(FLAG_KEYS.MULTI_PROVIDER_ADAPTERS).toBe("multi_provider_adapters");
   });
 
-  it("has exactly 12 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(12);
+  it("has exactly 13 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(13);
   });
 
   it("all values are unique", () => {
@@ -42,6 +43,10 @@ describe("FLAG_DEFAULTS", () => {
 
   it("LIVE_GATEWAY defaults to false", () => {
     expect(FLAG_DEFAULTS[FLAG_KEYS.LIVE_GATEWAY]).toBe(false);
+  });
+
+  it("MULTI_PROVIDER_ADAPTERS defaults to false (opt-in; OpenClaw always works)", () => {
+    expect(FLAG_DEFAULTS[FLAG_KEYS.MULTI_PROVIDER_ADAPTERS]).toBe(false);
   });
 
   it("all other flags default to true", () => {
