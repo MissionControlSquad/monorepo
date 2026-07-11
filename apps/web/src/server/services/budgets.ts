@@ -126,6 +126,14 @@ export async function resolveBudgetIncident(args: {
     throw new GraphQLError("Incident not found", { extensions: { code: "NOT_FOUND" } });
 
   if (res.count > 0) {
+    // Dismissing the incident cancels its budget_override approval so it does not orphan in the
+    // approvals inbox. (Resume is the other path — it approves the approval instead.)
+    if (incident.approvalId) {
+      await prisma.approval.updateMany({
+        where: { id: incident.approvalId, workspaceId: args.workspaceId, status: "pending" },
+        data: { status: "cancelled", decidedById: args.resolvedById, decidedAt: new Date() },
+      });
+    }
     await emit({
       type: EventTypes.BUDGET_INCIDENT_RESOLVED,
       incidentId: incident.id,

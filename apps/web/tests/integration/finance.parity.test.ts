@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
 import { recordCostEvent } from "../../src/server/services/cost";
-import { raiseBudgetAndResume } from "../../src/server/services/budgets";
+import { raiseBudgetAndResume, resolveBudgetIncident } from "../../src/server/services/budgets";
 import { windowBounds } from "../../src/server/services/budget-window";
 import { createTestAgent, createTestTask } from "../helpers";
 import type { BudgetScope } from "@agentcenter/database";
@@ -207,5 +207,30 @@ describe("raiseBudgetAndResume", () => {
     expect(agent.status).toBe("blocked"); // stays paused
     const stillOpen = await prisma.budgetIncident.findUniqueOrThrow({ where: { id: incident.id } });
     expect(stillOpen.status).toBe("open");
+  });
+
+  it("plain resolve (dismiss) cancels the linked budget_override approval and leaves the agent blocked", async () => {
+    const humanId = await makeHuman();
+    const agentId = await makeAgent("Dismiss");
+    const policy = await makePolicy({ scope: "agent", agentId, limitCents: 1000, hardStop: true });
+    await recordCostEvent({ workspaceId: WS, agentId, amountCents: 1500 });
+
+    const incident = await prisma.budgetIncident.findFirstOrThrow({
+      where: { policyId: policy.id, thresholdType: "hard" },
+    });
+    expect(incident.approvalId).toBeTruthy();
+
+    await resolveBudgetIncident({
+      incidentId: incident.id,
+      workspaceId: WS,
+      resolvedById: humanId,
+    });
+
+    const approval = await prisma.approval.findUniqueOrThrow({
+      where: { id: incident.approvalId! },
+    });
+    expect(approval.status).toBe("cancelled"); // no longer orphaned in the inbox
+    const agent = await prisma.agent.findUniqueOrThrow({ where: { id: agentId } });
+    expect(agent.status).toBe("blocked"); // dismiss does not resume
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation } from "urql";
 import { APPROVALS_QUERY } from "@/lib/graphql/queries";
 import { APPROVE_APPROVAL, REJECT_APPROVAL } from "@/lib/graphql/mutations";
@@ -84,7 +85,16 @@ export default function ApprovalsPage() {
                 Requested by {a.requestedBy?.displayName ?? "—"}
               </p>
             </div>
-            {a.status === "pending" && (
+            {a.status === "pending" && a.subjectType === "budget_override" && (
+              // A budget override can't be actioned with a plain approve — resuming needs a new
+              // limit. Send the admin to Finance where Raise & resume lives.
+              <Link href="/finance" className="shrink-0">
+                <Button size="sm" variant="secondary">
+                  Manage in Finance
+                </Button>
+              </Link>
+            )}
+            {a.status === "pending" && a.subjectType !== "budget_override" && (
               <div className="flex shrink-0 gap-2">
                 <Button
                   size="sm"

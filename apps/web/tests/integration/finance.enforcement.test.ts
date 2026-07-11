@@ -195,16 +195,19 @@ describe("resolveBudgetIncident", () => {
     const policy = await makePolicy({ scope: "agent", agentId, limitCents: 1000, hardStop: true });
     await recordCostEvent({ workspaceId: WS, agentId, amountCents: 1500 });
 
+    const human = await prisma.profile.create({
+      data: { kind: "human", displayName: "Resolver" },
+    });
     const open = await prisma.budgetIncident.findFirstOrThrow({ where: { policyId: policy.id } });
     const resolved = await resolveIncidentSvc({
       incidentId: open.id,
       workspaceId: WS,
-      resolvedById: "human_1",
+      resolvedById: human.id,
       detail: "reviewed",
     });
 
     expect(resolved.status).toBe("resolved");
-    expect(resolved.resolvedById).toBe("human_1");
+    expect(resolved.resolvedById).toBe(human.id);
     expect(resolved.resolvedAt).toBeTruthy();
 
     // Agent stays blocked — reactivation is a separate explicit action (R9).
