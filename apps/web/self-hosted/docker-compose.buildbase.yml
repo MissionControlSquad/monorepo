@@ -1,0 +1,105 @@
+# AgentCenter — buildbase self-hosted OVERLAY (Epic #1, opt-in)
+#
+# Runs the 4-service buildbase stack (MongoDB + Tenant Server + Client + Auth) alongside
+# AgentCenter so human tenancy/auth/RBAC/billing stay on the client's VPS (app data never leaves;
+# only a licensing heartbeat reaches buildbase's Central Server).
+#
+# Use ONLY if you want self-hosted buildbase (the cloud tier points SAAS_SERVER_URL at
+# api.console.buildbase.app instead and this overlay is not needed):
+#   docker compose -f docker-compose.yml -f docker-compose.buildbase.yml up -d
+#
+# Prerequisites (from the buildbase dashboard): create an Installation → INSTALLATION_ID +
+# INSTALLATION_API_KEY, and set the secrets below in .env.
+#
+# ⚑ Image tags + exact env are AUTHORITATIVE in the official starter — keep this in sync with
+#   github.com/buildbase-app/self-hosted-starter (docker-compose.selfhost.yml, .env.selfhost).
+
+volumes:
+  bb_mongo_data:
+
+services:
+  # ── buildbase MongoDB ────────────────────────────────────────────
+  bb-mongodb:
+    image: ${BB_MONGO_IMAGE:-mongo:7}
+    restart: unless-stopped
+    volumes:
+      - bb_mongo_data:/data/db
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+  # ── buildbase Tenant Server (core API — SDK serverUrl points here) ──
+  bb-tenant-server:
+    image: ${BB_TENANT_SERVER_IMAGE:-ghcr.io/buildbase-app/tenant-server:latest}
+    restart: unless-stopped
+    depends_on:
+      - bb-mongodb
+    networks:
+      - internal
+    environment:
+      - PORT=4101
+      - MONGO_URL=mongodb://bb-mongodb:27017/buildbase
+      - JWT_PASS=${JWT_PASS}
+      - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - OAUTH2_SECRET=${OAUTH2_SECRET}
+      - INSTALLATION_ID=${INSTALLATION_ID}
+      - INSTALLATION_API_KEY=${INSTALLATION_API_KEY}
+      - TENANT_SERVER_URL=${TENANT_SERVER_URL:-http://localhost:4101}
+      - CLIENT_URL=${CLIENT_URL:-http://localhost:4100}
+      - AUTH_URL=${AUTH_URL:-http://localhost:4103}
+    ports:
+      - "4101:4101"
+    security_opt:
+      - no-new-privileges:true
+
+  # ── buildbase Client (admin console) ─────────────────────────────
+  bb-client:
+    image: ${BB_CLIENT_IMAGE:-ghcr.io/buildbase-app/client:latest}
+    restart: unless-stopped
+    depends_on:
+      - bb-tenant-server
+    networks:
+      - internal
+    environment:
+      - CLIENT_URL=${CLIENT_URL:-http://localhost:4100}
+      - TENANT_SERVER_URL=${TENANT_SERVER_URL:-http://localhost:4101}
+    ports:
+      - "4100:4100"
+    security_opt:
+      - no-new-privileges:true
+
+  # ── buildbase Auth Portal ────────────────────────────────────────
+  bb-auth:
+    image: ${BB_AUTH_IMAGE:-ghcr.io/buildbase-app/auth:latest}
+    restart: unless-stopped
+    depends_on:
+      - bb-tenant-server
+    networks:
+      - internal
+    environment:
+      - AUTH_URL=${AUTH_URL:-http://localhost:4103}
+      - TENANT_SERVER_URL=${TENANT_SERVER_URL:-http://localhost:4101}
+    ports:
+      - "4103:4103"
+    security_opt:
+      - no-new-privileges:true
+
+  # ── AgentCenter app: point the SDK at the self-hosted tenant server ──
+  app:
+    depends_on:
+      bb-tenant-server:
+        condition: service_started
+    environment:
+      # Server-side (SDK factory + auth routes)
+      - SAAS_SERVER_URL=http://bb-tenant-server:4101
+      - SAAS_ORG_ID=${SAAS_ORG_ID}
+      - SAAS_CLIENT_ID=${SAAS_CLIENT_ID}
+      - SAAS_CLIENT_SECRET=${SAAS_CLIENT_SECRET}
+      - SYSTEM_SECRET=${SYSTEM_SECRET}
+      # Client-side (SaaSOSProvider) — must be the browser-reachable tenant server URL
+      - NEXT_PUBLIC_SAAS_SERVER_URL=${TENANT_SERVER_URL:-http://localhost:4101}
+      - NEXT_PUBLIC_SAAS_ORG_ID=${SAAS_ORG_ID}
+      - NEXT_PUBLIC_SAAS_CLIENT_ID=${SAAS_CLIENT_ID}
+      - NEXT_PUBLIC_APP_URL=${PUBLIC_URL:-http://localhost:3000}
