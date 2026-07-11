@@ -30,6 +30,7 @@ model Document {
   project                   Project?                  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   messageAttachments        MessageAttachment[]
   channelMessageAttachments ChannelMessageAttachment[]
+  caseDocument              CaseDocument?              @relation("CaseDocument") // Epic #17
 
   @@index([taskId])
   @@index([type])

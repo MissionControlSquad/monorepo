@@ -1,0 +1,153 @@
+// ─── Cases Domain (Epic #17) ──────────────────────────────────────
+// A first-class Case: a support-ticket / work-item with a hierarchy, custom fields, a status
+// lifecycle, labels, task links, and an append-only event timeline. Ports Paperclip's `cases`
+// domain (schema/cases.ts). DISTINCT from Epic #7's PipelineCase (workflow-stage items).
+//
+// Rework: workspaceId (buildbase, D5 — no FK); enum CaseState (NOT CaseStatus, owned by #7); reuses
+// the existing Document model for docs/attachments (no assets table) and Task for case↔task links.
+
+enum CaseState {
+  draft
+  in_progress
+  in_review
+  approved
+  done
+  cancelled
+}
+
+enum CaseTaskRole {
+  origin
+  work
+  reference
+}
+
+enum CaseEventKind {
+  created
+  updated
+  status_changed
+  fields_changed
+  task_linked
+  task_unlinked
+  document_attached
+  label_added
+  label_removed
+  child_linked
+}
+
+model Case {
+  id                 String    @id @default(cuid())
+  workspaceId        String // buildbase workspace _id; no FK (D5)
+  projectId          String?
+  caseNumber         Int       @unique @default(autoincrement())
+  identifier         String    @unique // "CASE-<caseNumber>"
+  caseType           String
+  key                String? // dedup key within (workspace, caseType)
+  title              String
+  summary            String?
+  status             CaseState @default(draft)
+  fields             Json      @default("{}")
+  parentCaseId       String?
+  createdByProfileId String?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  project          Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parentCase       Case?          @relation("CaseHierarchy", fields: [parentCaseId], references: [id], onDelete: SetNull)
+  childCases       Case[]         @relation("CaseHierarchy")
+  createdByProfile Profile?       @relation("CaseCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: SetNull)
+  taskLinks        CaseTaskLink[]
+  events           CaseEvent[]
+  documents        CaseDocument[]
+  labels           CaseLabel[]
+
+  @@unique([workspaceId, caseType, key])
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, caseType])
+  @@index([parentCaseId])
+  @@map("cases")
+}
+
+model CaseTaskLink {
+  id          String       @id @default(cuid())
+  workspaceId String
+  caseId      String
+  taskId      String
+  role        CaseTaskRole @default(work)
+  createdAt   DateTime     @default(now())
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  task Task @relation("CaseTaskLink", fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, taskId])
+  @@index([workspaceId, caseId])
+  @@index([taskId])
+  @@map("case_task_links")
+}
+
+model CaseEvent {
+  id             String        @id @default(cuid())
+  workspaceId    String
+  caseId         String
+  kind           CaseEventKind
+  actorType      String // "user" | "agent" | "system"
+  actorProfileId String?
+  payload        Json?
+  createdAt      DateTime      @default(now())
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt])
+  @@index([workspaceId, caseId])
+  @@map("case_events")
+}
+
+model CaseDocument {
+  id          String   @id @default(cuid())
+  workspaceId String
+  caseId      String
+  documentId  String
+  key         String // slot key, e.g. "body"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  case     Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  document Document @relation("CaseDocument", fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, key])
+  @@unique([documentId])
+  @@index([workspaceId, caseId])
+  @@map("case_documents")
+}
+
+model Label {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cases CaseLabel[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("labels")
+}
+
+model CaseLabel {
+  id          String   @id @default(cuid())
+  workspaceId String
+  caseId      String
+  labelId     String
+  createdAt   DateTime @default(now())
+
+  case  Case  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, labelId])
+  @@index([workspaceId, caseId])
+  @@index([labelId])
+  @@map("case_labels")
+}
