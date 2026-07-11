@@ -90,3 +90,5 @@ export {
 export { UPDATE_MY_PROFILE } from "./profile";
 
 export { UPDATE_FEATURE_FLAG } from "./feature-flags";
+
+export { APPROVE_APPROVAL, REJECT_APPROVAL } from "./approvals";
