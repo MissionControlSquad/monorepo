@@ -94,6 +94,28 @@ builder.queryField("pipeline", (t) =>
   }),
 );
 
+builder.queryField("casesInPipeline", (t) =>
+  t.prismaField({
+    type: ["PipelineCase"],
+    args: { pipelineId: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
+      requireRole(ctx, "member");
+      // Scope through the owning pipeline so another workspace's cases never leak.
+      const pipeline = await ctx.prisma.pipeline.findFirst({
+        where: scoped(ctx, { id: args.pipelineId }),
+        select: { id: true },
+      });
+      if (!pipeline) return [];
+      return ctx.prisma.pipelineCase.findMany({
+        ...query,
+        where: { pipelineId: pipeline.id },
+        orderBy: { createdAt: "desc" },
+      });
+    },
+  }),
+);
+
 builder.queryField("reviewCases", (t) =>
   t.prismaField({
     type: ["PipelineCase"],
