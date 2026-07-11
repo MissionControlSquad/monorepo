@@ -8,7 +8,6 @@
  * (3) emit `COST_EVENT_RECORDED`. Breach evaluation + auto-pause run OFF the bus
  * (`events/handlers/budget.ts` → `checkBreach`), never synchronously in this write.
  */
-import { randomUUID } from "node:crypto";
 import { prisma } from "@/server/prisma";
 import type { BudgetScope, BudgetWindow, CostEvent } from "@agentcenter/database";
 import { Prisma } from "@agentcenter/database";
@@ -35,8 +34,10 @@ export interface RecordCostEventInput {
 
 /**
  * Atomically create-or-increment the QuotaWindow for `policyId` in the window containing
- * `occurredAt`, by `amountCents`. Uses `INSERT … ON CONFLICT DO UPDATE` so concurrent
- * ingestion never loses a write and never creates duplicate window rows (race-safe).
+ * `occurredAt`, by `amountCents`. Race-safe: the per-row `{ increment }` UPDATE is atomic
+ * under concurrency (row lock), and the first-create race is resolved by catching the
+ * unique-constraint violation and looping back to the increment path. Uses the ORM (not raw
+ * SQL) so `windowStart` round-trips through Prisma's DateTime handling consistently.
  */
 async function incrementQuotaWindow(
   workspaceId: string,
@@ -46,16 +47,29 @@ async function incrementQuotaWindow(
   amountCents: number,
 ): Promise<void> {
   const { windowStart, windowEnd } = windowBounds(window, occurredAt);
-  const id = randomUUID();
-  await prisma.$executeRaw`
-    INSERT INTO "quota_windows"
-      ("id", "workspaceId", "policyId", "windowStart", "windowEnd", "spendCents", "breached", "updatedAt")
-    VALUES (${id}, ${workspaceId}, ${policyId}, ${windowStart}, ${windowEnd}, ${amountCents}, false, now())
-    ON CONFLICT ("policyId", "windowStart")
-    DO UPDATE SET
-      "spendCents" = "quota_windows"."spendCents" + ${amountCents},
-      "updatedAt" = now()
-  `;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const existing = await prisma.quotaWindow.findUnique({
+      where: { policyId_windowStart: { policyId, windowStart } },
+    });
+    if (existing) {
+      await prisma.quotaWindow.update({
+        where: { id: existing.id },
+        data: { spendCents: { increment: amountCents } },
+      });
+      return;
+    }
+    try {
+      await prisma.quotaWindow.create({
+        data: { workspaceId, policyId, windowStart, windowEnd, spendCents: amountCents },
+      });
+      return;
+    } catch (err) {
+      // Concurrent create won the race — loop back and increment the now-existing row.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") continue;
+      throw err;
+    }
+  }
+  throw new Error(`incrementQuotaWindow: exhausted retries for policy ${policyId}`);
 }
 
 /**
