@@ -140,6 +140,7 @@ model Agent {
   adapter       AgentAdapter? @relation("AgentAdapterType", fields: [adapterType], references: [type], onDelete: Restrict)
 
   secretBindings SecretBinding[] // Epic #5
+  agentSkills    AgentSkill[] // Epic #10
 
   @@index([username])
   @@index([cloudVmId])

@@ -69,6 +69,8 @@ model Profile {
 
   createdCases Case[] @relation("CaseCreatedByProfile") // Epic #17
 
+  createdSkills Skill[] @relation("SkillCreatedByProfile") // Epic #10
+
   @@index([kind])
   @@index([username])
   @@map("profiles")
