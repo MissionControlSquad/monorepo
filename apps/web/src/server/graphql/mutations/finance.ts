@@ -9,6 +9,7 @@ import {
   updateBudgetPolicy,
   deleteBudgetPolicy,
   resolveBudgetIncident,
+  raiseBudgetAndResume,
 } from "@/server/services/budgets";
 
 // Epic #4: budget mutations. Policy/incident writes require admin; manual cost ingest member+.
@@ -24,6 +25,7 @@ builder.mutationField("createBudgetPolicy", (t) =>
       limitCents: t.arg.int({ required: true }),
       window: t.arg.string({ required: true }),
       hardStop: t.arg.boolean(),
+      warnPercent: t.arg.int(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
@@ -36,6 +38,7 @@ builder.mutationField("createBudgetPolicy", (t) =>
         limitCents: args.limitCents,
         window: args.window as BudgetWindow,
         hardStop: args.hardStop ?? false,
+        warnPercent: args.warnPercent ?? null,
       });
       return ctx.prisma.budgetPolicy.findUniqueOrThrow({ ...query, where: { id: policy.id } });
     },
@@ -134,6 +137,25 @@ builder.mutationField("resolveBudgetIncident", (t) =>
         workspaceId: tenancy.workspaceId,
         resolvedById: tenancy.userId,
         detail: args.detail ?? null,
+      });
+      return ctx.prisma.budgetIncident.findUniqueOrThrow({ ...query, where: { id: incident.id } });
+    },
+  }),
+);
+
+// Paperclip parity: raise a hard-stopped budget above observed spend and reactivate the agent.
+builder.mutationField("raiseBudgetAndResume", (t) =>
+  t.prismaField({
+    type: "BudgetIncident",
+    args: { id: t.arg.string({ required: true }), newLimitCents: t.arg.int({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      const tenancy = requireRole(ctx, "admin");
+      const incident = await raiseBudgetAndResume({
+        incidentId: args.id,
+        workspaceId: tenancy.workspaceId,
+        newLimitCents: args.newLimitCents,
+        resolvedById: tenancy.userId,
       });
       return ctx.prisma.budgetIncident.findUniqueOrThrow({ ...query, where: { id: incident.id } });
     },

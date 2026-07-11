@@ -268,6 +268,7 @@ export type BudgetIncidentOpenedEvent = {
   workspaceId: string;
   policyId: string;
   agentId?: string;
+  thresholdType: "soft" | "hard";
   spendCents: number;
   limitCents: number;
   autoPaused: boolean;
