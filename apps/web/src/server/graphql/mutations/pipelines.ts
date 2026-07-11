@@ -175,7 +175,7 @@ builder.mutationField("addPipelineStage", (t) =>
   }),
 );
 
-builder.mutationField("createCase", (t) =>
+builder.mutationField("createPipelineCase", (t) =>
   t.prismaField({
     type: "PipelineCase",
     args: {

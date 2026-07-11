@@ -119,12 +119,12 @@ describe("pipeline cases (Epic #7)", () => {
     const { pid, stageIds } = await pipelineWithStages(WS_A);
     const member = await cookieFor(WS_A, "member");
     const c = await gql(
-      `mutation($p:String!){ createCase(pipelineId:$p, title:"Case 1"){ id currentStageId status } }`,
+      `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"Case 1"){ id currentStageId status } }`,
       { p: pid },
       member,
     );
-    const caseId = c.data.createCase.id;
-    expect(c.data.createCase.currentStageId).toBe(stageIds[0]);
+    const caseId = c.data.createPipelineCase.id;
+    expect(c.data.createPipelineCase.currentStageId).toBe(stageIds[0]);
 
     // Backward/equal transition rejected.
     const back = await gql(
@@ -152,11 +152,11 @@ describe("pipeline cases (Epic #7)", () => {
     const member = await cookieFor(WS_A, "member");
     const caseId = (
       await gql(
-        `mutation($p:String!){ createCase(pipelineId:$p, title:"race"){ id } }`,
+        `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"race"){ id } }`,
         { p: pid },
         member,
       )
-    ).data.createCase.id;
+    ).data.createPipelineCase.id;
 
     const CLAIM = `mutation($c:String!){ claimCase(caseId:$c){ id status } }`;
     const [a, b] = await Promise.all([
@@ -172,11 +172,11 @@ describe("pipeline cases (Epic #7)", () => {
     const member = await cookieFor(WS_A, "member");
     const caseId = (
       await gql(
-        `mutation($p:String!){ createCase(pipelineId:$p, title:"bd"){ id } }`,
+        `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"bd"){ id } }`,
         { p: pid },
         member,
       )
-    ).data.createCase.id;
+    ).data.createPipelineCase.id;
     const bd = await gql(
       `mutation($c:String!){ breakdownCase(caseId:$c, title:"Sub", description:"do it"){ id linkedTaskId } }`,
       { c: caseId },
@@ -193,11 +193,11 @@ describe("review inbox + health (Epic #7)", () => {
     const member = await cookieFor(WS_A, "member");
     const caseId = (
       await gql(
-        `mutation($p:String!){ createCase(pipelineId:$p, title:"rev"){ id } }`,
+        `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"rev"){ id } }`,
         { p: pid },
         member,
       )
-    ).data.createCase.id;
+    ).data.createPipelineCase.id;
 
     // Not on review stage yet → empty inbox.
     let inbox = await gql(
@@ -229,11 +229,11 @@ describe("review inbox + health (Epic #7)", () => {
     const member = await cookieFor(WS_A, "member");
     const caseId = (
       await gql(
-        `mutation($p:String!){ createCase(pipelineId:$p, title:"stale"){ id } }`,
+        `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"stale"){ id } }`,
         { p: pid },
         member,
       )
-    ).data.createCase.id;
+    ).data.createPipelineCase.id;
     // Backdate entry 2 hours to exceed the 1-minute SLA.
     await prisma.pipelineCase.update({
       where: { id: caseId },
