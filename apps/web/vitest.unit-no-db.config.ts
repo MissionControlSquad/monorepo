@@ -23,6 +23,7 @@ export default defineConfig({
       "tests/unit/adapters-registry.test.ts",
       "tests/unit/secrets-crypto.test.ts",
       "tests/unit/pipelines.test.ts",
+      "tests/unit/task-autonomy.test.ts",
     ],
   },
   resolve: {
