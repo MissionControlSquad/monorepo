@@ -22,14 +22,17 @@ model Channel {
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
-  createdByProfile Profile  @relation("ChannelCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: Cascade)
-  project         Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  members         ChannelMember[]
-  messages        ChannelMessage[]
+  createdByProfile Profile          @relation("ChannelCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: Cascade)
+  project          Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  members          ChannelMember[]
+  messages         ChannelMessage[]
+
+  workspaceId String? // buildbase workspace _id (Epic #1, D5); no FK; backfilled to default workspace
 
   @@index([visibility])
   @@index([createdByProfileId])
   @@index([projectId])
+  @@index([workspaceId])
   @@map("channels")
 }
 
@@ -59,9 +62,9 @@ model ChannelMessage {
   pinnedAt          DateTime?
   pinnedByProfileId String?
 
-  channel         Channel                   @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  fromProfile     Profile                   @relation("ChannelMessageFrom", fields: [fromProfileId], references: [id], onDelete: Cascade)
-  pinnedByProfile Profile?                  @relation("ChannelMessagePinnedBy", fields: [pinnedByProfileId], references: [id], onDelete: SetNull)
+  channel         Channel                    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  fromProfile     Profile                    @relation("ChannelMessageFrom", fields: [fromProfileId], references: [id], onDelete: Cascade)
+  pinnedByProfile Profile?                   @relation("ChannelMessagePinnedBy", fields: [pinnedByProfileId], references: [id], onDelete: SetNull)
   attachments     ChannelMessageAttachment[]
   mentions        ChannelMessageMention[]
   reactions       ChannelMessageReaction[]
