@@ -131,3 +131,5 @@ export {
   LEDGER_EVENTS_QUERY,
   LEDGER_CATEGORIES_QUERY,
 } from "./ledger";
+
+export { SECRETS_QUERY, SECRET_ACCESS_EVENTS_QUERY } from "./secrets";
