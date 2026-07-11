@@ -1,0 +1,88 @@
+// ─── Governance: Agent-domain Approvals & Trust (Epic #3) ─────────
+// Human RBAC is buildbase (D1). This file models ONLY agent-domain governance,
+// scoped by workspaceId (string, no FK — D5).
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+  needs_changes
+  cancelled
+}
+
+enum ApprovalSubjectType {
+  task
+  deliverable
+  hire_agent
+}
+
+enum TrustLevel {
+  untrusted
+  low
+  standard
+  trusted
+}
+
+model Approval {
+  id            String              @id @default(cuid())
+  workspaceId   String // buildbase workspace _id; no FK
+  subjectType   ApprovalSubjectType
+  subjectId     String // Task.id | Deliverable.id | agent-spec id (polymorphic, no FK)
+  taskId        String? // explicit approval↔task link
+  status        ApprovalStatus      @default(pending)
+  title         String
+  reason        String?
+  requestedById String
+  decidedById   String?
+  decidedAt     DateTime?
+  decisionNote  String?
+  resubmitCount Int                 @default(0)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  requestedBy Profile           @relation("ApprovalRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  decidedBy   Profile?          @relation("ApprovalDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  task        Task?             @relation("ApprovalTask", fields: [taskId], references: [id], onDelete: SetNull)
+  comments    ApprovalComment[]
+
+  @@index([workspaceId, status])
+  @@index([subjectType, subjectId])
+  @@index([taskId])
+  @@index([requestedById])
+  @@index([status, createdAt])
+  @@map("approvals")
+}
+
+model ApprovalComment {
+  id              String   @id @default(cuid())
+  workspaceId     String // denormalized for isolation queries; no FK
+  approvalId      String
+  authorProfileId String
+  body            String
+  createdAt       DateTime @default(now())
+
+  approval Approval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  author   Profile  @relation("ApprovalCommentAuthor", fields: [authorProfileId], references: [id], onDelete: Cascade)
+
+  @@index([approvalId, createdAt])
+  @@index([workspaceId])
+  @@map("approval_comments")
+}
+
+model AgentTrustProfile {
+  agentId                  String     @id // 1:1 with Agent
+  workspaceId              String // no FK
+  trustLevel               TrustLevel @default(standard)
+  lowTrustContainment      Boolean    @default(false)
+  requireUntrustedPrReview Boolean    @default(false)
+  autoPromoteWorkProduct   Boolean    @default(true)
+  sourceTrustBadge         String?
+  changeConsentRequired    Boolean    @default(false)
+  executionAllowlist       String[]   @default([])
+  updatedAt                DateTime   @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, trustLevel])
+  @@map("agent_trust_profiles")
+}
