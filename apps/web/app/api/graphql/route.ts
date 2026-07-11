@@ -36,7 +36,11 @@ const yoga = createYoga<GraphQLContext>({
         };
       }
     }
-    return { prisma, session, tenancy: resolveTenancy(session) };
+    return {
+      prisma,
+      session,
+      tenancy: await resolveTenancy(session, request.headers.get("cookie")),
+    };
   },
   graphqlEndpoint: "/api/graphql",
   fetchAPI: { Response },

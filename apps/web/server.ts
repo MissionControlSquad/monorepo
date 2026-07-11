@@ -64,7 +64,8 @@ setupGraphQLWS(
     subscribe: subscribe as (args: ExecutionArgs) => any,
     context: async (ctx) => {
       const session = await sessionFromRequest(ctx.extra.request);
-      return { prisma, session, tenancy: resolveTenancy(session) };
+      const cookieHeader = ctx.extra.request.headers.cookie ?? null;
+      return { prisma, session, tenancy: await resolveTenancy(session, cookieHeader) };
     },
   },
   wss,

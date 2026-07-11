@@ -3,6 +3,7 @@ import type { GraphQLContext, TenancyContext, WorkspaceRole } from "@agentcenter
 import { roleAtLeast, roleCan } from "@/server/tenancy/roles";
 import { requireTenancy, requireRole, requirePermission, scoped } from "@/server/tenancy/guards";
 import { resolveTenancy } from "@/server/tenancy/resolve";
+import { createJWT } from "@/lib/jwt";
 
 function tenancy(role: WorkspaceRole, workspaceId = "ws_1"): TenancyContext {
   return { userId: "u1", workspaceId, role, can: (p) => roleCan(role, p) };
@@ -58,22 +59,42 @@ describe("guards", () => {
   });
 });
 
-describe("resolveTenancy (bootstrap)", () => {
-  it("returns null when there is no session", () => {
-    expect(resolveTenancy(null)).toBeNull();
-    expect(resolveTenancy({ sub: "s", username: "u" } as GraphQLContext["session"])).toBeNull();
+describe("resolveTenancy", () => {
+  const adminSession = { sub: "s", username: "u", profileId: "p1" } as GraphQLContext["session"];
+
+  it("returns null when there is no session and no token", async () => {
+    expect(await resolveTenancy(null)).toBeNull();
+    expect(
+      await resolveTenancy({ sub: "s", username: "u" } as GraphQLContext["session"]),
+    ).toBeNull();
   });
 
-  it("maps an admin session to the default workspace as owner", () => {
-    const t = resolveTenancy({
-      sub: "s",
-      username: "u",
-      profileId: "p1",
-    } as GraphQLContext["session"]);
+  it("maps an admin session to the default workspace as owner (bootstrap)", async () => {
+    const t = await resolveTenancy(adminSession);
     expect(t).not.toBeNull();
     expect(t!.userId).toBe("p1");
     expect(t!.role).toBe("owner");
     expect(t!.workspaceId).toBeTruthy();
     expect(t!.can("delete")).toBe(true);
+  });
+
+  it("prefers a valid buildbase workspace token over the bootstrap", async () => {
+    process.env.SYSTEM_SECRET = "test-secret";
+    const token = await createJWT(
+      { userId: "bbUser", workspaceId: "ws_bb", userRole: "member" },
+      "test-secret",
+    );
+    const t = await resolveTenancy(adminSession, `bb-workspace-token=${token}`);
+    expect(t!.userId).toBe("bbUser");
+    expect(t!.workspaceId).toBe("ws_bb");
+    expect(t!.role).toBe("member");
+    expect(t!.can("write")).toBe(false); // member is read-only
+  });
+
+  it("ignores an invalid/tampered token and falls back to bootstrap", async () => {
+    process.env.SYSTEM_SECRET = "test-secret";
+    const t = await resolveTenancy(adminSession, "bb-workspace-token=not-a-valid-jwt");
+    expect(t!.workspaceId).not.toBe("ws_bb");
+    expect(t!.role).toBe("owner");
   });
 });
