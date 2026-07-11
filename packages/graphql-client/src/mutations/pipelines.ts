@@ -57,7 +57,7 @@ export const ADD_PIPELINE_STAGE = gql`
   }
 `;
 
-export const CREATE_CASE = gql`
+export const CREATE_PIPELINE_CASE = gql`
   mutation CreatePipelineCase($pipelineId: String!, $title: String!) {
     createPipelineCase(pipelineId: $pipelineId, title: $title) {
       id

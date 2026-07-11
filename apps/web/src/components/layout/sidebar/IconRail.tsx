@@ -21,6 +21,7 @@ import {
   Workflow,
   Repeat,
   ShieldCheck,
+  Ticket,
   Zap,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
@@ -49,6 +50,7 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   { href: "/routines", icon: Repeat, label: "Routines", flag: FLAG_KEYS.PIPELINES_ROUTINES },
   { href: "/pipelines", icon: Workflow, label: "Pipelines", flag: FLAG_KEYS.PIPELINES_ROUTINES },
   { href: "/reliability", icon: ShieldCheck, label: "Reliability", flag: FLAG_KEYS.TASK_AUTONOMY },
+  { href: "/cases", icon: Ticket, label: "Cases", flag: FLAG_KEYS.CASES },
 ];
 
 function isActive(pathname: string | null, href: string): boolean {
