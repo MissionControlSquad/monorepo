@@ -25,6 +25,7 @@ export default defineConfig({
       "tests/unit/pipelines.test.ts",
       "tests/unit/task-autonomy.test.ts",
       "tests/unit/cases.test.ts",
+      "tests/unit/skills-teams.test.ts",
     ],
   },
   resolve: {
