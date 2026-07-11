@@ -19,6 +19,7 @@ export default defineConfig({
       "tests/unit/tenancy.test.ts",
       "tests/unit/trust.test.ts",
       "tests/unit/budget-window.test.ts",
+      "tests/unit/ledger-bucket.test.ts",
     ],
   },
   resolve: {
