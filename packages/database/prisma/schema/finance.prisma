@@ -1,0 +1,122 @@
+// ─── Agent Budgets / Cost (Epic #4) ───────────────────────────────
+// Agent LLM/run cost + budget policies + auto-pause. Workspace-scoped (no FK, D5).
+// NOT the customer's business bookkeeping (that is Epic #16 finance ledger).
+
+enum BudgetScope {
+  workspace
+  agent
+}
+
+enum BudgetWindow {
+  hourly
+  daily
+  weekly
+  monthly
+}
+
+enum IncidentStatus {
+  open
+  resolved
+}
+
+model CostEvent {
+  id             String   @id @default(cuid())
+  workspaceId    String // buildbase workspace _id; no FK (D5)
+  agentId        String?
+  model          String? // e.g. "claude-opus-4-8"
+  provider       String? // "anthropic" | "openai" | "hetzner"
+  taskId         String?
+  projectId      String?
+  billerId       String?
+  issueId        String?
+  tokensIn       Int      @default(0)
+  tokensOut      Int      @default(0)
+  amountCents    Int      @default(0) // integer cents, no floats
+  source         String   @default("agent") // "agent" | "cloud_vm" | "manual"
+  idempotencyKey String?
+  occurredAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  agent   Agent?   @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId])
+  @@index([workspaceId, occurredAt])
+  @@index([agentId, occurredAt])
+  @@index([provider, model])
+  @@index([projectId])
+  @@index([taskId])
+  @@index([billerId])
+  @@index([issueId])
+  @@map("cost_events")
+}
+
+model BudgetPolicy {
+  id          String       @id @default(cuid())
+  workspaceId String
+  scope       BudgetScope
+  agentId     String? // required when scope=agent
+  name        String
+  limitCents  Int
+  window      BudgetWindow @default(monthly)
+  hardStop    Boolean      @default(false) // true = auto-pause on breach
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  agent     Agent?           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  windows   QuotaWindow[]
+  incidents BudgetIncident[]
+
+  @@unique([workspaceId, scope, agentId, window])
+  @@index([workspaceId])
+  @@index([workspaceId, isActive])
+  @@index([agentId])
+  @@map("budget_policies")
+}
+
+model QuotaWindow {
+  id          String   @id @default(cuid())
+  workspaceId String
+  policyId    String
+  windowStart DateTime
+  windowEnd   DateTime
+  spendCents  Int      @default(0)
+  breached    Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+
+  policy BudgetPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, windowStart]) // upsert target — race-safe increment
+  @@index([workspaceId])
+  @@index([policyId, windowEnd])
+  @@index([breached])
+  @@map("quota_windows")
+}
+
+model BudgetIncident {
+  id            String         @id @default(cuid())
+  workspaceId   String
+  policyId      String
+  quotaWindowId String?
+  agentId       String?
+  status        IncidentStatus @default(open)
+  spendCents    Int
+  limitCents    Int
+  autoPaused    Boolean        @default(false)
+  detail        String?
+  resolvedById  String?
+  resolvedAt    DateTime?
+  createdAt     DateTime       @default(now())
+
+  policy BudgetPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  agent  Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([policyId, status])
+  @@index([status, createdAt])
+  @@index([agentId])
+  @@map("budget_incidents")
+}
