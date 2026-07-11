@@ -142,3 +142,9 @@ export {
   REVIEW_CASES_QUERY,
   PIPELINE_HEALTH_QUERY,
 } from "./pipelines";
+
+export {
+  PENDING_DECOMPOSITIONS_QUERY,
+  TASK_TREE_HOLDS_QUERY,
+  TASK_RECOVERY_ACTIONS_QUERY,
+} from "./task-autonomy";
