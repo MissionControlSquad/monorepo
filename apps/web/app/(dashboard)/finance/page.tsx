@@ -1,0 +1,302 @@
+"use client";
+
+import { useState } from "react";
+import { useQuery, useMutation } from "urql";
+import {
+  FINANCE_SUMMARY_QUERY,
+  BUDGET_POLICIES_QUERY,
+  BUDGET_INCIDENTS_QUERY,
+  COST_BREAKDOWN_QUERY,
+} from "@/lib/graphql/queries";
+import {
+  CREATE_BUDGET_POLICY,
+  DELETE_BUDGET_POLICY,
+  RESOLVE_BUDGET_INCIDENT,
+} from "@/lib/graphql/mutations";
+import { Button, Card, Badge } from "@/components/ui";
+
+// Epic #4: agent budgets / cost dashboard. API-gated by the BUDGETS feature + buildbase role
+// (admin manages policies + resolves incidents; member views). All data is workspace-scoped
+// server-side. Auto-pause incidents surface here so operators see paused agents live.
+
+interface Summary {
+  totalSpendCents: number;
+  windowSpendCents: number;
+  activePolicies: number;
+  openIncidents: number;
+}
+interface Policy {
+  id: string;
+  scope: string;
+  agentId: string | null;
+  name: string;
+  limitCents: number;
+  window: string;
+  hardStop: boolean;
+  isActive: boolean;
+}
+interface Incident {
+  id: string;
+  policyId: string;
+  agentId: string | null;
+  status: string;
+  spendCents: number;
+  limitCents: number;
+  autoPaused: boolean;
+  detail: string | null;
+  createdAt: string;
+}
+interface Bucket {
+  key: string;
+  label: string | null;
+  amountCents: number;
+  eventCount: number;
+}
+
+const WINDOWS = ["hourly", "daily", "weekly", "monthly"] as const;
+
+function money(cents: number): string {
+  return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <Card className="p-4">
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-foreground">{value}</div>
+    </Card>
+  );
+}
+
+export default function FinancePage() {
+  const [{ data: sumData }, refetchSummary] = useQuery<{ financeSummary: Summary }>({
+    query: FINANCE_SUMMARY_QUERY,
+    variables: { window: "monthly" },
+  });
+  const [{ data: polData }, refetchPolicies] = useQuery<{ budgetPolicies: Policy[] }>({
+    query: BUDGET_POLICIES_QUERY,
+  });
+  const [{ data: incData }, refetchIncidents] = useQuery<{ budgetIncidents: Incident[] }>({
+    query: BUDGET_INCIDENTS_QUERY,
+    variables: { status: "open" },
+  });
+  const [{ data: costData }] = useQuery<{ costBreakdown: Bucket[] }>({
+    query: COST_BREAKDOWN_QUERY,
+    variables: { groupBy: "model" },
+  });
+
+  const [, createPolicy] = useMutation(CREATE_BUDGET_POLICY);
+  const [, deletePolicy] = useMutation(DELETE_BUDGET_POLICY);
+  const [, resolveIncident] = useMutation(RESOLVE_BUDGET_INCIDENT);
+
+  const [busy, setBusy] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: "", limit: "", window: "monthly", hardStop: true });
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const summary = sumData?.financeSummary;
+  const policies = polData?.budgetPolicies ?? [];
+  const incidents = incData?.budgetIncidents ?? [];
+  const buckets = [...(costData?.costBreakdown ?? [])].sort(
+    (a, b) => b.amountCents - a.amountCents,
+  );
+  const maxBucket = buckets.reduce((m, b) => Math.max(m, b.amountCents), 0) || 1;
+
+  async function onCreate() {
+    setFormError(null);
+    const limitCents = Math.round(Number(form.limit) * 100);
+    if (!form.name.trim()) return setFormError("Name is required");
+    if (!Number.isFinite(limitCents) || limitCents <= 0)
+      return setFormError("Enter a positive limit");
+    setBusy("create");
+    try {
+      const res = await createPolicy({
+        scope: "workspace",
+        name: form.name.trim(),
+        limitCents,
+        window: form.window,
+        hardStop: form.hardStop,
+      });
+      if (res.error) {
+        setFormError(res.error.graphQLErrors[0]?.message ?? "Failed to create policy");
+        return;
+      }
+      setForm({ name: "", limit: "", window: "monthly", hardStop: true });
+      refetchPolicies({ requestPolicy: "network-only" });
+      refetchSummary({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onDelete(id: string) {
+    setBusy(id);
+    try {
+      await deletePolicy({ id });
+      refetchPolicies({ requestPolicy: "network-only" });
+      refetchSummary({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onResolve(id: string) {
+    setBusy(id);
+    try {
+      await resolveIncident({ id });
+      refetchIncidents({ requestPolicy: "network-only" });
+      refetchSummary({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
+      <h1 className="text-lg font-semibold text-foreground">Finance &amp; Budgets</h1>
+
+      {/* Summary */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <SummaryCard label="Total spend" value={money(summary?.totalSpendCents ?? 0)} />
+        <SummaryCard label="This month" value={money(summary?.windowSpendCents ?? 0)} />
+        <SummaryCard label="Active budgets" value={String(summary?.activePolicies ?? 0)} />
+        <SummaryCard label="Open incidents" value={String(summary?.openIncidents ?? 0)} />
+      </div>
+
+      {/* Open incidents */}
+      {incidents.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-foreground">Open incidents</h2>
+          {incidents.map((inc) => (
+            <Card key={inc.id} className="flex items-start justify-between gap-4 p-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="red">breached</Badge>
+                  {inc.autoPaused && <Badge variant="orange">agent auto-paused</Badge>}
+                  <span className="text-sm font-medium text-foreground">
+                    {money(inc.spendCents)} / {money(inc.limitCents)}
+                  </span>
+                </div>
+                {inc.detail && <p className="mt-1 text-sm text-muted-foreground">{inc.detail}</p>}
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy === inc.id}
+                onClick={() => onResolve(inc.id)}
+              >
+                Resolve
+              </Button>
+            </Card>
+          ))}
+          <p className="text-xs text-muted-foreground">
+            Resolving an incident does not reactivate a paused agent — reactivate it explicitly from
+            the agent&apos;s page.
+          </p>
+        </section>
+      )}
+
+      {/* Spend by model */}
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-foreground">Spend by model</h2>
+        <Card className="space-y-3 p-4">
+          {buckets.length === 0 && (
+            <p className="text-sm text-muted-foreground">No cost recorded yet.</p>
+          )}
+          {buckets.map((b) => (
+            <div key={b.key} className="space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="truncate text-foreground">{b.label ?? b.key}</span>
+                <span className="text-muted-foreground">
+                  {money(b.amountCents)} · {b.eventCount} events
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded bg-muted">
+                <div
+                  className="h-full rounded bg-indigo-500"
+                  style={{ width: `${(b.amountCents / maxBucket) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </Card>
+      </section>
+
+      {/* Budget policies */}
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-foreground">Budget policies</h2>
+
+        <Card className="space-y-3 p-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+            <input
+              className="rounded border border-border bg-background px-3 py-1.5 text-sm sm:col-span-2"
+              placeholder="Budget name"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            />
+            <input
+              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+              placeholder="Limit ($)"
+              inputMode="decimal"
+              value={form.limit}
+              onChange={(e) => setForm((f) => ({ ...f, limit: e.target.value }))}
+            />
+            <select
+              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+              value={form.window}
+              onChange={(e) => setForm((f) => ({ ...f, window: e.target.value }))}
+            >
+              {WINDOWS.map((w) => (
+                <option key={w} value={w}>
+                  {w}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={form.hardStop}
+                onChange={(e) => setForm((f) => ({ ...f, hardStop: e.target.checked }))}
+              />
+              Hard stop (auto-pause agents on breach)
+            </label>
+            <Button size="sm" disabled={busy === "create"} onClick={onCreate}>
+              Add workspace budget
+            </Button>
+          </div>
+          {formError && <p className="text-sm text-destructive">{formError}</p>}
+        </Card>
+
+        {policies.length === 0 && (
+          <Card className="p-8 text-center text-sm text-muted-foreground">
+            No budget policies yet.
+          </Card>
+        )}
+
+        {policies.map((p) => (
+          <Card key={p.id} className="flex items-center justify-between gap-4 p-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate font-medium text-foreground">{p.name}</span>
+                <Badge variant="gray">{p.scope}</Badge>
+                <Badge variant="blue">{p.window}</Badge>
+                {p.hardStop && <Badge variant="orange">hard stop</Badge>}
+                {!p.isActive && <Badge variant="gray">inactive</Badge>}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">Limit {money(p.limitCents)}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="danger"
+              disabled={busy === p.id}
+              onClick={() => onDelete(p.id)}
+            >
+              Delete
+            </Button>
+          </Card>
+        ))}
+      </section>
+    </div>
+  );
+}

@@ -38,6 +38,7 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   { href: "/analytics", icon: BarChart3, label: "Analytics", flag: FLAG_KEYS.ANALYTICS },
   { href: "/cloud", icon: Cloud, label: "Cloud", flag: FLAG_KEYS.CLOUD_VMS },
   { href: "/live-gateway", icon: Zap, label: "Live Gateway", flag: FLAG_KEYS.LIVE_GATEWAY },
+  { href: "/finance", icon: CreditCard, label: "Finance", flag: FLAG_KEYS.BUDGETS },
 ];
 
 function isActive(pathname: string | null, href: string): boolean {
