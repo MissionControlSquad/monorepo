@@ -41,9 +41,14 @@ builder.prismaObject("Agent", {
     hostingType: t.exposeString("hostingType"),
     cloudVmId: t.exposeString("cloudVmId", { nullable: true }),
 
+    // Epic #2: pluggable provider adapter.
+    adapterType: t.exposeString("adapterType", { nullable: true }),
+    adapterConfig: t.expose("adapterConfig", { type: "JSON", nullable: true }),
+
     // Relations
     profile: t.relation("profile", { nullable: true }),
     cloudVm: t.relation("cloudVm", { nullable: true }),
+    adapter: t.relation("adapter", { nullable: true }),
     currentTaskRef: t.relation("currentTaskRef", { nullable: true }),
     queueItems: t.relation("queueItems"),
     statusHistory: t.relation("statusHistory"),

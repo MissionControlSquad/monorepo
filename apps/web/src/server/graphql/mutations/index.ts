@@ -21,3 +21,4 @@ import "./feature-flags";
 import "./approvals";
 import "./finance";
 import "./ledger";
+import "./adapters";
