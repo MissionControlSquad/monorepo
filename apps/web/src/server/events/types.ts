@@ -250,6 +250,37 @@ export type ProjectMemberRemovedEvent = {
   agentName: string;
 };
 
+// Budget / cost domain events (Epic #4)
+export type CostEventRecordedEvent = {
+  type: typeof EventTypes.COST_EVENT_RECORDED;
+  costEventId: string;
+  workspaceId: string;
+  agentId?: string;
+  amountCents: number;
+  /** Policy ids whose current window was incremented by this cost — the set to evaluate for breach. */
+  affectedPolicyIds: string[];
+  occurredAt: string;
+};
+
+export type BudgetIncidentOpenedEvent = {
+  type: typeof EventTypes.BUDGET_INCIDENT_OPENED;
+  incidentId: string;
+  workspaceId: string;
+  policyId: string;
+  agentId?: string;
+  spendCents: number;
+  limitCents: number;
+  autoPaused: boolean;
+};
+
+export type BudgetIncidentResolvedEvent = {
+  type: typeof EventTypes.BUDGET_INCIDENT_RESOLVED;
+  incidentId: string;
+  workspaceId: string;
+  policyId: string;
+  resolvedById: string;
+};
+
 // Discriminated union of all events
 export type SystemEvent =
   | AgentWokeUpEvent
@@ -272,6 +303,9 @@ export type SystemEvent =
   | DeliverableSubmittedEvent
   | ProjectCreatedEvent
   | ProjectMemberAddedEvent
-  | ProjectMemberRemovedEvent;
+  | ProjectMemberRemovedEvent
+  | CostEventRecordedEvent
+  | BudgetIncidentOpenedEvent
+  | BudgetIncidentResolvedEvent;
 
 export type EventType = SystemEvent["type"];

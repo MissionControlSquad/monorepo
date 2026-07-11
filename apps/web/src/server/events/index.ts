@@ -10,6 +10,7 @@ import "./handlers/cleanup";
 import "./handlers/queue";
 import "./handlers/project";
 import "./handlers/user-notification";
+import "./handlers/budget";
 
 // Re-export emit for use in mutations
 export { emit } from "./bus";

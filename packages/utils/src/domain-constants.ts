@@ -95,6 +95,11 @@ export const EventTypes = {
   PROJECT_CREATED: "project.created",
   PROJECT_MEMBER_ADDED: "project.member_added",
   PROJECT_MEMBER_REMOVED: "project.member_removed",
+
+  // Budgets / cost (Epic #4)
+  COST_EVENT_RECORDED: "cost.event_recorded",
+  BUDGET_INCIDENT_OPENED: "budget.incident_opened",
+  BUDGET_INCIDENT_RESOLVED: "budget.incident_resolved",
 } as const;
 
 export type EventTypeValue = (typeof EventTypes)[keyof typeof EventTypes];
