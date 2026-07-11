@@ -24,3 +24,4 @@ import "./ledger";
 import "./adapters";
 import "./secrets";
 import "./pipelines";
+import "./task-autonomy";

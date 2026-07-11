@@ -18,6 +18,11 @@ builder.prismaObject("Task", {
     blockedByTaskId: t.exposeString("blockedByTaskId", { nullable: true }),
     recurringTaskId: t.exposeString("recurringTaskId", { nullable: true }),
 
+    // Epic #8: lease checkout (token intentionally NOT exposed).
+    checkedOutByProfileId: t.exposeString("checkedOutByProfileId", { nullable: true }),
+    checkedOutAt: t.expose("checkedOutAt", { type: "DateTime", nullable: true }),
+    checkoutLeaseExpiresAt: t.expose("checkoutLeaseExpiresAt", { type: "DateTime", nullable: true }),
+
     // Relations
     createdByProfile: t.relation("createdByProfile", { nullable: true }),
     parentTask: t.relation("parentTask", { nullable: true }),
