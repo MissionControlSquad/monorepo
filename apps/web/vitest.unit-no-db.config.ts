@@ -22,6 +22,7 @@ export default defineConfig({
       "tests/unit/ledger-bucket.test.ts",
       "tests/unit/adapters-registry.test.ts",
       "tests/unit/secrets-crypto.test.ts",
+      "tests/unit/pipelines.test.ts",
     ],
   },
   resolve: {
