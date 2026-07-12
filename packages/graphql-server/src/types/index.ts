@@ -30,3 +30,4 @@ import "./task-autonomy";
 import "./case";
 import "./skill";
 import "./portability";
+import "./goal";
