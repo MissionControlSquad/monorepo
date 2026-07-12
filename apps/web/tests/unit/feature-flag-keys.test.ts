@@ -22,10 +22,11 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.TASK_AUTONOMY).toBe("task_autonomy");
     expect(FLAG_KEYS.CASES).toBe("cases");
     expect(FLAG_KEYS.SKILLS_TEAMS).toBe("skills_teams");
+    expect(FLAG_KEYS.WORKSPACE_PORTABILITY).toBe("workspace_portability");
   });
 
-  it("has exactly 18 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(18);
+  it("has exactly 19 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(19);
   });
 
   it("all values are unique", () => {
@@ -71,6 +72,7 @@ describe("FLAG_DEFAULTS", () => {
       FLAG_KEYS.TASK_AUTONOMY,
       FLAG_KEYS.CASES,
       FLAG_KEYS.SKILLS_TEAMS,
+      FLAG_KEYS.WORKSPACE_PORTABILITY,
     ];
     for (const key of expectedTrue) {
       expect(FLAG_DEFAULTS[key]).toBe(true);
