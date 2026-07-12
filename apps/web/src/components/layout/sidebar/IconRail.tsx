@@ -27,6 +27,7 @@ import {
   Zap,
   PackageOpen,
   Target,
+  Activity,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -58,6 +59,12 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   { href: "/skills", icon: Puzzle, label: "Skills", flag: FLAG_KEYS.SKILLS_TEAMS },
   { href: "/teams", icon: Users, label: "Teams", flag: FLAG_KEYS.SKILLS_TEAMS },
   { href: "/goals", icon: Target, label: "Goals", flag: FLAG_KEYS.GOALS },
+  {
+    href: "/observability",
+    icon: Activity,
+    label: "Observability",
+    flag: FLAG_KEYS.OBSERVABILITY,
+  },
   {
     href: "/portability",
     icon: PackageOpen,
