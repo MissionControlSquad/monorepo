@@ -25,10 +25,11 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.WORKSPACE_PORTABILITY).toBe("workspace_portability");
     expect(FLAG_KEYS.GOALS).toBe("goals");
     expect(FLAG_KEYS.OBSERVABILITY).toBe("observability");
+    expect(FLAG_KEYS.BOARD_CHAT).toBe("board_chat");
   });
 
-  it("has exactly 21 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(21);
+  it("has exactly 22 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(22);
   });
 
   it("all values are unique", () => {
@@ -55,6 +56,10 @@ describe("FLAG_DEFAULTS", () => {
 
   it("MULTI_PROVIDER_ADAPTERS defaults to false (opt-in; OpenClaw always works)", () => {
     expect(FLAG_DEFAULTS[FLAG_KEYS.MULTI_PROVIDER_ADAPTERS]).toBe(false);
+  });
+
+  it("BOARD_CHAT defaults to false (experimental; operator opt-in)", () => {
+    expect(FLAG_DEFAULTS[FLAG_KEYS.BOARD_CHAT]).toBe(false);
   });
 
   it("all other flags default to true", () => {
