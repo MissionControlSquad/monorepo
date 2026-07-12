@@ -5,6 +5,7 @@ export * from "./utils";
 export * from "./formatDuration";
 export * from "./chart-colors";
 export * from "./feature-flag-keys";
+export * from "./plugin-constants";
 export * from "./llm-providers";
 export * from "./asset-url";
 export * from "./client-env";
