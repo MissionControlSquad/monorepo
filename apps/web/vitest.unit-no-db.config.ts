@@ -27,6 +27,7 @@ export default defineConfig({
       "tests/unit/cases.test.ts",
       "tests/unit/skills-teams.test.ts",
       "tests/unit/portability.test.ts",
+      "tests/unit/goals.test.ts",
     ],
   },
   resolve: {
