@@ -142,6 +142,7 @@ model Agent {
   secretBindings SecretBinding[] // Epic #5
   agentSkills    AgentSkill[] // Epic #10
   goals          Goal[]         @relation("AgentGoals") // Epic #11
+  terminalSessions TerminalSession[] @relation("AgentTerminals") // Epic #9
 
   @@index([username])
   @@index([cloudVmId])
