@@ -167,3 +167,5 @@ export {
 } from "./agent-instructions";
 
 export { SET_AGENT_REPORTS_TO } from "./org-chart";
+
+export { GRANT_AGENT_CAPABILITY, REVOKE_AGENT_CAPABILITY } from "./agent-authz";
