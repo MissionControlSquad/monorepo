@@ -27,10 +27,11 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.OBSERVABILITY).toBe("observability");
     expect(FLAG_KEYS.BOARD_CHAT).toBe("board_chat");
     expect(FLAG_KEYS.PLUGIN_SDK).toBe("plugin_sdk");
+    expect(FLAG_KEYS.API_KEYS).toBe("api_keys");
   });
 
-  it("has exactly 23 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(23);
+  it("has exactly 24 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(24);
   });
 
   it("all values are unique", () => {
@@ -87,6 +88,7 @@ describe("FLAG_DEFAULTS", () => {
       FLAG_KEYS.WORKSPACE_PORTABILITY,
       FLAG_KEYS.GOALS,
       FLAG_KEYS.OBSERVABILITY,
+      FLAG_KEYS.API_KEYS,
     ];
     for (const key of expectedTrue) {
       expect(FLAG_DEFAULTS[key]).toBe(true);

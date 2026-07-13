@@ -1,0 +1,21 @@
+// ─── CLI / programmatic access — API keys (Epic #12) ──────────────
+// Workspace-scoped personal access tokens for CLI/programmatic access. The plaintext key is shown
+// once at mint; only keyHash (sha256) + keyPrefix (display) are stored. Revoke tombstones (never
+// hard-deletes) for audit. workspaceId-scoped (Epic #1, D5; no FK). The CLI binary + device-auth
+// challenge flow + middleware wiring are deferred (spec D2/D4).
+
+model ApiKey {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  name               String
+  keyHash            String    @unique
+  keyPrefix          String
+  createdByProfileId String?
+  lastUsedAt         DateTime?
+  revokedAt          DateTime?
+  expiresAt          DateTime?
+  createdAt          DateTime  @default(now())
+
+  @@index([workspaceId, revokedAt])
+  @@map("api_keys")
+}

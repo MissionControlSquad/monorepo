@@ -23,6 +23,7 @@ export const FLAG_KEYS = {
   OBSERVABILITY: "observability",
   BOARD_CHAT: "board_chat",
   PLUGIN_SDK: "plugin_sdk",
+  API_KEYS: "api_keys",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -53,4 +54,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.OBSERVABILITY]: true,
   [FLAG_KEYS.BOARD_CHAT]: false,
   [FLAG_KEYS.PLUGIN_SDK]: false,
+  [FLAG_KEYS.API_KEYS]: true,
 };
