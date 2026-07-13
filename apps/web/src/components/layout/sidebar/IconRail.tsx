@@ -32,6 +32,7 @@ import {
   Plug,
   Terminal,
   SquareTerminal,
+  FileText,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -48,6 +49,12 @@ interface IconRailProps {
 const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; flag?: string }[] = [
   { href: "/", icon: LayoutDashboard, label: "Home" },
   { href: "/agents", icon: Bot, label: "Agents" },
+  {
+    href: "/instructions",
+    icon: FileText,
+    label: "Instructions",
+    flag: FLAG_KEYS.AGENT_INSTRUCTIONS,
+  },
   { href: "/channels", icon: MessageSquare, label: "Channels", flag: FLAG_KEYS.CHANNELS },
   { href: "/projects", icon: FolderKanban, label: "Projects" },
   { href: "/analytics", icon: BarChart3, label: "Analytics", flag: FLAG_KEYS.ANALYTICS },
