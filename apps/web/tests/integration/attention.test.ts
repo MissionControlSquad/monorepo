@@ -71,10 +71,48 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE budget_incidents, budget_policies, approvals, tasks, projects, agents, profiles CASCADE`,
+    `TRUNCATE TABLE attention_dismissals, budget_incidents, budget_policies, approvals, tasks, projects, agents, profiles CASCADE`,
   );
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Attn Human" } });
   humanId = p.id;
+});
+
+describe("dismissals (Epic #20b)", () => {
+  const DISMISS = `mutation($k:String!){ dismissAttentionItem(itemKey:$k) }`;
+  const UNDISMISS = `mutation($k:String!){ undismissAttentionItem(itemKey:$k) }`;
+  const FEED_ALL = `query($inc:Boolean){ attentionFeed(includeDismissed:$inc){ totalCount items{ id } } }`;
+
+  it("dismissing an item hides it from the feed; undismissing restores it", async () => {
+    await seed(WS_A);
+    const member = await cookieFor(WS_A, "member");
+    const before = await gql(FEED, undefined, member);
+    const target = before.data.attentionFeed.items[0].id; // the critical incident
+    const n = before.data.attentionFeed.totalCount;
+
+    await gql(DISMISS, { k: target }, member);
+    const after = await gql(FEED, undefined, member);
+    expect(after.data.attentionFeed.totalCount).toBe(n - 1);
+    expect(after.data.attentionFeed.items.find((i: any) => i.id === target)).toBeUndefined();
+
+    // includeDismissed shows it again.
+    const all = await gql(FEED_ALL, { inc: true }, member);
+    expect(all.data.attentionFeed.items.find((i: any) => i.id === target)).toBeDefined();
+
+    // undismiss restores it to the default feed.
+    await gql(UNDISMISS, { k: target }, member);
+    const restored = await gql(FEED, undefined, member);
+    expect(restored.data.attentionFeed.totalCount).toBe(n);
+  });
+
+  it("dismissals are workspace-isolated", async () => {
+    await seed(WS_A);
+    const itemId = (await gql(FEED, undefined, await cookieFor(WS_A, "member"))).data.attentionFeed
+      .items[0].id;
+    // dismiss in WS_B — must not affect WS_A.
+    await gql(DISMISS, { k: itemId }, await cookieFor(WS_B, "member"));
+    const a = await gql(FEED, undefined, await cookieFor(WS_A, "member"));
+    expect(a.data.attentionFeed.items.find((i: any) => i.id === itemId)).toBeDefined();
+  });
 });
 
 describe("attention feed (Epic #20)", () => {

@@ -36,3 +36,4 @@ import "./terminals";
 import "./agent-instructions";
 import "./org-chart";
 import "./agent-authz";
+import "./attention";
