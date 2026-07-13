@@ -33,6 +33,7 @@ export default defineConfig({
       "tests/unit/plugins.test.ts",
       "tests/unit/api-keys.test.ts",
       "tests/unit/terminals.test.ts",
+      "tests/unit/agent-instructions.test.ts",
     ],
   },
   resolve: {
