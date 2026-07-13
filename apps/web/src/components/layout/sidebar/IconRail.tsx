@@ -30,6 +30,7 @@ import {
   Activity,
   Landmark,
   Plug,
+  Terminal,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -69,6 +70,7 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   },
   { href: "/boardroom", icon: Landmark, label: "Boardroom", flag: FLAG_KEYS.BOARD_CHAT },
   { href: "/plugins", icon: Plug, label: "Plugins", flag: FLAG_KEYS.PLUGIN_SDK },
+  { href: "/api-keys", icon: Terminal, label: "API keys", flag: FLAG_KEYS.API_KEYS },
   {
     href: "/portability",
     icon: PackageOpen,
