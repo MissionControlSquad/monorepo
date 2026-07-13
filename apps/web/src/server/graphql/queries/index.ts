@@ -33,3 +33,4 @@ import "./observability";
 import "./boardroom";
 import "./plugins";
 import "./api-keys";
+import "./terminals";
