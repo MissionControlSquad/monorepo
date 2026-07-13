@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { evaluateTrust, type TrustProfileEval } from "@/server/services/trust";
+import { evaluateTrust, type TrustProfileEval } from "@agentcenter/utils";
 
 const base: TrustProfileEval = {
   trustLevel: "standard",
