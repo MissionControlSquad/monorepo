@@ -31,6 +31,14 @@ async function truncateAll() {
   clearCaches();
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      -- feature_flags + licenses must be cleared per file: the DB is shared across test files. Many
+      -- files toggle a flag off to exercise the disabled path; the row lingers because it was never
+      -- truncated, so a later file that expects the feature on (e.g. goals, secrets) intermittently
+      -- reads the stale disabled row and its requireFeature() gate throws. Truncating here makes every
+      -- file start from all-flags-default-enabled; files that need an opt-in flag seed it in their own
+      -- beforeAll/beforeEach (which run after this). (In-process caches reset per isolated fork.)
+      feature_flags,
+      licenses,
       attention_dismissals,
       agent_capability_grants,
       agent_authz_events,
