@@ -5,6 +5,7 @@
  */
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
+import { slugify as coreSlugify } from "@agentcenter/utils";
 import type {
   Skill,
   SkillSourceType,
@@ -19,16 +20,9 @@ function notFound(what: string): never {
   throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
 }
 
-/** Pure: URL-safe slug from a name. Unit-testable. */
+/** Skill slug: the shared core slugify, capped at 64 chars with a "skill" fallback. */
 export function slugify(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 64) || "skill"
-  );
+  return coreSlugify(name, 64, "skill");
 }
 
 async function loadSkill(workspaceId: string, id: string) {

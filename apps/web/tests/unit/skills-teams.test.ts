@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { slugify } from "@/server/services/skills";
-import { resolveCollision } from "@/server/services/teams";
+import { resolveCollision } from "@agentcenter/utils";
 
 describe("slugify", () => {
   it("lowercases + hyphenates + trims", () => {

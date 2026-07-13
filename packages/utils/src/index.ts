@@ -17,6 +17,8 @@ export * from "./hierarchy";
 export * from "./org-chart";
 export * from "./goals";
 export * from "./terminals";
+export * from "./collision";
+export * from "./plugins";
 export * from "./llm-providers";
 export * from "./asset-url";
 export * from "./client-env";
