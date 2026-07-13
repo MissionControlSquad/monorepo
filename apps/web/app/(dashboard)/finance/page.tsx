@@ -14,7 +14,7 @@ import {
   RESOLVE_BUDGET_INCIDENT,
   RAISE_BUDGET_AND_RESUME,
 } from "@/lib/graphql/mutations";
-import { BUDGET_WINDOWS } from "@agentcenter/utils";
+import { BUDGET_WINDOWS, IncidentThreshold } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
 
 // Epic #4: agent budgets / cost dashboard. API-gated by the BUDGETS feature + buildbase role
@@ -210,7 +210,7 @@ export default function FinancePage() {
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  {inc.thresholdType === "hard" ? (
+                  {inc.thresholdType === IncidentThreshold.HARD ? (
                     <Badge variant="red">hard breach</Badge>
                   ) : (
                     <Badge variant="yellow">soft warning</Badge>
@@ -223,7 +223,7 @@ export default function FinancePage() {
                 {inc.detail && <p className="mt-1 text-sm text-muted-foreground">{inc.detail}</p>}
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {inc.thresholdType === "hard" && inc.autoPaused && (
+                {inc.thresholdType === IncidentThreshold.HARD && inc.autoPaused && (
                   <>
                     <input
                       className="w-28 rounded border border-border bg-background px-2 py-1.5 text-sm"

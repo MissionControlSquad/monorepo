@@ -90,3 +90,7 @@ export function agentCan(capability: string, input: AgentCanInput): AgentCanDeci
   if (granted) return { allowed: true, reason: "explicit grant" };
   return { allowed: false, reason: `restricted agent lacks capability '${capability}'` };
 }
+
+/** Agent authorization decision (Epic #21) — mirrors the AgentAuthzDecision enum. */
+export const AGENT_AUTHZ_DECISION = { ALLOW: "allow", DENY: "deny" } as const;
+export type AgentAuthzDecision = (typeof AGENT_AUTHZ_DECISION)[keyof typeof AGENT_AUTHZ_DECISION];

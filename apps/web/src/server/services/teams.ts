@@ -8,7 +8,7 @@ import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Team, TeamMember, TeamKind, TeamTrustLevel } from "@agentcenter/database";
 import { slugify } from "./skills";
-import { resolveCollision } from "@agentcenter/utils";
+import { resolveCollision, COLLISION_ACTION } from "@agentcenter/utils";
 import type { CollisionAction, CollisionStrategy } from "@agentcenter/utils";
 
 // resolveCollision is a shared pure helper in @agentcenter/utils (reused by skills, teams,
@@ -107,16 +107,16 @@ export async function installTeam(args: {
 
   for (const member of team.members) {
     const res = resolveCollision(names, member.name, args.collisionStrategy);
-    if (res.action === "skip") {
-      actions.push({ member: member.name, action: "skip", agentName: member.name });
+    if (res.action === COLLISION_ACTION.SKIP) {
+      actions.push({ member: member.name, action: res.action, agentName: member.name });
       continue;
     }
-    if (res.action === "replace") {
+    if (res.action === COLLISION_ACTION.REPLACE) {
       const target = existingAgents.find((a) => a.name === member.name);
       if (target) {
         await prisma.agent.update({ where: { id: target.id }, data: { role: member.role } });
         createdAgentIds.push(target.id);
-        actions.push({ member: member.name, action: "replace", agentName: member.name });
+        actions.push({ member: member.name, action: res.action, agentName: member.name });
       }
       continue;
     }
@@ -131,7 +131,7 @@ export async function installTeam(args: {
     });
     createdAgentIds.push(agent.id);
     names.push(res.name); // avoid intra-install collisions
-    actions.push({ member: member.name, action: "create", agentName: res.name });
+    actions.push({ member: member.name, action: res.action, agentName: res.name });
   }
 
   const install = await prisma.$transaction(async (tx) => {

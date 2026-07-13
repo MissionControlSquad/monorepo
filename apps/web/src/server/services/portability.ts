@@ -7,6 +7,7 @@
  * (never apiKeyHash, secrets, tokens, budgets, or buildbase identity).
  */
 import { randomUUID } from "node:crypto";
+import { COLLISION_ACTION } from "@agentcenter/utils";
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { CollisionStrategy } from "@agentcenter/database";
@@ -146,11 +147,11 @@ export async function importWorkspaceBundle(args: {
   for (const a of bundle.agents) {
     if (!a?.name || !a?.role) continue;
     const res = resolveCollision(agentNames, a.name, args.collisionStrategy);
-    if (res.action === "skip") {
+    if (res.action === COLLISION_ACTION.SKIP) {
       summary.skippedAgents++;
       continue;
     }
-    if (res.action === "replace") {
+    if (res.action === COLLISION_ACTION.REPLACE) {
       const target = existingAgents.find((x) => x.name === a.name);
       if (target) {
         await prisma.agent.update({

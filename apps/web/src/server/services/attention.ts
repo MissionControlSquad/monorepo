@@ -6,6 +6,7 @@ import { prisma } from "@/server/prisma";
 import {
   ATTENTION_SEVERITY,
   ATTENTION_SOURCE_KIND,
+  IncidentThreshold,
   rankAndCount,
   type AttentionItem,
   type AttentionFeed,
@@ -86,7 +87,7 @@ export async function getAttentionFeed(
   }
 
   for (const inc of incidents) {
-    const hard = inc.thresholdType === "hard";
+    const hard = inc.thresholdType === IncidentThreshold.HARD;
     items.push({
       id: `incident:${inc.id}`,
       sourceKind: ATTENTION_SOURCE_KIND.BUDGET_ALERT,

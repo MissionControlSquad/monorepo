@@ -5,6 +5,10 @@
  * existing agent auto-review mutations and is intentionally not reused here (it is agent-coupled).
  */
 import { prisma } from "@/server/prisma";
+import {
+  ApprovalStatus as ApprovalStatusConst,
+  ApprovalSubjectType as ApprovalSubjectTypeConst,
+} from "@agentcenter/utils";
 import type { ApprovalSubjectType } from "@agentcenter/database";
 import { TaskStatus } from "../constants";
 
@@ -60,7 +64,8 @@ export async function decideApproval(input: {
     });
   }
   const linkedTaskId =
-    approval.taskId ?? (approval.subjectType === "task" ? approval.subjectId : null);
+    approval.taskId ??
+    (approval.subjectType === ApprovalSubjectTypeConst.TASK ? approval.subjectId : null);
   const newStatus = input.decision === "approve" ? "approved" : "rejected";
 
   return prisma.$transaction(async (tx) => {
@@ -87,7 +92,10 @@ export async function decideApproval(input: {
 
 export async function resubmitApproval(approvalId: string, workspaceId: string) {
   const approval = await findScoped(approvalId, workspaceId);
-  if (approval.status === "approved" || approval.status === "cancelled") {
+  if (
+    approval.status === ApprovalStatusConst.APPROVED ||
+    approval.status === ApprovalStatusConst.CANCELLED
+  ) {
     throw Object.assign(new Error("Cannot resubmit a finalized approval"), { status: 400 });
   }
   return prisma.approval.update({
@@ -104,7 +112,7 @@ export async function resubmitApproval(approvalId: string, workspaceId: string) 
 
 export async function cancelApproval(approvalId: string, workspaceId: string) {
   const approval = await findScoped(approvalId, workspaceId);
-  if (approval.status === "approved") {
+  if (approval.status === ApprovalStatusConst.APPROVED) {
     throw Object.assign(new Error("Cannot cancel an approved approval"), { status: 400 });
   }
   return prisma.approval.update({ where: { id: approvalId }, data: { status: "cancelled" } });

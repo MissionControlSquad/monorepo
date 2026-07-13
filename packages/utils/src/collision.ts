@@ -2,9 +2,12 @@
  * Name-collision resolution + slug helpers — shared across all apps (Epic #10; reused by #14). Import
  * from @agentcenter/utils. Pure. Used by skills, teams, and workspace portability.
  */
-export const COLLISION_STRATEGIES = ["rename", "skip", "replace"] as const;
+export const COLLISION_STRATEGY = { RENAME: "rename", SKIP: "skip", REPLACE: "replace" } as const;
+export const COLLISION_STRATEGIES = Object.values(COLLISION_STRATEGY);
 export type CollisionStrategy = (typeof COLLISION_STRATEGIES)[number];
-export type CollisionAction = "create" | "skip" | "replace";
+
+export const COLLISION_ACTION = { CREATE: "create", SKIP: "skip", REPLACE: "replace" } as const;
+export type CollisionAction = (typeof COLLISION_ACTION)[keyof typeof COLLISION_ACTION];
 
 export function isCollisionStrategy(v: string): v is CollisionStrategy {
   return (COLLISION_STRATEGIES as readonly string[]).includes(v);
@@ -31,9 +34,9 @@ export function resolveCollision(
   strategy: CollisionStrategy,
 ): { action: CollisionAction; name: string } {
   const set = new Set(existing);
-  if (!set.has(name)) return { action: "create", name };
-  if (strategy === "skip") return { action: "skip", name };
-  if (strategy === "replace") return { action: "replace", name };
+  if (!set.has(name)) return { action: COLLISION_ACTION.CREATE, name };
+  if (strategy === COLLISION_STRATEGY.SKIP) return { action: COLLISION_ACTION.SKIP, name };
+  if (strategy === COLLISION_STRATEGY.REPLACE) return { action: COLLISION_ACTION.REPLACE, name };
   // rename → find the first free "<name>-N".
   let n = 2;
   let candidate = `${name}-${n}`;
