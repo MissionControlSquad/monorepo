@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveIssueGoalId, resolveNextIssueGoalId } from "@/server/services/issue-goal-fallback";
+import { resolveIssueGoalId, resolveNextIssueGoalId } from "@agentcenter/utils";
 import { assertNoCycle } from "@/server/services/goals";
 
 // Epic #11: pure resolvers. Fallback cases ported verbatim from Paperclip

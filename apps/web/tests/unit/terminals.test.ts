@@ -3,7 +3,7 @@ import {
   parseSshCommand,
   isUnsafeSessionWorkspaceCwd,
   terminalSessionState,
-} from "@/server/services/terminals";
+} from "@agentcenter/utils";
 
 // Epic #9: pure SSH parsing + cwd guard + lifecycle state. No DB. Parse cases ported from Paperclip
 // `environment-custom-image-terminal-sessions.test.ts`.
