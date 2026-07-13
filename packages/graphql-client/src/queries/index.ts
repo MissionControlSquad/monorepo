@@ -161,3 +161,4 @@ export { API_KEYS_QUERY } from "./api-keys";
 export { TERMINAL_SESSIONS_QUERY } from "./terminals";
 export { AGENT_INSTRUCTIONS_QUERY } from "./agent-instructions";
 export { ORG_CHART_QUERY } from "./org-chart";
+export { ATTENTION_FEED_QUERY } from "./attention";
