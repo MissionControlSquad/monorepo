@@ -31,6 +31,7 @@ export default defineConfig({
       "tests/unit/observability.test.ts",
       "tests/unit/boardroom.test.ts",
       "tests/unit/plugins.test.ts",
+      "tests/unit/api-keys.test.ts",
     ],
   },
   resolve: {
