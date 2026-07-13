@@ -14,6 +14,7 @@ import {
   RESOLVE_BUDGET_INCIDENT,
   RAISE_BUDGET_AND_RESUME,
 } from "@/lib/graphql/mutations";
+import { BUDGET_WINDOWS } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
 
 // Epic #4: agent budgets / cost dashboard. API-gated by the BUDGETS feature + buildbase role
@@ -56,7 +57,7 @@ interface Bucket {
   eventCount: number;
 }
 
-const WINDOWS = ["hourly", "daily", "weekly", "monthly"] as const;
+const WINDOWS = BUDGET_WINDOWS;
 
 function money(cents: number): string {
   return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

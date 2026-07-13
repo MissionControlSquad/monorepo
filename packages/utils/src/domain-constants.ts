@@ -259,3 +259,25 @@ export const StoragePrefix = {
 } as const;
 
 export type StoragePrefixValue = (typeof StoragePrefix)[keyof typeof StoragePrefix];
+
+// ─── Case States (Epic #17) ──────────────────────────────
+export const CaseState = {
+  DRAFT: "draft",
+  IN_PROGRESS: "in_progress",
+  IN_REVIEW: "in_review",
+  APPROVED: "approved",
+  DONE: "done",
+  CANCELLED: "cancelled",
+} as const;
+export const CASE_STATES = Object.values(CaseState);
+export type CaseStateValue = (typeof CASE_STATES)[number];
+
+// ─── Budget Windows (Epic #4) ────────────────────────────
+export const BudgetWindow = {
+  HOURLY: "hourly",
+  DAILY: "daily",
+  WEEKLY: "weekly",
+  MONTHLY: "monthly",
+} as const;
+export const BUDGET_WINDOWS = Object.values(BudgetWindow);
+export type BudgetWindowValue = (typeof BUDGET_WINDOWS)[number];

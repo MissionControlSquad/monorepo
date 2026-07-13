@@ -10,12 +10,13 @@ import {
   ADD_CASE_LABEL,
   REMOVE_CASE_LABEL,
 } from "@/lib/graphql/mutations";
+import { CASE_STATES } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
 
 // Epic #17: cases (support-ticket / work-item). CASES-gated + buildbase role (member works cases;
 // admin curates the label catalog). Distinct from pipeline cases (Epic #7).
 
-const STATES = ["draft", "in_progress", "in_review", "approved", "done", "cancelled"] as const;
+const STATES = CASE_STATES;
 
 interface Label {
   id: string;
