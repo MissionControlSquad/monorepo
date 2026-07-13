@@ -1,6 +1,9 @@
 import type { GraphQLContext, TenancyContext, WorkspaceRole } from "@agentcenter/graphql-server";
 import { roleCan } from "./roles";
 import { verifyJWT } from "@/lib/jwt";
+import { FLAG_KEYS } from "@agentcenter/utils";
+import { isFeatureEnabled } from "@/server/feature-flags";
+import { verifyApiKey } from "@/server/services/api-keys";
 
 /**
  * Pre-buildbase bootstrap workspace id. Existing domain rows are backfilled to this id by the
@@ -51,16 +54,45 @@ async function fromBuildbaseToken(
 }
 
 /**
- * Resolve per-request human tenancy (Epic #1). Preference order:
- *  1. The buildbase workspace-scoped JWT (`bb-workspace-token` cookie) — real tenancy.
- *  2. Bootstrap fallback: the existing admin session → default workspace as `owner` (until
+ * Resolve tenancy from an `Authorization: Bearer mc_…` API key (Epic #12). Programmatic/CLI access.
+ * The key authenticates as least-privilege `member` (a leaked key must not wield admin), scoped to the
+ * key's workspace, attributed to the minting profile. Gated by the API_KEYS flag as an admin
+ * kill-switch — disabling the feature immediately stops key auth.
+ */
+async function fromApiKey(authHeader: string | null | undefined): Promise<TenancyContext | null> {
+  if (!authHeader) return null;
+  const match = authHeader.match(/^Bearer\s+(mc_[A-Za-z0-9]+)$/);
+  if (!match) return null;
+  if (!(await isFeatureEnabled(FLAG_KEYS.API_KEYS))) return null;
+
+  const verified = await verifyApiKey(match[1]);
+  if (!verified) return null;
+
+  const role: WorkspaceRole = "member";
+  return {
+    userId: verified.createdByProfileId ?? `apikey_${verified.apiKeyId}`,
+    workspaceId: verified.workspaceId,
+    role,
+    can: (permission: string) => roleCan(role, permission),
+  };
+}
+
+/**
+ * Resolve per-request tenancy. Preference order:
+ *  1. An `Authorization: Bearer mc_…` API key (Epic #12) — programmatic/CLI access as `member`.
+ *  2. The buildbase workspace-scoped JWT (`bb-workspace-token` cookie) — real human tenancy.
+ *  3. Bootstrap fallback: the existing admin session → default workspace as `owner` (until
  *     buildbase credentials are configured).
  * Agents never reach here — they authenticate via apiKeyHash (D2).
  */
 export async function resolveTenancy(
   session: GraphQLContext["session"],
   cookieHeader?: string | null,
+  authHeader?: string | null,
 ): Promise<TenancyContext | null> {
+  const fromKey = await fromApiKey(authHeader);
+  if (fromKey) return fromKey;
+
   const fromBuildbase = await fromBuildbaseToken(cookieHeader);
   if (fromBuildbase) return fromBuildbase;
 

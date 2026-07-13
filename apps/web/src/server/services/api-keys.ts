@@ -85,10 +85,14 @@ export async function revokeApiKey(workspaceId: string, id: string): Promise<Saf
 export async function verifyApiKey(
   plainKey: string,
   now: Date = new Date(),
-): Promise<{ workspaceId: string; apiKeyId: string } | null> {
+): Promise<{ workspaceId: string; apiKeyId: string; createdByProfileId: string | null } | null> {
   if (!plainKey) return null;
   const key = await prisma.apiKey.findUnique({ where: { keyHash: hashApiKey(plainKey) } });
   if (!key || !isApiKeyActive(key, now)) return null;
   await prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: now } });
-  return { workspaceId: key.workspaceId, apiKeyId: key.id };
+  return {
+    workspaceId: key.workspaceId,
+    apiKeyId: key.id,
+    createdByProfileId: key.createdByProfileId,
+  };
 }
