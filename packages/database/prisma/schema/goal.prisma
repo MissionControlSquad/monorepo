@@ -27,6 +27,8 @@ model Goal {
   children     Goal[]     @relation("GoalTree")
   ownerAgentId String?
   ownerAgent   Agent?     @relation("AgentGoals", fields: [ownerAgentId], references: [id], onDelete: SetNull)
+  tasks              Task[]    @relation("GoalTasks") // Epic #11b
+  defaultForProjects Project[] @relation("ProjectDefaultGoal") // Epic #11b
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 

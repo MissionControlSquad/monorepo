@@ -4,7 +4,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { GoalLevel, GoalStatus } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
-import { createGoal, updateGoal, deleteGoal } from "@/server/services/goals";
+import { createGoal, updateGoal, deleteGoal, setProjectDefaultGoal } from "@/server/services/goals";
 
 // Epic #11: goals mutations. Member CRUD (goals are low blast-radius; matches Paperclip company access).
 const LEVELS = ["company", "team", "task"];
@@ -90,6 +90,23 @@ builder.mutationField("deleteGoal", (t) =>
       const tenancy = requireRole(ctx, "member");
       await deleteGoal(tenancy.workspaceId, args.id);
       return true;
+    },
+  }),
+);
+
+// Epic #11b: set (or clear) a project's default goal — tasks created in it inherit this.
+builder.mutationField("setProjectDefaultGoal", (t) =>
+  t.prismaField({
+    type: "Project",
+    args: {
+      projectId: t.arg.string({ required: true }),
+      goalId: t.arg.string(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.GOALS);
+      const tenancy = requireRole(ctx, "member");
+      await setProjectDefaultGoal(tenancy.workspaceId, args.projectId, args.goalId ?? null);
+      return ctx.prisma.project.findUniqueOrThrow({ ...query, where: { id: args.projectId } });
     },
   }),
 );

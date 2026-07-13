@@ -4,11 +4,52 @@
  */
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
-import { wouldCreateCycle, type HierarchyEdge } from "@agentcenter/utils";
+import {
+  wouldCreateCycle,
+  resolveIssueGoalId,
+  FLAG_KEYS,
+  type HierarchyEdge,
+} from "@agentcenter/utils";
+import { isFeatureEnabled } from "@/server/feature-flags";
 import type { Goal, GoalLevel, GoalStatus } from "@agentcenter/database";
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
+}
+
+/**
+ * Epic #11b: resolve which goal a new task should advance, using the shared fallback (explicit goal →
+ * the project's default goal → the workspace's default company goal). The workspace comes from the
+ * project when there is one, else `fallbackWorkspaceId` (the caller's tenancy). Returns null (and no
+ * auto-assign) when GOALS is disabled or no workspace is known — non-breaking. Uses `resolveIssueGoalId`
+ * from @agentcenter/utils.
+ */
+export async function resolveTaskGoalId(args: {
+  projectId?: string | null;
+  goalId?: string | null;
+  fallbackWorkspaceId?: string | null;
+}): Promise<string | null> {
+  if (!(await isFeatureEnabled(FLAG_KEYS.GOALS))) return args.goalId ?? null;
+
+  let workspaceId = args.fallbackWorkspaceId ?? null;
+  let projectGoalId: string | null = null;
+  if (args.projectId) {
+    const project = await prisma.project.findUnique({
+      where: { id: args.projectId },
+      select: { workspaceId: true, goalId: true },
+    });
+    if (project?.workspaceId) workspaceId = project.workspaceId;
+    projectGoalId = project?.goalId ?? null;
+  }
+  if (!workspaceId) return args.goalId ?? null;
+
+  const defaultGoal = await resolveDefaultGoal(workspaceId);
+  return resolveIssueGoalId({
+    projectId: args.projectId ?? null,
+    goalId: args.goalId ?? null,
+    projectGoalId,
+    defaultGoalId: defaultGoal?.id ?? null,
+  });
 }
 
 /**
@@ -146,4 +187,25 @@ export async function deleteGoal(workspaceId: string, id: string): Promise<Goal>
   if (!existing) badRequest("Goal not found");
   // Children re-root (schema onDelete: SetNull) — matches Paperclip's non-cascading delete.
   return prisma.goal.delete({ where: { id } });
+}
+
+/** Epic #11b: set (or clear) a project's default goal. Both must live in the workspace. */
+export async function setProjectDefaultGoal(
+  workspaceId: string,
+  projectId: string,
+  goalId: string | null,
+): Promise<void> {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, workspaceId },
+    select: { id: true },
+  });
+  if (!project) badRequest("projectId does not reference a project in this workspace");
+  if (goalId) {
+    const goal = await prisma.goal.findFirst({
+      where: { id: goalId, workspaceId },
+      select: { id: true },
+    });
+    if (!goal) badRequest("goalId does not reference a goal in this workspace");
+  }
+  await prisma.project.update({ where: { id: projectId }, data: { goalId } });
 }
