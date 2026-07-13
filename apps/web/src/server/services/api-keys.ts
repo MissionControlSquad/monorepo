@@ -6,7 +6,11 @@
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import { generateApiKey, hashApiKey } from "@/server/api-key";
+import { isApiKeyActive } from "@agentcenter/utils";
 import type { ApiKey } from "@agentcenter/database";
+
+// isApiKeyActive + redactKey are shared pure helpers in @agentcenter/utils (web/desktop/mobile).
+export { isApiKeyActive, redactKey } from "@agentcenter/utils";
 
 /** An ApiKey with the secret hash removed — the only shape ever returned to clients. */
 export type SafeApiKey = Omit<ApiKey, "keyHash">;
@@ -15,21 +19,6 @@ function stripHash(key: ApiKey): SafeApiKey {
   const { keyHash: _keyHash, ...safe } = key;
   void _keyHash;
   return safe;
-}
-
-/** Pure: a key is usable iff it is not revoked and not past its expiry. */
-export function isApiKeyActive(
-  key: { revokedAt: Date | null; expiresAt: Date | null },
-  now: Date = new Date(),
-): boolean {
-  if (key.revokedAt) return false;
-  if (key.expiresAt && key.expiresAt.getTime() <= now.getTime()) return false;
-  return true;
-}
-
-/** Pure: masked display form of a key from its stored prefix. */
-export function redactKey(keyPrefix: string): string {
-  return `${keyPrefix}${"•".repeat(8)}`;
 }
 
 function badRequest(message: string): never {

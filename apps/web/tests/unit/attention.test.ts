@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { severityRank, rankAndCount, type AttentionItem } from "@/server/services/attention";
+import { severityRank, rankAndCount, type AttentionItem } from "@agentcenter/utils";
 
 // Epic #20: pure severity ranking + feed assembly. No DB.
 

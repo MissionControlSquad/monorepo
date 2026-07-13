@@ -1,56 +1,18 @@
 /**
- * Attention feed (Epic #20). One ranked, severity-tagged feed of "what needs you now", computed over
- * existing entities — pending approvals, open budget incidents, blocked tasks, and broken org chains
- * (via #19). Read-only; no new tables. Ports Paperclip `types/attention.ts` (subset with real data).
+ * Attention feed (Epic #20) — DB aggregation. The severity/source vocabulary + ranking are shared in
+ * @agentcenter/utils (web/desktop/mobile); this file only gathers rows and shapes items.
  */
 import { prisma } from "@/server/prisma";
+import {
+  ATTENTION_SEVERITY,
+  ATTENTION_SOURCE_KIND,
+  rankAndCount,
+  type AttentionItem,
+  type AttentionFeed,
+} from "@agentcenter/utils";
 import { getAgentOrgChainHealth } from "./org-chart";
 
-export type AttentionSeverity = "critical" | "high" | "medium" | "low";
-export type AttentionSourceKind =
-  "approval" | "budget_alert" | "blocker_attention" | "agent_error_alert";
-
-export interface AttentionItem {
-  id: string;
-  sourceKind: AttentionSourceKind;
-  severity: AttentionSeverity;
-  subjectKind: string;
-  subjectId: string;
-  title: string;
-  whyNow: string;
-  activityAt: string; // ISO
-}
-export interface AttentionFeed {
-  totalCount: number;
-  countsBySourceKind: Record<string, number>;
-  items: AttentionItem[];
-}
-
-const SEVERITY_ORDER: Record<AttentionSeverity, number> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-};
-
-/** Pure: lower rank = more urgent. Unknown severities sort last. */
-export function severityRank(sev: string): number {
-  return SEVERITY_ORDER[sev as AttentionSeverity] ?? 99;
-}
-
-/** Pure: sort items (severity, then recency desc) + compute totals/counts. */
-export function rankAndCount(items: AttentionItem[]): AttentionFeed {
-  const sorted = [...items].sort((a, b) => {
-    const s = severityRank(a.severity) - severityRank(b.severity);
-    if (s !== 0) return s;
-    return b.activityAt.localeCompare(a.activityAt);
-  });
-  const countsBySourceKind: Record<string, number> = {};
-  for (const it of sorted) {
-    countsBySourceKind[it.sourceKind] = (countsBySourceKind[it.sourceKind] ?? 0) + 1;
-  }
-  return { totalCount: sorted.length, countsBySourceKind, items: sorted };
-}
+export type { AttentionItem, AttentionFeed } from "@agentcenter/utils";
 
 export async function getAttentionFeed(workspaceId: string): Promise<AttentionFeed> {
   const [approvals, incidents, blockedTasks, agents] = await Promise.all([
@@ -83,8 +45,8 @@ export async function getAttentionFeed(workspaceId: string): Promise<AttentionFe
   for (const a of approvals) {
     items.push({
       id: `approval:${a.id}`,
-      sourceKind: "approval",
-      severity: "high",
+      sourceKind: ATTENTION_SOURCE_KIND.APPROVAL,
+      severity: ATTENTION_SEVERITY.HIGH,
       subjectKind: "approval",
       subjectId: a.id,
       title: a.title,
@@ -94,17 +56,17 @@ export async function getAttentionFeed(workspaceId: string): Promise<AttentionFe
   }
 
   for (const inc of incidents) {
+    const hard = inc.thresholdType === "hard";
     items.push({
       id: `incident:${inc.id}`,
-      sourceKind: "budget_alert",
-      severity: inc.thresholdType === "hard" ? "critical" : "high",
+      sourceKind: ATTENTION_SOURCE_KIND.BUDGET_ALERT,
+      severity: hard ? ATTENTION_SEVERITY.CRITICAL : ATTENTION_SEVERITY.HIGH,
       subjectKind: "budget_incident",
       subjectId: inc.id,
-      title: `Budget ${inc.thresholdType === "hard" ? "breach" : "warning"} — $${(inc.spendCents / 100).toFixed(2)} of $${(inc.limitCents / 100).toFixed(2)}`,
-      whyNow:
-        inc.thresholdType === "hard"
-          ? "A hard budget limit was breached; agents may be paused"
-          : "A soft budget threshold was crossed",
+      title: `Budget ${hard ? "breach" : "warning"} — $${(inc.spendCents / 100).toFixed(2)} of $${(inc.limitCents / 100).toFixed(2)}`,
+      whyNow: hard
+        ? "A hard budget limit was breached; agents may be paused"
+        : "A soft budget threshold was crossed",
       activityAt: inc.createdAt.toISOString(),
     });
   }
@@ -112,8 +74,8 @@ export async function getAttentionFeed(workspaceId: string): Promise<AttentionFe
   for (const t of blockedTasks) {
     items.push({
       id: `task:${t.id}`,
-      sourceKind: "blocker_attention",
-      severity: "medium",
+      sourceKind: ATTENTION_SOURCE_KIND.BLOCKER_ATTENTION,
+      severity: ATTENTION_SEVERITY.MEDIUM,
       subjectKind: "issue",
       subjectId: t.id,
       title: t.title,
@@ -134,8 +96,8 @@ export async function getAttentionFeed(workspaceId: string): Promise<AttentionFe
     if (health.status !== "healthy") {
       items.push({
         id: `orgchain:${a.id}`,
-        sourceKind: "agent_error_alert",
-        severity: "high",
+        sourceKind: ATTENTION_SOURCE_KIND.AGENT_ERROR_ALERT,
+        severity: ATTENTION_SEVERITY.HIGH,
         subjectKind: "agent",
         subjectId: a.id,
         title: `${a.name}: ${health.reason.replace("_", " ")}`,
