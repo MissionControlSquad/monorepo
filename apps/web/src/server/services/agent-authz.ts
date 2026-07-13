@@ -7,7 +7,8 @@
  */
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
-import { isAgentCapability } from "@agentcenter/utils";
+import { isAgentCapability, FLAG_KEYS } from "@agentcenter/utils";
+import { isFeatureEnabled } from "@/server/feature-flags";
 import type { AgentCapabilityGrant, AgentAuthzEvent } from "@agentcenter/database";
 
 const BASE_CAPABILITIES = [
@@ -148,6 +149,8 @@ export async function requireAgentCapability(
   capability: string,
   scope?: { projectId?: string | null },
 ): Promise<void> {
+  // Kill-switch: with agent authorization disabled, enforcement is skipped entirely.
+  if (!(await isFeatureEnabled(FLAG_KEYS.AGENT_AUTHZ))) return;
   const [trust, grants] = await Promise.all([
     prisma.agentTrustProfile.findUnique({
       where: { agentId: agent.id },
