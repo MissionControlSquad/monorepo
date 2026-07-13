@@ -33,6 +33,7 @@ import {
   Terminal,
   SquareTerminal,
   FileText,
+  Network,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -55,6 +56,7 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
     label: "Instructions",
     flag: FLAG_KEYS.AGENT_INSTRUCTIONS,
   },
+  { href: "/org-chart", icon: Network, label: "Org chart", flag: FLAG_KEYS.ORG_CHART },
   { href: "/channels", icon: MessageSquare, label: "Channels", flag: FLAG_KEYS.CHANNELS },
   { href: "/projects", icon: FolderKanban, label: "Projects" },
   { href: "/analytics", icon: BarChart3, label: "Analytics", flag: FLAG_KEYS.ANALYTICS },

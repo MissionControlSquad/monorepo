@@ -165,3 +165,5 @@ export {
   DELETE_AGENT_INSTRUCTION,
   SEED_AGENT_INSTRUCTIONS,
 } from "./agent-instructions";
+
+export { SET_AGENT_REPORTS_TO } from "./org-chart";

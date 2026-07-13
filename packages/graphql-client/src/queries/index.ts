@@ -160,3 +160,4 @@ export { PLUGINS_QUERY } from "./plugins";
 export { API_KEYS_QUERY } from "./api-keys";
 export { TERMINAL_SESSIONS_QUERY } from "./terminals";
 export { AGENT_INSTRUCTIONS_QUERY } from "./agent-instructions";
+export { ORG_CHART_QUERY } from "./org-chart";
