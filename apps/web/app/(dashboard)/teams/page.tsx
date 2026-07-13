@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { TEAMS_QUERY } from "@/lib/graphql/queries";
 import { CREATE_TEAM, ADD_TEAM_MEMBER, INSTALL_TEAM } from "@/lib/graphql/mutations";
+import { COLLISION_STRATEGIES } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
 
 // Epic #10: teams catalog. SKILLS_TEAMS-gated (admin installs). A team is an installable bundle of
@@ -22,7 +23,7 @@ interface Team {
   members: Member[];
 }
 
-const STRATEGIES = ["rename", "skip", "replace"] as const;
+const STRATEGIES = COLLISION_STRATEGIES;
 
 export default function TeamsPage() {
   const [{ data }, refetch] = useQuery<{ teams: Team[] }>({ query: TEAMS_QUERY });

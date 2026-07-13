@@ -4,6 +4,11 @@
  */
 export const HISTORY_TURNS = 20;
 
+/** Board message roles — single source of truth (mirrors the BoardRole enum). */
+export const BOARD_ROLE = { USER: "user", ASSISTANT: "assistant" } as const;
+export const BOARD_ROLES = Object.values(BOARD_ROLE);
+export type BoardRole = (typeof BOARD_ROLES)[number];
+
 /** Default board-assistant preamble (Paperclip's fallback when the skill file is absent). */
 export const DEFAULT_BOARD_SKILL =
   "You are a board-level assistant helping a human manage their AI-agent company. Help them create " +

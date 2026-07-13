@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "urql";
+import { GOAL_LEVELS, GOAL_STATUSES, GOAL_STATUS } from "@agentcenter/utils";
 import { GOALS_QUERY, AGENTS_QUERY } from "@/lib/graphql/queries";
 import { CREATE_GOAL, UPDATE_GOAL, DELETE_GOAL } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
@@ -24,13 +25,13 @@ interface AgentLite {
   name: string;
 }
 
-const LEVELS = ["company", "team", "task"] as const;
-const STATUSES = ["planned", "active", "completed", "archived"] as const;
+const LEVELS = GOAL_LEVELS;
+const STATUSES = GOAL_STATUSES;
 const STATUS_VARIANT: Record<string, "gray" | "blue" | "green" | "purple"> = {
-  planned: "gray",
-  active: "blue",
-  completed: "green",
-  archived: "purple",
+  [GOAL_STATUS.PLANNED]: "gray",
+  [GOAL_STATUS.ACTIVE]: "blue",
+  [GOAL_STATUS.COMPLETED]: "green",
+  [GOAL_STATUS.ARCHIVED]: "purple",
 };
 
 export default function GoalsPage() {

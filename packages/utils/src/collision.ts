@@ -2,8 +2,13 @@
  * Name-collision resolution + slug helpers — shared across all apps (Epic #10; reused by #14). Import
  * from @agentcenter/utils. Pure. Used by skills, teams, and workspace portability.
  */
-export type CollisionStrategy = "rename" | "skip" | "replace";
+export const COLLISION_STRATEGIES = ["rename", "skip", "replace"] as const;
+export type CollisionStrategy = (typeof COLLISION_STRATEGIES)[number];
 export type CollisionAction = "create" | "skip" | "replace";
+
+export function isCollisionStrategy(v: string): v is CollisionStrategy {
+  return (COLLISION_STRATEGIES as readonly string[]).includes(v);
+}
 
 /** Pure: turn a name into a URL-safe slug. Optional `maxLength` cap + `fallback` for an empty result. */
 export function slugify(name: string, maxLength = 0, fallback = ""): string {

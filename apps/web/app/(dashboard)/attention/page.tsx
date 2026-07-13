@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation } from "urql";
+import { ATTENTION_SEVERITY, ATTENTION_SOURCE_KIND } from "@agentcenter/utils";
 import { ATTENTION_FEED_QUERY } from "@/lib/graphql/queries";
 import { DISMISS_ATTENTION_ITEM } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
@@ -27,23 +28,23 @@ interface Feed {
 }
 
 const SEVERITY_VARIANT: Record<string, "red" | "orange" | "yellow" | "gray"> = {
-  critical: "red",
-  high: "orange",
-  medium: "yellow",
-  low: "gray",
+  [ATTENTION_SEVERITY.CRITICAL]: "red",
+  [ATTENTION_SEVERITY.HIGH]: "orange",
+  [ATTENTION_SEVERITY.MEDIUM]: "yellow",
+  [ATTENTION_SEVERITY.LOW]: "gray",
 };
 const SOURCE_LABEL: Record<string, string> = {
-  approval: "Approval",
-  budget_alert: "Budget",
-  blocker_attention: "Blocked task",
-  agent_error_alert: "Org chain",
+  [ATTENTION_SOURCE_KIND.APPROVAL]: "Approval",
+  [ATTENTION_SOURCE_KIND.BUDGET_ALERT]: "Budget",
+  [ATTENTION_SOURCE_KIND.BLOCKER_ATTENTION]: "Blocked task",
+  [ATTENTION_SOURCE_KIND.AGENT_ERROR_ALERT]: "Org chain",
 };
 // Where each source resolves.
 const SOURCE_HREF: Record<string, string> = {
-  approval: "/approvals",
-  budget_alert: "/finance",
-  blocker_attention: "/reliability",
-  agent_error_alert: "/org-chart",
+  [ATTENTION_SOURCE_KIND.APPROVAL]: "/approvals",
+  [ATTENTION_SOURCE_KIND.BUDGET_ALERT]: "/finance",
+  [ATTENTION_SOURCE_KIND.BLOCKER_ATTENTION]: "/reliability",
+  [ATTENTION_SOURCE_KIND.AGENT_ERROR_ALERT]: "/org-chart",
 };
 
 export default function AttentionPage() {
