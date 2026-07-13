@@ -1,4 +1,5 @@
 import { resolveAgent } from "../_lib/resolve-agent";
+import { requireAgentCapability } from "@/server/services/agent-authz";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
 import { checkRateLimit } from "../_lib/rate-limit-check";
 import { createRateLimiter } from "@/server/rate-limit";
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
       return errorResponse("Budgets are not enabled", 403, "FEATURE_DISABLED");
 
     const agent = await resolveAgent(request);
+    await requireAgentCapability(agent, "cost.report");
     const workspaceId = agent.workspaceId ?? DEFAULT_WORKSPACE_ID;
 
     const body = (await request.json()) as {

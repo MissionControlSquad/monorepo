@@ -1,6 +1,7 @@
 import { projectDocModel, projectDocRevisionModel } from "@/server/models";
 import { invalidateProjectContext } from "@/server/cache";
 import { resolveAgent } from "../../../../_lib/resolve-agent";
+import { requireAgentCapability } from "@/server/services/agent-authz";
 import { successResponse, handleError } from "../../../../_lib/json-response";
 import { ERR } from "../../../../_lib/error-messages";
 import { validateBody, updateProjectDocSchema } from "../../../../_lib/validation";
@@ -35,6 +36,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
   try {
     const agent = await resolveAgent(request);
     const { id: projectId, docId } = await ctx.params;
+    await requireAgentCapability(agent, "docs.write", { projectId });
 
     const current = await projectDocModel.findById(docId);
     assertDocVisible(current, projectId);

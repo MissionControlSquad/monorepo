@@ -8,6 +8,7 @@ import { agentListCache } from "@/server/cache";
 import { escapeHtml } from "@/server/sanitize";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { resolveAgent } from "../_lib/resolve-agent";
+import { requireAgentCapability } from "@/server/services/agent-authz";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
 import { validateBody, createMessageSchema } from "../_lib/validation";
 import { parsePaginationParams } from "../_lib/pagination";
@@ -54,6 +55,7 @@ export async function POST(request: Request) {
     const v = await validateBody(request, createMessageSchema);
     if (v.error) return v.error;
     const agent = await resolveAgent(request);
+    await requireAgentCapability(agent, "messages.send");
 
     if (await isSystemShutdown()) {
       return errorResponse("System is in shutdown mode. No messages can be sent.", 503);
