@@ -6,7 +6,7 @@ import { TaskStatus } from "../../constants";
 import { assertAssignableAgents } from "../../assignment-guard";
 import { assertProjectWritable } from "../../system-settings";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
-import { resolveTaskGoalId } from "../../services/goals";
+import { resolveTaskGoalId, resolveTaskGoalIdOnUpdate } from "../../services/goals";
 import type { FieldChange } from "../../events/types";
 
 /** Publish task update to per-task, per-project, and global topics. */
@@ -174,6 +174,8 @@ builder.mutationField("updateTask", (t) =>
       blockedByTaskId: t.arg.string(),
       agentId: t.arg.string(),
       projectId: t.arg.string(),
+      goalId: t.arg.string(),
+      clearGoal: t.arg.boolean(),
     },
     resolve: async (query, _root, args, ctx) => {
       const oldTask = await taskModel.findById(args.id, {
@@ -196,9 +198,25 @@ builder.mutationField("updateTask", (t) =>
       if (args.parentTaskId !== undefined) data.parentTaskId = args.parentTaskId ?? null;
       if (args.blockedByTaskId !== undefined) data.blockedByTaskId = args.blockedByTaskId ?? null;
       // Only allow setting projectId if the task doesn't already have one
-      if (args.projectId !== undefined && args.projectId !== null && !oldTask.projectId) {
-        await assertProjectWritable(args.projectId);
+      const settingProject =
+        args.projectId !== undefined && args.projectId !== null && !oldTask.projectId;
+      if (settingProject) {
+        await assertProjectWritable(args.projectId as string);
         data.projectId = args.projectId;
+      }
+
+      // Epic #11c: re-resolve the task's goal when its project or goal changes.
+      const changingGoal = args.goalId !== undefined || args.clearGoal === true;
+      if (settingProject || changingGoal) {
+        data.goalId = await resolveTaskGoalIdOnUpdate({
+          currentProjectId: oldTask.projectId ?? null,
+          currentGoalId: oldTask.goalId ?? null,
+          changingProject: settingProject,
+          patchProjectId: settingProject ? (args.projectId as string) : undefined,
+          changingGoal,
+          patchGoalId: args.clearGoal ? null : args.goalId,
+          fallbackWorkspaceId: ctx.tenancy?.workspaceId,
+        });
       }
 
       // Compute assignee diff before the transaction
