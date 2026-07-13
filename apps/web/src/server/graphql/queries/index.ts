@@ -36,3 +36,4 @@ import "./api-keys";
 import "./terminals";
 import "./agent-instructions";
 import "./org-chart";
+import "./attention";
