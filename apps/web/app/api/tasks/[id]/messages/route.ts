@@ -7,6 +7,8 @@ import { escapeHtml } from "@/server/sanitize";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { parseMentions } from "@agentcenter/utils";
 import { resolveAgent } from "../../../_lib/resolve-agent";
+import { requireAgentCapability } from "@/server/services/agent-authz";
+import { AGENT_CAPABILITY } from "@agentcenter/utils";
 import { successResponse, handleError, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { validateBody, createMessageSchema } from "../../../_lib/validation";
@@ -42,6 +44,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const v = await validateBody(request, createMessageSchema);
     if (v.error) return v.error;
     const agent = await resolveAgent(request);
+    await requireAgentCapability(agent, AGENT_CAPABILITY.MESSAGES_SEND);
 
     const { content: rawContent, attachmentIds } = v.data;
     const content = escapeHtml(rawContent);

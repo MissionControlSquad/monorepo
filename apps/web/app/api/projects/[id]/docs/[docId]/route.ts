@@ -79,6 +79,7 @@ export async function DELETE(request: Request, ctx: RouteContext) {
   try {
     const agent = await resolveAgent(request);
     const { id: projectId, docId } = await ctx.params;
+    await requireAgentCapability(agent, AGENT_CAPABILITY.DOCS_WRITE, { projectId });
 
     const doc = await projectDocModel.findById(docId);
     assertDocVisible(doc, projectId);
