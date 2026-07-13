@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { agentCan, defaultCapabilitiesForRole } from "@/server/services/agent-authz";
+import { agentCan, defaultCapabilitiesForRole } from "@agentcenter/utils";
 
-// Epic #21: the pure agentCan decision (open vs restricted mode) + role defaults. No DB.
+// Epic #21: the pure agentCan decision (open vs restricted mode) + role defaults — now shared in
+// @agentcenter/utils (web/desktop/mobile). No DB.
 
 const restricted = (executionAllowlist: string[] = []) => ({
   changeConsentRequired: true,

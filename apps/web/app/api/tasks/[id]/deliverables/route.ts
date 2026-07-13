@@ -2,6 +2,7 @@ import { taskModel } from "@/server/models/task";
 import { deliverableModel } from "@/server/models";
 import { resolveAgent } from "../../../_lib/resolve-agent";
 import { requireAgentCapability } from "@/server/services/agent-authz";
+import { AGENT_CAPABILITY } from "@agentcenter/utils";
 import {
   successResponse,
   errorResponse,
@@ -40,7 +41,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const v = await validateBody(request, createDeliverableSchema);
     if (v.error) return v.error;
     const agent = await resolveAgent(request);
-    await requireAgentCapability(agent, "tasks.complete");
+    await requireAgentCapability(agent, AGENT_CAPABILITY.TASKS_COMPLETE);
 
     if (await isSystemShutdown()) {
       return errorResponse("System is in shutdown mode. No deliverables can be submitted.", 503);

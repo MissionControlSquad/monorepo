@@ -7,64 +7,12 @@
  */
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
-import { isAgentCapability, FLAG_KEYS } from "@agentcenter/utils";
+import { isAgentCapability, agentCan, FLAG_KEYS } from "@agentcenter/utils";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import type { AgentCapabilityGrant, AgentAuthzEvent } from "@agentcenter/database";
 
-const BASE_CAPABILITIES = [
-  "tasks.checkout",
-  "tasks.complete",
-  "queue.consume",
-  "docs.read",
-  "docs.write",
-  "messages.send",
-  "channels.post",
-  "cost.report",
-  "skills.use",
-];
-const LEAD_EXTRA = ["agents.invoke"];
-
-/** Pure: the baseline capabilities an agent of this role starts with (before any explicit grants). */
-export function defaultCapabilitiesForRole(role: string | null | undefined): string[] {
-  const r = (role ?? "").toLowerCase();
-  const isLead =
-    r.includes("ceo") || r.includes("chief") || r.includes("lead") || r.includes("manager");
-  return isLead ? [...BASE_CAPABILITIES, ...LEAD_EXTRA] : [...BASE_CAPABILITIES];
-}
-
-export interface AgentCanInput {
-  role: string | null | undefined;
-  trustProfile: { changeConsentRequired: boolean; executionAllowlist: string[] } | null;
-  grants: { capability: string; projectScope: string | null }[];
-  scope?: { projectId?: string | null };
-}
-export interface AgentCanDecision {
-  allowed: boolean;
-  reason: string;
-}
-
-/**
- * Pure decision. Open mode (the default) allows everything the route already permits. Restricted mode
- * (trust `changeConsentRequired`) permits only capabilities in role-defaults ∪ execution-allowlist ∪
- * explicit grants (scope-matched).
- */
-export function agentCan(capability: string, input: AgentCanInput): AgentCanDecision {
-  if (!input.trustProfile?.changeConsentRequired) {
-    return { allowed: true, reason: "open mode (no change-consent restriction)" };
-  }
-  if (defaultCapabilitiesForRole(input.role).includes(capability)) {
-    return { allowed: true, reason: "role default capability" };
-  }
-  if (input.trustProfile.executionAllowlist.includes(capability)) {
-    return { allowed: true, reason: "in execution allowlist" };
-  }
-  const scopeId = input.scope?.projectId ?? null;
-  const granted = input.grants.some(
-    (g) => g.capability === capability && (g.projectScope === null || g.projectScope === scopeId),
-  );
-  if (granted) return { allowed: true, reason: "explicit grant" };
-  return { allowed: false, reason: `restricted agent lacks capability '${capability}'` };
-}
+// Pure authorization logic (agentCan, defaultCapabilitiesForRole) + the capability vocabulary live in
+// @agentcenter/utils so web/desktop/mobile share one source of truth. This file is only DB/IO.
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
