@@ -45,6 +45,7 @@ builder.prismaObject("Agent", {
     // Epic #2: pluggable provider adapter.
     adapterType: t.exposeString("adapterType", { nullable: true }),
     adapterConfig: t.expose("adapterConfig", { type: "JSON", nullable: true }),
+    llmModel: t.exposeString("llmModel", { nullable: true }), // per-agent model override
 
     // Relations
     profile: t.relation("profile", { nullable: true }),

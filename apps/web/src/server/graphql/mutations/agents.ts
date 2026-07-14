@@ -131,6 +131,7 @@ builder.mutationField("updateAgentProfile", (t) =>
       role: t.arg.string(),
       personality: t.arg.string(),
       identityEmoji: t.arg.string(),
+      llmModel: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
       // Require authenticated admin session for profile updates
@@ -155,6 +156,8 @@ builder.mutationField("updateAgentProfile", (t) =>
       }
       if (args.personality !== undefined) data.personality = args.personality ?? null;
       if (args.identityEmoji !== undefined) data.identityEmoji = args.identityEmoji ?? null;
+      // Epic #2: per-agent LLM model override (empty string clears it → VM/adapter default).
+      if (args.llmModel !== undefined) data.llmModel = args.llmModel ? args.llmModel : null;
 
       const updated = await agentModel.update(args.id, {
         ...query,
