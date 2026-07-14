@@ -147,3 +147,27 @@ export const DELIVERABLE_VERSIONS_QUERY = gql`
     }
   }
 `;
+
+// Company-wide artifacts gallery — every deliverable in the workspace, optional kind filter.
+export const WORKSPACE_DELIVERABLES_QUERY = gql`
+  query WorkspaceDeliverables($kind: String, $limit: Int) {
+    workspaceDeliverables(kind: $kind, limit: $limit) {
+      id
+      title
+      kind
+      url
+      fileName
+      mimeType
+      createdAt
+      task {
+        id
+        title
+        taskNumber
+      }
+      profile {
+        id
+        displayName
+      }
+    }
+  }
+`;

@@ -38,6 +38,7 @@ import {
   Lock,
   Boxes,
   Search,
+  Images,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -72,6 +73,7 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   { href: "/agent-authz", icon: Lock, label: "Agent access", flag: FLAG_KEYS.AGENT_AUTHZ },
   { href: "/channels", icon: MessageSquare, label: "Channels", flag: FLAG_KEYS.CHANNELS },
   { href: "/projects", icon: FolderKanban, label: "Projects" },
+  { href: "/artifacts", icon: Images, label: "Artifacts" },
   { href: "/analytics", icon: BarChart3, label: "Analytics", flag: FLAG_KEYS.ANALYTICS },
   { href: "/cloud", icon: Cloud, label: "Cloud", flag: FLAG_KEYS.CLOUD_VMS },
   { href: "/live-gateway", icon: Zap, label: "Live Gateway", flag: FLAG_KEYS.LIVE_GATEWAY },

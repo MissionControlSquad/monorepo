@@ -200,7 +200,12 @@ export const DeliverableKind = {
   LINK: "link",
 } as const;
 
+export const DELIVERABLE_KINDS = Object.values(DeliverableKind);
 export type DeliverableKindValue = (typeof DeliverableKind)[keyof typeof DeliverableKind];
+
+export function isDeliverableKind(v: string): v is DeliverableKindValue {
+  return (DELIVERABLE_KINDS as readonly string[]).includes(v);
+}
 
 // ─── Project Member Statuses ──────────────────────────────
 export const ProjectMemberStatus = {
