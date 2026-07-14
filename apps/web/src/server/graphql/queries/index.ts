@@ -30,6 +30,7 @@ import "./skills";
 import "./portability";
 import "./goals";
 import "./observability";
+import "./profile-analytics";
 import "./boardroom";
 import "./plugins";
 import "./api-keys";

@@ -79,6 +79,9 @@ export const AGENT_QUERY = gql`
         taskNumber
         status
       }
+      profile {
+        id
+      }
     }
   }
 `;

@@ -19,6 +19,7 @@ export * from "./goals";
 export * from "./terminals";
 export * from "./collision";
 export * from "./adapter-config";
+export * from "./profile-analytics";
 export * from "./plugins";
 export * from "./llm-providers";
 export * from "./asset-url";
