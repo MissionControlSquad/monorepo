@@ -91,7 +91,14 @@ export { UPDATE_MY_PROFILE } from "./profile";
 
 export { UPDATE_FEATURE_FLAG } from "./feature-flags";
 
-export { APPROVE_APPROVAL, REJECT_APPROVAL } from "./approvals";
+export {
+  APPROVE_APPROVAL,
+  REJECT_APPROVAL,
+  REQUEST_APPROVAL_CHANGES,
+  RESUBMIT_APPROVAL,
+  CANCEL_APPROVAL,
+  ADD_APPROVAL_COMMENT,
+} from "./approvals";
 
 export {
   CREATE_BUDGET_POLICY,

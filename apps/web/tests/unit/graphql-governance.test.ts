@@ -108,4 +108,51 @@ describe("GraphQL governance / approvals (Epic #3)", () => {
     expect(r.errors!.length).toBeGreaterThan(0);
     expect(r.data?.approvals).toBeFalsy();
   });
+
+  it("requestApprovalChanges: admin sends a pending approval to needs_changes with a note", async () => {
+    const created = await createApprovalIn(WS_A, "Needs work");
+    const id = created.data.createApproval.id;
+    const adminCookie = await cookieFor(profileId, WS_A, "admin");
+
+    const changed = await runGraphQL(
+      `mutation($id:String!,$n:String){ requestApprovalChanges(id:$id, decisionNote:$n){ id status decisionNote } }`,
+      { id, n: "Tighten the scope" },
+      adminCookie,
+    );
+    expect(changed.errors).toBeFalsy();
+    expect(changed.data.requestApprovalChanges.status).toBe("needs_changes");
+    expect(changed.data.requestApprovalChanges.decisionNote).toBe("Tighten the scope");
+
+    // Non-terminal: the requester can resubmit it back to pending.
+    const resubmitted = await runGraphQL(
+      `mutation($id:String!){ resubmitApproval(id:$id){ id status resubmitCount } }`,
+      { id },
+      await cookieFor(profileId, WS_A, "member"),
+    );
+    expect(resubmitted.data.resubmitApproval.status).toBe("pending");
+    expect(resubmitted.data.resubmitApproval.resubmitCount).toBe(1);
+  });
+
+  it("requestApprovalChanges: member cannot; only a pending approval can be sent back", async () => {
+    const created = await createApprovalIn(WS_A, "Guarded");
+    const id = created.data.createApproval.id;
+
+    const denied = await runGraphQL(
+      `mutation($id:String!){ requestApprovalChanges(id:$id){ id status } }`,
+      { id },
+      await cookieFor(profileId, WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+    expect(denied.data?.requestApprovalChanges).toBeFalsy();
+
+    // Approve it (terminal), then a change-request must be rejected.
+    const adminCookie = await cookieFor(profileId, WS_A, "admin");
+    await runGraphQL(`mutation($id:String!){ approveApproval(id:$id){ id } }`, { id }, adminCookie);
+    const afterApprove = await runGraphQL(
+      `mutation($id:String!){ requestApprovalChanges(id:$id){ id status } }`,
+      { id },
+      adminCookie,
+    );
+    expect(afterApprove.errors).toBeDefined();
+  });
 });

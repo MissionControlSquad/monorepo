@@ -90,6 +90,51 @@ export async function decideApproval(input: {
   });
 }
 
+/**
+ * Reviewer asks for changes instead of a hard approve/reject — the missing transition into
+ * `needs_changes`. Non-terminal: the requester can resubmit (resubmitApproval) or the reviewer can
+ * later decide it. Only a pending approval can be sent back. Any linked task is returned to `assigned`
+ * so the agent can act on the feedback.
+ */
+export async function requestChanges(input: {
+  approvalId: string;
+  workspaceId: string;
+  decidedById: string; // Profile id
+  decisionNote?: string | null;
+}) {
+  const approval = await findScoped(input.approvalId, input.workspaceId);
+  if (approval.status !== ApprovalStatusConst.PENDING) {
+    throw Object.assign(
+      new Error(`Only a pending approval can be sent back (status: ${approval.status})`),
+      { status: 400 },
+    );
+  }
+  const linkedTaskId =
+    approval.taskId ??
+    (approval.subjectType === ApprovalSubjectTypeConst.TASK ? approval.subjectId : null);
+
+  return prisma.$transaction(async (tx) => {
+    if (linkedTaskId) {
+      const task = await tx.task.findUnique({ where: { id: linkedTaskId } });
+      if (task) {
+        await tx.task.update({
+          where: { id: linkedTaskId },
+          data: { status: TaskStatus.ASSIGNED },
+        });
+      }
+    }
+    return tx.approval.update({
+      where: { id: input.approvalId },
+      data: {
+        status: ApprovalStatusConst.NEEDS_CHANGES,
+        decidedById: input.decidedById,
+        decidedAt: new Date(),
+        decisionNote: input.decisionNote ?? null,
+      },
+    });
+  });
+}
+
 export async function resubmitApproval(approvalId: string, workspaceId: string) {
   const approval = await findScoped(approvalId, workspaceId);
   if (
