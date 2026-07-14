@@ -44,6 +44,14 @@ model Project {
   goalId      String? // Epic #11b: the project's default goal (tasks in it inherit this)
   defaultGoal Goal?   @relation("ProjectDefaultGoal", fields: [goalId], references: [id], onDelete: SetNull)
 
+  // Source configuration (Paperclip Project Workspace parity). Portable metadata; the runtime that
+  // actually checks out a repo is separate. sourceType: local_git | non_git | remote_repo |
+  // remote_managed. visibility: private | workspace.
+  sourceType String? // null = unset (legacy/none)
+  repoUrl    String?
+  repoRef    String? // branch / tag / ref
+  visibility String  @default("private")
+
   costEvents    CostEvent[] // Epic #4
   ledgerEvents  LedgerEvent[] @relation("ProjectLedgerEvents") // Epic #16
   routines      Routine[] // Epic #7

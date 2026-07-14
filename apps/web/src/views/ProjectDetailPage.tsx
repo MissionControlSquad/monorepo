@@ -54,6 +54,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { ProjectMemberEditor } from "../components/project/ProjectMemberEditor";
+import { ProjectSourceCard } from "../components/project/ProjectSourceCard";
 import {
   Breadcrumbs,
   Button,
@@ -720,6 +721,10 @@ function ProjectDetailPanel({
     status?: string;
     shutdownActive?: boolean;
     description?: string;
+    sourceType?: string | null;
+    repoUrl?: string | null;
+    repoRef?: string | null;
+    visibility?: string;
     members?: {
       profileId: string;
       id?: string;
@@ -974,6 +979,13 @@ function ProjectDetailPanel({
           </div>
         )}
       </Card>
+
+      {/* Source configuration */}
+      <ProjectSourceCard
+        project={project}
+        readOnly={isArchived}
+        onSaved={() => reexecuteProject({ requestPolicy: "network-only" })}
+      />
 
       {/* Docs */}
       <WhenFeatureEnabled flag={FLAG_KEYS.DOCUMENTS}>

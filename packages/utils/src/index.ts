@@ -20,6 +20,7 @@ export * from "./terminals";
 export * from "./collision";
 export * from "./adapter-config";
 export * from "./profile-analytics";
+export * from "./project-source";
 export * from "./plugins";
 export * from "./llm-providers";
 export * from "./asset-url";
