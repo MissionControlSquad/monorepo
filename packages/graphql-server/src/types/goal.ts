@@ -12,7 +12,9 @@ builder.prismaObject("Goal", {
     parentId: t.exposeString("parentId", { nullable: true }),
     ownerAgentId: t.exposeString("ownerAgentId", { nullable: true }),
     ownerAgent: t.relation("ownerAgent", { nullable: true }),
+    parent: t.relation("parent", { nullable: true }),
     children: t.relation("children", { query: { orderBy: { createdAt: "asc" } } }),
+    tasks: t.relation("tasks", { query: { orderBy: { createdAt: "desc" } } }), // Epic #11b linked tasks
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
   }),

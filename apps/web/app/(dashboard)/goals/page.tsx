@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation } from "urql";
 import { GOAL_LEVELS, GOAL_STATUSES, GOAL_STATUS } from "@agentcenter/utils";
 import { GOALS_QUERY, AGENTS_QUERY } from "@/lib/graphql/queries";
@@ -151,7 +152,12 @@ export default function GoalsPage() {
           >
             <span className="flex flex-wrap items-center gap-2">
               <Badge variant="gray">{goal.level}</Badge>
-              <span className="font-medium text-foreground">{goal.title}</span>
+              <Link
+                href={`/goals/${goal.id}`}
+                className="font-medium text-foreground hover:underline"
+              >
+                {goal.title}
+              </Link>
               {agentName(goal.ownerAgentId) && (
                 <span className="text-xs text-muted-foreground">
                   @ {agentName(goal.ownerAgentId)}
