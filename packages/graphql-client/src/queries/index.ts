@@ -111,7 +111,7 @@ export {
   ACTIVITY_TREND_QUERY,
 } from "./analytics";
 
-export { GLOBAL_SEARCH_QUERY } from "./search";
+export { GLOBAL_SEARCH_QUERY, SEARCH_ALL_QUERY } from "./search";
 
 export { FEATURE_FLAGS_QUERY } from "./feature-flags";
 

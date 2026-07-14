@@ -9,3 +9,17 @@ export const GLOBAL_SEARCH_QUERY = gql`
     }
   }
 `;
+
+// Full-page search — workspace-scoped, six scopes.
+export const SEARCH_ALL_QUERY = gql`
+  query SearchAll($searchText: String!, $limit: Int) {
+    searchAll(searchText: $searchText, limit: $limit) {
+      tasks
+      messages
+      deliverables
+      agents
+      projects
+      goals
+    }
+  }
+`;

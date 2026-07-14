@@ -37,6 +37,7 @@ import {
   Inbox,
   Lock,
   Boxes,
+  Search,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -52,6 +53,7 @@ interface IconRailProps {
 
 const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; flag?: string }[] = [
   { href: "/", icon: LayoutDashboard, label: "Home" },
+  { href: "/search", icon: Search, label: "Search" },
   { href: "/attention", icon: Inbox, label: "Attention", flag: FLAG_KEYS.ATTENTION },
   { href: "/agents", icon: Bot, label: "Agents" },
   {
