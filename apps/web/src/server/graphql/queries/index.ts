@@ -34,6 +34,7 @@ import "./profile-analytics";
 import "./boardroom";
 import "./plugins";
 import "./api-keys";
+import "./cli-auth";
 import "./terminals";
 import "./agent-instructions";
 import "./org-chart";

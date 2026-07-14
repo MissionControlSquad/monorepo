@@ -183,3 +183,5 @@ export { GRANT_AGENT_CAPABILITY, REVOKE_AGENT_CAPABILITY } from "./agent-authz";
 export { SET_PROJECT_DEFAULT_GOAL } from "./goal-task";
 
 export { DISMISS_ATTENTION_ITEM, UNDISMISS_ATTENTION_ITEM } from "./attention";
+
+export { APPROVE_CLI_AUTH, DENY_CLI_AUTH } from "./cli-auth";
