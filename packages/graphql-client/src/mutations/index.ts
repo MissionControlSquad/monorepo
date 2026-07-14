@@ -140,10 +140,12 @@ export {
 export {
   CREATE_CASE,
   SET_CASE_STATUS,
+  UPDATE_CASE,
   CREATE_LABEL,
   ADD_CASE_LABEL,
   REMOVE_CASE_LABEL,
   LINK_TASK_TO_CASE,
+  UNLINK_TASK_FROM_CASE,
 } from "./cases";
 
 export {

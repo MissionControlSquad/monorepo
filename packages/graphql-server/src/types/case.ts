@@ -30,6 +30,7 @@ builder.prismaObject("CaseTaskLink", {
     caseId: t.exposeString("caseId"),
     taskId: t.exposeString("taskId"),
     role: t.exposeString("role"),
+    task: t.relation("task"),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
   }),
 });

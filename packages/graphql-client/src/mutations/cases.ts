@@ -45,3 +45,21 @@ export const LINK_TASK_TO_CASE = gql`
     }
   }
 `;
+
+export const UPDATE_CASE = gql`
+  mutation UpdateCase($id: String!, $title: String, $summary: String, $caseType: String, $fields: JSON) {
+    updateCase(id: $id, title: $title, summary: $summary, caseType: $caseType, fields: $fields) {
+      id
+      title
+      summary
+      caseType
+      fields
+    }
+  }
+`;
+
+export const UNLINK_TASK_FROM_CASE = gql`
+  mutation UnlinkTaskFromCase($caseId: String!, $taskId: String!) {
+    unlinkTaskFromCase(caseId: $caseId, taskId: $taskId)
+  }
+`;
