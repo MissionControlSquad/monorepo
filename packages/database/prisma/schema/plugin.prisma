@@ -28,7 +28,9 @@ model Plugin {
   category             PluginCategory
   capabilities         String[]       @default([])
   manifest             Json
+  config               Json? // per-workspace config values, validated against manifest.configSchema
   status               PluginStatus   @default(installed)
+  lastError            String? // last error surfaced to the operator (status = error)
   enabled              Boolean        @default(true)
   installedByProfileId String?
   createdAt            DateTime       @default(now())

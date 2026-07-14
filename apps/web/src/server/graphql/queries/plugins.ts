@@ -18,3 +18,20 @@ builder.queryField("plugins", (t) =>
     },
   }),
 );
+
+// Single plugin (detail page). PLUGIN_SDK-gated, admin, workspace-scoped.
+builder.queryField("plugin", (t) =>
+  t.prismaField({
+    type: "Plugin",
+    nullable: true,
+    args: { pluginId: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PLUGIN_SDK);
+      requireRole(ctx, "admin");
+      return ctx.prisma.plugin.findFirst({
+        ...query,
+        where: scoped(ctx, { pluginId: args.pluginId }),
+      });
+    },
+  }),
+);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation } from "urql";
 import { PLUGINS_QUERY } from "@/lib/graphql/queries";
 import { INSTALL_PLUGIN, SET_PLUGIN_ENABLED, UNINSTALL_PLUGIN } from "@/lib/graphql/mutations";
@@ -119,7 +120,12 @@ export default function PluginsPage() {
         <Card key={p.id} className="space-y-2 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="flex flex-wrap items-center gap-2">
-              <span className="font-medium text-foreground">{p.displayName}</span>
+              <Link
+                href={`/plugins/${p.pluginId}`}
+                className="font-medium text-foreground hover:underline"
+              >
+                {p.displayName}
+              </Link>
               <Badge variant="gray">{p.category}</Badge>
               <Badge variant="blue">v{p.version}</Badge>
               <Badge variant={p.enabled ? "green" : "gray"}>{p.status}</Badge>

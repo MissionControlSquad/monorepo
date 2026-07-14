@@ -142,3 +142,75 @@ describe("plugin guards (Epic #6)", () => {
     expect(r.errors).toBeDefined();
   });
 });
+
+describe("plugin config + error surface (Epic #6)", () => {
+  const CONFIG_SCHEMA = {
+    type: "object",
+    required: ["apiToken"],
+    properties: {
+      apiToken: { type: "string", description: "API token" },
+      maxItems: { type: "integer", default: 50 },
+    },
+  };
+  const withConfig = () => manifest({ id: "cfg", configSchema: CONFIG_SCHEMA });
+  const SET_CONFIG = `mutation($p:String!,$c:JSON!){ setPluginConfig(pluginId:$p, config:$c){ pluginId config } }`;
+  const ONE = `query($p:String!){ plugin(pluginId:$p){ pluginId manifest config lastError status } }`;
+
+  it("saves config that satisfies the manifest schema and rejects invalid config", async () => {
+    await setPluginSdk(true);
+    const admin = await cookieFor(WS_A, "admin");
+    await gql(INSTALL, { m: withConfig() }, admin);
+
+    const ok = await gql(SET_CONFIG, { p: "cfg", c: { apiToken: "secret", maxItems: 10 } }, admin);
+    expect(ok.errors).toBeFalsy();
+    expect(ok.data.setPluginConfig.config).toMatchObject({ apiToken: "secret", maxItems: 10 });
+
+    const bad = await gql(SET_CONFIG, { p: "cfg", c: { maxItems: 10 } }, admin); // missing apiToken
+    expect(bad.errors).toBeDefined();
+  });
+
+  it("rejects config for a plugin that declares no configSchema", async () => {
+    await setPluginSdk(true);
+    const admin = await cookieFor(WS_A, "admin");
+    await gql(INSTALL, { m: manifest() }, admin);
+    const r = await gql(SET_CONFIG, { p: "acme", c: { anything: 1 } }, admin);
+    expect(r.errors).toBeDefined();
+  });
+
+  it("plugin(pluginId) returns the manifest; clearPluginError resets an errored plugin", async () => {
+    await setPluginSdk(true);
+    const admin = await cookieFor(WS_A, "admin");
+    await gql(INSTALL, { m: manifest() }, admin);
+    // simulate a runtime error state
+    await prisma.plugin.updateMany({
+      where: { pluginId: "acme" },
+      data: { status: "error", lastError: "boom" },
+    });
+
+    const detail = await gql(ONE, { p: "acme" }, admin);
+    expect(detail.data.plugin).toMatchObject({ status: "error", lastError: "boom" });
+    expect(detail.data.plugin.manifest.id).toBe("acme");
+
+    const cleared = await gql(
+      `mutation($p:String!){ clearPluginError(pluginId:$p){ status lastError } }`,
+      { p: "acme" },
+      admin,
+    );
+    expect(cleared.data.clearPluginError).toMatchObject({ status: "installed", lastError: null });
+  });
+
+  it("is workspace-isolated and admin-only", async () => {
+    await setPluginSdk(true);
+    await gql(INSTALL, { m: withConfig() }, await cookieFor(WS_A, "admin"));
+    // WS_B cannot see it
+    const cross = await gql(ONE, { p: "cfg" }, await cookieFor(WS_B, "admin"));
+    expect(cross.data.plugin).toBeNull();
+    // a member cannot configure
+    const denied = await gql(
+      SET_CONFIG,
+      { p: "cfg", c: { apiToken: "x" } },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+  });
+});

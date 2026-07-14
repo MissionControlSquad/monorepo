@@ -18,6 +18,10 @@ export default defineConfig({
     // sequential fork keeps SYSTEM_SECRET correct for the file currently running. Combined with
     // DISABLE_FLAG_CACHE + per-file feature_flags/licenses truncation, cross-file state stays clean.
     pool: "forks",
+    // vitest 4 dropped `poolOptions` from its published types but still honors it at runtime, and
+    // singleFork is what makes the suite deterministic (isolation stays on; only the process is
+    // shared). @ts-expect-error until vitest re-types this.
+    // @ts-expect-error - poolOptions is valid at runtime in vitest 4 but missing from the types
     poolOptions: { forks: { singleFork: true } },
     setupFiles: ["./tests/setup.ts"],
     // Read feature flags fresh from the DB on every check (bypass the 60s cache). Integration tests

@@ -51,6 +51,9 @@ const manifestSchema = z.object({
     }),
   tools: z.array(toolSchema).optional(),
   jobs: z.array(jobSchema).optional(),
+  // Optional JSON Schema (draft-07) describing per-workspace configuration. The install UI renders a
+  // form from it (shared adapterConfigFields helper) and setPluginConfig validates against it.
+  configSchema: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type PluginManifest = z.infer<typeof manifestSchema>;
