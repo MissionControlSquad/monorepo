@@ -6,6 +6,7 @@ import {
   LEDGER_SUMMARY_QUERY,
   LEDGER_BY_CATEGORY_QUERY,
   LEDGER_BY_PROJECT_QUERY,
+  LEDGER_BY_BILLER_QUERY,
   LEDGER_EVENTS_QUERY,
 } from "@/lib/graphql/queries";
 import { CREATE_LEDGER_EVENT, DELETE_LEDGER_EVENT } from "@/lib/graphql/mutations";
@@ -30,6 +31,13 @@ interface CatTotal {
 interface ProjectTotal {
   projectId: string | null;
   projectName: string;
+  revenueCents: number;
+  expenseCents: number;
+  netCents: number;
+  eventCount: number;
+}
+interface BillerTotal {
+  biller: string;
   revenueCents: number;
   expenseCents: number;
   netCents: number;
@@ -78,6 +86,9 @@ export default function LedgerPage() {
   const [{ data: projData }, refetchProjects] = useQuery<{ ledgerByProject: ProjectTotal[] }>({
     query: LEDGER_BY_PROJECT_QUERY,
   });
+  const [{ data: billerData }, refetchBillers] = useQuery<{ ledgerByBiller: BillerTotal[] }>({
+    query: LEDGER_BY_BILLER_QUERY,
+  });
   const [{ data: evData }, refetchEvents] = useQuery<{
     ledgerEvents: { events: Event[]; nextCursor: string | null };
   }>({ query: LEDGER_EVENTS_QUERY, variables: { limit: 25 } });
@@ -100,12 +111,14 @@ export default function LedgerPage() {
   const cats = [...(catData?.ledgerByCategory ?? [])].sort((a, b) => b.totalCents - a.totalCents);
   const maxCat = cats.reduce((m, c) => Math.max(m, c.totalCents), 0) || 1;
   const projects = projData?.ledgerByProject ?? [];
+  const billers = billerData?.ledgerByBiller ?? [];
   const events = evData?.ledgerEvents.events ?? [];
 
   function refresh() {
     refetchSummary({ requestPolicy: "network-only" });
     refetchCats({ requestPolicy: "network-only" });
     refetchProjects({ requestPolicy: "network-only" });
+    refetchBillers({ requestPolicy: "network-only" });
     refetchEvents({ requestPolicy: "network-only" });
   }
 
@@ -273,6 +286,30 @@ export default function LedgerPage() {
                   {p.netCents >= 0 ? money(p.netCents) : `−${money(-p.netCents)}`}
                 </Badge>
                 <span className="text-xs text-muted-foreground">{p.eventCount}</span>
+              </span>
+            </div>
+          ))}
+        </Card>
+      </section>
+
+      {/* By biller — who you bill / who bills you */}
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-foreground">By biller</h2>
+        <Card className="space-y-2 p-4">
+          {billers.length === 0 && <p className="text-sm text-muted-foreground">No entries yet.</p>}
+          {billers.map((b) => (
+            <div
+              key={b.biller}
+              className="flex items-center justify-between border-b border-border pb-2 text-sm last:border-0 last:pb-0"
+            >
+              <span className="truncate text-foreground">{b.biller}</span>
+              <span className="flex items-center gap-3">
+                <span className="text-success">{money(b.revenueCents)}</span>
+                <span className="text-destructive">−{money(b.expenseCents)}</span>
+                <Badge variant={b.netCents >= 0 ? "green" : "red"}>
+                  {b.netCents >= 0 ? money(b.netCents) : `−${money(-b.netCents)}`}
+                </Badge>
+                <span className="text-xs text-muted-foreground">{b.eventCount}</span>
               </span>
             </div>
           ))}

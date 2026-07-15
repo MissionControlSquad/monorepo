@@ -24,6 +24,18 @@ export const LEDGER_BY_CATEGORY_QUERY = gql`
   }
 `;
 
+export const LEDGER_BY_BILLER_QUERY = gql`
+  query LedgerByBiller($from: DateTime, $to: DateTime) {
+    ledgerByBiller(from: $from, to: $to) {
+      biller
+      revenueCents
+      expenseCents
+      netCents
+      eventCount
+    }
+  }
+`;
+
 export const LEDGER_BY_PROJECT_QUERY = gql`
   query LedgerByProject($from: DateTime, $to: DateTime) {
     ledgerByProject(from: $from, to: $to) {

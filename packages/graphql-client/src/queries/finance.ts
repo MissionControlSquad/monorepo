@@ -49,6 +49,15 @@ export const BUDGET_INCIDENTS_QUERY = gql`
   }
 `;
 
+export const COST_TREND_QUERY = gql`
+  query CostTrend($days: Int, $projectId: String) {
+    costTrend(days: $days, projectId: $projectId) {
+      date
+      amountCents
+    }
+  }
+`;
+
 export const COST_BREAKDOWN_QUERY = gql`
   query CostBreakdown($groupBy: String!, $from: DateTime, $to: DateTime, $projectId: String) {
     costBreakdown(groupBy: $groupBy, from: $from, to: $to, projectId: $projectId) {

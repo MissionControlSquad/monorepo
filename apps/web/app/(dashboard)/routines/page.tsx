@@ -8,6 +8,7 @@ import {
   TRIGGER_ROUTINE_NOW,
   ADD_ROUTINE_TRIGGER,
   UPDATE_ROUTINE,
+  REGENERATE_TRIGGER_PUBLIC_ID,
 } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 
@@ -46,6 +47,7 @@ export default function RoutinesPage() {
   const [, triggerNow] = useMutation(TRIGGER_ROUTINE_NOW);
   const [, addTrigger] = useMutation(ADD_ROUTINE_TRIGGER);
   const [, updateRoutine] = useMutation(UPDATE_ROUTINE);
+  const [, regenerateTrigger] = useMutation(REGENERATE_TRIGGER_PUBLIC_ID);
 
   const agents = agentsData?.agents ?? [];
   const goals = goalsData?.goals ?? [];
@@ -94,6 +96,16 @@ export default function RoutinesPage() {
         goalId: "",
       });
       refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onRegenerateTrigger(triggerId: string, routineId: string) {
+    setBusy(routineId);
+    try {
+      await regenerateTrigger({ triggerId });
+      refetch({ requestPolicy: "network-only" });
     } finally {
       setBusy(null);
     }
@@ -259,9 +271,21 @@ export default function RoutinesPage() {
             <p className="text-xs text-muted-foreground">Last run: {lastRun[r.id]}</p>
           )}
           {r.triggers.map((t) => (
-            <div key={t.id} className="text-xs text-muted-foreground">
-              <Badge variant="blue">{t.type}</Badge>{" "}
-              {t.publicId && <code className="break-all">/api/routines/fire/{t.publicId}</code>}
+            <div key={t.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="blue">{t.type}</Badge>
+              {t.publicId && (
+                <>
+                  <code className="break-all">/api/routines/fire/{t.publicId}</code>
+                  <button
+                    className="text-muted-foreground underline hover:text-foreground"
+                    disabled={busy === r.id}
+                    onClick={() => onRegenerateTrigger(t.id, r.id)}
+                    title="Rotate this webhook URL (invalidates the old one)"
+                  >
+                    regenerate
+                  </button>
+                </>
+              )}
             </div>
           ))}
         </Card>

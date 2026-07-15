@@ -53,6 +53,15 @@ export const UPDATE_ROUTINE = gql`
   }
 `;
 
+export const REGENERATE_TRIGGER_PUBLIC_ID = gql`
+  mutation RegenerateTriggerPublicId($triggerId: String!) {
+    regenerateTriggerPublicId(triggerId: $triggerId) {
+      id
+      publicId
+    }
+  }
+`;
+
 export const CREATE_PIPELINE = gql`
   mutation CreatePipeline($name: String!, $description: String) {
     createPipeline(name: $name, description: $description) {
