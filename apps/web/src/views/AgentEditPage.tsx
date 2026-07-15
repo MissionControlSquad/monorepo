@@ -10,6 +10,7 @@ import { AGENT_QUERY } from "../lib/graphql/queries";
 import { UPDATE_AGENT_PROFILE } from "../lib/graphql/mutations/agents";
 import { Breadcrumbs, Button, Card, PageLayout } from "../components/ui";
 import { AgentAdapterConfigCard } from "../components/agent/AgentAdapterConfigCard";
+import { AgentSkillsCard } from "../components/agent/AgentSkillsCard";
 import { Input } from "@/components/ui/shadcn/input";
 import { ProfileAvatar } from "../components/ui/ProfileAvatar";
 import { MentionTextArea } from "../components/common/MentionTextArea";
@@ -245,6 +246,8 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
         adapterConfig={(agent.adapterConfig as Record<string, unknown> | null) ?? null}
         llmModel={agent.llmModel ?? null}
       />
+
+      <AgentSkillsCard agentId={agentId} />
     </PageLayout>
   );
 }

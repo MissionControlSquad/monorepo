@@ -47,6 +47,20 @@ export const STAR_SKILL = gql`
   }
 `;
 
+export const ASSIGN_SKILL = gql`
+  mutation AssignSkill($agentId: String!, $skillId: String!) {
+    assignSkill(agentId: $agentId, skillId: $skillId) {
+      id
+    }
+  }
+`;
+
+export const UNASSIGN_SKILL = gql`
+  mutation UnassignSkill($agentId: String!, $skillId: String!) {
+    unassignSkill(agentId: $agentId, skillId: $skillId)
+  }
+`;
+
 export const UPDATE_SKILL = gql`
   mutation UpdateSkill($id: String!, $sharingScope: String) {
     updateSkill(id: $id, sharingScope: $sharingScope) {

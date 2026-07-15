@@ -51,6 +51,20 @@ export const LINT_SKILL_QUERY = gql`
   }
 `;
 
+export const AGENT_SKILLS_QUERY = gql`
+  query AgentSkills($agentId: String!) {
+    agentSkills(agentId: $agentId) {
+      id
+      skillId
+      skill {
+        id
+        name
+        icon
+      }
+    }
+  }
+`;
+
 export const SKILL_FILES_QUERY = gql`
   query SkillFiles($skillId: String!) {
     skillFiles(skillId: $skillId) {
