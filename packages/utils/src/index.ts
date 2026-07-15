@@ -19,6 +19,7 @@ export * from "./goals";
 export * from "./terminals";
 export * from "./collision";
 export * from "./dotenv-import";
+export * from "./skill-lint";
 export * from "./adapter-config";
 export * from "./profile-analytics";
 export * from "./project-source";

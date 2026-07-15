@@ -165,6 +165,27 @@ describe("skill bundle files (Epic #10)", () => {
     expect(await prisma.skillFile.count({ where: { skillId } })).toBe(1);
   });
 
+  it("lintSkill validates the skill + its files (test-run, no execution)", async () => {
+    // A skill with an empty entry doc would be rejected at create, so create a valid one then
+    // add an empty file to trigger a warn.
+    const skillId = (await makeSkill(WS_A, "Lintable", "# Title\ncontent")).data.createSkill.id;
+    const member = await cookieFor(WS_A, "member");
+    await gql(UPSERT, { s: skillId, p: "empty.txt", c: "" }, member);
+
+    const r = await gql(
+      `query($s:String!){ lintSkill(skillId:$s){ level path message } }`,
+      { s: skillId },
+      member,
+    );
+    expect(r.errors).toBeFalsy();
+    const findings = r.data.lintSkill as { level: string; path: string | null; message: string }[];
+    expect(findings).toContainEqual({
+      level: "warn",
+      path: "empty.txt",
+      message: "file is empty",
+    });
+  });
+
   it("rejects a path-traversal path and isolates across workspaces", async () => {
     const skillId = (await makeSkill(WS_A)).data.createSkill.id;
     const bad = await gql(

@@ -41,6 +41,16 @@ export const SKILL_CATALOG_QUERY = gql`
   }
 `;
 
+export const LINT_SKILL_QUERY = gql`
+  query LintSkill($skillId: String!) {
+    lintSkill(skillId: $skillId) {
+      level
+      path
+      message
+    }
+  }
+`;
+
 export const SKILL_FILES_QUERY = gql`
   query SkillFiles($skillId: String!) {
     skillFiles(skillId: $skillId) {

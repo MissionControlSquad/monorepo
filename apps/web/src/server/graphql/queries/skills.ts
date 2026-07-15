@@ -1,9 +1,17 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS, isCollisionStrategy } from "@agentcenter/utils";
+import { FLAG_KEYS, isCollisionStrategy, lintSkill } from "@agentcenter/utils";
 import type { CollisionStrategy } from "@agentcenter/utils";
 import { requireRole, scoped } from "@/server/tenancy";
 import { previewTeamInstall } from "@/server/services/teams";
+
+const SkillLintFinding = builder.simpleObject("SkillLintFinding", {
+  fields: (t) => ({
+    level: t.string(),
+    path: t.string({ nullable: true }),
+    message: t.string(),
+  }),
+});
 
 const TeamInstallPlanItemType = builder.simpleObject("TeamInstallPlanItem", {
   fields: (t) => ({
@@ -77,6 +85,24 @@ builder.queryField("skillCatalog", (t) =>
         orderBy: [{ installCount: "desc" }, { starCount: "desc" }, { updatedAt: "desc" }],
         take: 100,
       });
+    },
+  }),
+);
+
+// Skill "test-run": static validation of a skill's entry doc + bundle files (no code execution).
+builder.queryField("lintSkill", (t) =>
+  t.field({
+    type: [SkillLintFinding],
+    args: { skillId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      requireRole(ctx, "member");
+      const skill = await ctx.prisma.skill.findFirst({
+        where: scoped(ctx, { id: args.skillId }),
+        select: { markdown: true, files: { select: { path: true, content: true } } },
+      });
+      if (!skill) return [];
+      return lintSkill({ markdown: skill.markdown, files: skill.files });
     },
   }),
 );

@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "urql";
-import { SKILLS_QUERY, SKILL_FILES_QUERY, SKILL_CATALOG_QUERY } from "@/lib/graphql/queries";
+import {
+  SKILLS_QUERY,
+  SKILL_FILES_QUERY,
+  SKILL_CATALOG_QUERY,
+  LINT_SKILL_QUERY,
+} from "@/lib/graphql/queries";
 import {
   CREATE_SKILL,
   FORK_SKILL,
@@ -60,6 +65,7 @@ export default function SkillsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
   const [openFiles, setOpenFiles] = useState<string | null>(null);
+  const [openLint, setOpenLint] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     icon: "",
@@ -214,6 +220,13 @@ export default function SkillsPage() {
               </Button>
               <Button
                 size="sm"
+                variant="secondary"
+                onClick={() => setOpenLint((o) => (o === s.id ? null : s.id))}
+              >
+                Test
+              </Button>
+              <Button
+                size="sm"
                 variant={s.sharingScope === "public" ? "primary" : "secondary"}
                 disabled={busy === s.id}
                 title="Publish to the cross-workspace catalog"
@@ -259,6 +272,7 @@ export default function SkillsPage() {
             </span>
           </div>
           {openFiles === s.id && <SkillFilesPanel skillId={s.id} />}
+          {openLint === s.id && <SkillLintPanel skillId={s.id} />}
         </Card>
       ))}
     </div>
@@ -365,6 +379,37 @@ function SkillFilesPanel({ skillId }: { skillId: string }) {
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface LintFinding {
+  level: string;
+  path: string | null;
+  message: string;
+}
+
+function SkillLintPanel({ skillId }: { skillId: string }) {
+  const [{ data, fetching }] = useQuery<{ lintSkill: LintFinding[] }>({
+    query: LINT_SKILL_QUERY,
+    variables: { skillId },
+    requestPolicy: "network-only",
+  });
+  const findings = data?.lintSkill ?? [];
+  return (
+    <div className="mt-2 space-y-1 rounded border border-dashed border-border p-3">
+      <p className="text-xs font-medium text-muted-foreground">
+        Validation {fetching ? "…" : findings.length === 0 ? "— all checks passed ✓" : ""}
+      </p>
+      {findings.map((f, i) => (
+        <div key={i} className="flex items-start gap-2 text-xs">
+          <Badge variant={f.level === "error" ? "red" : "yellow"}>{f.level}</Badge>
+          <span>
+            {f.path && <span className="font-mono text-muted-foreground">{f.path}: </span>}
+            <span className="text-foreground">{f.message}</span>
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
