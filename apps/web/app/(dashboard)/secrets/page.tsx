@@ -2,13 +2,18 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "urql";
-import { SECRETS_QUERY, SECRET_PROVIDERS_QUERY } from "@/lib/graphql/queries";
+import {
+  SECRETS_QUERY,
+  SECRET_PROVIDERS_QUERY,
+  SECRET_ACCESS_EVENTS_QUERY,
+} from "@/lib/graphql/queries";
 import {
   CREATE_SECRET,
   CREATE_USER_SECRET,
   ROTATE_SECRET,
   BIND_SECRET,
   UNBIND_SECRET,
+  UPDATE_SECRET,
   SET_SECRET_STATUS,
   CREATE_SECRET_PROVIDER,
   DELETE_SECRET_PROVIDER,
@@ -70,6 +75,7 @@ export default function SecretsPage() {
   const [, bindSecret] = useMutation(BIND_SECRET);
   const [, unbindSecret] = useMutation(UNBIND_SECRET);
   const [, setStatus] = useMutation(SET_SECRET_STATUS);
+  const [, updateSecret] = useMutation(UPDATE_SECRET);
   const [, createProvider] = useMutation(CREATE_SECRET_PROVIDER);
   const [, deleteProvider] = useMutation(DELETE_SECRET_PROVIDER);
   const [, importSecrets] = useMutation(IMPORT_SECRETS);
@@ -88,6 +94,10 @@ export default function SecretsPage() {
   const [importResult, setImportResult] = useState<string | null>(null);
   const [rotateVal, setRotateVal] = useState<Record<string, string>>({});
   const [bindForm, setBindForm] = useState<Record<string, { env: string; agentId: string }>>({});
+  const [editing, setEditing] = useState<{ id: string; name: string; description: string } | null>(
+    null,
+  );
+  const [openAudit, setOpenAudit] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const secrets = data?.secrets ?? [];
@@ -389,19 +399,84 @@ export default function SecretsPage() {
             {s.description && (
               <span className="text-sm text-muted-foreground">{s.description}</span>
             )}
-            <select
-              className="ml-auto rounded border border-border bg-background px-2 py-1 text-xs"
-              value={s.status}
-              onChange={async (e) => {
-                await setStatus({ id: s.id, status: e.target.value });
-                refresh();
-              }}
-            >
-              <option value="active">active</option>
-              <option value="disabled">disabled</option>
-              <option value="archived">archived</option>
-            </select>
+            <span className="ml-auto flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  setEditing((e) =>
+                    e?.id === s.id
+                      ? null
+                      : { id: s.id, name: s.name, description: s.description ?? "" },
+                  )
+                }
+              >
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setOpenAudit((o) => (o === s.id ? null : s.id))}
+              >
+                Audit
+              </Button>
+              <select
+                className="rounded border border-border bg-background px-2 py-1 text-xs"
+                value={s.status}
+                onChange={async (e) => {
+                  await setStatus({ id: s.id, status: e.target.value });
+                  refresh();
+                }}
+              >
+                <option value="active">active</option>
+                <option value="disabled">disabled</option>
+                <option value="archived">archived</option>
+              </select>
+            </span>
           </div>
+
+          {/* Inline rename / edit description */}
+          {editing?.id === s.id && (
+            <div className="flex flex-wrap gap-2 rounded border border-dashed border-border p-2">
+              <input
+                className="flex-1 rounded border border-border bg-background px-2 py-1 text-sm"
+                placeholder="Name"
+                value={editing.name}
+                onChange={(e) => setEditing((p) => (p ? { ...p, name: e.target.value } : p))}
+              />
+              <input
+                className="flex-1 rounded border border-border bg-background px-2 py-1 text-sm"
+                placeholder="Description"
+                value={editing.description}
+                onChange={(e) => setEditing((p) => (p ? { ...p, description: e.target.value } : p))}
+              />
+              <Button
+                size="sm"
+                disabled={!editing.name.trim() || busy === s.id}
+                onClick={async () => {
+                  setBusy(s.id);
+                  try {
+                    const res = await updateSecret({
+                      id: s.id,
+                      name: editing.name.trim(),
+                      description: editing.description.trim() || null,
+                    });
+                    if (res.error)
+                      setError(res.error.graphQLErrors[0]?.message ?? "Failed to update");
+                    else {
+                      setEditing(null);
+                      refresh();
+                    }
+                  } finally {
+                    setBusy(null);
+                  }
+                }}
+              >
+                Save
+              </Button>
+            </div>
+          )}
+          {openAudit === s.id && <SecretAuditPanel secretId={s.id} />}
 
           {/* Bindings */}
           <div className="space-y-1">
@@ -479,6 +554,41 @@ export default function SecretsPage() {
             </div>
           </div>
         </Card>
+      ))}
+    </div>
+  );
+}
+
+interface AccessEvent {
+  id: string;
+  action: string;
+  actorType: string;
+  version: number | null;
+  createdAt: string;
+}
+
+function SecretAuditPanel({ secretId }: { secretId: string }) {
+  const [{ data, fetching }] = useQuery<{ secretAccessEvents: AccessEvent[] }>({
+    query: SECRET_ACCESS_EVENTS_QUERY,
+    variables: { secretId, limit: 50 },
+    requestPolicy: "network-only",
+  });
+  const events = data?.secretAccessEvents ?? [];
+  return (
+    <div className="space-y-1 rounded border border-dashed border-border p-3">
+      <p className="text-xs font-medium text-muted-foreground">Access history</p>
+      {fetching && <p className="text-xs text-muted-foreground">Loading…</p>}
+      {!fetching && events.length === 0 && (
+        <p className="text-xs text-muted-foreground">No events.</p>
+      )}
+      {events.map((e) => (
+        <div key={e.id} className="flex items-center gap-2 text-xs">
+          <Badge variant="gray">{e.action}</Badge>
+          <span className="text-muted-foreground">
+            {e.actorType}
+            {e.version ? ` · v${e.version}` : ""} · {new Date(e.createdAt).toLocaleString()}
+          </span>
+        </div>
       ))}
     </div>
   );
