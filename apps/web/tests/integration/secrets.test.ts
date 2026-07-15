@@ -136,6 +136,20 @@ describe("bindings + env resolution (Epic #5)", () => {
       where: { secretId: s.data.createSecret.id, action: "bound" },
     });
     expect(bound).not.toBeNull();
+
+    // Unbind removes the binding so it no longer resolves into the agent's env.
+    const unbind = await gql(
+      `mutation($id:String!){ unbindSecret(id:$id) }`,
+      { id: bind.data.bindSecret.id },
+      await cookieFor(WS_A, "admin"),
+    );
+    expect(unbind.data.unbindSecret).toBe(true);
+    expect(await resolveEnvForAgent(WS_A, agentId)).toEqual({});
+    expect(
+      await prisma.secretAccessEvent.count({
+        where: { secretId: s.data.createSecret.id, action: "unbound" },
+      }),
+    ).toBe(1);
   });
 
   it("rejects an invalid env var name", async () => {
