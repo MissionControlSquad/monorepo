@@ -22,6 +22,7 @@ import { Badge, Button } from "../ui";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { DELIVERABLE_VERSIONS_QUERY } from "../../lib/graphql/queries";
 import { DeliverableAnnotations } from "./DeliverableAnnotations";
+import { DeliverableVotes } from "./DeliverableVotes";
 import { getAssetUrl, formatFileSize, DeliverableKind } from "@agentcenter/utils";
 import type { Deliverable, Agent, DeliverableVersion } from "@agentcenter/types";
 
@@ -375,9 +376,13 @@ export function DeliverableFullView({
                   </div>
                 ))}
 
-              {/* Tier C: review annotations */}
+              {/* Tier C: votes + review annotations */}
               {!viewingVersion && (
-                <div className="mt-6 border-t border-border pt-4">
+                <div className="mt-6 space-y-4 border-t border-border pt-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-foreground">Review</h3>
+                    <DeliverableVotes deliverableId={deliverable.id} />
+                  </div>
                   <DeliverableAnnotations deliverableId={deliverable.id} />
                 </div>
               )}

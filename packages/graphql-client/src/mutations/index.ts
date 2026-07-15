@@ -213,3 +213,5 @@ export {
   RESOLVE_DELIVERABLE_ANNOTATION,
   DELETE_DELIVERABLE_ANNOTATION,
 } from "./deliverable-annotations";
+
+export { CAST_DELIVERABLE_VOTE } from "./deliverable-votes";

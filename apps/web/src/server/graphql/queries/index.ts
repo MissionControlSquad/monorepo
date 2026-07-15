@@ -45,3 +45,4 @@ import "./agent-governance";
 import "./task-relations";
 import "./external-links";
 import "./deliverable-annotations";
+import "./deliverable-votes";

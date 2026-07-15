@@ -30,6 +30,7 @@ model Deliverable {
   project  Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
   versions    DeliverableVersion[]
   annotations DeliverableAnnotation[]
+  votes       DeliverableVote[]
 
   @@index([taskId])
   @@index([profileId])
@@ -54,6 +55,24 @@ model DeliverableAnnotation {
 
   @@index([deliverableId, createdAt])
   @@map("deliverable_annotations")
+}
+
+// Tier C: lightweight quality/prioritization votes on a deliverable — one up (+1) or down (-1) vote
+// per member. Distinct from the formal Approval workflow and from chat reactions. voterId is a
+// buildbase userId (no FK, D5).
+model DeliverableVote {
+  id            String   @id @default(cuid())
+  deliverableId String
+  voterId       String
+  value         Int // +1 or -1
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  deliverable Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+
+  @@unique([deliverableId, voterId])
+  @@index([deliverableId])
+  @@map("deliverable_votes")
 }
 
 model DeliverableVersion {
