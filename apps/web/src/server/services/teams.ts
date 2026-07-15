@@ -8,8 +8,8 @@ import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Team, TeamMember, TeamKind, TeamTrustLevel } from "@agentcenter/database";
 import { slugify } from "./skills";
-import { resolveCollision, COLLISION_ACTION } from "@agentcenter/utils";
-import type { CollisionAction, CollisionStrategy } from "@agentcenter/utils";
+import { resolveCollision, planCollisions, COLLISION_ACTION } from "@agentcenter/utils";
+import type { CollisionAction, CollisionStrategy, CollisionPlanItem } from "@agentcenter/utils";
 
 // resolveCollision is a shared pure helper in @agentcenter/utils (reused by skills, teams,
 // portability). Imported for internal use here and re-exported for existing importers.
@@ -88,6 +88,44 @@ export interface InstallTeamResult {
   installId: string;
   createdAgentIds: string[];
   actions: { member: string; action: CollisionAction; agentName: string }[];
+}
+
+export interface TeamInstallPlanItem {
+  member: string;
+  action: CollisionAction;
+  agentName: string;
+}
+
+/**
+ * Dry-run: what would installing this team do? Returns the per-member plan (create/rename/skip/
+ * replace) without touching the DB. Backs the install-wizard preview.
+ */
+export async function previewTeamInstall(args: {
+  workspaceId: string;
+  teamId: string;
+  collisionStrategy: CollisionStrategy;
+}): Promise<TeamInstallPlanItem[]> {
+  const team = await prisma.team.findFirst({
+    where: { id: args.teamId, workspaceId: args.workspaceId },
+    include: { members: { orderBy: { order: "asc" } } },
+  });
+  if (!team) notFound("Team");
+  const existingNames = (
+    await prisma.agent.findMany({
+      where: { workspaceId: args.workspaceId },
+      select: { name: true },
+    })
+  ).map((a) => a.name);
+  const plan = planCollisions(
+    existingNames,
+    team.members.map((m) => m.name),
+    args.collisionStrategy,
+  );
+  return plan.map((p: CollisionPlanItem) => ({
+    member: p.name,
+    action: p.action,
+    agentName: p.resolvedName,
+  }));
 }
 
 /** Install a team: create/replace one Agent per member per the collision strategy; record it. */

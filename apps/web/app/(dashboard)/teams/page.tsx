@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "urql";
-import { TEAMS_QUERY } from "@/lib/graphql/queries";
+import { useQuery, useMutation, useClient } from "urql";
+import { TEAMS_QUERY, PREVIEW_TEAM_INSTALL_QUERY } from "@/lib/graphql/queries";
 import { CREATE_TEAM, ADD_TEAM_MEMBER, INSTALL_TEAM } from "@/lib/graphql/mutations";
 import { COLLISION_STRATEGIES } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
@@ -25,14 +25,27 @@ interface Team {
   installCount: number;
   members: Member[];
 }
+interface PlanItem {
+  member: string;
+  action: string;
+  agentName: string;
+}
 
 const STRATEGIES = COLLISION_STRATEGIES;
+
+function actionVariant(action: string): "green" | "yellow" | "gray" | "red" {
+  if (action === "create") return "green";
+  if (action === "replace") return "yellow";
+  if (action === "skip") return "gray";
+  return "gray";
+}
 
 export default function TeamsPage() {
   const [{ data }, refetch] = useQuery<{ teams: Team[] }>({ query: TEAMS_QUERY });
   const [, createTeam] = useMutation(CREATE_TEAM);
   const [, addMember] = useMutation(ADD_TEAM_MEMBER);
   const [, installTeam] = useMutation(INSTALL_TEAM);
+  const client = useClient();
 
   const [busy, setBusy] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", icon: "", tagline: "", tags: "" });
@@ -40,6 +53,7 @@ export default function TeamsPage() {
   const [memberForm, setMemberForm] = useState<Record<string, { name: string; role: string }>>({});
   const [strategy, setStrategy] = useState<Record<string, string>>({});
   const [result, setResult] = useState<Record<string, string>>({});
+  const [preview, setPreview] = useState<Record<string, PlanItem[]>>({});
   const allTeams = data?.teams ?? [];
   const allTags = [...new Set(allTeams.flatMap((t) => t.tags))].sort();
   const teams = tagFilter ? allTeams.filter((t) => t.tags.includes(tagFilter)) : allTeams;
@@ -163,6 +177,26 @@ export default function TeamsPage() {
                 </select>
                 <Button
                   size="sm"
+                  variant="secondary"
+                  disabled={tm.members.length === 0 || busy === tm.id}
+                  onClick={() =>
+                    act(async () => {
+                      const res = await client
+                        .query<{ previewTeamInstall: PlanItem[] }>(
+                          PREVIEW_TEAM_INSTALL_QUERY,
+                          { teamId: tm.id, collisionStrategy: strategy[tm.id] ?? "rename" },
+                          { requestPolicy: "network-only" },
+                        )
+                        .toPromise();
+                      setPreview((p) => ({ ...p, [tm.id]: res.data?.previewTeamInstall ?? [] }));
+                      setResult((r) => ({ ...r, [tm.id]: "" }));
+                    }, tm.id)
+                  }
+                >
+                  Preview
+                </Button>
+                <Button
+                  size="sm"
                   disabled={tm.members.length === 0 || busy === tm.id}
                   onClick={() =>
                     act(async () => {
@@ -172,6 +206,7 @@ export default function TeamsPage() {
                       });
                       const ids = res.data?.installTeam?.createdAgentIds ?? [];
                       setResult((r) => ({ ...r, [tm.id]: `installed — ${ids.length} agent(s)` }));
+                      setPreview((p) => ({ ...p, [tm.id]: [] }));
                     }, tm.id)
                   }
                 >
@@ -179,6 +214,22 @@ export default function TeamsPage() {
                 </Button>
               </span>
             </div>
+            {preview[tm.id] && preview[tm.id].length > 0 && (
+              <div className="space-y-1 rounded border border-dashed border-border p-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Install preview ({strategy[tm.id] ?? "rename"} on collision)
+                </p>
+                {preview[tm.id].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <Badge variant={actionVariant(item.action)}>{item.action}</Badge>
+                    <span className="text-foreground">{item.member}</span>
+                    {item.agentName !== item.member && (
+                      <span className="text-muted-foreground">→ {item.agentName}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             {result[tm.id] && <p className="text-xs text-muted-foreground">{result[tm.id]}</p>}
             <div className="flex flex-wrap gap-2">
               {tm.members.map((m) => (

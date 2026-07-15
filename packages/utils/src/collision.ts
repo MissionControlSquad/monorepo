@@ -43,3 +43,31 @@ export function resolveCollision(
   while (set.has(candidate)) candidate = `${name}-${++n}`;
   return { action: "create", name: candidate };
 }
+
+export interface CollisionPlanItem {
+  /** The requested/source name. */
+  name: string;
+  action: CollisionAction;
+  /** For `create`, the (possibly renamed) name to use; for skip/replace, the same as `name`. */
+  resolvedName: string;
+}
+
+/**
+ * Pure: resolve a whole batch of names sequentially against `existing`, threading each `create`
+ * back into the taken set so intra-batch renames don't collide with each other. This is the
+ * dry-run plan behind a team/skill install — it never touches the DB.
+ */
+export function planCollisions(
+  existing: string[],
+  names: string[],
+  strategy: CollisionStrategy,
+): CollisionPlanItem[] {
+  const taken = [...existing];
+  const plan: CollisionPlanItem[] = [];
+  for (const name of names) {
+    const res = resolveCollision(taken, name, strategy);
+    if (res.action === COLLISION_ACTION.CREATE) taken.push(res.name);
+    plan.push({ name, action: res.action, resolvedName: res.name });
+  }
+  return plan;
+}

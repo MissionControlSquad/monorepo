@@ -45,3 +45,13 @@ export const TEAMS_QUERY = gql`
     }
   }
 `;
+
+export const PREVIEW_TEAM_INSTALL_QUERY = gql`
+  query PreviewTeamInstall($teamId: String!, $collisionStrategy: String) {
+    previewTeamInstall(teamId: $teamId, collisionStrategy: $collisionStrategy) {
+      member
+      action
+      agentName
+    }
+  }
+`;

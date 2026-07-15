@@ -184,6 +184,32 @@ describe("teams install collision strategies (Epic #10)", () => {
     );
     expect(denied.errors).toBeDefined();
   });
+
+  it("previewTeamInstall (admin) is a dry-run: reports the plan without creating agents", async () => {
+    await agentInWs(WS_A, "Eve");
+    const teamId = await teamWithMember("Eve");
+    const before = await prisma.agent.count({ where: { workspaceId: WS_A, name: "Eve" } });
+    const r = await gql(
+      `query($t:String!){ previewTeamInstall(teamId:$t, collisionStrategy:"rename"){ member action agentName } }`,
+      { t: teamId },
+      await cookieFor(WS_A, "admin"),
+    );
+    expect(r.errors).toBeFalsy();
+    expect(r.data.previewTeamInstall).toEqual([
+      { member: "Eve", action: "create", agentName: "Eve-2" },
+    ]);
+    // dry-run: no new agent was created.
+    expect(
+      await prisma.agent.count({ where: { workspaceId: WS_A, name: { startsWith: "Eve" } } }),
+    ).toBe(before);
+    // member cannot preview an install.
+    const denied = await gql(
+      `query($t:String!){ previewTeamInstall(teamId:$t){ member } }`,
+      { t: teamId },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+  });
 });
 
 describe("isolation + gate (Epic #10)", () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { slugify } from "@/server/services/skills";
-import { resolveCollision } from "@agentcenter/utils";
+import { resolveCollision, planCollisions } from "@agentcenter/utils";
 
 describe("slugify", () => {
   it("lowercases + hyphenates + trims", () => {
@@ -37,5 +37,32 @@ describe("resolveCollision (team install)", () => {
       action: "create",
       name: "Alice-3",
     });
+  });
+});
+
+describe("planCollisions (team install preview)", () => {
+  it("plans a clean install (all new names create as-is)", () => {
+    expect(planCollisions([], ["Alice", "Bob"], "rename")).toEqual([
+      { name: "Alice", action: "create", resolvedName: "Alice" },
+      { name: "Bob", action: "create", resolvedName: "Bob" },
+    ]);
+  });
+
+  it("threads intra-batch renames so duplicates within the batch don't re-collide", () => {
+    // Two members both named "Alice" vs an existing "Alice" → Alice-2, then Alice-3.
+    expect(planCollisions(["Alice"], ["Alice", "Alice"], "rename")).toEqual([
+      { name: "Alice", action: "create", resolvedName: "Alice-2" },
+      { name: "Alice", action: "create", resolvedName: "Alice-3" },
+    ]);
+  });
+
+  it("honors skip and replace strategies against existing names", () => {
+    expect(planCollisions(["Alice"], ["Alice", "Bob"], "skip")).toEqual([
+      { name: "Alice", action: "skip", resolvedName: "Alice" },
+      { name: "Bob", action: "create", resolvedName: "Bob" },
+    ]);
+    expect(planCollisions(["Alice"], ["Alice"], "replace")).toEqual([
+      { name: "Alice", action: "replace", resolvedName: "Alice" },
+    ]);
   });
 });
