@@ -57,6 +57,7 @@ export const ADD_PIPELINE_STAGE = gql`
     $name: String!
     $order: Int!
     $isReviewStage: Boolean
+    $requireApproval: Boolean
     $slaMinutes: Int
   ) {
     addPipelineStage(
@@ -64,6 +65,7 @@ export const ADD_PIPELINE_STAGE = gql`
       name: $name
       order: $order
       isReviewStage: $isReviewStage
+      requireApproval: $requireApproval
       slaMinutes: $slaMinutes
     ) {
       id

@@ -175,6 +175,7 @@ builder.mutationField("addPipelineStage", (t) =>
       name: t.arg.string({ required: true }),
       order: t.arg.int({ required: true }),
       isReviewStage: t.arg.boolean(),
+      requireApproval: t.arg.boolean(),
       slaMinutes: t.arg.int(),
     },
     resolve: async (query, _root, args, ctx) => {
@@ -184,6 +185,7 @@ builder.mutationField("addPipelineStage", (t) =>
         name: args.name,
         order: args.order,
         isReviewStage: args.isReviewStage ?? false,
+        requireApproval: args.requireApproval ?? false,
         slaMinutes: args.slaMinutes ?? null,
       });
       return ctx.prisma.pipelineStage.findUniqueOrThrow({ ...query, where: { id: stage.id } });
@@ -240,6 +242,7 @@ builder.mutationField("transitionCase", (t) =>
         caseId: args.caseId,
         toStageId: args.toStageId,
         actorProfileId: tenancy.userId,
+        actorIsAdmin: tenancy.role === "admin" || tenancy.role === "owner",
         note: args.note ?? null,
       });
       return ctx.prisma.pipelineCase.findUniqueOrThrow({ ...query, where: { id: c.id } });

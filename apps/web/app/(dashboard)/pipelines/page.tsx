@@ -25,6 +25,7 @@ interface Stage {
   name: string;
   order: number;
   isReviewStage: boolean;
+  requireApproval: boolean;
   slaMinutes: number | null;
 }
 interface Pipeline {
@@ -94,8 +95,12 @@ function PipelineCard({ pipeline }: { pipeline: Pipeline }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium text-foreground">{pipeline.name}</span>
         {stages.map((s) => (
-          <Badge key={s.id} variant={s.isReviewStage ? "yellow" : "gray"}>
+          <Badge
+            key={s.id}
+            variant={s.requireApproval ? "red" : s.isReviewStage ? "yellow" : "gray"}
+          >
             {s.order}:{s.name}
+            {s.requireApproval ? " 🔒" : ""}
             {s.slaMinutes ? ` (${s.slaMinutes}m)` : ""}
           </Badge>
         ))}
@@ -195,7 +200,13 @@ export default function PipelinesPage() {
       if (pid) {
         // Seed a sensible default 3-stage flow (Intake → Review → Done).
         await addStage({ pipelineId: pid, name: "Intake", order: 0 });
-        await addStage({ pipelineId: pid, name: "Review", order: 1, isReviewStage: true });
+        await addStage({
+          pipelineId: pid,
+          name: "Review",
+          order: 1,
+          isReviewStage: true,
+          requireApproval: true,
+        });
         await addStage({ pipelineId: pid, name: "Done", order: 2 });
       }
       setName("");

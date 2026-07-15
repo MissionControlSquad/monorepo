@@ -318,3 +318,53 @@ describe("isolation + gate (Epic #7)", () => {
     }
   });
 });
+
+describe("stage approval gate (Epic #7)", () => {
+  it("a member cannot advance a case out of a requireApproval stage; an admin can", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    const p = await gql(`mutation{ createPipeline(name:"Gated"){ id } }`, undefined, admin);
+    const pid = p.data.createPipeline.id;
+    const stageIds: string[] = [];
+    for (const [order, gated] of [
+      [0, false],
+      [1, true], // approval gate
+      [2, false],
+    ] as [number, boolean][]) {
+      const s = await gql(
+        `mutation($p:String!,$n:String!,$o:Int!,$g:Boolean){ addPipelineStage(pipelineId:$p, name:$n, order:$o, requireApproval:$g){ id requireApproval } }`,
+        { p: pid, n: `S${order}`, o: order, g: gated },
+        admin,
+      );
+      stageIds.push(s.data.addPipelineStage.id);
+    }
+
+    const c = await gql(
+      `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"c"){ id } }`,
+      { p: pid },
+      admin,
+    );
+    const caseId = c.data.createPipelineCase.id;
+    // move into the gated stage (order 1) — allowed for anyone
+    await gql(
+      `mutation($c:String!,$s:String!){ transitionCase(caseId:$c, toStageId:$s){ id } }`,
+      { c: caseId, s: stageIds[1] },
+      await cookieFor(WS_A, "member"),
+    );
+
+    // leaving the gated stage: member is blocked, admin is allowed
+    const denied = await gql(
+      `mutation($c:String!,$s:String!){ transitionCase(caseId:$c, toStageId:$s){ id } }`,
+      { c: caseId, s: stageIds[2] },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+
+    const ok = await gql(
+      `mutation($c:String!,$s:String!){ transitionCase(caseId:$c, toStageId:$s){ currentStageId } }`,
+      { c: caseId, s: stageIds[2] },
+      admin,
+    );
+    expect(ok.errors).toBeFalsy();
+    expect(ok.data.transitionCase.currentStageId).toBe(stageIds[2]);
+  });
+});

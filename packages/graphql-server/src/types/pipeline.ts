@@ -80,6 +80,7 @@ builder.prismaObject("PipelineStage", {
     name: t.exposeString("name"),
     order: t.exposeInt("order"),
     isReviewStage: t.exposeBoolean("isReviewStage"),
+    requireApproval: t.exposeBoolean("requireApproval"),
     slaMinutes: t.exposeInt("slaMinutes", { nullable: true }),
   }),
 });

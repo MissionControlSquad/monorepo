@@ -46,6 +46,7 @@ export const PIPELINES_QUERY = gql`
         name
         order
         isReviewStage
+        requireApproval
         slaMinutes
       }
     }

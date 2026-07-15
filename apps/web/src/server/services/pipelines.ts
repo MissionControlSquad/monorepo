@@ -70,7 +70,13 @@ export async function createPipeline(input: {
 export async function addPipelineStage(
   workspaceId: string,
   pipelineId: string,
-  input: { name: string; order: number; isReviewStage?: boolean; slaMinutes?: number | null },
+  input: {
+    name: string;
+    order: number;
+    isReviewStage?: boolean;
+    requireApproval?: boolean;
+    slaMinutes?: number | null;
+  },
 ): Promise<PipelineStage> {
   const pipeline = await prisma.pipeline.findFirst({ where: { id: pipelineId, workspaceId } });
   if (!pipeline) notFound("Pipeline");
@@ -83,6 +89,7 @@ export async function addPipelineStage(
       name: input.name.trim(),
       order: input.order,
       isReviewStage: input.isReviewStage ?? false,
+      requireApproval: input.requireApproval ?? false,
       slaMinutes: input.slaMinutes ?? null,
     },
   });
@@ -140,6 +147,7 @@ export async function transitionCase(args: {
   caseId: string;
   toStageId: string;
   actorProfileId?: string | null;
+  actorIsAdmin?: boolean;
   note?: string | null;
 }): Promise<PipelineCase> {
   const c = await prisma.pipelineCase.findFirst({
@@ -155,6 +163,10 @@ export async function transitionCase(args: {
   const fromOrder = c.currentStage?.order ?? -1;
   if (!isValidTransition(fromOrder, toStage.order))
     badRequest("a case may only move to a higher-order stage");
+
+  // Approval gate: a case can only LEAVE a requireApproval stage if the actor is an admin.
+  if (c.currentStage?.requireApproval && !args.actorIsAdmin)
+    badRequest("this stage requires an admin approval to advance");
 
   const [updated] = await prisma.$transaction([
     prisma.pipelineCase.update({

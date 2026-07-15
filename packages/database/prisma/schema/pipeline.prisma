@@ -150,10 +150,11 @@ model Pipeline {
 model PipelineStage {
   id            String  @id @default(cuid())
   pipelineId    String
-  name          String
-  order         Int
-  isReviewStage Boolean @default(false) // surfaces cases in the review-cases inbox
-  slaMinutes    Int? // liveness/health: stage SLA
+  name            String
+  order           Int
+  isReviewStage   Boolean @default(false) // surfaces cases in the review-cases inbox
+  requireApproval Boolean @default(false) // a case can only leave this stage via an admin (approval gate)
+  slaMinutes      Int? // liveness/health: stage SLA
 
   pipeline     Pipeline       @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   casesAtStage PipelineCase[] @relation("CaseCurrentStage")
