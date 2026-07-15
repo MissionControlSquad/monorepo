@@ -179,3 +179,5 @@ export { PROFILE_ANALYTICS_QUERY } from "./profile-analytics";
 export { CLI_AUTH_CHALLENGE_QUERY } from "./cli-auth";
 
 export { WORK_TIMELINE_QUERY } from "./timeline";
+
+export { AGENT_GOVERNANCE_QUERY } from "./agent-governance";

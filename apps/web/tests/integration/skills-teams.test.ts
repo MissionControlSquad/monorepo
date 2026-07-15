@@ -48,7 +48,9 @@ beforeAll(() => {
   process.env.SYSTEM_SECRET = SECRET;
 });
 beforeEach(async () => {
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE skills, teams, agents, profiles CASCADE`);
+  await prisma.$executeRawUnsafe(
+    `TRUNCATE TABLE skills, teams, agents, profiles, agent_governance_policies CASCADE`,
+  );
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Skills Human" } });
   humanId = p.id;
 });
@@ -370,6 +372,57 @@ describe("teams install collision strategies (Epic #10)", () => {
       await cookieFor(WS_A, "member"),
     );
     expect(denied.errors).toBeDefined();
+  });
+});
+
+describe("agent governance (Epic A.4)", () => {
+  it("requireAgentApproval provisions installed agents as pending_setup (blocked from work)", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    // Turn on the governance knob.
+    const set = await gql(
+      `mutation($r:Boolean){ setAgentGovernance(requireAgentApproval:$r){ requireAgentApproval } }`,
+      { r: true },
+      admin,
+    );
+    expect(set.data.setAgentGovernance.requireAgentApproval).toBe(true);
+    // A member cannot change governance.
+    const denied = await gql(
+      `mutation($r:Boolean){ setAgentGovernance(requireAgentApproval:$r){ requireAgentApproval } }`,
+      { r: false },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+
+    // Install a team → its new agent must be pending_setup.
+    const team = await createTeam({ workspaceId: WS_A, name: "Gov", createdByProfileId: humanId });
+    await addTeamMember(WS_A, team.id, { name: "Newbie", role: "Worker" });
+    const res = await installTeam({
+      workspaceId: WS_A,
+      teamId: team.id,
+      collisionStrategy: "rename",
+    });
+    const agent = await prisma.agent.findUniqueOrThrow({ where: { id: res.createdAgentIds[0] } });
+    expect(agent.setupStatus).toBe("pending_setup");
+
+    // With governance OFF, a freshly installed agent is active.
+    await gql(
+      `mutation{ setAgentGovernance(requireAgentApproval:false){ requireAgentApproval } }`,
+      undefined,
+      admin,
+    );
+    const team2 = await createTeam({
+      workspaceId: WS_A,
+      name: "Gov2",
+      createdByProfileId: humanId,
+    });
+    await addTeamMember(WS_A, team2.id, { name: "Active", role: "Worker" });
+    const res2 = await installTeam({
+      workspaceId: WS_A,
+      teamId: team2.id,
+      collisionStrategy: "rename",
+    });
+    const agent2 = await prisma.agent.findUniqueOrThrow({ where: { id: res2.createdAgentIds[0] } });
+    expect(agent2.setupStatus).toBe("active");
   });
 });
 

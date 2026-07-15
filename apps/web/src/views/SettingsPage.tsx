@@ -9,6 +9,8 @@ import {
   SYSTEM_SETTINGS_QUERY,
   CHANGE_PASSWORD,
 } from "../lib/graphql/mutations/system";
+import { AGENT_GOVERNANCE_QUERY } from "@/lib/graphql/queries";
+import { SET_AGENT_GOVERNANCE } from "@/lib/graphql/mutations";
 import { Breadcrumbs, Card, Button, ConfirmDialog, PageLayout } from "../components/ui";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -179,6 +181,9 @@ export function SettingsPage() {
         </Form>
       </Card>
 
+      {/* Agent Governance */}
+      <AgentGovernanceCard />
+
       {/* License */}
       {licenseInfo && licenseInfo.status !== LicenseStatusCode.NONE && (
         <Card padding="lg" className="space-y-4">
@@ -312,5 +317,59 @@ export function SettingsPage() {
         />
       </div>
     </PageLayout>
+  );
+}
+
+/**
+ * Epic A.4: workspace agent governance. The one enforceable knob — requireAgentApproval — makes
+ * newly provisioned agents (team install / import) start pending_setup so they can't be assigned
+ * work until an admin activates them.
+ */
+function AgentGovernanceCard() {
+  const [{ data }, refetch] = useQuery({ query: AGENT_GOVERNANCE_QUERY });
+  const [, setGovernance] = useMutation(SET_AGENT_GOVERNANCE);
+  const requireApproval: boolean = data?.agentGovernance?.requireAgentApproval ?? false;
+  const [saving, setSaving] = useState(false);
+
+  async function toggle(next: boolean) {
+    setSaving(true);
+    try {
+      const res = await setGovernance({ requireAgentApproval: next });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors[0]?.message ?? "Failed to update governance");
+      } else {
+        toast.success(next ? "New agents now require approval" : "Agent approval requirement off");
+        refetch({ requestPolicy: "network-only" });
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card padding="lg" className="space-y-4">
+      <div className="flex items-start gap-4">
+        <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-muted">
+          <ShieldOff className="w-5 h-5 text-muted-foreground" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-base font-semibold text-foreground">Agent Governance</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Require admin approval for new agents. When on, agents added by installing a team or
+            importing a workspace start deactivated and cannot be assigned work until an admin
+            activates them.
+          </p>
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-sm text-foreground">
+        <input
+          type="checkbox"
+          checked={requireApproval}
+          disabled={saving}
+          onChange={(e) => toggle(e.target.checked)}
+        />
+        Require approval before new agents can work
+      </label>
+    </Card>
   );
 }

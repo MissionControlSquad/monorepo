@@ -8,6 +8,7 @@ import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Team, TeamMember, TeamKind, TeamTrustLevel } from "@agentcenter/database";
 import { slugify } from "./skills";
+import { provisionSetupStatus } from "./agent-governance";
 import { resolveCollision, planCollisions, COLLISION_ACTION } from "@agentcenter/utils";
 import type { CollisionAction, CollisionStrategy, CollisionPlanItem } from "@agentcenter/utils";
 
@@ -147,6 +148,9 @@ export async function installTeam(args: {
     select: { id: true, name: true },
   });
   const names = existingAgents.map((a) => a.name);
+  // Governance: when the workspace requires agent approval, provisioned agents start pending_setup
+  // (blocked from work by the assignment-guard) until an admin activates them.
+  const setupStatus = await provisionSetupStatus(args.workspaceId);
 
   const createdAgentIds: string[] = [];
   const actions: InstallTeamResult["actions"] = [];
@@ -173,6 +177,7 @@ export async function installTeam(args: {
         role: member.role,
         workspaceId: args.workspaceId,
         username: `${slugify(res.name)}-${randomUUID().slice(0, 6)}`,
+        setupStatus,
       },
     });
     createdAgentIds.push(agent.id);

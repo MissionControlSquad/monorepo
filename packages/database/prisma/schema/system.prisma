@@ -45,3 +45,18 @@ model FeatureFlag {
 
   @@map("feature_flags")
 }
+
+// ─── Agent governance (Epic A.4) ──────────────────────────────────
+// Workspace-scoped governance of AI AGENTS (our domain — NOT buildbase workspace settings/branding).
+// Enforceable knobs only: each is applied at a real server code path, never a decorative toggle.
+model AgentGovernancePolicy {
+  id                   String   @id @default(cuid())
+  workspaceId          String   @unique // buildbase workspace _id; no FK (D5)
+  // When true, newly PROVISIONED agents (team install / import) start pending_setup and cannot be
+  // assigned work until an admin activates them — enforced via the assignment-guard.
+  requireAgentApproval Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("agent_governance_policies")
+}

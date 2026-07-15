@@ -195,3 +195,5 @@ export { SET_PROJECT_DEFAULT_GOAL } from "./goal-task";
 export { DISMISS_ATTENTION_ITEM, UNDISMISS_ATTENTION_ITEM } from "./attention";
 
 export { APPROVE_CLI_AUTH, DENY_CLI_AUTH } from "./cli-auth";
+
+export { SET_AGENT_GOVERNANCE } from "./agent-governance";
