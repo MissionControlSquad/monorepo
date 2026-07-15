@@ -24,6 +24,19 @@ export const LEDGER_BY_CATEGORY_QUERY = gql`
   }
 `;
 
+export const LEDGER_BY_PROJECT_QUERY = gql`
+  query LedgerByProject($from: DateTime, $to: DateTime) {
+    ledgerByProject(from: $from, to: $to) {
+      projectId
+      projectName
+      revenueCents
+      expenseCents
+      netCents
+      eventCount
+    }
+  }
+`;
+
 export const LEDGER_TIMELINE_QUERY = gql`
   query LedgerTimeline($from: DateTime, $to: DateTime, $bucket: String) {
     ledgerTimeline(from: $from, to: $to, bucket: $bucket) {

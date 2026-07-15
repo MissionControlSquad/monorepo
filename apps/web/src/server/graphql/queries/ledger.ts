@@ -14,6 +14,7 @@ import {
   ledgerByKindCache,
   ledgerByBillerCache,
   ledgerByCategoryCache,
+  ledgerByProjectCache,
   ledgerTimelineCache,
 } from "@/server/cache";
 
@@ -54,6 +55,17 @@ const LedgerCategoryTotal = builder.simpleObject("LedgerCategoryTotal", {
     category: t.string(),
     kind: t.string(),
     totalCents: t.int(),
+    eventCount: t.int(),
+  }),
+});
+
+const LedgerProjectTotal = builder.simpleObject("LedgerProjectTotal", {
+  fields: (t) => ({
+    projectId: t.string({ nullable: true }),
+    projectName: t.string(),
+    revenueCents: t.int(),
+    expenseCents: t.int(),
+    netCents: t.int(),
     eventCount: t.int(),
   }),
 });
@@ -234,6 +246,68 @@ builder.queryField("ledgerByCategory", (t) =>
         eventCount: g._count._all,
       }));
       ledgerByCategoryCache.set(cacheKey, result);
+      return result;
+    },
+  }),
+);
+
+builder.queryField("ledgerByProject", (t) =>
+  t.field({
+    type: [LedgerProjectTotal],
+    args: { from: t.arg({ type: "DateTime" }), to: t.arg({ type: "DateTime" }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.LEDGER);
+      const tenancy = requireRole(ctx, "member");
+      const cacheKey = `${tenancy.workspaceId}|${rangeKey(args.from, args.to)}`;
+      const cached = ledgerByProjectCache.get(cacheKey);
+      if (cached) return cached;
+
+      const grouped = await prisma.ledgerEvent.groupBy({
+        by: ["projectId", "kind"],
+        where: scoped(ctx, rangeWhere(args.from, args.to)),
+        _sum: { amountCents: true },
+        _count: { _all: true },
+      });
+      const byProject = new Map<
+        string,
+        {
+          projectId: string | null;
+          revenueCents: number;
+          expenseCents: number;
+          eventCount: number;
+        }
+      >();
+      for (const g of grouped) {
+        const key = g.projectId ?? "";
+        const row = byProject.get(key) ?? {
+          projectId: g.projectId ?? null,
+          revenueCents: 0,
+          expenseCents: 0,
+          eventCount: 0,
+        };
+        const sum = g._sum.amountCents ?? 0;
+        if (g.kind === "revenue") row.revenueCents += sum;
+        else row.expenseCents += sum;
+        row.eventCount += g._count._all;
+        byProject.set(key, row);
+      }
+      // Resolve project names (workspace-scoped) for the grouped ids; unlinked → "(no project)".
+      const ids = [...byProject.keys()].filter(Boolean);
+      const projects = ids.length
+        ? await prisma.project.findMany({
+            where: scoped(ctx, { id: { in: ids } }),
+            select: { id: true, name: true },
+          })
+        : [];
+      const nameById = new Map(projects.map((p) => [p.id, p.name]));
+      const result = [...byProject.values()]
+        .map((r) => ({
+          ...r,
+          projectName: r.projectId ? (nameById.get(r.projectId) ?? "(unknown)") : "(no project)",
+          netCents: r.revenueCents - r.expenseCents,
+        }))
+        .sort((a, b) => b.netCents - a.netCents);
+      ledgerByProjectCache.set(cacheKey, result);
       return result;
     },
   }),
