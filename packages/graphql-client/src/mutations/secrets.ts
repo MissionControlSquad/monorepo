@@ -30,6 +30,17 @@ export const DELETE_SECRET_PROVIDER = gql`
   }
 `;
 
+export const IMPORT_SECRETS = gql`
+  mutation ImportSecrets($text: String!, $overwrite: Boolean) {
+    importSecrets(text: $text, overwrite: $overwrite) {
+      created
+      skipped
+      rotated
+      invalidLines
+    }
+  }
+`;
+
 export const ROTATE_SECRET = gql`
   mutation RotateSecret($id: String!, $value: String!) {
     rotateSecret(id: $id, value: $value) {

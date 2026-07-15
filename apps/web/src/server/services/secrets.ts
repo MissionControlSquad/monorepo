@@ -105,6 +105,56 @@ export async function createSecret(input: CreateSecretInput): Promise<Secret> {
   return secret;
 }
 
+export interface ImportSecretsResult {
+  created: number;
+  skipped: number; // already existed and overwrite=false
+  rotated: number; // already existed and overwrite=true → new version appended
+}
+
+/**
+ * Bulk-import name/value pairs (e.g. a pasted .env). Each is created; on a name collision the entry
+ * is either skipped or rotated (new version) per `overwrite`. Plaintext values are encrypted on the
+ * way in exactly like createSecret/rotateSecret — none are logged or returned.
+ */
+export async function importSecrets(args: {
+  workspaceId: string;
+  createdBy: string;
+  entries: { name: string; value: string }[];
+  overwrite?: boolean;
+}): Promise<ImportSecretsResult> {
+  const result: ImportSecretsResult = { created: 0, skipped: 0, rotated: 0 };
+  for (const raw of args.entries) {
+    const name = raw.name.trim();
+    if (!name || !raw.value) continue; // ignore empties defensively
+    const existing = await prisma.secret.findFirst({
+      where: { workspaceId: args.workspaceId, name },
+      select: { id: true },
+    });
+    if (existing) {
+      if (!args.overwrite) {
+        result.skipped++;
+        continue;
+      }
+      await rotateSecret({
+        workspaceId: args.workspaceId,
+        secretId: existing.id,
+        value: raw.value,
+        createdBy: args.createdBy,
+      });
+      result.rotated++;
+      continue;
+    }
+    await createSecret({
+      workspaceId: args.workspaceId,
+      createdBy: args.createdBy,
+      name,
+      value: raw.value,
+    });
+    result.created++;
+  }
+  return result;
+}
+
 /** Load a secret scoped to its workspace; 404 for missing / cross-workspace ids. */
 async function findScopedSecret(secretId: string, workspaceId: string): Promise<Secret> {
   const secret = await prisma.secret.findFirst({ where: { id: secretId, workspaceId } });

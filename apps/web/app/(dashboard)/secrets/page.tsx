@@ -11,6 +11,7 @@ import {
   SET_SECRET_STATUS,
   CREATE_SECRET_PROVIDER,
   DELETE_SECRET_PROVIDER,
+  IMPORT_SECRETS,
 } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 
@@ -68,10 +69,14 @@ export default function SecretsPage() {
   const [, setStatus] = useMutation(SET_SECRET_STATUS);
   const [, createProvider] = useMutation(CREATE_SECRET_PROVIDER);
   const [, deleteProvider] = useMutation(DELETE_SECRET_PROVIDER);
+  const [, importSecrets] = useMutation(IMPORT_SECRETS);
 
   const [busy, setBusy] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", value: "", description: "", providerId: "" });
   const [providerForm, setProviderForm] = useState({ name: "", kind: "env" });
+  const [importText, setImportText] = useState("");
+  const [importOverwrite, setImportOverwrite] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
   const [rotateVal, setRotateVal] = useState<Record<string, string>>({});
   const [bindForm, setBindForm] = useState<Record<string, { env: string; agentId: string }>>({});
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +111,28 @@ export default function SecretsPage() {
     try {
       await deleteProvider({ id });
       refreshProviders();
+      refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onImport() {
+    setError(null);
+    setImportResult(null);
+    if (!importText.trim()) return setError("Paste some KEY=VALUE lines to import");
+    setBusy("import");
+    try {
+      const res = await importSecrets({ text: importText, overwrite: importOverwrite });
+      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to import");
+      const s = res.data?.importSecrets;
+      if (s) {
+        setImportResult(
+          `Imported: ${s.created} created, ${s.rotated} rotated, ${s.skipped} skipped` +
+            (s.invalidLines ? `, ${s.invalidLines} invalid line(s) ignored` : ""),
+        );
+        setImportText("");
+      }
       refresh();
     } finally {
       setBusy(null);
@@ -289,6 +316,39 @@ export default function SecretsPage() {
           </Button>
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
+      </Card>
+
+      {/* Bulk import — paste a .env (KEY=VALUE lines). Values are encrypted on the way in. */}
+      <Card className="space-y-2 p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Bulk import</h2>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={importOverwrite}
+              onChange={(e) => setImportOverwrite(e.target.checked)}
+            />
+            overwrite existing (rotate)
+          </label>
+        </div>
+        <textarea
+          className="h-24 w-full rounded border border-border bg-background px-3 py-1.5 font-mono text-xs"
+          placeholder={"# paste a .env\nOPENAI_API_KEY=sk-...\nSTRIPE_KEY=sk_live_..."}
+          value={importText}
+          onChange={(e) => setImportText(e.target.value)}
+        />
+        <div className="flex items-center justify-between">
+          {importResult ? (
+            <p className="text-xs text-muted-foreground">{importResult}</p>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              Existing names are skipped unless overwrite is checked.
+            </span>
+          )}
+          <Button size="sm" variant="secondary" disabled={busy === "import"} onClick={onImport}>
+            Import
+          </Button>
+        </div>
       </Card>
 
       {secrets.length === 0 && (

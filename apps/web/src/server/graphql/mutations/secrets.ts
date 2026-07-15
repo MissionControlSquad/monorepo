@@ -3,7 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
 import { GraphQLError } from "graphql";
-import { isSecretStatus } from "@agentcenter/utils";
+import { isSecretStatus, parseDotEnv } from "@agentcenter/utils";
 import {
   createSecret,
   rotateSecret,
@@ -13,8 +13,18 @@ import {
   setSecretStatus,
   createSecretProvider,
   deleteSecretProvider,
+  importSecrets,
   isSecretProviderKind,
 } from "@/server/services/secrets";
+
+const ImportSecretsSummary = builder.simpleObject("ImportSecretsSummary", {
+  fields: (t) => ({
+    created: t.int(),
+    skipped: t.int(),
+    rotated: t.int(),
+    invalidLines: t.int(),
+  }),
+});
 
 // Epic #5: secrets vault mutations — SECRETS_VAULT-gated + admin only. The `value` arg is the ONLY
 // place plaintext enters (over TLS); it is encrypted immediately and never returned.
@@ -159,6 +169,25 @@ builder.mutationField("deleteSecretProvider", (t) =>
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
       const tenancy = requireRole(ctx, "admin");
       return deleteSecretProvider(tenancy.workspaceId, args.id);
+    },
+  }),
+);
+
+builder.mutationField("importSecrets", (t) =>
+  t.field({
+    type: ImportSecretsSummary,
+    args: { text: t.arg.string({ required: true }), overwrite: t.arg.boolean() },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SECRETS_VAULT);
+      const tenancy = requireRole(ctx, "admin");
+      const parsed = parseDotEnv(args.text);
+      const res = await importSecrets({
+        workspaceId: tenancy.workspaceId,
+        createdBy: tenancy.userId,
+        entries: parsed.entries,
+        overwrite: args.overwrite ?? false,
+      });
+      return { ...res, invalidLines: parsed.invalidLines.length };
     },
   }),
 );

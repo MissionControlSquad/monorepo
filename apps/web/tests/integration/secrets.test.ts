@@ -290,3 +290,46 @@ describe("provider configs (Epic #5)", () => {
     expect(again.errors).toBeDefined();
   });
 });
+
+describe("bulk import (Epic #5)", () => {
+  const IMPORT = `mutation($t:String!,$o:Boolean){ importSecrets(text:$t, overwrite:$o){ created skipped rotated invalidLines } }`;
+
+  it("creates secrets from a .env, skips existing, and reports invalid lines", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    await makeSecret(WS_A, "EXISTING", "old"); // pre-existing → skipped
+
+    const r = await gql(
+      IMPORT,
+      { t: "# comment\nNEW_ONE=a\nNEW_TWO=b\nEXISTING=ignored\nbad-line" },
+      admin,
+    );
+    expect(r.errors).toBeFalsy();
+    expect(r.data.importSecrets).toEqual({ created: 2, skipped: 1, rotated: 0, invalidLines: 1 });
+
+    // The two new secrets landed encrypted; the existing one was NOT touched.
+    expect(await prisma.secret.count({ where: { workspaceId: WS_A } })).toBe(3);
+    expect((await getDecrypted(WS_A, (await secretId("NEW_ONE")) ?? ""))?.value).toBe("a");
+    expect((await getDecrypted(WS_A, (await secretId("EXISTING")) ?? ""))?.value).toBe("old");
+  });
+
+  it("overwrite=true rotates an existing secret instead of skipping", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    await makeSecret(WS_A, "ROT", "v1");
+    const r = await gql(IMPORT, { t: "ROT=v2", o: true }, admin);
+    expect(r.data.importSecrets).toEqual({ created: 0, skipped: 0, rotated: 1, invalidLines: 0 });
+    const id = (await secretId("ROT")) ?? "";
+    expect((await getDecrypted(WS_A, id))?.value).toBe("v2");
+    expect((await prisma.secret.findUniqueOrThrow({ where: { id } })).currentVersion).toBe(2);
+  });
+
+  it("a member cannot bulk-import", async () => {
+    const r = await gql(IMPORT, { t: "X=y" }, await cookieFor(WS_A, "member"));
+    expect(r.errors).toBeDefined();
+  });
+
+  async function secretId(name: string) {
+    return (
+      await prisma.secret.findFirst({ where: { workspaceId: WS_A, name }, select: { id: true } })
+    )?.id;
+  }
+});
