@@ -299,6 +299,52 @@ describe("case release + claim lease (Epic #7)", () => {
   });
 });
 
+describe("stage edit + delete (Epic #7)", () => {
+  it("updatePipelineStage toggles approval; deletePipelineStage removes an empty stage but not an occupied one", async () => {
+    const { pid, stageIds } = await pipelineWithStages(WS_A);
+    const admin = await cookieFor(WS_A, "admin");
+
+    // toggle requireApproval on stage 1
+    const up = await gql(
+      `mutation($s:String!){ updatePipelineStage(stageId:$s, requireApproval:true, name:"Gate"){ id name requireApproval } }`,
+      { s: stageIds[1] },
+      admin,
+    );
+    expect(up.errors).toBeFalsy();
+    expect(up.data.updatePipelineStage).toMatchObject({ name: "Gate", requireApproval: true });
+
+    // a member cannot edit structure
+    const denied = await gql(
+      `mutation($s:String!){ updatePipelineStage(stageId:$s, name:"x"){ id } }`,
+      { s: stageIds[1] },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+
+    // put a case on stage 0 → its stage cannot be deleted
+    await gql(
+      `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"c"){ id } }`,
+      { p: pid },
+      admin,
+    );
+    const blocked = await gql(
+      `mutation($s:String!){ deletePipelineStage(stageId:$s) }`,
+      { s: stageIds[0] },
+      admin,
+    );
+    expect(blocked.errors).toBeDefined();
+
+    // an empty stage (order 2, no cases) deletes fine
+    const ok = await gql(
+      `mutation($s:String!){ deletePipelineStage(stageId:$s) }`,
+      { s: stageIds[2] },
+      admin,
+    );
+    expect(ok.data.deletePipelineStage).toBe(true);
+    expect(await prisma.pipelineStage.count({ where: { pipelineId: pid } })).toBe(2);
+  });
+});
+
 describe("case comments + timeline (Epic #7)", () => {
   it("commentCase appends a commented event; caseEvents returns the timeline oldest-first", async () => {
     const { pid } = await pipelineWithStages(WS_A);

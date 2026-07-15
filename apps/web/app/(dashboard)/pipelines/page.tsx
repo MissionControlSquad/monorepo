@@ -11,6 +11,8 @@ import {
 import {
   CREATE_PIPELINE,
   ADD_PIPELINE_STAGE,
+  UPDATE_PIPELINE_STAGE,
+  DELETE_PIPELINE_STAGE,
   CREATE_PIPELINE_CASE,
   CLAIM_CASE,
   RELEASE_CASE,
@@ -53,7 +55,13 @@ function statusVariant(s: string): "gray" | "blue" | "yellow" | "green" | "red" 
   return "gray";
 }
 
-function PipelineCard({ pipeline }: { pipeline: Pipeline }) {
+function PipelineCard({
+  pipeline,
+  onStagesChanged,
+}: {
+  pipeline: Pipeline;
+  onStagesChanged: () => void;
+}) {
   const stages = [...pipeline.stages].sort((a, b) => a.order - b.order);
   const [{ data: caseData }, refetchCases] = useQuery<{ casesInPipeline: Case[] }>({
     query: CASES_IN_PIPELINE_QUERY,
@@ -68,6 +76,8 @@ function PipelineCard({ pipeline }: { pipeline: Pipeline }) {
   const [, releaseCase] = useMutation(RELEASE_CASE);
   const [, transitionCase] = useMutation(TRANSITION_CASE);
   const [, rejectCase] = useMutation(REJECT_CASE);
+  const [, updateStage] = useMutation(UPDATE_PIPELINE_STAGE);
+  const [, deleteStage] = useMutation(DELETE_PIPELINE_STAGE);
 
   const [title, setTitle] = useState("");
   const [openCase, setOpenCase] = useState<string | null>(null);
@@ -100,14 +110,37 @@ function PipelineCard({ pipeline }: { pipeline: Pipeline }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium text-foreground">{pipeline.name}</span>
         {stages.map((s) => (
-          <Badge
+          <span
             key={s.id}
-            variant={s.requireApproval ? "red" : s.isReviewStage ? "yellow" : "gray"}
+            className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5"
           >
-            {s.order}:{s.name}
-            {s.requireApproval ? " 🔒" : ""}
-            {s.slaMinutes ? ` (${s.slaMinutes}m)` : ""}
-          </Badge>
+            <Badge variant={s.requireApproval ? "red" : s.isReviewStage ? "yellow" : "gray"}>
+              {s.order}:{s.name}
+              {s.requireApproval ? " 🔒" : ""}
+              {s.slaMinutes ? ` (${s.slaMinutes}m)` : ""}
+            </Badge>
+            <button
+              title="toggle approval gate"
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={async () => {
+                await updateStage({ stageId: s.id, requireApproval: !s.requireApproval });
+                onStagesChanged();
+              }}
+            >
+              🔒
+            </button>
+            <button
+              title="delete stage"
+              className="text-xs text-destructive"
+              onClick={async () => {
+                const res = await deleteStage({ stageId: s.id });
+                if (res.error) alert(res.error.graphQLErrors[0]?.message ?? "Cannot delete stage");
+                else onStagesChanged();
+              }}
+            >
+              ×
+            </button>
+          </span>
         ))}
       </div>
 
@@ -263,7 +296,11 @@ export default function PipelinesPage() {
         <Card className="p-8 text-center text-sm text-muted-foreground">No pipelines yet.</Card>
       )}
       {pipelines.map((p) => (
-        <PipelineCard key={p.id} pipeline={p} />
+        <PipelineCard
+          key={p.id}
+          pipeline={p}
+          onStagesChanged={() => refetch({ requestPolicy: "network-only" })}
+        />
       ))}
     </div>
   );

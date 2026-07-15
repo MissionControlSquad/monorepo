@@ -95,6 +95,52 @@ export async function addPipelineStage(
   });
 }
 
+/** Edit a stage's config. Order is immutable here (it anchors transitions + the unique index). */
+export async function updatePipelineStage(
+  workspaceId: string,
+  stageId: string,
+  patch: {
+    name?: string | null;
+    isReviewStage?: boolean | null;
+    requireApproval?: boolean | null;
+    slaMinutes?: number | null;
+    clearSla?: boolean;
+  },
+): Promise<PipelineStage> {
+  const stage = await prisma.pipelineStage.findFirst({
+    where: { id: stageId, pipeline: { workspaceId } },
+  });
+  if (!stage) notFound("Stage");
+  const name = patch.name?.trim();
+  if (patch.name != null && !name) badRequest("name cannot be empty");
+  return prisma.pipelineStage.update({
+    where: { id: stage.id },
+    data: {
+      ...(name ? { name } : {}),
+      ...(patch.isReviewStage != null ? { isReviewStage: patch.isReviewStage } : {}),
+      ...(patch.requireApproval != null ? { requireApproval: patch.requireApproval } : {}),
+      ...(patch.clearSla
+        ? { slaMinutes: null }
+        : patch.slaMinutes != null
+          ? { slaMinutes: patch.slaMinutes }
+          : {}),
+    },
+  });
+}
+
+/** Remove a stage. Refuses if any case currently sits on it (would orphan live work). */
+export async function deletePipelineStage(workspaceId: string, stageId: string): Promise<boolean> {
+  const stage = await prisma.pipelineStage.findFirst({
+    where: { id: stageId, pipeline: { workspaceId } },
+    select: { id: true },
+  });
+  if (!stage) notFound("Stage");
+  const onStage = await prisma.pipelineCase.count({ where: { currentStageId: stage.id } });
+  if (onStage > 0) badRequest("cannot delete a stage that has cases on it; move them first");
+  await prisma.pipelineStage.delete({ where: { id: stage.id } });
+  return true;
+}
+
 /** Create a case, placing it at the pipeline's first (lowest-order) stage. */
 export async function createCase(
   workspaceId: string,

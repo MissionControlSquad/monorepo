@@ -12,6 +12,8 @@ import {
 import {
   createPipeline,
   addPipelineStage,
+  updatePipelineStage,
+  deletePipelineStage,
   createCase,
   claimCase,
   releaseCase,
@@ -191,6 +193,44 @@ builder.mutationField("addPipelineStage", (t) =>
         slaMinutes: args.slaMinutes ?? null,
       });
       return ctx.prisma.pipelineStage.findUniqueOrThrow({ ...query, where: { id: stage.id } });
+    },
+  }),
+);
+
+builder.mutationField("updatePipelineStage", (t) =>
+  t.prismaField({
+    type: "PipelineStage",
+    args: {
+      stageId: t.arg.string({ required: true }),
+      name: t.arg.string(),
+      isReviewStage: t.arg.boolean(),
+      requireApproval: t.arg.boolean(),
+      slaMinutes: t.arg.int(),
+      clearSla: t.arg.boolean(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
+      const tenancy = requireRole(ctx, "admin");
+      const stage = await updatePipelineStage(tenancy.workspaceId, args.stageId, {
+        name: args.name ?? null,
+        isReviewStage: args.isReviewStage ?? null,
+        requireApproval: args.requireApproval ?? null,
+        slaMinutes: args.slaMinutes ?? null,
+        clearSla: args.clearSla ?? false,
+      });
+      return ctx.prisma.pipelineStage.findUniqueOrThrow({ ...query, where: { id: stage.id } });
+    },
+  }),
+);
+
+builder.mutationField("deletePipelineStage", (t) =>
+  t.field({
+    type: "Boolean",
+    args: { stageId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
+      const tenancy = requireRole(ctx, "admin");
+      return deletePipelineStage(tenancy.workspaceId, args.stageId);
     },
   }),
 );

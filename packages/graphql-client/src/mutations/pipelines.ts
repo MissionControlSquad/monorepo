@@ -73,6 +73,38 @@ export const ADD_PIPELINE_STAGE = gql`
   }
 `;
 
+export const UPDATE_PIPELINE_STAGE = gql`
+  mutation UpdatePipelineStage(
+    $stageId: String!
+    $name: String
+    $isReviewStage: Boolean
+    $requireApproval: Boolean
+    $slaMinutes: Int
+    $clearSla: Boolean
+  ) {
+    updatePipelineStage(
+      stageId: $stageId
+      name: $name
+      isReviewStage: $isReviewStage
+      requireApproval: $requireApproval
+      slaMinutes: $slaMinutes
+      clearSla: $clearSla
+    ) {
+      id
+      name
+      isReviewStage
+      requireApproval
+      slaMinutes
+    }
+  }
+`;
+
+export const DELETE_PIPELINE_STAGE = gql`
+  mutation DeletePipelineStage($stageId: String!) {
+    deletePipelineStage(stageId: $stageId)
+  }
+`;
+
 export const CREATE_PIPELINE_CASE = gql`
   mutation CreatePipelineCase($pipelineId: String!, $title: String!) {
     createPipelineCase(pipelineId: $pipelineId, title: $title) {
