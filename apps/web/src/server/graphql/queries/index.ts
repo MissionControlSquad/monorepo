@@ -31,6 +31,7 @@ import "./portability";
 import "./goals";
 import "./observability";
 import "./profile-analytics";
+import "./timeline";
 import "./boardroom";
 import "./plugins";
 import "./api-keys";

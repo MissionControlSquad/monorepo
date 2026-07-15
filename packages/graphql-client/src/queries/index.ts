@@ -167,3 +167,5 @@ export { AGENT_CAPABILITY_GRANTS_QUERY, AGENT_AUTHZ_EVENTS_QUERY } from "./agent
 export { PROFILE_ANALYTICS_QUERY } from "./profile-analytics";
 
 export { CLI_AUTH_CHALLENGE_QUERY } from "./cli-auth";
+
+export { WORK_TIMELINE_QUERY } from "./timeline";
