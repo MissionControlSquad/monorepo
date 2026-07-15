@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "urql";
 import { SECRETS_QUERY, SECRET_PROVIDERS_QUERY } from "@/lib/graphql/queries";
 import {
   CREATE_SECRET,
+  CREATE_USER_SECRET,
   ROTATE_SECRET,
   BIND_SECRET,
   UNBIND_SECRET,
@@ -37,6 +38,7 @@ interface Secret {
   description: string | null;
   currentVersion: number;
   status: string;
+  personal: boolean;
   providerId: string | null;
   bindings: Binding[];
   versions: Version[];
@@ -63,6 +65,7 @@ export default function SecretsPage() {
     query: SECRET_PROVIDERS_QUERY,
   });
   const [, createSecret] = useMutation(CREATE_SECRET);
+  const [, createUserSecret] = useMutation(CREATE_USER_SECRET);
   const [, rotateSecret] = useMutation(ROTATE_SECRET);
   const [, bindSecret] = useMutation(BIND_SECRET);
   const [, unbindSecret] = useMutation(UNBIND_SECRET);
@@ -72,7 +75,13 @@ export default function SecretsPage() {
   const [, importSecrets] = useMutation(IMPORT_SECRETS);
 
   const [busy, setBusy] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", value: "", description: "", providerId: "" });
+  const [form, setForm] = useState({
+    name: "",
+    value: "",
+    description: "",
+    providerId: "",
+    personal: false,
+  });
   const [providerForm, setProviderForm] = useState({ name: "", kind: "env" });
   const [importText, setImportText] = useState("");
   const [importOverwrite, setImportOverwrite] = useState(false);
@@ -145,14 +154,20 @@ export default function SecretsPage() {
     if (!form.value) return setError("Value is required");
     setBusy("create");
     try {
-      const res = await createSecret({
-        name: form.name.trim(),
-        value: form.value,
-        description: form.description.trim() || null,
-        providerId: form.providerId || null,
-      });
+      const res = form.personal
+        ? await createUserSecret({
+            name: form.name.trim(),
+            value: form.value,
+            description: form.description.trim() || null,
+          })
+        : await createSecret({
+            name: form.name.trim(),
+            value: form.value,
+            description: form.description.trim() || null,
+            providerId: form.providerId || null,
+          });
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create");
-      setForm({ name: "", value: "", description: "", providerId: "" });
+      setForm({ name: "", value: "", description: "", providerId: "", personal: false });
       refresh();
     } finally {
       setBusy(null);
@@ -310,7 +325,15 @@ export default function SecretsPage() {
             ))}
           </select>
         </div>
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={form.personal}
+              onChange={(e) => setForm((f) => ({ ...f, personal: e.target.checked }))}
+            />
+            personal (only you can see &amp; manage it)
+          </label>
           <Button size="sm" disabled={busy === "create"} onClick={onCreate}>
             Add secret
           </Button>
@@ -361,6 +384,7 @@ export default function SecretsPage() {
             <span className="font-medium text-foreground">{s.name}</span>
             <Badge variant="gray">v{s.currentVersion}</Badge>
             <Badge variant={STATUS_VARIANT[s.status] ?? "gray"}>{s.status}</Badge>
+            {s.personal && <Badge variant="purple">personal</Badge>}
             {s.providerId && <Badge variant="blue">{providerName(s.providerId)}</Badge>}
             {s.description && (
               <span className="text-sm text-muted-foreground">{s.description}</span>

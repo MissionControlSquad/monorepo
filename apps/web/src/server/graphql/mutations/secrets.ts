@@ -53,18 +53,46 @@ builder.mutationField("createSecret", (t) =>
   }),
 );
 
+// A member's OWN personal secret (owner-only visibility + management). Members create these for
+// themselves — workspace secrets remain admin-only via createSecret.
+builder.mutationField("createUserSecret", (t) =>
+  t.prismaField({
+    type: "Secret",
+    args: {
+      name: t.arg.string({ required: true }),
+      value: t.arg.string({ required: true }),
+      description: t.arg.string(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SECRETS_VAULT);
+      const tenancy = requireRole(ctx, "member");
+      const secret = await createSecret({
+        workspaceId: tenancy.workspaceId,
+        createdBy: tenancy.userId,
+        name: args.name,
+        value: args.value,
+        description: args.description ?? null,
+        personal: true,
+      });
+      return ctx.prisma.secret.findUniqueOrThrow({ ...query, where: { id: secret.id } });
+    },
+  }),
+);
+
 builder.mutationField("rotateSecret", (t) =>
   t.prismaField({
     type: "Secret",
     args: { id: t.arg.string({ required: true }), value: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "admin");
+      // member+ then the service authorizes (owner for personal, admin for workspace).
+      const tenancy = requireRole(ctx, "member");
       const secret = await rotateSecret({
         workspaceId: tenancy.workspaceId,
         secretId: args.id,
         value: args.value,
         createdBy: tenancy.userId,
+        actor: { userId: tenancy.userId, role: tenancy.role },
       });
       return ctx.prisma.secret.findUniqueOrThrow({ ...query, where: { id: secret.id } });
     },
@@ -84,7 +112,7 @@ builder.mutationField("bindSecret", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, "member");
       const binding = await bindSecret({
         workspaceId: tenancy.workspaceId,
         createdBy: tenancy.userId,
@@ -94,6 +122,7 @@ builder.mutationField("bindSecret", (t) =>
         adapterType: args.adapterType ?? null,
         envVarName: args.envVarName,
         pinnedVersion: args.pinnedVersion ?? null,
+        actor: { userId: tenancy.userId, role: tenancy.role },
       });
       return ctx.prisma.secretBinding.findUniqueOrThrow({ ...query, where: { id: binding.id } });
     },
@@ -106,8 +135,11 @@ builder.mutationField("unbindSecret", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "admin");
-      return unbindSecret(tenancy.workspaceId, args.id, tenancy.userId);
+      const tenancy = requireRole(ctx, "member");
+      return unbindSecret(tenancy.workspaceId, args.id, tenancy.userId, {
+        userId: tenancy.userId,
+        role: tenancy.role,
+      });
     },
   }),
 );
@@ -122,11 +154,13 @@ builder.mutationField("updateSecret", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "admin");
-      const secret = await updateSecret(tenancy.workspaceId, args.id, {
-        name: args.name ?? null,
-        description: args.description ?? undefined,
-      });
+      const tenancy = requireRole(ctx, "member");
+      const secret = await updateSecret(
+        tenancy.workspaceId,
+        args.id,
+        { name: args.name ?? null, description: args.description ?? undefined },
+        { userId: tenancy.userId, role: tenancy.role },
+      );
       return ctx.prisma.secret.findUniqueOrThrow({ ...query, where: { id: secret.id } });
     },
   }),
@@ -198,12 +232,15 @@ builder.mutationField("setSecretStatus", (t) =>
     args: { id: t.arg.string({ required: true }), status: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, "member");
       if (!isSecretStatus(args.status))
         throw new GraphQLError(`Invalid status '${args.status}'`, {
           extensions: { code: "BAD_USER_INPUT" },
         });
-      const secret = await setSecretStatus(tenancy.workspaceId, args.id, args.status);
+      const secret = await setSecretStatus(tenancy.workspaceId, args.id, args.status, {
+        userId: tenancy.userId,
+        role: tenancy.role,
+      });
       return ctx.prisma.secret.findUniqueOrThrow({ ...query, where: { id: secret.id } });
     },
   }),

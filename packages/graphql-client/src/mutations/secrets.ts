@@ -14,6 +14,14 @@ export const CREATE_SECRET = gql`
   }
 `;
 
+export const CREATE_USER_SECRET = gql`
+  mutation CreateUserSecret($name: String!, $value: String!, $description: String) {
+    createUserSecret(name: $name, value: $value, description: $description) {
+      id
+    }
+  }
+`;
+
 export const CREATE_SECRET_PROVIDER = gql`
   mutation CreateSecretProvider($name: String!, $kind: String!, $config: JSON) {
     createSecretProvider(name: $name, kind: $kind, config: $config) {

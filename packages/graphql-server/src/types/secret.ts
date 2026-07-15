@@ -11,6 +11,7 @@ builder.prismaObject("Secret", {
     providerId: t.exposeString("providerId", { nullable: true }),
     currentVersion: t.exposeInt("currentVersion"),
     status: t.exposeString("status"),
+    personal: t.exposeBoolean("personal"),
     createdBy: t.exposeString("createdBy", { nullable: true }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),

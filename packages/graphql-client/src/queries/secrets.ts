@@ -9,6 +9,7 @@ export const SECRETS_QUERY = gql`
       description
       currentVersion
       status
+      personal
       providerId
       createdAt
       bindings {

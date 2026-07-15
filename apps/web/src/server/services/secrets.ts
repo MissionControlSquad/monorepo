@@ -51,7 +51,26 @@ export interface CreateSecretInput {
   value: string;
   description?: string | null;
   providerId?: string | null;
+  personal?: boolean;
   createdBy: string;
+}
+
+/** An actor for secret-management authorization. */
+export interface SecretActor {
+  userId: string;
+  role: string;
+}
+
+/**
+ * Who may manage a secret: a PERSONAL secret only by its owner (createdBy); a WORKSPACE secret only
+ * by an admin/owner. Pure — the single source of truth reused by every mutating secret op.
+ */
+export function canManageSecret(
+  secret: { personal: boolean; createdBy: string | null },
+  actor: SecretActor,
+): boolean {
+  if (secret.personal) return secret.createdBy === actor.userId;
+  return actor.role === "admin" || actor.role === "owner";
 }
 
 export async function createSecret(input: CreateSecretInput): Promise<Secret> {
@@ -80,6 +99,7 @@ export async function createSecret(input: CreateSecretInput): Promise<Secret> {
         name,
         description: input.description ?? null,
         providerId: input.providerId ?? null,
+        personal: input.personal ?? false,
         currentVersion: 1,
         createdBy: input.createdBy,
       },
@@ -162,13 +182,36 @@ async function findScopedSecret(secretId: string, workspaceId: string): Promise<
   return secret;
 }
 
+function forbidden(): never {
+  throw new GraphQLError("Not authorized to manage this secret", {
+    extensions: { code: "FORBIDDEN" },
+  });
+}
+
+/** Load a secret AND authorize the actor to manage it (owner for personal, admin for workspace). */
+async function loadManageableSecret(
+  secretId: string,
+  workspaceId: string,
+  actor: SecretActor,
+): Promise<Secret> {
+  const secret = await findScopedSecret(secretId, workspaceId);
+  if (!canManageSecret(secret, actor)) forbidden();
+  return secret;
+}
+
+/** Where-clause for the secrets a member may SEE: all workspace secrets + only their own personal. */
+export function visibleSecretsWhere(userId: string): Record<string, unknown> {
+  return { OR: [{ personal: false }, { personal: true, createdBy: userId }] };
+}
+
 /** Edit a secret's metadata (name/description) — never touches the encrypted value. */
 export async function updateSecret(
   workspaceId: string,
   secretId: string,
   patch: { name?: string | null; description?: string | null },
+  actor: SecretActor,
 ): Promise<Secret> {
-  await findScopedSecret(secretId, workspaceId);
+  await loadManageableSecret(secretId, workspaceId, actor);
   const name = patch.name?.trim();
   if (patch.name != null && !name) badRequest("name cannot be empty");
   return prisma.secret.update({
@@ -188,8 +231,9 @@ export async function setSecretStatus(
   workspaceId: string,
   secretId: string,
   status: "active" | "disabled" | "archived",
+  actor: SecretActor,
 ): Promise<Secret> {
-  await findScopedSecret(secretId, workspaceId);
+  await loadManageableSecret(secretId, workspaceId, actor);
   return prisma.secret.update({ where: { id: secretId }, data: { status } });
 }
 
@@ -199,12 +243,15 @@ export async function rotateSecret(args: {
   secretId: string;
   value: string;
   createdBy: string;
+  actor?: SecretActor;
 }): Promise<Secret> {
   if (!args.value) badRequest("value is required");
   const secret = await prisma.secret.findFirst({
     where: { id: args.secretId, workspaceId: args.workspaceId },
   });
   if (!secret) throw new GraphQLError("Secret not found", { extensions: { code: "NOT_FOUND" } });
+  // actor is optional so internal callers (bulk import) keep working; when present, enforce it.
+  if (args.actor && !canManageSecret(secret, args.actor)) forbidden();
 
   const nextVersion = secret.currentVersion + 1;
   const ciphertext = encryptSecret(args.value);
@@ -265,6 +312,7 @@ export async function bindSecret(args: {
   envVarName: string;
   pinnedVersion?: number | null;
   createdBy: string;
+  actor?: SecretActor;
 }): Promise<SecretBinding> {
   const envVarName = args.envVarName.trim();
   if (!/^[A-Z_][A-Z0-9_]*$/.test(envVarName))
@@ -278,6 +326,9 @@ export async function bindSecret(args: {
     where: { id: args.secretId, workspaceId: args.workspaceId },
   });
   if (!secret) throw new GraphQLError("Secret not found", { extensions: { code: "NOT_FOUND" } });
+  // Only the owner may bind a personal secret; workspace secrets require admin. Prevents an admin
+  // from routing someone else's private credential into an agent (and vice-versa).
+  if (args.actor && !canManageSecret(secret, args.actor)) forbidden();
 
   // Agent-scoped bindings must target an agent in the same workspace.
   if (args.scope === "agent") {
@@ -314,12 +365,15 @@ export async function unbindSecret(
   workspaceId: string,
   bindingId: string,
   actorId: string,
+  actor?: SecretActor,
 ): Promise<boolean> {
   // Join through the secret to enforce workspace isolation on the binding.
   const binding = await prisma.secretBinding.findFirst({
     where: { id: bindingId, secret: { workspaceId } },
+    include: { secret: { select: { personal: true, createdBy: true } } },
   });
   if (!binding) return false;
+  if (actor && !canManageSecret(binding.secret, actor)) forbidden();
   await prisma.secretBinding.delete({ where: { id: binding.id } });
   await recordSecretAccess({
     secretId: binding.secretId,

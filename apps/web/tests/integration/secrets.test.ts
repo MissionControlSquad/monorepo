@@ -333,3 +333,95 @@ describe("bulk import (Epic #5)", () => {
     )?.id;
   }
 });
+
+describe("personal (member-owned) secrets (Epic #5)", () => {
+  // Two distinct members in WS_A, plus the admin.
+  const memberCookie = async (userId: string) =>
+    `bb-workspace-token=${await createJWT({ userId, workspaceId: WS_A, userRole: "member" }, SECRET)}`;
+  const CREATE_USER = `mutation($n:String!,$v:String!){ createUserSecret(name:$n, value:$v){ id name personal createdBy } }`;
+
+  it("a member creates a personal secret; only the owner sees it, admins/others do not", async () => {
+    const alice = await memberCookie("human_alice");
+    const bob = await memberCookie("human_bob");
+
+    const made = await gql(CREATE_USER, { n: "ALICE_KEY", v: "sk-alice" }, alice);
+    expect(made.errors).toBeFalsy();
+    expect(made.data.createUserSecret).toMatchObject({ personal: true, createdBy: "human_alice" });
+
+    // A workspace secret everyone sees, for contrast.
+    await makeSecret(WS_A, "SHARED", "x");
+
+    const aliceList = await gql(`query{ secrets{ name personal } }`, undefined, alice);
+    expect((aliceList.data.secrets as any[]).map((s) => s.name).sort()).toEqual([
+      "ALICE_KEY",
+      "SHARED",
+    ]);
+
+    // Bob (another member) sees the workspace secret but NOT Alice's personal one.
+    const bobList = await gql(`query{ secrets{ name } }`, undefined, bob);
+    expect((bobList.data.secrets as any[]).map((s) => s.name)).toEqual(["SHARED"]);
+
+    // The admin also does NOT see Alice's personal secret.
+    const adminList = await gql(
+      `query{ secrets{ name } }`,
+      undefined,
+      await cookieFor(WS_A, "admin"),
+    );
+    expect((adminList.data.secrets as any[]).map((s) => s.name)).toEqual(["SHARED"]);
+  });
+
+  it("only the owner can rotate/disable a personal secret", async () => {
+    const alice = await memberCookie("human_alice");
+    const bob = await memberCookie("human_bob");
+    const id = (await gql(CREATE_USER, { n: "ROT_ME", v: "v1" }, alice)).data.createUserSecret.id;
+
+    // Bob cannot rotate Alice's personal secret.
+    const bobRot = await gql(
+      `mutation($id:String!,$v:String!){ rotateSecret(id:$id, value:$v){ currentVersion } }`,
+      { id, v: "v2" },
+      bob,
+    );
+    expect(bobRot.errors).toBeDefined();
+
+    // Neither can the admin (workspace admin ≠ personal owner).
+    const adminStatus = await gql(
+      `mutation($id:String!){ setSecretStatus(id:$id, status:"disabled"){ status } }`,
+      { id },
+      await cookieFor(WS_A, "admin"),
+    );
+    expect(adminStatus.errors).toBeDefined();
+
+    // Alice (owner) can rotate.
+    const ok = await gql(
+      `mutation($id:String!,$v:String!){ rotateSecret(id:$id, value:$v){ currentVersion } }`,
+      { id, v: "v2" },
+      alice,
+    );
+    expect(ok.data.rotateSecret.currentVersion).toBe(2);
+  });
+
+  it("a member remains unable to manage a WORKSPACE secret", async () => {
+    const alice = await memberCookie("human_alice");
+    const shared = (await makeSecret(WS_A, "TEAM_KEY", "v")).data.createSecret.id;
+    const denied = await gql(
+      `mutation($id:String!,$v:String!){ rotateSecret(id:$id, value:$v){ id } }`,
+      { id: shared, v: "v2" },
+      alice,
+    );
+    expect(denied.errors).toBeDefined();
+  });
+
+  it("the owner can bind their personal secret into an agent and it resolves", async () => {
+    const alice = await memberCookie("human_alice");
+    const agentId = await makeAgentInWs(WS_A);
+    const id = (await gql(CREATE_USER, { n: "PERSONAL_ENV", v: "sk-personal" }, alice)).data
+      .createUserSecret.id;
+    const bind = await gql(
+      `mutation($s:String!,$a:String!){ bindSecret(secretId:$s, scope:"agent", agentId:$a, envVarName:"MY_KEY"){ id } }`,
+      { s: id, a: agentId },
+      alice,
+    );
+    expect(bind.errors).toBeFalsy();
+    expect(await resolveEnvForAgent(WS_A, agentId)).toEqual({ MY_KEY: "sk-personal" });
+  });
+});
