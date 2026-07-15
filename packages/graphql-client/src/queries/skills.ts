@@ -18,7 +18,25 @@ export const SKILLS_QUERY = gql`
       installCount
       forkCount
       trustLevel
+      sharingScope
       forkedFromSkillId
+    }
+  }
+`;
+
+export const SKILL_CATALOG_QUERY = gql`
+  query SkillCatalog {
+    skillCatalog {
+      id
+      name
+      description
+      icon
+      tagline
+      author
+      starCount
+      installCount
+      forkCount
+      trustLevel
     }
   }
 `;

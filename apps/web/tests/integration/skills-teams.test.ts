@@ -184,6 +184,89 @@ describe("skill bundle files (Epic #10)", () => {
   });
 });
 
+describe("public skill catalog (Epic #10)", () => {
+  // publish a skill in WS_B, install it into WS_A.
+  async function publishInB(name = "Shared Runbook") {
+    const created = await gql(
+      `mutation($n:String!,$m:String!){ createSkill(name:$n, markdown:$m){ id } }`,
+      { n: name, m: "# shared" },
+      await cookieFor(WS_B, "member"),
+    );
+    const id = created.data.createSkill.id;
+    await gql(
+      `mutation($id:String!,$s:String!){ updateSkill(id:$id, sharingScope:$s){ id sharingScope } }`,
+      { id, s: "public" },
+      await cookieFor(WS_B, "member"),
+    );
+    // add a bundle file so we can prove install copies files too
+    await gql(
+      `mutation($s:String!,$p:String!,$c:String!){ upsertSkillFile(skillId:$s, path:$p, content:$c){ id } }`,
+      { s: id, p: "run.sh", c: "echo hi" },
+      await cookieFor(WS_B, "member"),
+    );
+    return id;
+  }
+
+  it("catalog lists other workspaces' PUBLIC skills only; private/workspace never leak", async () => {
+    const publicId = await publishInB();
+    // a NON-public skill in WS_B must never appear
+    await gql(
+      `mutation($n:String!,$m:String!){ createSkill(name:$n, markdown:$m){ id } }`,
+      { n: "Secret WS_B", m: "# private" },
+      await cookieFor(WS_B, "member"),
+    );
+
+    const cat = await gql(
+      `query{ skillCatalog{ id name } }`,
+      undefined,
+      await cookieFor(WS_A, "member"),
+    );
+    const ids = (cat.data.skillCatalog as { id: string }[]).map((s) => s.id);
+    expect(ids).toContain(publicId);
+    expect(cat.data.skillCatalog).toHaveLength(1); // only the public one
+
+    // WS_B does not see its OWN skill in its catalog (catalog excludes own workspace)
+    const ownCat = await gql(
+      `query{ skillCatalog{ id } }`,
+      undefined,
+      await cookieFor(WS_B, "member"),
+    );
+    expect(ownCat.data.skillCatalog).toHaveLength(0);
+  });
+
+  it("install copies the skill + its files into the caller's workspace and bumps source forkCount", async () => {
+    const publicId = await publishInB();
+    const inst = await gql(
+      `mutation($id:String!){ installCatalogSkill(skillId:$id){ id name workspaceId sharingScope forkedFromSkillId } }`,
+      { id: publicId },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(inst.errors).toBeFalsy();
+    const copy = inst.data.installCatalogSkill;
+    expect(copy.workspaceId).toBe(WS_A);
+    expect(copy.sharingScope).toBe("workspace"); // the copy is private by default
+    expect(copy.forkedFromSkillId).toBe(publicId);
+    // files were copied
+    expect(await prisma.skillFile.count({ where: { skillId: copy.id, path: "run.sh" } })).toBe(1);
+    // source forkCount bumped
+    expect((await prisma.skill.findUniqueOrThrow({ where: { id: publicId } })).forkCount).toBe(1);
+  });
+
+  it("a non-public skill id cannot be installed", async () => {
+    const priv = await gql(
+      `mutation($n:String!,$m:String!){ createSkill(name:$n, markdown:$m){ id } }`,
+      { n: "NotShared", m: "# x" },
+      await cookieFor(WS_B, "member"),
+    );
+    const r = await gql(
+      `mutation($id:String!){ installCatalogSkill(skillId:$id){ id } }`,
+      { id: priv.data.createSkill.id },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(r.errors).toBeDefined();
+  });
+});
+
 describe("teams install collision strategies (Epic #10)", () => {
   async function teamWithMember(memberName: string) {
     const team = await createTeam({

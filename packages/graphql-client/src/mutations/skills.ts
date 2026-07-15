@@ -47,6 +47,24 @@ export const STAR_SKILL = gql`
   }
 `;
 
+export const UPDATE_SKILL = gql`
+  mutation UpdateSkill($id: String!, $sharingScope: String) {
+    updateSkill(id: $id, sharingScope: $sharingScope) {
+      id
+      sharingScope
+    }
+  }
+`;
+
+export const INSTALL_CATALOG_SKILL = gql`
+  mutation InstallCatalogSkill($skillId: String!) {
+    installCatalogSkill(skillId: $skillId) {
+      id
+      name
+    }
+  }
+`;
+
 export const UPSERT_SKILL_FILE = gql`
   mutation UpsertSkillFile($skillId: String!, $path: String!, $content: String!) {
     upsertSkillFile(skillId: $skillId, path: $path, content: $content) {

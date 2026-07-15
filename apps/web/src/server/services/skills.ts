@@ -198,6 +198,85 @@ export async function forkSkill(
   return fork;
 }
 
+// ─── Public catalog (cross-workspace) ─────────────────────────────
+// Skills whose author set sharingScope="public" are shared beyond their workspace. The catalog lists
+// ONLY those (never `private`/`workspace`), and install COPIES one into the caller's workspace — the
+// original is never mutated except its forkCount. Single shared buildbase org (D5), so "public" is
+// the deliberate publish action, not a leak.
+
+/** Public skills authored by OTHER workspaces (the browsable catalog). */
+export function skillCatalog(currentWorkspaceId: string): Promise<Skill[]> {
+  return prisma.skill.findMany({
+    where: { sharingScope: "public", workspaceId: { not: currentWorkspaceId } },
+    orderBy: [{ installCount: "desc" }, { starCount: "desc" }, { updatedAt: "desc" }],
+    take: 100,
+  });
+}
+
+/** Copy a public catalog skill (incl. its bundle files) into the caller's workspace as rev 1. */
+export async function installCatalogSkill(
+  currentWorkspaceId: string,
+  sourceId: string,
+  createdByProfileId?: string | null,
+): Promise<Skill> {
+  const source = await prisma.skill.findFirst({
+    where: { id: sourceId, sharingScope: "public" }, // gate: only published skills are installable
+    include: { files: true },
+  });
+  if (!source) notFound("Skill");
+  if (source.workspaceId === currentWorkspaceId)
+    badRequest("this skill already belongs to your workspace");
+
+  let key = source.key;
+  for (
+    let i = 2;
+    await prisma.skill.findFirst({ where: { workspaceId: currentWorkspaceId, key } });
+    i++
+  )
+    key = `${source.key}-${i}`;
+
+  return prisma.$transaction(async (tx) => {
+    const skill = await tx.skill.create({
+      data: {
+        workspaceId: currentWorkspaceId,
+        key,
+        slug: slugify(source.name),
+        name: source.name,
+        markdown: source.markdown,
+        description: source.description,
+        categories: source.categories,
+        icon: source.icon,
+        color: source.color,
+        tagline: source.tagline,
+        author: source.author,
+        homepage: source.homepage,
+        sourceType: source.sourceType,
+        trustLevel: source.trustLevel,
+        sharingScope: "workspace", // the copy is private to the installer by default
+        forkedFromSkillId: source.id,
+        createdByProfileId: createdByProfileId ?? null,
+        currentVersion: 1,
+      },
+    });
+    await tx.skillVersion.create({
+      data: {
+        workspaceId: currentWorkspaceId,
+        skillId: skill.id,
+        revisionNumber: 1,
+        content: source.markdown,
+        createdByProfileId: createdByProfileId ?? null,
+      },
+    });
+    if (source.files.length) {
+      await tx.skillFile.createMany({
+        data: source.files.map((f) => ({ skillId: skill.id, path: f.path, content: f.content })),
+      });
+    }
+    await tx.skill.update({ where: { id: source.id }, data: { forkCount: { increment: 1 } } });
+    return skill;
+  });
+}
+
 export async function starSkill(
   workspaceId: string,
   skillId: string,

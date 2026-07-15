@@ -63,6 +63,24 @@ builder.queryField("skillVersions", (t) =>
   }),
 );
 
+// Public catalog: skills other workspaces published (sharingScope=public). Read-only, member+.
+builder.queryField("skillCatalog", (t) =>
+  t.prismaField({
+    type: ["Skill"],
+    resolve: async (query, _root, _args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      // ONLY sharingScope=public + never the caller's own workspace — never a private/workspace leak.
+      return ctx.prisma.skill.findMany({
+        ...query,
+        where: { sharingScope: "public", workspaceId: { not: tenancy.workspaceId } },
+        orderBy: [{ installCount: "desc" }, { starCount: "desc" }, { updatedAt: "desc" }],
+        take: 100,
+      });
+    },
+  }),
+);
+
 builder.queryField("skillFiles", (t) =>
   t.prismaField({
     type: ["SkillFile"],

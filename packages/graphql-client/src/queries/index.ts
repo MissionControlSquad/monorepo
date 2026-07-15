@@ -155,7 +155,13 @@ export {
 
 export { CASES_QUERY, CASE_QUERY, LABELS_QUERY, CASE_EVENTS_QUERY } from "./cases";
 
-export { SKILLS_QUERY, SKILL_FILES_QUERY, TEAMS_QUERY, PREVIEW_TEAM_INSTALL_QUERY } from "./skills";
+export {
+  SKILLS_QUERY,
+  SKILL_FILES_QUERY,
+  SKILL_CATALOG_QUERY,
+  TEAMS_QUERY,
+  PREVIEW_TEAM_INSTALL_QUERY,
+} from "./skills";
 export { EXPORT_WORKSPACE_BUNDLE, WORKSPACE_IMPORTS } from "./portability";
 export { GOALS_QUERY, GOAL_QUERY, DEFAULT_GOAL_QUERY } from "./goals";
 export { WORKSPACE_SUMMARY_QUERY } from "./observability";

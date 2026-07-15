@@ -20,6 +20,7 @@ import {
   unassignSkillFromAgent,
   upsertSkillFile,
   deleteSkillFile,
+  installCatalogSkill,
 } from "@/server/services/skills";
 import { createTeam, addTeamMember, installTeam } from "@/server/services/teams";
 
@@ -188,6 +189,19 @@ builder.mutationField("unassignSkill", (t) =>
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
       const tenancy = requireRole(ctx, "member");
       return unassignSkillFromAgent(tenancy.workspaceId, args.agentId, args.skillId);
+    },
+  }),
+);
+
+builder.mutationField("installCatalogSkill", (t) =>
+  t.prismaField({
+    type: "Skill",
+    args: { skillId: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      const skill = await installCatalogSkill(tenancy.workspaceId, args.skillId, tenancy.userId);
+      return ctx.prisma.skill.findUniqueOrThrow({ ...query, where: { id: skill.id } });
     },
   }),
 );

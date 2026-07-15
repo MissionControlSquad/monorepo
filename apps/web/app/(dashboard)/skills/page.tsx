@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "urql";
-import { SKILLS_QUERY, SKILL_FILES_QUERY } from "@/lib/graphql/queries";
+import { SKILLS_QUERY, SKILL_FILES_QUERY, SKILL_CATALOG_QUERY } from "@/lib/graphql/queries";
 import {
   CREATE_SKILL,
   FORK_SKILL,
   STAR_SKILL,
   DELETE_SKILL,
+  UPDATE_SKILL,
+  INSTALL_CATALOG_SKILL,
   UPSERT_SKILL_FILE,
   DELETE_SKILL_FILE,
 } from "@/lib/graphql/mutations";
@@ -27,7 +29,20 @@ interface Skill {
   installCount: number;
   forkCount: number;
   trustLevel: string;
+  sharingScope: string;
   forkedFromSkillId: string | null;
+}
+interface CatalogSkill {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  tagline: string | null;
+  author: string | null;
+  starCount: number;
+  installCount: number;
+  forkCount: number;
+  trustLevel: string;
 }
 
 export default function SkillsPage() {
@@ -36,8 +51,14 @@ export default function SkillsPage() {
   const [, forkSkill] = useMutation(FORK_SKILL);
   const [, starSkill] = useMutation(STAR_SKILL);
   const [, deleteSkill] = useMutation(DELETE_SKILL);
+  const [, updateSkill] = useMutation(UPDATE_SKILL);
+  const [, installCatalogSkill] = useMutation(INSTALL_CATALOG_SKILL);
+  const [{ data: catData }, refetchCatalog] = useQuery<{ skillCatalog: CatalogSkill[] }>({
+    query: SKILL_CATALOG_QUERY,
+  });
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [showCatalog, setShowCatalog] = useState(false);
   const [openFiles, setOpenFiles] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -47,6 +68,7 @@ export default function SkillsPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const skills = data?.skills ?? [];
+  const catalog = catData?.skillCatalog ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
   async function act(fn: () => Promise<unknown>, key: string) {
@@ -118,6 +140,53 @@ export default function SkillsPage() {
         {error && <p className="text-sm text-destructive">{error}</p>}
       </Card>
 
+      {/* Public catalog — skills other workspaces published (sharingScope=public). Install copies
+          one into your workspace. */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-foreground">
+          Catalog {catalog.length > 0 && `(${catalog.length})`}
+        </h2>
+        <Button size="sm" variant="ghost" onClick={() => setShowCatalog((v) => !v)}>
+          {showCatalog ? "Hide" : "Browse catalog"}
+        </Button>
+      </div>
+      {showCatalog && (
+        <Card className="space-y-2 p-4">
+          {catalog.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No public skills yet. Publish one of yours to share it across workspaces.
+            </p>
+          )}
+          {catalog.map((c) => (
+            <div
+              key={c.id}
+              className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 last:border-0 last:pb-0"
+            >
+              <span className="flex flex-wrap items-center gap-2 text-sm">
+                {c.icon && <span className="text-base">{c.icon}</span>}
+                <span className="font-medium text-foreground">{c.name}</span>
+                {c.tagline && <span className="text-xs text-muted-foreground">— {c.tagline}</span>}
+                {c.author && <Badge variant="gray">{c.author}</Badge>}
+                <span className="text-xs text-muted-foreground">
+                  ★ {c.starCount} · {c.installCount} agents · {c.forkCount} installs
+                </span>
+              </span>
+              <Button
+                size="sm"
+                disabled={busy === c.id}
+                onClick={() =>
+                  act(async () => {
+                    await installCatalogSkill({ skillId: c.id });
+                  }, c.id)
+                }
+              >
+                Install
+              </Button>
+            </div>
+          ))}
+        </Card>
+      )}
+
       {skills.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No skills yet.</Card>
       )}
@@ -142,6 +211,23 @@ export default function SkillsPage() {
                 onClick={() => setOpenFiles((o) => (o === s.id ? null : s.id))}
               >
                 Files
+              </Button>
+              <Button
+                size="sm"
+                variant={s.sharingScope === "public" ? "primary" : "secondary"}
+                disabled={busy === s.id}
+                title="Publish to the cross-workspace catalog"
+                onClick={() =>
+                  act(async () => {
+                    await updateSkill({
+                      id: s.id,
+                      sharingScope: s.sharingScope === "public" ? "workspace" : "public",
+                    });
+                    refetchCatalog({ requestPolicy: "network-only" });
+                  }, s.id)
+                }
+              >
+                {s.sharingScope === "public" ? "Published" : "Publish"}
               </Button>
               <Button
                 size="sm"
