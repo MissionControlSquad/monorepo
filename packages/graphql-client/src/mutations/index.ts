@@ -207,3 +207,9 @@ export { SET_AGENT_GOVERNANCE } from "./agent-governance";
 export { LINK_TASKS, UNLINK_TASKS } from "./task-relations";
 
 export { ADD_EXTERNAL_LINK, REMOVE_EXTERNAL_LINK } from "./external-links";
+
+export {
+  ADD_DELIVERABLE_ANNOTATION,
+  RESOLVE_DELIVERABLE_ANNOTATION,
+  DELETE_DELIVERABLE_ANNOTATION,
+} from "./deliverable-annotations";

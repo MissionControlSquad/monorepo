@@ -31,6 +31,7 @@ export const FLAG_KEYS = {
   AGENT_AUTHZ: "agent_authz",
   TASK_RELATIONS: "task_relations",
   EXTERNAL_LINKS: "external_links",
+  ANNOTATIONS: "annotations",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -69,4 +70,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.AGENT_AUTHZ]: true,
   [FLAG_KEYS.TASK_RELATIONS]: true,
   [FLAG_KEYS.EXTERNAL_LINKS]: true,
+  [FLAG_KEYS.ANNOTATIONS]: true,
 };

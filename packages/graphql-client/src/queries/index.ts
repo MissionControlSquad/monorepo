@@ -188,3 +188,5 @@ export { AGENT_GOVERNANCE_QUERY } from "./agent-governance";
 export { TASK_RELATIONS_QUERY } from "./task-relations";
 
 export { TASK_EXTERNAL_LINKS_QUERY } from "./external-links";
+
+export { DELIVERABLE_ANNOTATIONS_QUERY } from "./deliverable-annotations";

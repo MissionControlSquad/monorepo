@@ -21,6 +21,7 @@ import { TimeAgo } from "../common/TimeAgo";
 import { Badge, Button } from "../ui";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { DELIVERABLE_VERSIONS_QUERY } from "../../lib/graphql/queries";
+import { DeliverableAnnotations } from "./DeliverableAnnotations";
 import { getAssetUrl, formatFileSize, DeliverableKind } from "@agentcenter/utils";
 import type { Deliverable, Agent, DeliverableVersion } from "@agentcenter/types";
 
@@ -373,6 +374,13 @@ export function DeliverableFullView({
                     </a>
                   </div>
                 ))}
+
+              {/* Tier C: review annotations */}
+              {!viewingVersion && (
+                <div className="mt-6 border-t border-border pt-4">
+                  <DeliverableAnnotations deliverableId={deliverable.id} />
+                </div>
+              )}
 
               {/* Version History */}
               {(deliverable.version ?? 0) > 1 && (

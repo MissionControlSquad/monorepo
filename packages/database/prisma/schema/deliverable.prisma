@@ -28,13 +28,32 @@ model Deliverable {
   task     Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
   profile  Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
   project  Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  versions DeliverableVersion[]
+  versions    DeliverableVersion[]
+  annotations DeliverableAnnotation[]
 
   @@index([taskId])
   @@index([profileId])
   @@index([taskId, profileId])
   @@index([projectId])
   @@map("deliverables")
+}
+
+// Tier C: review annotations on a deliverable — a comment, optionally anchored to a quoted snippet
+// of the content. Resolvable (like a review thread). Display/review only.
+model DeliverableAnnotation {
+  id                 String   @id @default(cuid())
+  deliverableId      String
+  body               String
+  quote              String? // the highlighted snippet this comment refers to (optional anchor)
+  resolved           Boolean  @default(false)
+  createdByProfileId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  deliverable Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+
+  @@index([deliverableId, createdAt])
+  @@map("deliverable_annotations")
 }
 
 model DeliverableVersion {

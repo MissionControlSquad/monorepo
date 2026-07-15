@@ -47,3 +47,16 @@ builder.prismaObject("DeliverableVersion", {
     editedByProfile: t.relation("editedByProfile", { nullable: true }),
   }),
 });
+
+// Tier C: deliverable review annotations.
+builder.prismaObject("DeliverableAnnotation", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    deliverableId: t.exposeString("deliverableId"),
+    body: t.exposeString("body"),
+    quote: t.exposeString("quote", { nullable: true }),
+    resolved: t.exposeBoolean("resolved"),
+    createdByProfileId: t.exposeString("createdByProfileId", { nullable: true }),
+    createdAt: t.expose("createdAt", { type: "DateTime" }),
+  }),
+});
