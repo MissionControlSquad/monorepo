@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "urql";
-import { ROUTINES_QUERY } from "@/lib/graphql/queries";
+import { ROUTINES_QUERY, AGENTS_QUERY, GOALS_QUERY } from "@/lib/graphql/queries";
 import { CREATE_ROUTINE, TRIGGER_ROUTINE_NOW, ADD_ROUTINE_TRIGGER } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
+
+const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 
 // Epic #7: routines (scheduled/triggered workflow docs). PIPELINES_ROUTINES-gated + buildbase role
 // (admin manages; member can trigger). Firing a routine creates a Task as its output.
@@ -21,20 +23,35 @@ interface Routine {
   description: string | null;
   isActive: boolean;
   currentVersion: number;
+  assigneeAgentId: string | null;
+  priority: string | null;
+  goalId: string | null;
   triggers: Trigger[];
 }
 
 export default function RoutinesPage() {
   const [{ data }, refetch] = useQuery<{ routines: Routine[] }>({ query: ROUTINES_QUERY });
+  const [{ data: agentsData }] = useQuery<{ agents: { id: string; name: string }[] }>({
+    query: AGENTS_QUERY,
+  });
+  const [{ data: goalsData }] = useQuery<{ goals: { id: string; title: string }[] }>({
+    query: GOALS_QUERY,
+  });
   const [, createRoutine] = useMutation(CREATE_ROUTINE);
   const [, triggerNow] = useMutation(TRIGGER_ROUTINE_NOW);
   const [, addTrigger] = useMutation(ADD_ROUTINE_TRIGGER);
+
+  const agents = agentsData?.agents ?? [];
+  const goals = goalsData?.goals ?? [];
 
   const [busy, setBusy] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     definition: '{\n  "steps": []\n}',
     description: "",
+    assigneeAgentId: "",
+    priority: "",
+    goalId: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<Record<string, string>>({});
@@ -57,9 +74,19 @@ export default function RoutinesPage() {
         name: form.name.trim(),
         definition,
         description: form.description.trim() || null,
+        assigneeAgentId: form.assigneeAgentId || null,
+        priority: form.priority || null,
+        goalId: form.goalId || null,
       });
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create");
-      setForm({ name: "", definition: '{\n  "steps": []\n}', description: "" });
+      setForm({
+        name: "",
+        definition: '{\n  "steps": []\n}',
+        description: "",
+        assigneeAgentId: "",
+        priority: "",
+        goalId: "",
+      });
       refresh();
     } finally {
       setBusy(null);
@@ -114,6 +141,45 @@ export default function RoutinesPage() {
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           />
         </div>
+        {/* Metadata applied to each generated task */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <select
+            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+            value={form.assigneeAgentId}
+            onChange={(e) => setForm((f) => ({ ...f, assigneeAgentId: e.target.value }))}
+          >
+            <option value="">Assign to… (optional)</option>
+            {agents.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+          <select
+            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+            value={form.priority}
+            onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
+          >
+            <option value="">Priority… (optional)</option>
+            {PRIORITIES.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <select
+            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+            value={form.goalId}
+            onChange={(e) => setForm((f) => ({ ...f, goalId: e.target.value }))}
+          >
+            <option value="">Goal… (optional)</option>
+            {goals.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.title}
+              </option>
+            ))}
+          </select>
+        </div>
         <textarea
           className="h-24 w-full rounded border border-border bg-background px-3 py-1.5 font-mono text-xs"
           value={form.definition}
@@ -138,6 +204,17 @@ export default function RoutinesPage() {
               <span className="font-medium text-foreground">{r.name}</span>
               <Badge variant="gray">v{r.currentVersion}</Badge>
               {!r.isActive && <Badge variant="gray">inactive</Badge>}
+              {r.priority && <Badge variant="yellow">{r.priority}</Badge>}
+              {r.assigneeAgentId && (
+                <Badge variant="blue">
+                  → {agents.find((a) => a.id === r.assigneeAgentId)?.name ?? "agent"}
+                </Badge>
+              )}
+              {r.goalId && (
+                <Badge variant="purple">
+                  ◎ {goals.find((g) => g.id === r.goalId)?.title ?? "goal"}
+                </Badge>
+              )}
             </div>
             <div className="flex gap-2">
               <Button

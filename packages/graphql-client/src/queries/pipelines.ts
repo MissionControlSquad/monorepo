@@ -9,6 +9,9 @@ export const ROUTINES_QUERY = gql`
       description
       isActive
       currentVersion
+      assigneeAgentId
+      priority
+      goalId
       triggers {
         id
         type

@@ -85,6 +85,42 @@ describe("routines (Epic #7)", () => {
     expect(task?.title).toBe("Daily report");
   });
 
+  it("applies assignee / priority / goal metadata to the generated task", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    const agent = await prisma.agent.create({
+      data: { name: "Reporter", role: "worker", workspaceId: WS_A },
+    });
+    const goal = await prisma.goal.create({ data: { workspaceId: WS_A, title: "Weekly OKR" } });
+
+    const r = await gql(
+      `mutation($d:JSON!,$a:String!,$g:String!){ createRoutine(name:"Report", definition:$d, assigneeAgentId:$a, priority:"high", goalId:$g){ id assigneeAgentId priority goalId } }`,
+      { d: { steps: ["a"] }, a: agent.id, g: goal.id },
+      admin,
+    );
+    expect(r.errors).toBeFalsy();
+    expect(r.data.createRoutine).toMatchObject({
+      assigneeAgentId: agent.id,
+      priority: "high",
+      goalId: goal.id,
+    });
+
+    const run = await gql(
+      `mutation($id:String!){ triggerRoutineNow(routineId:$id){ generatedTaskId } }`,
+      { id: r.data.createRoutine.id },
+      admin,
+    );
+    const taskId = run.data.triggerRoutineNow.generatedTaskId;
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: { assignees: true },
+    });
+    expect(task?.priority).toBe("high");
+    expect(task?.goalId).toBe(goal.id);
+    // the task is assigned to the agent's profile
+    const agentProfile = await prisma.profile.findFirst({ where: { agentId: agent.id } });
+    expect(task?.assignees.map((a) => a.profileId)).toContain(agentProfile?.id);
+  });
+
   it("updateRoutine snapshots a new revision only when the definition changes", async () => {
     const admin = await cookieFor(WS_A, "admin");
     const id = (

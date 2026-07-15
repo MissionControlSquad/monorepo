@@ -2,8 +2,22 @@ import { gql } from "urql";
 
 // Epic #7: routines + pipelines mutations.
 export const CREATE_ROUTINE = gql`
-  mutation CreateRoutine($name: String!, $definition: JSON!, $description: String) {
-    createRoutine(name: $name, definition: $definition, description: $description) {
+  mutation CreateRoutine(
+    $name: String!
+    $definition: JSON!
+    $description: String
+    $assigneeAgentId: String
+    $priority: String
+    $goalId: String
+  ) {
+    createRoutine(
+      name: $name
+      definition: $definition
+      description: $description
+      assigneeAgentId: $assigneeAgentId
+      priority: $priority
+      goalId: $goalId
+    ) {
       id
     }
   }

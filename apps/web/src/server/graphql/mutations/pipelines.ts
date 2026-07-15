@@ -32,6 +32,9 @@ builder.mutationField("createRoutine", (t) =>
       description: t.arg.string(),
       timezone: t.arg.string(),
       projectId: t.arg.string(),
+      assigneeAgentId: t.arg.string(),
+      priority: t.arg.string(),
+      goalId: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
@@ -44,6 +47,9 @@ builder.mutationField("createRoutine", (t) =>
         description: args.description ?? null,
         timezone: args.timezone ?? null,
         projectId: args.projectId ?? null,
+        assigneeAgentId: args.assigneeAgentId ?? null,
+        priority: (args.priority as "low" | "medium" | "high" | "urgent" | null) ?? null,
+        goalId: args.goalId ?? null,
       });
       return ctx.prisma.routine.findUniqueOrThrow({ ...query, where: { id: routine.id } });
     },
@@ -59,6 +65,11 @@ builder.mutationField("updateRoutine", (t) =>
       description: t.arg.string(),
       definition: t.arg({ type: "JSON" }),
       isActive: t.arg.boolean(),
+      assigneeAgentId: t.arg.string(),
+      priority: t.arg.string(),
+      goalId: t.arg.string(),
+      clearAssignee: t.arg.boolean(),
+      clearGoal: t.arg.boolean(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
@@ -69,6 +80,11 @@ builder.mutationField("updateRoutine", (t) =>
         definition: args.definition ?? undefined,
         isActive: args.isActive ?? null,
         editedById: tenancy.userId,
+        assigneeAgentId: args.assigneeAgentId ?? null,
+        priority: (args.priority as "low" | "medium" | "high" | "urgent" | null) ?? null,
+        goalId: args.goalId ?? null,
+        clearAssignee: args.clearAssignee ?? false,
+        clearGoal: args.clearGoal ?? false,
       });
       return ctx.prisma.routine.findUniqueOrThrow({ ...query, where: { id: routine.id } });
     },
