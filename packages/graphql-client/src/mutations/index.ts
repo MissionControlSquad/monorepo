@@ -128,6 +128,7 @@ export {
   CREATE_PIPELINE_CASE,
   CLAIM_CASE,
   RELEASE_CASE,
+  COMMENT_CASE,
   TRANSITION_CASE,
   REJECT_CASE,
 } from "./pipelines";

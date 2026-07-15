@@ -299,6 +299,57 @@ describe("case release + claim lease (Epic #7)", () => {
   });
 });
 
+describe("case comments + timeline (Epic #7)", () => {
+  it("commentCase appends a commented event; caseEvents returns the timeline oldest-first", async () => {
+    const { pid } = await pipelineWithStages(WS_A);
+    const member = await cookieFor(WS_A, "member");
+    const caseId = (
+      await gql(
+        `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"c"){ id } }`,
+        { p: pid },
+        member,
+      )
+    ).data.createPipelineCase.id;
+
+    const empty = await gql(
+      `mutation($c:String!){ commentCase(caseId:$c, note:"   "){ id } }`,
+      { c: caseId },
+      member,
+    );
+    expect(empty.errors).toBeDefined(); // blank comment rejected
+
+    const ok = await gql(
+      `mutation($c:String!){ commentCase(caseId:$c, note:"looks good"){ id } }`,
+      { c: caseId },
+      member,
+    );
+    expect(ok.errors).toBeFalsy();
+
+    const events = await gql(
+      `query($c:String!){ pipelineCaseEvents(caseId:$c){ type note } }`,
+      { c: caseId },
+      member,
+    );
+    // created (from case creation) then commented.
+    expect(events.data.pipelineCaseEvents.map((e: { type: string }) => e.type)).toEqual([
+      "created",
+      "commented",
+    ]);
+    const comment = events.data.pipelineCaseEvents.find(
+      (e: { type: string }) => e.type === "commented",
+    );
+    expect(comment.note).toBe("looks good");
+
+    // cross-workspace cannot read this case's timeline.
+    const cross = await gql(
+      `query($c:String!){ pipelineCaseEvents(caseId:$c){ type } }`,
+      { c: caseId },
+      await cookieFor(WS_B, "member"),
+    );
+    expect(cross.data.pipelineCaseEvents).toHaveLength(0);
+  });
+});
+
 describe("review inbox + health (Epic #7)", () => {
   it("reviewCases returns only cases on a review stage", async () => {
     const { pid, stageIds } = await pipelineWithStages(WS_A, /* reviewAtOrder1 */ true);

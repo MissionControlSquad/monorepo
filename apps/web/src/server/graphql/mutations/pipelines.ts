@@ -18,6 +18,7 @@ import {
   transitionCase,
   breakdownCase,
   rejectCase,
+  commentCase,
 } from "@/server/services/pipelines";
 
 // Epic #7 mutations. Routine/pipeline STRUCTURE is admin; working CASES (claim/transition/etc) is
@@ -239,6 +240,24 @@ builder.mutationField("releaseCase", (t) =>
         caseId: args.caseId,
         actorProfileId: tenancy.userId,
         actorIsAdmin: tenancy.role === "admin" || tenancy.role === "owner",
+      });
+      return ctx.prisma.pipelineCase.findUniqueOrThrow({ ...query, where: { id: c.id } });
+    },
+  }),
+);
+
+builder.mutationField("commentCase", (t) =>
+  t.prismaField({
+    type: "PipelineCase",
+    args: { caseId: t.arg.string({ required: true }), note: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
+      const tenancy = requireRole(ctx, "member");
+      const c = await commentCase({
+        workspaceId: tenancy.workspaceId,
+        caseId: args.caseId,
+        actorProfileId: tenancy.userId,
+        note: args.note,
       });
       return ctx.prisma.pipelineCase.findUniqueOrThrow({ ...query, where: { id: c.id } });
     },

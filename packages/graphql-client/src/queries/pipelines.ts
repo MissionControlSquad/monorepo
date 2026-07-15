@@ -87,6 +87,18 @@ export const PIPELINE_HEALTH_QUERY = gql`
   }
 `;
 
+export const PIPELINE_CASE_EVENTS_QUERY = gql`
+  query PipelineCaseEvents($caseId: String!) {
+    pipelineCaseEvents(caseId: $caseId) {
+      id
+      type
+      note
+      actorProfileId
+      createdAt
+    }
+  }
+`;
+
 export const STALE_CLAIMS_QUERY = gql`
   query StaleClaims($pipelineId: String, $leaseMinutes: Int) {
     staleClaims(pipelineId: $pipelineId, leaseMinutes: $leaseMinutes) {

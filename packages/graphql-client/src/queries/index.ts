@@ -143,6 +143,7 @@ export {
   REVIEW_CASES_QUERY,
   PIPELINE_HEALTH_QUERY,
   STALE_CLAIMS_QUERY,
+  PIPELINE_CASE_EVENTS_QUERY,
 } from "./pipelines";
 
 export {

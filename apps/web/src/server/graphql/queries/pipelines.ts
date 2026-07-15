@@ -157,6 +157,30 @@ builder.queryField("pipelineHealth", (t) =>
   }),
 );
 
+// A case's event timeline (created/claimed/released/transitioned/commented/…), oldest first.
+builder.queryField("pipelineCaseEvents", (t) =>
+  t.prismaField({
+    type: ["PipelineCaseEvent"],
+    args: { caseId: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
+      const tenancy = requireTenancy(ctx);
+      requireRole(ctx, "member");
+      // Scope through the owning case so another workspace's timeline is never returned.
+      const c = await ctx.prisma.pipelineCase.findFirst({
+        where: { id: args.caseId, pipeline: { workspaceId: tenancy.workspaceId } },
+        select: { id: true },
+      });
+      if (!c) return [];
+      return ctx.prisma.pipelineCaseEvent.findMany({
+        ...query,
+        where: { caseId: c.id },
+        orderBy: { createdAt: "asc" },
+      });
+    },
+  }),
+);
+
 // Cases whose claim lease has expired (claimed > leaseMinutes ago, still not advanced).
 builder.queryField("staleClaims", (t) =>
   t.field({

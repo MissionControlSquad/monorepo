@@ -99,6 +99,14 @@ export const RELEASE_CASE = gql`
   }
 `;
 
+export const COMMENT_CASE = gql`
+  mutation CommentCase($caseId: String!, $note: String!) {
+    commentCase(caseId: $caseId, note: $note) {
+      id
+    }
+  }
+`;
+
 export const TRANSITION_CASE = gql`
   mutation TransitionCase($caseId: String!, $toStageId: String!) {
     transitionCase(caseId: $caseId, toStageId: $toStageId) {

@@ -168,6 +168,24 @@ export async function releaseCase(args: {
   return updated;
 }
 
+/** Append a free-text comment to a case's timeline (a `commented` event). */
+export async function commentCase(args: {
+  workspaceId: string;
+  caseId: string;
+  actorProfileId: string;
+  note: string;
+}): Promise<PipelineCase> {
+  const note = args.note.trim();
+  if (!note) badRequest("comment cannot be empty");
+  const c = await prisma.pipelineCase.findFirst({
+    where: { id: args.caseId, pipeline: { workspaceId: args.workspaceId } },
+    select: { id: true },
+  });
+  if (!c) notFound("Case");
+  await appendEvent(c.id, "commented", { actorProfileId: args.actorProfileId, note });
+  return prisma.pipelineCase.findUniqueOrThrow({ where: { id: c.id } });
+}
+
 export interface StaleClaim {
   caseId: string;
   title: string;

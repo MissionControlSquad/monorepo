@@ -6,6 +6,7 @@ import {
   PIPELINES_QUERY,
   CASES_IN_PIPELINE_QUERY,
   PIPELINE_HEALTH_QUERY,
+  PIPELINE_CASE_EVENTS_QUERY,
 } from "@/lib/graphql/queries";
 import {
   CREATE_PIPELINE,
@@ -13,6 +14,7 @@ import {
   CREATE_PIPELINE_CASE,
   CLAIM_CASE,
   RELEASE_CASE,
+  COMMENT_CASE,
   TRANSITION_CASE,
   REJECT_CASE,
 } from "@/lib/graphql/mutations";
@@ -68,6 +70,7 @@ function PipelineCard({ pipeline }: { pipeline: Pipeline }) {
   const [, rejectCase] = useMutation(REJECT_CASE);
 
   const [title, setTitle] = useState("");
+  const [openCase, setOpenCase] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const cases = caseData?.casesInPipeline ?? [];
@@ -134,59 +137,68 @@ function PipelineCard({ pipeline }: { pipeline: Pipeline }) {
         const next = nextStageId(c.currentStageId);
         const active = c.status !== "rejected" && c.status !== "done";
         return (
-          <div
-            key={c.id}
-            className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2"
-          >
-            <span className="flex flex-wrap items-center gap-2 text-sm">
-              <Badge variant={statusVariant(c.status)}>{c.status}</Badge>
-              <span className="text-foreground">{c.title}</span>
-              {stale.has(c.id) && <Badge variant="red">SLA breached</Badge>}
-              {c.linkedTaskId && <Badge variant="blue">task</Badge>}
-            </span>
-            {active && (
+          <div key={c.id} className="border-t border-border pt-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="flex flex-wrap items-center gap-2 text-sm">
+                <Badge variant={statusVariant(c.status)}>{c.status}</Badge>
+                <span className="text-foreground">{c.title}</span>
+                {stale.has(c.id) && <Badge variant="red">SLA breached</Badge>}
+                {c.linkedTaskId && <Badge variant="blue">task</Badge>}
+              </span>
               <span className="flex gap-2">
-                {c.status === "open" && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={busy === c.id}
-                    onClick={() => act(() => claimCase({ caseId: c.id }), c.id)}
-                  >
-                    Claim
-                  </Button>
-                )}
-                {c.status === "claimed" && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={busy === c.id}
-                    onClick={() => act(() => releaseCase({ caseId: c.id }), c.id)}
-                  >
-                    Release
-                  </Button>
-                )}
-                {next && (
-                  <Button
-                    size="sm"
-                    disabled={busy === c.id}
-                    onClick={() =>
-                      act(() => transitionCase({ caseId: c.id, toStageId: next }), c.id)
-                    }
-                  >
-                    Advance
-                  </Button>
-                )}
                 <Button
                   size="sm"
-                  variant="danger"
-                  disabled={busy === c.id}
-                  onClick={() => act(() => rejectCase({ caseId: c.id }), c.id)}
+                  variant="ghost"
+                  onClick={() => setOpenCase((o) => (o === c.id ? null : c.id))}
                 >
-                  Reject
+                  History
                 </Button>
+                {active && (
+                  <>
+                    {c.status === "open" && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy === c.id}
+                        onClick={() => act(() => claimCase({ caseId: c.id }), c.id)}
+                      >
+                        Claim
+                      </Button>
+                    )}
+                    {c.status === "claimed" && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy === c.id}
+                        onClick={() => act(() => releaseCase({ caseId: c.id }), c.id)}
+                      >
+                        Release
+                      </Button>
+                    )}
+                    {next && (
+                      <Button
+                        size="sm"
+                        disabled={busy === c.id}
+                        onClick={() =>
+                          act(() => transitionCase({ caseId: c.id, toStageId: next }), c.id)
+                        }
+                      >
+                        Advance
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={busy === c.id}
+                      onClick={() => act(() => rejectCase({ caseId: c.id }), c.id)}
+                    >
+                      Reject
+                    </Button>
+                  </>
+                )}
               </span>
-            )}
+            </div>
+            {openCase === c.id && <CaseTimeline caseId={c.id} />}
           </div>
         );
       })}
@@ -253,6 +265,72 @@ export default function PipelinesPage() {
       {pipelines.map((p) => (
         <PipelineCard key={p.id} pipeline={p} />
       ))}
+    </div>
+  );
+}
+
+interface CaseEvent {
+  id: string;
+  type: string;
+  note: string | null;
+  actorProfileId: string | null;
+  createdAt: string;
+}
+
+function CaseTimeline({ caseId }: { caseId: string }) {
+  const [{ data, fetching }, refetch] = useQuery<{ pipelineCaseEvents: CaseEvent[] }>({
+    query: PIPELINE_CASE_EVENTS_QUERY,
+    variables: { caseId },
+  });
+  const [, commentCase] = useMutation(COMMENT_CASE);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const events = data?.pipelineCaseEvents ?? [];
+
+  async function onComment() {
+    if (!note.trim()) return;
+    setBusy(true);
+    try {
+      await commentCase({ caseId, note: note.trim() });
+      setNote("");
+      refetch({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 space-y-2 rounded border border-dashed border-border p-3">
+      <p className="text-xs font-medium text-muted-foreground">Timeline</p>
+      {fetching && <p className="text-xs text-muted-foreground">Loading…</p>}
+      {events.length === 0 && !fetching && (
+        <p className="text-xs text-muted-foreground">No events yet.</p>
+      )}
+      {events.map((e) => (
+        <div key={e.id} className="flex items-start gap-2 text-xs">
+          <Badge variant={e.type === "commented" ? "blue" : "gray"}>{e.type}</Badge>
+          <span className="flex-1">
+            {e.note && <span className="text-foreground">{e.note}</span>}
+            <span className="ml-1 text-muted-foreground">
+              {new Date(e.createdAt).toLocaleString()}
+            </span>
+          </span>
+        </div>
+      ))}
+      <div className="flex gap-2 border-t border-border pt-2">
+        <input
+          className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+          placeholder="Add a comment"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onComment();
+          }}
+        />
+        <Button size="sm" variant="secondary" disabled={busy || !note.trim()} onClick={onComment}>
+          Comment
+        </Button>
+      </div>
     </div>
   );
 }
