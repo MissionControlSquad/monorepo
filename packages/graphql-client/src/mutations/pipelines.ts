@@ -73,6 +73,15 @@ export const ADD_PIPELINE_STAGE = gql`
   }
 `;
 
+export const SET_PIPELINE_SEQUENTIAL = gql`
+  mutation SetPipelineSequential($pipelineId: String!, $sequentialOnly: Boolean!) {
+    setPipelineSequential(pipelineId: $pipelineId, sequentialOnly: $sequentialOnly) {
+      id
+      sequentialOnly
+    }
+  }
+`;
+
 export const UPDATE_PIPELINE_STAGE = gql`
   mutation UpdatePipelineStage(
     $stageId: String!

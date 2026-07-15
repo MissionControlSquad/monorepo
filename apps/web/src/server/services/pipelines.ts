@@ -54,6 +54,7 @@ export async function createPipeline(input: {
   name: string;
   description?: string | null;
   projectId?: string | null;
+  sequentialOnly?: boolean;
 }): Promise<Pipeline> {
   const name = input.name.trim();
   if (!name) badRequest("name is required");
@@ -63,8 +64,20 @@ export async function createPipeline(input: {
       name,
       description: input.description ?? null,
       projectId: input.projectId ?? null,
+      sequentialOnly: input.sequentialOnly ?? false,
     },
   });
+}
+
+/** Toggle the sequential-only transition rule on a pipeline. */
+export async function setPipelineSequential(
+  workspaceId: string,
+  pipelineId: string,
+  sequentialOnly: boolean,
+): Promise<Pipeline> {
+  const pipeline = await prisma.pipeline.findFirst({ where: { id: pipelineId, workspaceId } });
+  if (!pipeline) notFound("Pipeline");
+  return prisma.pipeline.update({ where: { id: pipeline.id }, data: { sequentialOnly } });
 }
 
 export async function addPipelineStage(
@@ -278,7 +291,7 @@ export async function transitionCase(args: {
 }): Promise<PipelineCase> {
   const c = await prisma.pipelineCase.findFirst({
     where: { id: args.caseId, pipeline: { workspaceId: args.workspaceId } },
-    include: { currentStage: true },
+    include: { currentStage: true, pipeline: { select: { sequentialOnly: true } } },
   });
   if (!c) notFound("Case");
   const toStage = await prisma.pipelineStage.findFirst({
@@ -289,6 +302,17 @@ export async function transitionCase(args: {
   const fromOrder = c.currentStage?.order ?? -1;
   if (!isValidTransition(fromOrder, toStage.order))
     badRequest("a case may only move to a higher-order stage");
+
+  // Sequential-only automation: the target must be the IMMEDIATELY next stage (no skipping ahead).
+  if (c.pipeline.sequentialOnly) {
+    const nextStage = await prisma.pipelineStage.findFirst({
+      where: { pipelineId: c.pipelineId, order: { gt: fromOrder } },
+      orderBy: { order: "asc" },
+      select: { id: true },
+    });
+    if (!nextStage || nextStage.id !== toStage.id)
+      badRequest("this pipeline requires advancing one stage at a time");
+  }
 
   // Approval gate: a case can only LEAVE a requireApproval stage if the actor is an admin.
   if (c.currentStage?.requireApproval && !args.actorIsAdmin)

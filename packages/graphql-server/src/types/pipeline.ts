@@ -66,6 +66,7 @@ builder.prismaObject("Pipeline", {
     name: t.exposeString("name"),
     description: t.exposeString("description", { nullable: true }),
     isActive: t.exposeBoolean("isActive"),
+    sequentialOnly: t.exposeBoolean("sequentialOnly"),
     projectId: t.exposeString("projectId", { nullable: true }),
     stages: t.relation("stages", { query: { orderBy: { order: "asc" } } }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),

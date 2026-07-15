@@ -345,6 +345,60 @@ describe("stage edit + delete (Epic #7)", () => {
   });
 });
 
+describe("sequential-only transitions (Epic #7)", () => {
+  it("blocks skipping a stage when sequentialOnly is on; allows one-at-a-time", async () => {
+    const { pid, stageIds } = await pipelineWithStages(WS_A);
+    const admin = await cookieFor(WS_A, "admin");
+    await gql(
+      `mutation($p:String!){ setPipelineSequential(pipelineId:$p, sequentialOnly:true){ id sequentialOnly } }`,
+      { p: pid },
+      admin,
+    );
+    const member = await cookieFor(WS_A, "member");
+    const caseId = (
+      await gql(
+        `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"seq"){ id } }`,
+        { p: pid },
+        member,
+      )
+    ).data.createPipelineCase.id;
+
+    // stage 0 → stage 2 (skip) is rejected.
+    const skip = await gql(
+      `mutation($c:String!,$s:String!){ transitionCase(caseId:$c, toStageId:$s){ id } }`,
+      { c: caseId, s: stageIds[2] },
+      member,
+    );
+    expect(skip.errors).toBeDefined();
+
+    // stage 0 → stage 1 (immediate next) is allowed…
+    const step1 = await gql(
+      `mutation($c:String!,$s:String!){ transitionCase(caseId:$c, toStageId:$s){ currentStageId } }`,
+      { c: caseId, s: stageIds[1] },
+      member,
+    );
+    expect(step1.data.transitionCase.currentStageId).toBe(stageIds[1]);
+
+    // …then stage 1 → stage 2 is allowed.
+    const step2 = await gql(
+      `mutation($c:String!,$s:String!){ transitionCase(caseId:$c, toStageId:$s){ currentStageId } }`,
+      { c: caseId, s: stageIds[2] },
+      member,
+    );
+    expect(step2.data.transitionCase.currentStageId).toBe(stageIds[2]);
+  });
+
+  it("a member cannot toggle the sequential rule", async () => {
+    const { pid } = await pipelineWithStages(WS_A);
+    const r = await gql(
+      `mutation($p:String!){ setPipelineSequential(pipelineId:$p, sequentialOnly:true){ id } }`,
+      { p: pid },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(r.errors).toBeDefined();
+  });
+});
+
 describe("case comments + timeline (Epic #7)", () => {
   it("commentCase appends a commented event; caseEvents returns the timeline oldest-first", async () => {
     const { pid } = await pipelineWithStages(WS_A);

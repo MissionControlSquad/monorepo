@@ -11,6 +11,7 @@ import {
 import {
   CREATE_PIPELINE,
   ADD_PIPELINE_STAGE,
+  SET_PIPELINE_SEQUENTIAL,
   UPDATE_PIPELINE_STAGE,
   DELETE_PIPELINE_STAGE,
   CREATE_PIPELINE_CASE,
@@ -37,6 +38,7 @@ interface Pipeline {
   id: string;
   name: string;
   description: string | null;
+  sequentialOnly: boolean;
   stages: Stage[];
 }
 interface Case {
@@ -78,6 +80,7 @@ function PipelineCard({
   const [, rejectCase] = useMutation(REJECT_CASE);
   const [, updateStage] = useMutation(UPDATE_PIPELINE_STAGE);
   const [, deleteStage] = useMutation(DELETE_PIPELINE_STAGE);
+  const [, setSequential] = useMutation(SET_PIPELINE_SEQUENTIAL);
 
   const [title, setTitle] = useState("");
   const [openCase, setOpenCase] = useState<string | null>(null);
@@ -109,6 +112,20 @@ function PipelineCard({
     <Card className="space-y-3 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium text-foreground">{pipeline.name}</span>
+        <label className="flex items-center gap-1 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={pipeline.sequentialOnly}
+            onChange={async (e) => {
+              await setSequential({
+                pipelineId: pipeline.id,
+                sequentialOnly: e.target.checked,
+              });
+              onStagesChanged();
+            }}
+          />
+          sequential
+        </label>
         {stages.map((s) => (
           <span
             key={s.id}

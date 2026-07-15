@@ -11,6 +11,7 @@ import {
 } from "@/server/services/routines";
 import {
   createPipeline,
+  setPipelineSequential,
   addPipelineStage,
   updatePipelineStage,
   deletePipelineStage,
@@ -156,6 +157,7 @@ builder.mutationField("createPipeline", (t) =>
       name: t.arg.string({ required: true }),
       description: t.arg.string(),
       projectId: t.arg.string(),
+      sequentialOnly: t.arg.boolean(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
@@ -165,7 +167,28 @@ builder.mutationField("createPipeline", (t) =>
         name: args.name,
         description: args.description ?? null,
         projectId: args.projectId ?? null,
+        sequentialOnly: args.sequentialOnly ?? false,
       });
+      return ctx.prisma.pipeline.findUniqueOrThrow({ ...query, where: { id: p.id } });
+    },
+  }),
+);
+
+builder.mutationField("setPipelineSequential", (t) =>
+  t.prismaField({
+    type: "Pipeline",
+    args: {
+      pipelineId: t.arg.string({ required: true }),
+      sequentialOnly: t.arg.boolean({ required: true }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
+      const tenancy = requireRole(ctx, "admin");
+      const p = await setPipelineSequential(
+        tenancy.workspaceId,
+        args.pipelineId,
+        args.sequentialOnly,
+      );
       return ctx.prisma.pipeline.findUniqueOrThrow({ ...query, where: { id: p.id } });
     },
   }),

@@ -41,6 +41,7 @@ export const PIPELINES_QUERY = gql`
       id
       name
       description
+      sequentialOnly
       stages {
         id
         name
