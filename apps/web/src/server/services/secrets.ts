@@ -87,6 +87,44 @@ export async function createSecret(input: CreateSecretInput): Promise<Secret> {
   return secret;
 }
 
+/** Load a secret scoped to its workspace; 404 for missing / cross-workspace ids. */
+async function findScopedSecret(secretId: string, workspaceId: string): Promise<Secret> {
+  const secret = await prisma.secret.findFirst({ where: { id: secretId, workspaceId } });
+  if (!secret) throw new GraphQLError("Secret not found", { extensions: { code: "NOT_FOUND" } });
+  return secret;
+}
+
+/** Edit a secret's metadata (name/description) — never touches the encrypted value. */
+export async function updateSecret(
+  workspaceId: string,
+  secretId: string,
+  patch: { name?: string | null; description?: string | null },
+): Promise<Secret> {
+  await findScopedSecret(secretId, workspaceId);
+  const name = patch.name?.trim();
+  if (patch.name != null && !name) badRequest("name cannot be empty");
+  return prisma.secret.update({
+    where: { id: secretId },
+    data: {
+      ...(name ? { name } : {}),
+      ...(patch.description !== undefined ? { description: patch.description } : {}),
+    },
+  });
+}
+
+/**
+ * Lifecycle: active | disabled | archived. Only `active` secrets resolve into an agent's env, so
+ * disabling instantly cuts off a leaked or rotated-out credential without deleting its history.
+ */
+export async function setSecretStatus(
+  workspaceId: string,
+  secretId: string,
+  status: "active" | "disabled" | "archived",
+): Promise<Secret> {
+  await findScopedSecret(secretId, workspaceId);
+  return prisma.secret.update({ where: { id: secretId }, data: { status } });
+}
+
 /** Rotate: append version N+1, retire the prior, repoint currentVersion. Reversible via history. */
 export async function rotateSecret(args: {
   workspaceId: string;
@@ -260,7 +298,8 @@ export async function resolveEnvForAgent(
           ? [{ scope: "adapter" as const, adapterType: agent.adapterType }]
           : []),
       ],
-      secret: { workspaceId },
+      // Only active secrets resolve — a disabled/archived secret is instantly cut off from agents.
+      secret: { workspaceId, status: "active" },
     },
     include: { secret: { select: { currentVersion: true } } },
   });

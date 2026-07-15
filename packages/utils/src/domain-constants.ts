@@ -312,3 +312,16 @@ export const ApprovalSubjectType = {
 } as const;
 export type ApprovalSubjectTypeValue =
   (typeof ApprovalSubjectType)[keyof typeof ApprovalSubjectType];
+
+// Secret lifecycle status (Epic #5). Only `active` secrets resolve into an agent's env.
+export const SecretStatus = {
+  ACTIVE: "active",
+  DISABLED: "disabled",
+  ARCHIVED: "archived",
+} as const;
+export const SECRET_STATUSES = Object.values(SecretStatus);
+export type SecretStatusValue = (typeof SecretStatus)[keyof typeof SecretStatus];
+
+export function isSecretStatus(v: string): v is SecretStatusValue {
+  return (SECRET_STATUSES as readonly string[]).includes(v);
+}

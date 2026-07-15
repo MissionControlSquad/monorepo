@@ -150,6 +150,46 @@ describe("bindings + env resolution (Epic #5)", () => {
   });
 });
 
+describe("lifecycle status (Epic #5)", () => {
+  const SET_STATUS = `mutation($id:String!,$s:String!){ setSecretStatus(id:$id, status:$s){ id status } }`;
+
+  it("a disabled secret stops resolving into agent env; re-enabling restores it", async () => {
+    const agentId = await makeAgentInWs(WS_A);
+    const s = await makeSecret(WS_A, "DISABLED_TEST", "sk-live");
+    const id = s.data.createSecret.id;
+    await gql(
+      `mutation($s:String!,$a:String!){ bindSecret(secretId:$s, scope:"agent", agentId:$a, envVarName:"API_KEY"){ id } }`,
+      { s: id, a: agentId },
+      await cookieFor(WS_A, "admin"),
+    );
+    expect(await resolveEnvForAgent(WS_A, agentId)).toEqual({ API_KEY: "sk-live" });
+
+    const off = await gql(SET_STATUS, { id, s: "disabled" }, await cookieFor(WS_A, "admin"));
+    expect(off.data.setSecretStatus.status).toBe("disabled");
+    expect(await resolveEnvForAgent(WS_A, agentId)).toEqual({}); // cut off
+
+    await gql(SET_STATUS, { id, s: "active" }, await cookieFor(WS_A, "admin"));
+    expect(await resolveEnvForAgent(WS_A, agentId)).toEqual({ API_KEY: "sk-live" }); // restored
+  });
+
+  it("updateSecret edits metadata; rejects an invalid status + a member", async () => {
+    const s = await makeSecret(WS_A, "META", "v");
+    const id = s.data.createSecret.id;
+    const upd = await gql(
+      `mutation($id:String!){ updateSecret(id:$id, description:"prod key"){ id description } }`,
+      { id },
+      await cookieFor(WS_A, "admin"),
+    );
+    expect(upd.data.updateSecret.description).toBe("prod key");
+
+    const bad = await gql(SET_STATUS, { id, s: "paused" }, await cookieFor(WS_A, "admin"));
+    expect(bad.errors).toBeDefined();
+
+    const member = await gql(SET_STATUS, { id, s: "archived" }, await cookieFor(WS_A, "member"));
+    expect(member.errors).toBeDefined();
+  });
+});
+
 describe("workspace isolation (Epic #5)", () => {
   it("a workspace cannot see or rotate another's secret", async () => {
     const inB = await makeSecret(WS_B, "B_ONLY", "b-value");

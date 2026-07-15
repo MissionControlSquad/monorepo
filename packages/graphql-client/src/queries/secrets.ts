@@ -8,6 +8,7 @@ export const SECRETS_QUERY = gql`
       name
       description
       currentVersion
+      status
       createdAt
       bindings {
         id

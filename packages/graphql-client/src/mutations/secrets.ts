@@ -45,3 +45,22 @@ export const UNBIND_SECRET = gql`
     unbindSecret(id: $id)
   }
 `;
+
+export const UPDATE_SECRET = gql`
+  mutation UpdateSecret($id: String!, $name: String, $description: String) {
+    updateSecret(id: $id, name: $name, description: $description) {
+      id
+      name
+      description
+    }
+  }
+`;
+
+export const SET_SECRET_STATUS = gql`
+  mutation SetSecretStatus($id: String!, $status: String!) {
+    setSecretStatus(id: $id, status: $status) {
+      id
+      status
+    }
+  }
+`;

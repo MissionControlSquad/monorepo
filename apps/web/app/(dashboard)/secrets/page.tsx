@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { SECRETS_QUERY } from "@/lib/graphql/queries";
-import { CREATE_SECRET, ROTATE_SECRET, BIND_SECRET, UNBIND_SECRET } from "@/lib/graphql/mutations";
+import {
+  CREATE_SECRET,
+  ROTATE_SECRET,
+  BIND_SECRET,
+  UNBIND_SECRET,
+  SET_SECRET_STATUS,
+} from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 
 // Epic #5: secrets vault. API-gated by SECRETS_VAULT + buildbase role (admin manages; member views
@@ -27,9 +33,16 @@ interface Secret {
   name: string;
   description: string | null;
   currentVersion: number;
+  status: string;
   bindings: Binding[];
   versions: Version[];
 }
+
+const STATUS_VARIANT: Record<string, "green" | "yellow" | "gray"> = {
+  active: "green",
+  disabled: "yellow",
+  archived: "gray",
+};
 
 export default function SecretsPage() {
   const [{ data }, refetch] = useQuery<{ secrets: Secret[] }>({ query: SECRETS_QUERY });
@@ -37,6 +50,7 @@ export default function SecretsPage() {
   const [, rotateSecret] = useMutation(ROTATE_SECRET);
   const [, bindSecret] = useMutation(BIND_SECRET);
   const [, unbindSecret] = useMutation(UNBIND_SECRET);
+  const [, setStatus] = useMutation(SET_SECRET_STATUS);
 
   const [busy, setBusy] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", value: "", description: "" });
@@ -157,9 +171,22 @@ export default function SecretsPage() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-foreground">{s.name}</span>
             <Badge variant="gray">v{s.currentVersion}</Badge>
+            <Badge variant={STATUS_VARIANT[s.status] ?? "gray"}>{s.status}</Badge>
             {s.description && (
               <span className="text-sm text-muted-foreground">{s.description}</span>
             )}
+            <select
+              className="ml-auto rounded border border-border bg-background px-2 py-1 text-xs"
+              value={s.status}
+              onChange={async (e) => {
+                await setStatus({ id: s.id, status: e.target.value });
+                refresh();
+              }}
+            >
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+              <option value="archived">archived</option>
+            </select>
           </div>
 
           {/* Bindings */}

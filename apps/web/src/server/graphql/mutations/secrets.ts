@@ -2,7 +2,16 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
-import { createSecret, rotateSecret, bindSecret, unbindSecret } from "@/server/services/secrets";
+import { GraphQLError } from "graphql";
+import { isSecretStatus } from "@agentcenter/utils";
+import {
+  createSecret,
+  rotateSecret,
+  bindSecret,
+  unbindSecret,
+  updateSecret,
+  setSecretStatus,
+} from "@/server/services/secrets";
 
 // Epic #5: secrets vault mutations — SECRETS_VAULT-gated + admin only. The `value` arg is the ONLY
 // place plaintext enters (over TLS); it is encrypted immediately and never returned.
@@ -84,6 +93,43 @@ builder.mutationField("unbindSecret", (t) =>
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
       const tenancy = requireRole(ctx, "admin");
       return unbindSecret(tenancy.workspaceId, args.id, tenancy.userId);
+    },
+  }),
+);
+
+builder.mutationField("updateSecret", (t) =>
+  t.prismaField({
+    type: "Secret",
+    args: {
+      id: t.arg.string({ required: true }),
+      name: t.arg.string(),
+      description: t.arg.string(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SECRETS_VAULT);
+      const tenancy = requireRole(ctx, "admin");
+      const secret = await updateSecret(tenancy.workspaceId, args.id, {
+        name: args.name ?? null,
+        description: args.description ?? undefined,
+      });
+      return ctx.prisma.secret.findUniqueOrThrow({ ...query, where: { id: secret.id } });
+    },
+  }),
+);
+
+builder.mutationField("setSecretStatus", (t) =>
+  t.prismaField({
+    type: "Secret",
+    args: { id: t.arg.string({ required: true }), status: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SECRETS_VAULT);
+      const tenancy = requireRole(ctx, "admin");
+      if (!isSecretStatus(args.status))
+        throw new GraphQLError(`Invalid status '${args.status}'`, {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      const secret = await setSecretStatus(tenancy.workspaceId, args.id, args.status);
+      return ctx.prisma.secret.findUniqueOrThrow({ ...query, where: { id: secret.id } });
     },
   }),
 );
