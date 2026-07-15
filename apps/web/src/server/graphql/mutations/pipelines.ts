@@ -14,6 +14,7 @@ import {
   addPipelineStage,
   createCase,
   claimCase,
+  releaseCase,
   transitionCase,
   breakdownCase,
   rejectCase,
@@ -221,6 +222,24 @@ builder.mutationField("claimCase", (t) =>
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
       const tenancy = requireRole(ctx, "member");
       const c = await claimCase(tenancy.workspaceId, args.caseId, tenancy.userId);
+      return ctx.prisma.pipelineCase.findUniqueOrThrow({ ...query, where: { id: c.id } });
+    },
+  }),
+);
+
+builder.mutationField("releaseCase", (t) =>
+  t.prismaField({
+    type: "PipelineCase",
+    args: { caseId: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
+      const tenancy = requireRole(ctx, "member");
+      const c = await releaseCase({
+        workspaceId: tenancy.workspaceId,
+        caseId: args.caseId,
+        actorProfileId: tenancy.userId,
+        actorIsAdmin: tenancy.role === "admin" || tenancy.role === "owner",
+      });
       return ctx.prisma.pipelineCase.findUniqueOrThrow({ ...query, where: { id: c.id } });
     },
   }),

@@ -142,6 +142,68 @@ export async function claimCase(
   return prisma.pipelineCase.findUniqueOrThrow({ where: { id: caseId } });
 }
 
+/**
+ * Release a claimed case back to `open` so someone else can pick it up. Only the current claimer or
+ * an admin may release — this backs both a manual "give it back" and reclaiming an expired lease.
+ */
+export async function releaseCase(args: {
+  workspaceId: string;
+  caseId: string;
+  actorProfileId: string;
+  actorIsAdmin?: boolean;
+}): Promise<PipelineCase> {
+  const c = await prisma.pipelineCase.findFirst({
+    where: { id: args.caseId, pipeline: { workspaceId: args.workspaceId } },
+    select: { id: true, status: true, claimedByProfileId: true },
+  });
+  if (!c) notFound("Case");
+  if (c.status !== "claimed") badRequest("only a claimed case can be released");
+  if (c.claimedByProfileId !== args.actorProfileId && !args.actorIsAdmin)
+    badRequest("only the claimer or an admin can release this case");
+  const updated = await prisma.pipelineCase.update({
+    where: { id: c.id },
+    data: { status: "open", claimedByProfileId: null, claimedAt: null },
+  });
+  await appendEvent(c.id, "released", { actorProfileId: args.actorProfileId });
+  return updated;
+}
+
+export interface StaleClaim {
+  caseId: string;
+  title: string;
+  claimedByProfileId: string | null;
+  minutesClaimed: number;
+  leaseMinutes: number;
+}
+
+/**
+ * Cases claimed longer than `leaseMinutes` ago and still not advanced — an expired claim lease. These
+ * are stuck on someone who claimed but stalled; surfacing them lets an operator reclaim (release) them.
+ */
+export async function staleClaimedCases(
+  workspaceId: string,
+  leaseMinutes: number,
+  pipelineId?: string | null,
+  now: Date = new Date(),
+): Promise<StaleClaim[]> {
+  const cutoff = new Date(now.getTime() - leaseMinutes * 60000);
+  const cases = await prisma.pipelineCase.findMany({
+    where: {
+      pipeline: { workspaceId, ...(pipelineId ? { id: pipelineId } : {}) },
+      status: "claimed",
+      claimedAt: { lt: cutoff },
+    },
+    orderBy: { claimedAt: "asc" },
+  });
+  return cases.map((c) => ({
+    caseId: c.id,
+    title: c.title,
+    claimedByProfileId: c.claimedByProfileId,
+    minutesClaimed: c.claimedAt ? Math.floor((now.getTime() - c.claimedAt.getTime()) / 60000) : 0,
+    leaseMinutes,
+  }));
+}
+
 export async function transitionCase(args: {
   workspaceId: string;
   caseId: string;

@@ -12,6 +12,7 @@ import {
   ADD_PIPELINE_STAGE,
   CREATE_PIPELINE_CASE,
   CLAIM_CASE,
+  RELEASE_CASE,
   TRANSITION_CASE,
   REJECT_CASE,
 } from "@/lib/graphql/mutations";
@@ -62,6 +63,7 @@ function PipelineCard({ pipeline }: { pipeline: Pipeline }) {
 
   const [, createCase] = useMutation(CREATE_PIPELINE_CASE);
   const [, claimCase] = useMutation(CLAIM_CASE);
+  const [, releaseCase] = useMutation(RELEASE_CASE);
   const [, transitionCase] = useMutation(TRANSITION_CASE);
   const [, rejectCase] = useMutation(REJECT_CASE);
 
@@ -152,6 +154,16 @@ function PipelineCard({ pipeline }: { pipeline: Pipeline }) {
                     onClick={() => act(() => claimCase({ caseId: c.id }), c.id)}
                   >
                     Claim
+                  </Button>
+                )}
+                {c.status === "claimed" && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy === c.id}
+                    onClick={() => act(() => releaseCase({ caseId: c.id }), c.id)}
+                  >
+                    Release
                   </Button>
                 )}
                 {next && (

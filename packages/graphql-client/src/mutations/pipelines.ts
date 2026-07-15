@@ -90,6 +90,15 @@ export const CLAIM_CASE = gql`
   }
 `;
 
+export const RELEASE_CASE = gql`
+  mutation ReleaseCase($caseId: String!) {
+    releaseCase(caseId: $caseId) {
+      id
+      status
+    }
+  }
+`;
+
 export const TRANSITION_CASE = gql`
   mutation TransitionCase($caseId: String!, $toStageId: String!) {
     transitionCase(caseId: $caseId, toStageId: $toStageId) {

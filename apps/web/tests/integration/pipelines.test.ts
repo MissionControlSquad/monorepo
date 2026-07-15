@@ -223,6 +223,82 @@ describe("pipeline cases (Epic #7)", () => {
   });
 });
 
+describe("case release + claim lease (Epic #7)", () => {
+  async function makeClaimedCase() {
+    const { pid } = await pipelineWithStages(WS_A);
+    const member = await cookieFor(WS_A, "member");
+    const caseId = (
+      await gql(
+        `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"lease"){ id } }`,
+        { p: pid },
+        member,
+      )
+    ).data.createPipelineCase.id;
+    await gql(`mutation($c:String!){ claimCase(caseId:$c){ id status } }`, { c: caseId }, member);
+    return { pid, caseId, member };
+  }
+
+  it("releaseCase returns a claimed case to open, clearing the claimer", async () => {
+    const { caseId, member } = await makeClaimedCase();
+    const r = await gql(
+      `mutation($c:String!){ releaseCase(caseId:$c){ id status } }`,
+      { c: caseId },
+      member,
+    );
+    expect(r.errors).toBeFalsy();
+    expect(r.data.releaseCase.status).toBe("open");
+    const row = await prisma.pipelineCase.findUniqueOrThrow({ where: { id: caseId } });
+    expect(row.claimedByProfileId).toBeNull();
+    expect(row.claimedAt).toBeNull();
+    // a `released` event was appended.
+    expect(await prisma.pipelineCaseEvent.count({ where: { caseId, type: "released" } })).toBe(1);
+  });
+
+  it("releasing an unclaimed (open) case is rejected", async () => {
+    const { pid } = await pipelineWithStages(WS_A);
+    const member = await cookieFor(WS_A, "member");
+    const caseId = (
+      await gql(
+        `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"open"){ id } }`,
+        { p: pid },
+        member,
+      )
+    ).data.createPipelineCase.id;
+    const r = await gql(
+      `mutation($c:String!){ releaseCase(caseId:$c){ id } }`,
+      { c: caseId },
+      member,
+    );
+    expect(r.errors).toBeDefined();
+  });
+
+  it("staleClaims surfaces a case claimed longer than the lease window", async () => {
+    const { caseId, member } = await makeClaimedCase();
+    // Backdate the claim to 2h ago so a 60-minute lease has expired.
+    await prisma.pipelineCase.update({
+      where: { id: caseId },
+      data: { claimedAt: new Date(Date.now() - 120 * 60000) },
+    });
+    const stale = await gql(
+      `query{ staleClaims(leaseMinutes:60){ caseId title minutesClaimed leaseMinutes } }`,
+      undefined,
+      member,
+    );
+    expect(stale.errors).toBeFalsy();
+    expect(stale.data.staleClaims).toHaveLength(1);
+    expect(stale.data.staleClaims[0].caseId).toBe(caseId);
+    expect(stale.data.staleClaims[0].minutesClaimed).toBeGreaterThanOrEqual(60);
+
+    // A fresh claim is NOT stale under the same lease.
+    const fresh = await gql(
+      `query{ staleClaims(leaseMinutes:10000){ caseId } }`,
+      undefined,
+      member,
+    );
+    expect(fresh.data.staleClaims).toHaveLength(0);
+  });
+});
+
 describe("review inbox + health (Epic #7)", () => {
   it("reviewCases returns only cases on a review stage", async () => {
     const { pid, stageIds } = await pipelineWithStages(WS_A, /* reviewAtOrder1 */ true);

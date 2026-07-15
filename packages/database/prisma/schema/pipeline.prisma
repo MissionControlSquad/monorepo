@@ -121,6 +121,7 @@ enum CaseStatus {
 enum PipelineCaseEventType {
   created
   claimed
+  released
   transitioned
   commented
   breakdown

@@ -270,6 +270,7 @@ export default function FinancePage() {
             <option value="provider">provider</option>
             <option value="project">project</option>
             <option value="biller">biller</option>
+            <option value="issue">issue</option>
             <option value="billingType">billing type</option>
           </select>
         </div>

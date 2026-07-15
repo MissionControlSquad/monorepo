@@ -86,3 +86,15 @@ export const PIPELINE_HEALTH_QUERY = gql`
     }
   }
 `;
+
+export const STALE_CLAIMS_QUERY = gql`
+  query StaleClaims($pipelineId: String, $leaseMinutes: Int) {
+    staleClaims(pipelineId: $pipelineId, leaseMinutes: $leaseMinutes) {
+      caseId
+      title
+      claimedByProfileId
+      minutesClaimed
+      leaseMinutes
+    }
+  }
+`;
