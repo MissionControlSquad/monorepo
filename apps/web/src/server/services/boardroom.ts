@@ -5,6 +5,7 @@
  * deferred runtime seam (spec D2); the default `unavailableRelay` keeps the feature end-to-end
  * functional and testable without a live model.
  */
+import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import {
   DEFAULT_BOARD_SKILL,
@@ -55,6 +56,34 @@ export async function listBoardMessages(workspaceId: string): Promise<BoardMessa
   return prisma.boardMessage.findMany({
     where: { threadId: thread.id },
     orderBy: { createdAt: "asc" },
+  });
+}
+
+/**
+ * Operator feedback on an assistant board turn: score +1 (up) / -1 (down) / 0 (clear), optional
+ * reason. Only assistant turns are rateable, and only within the caller's workspace thread.
+ */
+export async function setBoardMessageFeedback(input: {
+  workspaceId: string;
+  messageId: string;
+  score: number;
+  reason?: string | null;
+}): Promise<BoardMessage> {
+  const message = await prisma.boardMessage.findFirst({
+    where: { id: input.messageId, thread: { workspaceId: input.workspaceId } },
+  });
+  if (!message) throw new GraphQLError("Message not found", { extensions: { code: "NOT_FOUND" } });
+  if (message.role !== "assistant")
+    throw new GraphQLError("Only assistant messages can be rated", {
+      extensions: { code: "BAD_USER_INPUT" },
+    });
+  const score = input.score > 0 ? 1 : input.score < 0 ? -1 : 0;
+  return prisma.boardMessage.update({
+    where: { id: message.id },
+    data: {
+      feedbackScore: score === 0 ? null : score,
+      feedbackReason: score === 0 ? null : (input.reason ?? null),
+    },
   });
 }
 

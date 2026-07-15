@@ -10,6 +10,8 @@ export const BOARD_THREAD_QUERY = gql`
         id
         role
         body
+        feedbackScore
+        feedbackReason
         createdAt
       }
     }
