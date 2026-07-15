@@ -23,6 +23,17 @@ export const SKILLS_QUERY = gql`
   }
 `;
 
+export const SKILL_FILES_QUERY = gql`
+  query SkillFiles($skillId: String!) {
+    skillFiles(skillId: $skillId) {
+      id
+      path
+      content
+      updatedAt
+    }
+  }
+`;
+
 export const TEAMS_QUERY = gql`
   query Teams {
     teams {

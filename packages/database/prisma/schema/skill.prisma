@@ -78,11 +78,29 @@ model Skill {
   versions         SkillVersion[]
   agentSkills      AgentSkill[]
   stars            SkillStar[]
+  files            SkillFile[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId])
   @@index([workspaceId, sharingScope])
   @@map("skills")
+}
+
+// Multi-file skill bundles (Paperclip parity): a skill's `markdown` is its entry doc; supporting
+// files (scripts, references) live here as path→content. No execution — content is display/storage.
+model SkillFile {
+  id        String   @id @default(cuid())
+  skillId   String
+  path      String // e.g. "SKILL.md", "scripts/run.py", "reference/api.md"
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([skillId, path])
+  @@index([skillId])
+  @@map("skill_files")
 }
 
 model SkillVersion {

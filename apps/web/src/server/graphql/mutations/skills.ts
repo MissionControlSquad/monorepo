@@ -18,6 +18,8 @@ import {
   unstarSkill,
   assignSkillToAgent,
   unassignSkillFromAgent,
+  upsertSkillFile,
+  deleteSkillFile,
 } from "@/server/services/skills";
 import { createTeam, addTeamMember, installTeam } from "@/server/services/teams";
 
@@ -186,6 +188,38 @@ builder.mutationField("unassignSkill", (t) =>
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
       const tenancy = requireRole(ctx, "member");
       return unassignSkillFromAgent(tenancy.workspaceId, args.agentId, args.skillId);
+    },
+  }),
+);
+
+builder.mutationField("upsertSkillFile", (t) =>
+  t.prismaField({
+    type: "SkillFile",
+    args: {
+      skillId: t.arg.string({ required: true }),
+      path: t.arg.string({ required: true }),
+      content: t.arg.string({ required: true }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      const file = await upsertSkillFile(tenancy.workspaceId, args.skillId, {
+        path: args.path,
+        content: args.content,
+      });
+      return ctx.prisma.skillFile.findUniqueOrThrow({ ...query, where: { id: file.id } });
+    },
+  }),
+);
+
+builder.mutationField("deleteSkillFile", (t) =>
+  t.field({
+    type: "Boolean",
+    args: { skillId: t.arg.string({ required: true }), path: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      return deleteSkillFile(tenancy.workspaceId, args.skillId, args.path);
     },
   }),
 );

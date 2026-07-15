@@ -63,6 +63,27 @@ builder.queryField("skillVersions", (t) =>
   }),
 );
 
+builder.queryField("skillFiles", (t) =>
+  t.prismaField({
+    type: ["SkillFile"],
+    args: { skillId: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      requireRole(ctx, "member");
+      const s = await ctx.prisma.skill.findFirst({
+        where: scoped(ctx, { id: args.skillId }),
+        select: { id: true },
+      });
+      if (!s) return [];
+      return ctx.prisma.skillFile.findMany({
+        ...query,
+        where: { skillId: s.id },
+        orderBy: { path: "asc" },
+      });
+    },
+  }),
+);
+
 builder.queryField("agentSkills", (t) =>
   t.prismaField({
     type: ["AgentSkill"],

@@ -127,6 +127,63 @@ describe("skills library (Epic #10)", () => {
   });
 });
 
+describe("skill bundle files (Epic #10)", () => {
+  const UPSERT = `mutation($s:String!,$p:String!,$c:String!){ upsertSkillFile(skillId:$s, path:$p, content:$c){ id path content } }`;
+
+  it("upsert creates then updates by path; list is sorted; delete removes", async () => {
+    const skillId = (await makeSkill(WS_A)).data.createSkill.id;
+    const member = await cookieFor(WS_A, "member");
+
+    // create two files
+    await gql(UPSERT, { s: skillId, p: "scripts/run.py", c: "print(1)" }, member);
+    const first = await gql(UPSERT, { s: skillId, p: "SKILL.md", c: "# entry" }, member);
+    expect(first.errors).toBeFalsy();
+
+    // upsert same path updates content (no duplicate row)
+    await gql(UPSERT, { s: skillId, p: "scripts/run.py", c: "print(2)" }, member);
+    expect(await prisma.skillFile.count({ where: { skillId } })).toBe(2);
+
+    // list reflects both files and the update
+    const list = await gql(
+      `query($s:String!){ skillFiles(skillId:$s){ path content } }`,
+      { s: skillId },
+      member,
+    );
+    const byPath = Object.fromEntries(
+      list.data.skillFiles.map((f: { path: string; content: string }) => [f.path, f.content]),
+    );
+    expect(Object.keys(byPath).sort()).toEqual(["SKILL.md", "scripts/run.py"]);
+    expect(byPath["scripts/run.py"]).toBe("print(2)");
+
+    // delete
+    const del = await gql(
+      `mutation($s:String!,$p:String!){ deleteSkillFile(skillId:$s, path:$p) }`,
+      { s: skillId, p: "SKILL.md" },
+      member,
+    );
+    expect(del.data.deleteSkillFile).toBe(true);
+    expect(await prisma.skillFile.count({ where: { skillId } })).toBe(1);
+  });
+
+  it("rejects a path-traversal path and isolates across workspaces", async () => {
+    const skillId = (await makeSkill(WS_A)).data.createSkill.id;
+    const bad = await gql(
+      UPSERT,
+      { s: skillId, p: "../etc/passwd", c: "x" },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(bad.errors).toBeDefined();
+
+    // WS_B cannot add a file to WS_A's skill (scoped → skill not found).
+    const cross = await gql(
+      UPSERT,
+      { s: skillId, p: "a.md", c: "x" },
+      await cookieFor(WS_B, "member"),
+    );
+    expect(cross.errors).toBeDefined();
+  });
+});
+
 describe("teams install collision strategies (Epic #10)", () => {
   async function teamWithMember(memberName: string) {
     const team = await createTeam({

@@ -47,6 +47,23 @@ export const STAR_SKILL = gql`
   }
 `;
 
+export const UPSERT_SKILL_FILE = gql`
+  mutation UpsertSkillFile($skillId: String!, $path: String!, $content: String!) {
+    upsertSkillFile(skillId: $skillId, path: $path, content: $content) {
+      id
+      path
+      content
+      updatedAt
+    }
+  }
+`;
+
+export const DELETE_SKILL_FILE = gql`
+  mutation DeleteSkillFile($skillId: String!, $path: String!) {
+    deleteSkillFile(skillId: $skillId, path: $path)
+  }
+`;
+
 export const CREATE_TEAM = gql`
   mutation CreateTeam(
     $name: String!

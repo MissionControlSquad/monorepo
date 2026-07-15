@@ -24,6 +24,18 @@ builder.prismaObject("Skill", {
     installCount: t.exposeInt("installCount"),
     forkCount: t.exposeInt("forkCount"),
     currentVersion: t.exposeInt("currentVersion"),
+    files: t.relation("files", { query: { orderBy: { path: "asc" } } }),
+    createdAt: t.expose("createdAt", { type: "DateTime" }),
+    updatedAt: t.expose("updatedAt", { type: "DateTime" }),
+  }),
+});
+
+builder.prismaObject("SkillFile", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    skillId: t.exposeString("skillId"),
+    path: t.exposeString("path"),
+    content: t.exposeString("content"),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
   }),

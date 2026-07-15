@@ -8,6 +8,7 @@ import { prisma } from "@/server/prisma";
 import { slugify as coreSlugify } from "@agentcenter/utils";
 import type {
   Skill,
+  SkillFile,
   SkillSourceType,
   SkillTrustLevel,
   SkillSharingScope,
@@ -270,4 +271,49 @@ export async function unassignSkillFromAgent(
   if (res.count === 0) return false;
   await syncInstallCount(skillId);
   return true;
+}
+
+// ─── Multi-file bundles ───────────────────────────────────────────
+// Supporting files (path → content) attached to a skill. `markdown` remains the entry doc; these
+// are additional bundle files. Content is stored/displayed only — never executed.
+const MAX_FILE_PATH = 200;
+
+/** Normalize + validate a bundle file path: no leading slash, no "..", no backslashes. */
+export function normalizeSkillFilePath(raw: string): string {
+  const path = raw.trim().replace(/^\/+/, "");
+  if (!path) badRequest("file path is required");
+  if (path.length > MAX_FILE_PATH) badRequest("file path is too long");
+  if (path.includes("..") || path.includes("\\") || path.includes("//"))
+    badRequest("file path may not contain '..', '\\\\', or '//'");
+  return path;
+}
+
+/** Create or update a bundle file by path (idempotent per [skillId, path]). */
+export async function upsertSkillFile(
+  workspaceId: string,
+  skillId: string,
+  input: { path: string; content: string },
+): Promise<SkillFile> {
+  await loadSkill(workspaceId, skillId); // 404s cross-workspace / missing
+  const path = normalizeSkillFilePath(input.path);
+  return prisma.skillFile.upsert({
+    where: { skillId_path: { skillId, path } },
+    create: { skillId, path, content: input.content },
+    update: { content: input.content },
+  });
+}
+
+export async function deleteSkillFile(
+  workspaceId: string,
+  skillId: string,
+  path: string,
+): Promise<boolean> {
+  await loadSkill(workspaceId, skillId);
+  const res = await prisma.skillFile.deleteMany({ where: { skillId, path } });
+  return res.count > 0;
+}
+
+export async function listSkillFiles(workspaceId: string, skillId: string): Promise<SkillFile[]> {
+  await loadSkill(workspaceId, skillId);
+  return prisma.skillFile.findMany({ where: { skillId }, orderBy: { path: "asc" } });
 }
