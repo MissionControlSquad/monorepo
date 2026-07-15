@@ -46,3 +46,4 @@ import "./task-relations";
 import "./external-links";
 import "./deliverable-annotations";
 import "./deliverable-votes";
+import "./monitors";

@@ -192,3 +192,5 @@ export { TASK_EXTERNAL_LINKS_QUERY } from "./external-links";
 export { DELIVERABLE_ANNOTATIONS_QUERY } from "./deliverable-annotations";
 
 export { DELIVERABLE_VOTES_QUERY } from "./deliverable-votes";
+
+export { MONITORS_QUERY } from "./monitors";
