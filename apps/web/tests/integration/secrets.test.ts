@@ -52,7 +52,7 @@ beforeAll(() => {
 });
 
 beforeEach(async () => {
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE secrets, agents CASCADE`);
+  await prisma.$executeRawUnsafe(`TRUNCATE TABLE secrets, secret_provider_configs, agents CASCADE`);
 });
 
 describe("encryption at rest + no plaintext exposure (Epic #5)", () => {
@@ -226,5 +226,67 @@ describe("feature gate (Epic #5)", () => {
       await prisma.featureFlag.deleteMany({ where: { key: "secrets_vault" } });
       invalidateFlagCache();
     }
+  });
+});
+
+describe("provider configs (Epic #5)", () => {
+  const CREATE_PROVIDER = `mutation($n:String!,$k:String!){ createSecretProvider(name:$n, kind:$k){ id name kind } }`;
+
+  it("admin creates/lists providers; member is denied; a secret can bind to one", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    // member cannot create a provider.
+    const denied = await gql(
+      CREATE_PROVIDER,
+      { n: "p", k: "vault" },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+
+    // admin creates a vault provider.
+    const made = await gql(CREATE_PROVIDER, { n: "prod-vault", k: "vault" }, admin);
+    expect(made.errors).toBeFalsy();
+    const providerId = made.data.createSecretProvider.id;
+
+    // an invalid kind is rejected.
+    const bad = await gql(CREATE_PROVIDER, { n: "bad", k: "nope" }, admin);
+    expect(bad.errors).toBeDefined();
+
+    // listed for the workspace.
+    const list = await gql(`query{ secretProviders{ id name kind } }`, undefined, admin);
+    expect(list.data.secretProviders).toHaveLength(1);
+
+    // a secret can be created against that provider.
+    const sec = await gql(
+      `mutation($n:String!,$v:String!,$p:String!){ createSecret(name:$n, value:$v, providerId:$p){ id providerId } }`,
+      { n: "VIA_VAULT", v: "s", p: providerId },
+      admin,
+    );
+    expect(sec.errors).toBeFalsy();
+    expect(sec.data.createSecret.providerId).toBe(providerId);
+
+    // an unknown provider id is rejected.
+    const badRef = await gql(
+      `mutation($n:String!,$v:String!,$p:String!){ createSecret(name:$n, value:$v, providerId:$p){ id } }`,
+      { n: "ORPHAN", v: "s", p: "does-not-exist" },
+      admin,
+    );
+    expect(badRef.errors).toBeDefined();
+
+    // deleting the provider nulls the secret's providerId (secret survives).
+    const del = await gql(
+      `mutation($id:String!){ deleteSecretProvider(id:$id) }`,
+      { id: providerId },
+      admin,
+    );
+    expect(del.data.deleteSecretProvider).toBe(true);
+    const orphaned = await prisma.secret.findFirstOrThrow({ where: { name: "VIA_VAULT" } });
+    expect(orphaned.providerId).toBeNull();
+  });
+
+  it("a provider name cannot collide within a workspace", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    await gql(CREATE_PROVIDER, { n: "dup", k: "env" }, admin);
+    const again = await gql(CREATE_PROVIDER, { n: "dup", k: "env" }, admin);
+    expect(again.errors).toBeDefined();
   });
 });

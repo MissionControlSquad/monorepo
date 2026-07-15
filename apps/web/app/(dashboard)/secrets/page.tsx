@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "urql";
-import { SECRETS_QUERY } from "@/lib/graphql/queries";
+import { SECRETS_QUERY, SECRET_PROVIDERS_QUERY } from "@/lib/graphql/queries";
 import {
   CREATE_SECRET,
   ROTATE_SECRET,
   BIND_SECRET,
   UNBIND_SECRET,
   SET_SECRET_STATUS,
+  CREATE_SECRET_PROVIDER,
+  DELETE_SECRET_PROVIDER,
 } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 
@@ -34,8 +36,16 @@ interface Secret {
   description: string | null;
   currentVersion: number;
   status: string;
+  providerId: string | null;
   bindings: Binding[];
   versions: Version[];
+}
+interface Provider {
+  id: string;
+  name: string;
+  kind: string;
+  healthy: boolean;
+  lastError: string | null;
 }
 
 const STATUS_VARIANT: Record<string, "green" | "yellow" | "gray"> = {
@@ -44,22 +54,63 @@ const STATUS_VARIANT: Record<string, "green" | "yellow" | "gray"> = {
   archived: "gray",
 };
 
+const PROVIDER_KINDS = ["env", "aws", "vault"];
+
 export default function SecretsPage() {
   const [{ data }, refetch] = useQuery<{ secrets: Secret[] }>({ query: SECRETS_QUERY });
+  const [{ data: providerData }, refetchProviders] = useQuery<{ secretProviders: Provider[] }>({
+    query: SECRET_PROVIDERS_QUERY,
+  });
   const [, createSecret] = useMutation(CREATE_SECRET);
   const [, rotateSecret] = useMutation(ROTATE_SECRET);
   const [, bindSecret] = useMutation(BIND_SECRET);
   const [, unbindSecret] = useMutation(UNBIND_SECRET);
   const [, setStatus] = useMutation(SET_SECRET_STATUS);
+  const [, createProvider] = useMutation(CREATE_SECRET_PROVIDER);
+  const [, deleteProvider] = useMutation(DELETE_SECRET_PROVIDER);
 
   const [busy, setBusy] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", value: "", description: "" });
+  const [form, setForm] = useState({ name: "", value: "", description: "", providerId: "" });
+  const [providerForm, setProviderForm] = useState({ name: "", kind: "env" });
   const [rotateVal, setRotateVal] = useState<Record<string, string>>({});
   const [bindForm, setBindForm] = useState<Record<string, { env: string; agentId: string }>>({});
   const [error, setError] = useState<string | null>(null);
 
   const secrets = data?.secrets ?? [];
+  const providers = providerData?.secretProviders ?? [];
+  const providerName = (id: string | null) =>
+    id ? (providers.find((p) => p.id === id)?.name ?? "unknown") : null;
   const refresh = () => refetch({ requestPolicy: "network-only" });
+  const refreshProviders = () => refetchProviders({ requestPolicy: "network-only" });
+
+  async function onCreateProvider() {
+    setError(null);
+    if (!providerForm.name.trim()) return setError("Provider name is required");
+    setBusy("provider");
+    try {
+      const res = await createProvider({
+        name: providerForm.name.trim(),
+        kind: providerForm.kind,
+      });
+      if (res.error)
+        return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create provider");
+      setProviderForm({ name: "", kind: "env" });
+      refreshProviders();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onDeleteProvider(id: string) {
+    setBusy(id);
+    try {
+      await deleteProvider({ id });
+      refreshProviders();
+      refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function onCreate() {
     setError(null);
@@ -71,9 +122,10 @@ export default function SecretsPage() {
         name: form.name.trim(),
         value: form.value,
         description: form.description.trim() || null,
+        providerId: form.providerId || null,
       });
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create");
-      setForm({ name: "", value: "", description: "" });
+      setForm({ name: "", value: "", description: "", providerId: "" });
       refresh();
     } finally {
       setBusy(null);
@@ -131,9 +183,74 @@ export default function SecretsPage() {
         rotated. Bind a secret to an agent to inject it as an env var.
       </p>
 
+      {/* Provider configs — point the vault at an external backend (aws/vault) or the local
+          envelope (env). `config` holds only non-secret settings; backend creds are Secrets. */}
+      <Card className="space-y-3 p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Providers</h2>
+          <span className="text-xs text-muted-foreground">
+            Where secrets are stored. Default is the local envelope.
+          </span>
+        </div>
+        <div className="space-y-1">
+          {providers.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No custom providers — secrets use the local AES-256-GCM envelope.
+            </p>
+          )}
+          {providers.map((p) => (
+            <div key={p.id} className="flex items-center justify-between gap-2 text-sm">
+              <span className="flex items-center gap-2">
+                <Badge variant="blue">{p.kind}</Badge>
+                <span className="text-foreground">{p.name}</span>
+                <Badge variant={p.healthy ? "green" : "gray"}>
+                  {p.healthy ? "healthy" : "unchecked"}
+                </Badge>
+                {p.lastError && <span className="text-xs text-destructive">{p.lastError}</span>}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={busy === p.id}
+                onClick={() => onDeleteProvider(p.id)}
+              >
+                Delete
+              </Button>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 border-t border-border pt-3">
+          <input
+            className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
+            placeholder="Provider name (e.g. prod-vault)"
+            value={providerForm.name}
+            onChange={(e) => setProviderForm((f) => ({ ...f, name: e.target.value }))}
+          />
+          <select
+            className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+            value={providerForm.kind}
+            onChange={(e) => setProviderForm((f) => ({ ...f, kind: e.target.value }))}
+          >
+            {PROVIDER_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={busy === "provider"}
+            onClick={onCreateProvider}
+          >
+            Add provider
+          </Button>
+        </div>
+      </Card>
+
       {/* Create */}
       <Card className="space-y-3 p-4">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <input
             className="rounded border border-border bg-background px-3 py-1.5 text-sm"
             placeholder="Name (e.g. OPENAI_API_KEY)"
@@ -153,6 +270,18 @@ export default function SecretsPage() {
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           />
+          <select
+            className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+            value={form.providerId}
+            onChange={(e) => setForm((f) => ({ ...f, providerId: e.target.value }))}
+          >
+            <option value="">local envelope</option>
+            {providers.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.kind})
+              </option>
+            ))}
+          </select>
         </div>
         <div className="flex justify-end">
           <Button size="sm" disabled={busy === "create"} onClick={onCreate}>
@@ -172,6 +301,7 @@ export default function SecretsPage() {
             <span className="font-medium text-foreground">{s.name}</span>
             <Badge variant="gray">v{s.currentVersion}</Badge>
             <Badge variant={STATUS_VARIANT[s.status] ?? "gray"}>{s.status}</Badge>
+            {s.providerId && <Badge variant="blue">{providerName(s.providerId)}</Badge>}
             {s.description && (
               <span className="text-sm text-muted-foreground">{s.description}</span>
             )}

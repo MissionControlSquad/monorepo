@@ -11,6 +11,9 @@ import {
   unbindSecret,
   updateSecret,
   setSecretStatus,
+  createSecretProvider,
+  deleteSecretProvider,
+  isSecretProviderKind,
 } from "@/server/services/secrets";
 
 // Epic #5: secrets vault mutations — SECRETS_VAULT-gated + admin only. The `value` arg is the ONLY
@@ -22,6 +25,7 @@ builder.mutationField("createSecret", (t) =>
       name: t.arg.string({ required: true }),
       value: t.arg.string({ required: true }),
       description: t.arg.string(),
+      providerId: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
@@ -32,6 +36,7 @@ builder.mutationField("createSecret", (t) =>
         name: args.name,
         value: args.value,
         description: args.description ?? null,
+        providerId: args.providerId ?? null,
       });
       return ctx.prisma.secret.findUniqueOrThrow({ ...query, where: { id: secret.id } });
     },
@@ -113,6 +118,47 @@ builder.mutationField("updateSecret", (t) =>
         description: args.description ?? undefined,
       });
       return ctx.prisma.secret.findUniqueOrThrow({ ...query, where: { id: secret.id } });
+    },
+  }),
+);
+
+builder.mutationField("createSecretProvider", (t) =>
+  t.prismaField({
+    type: "SecretProviderConfig",
+    args: {
+      name: t.arg.string({ required: true }),
+      kind: t.arg.string({ required: true }),
+      config: t.arg({ type: "JSON" }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SECRETS_VAULT);
+      const tenancy = requireRole(ctx, "admin");
+      if (!isSecretProviderKind(args.kind))
+        throw new GraphQLError(`Invalid provider kind '${args.kind}'`, {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      const provider = await createSecretProvider({
+        workspaceId: tenancy.workspaceId,
+        name: args.name,
+        kind: args.kind,
+        config: (args.config as Record<string, unknown> | null) ?? null,
+      });
+      return ctx.prisma.secretProviderConfig.findUniqueOrThrow({
+        ...query,
+        where: { id: provider.id },
+      });
+    },
+  }),
+);
+
+builder.mutationField("deleteSecretProvider", (t) =>
+  t.field({
+    type: "Boolean",
+    args: { id: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SECRETS_VAULT);
+      const tenancy = requireRole(ctx, "admin");
+      return deleteSecretProvider(tenancy.workspaceId, args.id);
     },
   }),
 );

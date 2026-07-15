@@ -33,6 +33,21 @@ builder.queryField("secret", (t) =>
   }),
 );
 
+builder.queryField("secretProviders", (t) =>
+  t.prismaField({
+    type: ["SecretProviderConfig"],
+    resolve: async (query, _root, _args, ctx) => {
+      await requireFeature(FLAG_KEYS.SECRETS_VAULT);
+      requireRole(ctx, "member");
+      return ctx.prisma.secretProviderConfig.findMany({
+        ...query,
+        where: scoped(ctx, {}),
+        orderBy: { name: "asc" },
+      });
+    },
+  }),
+);
+
 builder.queryField("secretAccessEvents", (t) =>
   t.prismaField({
     type: ["SecretAccessEvent"],

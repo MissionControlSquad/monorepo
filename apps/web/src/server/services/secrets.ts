@@ -6,11 +6,20 @@
  */
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
-import type { Secret, SecretBinding, SecretAccessAction } from "@agentcenter/database";
+import type {
+  Secret,
+  SecretBinding,
+  SecretAccessAction,
+  SecretProviderConfig,
+  SecretProviderKind,
+} from "@agentcenter/database";
 import { encryptSecret, decryptSecret, CURRENT_KEY_ID } from "./secrets-crypto";
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
+}
+function notFound(what: string): never {
+  throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
 }
 
 /** Append a secret access-event (audit). Centralized so no path skips the log. */
@@ -53,6 +62,15 @@ export async function createSecret(input: CreateSecretInput): Promise<Secret> {
     where: { workspaceId: input.workspaceId, name },
   });
   if (dup) badRequest(`a secret named "${name}" already exists in this workspace`);
+
+  // A provider, if given, must belong to this workspace (never bind to another tenant's backend).
+  if (input.providerId) {
+    const provider = await prisma.secretProviderConfig.findFirst({
+      where: { id: input.providerId, workspaceId: input.workspaceId },
+      select: { id: true },
+    });
+    if (!provider) badRequest("provider not found in this workspace");
+  }
 
   const ciphertext = encryptSecret(input.value);
   const secret = await prisma.$transaction(async (tx) => {
@@ -318,4 +336,54 @@ export async function resolveEnvForAgent(
     });
   }
   return mergeEnvBindings(entries);
+}
+
+// ─── Provider configs ─────────────────────────────────────────────
+// A SecretProviderConfig points the vault at an external backend (aws/vault) or the default local
+// envelope (env). `config` holds only NON-secret settings (region, path prefix); the backend's own
+// credentials are themselves Secrets. Nothing here ever stores or returns a plaintext secret.
+const PROVIDER_KINDS: SecretProviderKind[] = ["env", "aws", "vault"];
+
+export function isSecretProviderKind(v: string): v is SecretProviderKind {
+  return (PROVIDER_KINDS as string[]).includes(v);
+}
+
+export async function createSecretProvider(input: {
+  workspaceId: string;
+  name: string;
+  kind: SecretProviderKind;
+  config?: Record<string, unknown> | null;
+}): Promise<SecretProviderConfig> {
+  const name = input.name.trim();
+  if (!name) badRequest("name is required");
+  const dup = await prisma.secretProviderConfig.findFirst({
+    where: { workspaceId: input.workspaceId, name },
+  });
+  if (dup) badRequest(`a provider named "${name}" already exists in this workspace`);
+  return prisma.secretProviderConfig.create({
+    data: {
+      workspaceId: input.workspaceId,
+      name,
+      kind: input.kind,
+      config: (input.config ?? {}) as never,
+    },
+  });
+}
+
+export function listSecretProviders(workspaceId: string) {
+  return prisma.secretProviderConfig.findMany({
+    where: { workspaceId },
+    orderBy: { name: "asc" },
+  });
+}
+
+/** Delete a provider. Its secrets are NOT deleted — providerId is SetNull, falling back to local. */
+export async function deleteSecretProvider(workspaceId: string, id: string): Promise<boolean> {
+  const provider = await prisma.secretProviderConfig.findFirst({
+    where: { id, workspaceId },
+    select: { id: true },
+  });
+  if (!provider) notFound("Provider");
+  await prisma.secretProviderConfig.delete({ where: { id: provider.id } });
+  return true;
 }
