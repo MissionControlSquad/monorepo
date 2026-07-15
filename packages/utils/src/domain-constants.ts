@@ -325,3 +325,15 @@ export type SecretStatusValue = (typeof SecretStatus)[keyof typeof SecretStatus]
 export function isSecretStatus(v: string): v is SecretStatusValue {
   return (SECRET_STATUSES as readonly string[]).includes(v);
 }
+
+// Cost billing type (Epic #4). Splits metered API spend from flat subscription spend in reports.
+export const CostBillingType = {
+  API: "api",
+  SUBSCRIPTION: "subscription",
+} as const;
+export const COST_BILLING_TYPES = Object.values(CostBillingType);
+export type CostBillingTypeValue = (typeof CostBillingType)[keyof typeof CostBillingType];
+
+export function isCostBillingType(v: string): v is CostBillingTypeValue {
+  return (COST_BILLING_TYPES as readonly string[]).includes(v);
+}

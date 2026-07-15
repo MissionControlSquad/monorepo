@@ -99,6 +99,7 @@ builder.mutationField("ingestCostEvent", (t) =>
       tokensIn: t.arg.int(),
       tokensOut: t.arg.int(),
       amountCents: t.arg.int({ required: true }),
+      billingType: t.arg.string(),
       source: t.arg.string(),
       idempotencyKey: t.arg.string(),
     },
@@ -117,6 +118,7 @@ builder.mutationField("ingestCostEvent", (t) =>
         tokensIn: args.tokensIn ?? 0,
         tokensOut: args.tokensOut ?? 0,
         amountCents: args.amountCents,
+        billingType: args.billingType ?? undefined,
         source: args.source ?? "manual",
         idempotencyKey: args.idempotencyKey ?? null,
       });

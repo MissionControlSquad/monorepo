@@ -27,6 +27,7 @@ export interface RecordCostEventInput {
   tokensIn?: number;
   tokensOut?: number;
   amountCents: number;
+  billingType?: string;
   source?: string;
   idempotencyKey?: string | null;
   occurredAt?: Date;
@@ -94,6 +95,7 @@ export async function recordCostEvent(input: RecordCostEventInput): Promise<Cost
     tokensIn: input.tokensIn ?? 0,
     tokensOut: input.tokensOut ?? 0,
     amountCents,
+    billingType: input.billingType === "subscription" ? "subscription" : "api",
     source: input.source ?? "agent",
     idempotencyKey: input.idempotencyKey ?? null,
     occurredAt,

@@ -46,6 +46,7 @@ model CostEvent {
   tokensIn       Int      @default(0)
   tokensOut      Int      @default(0)
   amountCents    Int      @default(0) // integer cents, no floats
+  billingType    String   @default("api") // "api" (metered) | "subscription" (flat) — split spend reporting
   source         String   @default("agent") // "agent" | "cloud_vm" | "manual"
   idempotencyKey String?
   occurredAt     DateTime @default(now())

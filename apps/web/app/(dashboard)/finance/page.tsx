@@ -84,9 +84,10 @@ export default function FinancePage() {
     query: BUDGET_INCIDENTS_QUERY,
     variables: { status: "open" },
   });
+  const [breakdownBy, setBreakdownBy] = useState("model");
   const [{ data: costData }] = useQuery<{ costBreakdown: Bucket[] }>({
     query: COST_BREAKDOWN_QUERY,
-    variables: { groupBy: "model" },
+    variables: { groupBy: breakdownBy },
   });
 
   const [, createPolicy] = useMutation(CREATE_BUDGET_POLICY);
@@ -255,9 +256,23 @@ export default function FinancePage() {
         </section>
       )}
 
-      {/* Spend by model */}
+      {/* Spend breakdown */}
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-foreground">Spend by model</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Spend by {breakdownBy}</h2>
+          <select
+            className="rounded border border-border bg-background px-2 py-1 text-xs"
+            value={breakdownBy}
+            onChange={(e) => setBreakdownBy(e.target.value)}
+          >
+            <option value="model">model</option>
+            <option value="agent">agent</option>
+            <option value="provider">provider</option>
+            <option value="project">project</option>
+            <option value="biller">biller</option>
+            <option value="billingType">billing type</option>
+          </select>
+        </div>
         <Card className="space-y-3 p-4">
           {buckets.length === 0 && (
             <p className="text-sm text-muted-foreground">No cost recorded yet.</p>
