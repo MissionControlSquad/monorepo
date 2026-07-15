@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { SKILLS_QUERY } from "@/lib/graphql/queries";
-import { CREATE_SKILL, FORK_SKILL, STAR_SKILL } from "@/lib/graphql/mutations";
+import { CREATE_SKILL, FORK_SKILL, STAR_SKILL, DELETE_SKILL } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 
 // Epic #10: skills library. SKILLS_TEAMS-gated. Reusable markdown capability modules with versions,
@@ -13,6 +13,8 @@ interface Skill {
   id: string;
   name: string;
   key: string;
+  icon: string | null;
+  tagline: string | null;
   currentVersion: number;
   starCount: number;
   installCount: number;
@@ -26,10 +28,13 @@ export default function SkillsPage() {
   const [, createSkill] = useMutation(CREATE_SKILL);
   const [, forkSkill] = useMutation(FORK_SKILL);
   const [, starSkill] = useMutation(STAR_SKILL);
+  const [, deleteSkill] = useMutation(DELETE_SKILL);
 
   const [busy, setBusy] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
+    icon: "",
+    tagline: "",
     markdown: "# Skill\n\nDescribe what the agent should do.",
   });
   const [error, setError] = useState<string | null>(null);
@@ -48,9 +53,19 @@ export default function SkillsPage() {
   async function onCreate() {
     setError(null);
     if (!form.name.trim()) return setError("Name is required");
-    const res = await createSkill({ name: form.name.trim(), markdown: form.markdown });
+    const res = await createSkill({
+      name: form.name.trim(),
+      markdown: form.markdown,
+      icon: form.icon.trim() || null,
+      tagline: form.tagline.trim() || null,
+    });
     if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create");
-    setForm({ name: "", markdown: "# Skill\n\nDescribe what the agent should do." });
+    setForm({
+      name: "",
+      icon: "",
+      tagline: "",
+      markdown: "# Skill\n\nDescribe what the agent should do.",
+    });
     refresh();
   }
 
@@ -62,11 +77,25 @@ export default function SkillsPage() {
       </p>
 
       <Card className="space-y-3 p-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[5rem_1fr]">
+          <input
+            className="rounded border border-border bg-background px-3 py-1.5 text-center text-sm"
+            placeholder="🧩"
+            value={form.icon}
+            onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
+          />
+          <input
+            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+            placeholder="Skill name"
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          />
+        </div>
         <input
           className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-          placeholder="Skill name"
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          placeholder="Tagline (optional)"
+          value={form.tagline}
+          onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))}
         />
         <textarea
           className="h-28 w-full rounded border border-border bg-background px-3 py-1.5 font-mono text-xs"
@@ -87,7 +116,9 @@ export default function SkillsPage() {
       {skills.map((s) => (
         <Card key={s.id} className="flex flex-wrap items-center justify-between gap-2 p-4">
           <span className="flex flex-wrap items-center gap-2">
+            {s.icon && <span className="text-base">{s.icon}</span>}
             <span className="font-medium text-foreground">{s.name}</span>
+            {s.tagline && <span className="text-xs text-muted-foreground">— {s.tagline}</span>}
             <Badge variant="gray">v{s.currentVersion}</Badge>
             <Badge variant="blue">{s.trustLevel}</Badge>
             {s.forkedFromSkillId && <Badge variant="purple">fork</Badge>}
@@ -111,6 +142,17 @@ export default function SkillsPage() {
               onClick={() => act(() => forkSkill({ id: s.id }), s.id)}
             >
               Fork
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              disabled={busy === s.id}
+              onClick={() => {
+                if (confirm(`Delete skill "${s.name}"?`))
+                  act(() => deleteSkill({ id: s.id }), s.id);
+              }}
+            >
+              Delete
             </Button>
           </span>
         </Card>

@@ -2,10 +2,34 @@ import { gql } from "urql";
 
 // Epic #10: skills + teams mutations.
 export const CREATE_SKILL = gql`
-  mutation CreateSkill($name: String!, $markdown: String!) {
-    createSkill(name: $name, markdown: $markdown) {
+  mutation CreateSkill(
+    $name: String!
+    $markdown: String!
+    $description: String
+    $icon: String
+    $color: String
+    $tagline: String
+    $author: String
+    $homepage: String
+  ) {
+    createSkill(
+      name: $name
+      markdown: $markdown
+      description: $description
+      icon: $icon
+      color: $color
+      tagline: $tagline
+      author: $author
+      homepage: $homepage
+    ) {
       id
     }
+  }
+`;
+
+export const DELETE_SKILL = gql`
+  mutation DeleteSkill($id: String!) {
+    deleteSkill(id: $id)
   }
 `;
 

@@ -7,6 +7,12 @@ export const SKILLS_QUERY = gql`
       id
       name
       key
+      description
+      icon
+      color
+      tagline
+      author
+      homepage
       currentVersion
       starCount
       installCount

@@ -42,6 +42,11 @@ export interface CreateSkillInput {
   trustLevel?: SkillTrustLevel | null;
   sharingScope?: SkillSharingScope | null;
   createdByProfileId?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  tagline?: string | null;
+  author?: string | null;
+  homepage?: string | null;
 }
 
 export async function createSkill(input: CreateSkillInput): Promise<Skill> {
@@ -62,6 +67,11 @@ export async function createSkill(input: CreateSkillInput): Promise<Skill> {
         markdown: input.markdown,
         description: input.description ?? null,
         categories: input.categories ?? [],
+        icon: input.icon ?? null,
+        color: input.color ?? null,
+        tagline: input.tagline ?? null,
+        author: input.author ?? null,
+        homepage: input.homepage ?? null,
         sourceType: input.sourceType ?? "local_path",
         trustLevel: input.trustLevel ?? "markdown_only",
         sharingScope: input.sharingScope ?? "workspace",
@@ -92,6 +102,11 @@ export async function updateSkill(
     categories?: string[] | null;
     trustLevel?: SkillTrustLevel | null;
     sharingScope?: SkillSharingScope | null;
+    icon?: string | null;
+    color?: string | null;
+    tagline?: string | null;
+    author?: string | null;
+    homepage?: string | null;
   },
   actorProfileId?: string | null,
 ): Promise<Skill> {
@@ -108,6 +123,11 @@ export async function updateSkill(
         ...(patch.categories != null ? { categories: patch.categories } : {}),
         ...(patch.trustLevel != null ? { trustLevel: patch.trustLevel } : {}),
         ...(patch.sharingScope != null ? { sharingScope: patch.sharingScope } : {}),
+        ...(patch.icon !== undefined ? { icon: patch.icon } : {}),
+        ...(patch.color !== undefined ? { color: patch.color } : {}),
+        ...(patch.tagline !== undefined ? { tagline: patch.tagline } : {}),
+        ...(patch.author !== undefined ? { author: patch.author } : {}),
+        ...(patch.homepage !== undefined ? { homepage: patch.homepage } : {}),
         ...(markdownChanged ? { markdown: patch.markdown!, currentVersion: nextVersion } : {}),
       },
     });
@@ -124,6 +144,13 @@ export async function updateSkill(
     }
     return updated;
   });
+}
+
+/** Delete a skill (and its versions/stars/assignments via FK cascade). Workspace-scoped. */
+export async function deleteSkill(workspaceId: string, id: string): Promise<boolean> {
+  await loadSkill(workspaceId, id); // 404s cross-workspace / missing
+  await prisma.skill.delete({ where: { id } });
+  return true;
 }
 
 /** Fork a skill into a new one (copies the current markdown as rev 1), bumping the source forkCount. */

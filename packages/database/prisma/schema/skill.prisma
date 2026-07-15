@@ -52,6 +52,12 @@ model Skill {
   name               String
   description        String?
   markdown           String
+  // Appearance / provenance metadata (Paperclip skill catalog parity). All optional, display-only.
+  icon               String? // emoji or short glyph
+  color              String? // hex/tailwind token for the card accent
+  tagline            String?
+  author             String?
+  homepage           String?
   sourceType         SkillSourceType   @default(local_path)
   sourceRef          String?
   trustLevel         SkillTrustLevel   @default(markdown_only)

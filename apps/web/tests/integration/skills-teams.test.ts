@@ -208,3 +208,41 @@ describe("isolation + gate (Epic #10)", () => {
     }
   });
 });
+
+describe("skill appearance + delete (Epic #10)", () => {
+  it("stores appearance metadata on create and deletes a skill", async () => {
+    const member = await cookieFor(WS_A, "member");
+    const created = await gql(
+      `mutation{ createSkill(name:"Deploy", markdown:"# md", icon:"🚀", tagline:"ship it", author:"acme"){ id icon tagline author } }`,
+      undefined,
+      member,
+    );
+    expect(created.errors).toBeFalsy();
+    expect(created.data.createSkill).toMatchObject({
+      icon: "🚀",
+      tagline: "ship it",
+      author: "acme",
+    });
+    const id = created.data.createSkill.id;
+
+    const del = await gql(`mutation($id:String!){ deleteSkill(id:$id) }`, { id }, member);
+    expect(del.data.deleteSkill).toBe(true);
+    expect(await prisma.skill.count({ where: { id } })).toBe(0);
+  });
+
+  it("cannot delete another workspace's skill", async () => {
+    const inB = await gql(
+      `mutation{ createSkill(name:"B skill", markdown:"# x"){ id } }`,
+      undefined,
+      await cookieFor(WS_B, "member"),
+    );
+    const idB = inB.data.createSkill.id;
+    const cross = await gql(
+      `mutation($id:String!){ deleteSkill(id:$id) }`,
+      { id: idB },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(cross.errors).toBeDefined();
+    expect(await prisma.skill.count({ where: { id: idB } })).toBe(1);
+  });
+});

@@ -151,6 +151,7 @@ export {
 
 export {
   CREATE_SKILL,
+  DELETE_SKILL,
   FORK_SKILL,
   STAR_SKILL,
   CREATE_TEAM,
