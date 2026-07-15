@@ -184,3 +184,5 @@ export { CLI_AUTH_CHALLENGE_QUERY } from "./cli-auth";
 export { WORK_TIMELINE_QUERY } from "./timeline";
 
 export { AGENT_GOVERNANCE_QUERY } from "./agent-governance";
+
+export { TASK_RELATIONS_QUERY } from "./task-relations";

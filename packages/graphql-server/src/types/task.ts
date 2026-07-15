@@ -41,3 +41,16 @@ builder.prismaObject("Task", {
     documents: t.relation("documents"),
   }),
 });
+
+// Tier C: typed task dependency graph.
+builder.prismaObject("TaskRelation", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    type: t.exposeString("type"),
+    sourceTaskId: t.exposeString("sourceTaskId"),
+    targetTaskId: t.exposeString("targetTaskId"),
+    sourceTask: t.relation("sourceTask"),
+    targetTask: t.relation("targetTask"),
+    createdAt: t.expose("createdAt", { type: "DateTime" }),
+  }),
+});

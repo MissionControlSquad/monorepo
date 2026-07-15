@@ -48,6 +48,7 @@ import {
 } from "../../lib/graphql/mutations";
 import { useAppContext } from "../context/AppContext";
 import { TaskComments } from "./TaskComments";
+import { TaskRelationsCard } from "./TaskRelationsCard";
 import { TaskDeliverables } from "./TaskDeliverables";
 import { ChildTaskDeliverables } from "./ChildTaskDeliverables";
 import { ErrorBoundary, PanelErrorFallback } from "../common/ErrorBoundary";
@@ -1147,6 +1148,14 @@ export function TaskDetailModal({
                   </div>
                 )}
               </div>
+
+              {/* Tier C: typed task dependency graph */}
+              {resolvedTaskId && (
+                <>
+                  <div className="border-t border-border" />
+                  <TaskRelationsCard taskId={resolvedTaskId} />
+                </>
+              )}
 
               {/* Child Tasks */}
               {childTasks && childTasks.length > 0 && (

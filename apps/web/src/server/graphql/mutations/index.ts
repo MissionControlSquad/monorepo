@@ -38,4 +38,5 @@ import "./agent-instructions";
 import "./org-chart";
 import "./agent-authz";
 import "./agent-governance";
+import "./task-relations";
 import "./attention";

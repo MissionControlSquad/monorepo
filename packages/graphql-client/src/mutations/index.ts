@@ -203,3 +203,5 @@ export { DISMISS_ATTENTION_ITEM, UNDISMISS_ATTENTION_ITEM } from "./attention";
 export { APPROVE_CLI_AUTH, DENY_CLI_AUTH } from "./cli-auth";
 
 export { SET_AGENT_GOVERNANCE } from "./agent-governance";
+
+export { LINK_TASKS, UNLINK_TASKS } from "./task-relations";

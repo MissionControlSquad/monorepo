@@ -69,6 +69,9 @@ model Task {
   routineRuns   RoutineRun[]   @relation("TaskFromRoutineRun") // Epic #7
   pipelineCases PipelineCase[] @relation("TaskFromPipelineCase")
   caseLinks     CaseTaskLink[] @relation("CaseTaskLink") // Epic #17
+  // Tier C: typed task dependency graph (beyond the single blockedByTaskId).
+  relationsFrom TaskRelation[] @relation("TaskRelationSource")
+  relationsTo   TaskRelation[] @relation("TaskRelationTarget")
 
   // Epic #8: lease-based atomic checkout + autonomy hardening.
   checkedOutByProfileId  String?
@@ -88,6 +91,32 @@ model Task {
   @@index([deletedAt])
   @@index([status, deletedAt])
   @@map("tasks")
+}
+
+// Tier C: typed task dependency graph. `blocks` is directional (source blocks target); `relates_to`
+// and `duplicates` describe non-blocking links. Complements the single blockedByTaskId with a full
+// many-to-many graph.
+enum TaskRelationType {
+  blocks
+  relates_to
+  duplicates
+}
+
+model TaskRelation {
+  id           String           @id @default(cuid())
+  sourceTaskId String
+  targetTaskId String
+  type         TaskRelationType @default(relates_to)
+  createdByProfileId String?
+  createdAt    DateTime         @default(now())
+
+  sourceTask Task @relation("TaskRelationSource", fields: [sourceTaskId], references: [id], onDelete: Cascade)
+  targetTask Task @relation("TaskRelationTarget", fields: [targetTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceTaskId, targetTaskId, type])
+  @@index([sourceTaskId])
+  @@index([targetTaskId])
+  @@map("task_relations")
 }
 
 model TaskAssignee {
