@@ -72,6 +72,7 @@ model Task {
   // Tier C: typed task dependency graph (beyond the single blockedByTaskId).
   relationsFrom TaskRelation[] @relation("TaskRelationSource")
   relationsTo   TaskRelation[] @relation("TaskRelationTarget")
+  externalLinks ExternalLink[] @relation("TaskExternalLinks")
 
   // Epic #8: lease-based atomic checkout + autonomy hardening.
   checkedOutByProfileId  String?
@@ -117,6 +118,29 @@ model TaskRelation {
   @@index([sourceTaskId])
   @@index([targetTaskId])
   @@map("task_relations")
+}
+
+// Tier C: external object links — attach a task to an external system (GitHub issue/PR, GitLab, a
+// generic URL). Storage/display only; no live sync (that would be an integration = out of scope).
+enum ExternalLinkKind {
+  github
+  gitlab
+  url
+}
+
+model ExternalLink {
+  id                 String           @id @default(cuid())
+  taskId             String
+  kind               ExternalLinkKind @default(url)
+  url                String
+  title              String?
+  createdByProfileId String?
+  createdAt          DateTime         @default(now())
+
+  task Task @relation("TaskExternalLinks", fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("external_links")
 }
 
 model TaskAssignee {

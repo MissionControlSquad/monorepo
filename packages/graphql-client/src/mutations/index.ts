@@ -205,3 +205,5 @@ export { APPROVE_CLI_AUTH, DENY_CLI_AUTH } from "./cli-auth";
 export { SET_AGENT_GOVERNANCE } from "./agent-governance";
 
 export { LINK_TASKS, UNLINK_TASKS } from "./task-relations";
+
+export { ADD_EXTERNAL_LINK, REMOVE_EXTERNAL_LINK } from "./external-links";

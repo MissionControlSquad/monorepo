@@ -54,3 +54,15 @@ builder.prismaObject("TaskRelation", {
     createdAt: t.expose("createdAt", { type: "DateTime" }),
   }),
 });
+
+// Tier C: external object links.
+builder.prismaObject("ExternalLink", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    taskId: t.exposeString("taskId"),
+    kind: t.exposeString("kind"),
+    url: t.exposeString("url"),
+    title: t.exposeString("title", { nullable: true }),
+    createdAt: t.expose("createdAt", { type: "DateTime" }),
+  }),
+});

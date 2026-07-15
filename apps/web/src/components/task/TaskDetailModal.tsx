@@ -49,6 +49,7 @@ import {
 import { useAppContext } from "../context/AppContext";
 import { TaskComments } from "./TaskComments";
 import { TaskRelationsCard } from "./TaskRelationsCard";
+import { TaskExternalLinksCard } from "./TaskExternalLinksCard";
 import { TaskDeliverables } from "./TaskDeliverables";
 import { ChildTaskDeliverables } from "./ChildTaskDeliverables";
 import { ErrorBoundary, PanelErrorFallback } from "../common/ErrorBoundary";
@@ -1154,6 +1155,8 @@ export function TaskDetailModal({
                 <>
                   <div className="border-t border-border" />
                   <TaskRelationsCard taskId={resolvedTaskId} />
+                  <div className="border-t border-border" />
+                  <TaskExternalLinksCard taskId={resolvedTaskId} />
                 </>
               )}
 
