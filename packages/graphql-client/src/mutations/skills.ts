@@ -48,8 +48,22 @@ export const STAR_SKILL = gql`
 `;
 
 export const CREATE_TEAM = gql`
-  mutation CreateTeam($name: String!) {
-    createTeam(name: $name) {
+  mutation CreateTeam(
+    $name: String!
+    $description: String
+    $icon: String
+    $tagline: String
+    $author: String
+    $tags: [String!]
+  ) {
+    createTeam(
+      name: $name
+      description: $description
+      icon: $icon
+      tagline: $tagline
+      author: $author
+      tags: $tags
+    ) {
       id
     }
   }

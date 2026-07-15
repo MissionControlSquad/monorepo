@@ -139,6 +139,11 @@ model Team {
   key                String
   name               String
   description        String?
+  // Catalog appearance / discovery metadata (Paperclip team catalog parity). Display + filtering only.
+  icon               String?
+  tagline            String?
+  author             String?
+  tags               String[]       @default([])
   kind               TeamKind       @default(optional)
   trustLevel         TeamTrustLevel @default(markdown_only)
   sourceRef          String?

@@ -246,3 +246,27 @@ describe("skill appearance + delete (Epic #10)", () => {
     expect(await prisma.skill.count({ where: { id: idB } })).toBe(1);
   });
 });
+
+describe("team catalog metadata (Epic #10)", () => {
+  it("stores appearance + tags on create and exposes them", async () => {
+    const member = await cookieFor(WS_A, "member");
+    const r = await gql(
+      `mutation{ createTeam(name:"Growth Pod", icon:"📈", tagline:"scale it", author:"acme", tags:["growth","sales"]){ id icon tagline author tags } }`,
+      undefined,
+      member,
+    );
+    expect(r.errors).toBeFalsy();
+    expect(r.data.createTeam).toMatchObject({
+      icon: "📈",
+      tagline: "scale it",
+      author: "acme",
+    });
+    expect(r.data.createTeam.tags).toEqual(["growth", "sales"]);
+
+    const list = await gql(`query{ teams{ id tags tagline } }`, undefined, member);
+    const found = (list.data.teams as { id: string; tags: string[] }[]).find(
+      (t) => t.id === r.data.createTeam.id,
+    );
+    expect(found?.tags).toContain("growth");
+  });
+});

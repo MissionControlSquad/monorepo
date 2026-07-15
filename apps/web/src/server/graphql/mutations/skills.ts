@@ -199,6 +199,10 @@ builder.mutationField("createTeam", (t) =>
       description: t.arg.string(),
       kind: t.arg.string(),
       trustLevel: t.arg.string(),
+      icon: t.arg.string(),
+      tagline: t.arg.string(),
+      author: t.arg.string(),
+      tags: t.arg.stringList(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
@@ -211,6 +215,10 @@ builder.mutationField("createTeam", (t) =>
         description: args.description ?? null,
         kind: (args.kind as TeamKind) ?? null,
         trustLevel: (args.trustLevel as TeamTrustLevel) ?? null,
+        icon: args.icon ?? null,
+        tagline: args.tagline ?? null,
+        author: args.author ?? null,
+        tags: args.tags ?? null,
       });
       return ctx.prisma.team.findUniqueOrThrow({ ...query, where: { id: team.id } });
     },

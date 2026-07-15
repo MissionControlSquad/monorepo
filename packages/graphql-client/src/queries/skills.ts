@@ -29,6 +29,13 @@ export const TEAMS_QUERY = gql`
       id
       name
       key
+      description
+      icon
+      tagline
+      author
+      tags
+      kind
+      trustLevel
       installCount
       members {
         id

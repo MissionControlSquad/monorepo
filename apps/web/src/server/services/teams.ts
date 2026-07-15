@@ -31,6 +31,10 @@ export async function createTeam(input: {
   kind?: TeamKind | null;
   trustLevel?: TeamTrustLevel | null;
   createdByProfileId?: string | null;
+  icon?: string | null;
+  tagline?: string | null;
+  author?: string | null;
+  tags?: string[] | null;
 }): Promise<Team> {
   const name = input.name.trim();
   if (!name) badRequest("name is required");
@@ -46,6 +50,10 @@ export async function createTeam(input: {
       kind: input.kind ?? "optional",
       trustLevel: input.trustLevel ?? "markdown_only",
       createdByProfileId: input.createdByProfileId ?? null,
+      icon: input.icon ?? null,
+      tagline: input.tagline ?? null,
+      author: input.author ?? null,
+      tags: input.tags ?? [],
     },
   });
 }
