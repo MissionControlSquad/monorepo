@@ -18,6 +18,7 @@ import {
   CLAIM_CASE,
   RELEASE_CASE,
   COMMENT_CASE,
+  BREAKDOWN_CASE,
   TRANSITION_CASE,
   REJECT_CASE,
 } from "@/lib/graphql/mutations";
@@ -76,6 +77,7 @@ function PipelineCard({
   const [, createCase] = useMutation(CREATE_PIPELINE_CASE);
   const [, claimCase] = useMutation(CLAIM_CASE);
   const [, releaseCase] = useMutation(RELEASE_CASE);
+  const [, breakdownCase] = useMutation(BREAKDOWN_CASE);
   const [, transitionCase] = useMutation(TRANSITION_CASE);
   const [, rejectCase] = useMutation(REJECT_CASE);
   const [, updateStage] = useMutation(UPDATE_PIPELINE_STAGE);
@@ -234,6 +236,26 @@ function PipelineCard({
                         }
                       >
                         Advance
+                      </Button>
+                    )}
+                    {!c.linkedTaskId && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy === c.id}
+                        onClick={() =>
+                          act(
+                            () =>
+                              breakdownCase({
+                                caseId: c.id,
+                                title: c.title,
+                                description: `Broken down from pipeline case "${c.title}"`,
+                              }),
+                            c.id,
+                          )
+                        }
+                      >
+                        Break down
                       </Button>
                     )}
                     <Button

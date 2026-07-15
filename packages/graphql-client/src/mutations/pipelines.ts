@@ -43,6 +43,16 @@ export const ADD_ROUTINE_TRIGGER = gql`
   }
 `;
 
+export const UPDATE_ROUTINE = gql`
+  mutation UpdateRoutine($id: String!, $name: String, $isActive: Boolean) {
+    updateRoutine(id: $id, name: $name, isActive: $isActive) {
+      id
+      name
+      isActive
+    }
+  }
+`;
+
 export const CREATE_PIPELINE = gql`
   mutation CreatePipeline($name: String!, $description: String) {
     createPipeline(name: $name, description: $description) {
@@ -154,6 +164,15 @@ export const TRANSITION_CASE = gql`
       id
       currentStageId
       status
+    }
+  }
+`;
+
+export const BREAKDOWN_CASE = gql`
+  mutation BreakdownCase($caseId: String!, $title: String!, $description: String!) {
+    breakdownCase(caseId: $caseId, title: $title, description: $description) {
+      id
+      linkedTaskId
     }
   }
 `;

@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { ROUTINES_QUERY, AGENTS_QUERY, GOALS_QUERY } from "@/lib/graphql/queries";
-import { CREATE_ROUTINE, TRIGGER_ROUTINE_NOW, ADD_ROUTINE_TRIGGER } from "@/lib/graphql/mutations";
+import {
+  CREATE_ROUTINE,
+  TRIGGER_ROUTINE_NOW,
+  ADD_ROUTINE_TRIGGER,
+  UPDATE_ROUTINE,
+} from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 
 const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
@@ -40,6 +45,7 @@ export default function RoutinesPage() {
   const [, createRoutine] = useMutation(CREATE_ROUTINE);
   const [, triggerNow] = useMutation(TRIGGER_ROUTINE_NOW);
   const [, addTrigger] = useMutation(ADD_ROUTINE_TRIGGER);
+  const [, updateRoutine] = useMutation(UPDATE_ROUTINE);
 
   const agents = agentsData?.agents ?? [];
   const goals = goalsData?.goals ?? [];
@@ -88,6 +94,16 @@ export default function RoutinesPage() {
         goalId: "",
       });
       refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onToggleActive(id: string, isActive: boolean) {
+    setBusy(id);
+    try {
+      await updateRoutine({ id, isActive });
+      refetch({ requestPolicy: "network-only" });
     } finally {
       setBusy(null);
     }
@@ -217,6 +233,14 @@ export default function RoutinesPage() {
               )}
             </div>
             <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy === r.id}
+                onClick={() => onToggleActive(r.id, !r.isActive)}
+              >
+                {r.isActive ? "Pause" : "Activate"}
+              </Button>
               <Button
                 size="sm"
                 variant="secondary"

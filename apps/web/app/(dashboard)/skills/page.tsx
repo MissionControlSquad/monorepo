@@ -12,6 +12,7 @@ import {
   CREATE_SKILL,
   FORK_SKILL,
   STAR_SKILL,
+  UNSTAR_SKILL,
   DELETE_SKILL,
   UPDATE_SKILL,
   INSTALL_CATALOG_SKILL,
@@ -55,6 +56,7 @@ export default function SkillsPage() {
   const [, createSkill] = useMutation(CREATE_SKILL);
   const [, forkSkill] = useMutation(FORK_SKILL);
   const [, starSkill] = useMutation(STAR_SKILL);
+  const [, unstarSkill] = useMutation(UNSTAR_SKILL);
   const [, deleteSkill] = useMutation(DELETE_SKILL);
   const [, updateSkill] = useMutation(UPDATE_SKILL);
   const [, installCatalogSkill] = useMutation(INSTALL_CATALOG_SKILL);
@@ -248,7 +250,15 @@ export default function SkillsPage() {
                 disabled={busy === s.id}
                 onClick={() => act(() => starSkill({ id: s.id }), s.id)}
               >
-                Star
+                Star ({s.starCount})
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy === s.id || s.starCount === 0}
+                onClick={() => act(() => unstarSkill({ id: s.id }), s.id)}
+              >
+                Unstar
               </Button>
               <Button
                 size="sm"

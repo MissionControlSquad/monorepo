@@ -47,6 +47,12 @@ export const STAR_SKILL = gql`
   }
 `;
 
+export const UNSTAR_SKILL = gql`
+  mutation UnstarSkill($id: String!) {
+    unstarSkill(id: $id)
+  }
+`;
+
 export const ASSIGN_SKILL = gql`
   mutation AssignSkill($agentId: String!, $skillId: String!) {
     assignSkill(agentId: $agentId, skillId: $skillId) {
