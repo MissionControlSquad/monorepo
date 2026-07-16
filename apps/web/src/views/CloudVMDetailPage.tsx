@@ -43,6 +43,7 @@ import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 import { toast } from "sonner";
 import { CloudVmStatus } from "@/server/constants";
 import { Breadcrumbs, Button, Badge, Card, ConfirmDialog, Input } from "../components/ui";
+import { RunnerCommandPanel } from "../components/cloud/RunnerCommandPanel";
 
 interface VMAgent {
   id: string;
@@ -133,6 +134,7 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const liveGatewayEnabled = useFeatureFlag(FLAG_KEYS.LIVE_GATEWAY);
+  const runnersEnabled = useFeatureFlag(FLAG_KEYS.RUNNERS);
   const [showLogs, setShowLogs] = useState(false);
   const [showDestroyConfirm, setShowDestroyConfirm] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -848,6 +850,9 @@ export function CloudVMDetailPage({ vmId }: CloudVMDetailPageProps) {
           {showLogs ? "Hide logs" : "Show logs"}
         </button>
       </div>
+
+      {/* Runner commands — raw shell over SSH (Tier D). Only useful once the VM is reachable. */}
+      {runnersEnabled && vm?.status === CloudVmStatus.RUNNING && <RunnerCommandPanel vmId={vmId} />}
 
       {/* Logs */}
       {showLogs && (

@@ -39,3 +39,4 @@ import "./terminal";
 import "./agent-instruction";
 
 import "./monitor";
+import "./runner-command";

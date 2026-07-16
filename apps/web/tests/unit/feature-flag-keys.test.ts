@@ -39,10 +39,12 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.ANNOTATIONS).toBe("annotations");
     expect(FLAG_KEYS.VOTING).toBe("voting");
     expect(FLAG_KEYS.MONITORS).toBe("monitors");
+    // Tier D
+    expect(FLAG_KEYS.RUNNERS).toBe("runners");
   });
 
-  it("has exactly 34 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(34);
+  it("has exactly 35 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(35);
   });
 
   it("all values are unique", () => {
@@ -83,6 +85,10 @@ describe("FLAG_DEFAULTS", () => {
     expect(FLAG_DEFAULTS[FLAG_KEYS.TERMINALS]).toBe(false);
   });
 
+  it("RUNNERS defaults to false (Tier D execution surface; opt-in)", () => {
+    expect(FLAG_DEFAULTS[FLAG_KEYS.RUNNERS]).toBe(false);
+  });
+
   it("all other flags default to true", () => {
     const expectedTrue: FlagKey[] = [
       FLAG_KEYS.CHANNELS,
@@ -113,7 +119,7 @@ describe("FLAG_DEFAULTS", () => {
       FLAG_KEYS.ANNOTATIONS,
       FLAG_KEYS.VOTING,
       FLAG_KEYS.MONITORS,
-    ]; // TERMINALS + PLUGIN_SDK + BOARD_CHAT + CLOUD_VMS + LIVE_GATEWAY + MULTI_PROVIDER_ADAPTERS default false
+    ]; // TERMINALS + PLUGIN_SDK + BOARD_CHAT + CLOUD_VMS + LIVE_GATEWAY + MULTI_PROVIDER_ADAPTERS + RUNNERS default false
     for (const key of expectedTrue) {
       expect(FLAG_DEFAULTS[key]).toBe(true);
     }

@@ -47,3 +47,4 @@ import "./external-links";
 import "./deliverable-annotations";
 import "./deliverable-votes";
 import "./monitors";
+import "./runner-commands";

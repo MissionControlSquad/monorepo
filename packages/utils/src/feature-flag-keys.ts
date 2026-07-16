@@ -34,6 +34,7 @@ export const FLAG_KEYS = {
   ANNOTATIONS: "annotations",
   VOTING: "voting",
   MONITORS: "monitors",
+  RUNNERS: "runners",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -75,4 +76,6 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.ANNOTATIONS]: true,
   [FLAG_KEYS.VOTING]: true,
   [FLAG_KEYS.MONITORS]: true,
+  // Tier D: runner commands / runtime-agnostic execution. Opt-in operator surface.
+  [FLAG_KEYS.RUNNERS]: false,
 };
