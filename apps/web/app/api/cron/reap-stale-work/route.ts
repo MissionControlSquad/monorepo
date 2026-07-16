@@ -12,6 +12,8 @@ import { successResponse, errorResponse, handleError } from "../../_lib/json-res
 import { env } from "@/server/env";
 import { reapStuckRunnerCommands } from "@/server/services/runner-commands";
 import { reapStaleTerminalSessions } from "@/server/services/terminals";
+import { sweepExpiredCheckouts } from "@/server/services/task-checkout";
+import { evaluateWatchdogs } from "@/server/services/task-watchdog";
 
 export async function GET(request: Request) {
   try {
@@ -20,12 +22,19 @@ export async function GET(request: Request) {
       return errorResponse("Unauthorized", 401);
     }
     const now = new Date();
-    const [commandsReaped, terminals] = await Promise.all([
+    // Watchdogs FIRST + sequentially: they read expired leases to record recovery decisions; the
+    // blanket sweep below would otherwise clear those leases before the watchdog sees them, losing
+    // the audit trail. The remaining reapers are independent + idempotent, so they run in parallel.
+    const watchdogDecisions = await evaluateWatchdogs(now);
+    const [checkoutsReleased, commandsReaped, terminals] = await Promise.all([
+      sweepExpiredCheckouts(now),
       reapStuckRunnerCommands(now),
       reapStaleTerminalSessions(now),
     ]);
     return successResponse({
       ok: true,
+      watchdogsFired: watchdogDecisions.length,
+      checkoutsReleased,
       commandsReaped,
       terminalsClosed: terminals.closed,
       terminalsExpired: terminals.expired,

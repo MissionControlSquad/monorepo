@@ -88,6 +88,26 @@ export async function releaseCheckout(taskId: string, token: string): Promise<bo
   return rows.length > 0;
 }
 
+/**
+ * Proactively release every checkout whose lease has expired (self-healing sweep, run from the
+ * reap-stale-work cron). Without this, an expired lease is only cleared lazily when someone else
+ * tries to check the task out — so a task abandoned by a dead worker can look "checked out"
+ * indefinitely. A still-live worker whose lease was swept simply fails its next token-gated renew
+ * (correct fencing). Returns the number released.
+ */
+export async function sweepExpiredCheckouts(now: Date = new Date()): Promise<number> {
+  const res = await prisma.task.updateMany({
+    where: { checkedOutByProfileId: { not: null }, checkoutLeaseExpiresAt: { lt: now } },
+    data: {
+      checkedOutByProfileId: null,
+      checkedOutAt: null,
+      checkoutLeaseExpiresAt: null,
+      checkoutToken: null,
+    },
+  });
+  return res.count;
+}
+
 /** Force-clear a checkout (recovery path — no token, used by watchdog/cron). */
 export async function forceReleaseCheckout(taskId: string): Promise<void> {
   await prisma.task.update({

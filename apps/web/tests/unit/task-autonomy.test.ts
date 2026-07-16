@@ -73,10 +73,40 @@ describe("watchdog condition (lease_expired)", () => {
       ),
     ).toBe(false);
   });
-  it("other conditions report false in v1 (deferred to liveness cron)", () => {
+  it("no_heartbeat: holds when the owning agent's heartbeat is stale past the threshold", () => {
+    const task = { checkedOutByProfileId: "p", checkoutLeaseExpiresAt: future };
+    const staleHb = new Date(now.getTime() - 10 * 60_000); // 10 min ago
+    const freshHb = new Date(now.getTime() - 5_000); // 5 s ago
+    // threshold 300s: a 10-min-old heartbeat is stale → holds
+    expect(
+      conditionHolds("no_heartbeat", task, now, { thresholdSec: 300, agentLastHeartbeat: staleHb }),
+    ).toBe(true);
+    // a fresh heartbeat → does not hold
+    expect(
+      conditionHolds("no_heartbeat", task, now, { thresholdSec: 300, agentLastHeartbeat: freshHb }),
+    ).toBe(false);
+    // null heartbeat → can't confirm death, defers to lease_expired → does not hold
+    expect(
+      conditionHolds("no_heartbeat", task, now, { thresholdSec: 300, agentLastHeartbeat: null }),
+    ).toBe(false);
+    // free task → never holds
     expect(
       conditionHolds(
         "no_heartbeat",
+        { checkedOutByProfileId: null, checkoutLeaseExpiresAt: null },
+        now,
+        {
+          thresholdSec: 300,
+          agentLastHeartbeat: staleHb,
+        },
+      ),
+    ).toBe(false);
+  });
+
+  it("no_progress / stuck_in_status still report false (deferred)", () => {
+    expect(
+      conditionHolds(
+        "no_progress",
         { checkedOutByProfileId: "p", checkoutLeaseExpiresAt: past },
         now,
       ),

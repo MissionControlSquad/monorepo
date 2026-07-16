@@ -6,7 +6,9 @@ import {
   checkoutTask,
   renewCheckout,
   releaseCheckout,
+  sweepExpiredCheckouts,
 } from "../../src/server/services/task-checkout";
+import { getOrCreateAgentProfileId } from "../../src/server/agent-profile";
 import {
   proposeDecomposition,
   reviewDecomposition,
@@ -114,6 +116,55 @@ describe("watchdog recovery", () => {
 
     // Idempotent: a second sweep with no new stall fires nothing.
     expect(await evaluateWatchdogs()).toHaveLength(0);
+  });
+
+  it("no_heartbeat: fires when the owning agent's heartbeat is stale (lease still live)", async () => {
+    const { agent } = await createTestAgent({
+      name: `HB-${Math.random().toString(36).slice(2, 8)}`,
+    });
+    const task = await createTestTask(agent.id, { title: "silent worker" });
+    const profileId = await getOrCreateAgentProfileId(agent.id);
+    await checkoutTask(task.id, profileId, 300); // lease live for 5 min → lease_expired would NOT fire
+    await prisma.agent.update({
+      where: { id: agent.id },
+      data: { lastHeartbeat: new Date(Date.now() - 10 * 60_000) }, // 10 min stale
+    });
+    await createWatchdog({
+      taskId: task.id,
+      condition: "no_heartbeat",
+      thresholdSec: 300,
+      action: "release_checkout",
+    });
+
+    const decisions = await evaluateWatchdogs();
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].outcome).toBe("action_taken");
+    const row = await prisma.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(row.checkedOutByProfileId).toBeNull();
+  });
+});
+
+describe("expired-lease sweep", () => {
+  it("releases every checkout whose lease has expired, leaves live ones alone", async () => {
+    const expired = await makeTask();
+    const live = await makeTask();
+    const p1 = await makeProfile("sweeper1");
+    const p2 = await makeProfile("sweeper2");
+    await checkoutTask(expired, p1, 300);
+    await checkoutTask(live, p2, 300);
+    await prisma.task.update({
+      where: { id: expired },
+      data: { checkoutLeaseExpiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const released = await sweepExpiredCheckouts(new Date());
+    expect(released).toBe(1);
+    expect(
+      (await prisma.task.findUniqueOrThrow({ where: { id: expired } })).checkedOutByProfileId,
+    ).toBeNull();
+    expect(
+      (await prisma.task.findUniqueOrThrow({ where: { id: live } })).checkedOutByProfileId,
+    ).toBe(p2);
   });
 });
 
