@@ -261,6 +261,27 @@ export async function deadLetterExhaustedDeliveries(
   return count;
 }
 
+/**
+ * Deliveries that were pushed at least once but not yet acked, whose last push is older than
+ * `staleMs`, and which haven't been dead-lettered/exhausted. Candidates for an in-place re-push to a
+ * still-connected agent (without waiting for a reconnect drain). attempts=0 rows are skipped — they
+ * were never pushed (connection was offline) and the reconnect drain will handle them.
+ */
+export async function findStalePendingDeliveries(staleMs: number, maxAttempts: number, now: Date) {
+  const cutoff = new Date(now.getTime() - staleMs);
+  return prisma.livePendingDelivery.findMany({
+    where: {
+      delivered: false,
+      deadLetteredAt: null,
+      expiresAt: { gt: now },
+      attempts: { gte: 1, lt: maxAttempts },
+      lastAttemptAt: { lt: cutoff },
+    },
+    orderBy: { createdAt: "asc" },
+    take: 200,
+  });
+}
+
 export async function markDeliveryReceived(deliveryId: string) {
   await prisma.livePendingDelivery
     .update({

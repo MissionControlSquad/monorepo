@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
 import { invalidateFlagCache } from "../../src/server/feature-flags";
-import { tryDeliverTaskToLiveAgents } from "../../src/server/services/live-task-delivery";
+import {
+  tryDeliverTaskToLiveAgents,
+  redeliverStalePending,
+} from "../../src/server/services/live-task-delivery";
 
 // Tier D robustness (disconnect race): a task assigned while a known machine is briefly disconnected
 // must still be enqueued against its (stable) connection so it drains on reconnect — not lost to the
@@ -85,5 +88,85 @@ describe("live-gateway disconnect race (Tier D)", () => {
       priority: "normal",
     });
     expect(await prisma.livePendingDelivery.count({ where: { taskId: task.id } })).toBe(0);
+  });
+
+  it("re-pushes a stale un-acked delivery to a live connection and bumps its attempts", async () => {
+    const conn = await prisma.liveGatewayConnection.create({
+      data: {
+        machineFingerprint: "fp-redeliver",
+        machineName: "m",
+        connectionStatus: "connected",
+        pluginVersion: "0.1.0",
+        hostMeta: { hostname: "h", platform: "linux", arch: "x64" },
+      },
+    });
+    const stale = await prisma.livePendingDelivery.create({
+      data: {
+        connectionId: conn.id,
+        agentSlug: "a",
+        taskId: "t-stale",
+        message: "m",
+        priority: "normal",
+        idempotencyKey: "task:t-stale:agent:a",
+        expiresAt: new Date(Date.now() + 3600_000),
+        attempts: 1,
+        lastAttemptAt: new Date(Date.now() - 120_000), // pushed 2 min ago, never acked → stale
+      },
+    });
+    const fresh = await prisma.livePendingDelivery.create({
+      data: {
+        connectionId: conn.id,
+        agentSlug: "a",
+        taskId: "t-fresh",
+        message: "m",
+        priority: "normal",
+        idempotencyKey: "task:t-fresh:agent:a",
+        expiresAt: new Date(Date.now() + 3600_000),
+        attempts: 1,
+        lastAttemptAt: new Date(), // just pushed → not stale
+      },
+    });
+
+    const sent: string[] = [];
+    const n = await redeliverStalePending(new Date(), (connectionId) => {
+      sent.push(connectionId);
+      return true; // pretend the connection is live
+    });
+
+    expect(n).toBe(1);
+    expect(sent).toEqual([conn.id]);
+    expect(
+      (await prisma.livePendingDelivery.findUniqueOrThrow({ where: { id: stale.id } })).attempts,
+    ).toBe(2);
+    expect(
+      (await prisma.livePendingDelivery.findUniqueOrThrow({ where: { id: fresh.id } })).attempts,
+    ).toBe(1);
+  });
+
+  it("does not count a re-push whose connection is offline", async () => {
+    const conn = await prisma.liveGatewayConnection.create({
+      data: {
+        machineFingerprint: "fp-offline",
+        machineName: "m",
+        connectionStatus: "disconnected",
+        pluginVersion: "0.1.0",
+        hostMeta: { hostname: "h", platform: "linux", arch: "x64" },
+      },
+    });
+    await prisma.livePendingDelivery.create({
+      data: {
+        connectionId: conn.id,
+        agentSlug: "a",
+        taskId: "t-off",
+        message: "m",
+        priority: "normal",
+        idempotencyKey: "task:t-off:agent:a",
+        expiresAt: new Date(Date.now() + 3600_000),
+        attempts: 1,
+        lastAttemptAt: new Date(Date.now() - 120_000),
+      },
+    });
+    const n = await redeliverStalePending(new Date(), () => false); // connection not live
+    expect(n).toBe(0);
   });
 });
