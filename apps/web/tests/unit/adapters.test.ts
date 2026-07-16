@@ -8,6 +8,8 @@ import {
   BUILTIN_ADAPTER_KEYS,
   substituteAdapterToken,
   resolveAdapterModels,
+  loadAdapterPlugins,
+  adapterFromPluginSpec,
   type Adapter,
   type AdapterInvocation,
 } from "@agentcenter/utils";
@@ -161,6 +163,39 @@ describe("adapter registry", () => {
       },
     };
     expect(await resolveAdapterModels(failing)).toEqual(["fallback"]);
+  });
+
+  it("loadAdapterPlugins registers declarative adapters wrapping a base adapter", () => {
+    const keys = loadAdapterPlugins([
+      {
+        key: "aider",
+        base: "process",
+        template: ["aider", "--message", "{prompt}"],
+        models: ["gpt-x"],
+      },
+      { key: "notify", base: "http", template: "https://hooks.example/{taskId}" },
+    ]);
+    expect(keys).toEqual(["aider", "notify"]);
+    expect(isAdapterKey("aider")).toBe(true);
+
+    const aider = buildAdapterInvocation("aider", { ...base, prompt: "do it" });
+    if (aider.mode !== "spawn") throw new Error("expected spawn");
+    expect(aider.argv).toEqual(["aider", "--message", "do it"]);
+    expect(getAdapter("aider")!.requiresTemplate).toBe(false); // template baked in
+    expect(getAdapter("aider")!.models).toEqual(["gpt-x"]);
+
+    const notify = buildAdapterInvocation("notify", base);
+    if (notify.mode !== "http") throw new Error("expected http");
+    expect(notify.url).toBe("https://hooks.example/t_1");
+  });
+
+  it("adapterFromPluginSpec rejects an unknown base or empty template", () => {
+    expect(() => adapterFromPluginSpec({ key: "x", base: "nope" as never, template: "y" })).toThrow(
+      /base/,
+    );
+    expect(() => adapterFromPluginSpec({ key: "x", base: "process", template: [] })).toThrow(
+      /template/,
+    );
   });
 
   it("substituteAdapterToken replaces all tokens", () => {

@@ -274,3 +274,45 @@ export function buildAdapterInvocation(key: string, ctx: AdapterContext): Adapte
   if (!adapter) throw new Error(`Unknown runtime adapter: ${key}`);
   return adapter.build(ctx);
 }
+
+// ─── Declarative adapter plugins ────────────────────────────────────────────
+// A named adapter defined purely by data (no code) — it wraps a generic base adapter (process/shell/
+// http) with a baked-in template. This is the safe, zero-code-exec analog of Paperclip's
+// adapter-plugins.json: e.g. { key:"aider", base:"process", template:["aider","--message","{prompt}"] }
+// registers an `aider` runtime the daemon can select, without shipping a JS module.
+
+export interface AdapterPluginSpec {
+  key: string;
+  displayName?: string;
+  /** Which generic adapter to wrap. */
+  base: "process" | "shell" | "http";
+  /** The baked argv/command/URL template (tokens substituted per task). */
+  template: string | string[];
+  models?: string[];
+  supportsModel?: boolean;
+}
+
+export function adapterFromPluginSpec(spec: AdapterPluginSpec): Adapter {
+  const baseAdapter = registry.get(spec.base);
+  if (!baseAdapter) throw new Error(`plugin ${spec.key}: unknown base adapter ${spec.base}`);
+  if (!spec.key || spec.template == null || (Array.isArray(spec.template) && !spec.template.length))
+    throw new Error(`plugin ${spec.key || "?"}: key + non-empty template are required`);
+  return {
+    key: spec.key,
+    displayName: spec.displayName ?? spec.key,
+    requiresTemplate: false, // the template is baked into the spec
+    supportsModel: spec.supportsModel ?? false,
+    models: spec.models ?? [],
+    build: (ctx) => baseAdapter.build({ ...ctx, template: spec.template }),
+  };
+}
+
+/** Register a batch of declarative plugin adapters. Returns the keys registered. */
+export function loadAdapterPlugins(specs: AdapterPluginSpec[]): string[] {
+  const keys: string[] = [];
+  for (const spec of specs) {
+    registerAdapter(adapterFromPluginSpec(spec));
+    keys.push(spec.key);
+  }
+  return keys;
+}

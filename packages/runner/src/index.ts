@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
-import { writeFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { homedir } from "node:os";
 import {
   resolveConfig,
   loadConfigFile,
@@ -10,7 +11,7 @@ import {
 } from "./config.js";
 import { HttpRunnerApi } from "./api-client.js";
 import { execShell, execPlan } from "./executor.js";
-import { listAdapters } from "@agentcenter/utils";
+import { listAdapters, loadAdapterPlugins } from "@agentcenter/utils";
 import type { AgentContextProject } from "@agentcenter/types";
 import {
   pollLoop,
@@ -106,6 +107,21 @@ function cmdLogin(flags: Record<string, string>): void {
   logger.info(`saved credentials to ${DEFAULT_CONFIG_PATH}`);
 }
 
+const ADAPTER_PLUGINS_PATH = join(homedir(), ".agentcenter", "adapter-plugins.json");
+
+/** Register declarative plugin adapters from ~/.agentcenter/adapter-plugins.json (if present). */
+function loadPluginAdapters(): void {
+  if (!existsSync(ADAPTER_PLUGINS_PATH)) return;
+  try {
+    const specs = JSON.parse(readFileSync(ADAPTER_PLUGINS_PATH, "utf8"));
+    if (!Array.isArray(specs)) return;
+    const keys = loadAdapterPlugins(specs);
+    if (keys.length) logger.info(`loaded ${keys.length} plugin adapter(s): ${keys.join(", ")}`);
+  } catch (err) {
+    logger.error(`failed to load adapter plugins: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 function cmdAdapters(): void {
   logger.info("available runtime adapters:");
   for (const a of listAdapters()) {
@@ -174,6 +190,7 @@ function usage(): void {
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
+  loadPluginAdapters(); // register any declarative plugin adapters before resolving the runtime
   const [command, ...rest] = argv;
   const flags = parseFlags(rest);
   switch (command) {
