@@ -9,6 +9,8 @@
 import { WebSocket } from "ws";
 import { randomBytes, createHash } from "node:crypto";
 import os from "node:os";
+import * as nodeFs from "node:fs";
+import { DeliveryDedup, shouldForceReconnect } from "./delivery-dedup";
 import type {
   PluginToMC,
   MCToPlugin,
@@ -38,7 +40,9 @@ export class MCBridgeWsClient {
   private fingerprint = "";
   private connectionId = "";
   private connectionToken = ""; // Updated after first mc.welcome (per-machine token, persisted in config)
-  private deliveredIds = new Set<string>(); // Dedup buffer (capped at PLUGIN_DEDUP_LIMIT)
+  private dedup: DeliveryDedup; // Dedup buffer (capped; optionally persisted across restarts)
+  private pongPending = false; // a ping was sent and its pong not yet received
+  private missedPongs = 0; // consecutive unanswered pings
   private onConnectCallbacks: Array<() => void> = [];
   /** Tracks which agents currently have a running runEmbeddedAgent session. */
   private activeSessions = new Set<string>();
@@ -48,7 +52,15 @@ export class MCBridgeWsClient {
   constructor(private config: MCBridgeConfig, private api: any) {
     this.reconnectMs = config.reconnectBaseMs ?? 2_000;
     this.connectionToken = config.token;
+    this.dedup = new DeliveryDedup(
+      LIVE_GATEWAY.PLUGIN_DEDUP_LIMIT,
+      config.dedupStatePath,
+      config.dedupStatePath ? nodeFs : undefined,
+    );
   }
+
+  /** Force-reconnect after this many consecutive unanswered pings (half-open socket detection). */
+  private static readonly MAX_MISSED_PONGS = 2;
 
   onConnect(cb: () => void): void {
     this.onConnectCallbacks.push(cb);
@@ -142,7 +154,9 @@ export class MCBridgeWsClient {
         break;
 
       case "mc.pong":
-        // Keepalive acknowledged — nothing to do
+        // Keepalive acknowledged — the socket is alive.
+        this.pongPending = false;
+        this.missedPongs = 0;
         break;
 
       case "mc.deliver_task":
@@ -168,15 +182,10 @@ export class MCBridgeWsClient {
   }
 
   private async handleDeliverTask(msg: MsgDeliverTask): Promise<void> {
-    // Dedup: if already delivered this deliveryId, just ack again
-    if (!this.deliveredIds.has(msg.deliveryId)) {
-      if (this.deliveredIds.size >= LIVE_GATEWAY.PLUGIN_DEDUP_LIMIT) {
-        // Evict oldest entry (Set preserves insertion order)
-        const oldest = this.deliveredIds.values().next().value;
-        if (oldest) this.deliveredIds.delete(oldest);
-      }
-      this.deliveredIds.add(msg.deliveryId);
-
+    // Dedup (FIFO-capped, persisted across restarts when configured): run the session only once per
+    // deliveryId. A re-delivery — even after a plugin restart — is acked again but not re-run.
+    if (!this.dedup.has(msg.deliveryId)) {
+      this.dedup.add(msg.deliveryId);
       this.runAgentSession(msg.agentSlug, msg.message, "task_delivery", msg.deliveryId);
     }
 
@@ -264,8 +273,23 @@ export class MCBridgeWsClient {
   }
 
   private startPing(): void {
+    this.pongPending = false;
+    this.missedPongs = 0;
     this.pingInterval = setInterval(() => {
+      // If the previous ping was never answered, the socket may be half-open (no FIN/RST). Count
+      // consecutive misses and force a reconnect before the server's slower activity eviction.
+      if (this.pongPending) {
+        this.missedPongs += 1;
+        if (shouldForceReconnect(this.missedPongs, MCBridgeWsClient.MAX_MISSED_PONGS)) {
+          console.warn(
+            `[agentcenter-bridge] No pong after ${this.missedPongs} pings — connection stale, reconnecting.`,
+          );
+          this.ws?.terminate(); // fires 'close' → handleClose → scheduleReconnect
+          return;
+        }
+      }
       this.send({ type: "vm.ping", timestamp: Date.now() });
+      this.pongPending = true;
     }, LIVE_GATEWAY.PLUGIN_PING_INTERVAL_MS);
   }
 
