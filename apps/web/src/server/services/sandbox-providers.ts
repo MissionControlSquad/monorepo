@@ -1,42 +1,37 @@
 /**
- * Tier D: sandbox provider abstraction — parity with Paperclip's sandbox-providers (e2b/daytona/
- * modal/novita/cloudflare/kubernetes/exe-dev). A sandbox provider provisions an ephemeral machine to
- * run a task on, exposes an exec, and tears it down.
+ * Tier D: sandbox provider registry — parity with Paperclip's sandbox-providers (e2b/daytona/modal/
+ * novita/cloudflare/kubernetes/exe-dev). A sandbox provider provisions an ephemeral machine to run a
+ * task on, exposes an `exec`, and tears it down.
  *
- * HONEST BOUNDARY: the `local` provider is real and runs with no keys (a temp dir + child_process) —
- * it's the reference implementation + what the tests exercise. The seven cloud providers are
- * registered as first-class options but their provision() throws a clear "not configured — needs API
- * key + SDK" until wired against the real SDK. They are NOT faked to look like they work.
+ * `local` is the reference provider — real, no keys (a temp dir + child_process), and what the tests
+ * exercise. The seven cloud providers port the CORE provision→exec→destroy calls from the real
+ * Paperclip plugins (see each file under ./sandbox). Their vendor SDKs are heavy + optional, so each
+ * loads its module at runtime and is typed against a locally-declared minimal interface — typecheck
+ * passes without installing them, and a missing credential OR a missing SDK throws a clear, actionable
+ * error. Nothing is faked to look like it works.
+ *
+ * Credentials are per-DEPLOYMENT env vars (the operator owns them + bills users), same model as
+ * HETZNER_API_TOKEN — NOT a per-workspace vault.
  */
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type {
+  SandboxExecResult,
+  SandboxHandle,
+  SandboxProvider,
+  SandboxSpec,
+} from "./sandbox/types";
+import { e2bProvider } from "./sandbox/e2b";
+import { daytonaProvider } from "./sandbox/daytona";
+import { modalProvider } from "./sandbox/modal";
+import { novitaProvider } from "./sandbox/novita";
+import { cloudflareProvider } from "./sandbox/cloudflare";
+import { kubernetesProvider } from "./sandbox/kubernetes";
+import { exeDevProvider } from "./sandbox/exe-dev";
 
-export interface SandboxSpec {
-  image?: string;
-  region?: string;
-}
-export interface SandboxExecResult {
-  exitCode: number | null;
-  stdout: string;
-  stderr: string;
-}
-export interface SandboxHandle {
-  id: string;
-  providerKey: string;
-  exec(command: string, opts?: { cwd?: string; timeoutMs?: number }): Promise<SandboxExecResult>;
-  destroy(): Promise<void>;
-}
-export interface SandboxProvider {
-  key: string;
-  displayName: string;
-  /** true → provision() needs a configured API key + SDK (not runnable in this environment). */
-  requiresApiKey: boolean;
-  /** Per-DEPLOYMENT env keys this provider reads (the operator owns these, like HETZNER_API_TOKEN). */
-  credentialEnvKeys: string[];
-  provision(spec?: SandboxSpec): Promise<SandboxHandle>;
-}
+export type { SandboxExecResult, SandboxHandle, SandboxProvider, SandboxSpec };
 
 /** Is this provider configured on THIS deployment? (all its credential env keys present + non-empty). */
 export function isSandboxProviderConfigured(
@@ -86,61 +81,23 @@ const localProvider: SandboxProvider = {
   },
 };
 
-// ─── cloud providers (registered; require API key + SDK to provision) ────────
-
-/**
- * A cloud provider whose credentials are per-DEPLOYMENT (env keys the operator sets — we own them
- * and bill users for usage). provision() distinguishes "not configured on this deployment" from
- * "configured, but its SDK integration is pending" — neither is faked as a working sandbox.
- */
-function cloudProvider(
-  key: string,
-  displayName: string,
-  credentialEnvKeys: string[],
-): SandboxProvider {
-  return {
-    key,
-    displayName,
-    requiresApiKey: true,
-    credentialEnvKeys,
-    provision: async () => {
-      if (
-        !isSandboxProviderConfigured({
-          key,
-          displayName,
-          requiresApiKey: true,
-          credentialEnvKeys,
-          provision: null as never,
-        })
-      )
-        throw new Error(
-          `${displayName} is not configured on this deployment — set ${credentialEnvKeys.join(", ")}.`,
-        );
-      // Credentials are present; the concrete SDK provisioning is wired per-provider (one by one).
-      throw new Error(
-        `${displayName} credentials are configured, but its provisioning SDK is not yet wired.`,
-      );
-    },
-  };
-}
+// ─── registry ────────────────────────────────────────────────────────────────
 
 const CLOUD_PROVIDERS: SandboxProvider[] = [
-  cloudProvider("e2b", "E2B", ["E2B_API_KEY"]),
-  cloudProvider("daytona", "Daytona", ["DAYTONA_API_KEY"]),
-  cloudProvider("modal", "Modal", ["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"]),
-  cloudProvider("novita", "Novita", ["NOVITA_API_KEY"]),
-  cloudProvider("cloudflare", "Cloudflare", ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]),
-  cloudProvider("kubernetes", "Kubernetes", ["KUBECONFIG"]),
-  cloudProvider("exe-dev", "exe.dev", ["EXE_DEV_API_KEY"]),
+  e2bProvider,
+  daytonaProvider,
+  modalProvider,
+  novitaProvider,
+  cloudflareProvider,
+  kubernetesProvider,
+  exeDevProvider,
 ];
-
-// ─── registry ────────────────────────────────────────────────────────────────
 
 const registry = new Map<string, SandboxProvider>(
   [localProvider, ...CLOUD_PROVIDERS].map((p) => [p.key, p]),
 );
 
-/** Register (or override) a sandbox provider — the seam for wiring a real cloud SDK. */
+/** Register (or override) a sandbox provider — the seam for wiring a custom cloud SDK. */
 export function registerSandboxProvider(provider: SandboxProvider): void {
   registry.set(provider.key, provider);
 }

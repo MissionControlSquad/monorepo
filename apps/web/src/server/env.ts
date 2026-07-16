@@ -38,13 +38,26 @@ const serverSchema = z.object({
   E2B_API_KEY: z.string().optional(),
   DAYTONA_API_KEY: z.string().optional(),
   DAYTONA_API_URL: z.string().optional(),
+  DAYTONA_SANDBOX_IMAGE: z.string().optional(),
   MODAL_TOKEN_ID: z.string().optional(),
   MODAL_TOKEN_SECRET: z.string().optional(),
+  MODAL_ENVIRONMENT: z.string().optional(),
   NOVITA_API_KEY: z.string().optional(),
+  // Cloudflare sandbox = a deployed bridge Worker (the @cloudflare/sandbox SDK only runs inside a
+  // Worker), addressed by URL + a static bearer token — NOT a raw Cloudflare account API token.
+  CLOUDFLARE_SANDBOX_BRIDGE_URL: z.string().optional(),
+  CLOUDFLARE_SANDBOX_BRIDGE_TOKEN: z.string().optional(),
   CLOUDFLARE_API_TOKEN: z.string().optional(),
   CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
   EXE_DEV_API_KEY: z.string().optional(),
+  EXE_DEV_API_URL: z.string().optional(),
+  // exe.dev exec runs over SSH (a credential separate from the API token) — key content + user.
+  EXE_DEV_SSH_KEY: z.string().optional(),
+  EXE_DEV_SSH_USER: z.string().optional(),
+  // KUBECONFIG holds the kubeconfig YAML content (or a path); optional namespace + image overrides.
   KUBECONFIG: z.string().optional(),
+  K8S_NAMESPACE: z.string().optional(),
+  K8S_SANDBOX_IMAGE: z.string().optional(),
   DEPLOYMENT_WEBHOOK_BASE_URL: z
     .union([z.string().url(), z.literal("")])
     .optional()
