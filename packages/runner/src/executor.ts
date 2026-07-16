@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import type { RenderedRuntime } from "@agentcenter/utils";
 
 export interface ExecResult {
   exitCode: number | null;
@@ -15,21 +16,25 @@ export interface ExecOptions {
 /** Run a shell command locally. Injected into the poll loop so tests can substitute a fake. */
 export type ExecFn = (command: string, opts?: ExecOptions) => Promise<ExecResult>;
 
-/**
- * Execute a command through the platform shell, capturing stdout/stderr and enforcing a timeout.
- * Nothing leaves the machine except the result the daemon chooses to post back.
- */
-export const execShell: ExecFn = (command, opts = {}) =>
-  new Promise<ExecResult>((resolve) => {
-    const isWin = process.platform === "win32";
-    const child = isWin
-      ? spawn("cmd", ["/c", command], { cwd: opts.cwd })
-      : spawn("sh", ["-c", command], { cwd: opts.cwd });
+/** Run a rendered runtime plan (argv). Injected into the task cycle so tests can substitute a fake. */
+export type ExecPlanFn = (
+  plan: RenderedRuntime,
+  opts?: { timeoutMs?: number },
+) => Promise<ExecResult>;
 
+const isWin = process.platform === "win32";
+
+/** Core spawn+capture. Enforces a timeout; nothing leaves the machine except the returned result. */
+function runChild(
+  file: string,
+  args: string[],
+  opts: { cwd?: string; timeoutMs?: number },
+): Promise<ExecResult> {
+  return new Promise<ExecResult>((resolve) => {
+    const child = spawn(file, args, { cwd: opts.cwd });
     let stdout = "";
     let stderr = "";
     let timedOut = false;
-
     const timer = opts.timeoutMs
       ? setTimeout(() => {
           timedOut = true;
@@ -48,3 +53,22 @@ export const execShell: ExecFn = (command, opts = {}) =>
       resolve({ exitCode: code, stdout, stderr, timedOut });
     });
   });
+}
+
+/** Execute a command through the platform shell (used for raw RunnerCommands). */
+export const execShell: ExecFn = (command, opts = {}) =>
+  isWin ? runChild("cmd", ["/c", command], opts) : runChild("sh", ["-c", command], opts);
+
+/**
+ * Execute a rendered runtime plan. `shell` plans run through the platform shell; every other runtime
+ * is spawned directly (argv[0] + args) with no shell, so arguments can't be re-interpreted.
+ */
+export const execPlan: ExecPlanFn = (plan, opts = {}) => {
+  const runOpts = { cwd: plan.cwd, timeoutMs: opts.timeoutMs };
+  if (plan.useShell) {
+    return isWin
+      ? runChild("cmd", ["/c", plan.argv[0]], runOpts)
+      : runChild("sh", ["-c", plan.argv[0]], runOpts);
+  }
+  return runChild(plan.argv[0], plan.argv.slice(1), runOpts);
+};

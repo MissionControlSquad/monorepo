@@ -23,6 +23,20 @@ export interface HeartbeatPreflight {
   [k: string]: unknown;
 }
 
+/** A queue item as returned by GET /api/queue?active=true. Items with a taskId are runnable tasks. */
+export interface QueueItemDTO {
+  id: string;
+  taskId: string | null;
+  title: string;
+  status: string;
+}
+
+export interface DeliverableInput {
+  title: string;
+  kind: "markdown" | "code" | "file" | "link";
+  content?: string;
+}
+
 /**
  * The control-plane surface the daemon talks to. All calls are OUTBOUND HTTP with an
  * `Authorization: Bearer <apiKey>` header — no inbound reachability, so it works behind any NAT.
@@ -33,6 +47,11 @@ export interface RunnerApi {
   getCommands(limit?: number): Promise<RunnerCommandDTO[]>;
   postCommandResult(id: string, result: CommandResultPayload): Promise<void>;
   getContext(taskId: string): Promise<AgentContextBundle>;
+  // Task execution path (agent tasks, not raw commands):
+  getQueue(): Promise<QueueItemDTO[]>;
+  postTaskMessage(taskId: string, content: string): Promise<void>;
+  setTaskStatus(taskId: string, status: string): Promise<void>;
+  postDeliverable(taskId: string, deliverable: DeliverableInput): Promise<void>;
 }
 
 export class HttpRunnerApi implements RunnerApi {
@@ -88,5 +107,31 @@ export class HttpRunnerApi implements RunnerApi {
     return this.request<AgentContextBundle>(
       `/api/agents/me/context?taskId=${encodeURIComponent(taskId)}`,
     );
+  }
+
+  async getQueue(): Promise<QueueItemDTO[]> {
+    const items = await this.request<QueueItemDTO[]>("/api/queue?active=true");
+    return Array.isArray(items) ? items : [];
+  }
+
+  async postTaskMessage(taskId: string, content: string): Promise<void> {
+    await this.request(`/api/tasks/${encodeURIComponent(taskId)}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async setTaskStatus(taskId: string, status: string): Promise<void> {
+    await this.request(`/api/tasks/${encodeURIComponent(taskId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async postDeliverable(taskId: string, deliverable: DeliverableInput): Promise<void> {
+    await this.request(`/api/tasks/${encodeURIComponent(taskId)}/deliverables`, {
+      method: "POST",
+      body: JSON.stringify(deliverable),
+    });
   }
 }

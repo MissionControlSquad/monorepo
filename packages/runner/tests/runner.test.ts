@@ -1,28 +1,48 @@
 import { describe, it, expect, vi } from "vitest";
-import type { AgentContextBundle } from "@agentcenter/types";
+import type { AgentContextBundle, AgentContextProject } from "@agentcenter/types";
 import type { RunnerApi, RunnerCommandDTO, CommandResultPayload } from "../src/api-client.js";
 import type { ExecFn, ExecResult } from "../src/executor.js";
-import { runCommandsOnce, writeBundleFiles, prepareTaskRun, pollLoop } from "../src/runner.js";
+import type { RenderedRuntime } from "@agentcenter/utils";
+import {
+  runCommandsOnce,
+  writeBundleFiles,
+  prepareTaskRun,
+  pollLoop,
+  runTaskOnce,
+  runQueuedTasksOnce,
+  type TaskRunDeps,
+} from "../src/runner.js";
 import { resolveConfig } from "../src/config.js";
 
-// A fake api that records posted results and hands back canned commands/context.
-function fakeApi(overrides: Partial<RunnerApi> = {}): {
-  api: RunnerApi;
+interface Recorder {
   posted: { id: string; result: CommandResultPayload }[];
-} {
-  const posted: { id: string; result: CommandResultPayload }[] = [];
+  messages: { taskId: string; content: string }[];
+  statuses: { taskId: string; status: string }[];
+}
+
+// A fake api that records posted results/messages/statuses and hands back canned commands/context.
+function fakeApi(overrides: Partial<RunnerApi> = {}): { api: RunnerApi } & Recorder {
+  const rec: Recorder = { posted: [], messages: [], statuses: [] };
   const api: RunnerApi = {
     heartbeatPreflight: async () => ({ shouldWork: true }),
     getCommands: async () => [],
     postCommandResult: async (id, result) => {
-      posted.push({ id, result });
+      rec.posted.push({ id, result });
     },
     getContext: async () => {
       throw new Error("not stubbed");
     },
+    getQueue: async () => [],
+    postTaskMessage: async (taskId, content) => {
+      rec.messages.push({ taskId, content });
+    },
+    setTaskStatus: async (taskId, status) => {
+      rec.statuses.push({ taskId, status });
+    },
+    postDeliverable: async () => {},
     ...overrides,
   };
-  return { api, posted };
+  return { api, ...rec };
 }
 
 const okExec = (result: Partial<ExecResult> = {}): ExecFn => {
@@ -138,6 +158,92 @@ describe("prepareTaskRun", () => {
     expect(plan.argv).toEqual(["openclaw", "run", "--task", "t1"]);
     expect(plan.cwd).toBe("/work/t1");
     expect(written.length).toBeGreaterThan(0);
+  });
+});
+
+const okExecPlan = (result: Partial<ExecResult> = {}) =>
+  vi.fn(async (_plan: RenderedRuntime) => ({
+    exitCode: 0,
+    stdout: "task output",
+    stderr: "",
+    timedOut: false,
+    ...result,
+  }));
+
+function taskDeps(execPlan: ReturnType<typeof okExecPlan>, over: Partial<TaskRunDeps> = {}): TaskRunDeps {
+  return {
+    runtime: "openclaw",
+    workDir: "/work",
+    writeFile: () => {},
+    execPlan,
+    ...over,
+  };
+}
+
+describe("runTaskOnce", () => {
+  it("fetches context, runs the plan, reports output, and sets review on success", async () => {
+    const { api, messages, statuses } = fakeApi({ getContext: async () => bundle });
+    const execPlan = okExecPlan();
+    const result = await runTaskOnce(api, "t1", taskDeps(execPlan));
+    expect(result.exitCode).toBe(0);
+    expect(execPlan).toHaveBeenCalledOnce();
+    expect(messages).toEqual([{ taskId: "t1", content: "task output" }]);
+    // in_progress before the run, review after
+    expect(statuses).toEqual([
+      { taskId: "t1", status: "in_progress" },
+      { taskId: "t1", status: "review" },
+    ]);
+  });
+
+  it("marks blocked on a non-zero exit and includes stderr in the message", async () => {
+    const { api, messages, statuses } = fakeApi({ getContext: async () => bundle });
+    await runTaskOnce(api, "t1", taskDeps(okExecPlan({ exitCode: 2, stderr: "boom" })));
+    expect(messages[0].content).toContain("boom");
+    expect(statuses.at(-1)).toEqual({ taskId: "t1", status: "blocked" });
+  });
+
+  it("clones the repo when the project has a repoUrl", async () => {
+    const { api } = fakeApi({ getContext: async () => bundle });
+    const cloneRepo = vi.fn(async (_p: AgentContextProject, _d: string) => {});
+    await runTaskOnce(api, "t1", taskDeps(okExecPlan(), { cloneRepo }));
+    expect(cloneRepo).toHaveBeenCalledOnce();
+    expect(cloneRepo.mock.calls[0][0]).toMatchObject({ repoUrl: "https://x/y.git" });
+  });
+});
+
+describe("runQueuedTasksOnce", () => {
+  it("runs only queue items that reference a task", async () => {
+    const { api, statuses } = fakeApi({
+      getContext: async () => bundle,
+      getQueue: async () => [
+        { id: "q1", taskId: "t1", title: "a", status: "pending" },
+        { id: "q2", taskId: null, title: "no task", status: "pending" },
+      ],
+    });
+    const n = await runQueuedTasksOnce(api, taskDeps(okExecPlan()));
+    expect(n).toBe(1);
+    expect(statuses.some((s) => s.taskId === "t1" && s.status === "review")).toBe(true);
+  });
+
+  it("reports a task that throws and keeps going", async () => {
+    let calls = 0;
+    const { api, statuses, messages } = fakeApi({
+      getContext: async () => {
+        calls++;
+        if (calls === 1) throw new Error("context fetch failed");
+        return bundle;
+      },
+      getQueue: async () => [
+        { id: "q1", taskId: "t1", title: "bad", status: "pending" },
+        { id: "q2", taskId: "t2", title: "good", status: "pending" },
+      ],
+    });
+    const n = await runQueuedTasksOnce(api, taskDeps(okExecPlan()));
+    expect(n).toBe(2);
+    // t1 failed → blocked with an error message; t2 still ran → review
+    expect(messages.some((m) => m.taskId === "t1" && m.content.includes("context fetch failed"))).toBe(true);
+    expect(statuses.some((s) => s.taskId === "t1" && s.status === "blocked")).toBe(true);
+    expect(statuses.some((s) => s.taskId === "t2" && s.status === "review")).toBe(true);
   });
 });
 

@@ -5,9 +5,9 @@ import {
   type RuntimeKind,
   type RenderedRuntime,
 } from "@agentcenter/utils";
-import type { AgentContextBundle } from "@agentcenter/types";
+import type { AgentContextBundle, AgentContextProject } from "@agentcenter/types";
 import type { RunnerApi } from "./api-client.js";
-import type { ExecFn } from "./executor.js";
+import type { ExecFn, ExecPlanFn, ExecResult } from "./executor.js";
 
 /** Sink for writing bundle files — real fs in prod, a recorder in tests. */
 export type WriteFileFn = (path: string, content: string) => void | Promise<void>;
@@ -126,11 +126,89 @@ export async function prepareTaskRun(
   return { bundle, written, plan };
 }
 
+/** Everything runTaskOnce needs to execute a task run, all injectable for tests. */
+export interface TaskRunDeps {
+  runtime: RuntimeKind;
+  workDir: string;
+  writeFile: WriteFileFn;
+  execPlan: ExecPlanFn;
+  template?: string[] | string;
+  /** Check out the project repo into the run dir. Real git in prod; omitted/no-op in tests. */
+  cloneRepo?: (project: AgentContextProject, dir: string) => Promise<void>;
+  timeoutMs?: number;
+}
+
+/**
+ * The stateless per-task run: fetch context → (clone repo) → materialise the bundle → spawn the
+ * runtime → report output as a task message + set status. Holds nothing after it returns. The git
+ * clone and the real runtime binary are the only machine-specific pieces (injected); the
+ * fetch→materialise→spawn→report orchestration is fully exercised with fakes.
+ */
+export async function runTaskOnce(
+  api: RunnerApi,
+  taskId: string,
+  deps: TaskRunDeps,
+  log: RunnerLogger = noopLogger,
+): Promise<ExecResult> {
+  const { bundle, plan } = await prepareTaskRun(
+    api,
+    taskId,
+    deps.runtime,
+    deps.workDir,
+    deps.writeFile,
+    deps.template,
+  );
+  if (deps.cloneRepo && bundle.project?.repoUrl) {
+    log.info(`cloning ${bundle.project.repoUrl} for task ${taskId}`);
+    await deps.cloneRepo(bundle.project, plan.cwd);
+  }
+
+  await api.setTaskStatus(taskId, "in_progress");
+  log.info(`running task ${taskId} via ${deps.runtime}`);
+  const result = await deps.execPlan(plan, { timeoutMs: deps.timeoutMs ?? 600_000 });
+
+  const output = [result.stdout, result.stderr ? `\n[stderr]\n${result.stderr}` : ""]
+    .join("")
+    .slice(-45_000);
+  await api.postTaskMessage(taskId, output || "(runner produced no output)");
+  const finalStatus = result.timedOut || result.exitCode !== 0 ? "blocked" : "review";
+  await api.setTaskStatus(taskId, finalStatus);
+  log.info(`task ${taskId} → ${finalStatus} (exit ${result.exitCode})`);
+  return result;
+}
+
+/**
+ * Pull this agent's active queue, run each item that references a task, and report. A failure on one
+ * task is reported (message + blocked) and does not stop the others. Returns the number attempted.
+ */
+export async function runQueuedTasksOnce(
+  api: RunnerApi,
+  deps: TaskRunDeps,
+  log: RunnerLogger = noopLogger,
+): Promise<number> {
+  const queue = await api.getQueue();
+  const tasks = queue.filter((q) => q.taskId);
+  for (const item of tasks) {
+    const taskId = item.taskId as string;
+    try {
+      await runTaskOnce(api, taskId, deps, log);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      log.error(`task ${taskId} failed: ${message}`);
+      await api.postTaskMessage(taskId, `Runner error: ${message}`).catch(() => {});
+      await api.setTaskStatus(taskId, "blocked").catch(() => {});
+    }
+  }
+  return tasks.length;
+}
+
 export interface PollLoopOptions {
   api: RunnerApi;
   exec: ExecFn;
   pollIntervalMs: number;
   log?: RunnerLogger;
+  /** When provided, each poll also pulls + runs the agent's queued TASKS (not just raw commands). */
+  taskDeps?: TaskRunDeps;
   /** Test hook: stop after N iterations. Undefined = run forever. */
   maxIterations?: number;
   /** Injectable sleep so tests don't wait real time. */
@@ -139,15 +217,16 @@ export interface PollLoopOptions {
 
 const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** Run the command poll on an interval until stopped. */
+/** Run the command poll (and, if configured, the task poll) on an interval until stopped. */
 export async function pollLoop(opts: PollLoopOptions): Promise<void> {
   const log = opts.log ?? noopLogger;
   const sleep = opts.sleep ?? realSleep;
   let i = 0;
   for (;;) {
     try {
-      const n = await runCommandsOnce(opts.api, opts.exec, log);
-      if (n === 0) log.info("no work");
+      const commands = await runCommandsOnce(opts.api, opts.exec, log);
+      const tasks = opts.taskDeps ? await runQueuedTasksOnce(opts.api, opts.taskDeps, log) : 0;
+      if (commands === 0 && tasks === 0) log.info("no work");
     } catch (err) {
       log.error(`poll error: ${err instanceof Error ? err.message : String(err)}`);
     }

@@ -1,4 +1,6 @@
 import { pathToFileURL } from "node:url";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import {
   resolveConfig,
   loadConfigFile,
@@ -7,8 +9,15 @@ import {
   type RunnerConfig,
 } from "./config.js";
 import { HttpRunnerApi } from "./api-client.js";
-import { execShell } from "./executor.js";
-import { pollLoop, runCommandsOnce, type RunnerLogger } from "./runner.js";
+import { execShell, execPlan } from "./executor.js";
+import type { AgentContextProject } from "@agentcenter/types";
+import {
+  pollLoop,
+  runCommandsOnce,
+  runTaskOnce,
+  type RunnerLogger,
+  type TaskRunDeps,
+} from "./runner.js";
 
 const logger: RunnerLogger = {
   info: (m) => console.log(`[runner] ${m}`),
@@ -37,6 +46,35 @@ function configFromFileAndEnv(overrides: Partial<RunnerConfig> = {}): RunnerConf
   return resolveConfig({ ...loadConfigFile(), ...overrides });
 }
 
+/** Write a bundle file to disk, creating parent dirs. */
+function realWriteFile(path: string, content: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, content);
+}
+
+/** Shallow-clone the project repo into the run dir (or pull if it already exists). */
+async function realCloneRepo(project: AgentContextProject, dir: string): Promise<void> {
+  if (!project.repoUrl) return;
+  const ref = project.repoRef ? `--branch '${project.repoRef}'` : "";
+  const res = await execShell(
+    `git clone --depth 1 ${ref} '${project.repoUrl}' '${dir}' 2>/dev/null || (cd '${dir}' && git pull)`,
+    { timeoutMs: 180_000 },
+  );
+  if (res.exitCode !== 0) throw new Error(`git clone/pull failed: ${res.stderr.slice(0, 300)}`);
+}
+
+/** Assemble the task-run dependencies (real fs, git, and process spawn) from config. */
+function buildTaskDeps(config: RunnerConfig): TaskRunDeps {
+  return {
+    runtime: config.runtime,
+    workDir: config.workDir,
+    writeFile: realWriteFile,
+    execPlan,
+    template: config.runtimeTemplate,
+    cloneRepo: realCloneRepo,
+  };
+}
+
 function cmdLogin(flags: Record<string, string>): void {
   const apiUrl = flags["api-url"] ?? process.env.AGENTCENTER_API_URL;
   const apiKey = flags["api-key"] ?? process.env.AGENTCENTER_API_KEY;
@@ -60,8 +98,19 @@ async function cmdStart(flags: Record<string, string>): Promise<void> {
     flags["poll-ms"] ? { pollIntervalMs: Number(flags["poll-ms"]) } : {},
   );
   const api = new HttpRunnerApi(config.apiUrl, config.apiKey);
-  logger.info(`polling ${config.apiUrl} every ${config.pollIntervalMs}ms (runtime: ${config.runtime})`);
-  await pollLoop({ api, exec: execShell, pollIntervalMs: config.pollIntervalMs, log: logger });
+  // --commands-only skips agent-task execution (raw RunnerCommands still run).
+  const taskDeps = flags["commands-only"] ? undefined : buildTaskDeps(config);
+  logger.info(
+    `polling ${config.apiUrl} every ${config.pollIntervalMs}ms (runtime: ${config.runtime}` +
+      `${taskDeps ? "" : ", commands only"})`,
+  );
+  await pollLoop({
+    api,
+    exec: execShell,
+    pollIntervalMs: config.pollIntervalMs,
+    taskDeps,
+    log: logger,
+  });
 }
 
 async function cmdRunOnce(): Promise<void> {
@@ -71,6 +120,18 @@ async function cmdRunOnce(): Promise<void> {
   logger.info(`processed ${n} command(s)`);
 }
 
+async function cmdRunTask(rest: string[]): Promise<void> {
+  const taskId = rest.find((a) => !a.startsWith("--"));
+  if (!taskId) {
+    logger.error("run-task requires a <taskId>");
+    process.exit(1);
+  }
+  const config = configFromFileAndEnv();
+  const api = new HttpRunnerApi(config.apiUrl, config.apiKey);
+  const result = await runTaskOnce(api, taskId, buildTaskDeps(config), logger);
+  logger.info(`task ${taskId} finished (exit ${result.exitCode})`);
+}
+
 function usage(): void {
   console.log(
     [
@@ -78,8 +139,9 @@ function usage(): void {
       "",
       "Usage:",
       "  agentcenter-runner login --api-url <url> --api-key <mc_key> [--runtime openclaw|codex|custom|shell]",
-      "  agentcenter-runner start [--poll-ms <ms>]",
-      "  agentcenter-runner run-once",
+      "  agentcenter-runner start [--poll-ms <ms>] [--commands-only]",
+      "  agentcenter-runner run-once            (process queued raw commands once)",
+      "  agentcenter-runner run-task <taskId>   (run one agent task end-to-end)",
       "",
       "Config: " + DEFAULT_CONFIG_PATH + " (or AGENTCENTER_API_URL / AGENTCENTER_API_KEY env)",
     ].join("\n"),
@@ -98,6 +160,9 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       break;
     case "run-once":
       await cmdRunOnce();
+      break;
+    case "run-task":
+      await cmdRunTask(rest);
       break;
     case undefined:
     case "help":
