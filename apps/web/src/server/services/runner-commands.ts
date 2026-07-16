@@ -58,6 +58,15 @@ function withCwd(command: string, cwd?: string | null): string {
   return `cd '${cwd.replace(/'/g, "'\\''")}' && ${command}`;
 }
 
+/** Cap persisted output so a runaway command can't write an unbounded DB row. */
+const MAX_OUTPUT_BYTES = 64_000;
+export function capOutput(s: string | null | undefined): string | null {
+  if (s == null) return null;
+  if (s.length <= MAX_OUTPUT_BYTES) return s;
+  const kept = s.slice(0, MAX_OUTPUT_BYTES);
+  return `${kept}\n…[truncated ${s.length - MAX_OUTPUT_BYTES} chars]`;
+}
+
 /** Resolve the SSHConfig for an SSH-reachable target (cloud_vm or host). */
 async function resolveTargetSshConfig(
   workspaceId: string,
@@ -107,8 +116,8 @@ export async function runQueuedCommand(workspaceId: string, id: string): Promise
       data: {
         status: "done",
         exitCode: result.code,
-        stdout: result.stdout,
-        stderr: result.stderr,
+        stdout: capOutput(result.stdout),
+        stderr: capOutput(result.stderr),
         finishedAt: new Date(),
       },
     });
@@ -257,9 +266,9 @@ export async function recordCommandResult(
     data: {
       status: finalStatus,
       exitCode: result.exitCode ?? null,
-      stdout: result.stdout ?? null,
-      stderr: result.stderr ?? null,
-      errorMessage: result.errorMessage ?? null,
+      stdout: capOutput(result.stdout),
+      stderr: capOutput(result.stderr),
+      errorMessage: capOutput(result.errorMessage),
       finishedAt: new Date(),
     },
   });

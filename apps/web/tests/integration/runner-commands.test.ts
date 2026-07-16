@@ -23,6 +23,7 @@ import {
   runQueuedCommand,
   runCommandOnVM,
   cancelRunnerCommand,
+  capOutput,
 } from "../../src/server/services/runner-commands";
 
 const mockedSshExec = vi.mocked(sshExec);
@@ -143,6 +144,24 @@ describe("runner-commands service (Tier D)", () => {
       command: "echo hi",
     });
     await expect(runQueuedCommand("ws_other", cmd.id)).rejects.toThrow(/not found/i);
+  });
+
+  it("capOutput truncates oversized output with a marker (pure)", () => {
+    expect(capOutput(null)).toBeNull();
+    expect(capOutput("short")).toBe("short");
+    const big = "x".repeat(70_000);
+    const capped = capOutput(big)!;
+    expect(capped.length).toBeLessThan(big.length);
+    expect(capped).toContain("truncated");
+  });
+
+  it("caps runaway stdout when persisting a result", async () => {
+    const vmId = await makeVM();
+    mockedSshExec.mockResolvedValue({ stdout: "y".repeat(200_000), stderr: "", code: 0 });
+    const cmd = await runCommandOnVM({ workspaceId: WS, vmId, command: "spew" });
+    expect(cmd.status).toBe("done");
+    expect(cmd.stdout!.length).toBeLessThan(70_000);
+    expect(cmd.stdout).toContain("truncated");
   });
 
   it("cancels a queued command", async () => {

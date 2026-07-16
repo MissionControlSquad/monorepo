@@ -131,6 +131,19 @@ describe("agent context endpoint (Tier D Slice 3)", () => {
     expect(body.subtasks[0]).toMatchObject({ title: "subtask" });
   });
 
+  it("returns empty arrays when the agent/task have nothing linked", async () => {
+    const { taskId } = await makeProjectTask();
+    const res = await getContext(taskId);
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.instructions).toEqual([]);
+    expect(body.skills).toEqual([]);
+    expect(body.deliverables).toEqual([]);
+    expect(body.documents).toEqual([]);
+    expect(body.subtasks).toEqual([]);
+    expect(body.task.title).toBe("Fix nav");
+  });
+
   it("requires taskId", async () => {
     const res = await getContext(null);
     expect(res.status).toBe(400);
