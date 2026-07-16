@@ -2,7 +2,11 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
-import { runCommandOnVM, cancelRunnerCommand } from "@/server/services/runner-commands";
+import {
+  runCommandOnVM,
+  cancelRunnerCommand,
+  createRunnerCommand,
+} from "@/server/services/runner-commands";
 
 // Tier D: runner command writes. RUNNERS-gated, admin manages (arbitrary shell execution).
 
@@ -22,6 +26,34 @@ builder.mutationField("runCommandOnVm", (t) =>
       const cmd = await runCommandOnVM({
         workspaceId: tenancy.workspaceId,
         vmId: args.vmId,
+        command: args.command,
+        cwd: args.cwd ?? null,
+        timeoutMs: args.timeoutMs ?? null,
+        requestedByProfileId: tenancy.userId,
+      });
+      return ctx.prisma.runnerCommand.findUniqueOrThrow({ ...query, where: { id: cmd.id } });
+    },
+  }),
+);
+
+// Queue a raw command for an agent's runner daemon to pull (outbound-only / NAT-safe targets).
+// The daemon claims it via GET /api/runner/commands and posts the result back.
+builder.mutationField("queueAgentCommand", (t) =>
+  t.prismaField({
+    type: "RunnerCommand",
+    args: {
+      agentId: t.arg.string({ required: true }),
+      command: t.arg.string({ required: true }),
+      cwd: t.arg.string(),
+      timeoutMs: t.arg.int(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.RUNNERS);
+      const tenancy = requireRole(ctx, "admin");
+      const cmd = await createRunnerCommand({
+        workspaceId: tenancy.workspaceId,
+        targetKind: "agent",
+        targetId: args.agentId,
         command: args.command,
         cwd: args.cwd ?? null,
         timeoutMs: args.timeoutMs ?? null,

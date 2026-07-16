@@ -152,3 +152,76 @@ export async function cancelRunnerCommand(workspaceId: string, id: string): Prom
   });
   return res.count > 0;
 }
+
+// ─── Agent-daemon pull path (outbound-only runners behind NAT, Slice 2) ─────
+
+/**
+ * Atomically claim this agent's queued commands and return the claimed rows. Each row's transition
+ * queued → running is guarded by an updateMany on status=queued, so two concurrent pollers can never
+ * both win the same command (only one updateMany reports count===1). Mirrors the task-checkout lease.
+ */
+export async function claimCommandsForAgent(
+  agentId: string,
+  workspaceId: string,
+  limit = 10,
+): Promise<RunnerCommand[]> {
+  const candidates = await prisma.runnerCommand.findMany({
+    where: { targetKind: "agent", targetId: agentId, workspaceId, status: "queued" },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+    take: Math.min(limit, 50),
+  });
+  const now = new Date();
+  const claimedIds: string[] = [];
+  for (const c of candidates) {
+    const res = await prisma.runnerCommand.updateMany({
+      where: { id: c.id, status: "queued" },
+      data: { status: "running", claimedAt: now, startedAt: now },
+    });
+    if (res.count === 1) claimedIds.push(c.id);
+  }
+  if (claimedIds.length === 0) return [];
+  return prisma.runnerCommand.findMany({
+    where: { id: { in: claimedIds } },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+export interface CommandResultInput {
+  exitCode?: number | null;
+  stdout?: string | null;
+  stderr?: string | null;
+  status?: "done" | "failed" | "timeout" | null;
+  errorMessage?: string | null;
+}
+
+/**
+ * Record a result posted by an agent daemon for a command it claimed. Scoped to the agent
+ * (targetKind=agent, targetId=agentId) and only accepts a row that is currently running.
+ */
+export async function recordCommandResult(
+  agentId: string,
+  workspaceId: string,
+  id: string,
+  result: CommandResultInput,
+): Promise<RunnerCommand> {
+  const cmd = await prisma.runnerCommand.findFirst({
+    where: { id, workspaceId, targetKind: "agent", targetId: agentId },
+  });
+  if (!cmd) notFound("Runner command not found");
+  if (cmd.status !== "running") badRequest(`Command is not running (status: ${cmd.status})`);
+
+  const finalStatus =
+    result.status ?? (result.errorMessage && result.exitCode == null ? "failed" : "done");
+  return prisma.runnerCommand.update({
+    where: { id: cmd.id },
+    data: {
+      status: finalStatus,
+      exitCode: result.exitCode ?? null,
+      stdout: result.stdout ?? null,
+      stderr: result.stderr ?? null,
+      errorMessage: result.errorMessage ?? null,
+      finishedAt: new Date(),
+    },
+  });
+}
