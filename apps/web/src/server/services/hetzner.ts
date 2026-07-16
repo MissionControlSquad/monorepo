@@ -1,10 +1,9 @@
 /**
- * @deprecated Hetzner API client for the operator-MANAGED cloud-VM path. This whole path is
- * deprecated — all infrastructure is now bring-your-own (BYO runner daemon / registered SSH host /
- * BYO sandbox providers). No new managed VMs are provisioned (provisioning routes are gated behind
- * the default-off CLOUD_VMS flag). Retained for reversibility; do not build new features on it.
- * NOTE: the OpenClaw *runtime* is NOT deprecated — it stays first-class via the live-gateway bridge
- * and the BYO runner + adapter registry, neither of which imports this file.
+ * Hetzner Cloud API client. BYO: every call takes a `token` — the CUSTOMER's Hetzner API token,
+ * resolved from their workspace secrets vault by the caller (hetzner-provision.ts). We provision on
+ * THEIR account; we never own the credential. The legacy operator-managed path (cloud-vm.ts) still
+ * calls these without a token during the transition and falls back to env.HETZNER_API_TOKEN — that
+ * fallback + cloud-vm.ts are removed once the managed subsystem is retired.
  */
 import { env } from "../env";
 
@@ -50,16 +49,21 @@ interface CreateServerConfig {
   labels?: Record<string, string>;
 }
 
-async function hetznerFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = env.HETZNER_API_TOKEN;
-  if (!token) {
-    throw new Error("HETZNER_API_TOKEN is not configured");
+async function hetznerFetch<T>(
+  path: string,
+  options: RequestInit = {},
+  token?: string,
+): Promise<T> {
+  // BYO token when provided; else the legacy operator env token (removed with the managed subsystem).
+  const authToken = token ?? env.HETZNER_API_TOKEN;
+  if (!authToken) {
+    throw new Error("Hetzner API token is not available");
   }
 
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${authToken}`,
       "Content-Type": "application/json",
       ...options.headers,
     },
@@ -73,7 +77,10 @@ async function hetznerFetch<T>(path: string, options: RequestInit = {}): Promise
   return res.json() as Promise<T>;
 }
 
-export async function createServer(config: CreateServerConfig): Promise<{
+export async function createServer(
+  config: CreateServerConfig,
+  token?: string,
+): Promise<{
   serverId: string;
   ipv4: string;
   status: string;
@@ -96,10 +103,11 @@ export async function createServer(config: CreateServerConfig): Promise<{
     body.firewalls = config.firewallIds.map((id) => ({ firewall: id }));
   }
 
-  const data = await hetznerFetch<HetznerServerResponse>("/servers", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  const data = await hetznerFetch<HetznerServerResponse>(
+    "/servers",
+    { method: "POST", body: JSON.stringify(body) },
+    token,
+  );
 
   return {
     serverId: String(data.server.id),
@@ -108,12 +116,15 @@ export async function createServer(config: CreateServerConfig): Promise<{
   };
 }
 
-export async function getServer(serverId: string): Promise<{
+export async function getServer(
+  serverId: string,
+  token?: string,
+): Promise<{
   status: string;
   ipv4: string;
   name: string;
 }> {
-  const data = await hetznerFetch<HetznerServerResponse>(`/servers/${serverId}`);
+  const data = await hetznerFetch<HetznerServerResponse>(`/servers/${serverId}`, {}, token);
   return {
     status: data.server.status,
     ipv4: data.server.public_net.ipv4.ip,
@@ -121,37 +132,46 @@ export async function getServer(serverId: string): Promise<{
   };
 }
 
-export async function powerOn(serverId: string): Promise<void> {
-  await hetznerFetch<HetznerActionResponse>(`/servers/${serverId}/actions/poweron`, {
-    method: "POST",
-  });
+export async function powerOn(serverId: string, token?: string): Promise<void> {
+  await hetznerFetch<HetznerActionResponse>(
+    `/servers/${serverId}/actions/poweron`,
+    { method: "POST" },
+    token,
+  );
 }
 
-export async function powerOff(serverId: string): Promise<void> {
-  await hetznerFetch<HetznerActionResponse>(`/servers/${serverId}/actions/poweroff`, {
-    method: "POST",
-  });
+export async function powerOff(serverId: string, token?: string): Promise<void> {
+  await hetznerFetch<HetznerActionResponse>(
+    `/servers/${serverId}/actions/poweroff`,
+    { method: "POST" },
+    token,
+  );
 }
 
-export async function deleteServer(serverId: string): Promise<void> {
-  await hetznerFetch<unknown>(`/servers/${serverId}`, {
-    method: "DELETE",
-  });
+export async function deleteServer(serverId: string, token?: string): Promise<void> {
+  await hetznerFetch<unknown>(`/servers/${serverId}`, { method: "DELETE" }, token);
 }
 
-export async function createSSHKey(params: {
-  name: string;
-  publicKey: string;
-  labels?: Record<string, string>;
-}): Promise<{ sshKeyId: string; fingerprint: string }> {
-  const data = await hetznerFetch<HetznerSSHKeyResponse>("/ssh_keys", {
-    method: "POST",
-    body: JSON.stringify({
-      name: params.name,
-      public_key: params.publicKey,
-      labels: params.labels || {},
-    }),
-  });
+export async function createSSHKey(
+  params: {
+    name: string;
+    publicKey: string;
+    labels?: Record<string, string>;
+  },
+  token?: string,
+): Promise<{ sshKeyId: string; fingerprint: string }> {
+  const data = await hetznerFetch<HetznerSSHKeyResponse>(
+    "/ssh_keys",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: params.name,
+        public_key: params.publicKey,
+        labels: params.labels || {},
+      }),
+    },
+    token,
+  );
 
   return {
     sshKeyId: String(data.ssh_key.id),
@@ -159,8 +179,6 @@ export async function createSSHKey(params: {
   };
 }
 
-export async function deleteSSHKey(sshKeyId: string): Promise<void> {
-  await hetznerFetch<unknown>(`/ssh_keys/${sshKeyId}`, {
-    method: "DELETE",
-  });
+export async function deleteSSHKey(sshKeyId: string, token?: string): Promise<void> {
+  await hetznerFetch<unknown>(`/ssh_keys/${sshKeyId}`, { method: "DELETE" }, token);
 }

@@ -4,6 +4,7 @@ import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
 import { createRunnerHost, deleteRunnerHost } from "@/server/services/runner-hosts";
 import { runCommandOnHost } from "@/server/services/runner-commands";
+import { provisionHetznerHost } from "@/server/services/hetzner-provision";
 
 // Tier D: BYO host management + direct command execution. RUNNERS-gated, admin (arbitrary SSH +
 // credential storage). The private key is write-only — accepted here, never returned.
@@ -27,6 +28,31 @@ builder.mutationField("createRunnerHost", (t) =>
         port: args.port ?? null,
         username: args.username ?? null,
         privateKey: args.privateKey,
+        createdByProfileId: tenancy.userId,
+      });
+      return ctx.prisma.runnerHost.findUniqueOrThrow({ ...query, where: { id: host.id } });
+    },
+  }),
+);
+
+// Provision a Hetzner VM on the workspace's OWN account (BYO — its HETZNER_API_TOKEN vault secret) and
+// register it as a RunnerHost. RUNNERS-gated, admin. Returns the new host (key never returned).
+builder.mutationField("provisionHetznerHost", (t) =>
+  t.prismaField({
+    type: "RunnerHost",
+    args: {
+      name: t.arg.string({ required: true }),
+      region: t.arg.string(),
+      serverType: t.arg.string(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.RUNNERS);
+      const tenancy = requireRole(ctx, "admin");
+      const host = await provisionHetznerHost({
+        workspaceId: tenancy.workspaceId,
+        name: args.name,
+        region: args.region ?? undefined,
+        serverType: args.serverType ?? undefined,
         createdByProfileId: tenancy.userId,
       });
       return ctx.prisma.runnerHost.findUniqueOrThrow({ ...query, where: { id: host.id } });
