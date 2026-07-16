@@ -229,9 +229,36 @@ export async function enqueuePendingDelivery(data: {
 export async function drainPendingDeliveries(connectionId: string) {
   const now = new Date();
   return prisma.livePendingDelivery.findMany({
-    where: { connectionId, delivered: false, expiresAt: { gt: now } },
+    where: { connectionId, delivered: false, deadLetteredAt: null, expiresAt: { gt: now } },
     orderBy: { createdAt: "asc" },
   });
+}
+
+/** Record that these deliveries were (re)pushed to the agent — bumps the attempt counter. */
+export async function markDeliveriesAttempted(deliveryIds: string[]): Promise<void> {
+  if (deliveryIds.length === 0) return;
+  await prisma.livePendingDelivery
+    .updateMany({
+      where: { id: { in: deliveryIds } },
+      data: { attempts: { increment: 1 }, lastAttemptAt: new Date() },
+    })
+    .catch(() => undefined);
+}
+
+/**
+ * Dead-letter deliveries that have been pushed `maxAttempts`+ times without an ack — they keep
+ * failing to reach the agent, so give up (stop re-draining) instead of retrying forever. Returns the
+ * number newly dead-lettered.
+ */
+export async function deadLetterExhaustedDeliveries(
+  maxAttempts = 5,
+  now: Date = new Date(),
+): Promise<number> {
+  const { count } = await prisma.livePendingDelivery.updateMany({
+    where: { delivered: false, deadLetteredAt: null, attempts: { gte: maxAttempts } },
+    data: { deadLetteredAt: now },
+  });
+  return count;
 }
 
 export async function markDeliveryReceived(deliveryId: string) {

@@ -77,6 +77,9 @@ model LivePendingDelivery {
   expiresAt      DateTime                            // 24h TTL
   delivered      Boolean              @default(false)
   deliveredAt    DateTime?
+  attempts       Int                  @default(0)    // # times pushed to the agent (re-drain on reconnect)
+  lastAttemptAt  DateTime?
+  deadLetteredAt DateTime?                           // given up after too many un-acked attempts
 
   connection     LiveGatewayConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 

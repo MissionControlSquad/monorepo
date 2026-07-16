@@ -14,6 +14,7 @@ import { reapStuckRunnerCommands } from "@/server/services/runner-commands";
 import { reapStaleTerminalSessions } from "@/server/services/terminals";
 import { sweepExpiredCheckouts } from "@/server/services/task-checkout";
 import { evaluateWatchdogs } from "@/server/services/task-watchdog";
+import { deadLetterExhaustedDeliveries } from "@agentcenter/database";
 
 export async function GET(request: Request) {
   try {
@@ -26,11 +27,13 @@ export async function GET(request: Request) {
     // blanket sweep below would otherwise clear those leases before the watchdog sees them, losing
     // the audit trail. The remaining reapers are independent + idempotent, so they run in parallel.
     const watchdogDecisions = await evaluateWatchdogs(now);
-    const [checkoutsReleased, commandsReaped, terminals] = await Promise.all([
-      sweepExpiredCheckouts(now),
-      reapStuckRunnerCommands(now),
-      reapStaleTerminalSessions(now),
-    ]);
+    const [checkoutsReleased, commandsReaped, terminals, deliveriesDeadLettered] =
+      await Promise.all([
+        sweepExpiredCheckouts(now),
+        reapStuckRunnerCommands(now),
+        reapStaleTerminalSessions(now),
+        deadLetterExhaustedDeliveries(5, now),
+      ]);
     return successResponse({
       ok: true,
       watchdogsFired: watchdogDecisions.length,
@@ -38,6 +41,7 @@ export async function GET(request: Request) {
       commandsReaped,
       terminalsClosed: terminals.closed,
       terminalsExpired: terminals.expired,
+      deliveriesDeadLettered,
       at: now.toISOString(),
     });
   } catch (err) {

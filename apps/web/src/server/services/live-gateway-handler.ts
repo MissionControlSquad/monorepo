@@ -25,6 +25,7 @@ import {
   syncAgentRoutes,
   clearAgentRoutes,
   drainPendingDeliveries,
+  markDeliveriesAttempted,
   markDeliveryReceived,
   findPendingDeliveryConnection,
   resolveAgentBySlugOrId,
@@ -505,6 +506,9 @@ async function drainAndDeliver(
       `Task delivered to agent @${task.agentSlug} (task: ${task.taskId})`,
     ).catch(() => undefined);
   }
+  // Count this push against each delivery's attempt budget; the reap cron dead-letters any that
+  // keep failing to ack so we stop re-draining them forever.
+  await markDeliveriesAttempted(pending.map((p) => p.id)).catch(() => undefined);
 }
 
 // ─── Connection entry point ───────────────────────────────────────────────────
