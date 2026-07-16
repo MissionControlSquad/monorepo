@@ -133,7 +133,9 @@ export async function prepareTaskRun(
     template,
     model: model ?? null,
   });
-  const written = await writeBundleFiles(bundle, plan.layout, runDir, writeFile);
+  // http (webhook) adapters run nothing locally → no bundle files to materialise.
+  const written =
+    plan.mode === "spawn" ? await writeBundleFiles(bundle, plan.layout, runDir, writeFile) : [];
   return { bundle, written, plan };
 }
 
@@ -173,7 +175,7 @@ export async function runTaskOnce(
     deps.template,
     deps.model,
   );
-  if (deps.cloneRepo && bundle.project?.repoUrl) {
+  if (plan.mode === "spawn" && deps.cloneRepo && bundle.project?.repoUrl) {
     log.info(`cloning ${bundle.project.repoUrl} for task ${taskId}`);
     await deps.cloneRepo(bundle.project, plan.cwd);
   }

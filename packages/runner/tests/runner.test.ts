@@ -173,9 +173,29 @@ describe("prepareTaskRun", () => {
       () => {},
     );
     expect(got.task.title).toBe("Fix nav");
+    if (plan.mode !== "spawn") throw new Error("expected a spawn plan");
     expect(plan.argv).toEqual(["openclaw", "run", "--task", "t1"]);
     expect(plan.cwd).toBe("/work/t1");
     expect(written.length).toBeGreaterThan(0);
+  });
+
+  it("http adapter produces an http plan and writes no bundle files", async () => {
+    const { api } = fakeApi({ getContext: async () => bundle });
+    const { plan, written } = await prepareTaskRun(
+      api,
+      "t1",
+      "http",
+      "/work",
+      () => {
+        throw new Error("should not write files for http mode");
+      },
+      "https://hooks.example/agent?task={taskId}",
+    );
+    if (plan.mode !== "http") throw new Error("expected an http plan");
+    expect(plan.url).toBe("https://hooks.example/agent?task=t1");
+    expect(plan.method).toBe("POST");
+    expect(JSON.parse(plan.body)).toMatchObject({ taskId: "t1" });
+    expect(written).toEqual([]);
   });
 });
 

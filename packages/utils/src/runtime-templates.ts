@@ -92,6 +92,8 @@ export function renderRuntimeCommand(
     prompt: input.prompt,
     template: input.template,
   });
+  // The four legacy kinds only ever map to spawn adapters (never the http adapter).
+  if (inv.mode !== "spawn") throw new Error(`renderRuntimeCommand: unexpected ${inv.mode} invocation`);
   return { argv: inv.argv, cwd: inv.cwd, useShell: inv.useShell, layout: inv.layout };
 }
 

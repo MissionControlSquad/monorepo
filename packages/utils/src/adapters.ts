@@ -28,13 +28,27 @@ export interface AdapterContext {
   template?: string | string[];
 }
 
-export interface AdapterInvocation {
+/** Spawn a local/remote process (the common case — openclaw/codex/claude/… /process/shell). */
+export interface SpawnInvocation {
+  mode: "spawn";
   /** argv[0] is the executable; the rest are args. Spawn WITHOUT a shell unless useShell. */
   argv: string[];
   cwd: string;
   useShell: boolean;
   layout: AdapterLayout;
 }
+
+/** Fire an HTTP request instead of spawning — a webhook / already-running agent endpoint. */
+export interface HttpInvocation {
+  mode: "http";
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body: string;
+  layout: AdapterLayout;
+}
+
+export type AdapterInvocation = SpawnInvocation | HttpInvocation;
 
 export interface Adapter {
   /** Stable key used in config / selection (e.g. "openclaw", "codex", "claude", "process"). */
@@ -86,6 +100,7 @@ const openclawAdapter: Adapter = {
   models: [],
   build: (ctx) => ({
     argv: ["openclaw", "run", "--task", ctx.taskId, ...(ctx.model ? ["--model", ctx.model] : [])],
+    mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
     layout: OPENCLAW_LAYOUT,
@@ -100,6 +115,7 @@ const codexAdapter: Adapter = {
   models: [],
   build: (ctx) => ({
     argv: ["codex", "exec", ...(ctx.model ? ["-m", ctx.model] : []), brief(ctx)],
+    mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
     layout: GENERIC_LAYOUT,
@@ -114,6 +130,7 @@ const claudeAdapter: Adapter = {
   models: [],
   build: (ctx) => ({
     argv: ["claude", "--print", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
     layout: GENERIC_LAYOUT,
@@ -128,6 +145,7 @@ const geminiAdapter: Adapter = {
   models: [],
   build: (ctx) => ({
     argv: ["gemini", ...(ctx.model ? ["-m", ctx.model] : []), "-p", brief(ctx)],
+    mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
     layout: GENERIC_LAYOUT,
@@ -146,7 +164,8 @@ const processAdapter: Adapter = {
       throw new Error("process adapter requires a non-empty argv template");
     return {
       argv: ctx.template.map((tok) => substituteAdapterToken(tok, ctx)),
-      cwd: ctx.workspaceDir,
+      mode: "spawn",
+    cwd: ctx.workspaceDir,
       useShell: false,
       layout: GENERIC_LAYOUT,
     };
@@ -165,8 +184,35 @@ const shellAdapter: Adapter = {
     if (!cmd) throw new Error("shell adapter requires a command template");
     return {
       argv: [substituteAdapterToken(cmd, ctx)],
-      cwd: ctx.workspaceDir,
+      mode: "spawn",
+    cwd: ctx.workspaceDir,
       useShell: true,
+      layout: GENERIC_LAYOUT,
+    };
+  },
+};
+
+/** Fire a webhook with the task payload — an already-running / serverless agent endpoint. */
+const httpAdapter: Adapter = {
+  key: "http",
+  displayName: "HTTP webhook",
+  requiresTemplate: true,
+  supportsModel: true,
+  models: [],
+  build: (ctx) => {
+    const url = typeof ctx.template === "string" ? ctx.template : ctx.template?.[0];
+    if (!url) throw new Error("http adapter requires a webhook URL template");
+    return {
+      mode: "http",
+      url: substituteAdapterToken(url, ctx),
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        taskId: ctx.taskId,
+        taskTitle: ctx.taskTitle ?? null,
+        prompt: ctx.prompt ?? null,
+        model: ctx.model ?? null,
+      }),
       layout: GENERIC_LAYOUT,
     };
   },
@@ -179,6 +225,7 @@ const BUILTIN_ADAPTERS: Adapter[] = [
   geminiAdapter,
   processAdapter,
   shellAdapter,
+  httpAdapter,
 ];
 
 // ─── Registry ───────────────────────────────────────────────────────────────
