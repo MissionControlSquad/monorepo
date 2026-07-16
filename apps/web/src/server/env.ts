@@ -34,6 +34,17 @@ const serverSchema = z.object({
   // ── Cloud Deployments (optional — only needed for Deploy to Cloud) ──
   HETZNER_API_TOKEN: z.string().optional(),
   HETZNER_SSH_KEY_ID: z.string().optional(),
+  // ── Sandbox providers (Tier D — per-deployment; the operator owns these + bills users) ──
+  E2B_API_KEY: z.string().optional(),
+  DAYTONA_API_KEY: z.string().optional(),
+  DAYTONA_API_URL: z.string().optional(),
+  MODAL_TOKEN_ID: z.string().optional(),
+  MODAL_TOKEN_SECRET: z.string().optional(),
+  NOVITA_API_KEY: z.string().optional(),
+  CLOUDFLARE_API_TOKEN: z.string().optional(),
+  CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
+  EXE_DEV_API_KEY: z.string().optional(),
+  KUBECONFIG: z.string().optional(),
   DEPLOYMENT_WEBHOOK_BASE_URL: z
     .union([z.string().url(), z.literal("")])
     .optional()

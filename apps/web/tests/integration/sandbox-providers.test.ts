@@ -6,6 +6,7 @@ import { invalidateFlagCache } from "../../src/server/feature-flags";
 import {
   getSandboxProvider,
   listSandboxProviders,
+  isSandboxProviderConfigured,
   SANDBOX_PROVIDER_KEYS,
 } from "../../src/server/services/sandbox-providers";
 
@@ -60,10 +61,26 @@ describe("sandbox providers (Tier D)", () => {
     await box.destroy();
   });
 
-  it("a cloud provider provision throws a clear not-configured error", async () => {
+  it("per-deployment config: a provider is configured only when its env keys are set", () => {
+    const e2b = getSandboxProvider("e2b")!;
+    expect(e2b.credentialEnvKeys).toEqual(["E2B_API_KEY"]);
+    expect(isSandboxProviderConfigured(e2b, {})).toBe(false);
+    expect(isSandboxProviderConfigured(e2b, { E2B_API_KEY: "sk_x" })).toBe(true);
+    // multi-key provider needs all keys
+    const modal = getSandboxProvider("modal")!;
+    expect(isSandboxProviderConfigured(modal, { MODAL_TOKEN_ID: "a" })).toBe(false);
+    expect(
+      isSandboxProviderConfigured(modal, { MODAL_TOKEN_ID: "a", MODAL_TOKEN_SECRET: "b" }),
+    ).toBe(true);
+    // local needs nothing
+    expect(isSandboxProviderConfigured(getSandboxProvider("local")!, {})).toBe(true);
+  });
+
+  it("a cloud provider provision throws a clear error (not-configured vs SDK-pending)", async () => {
     const e2b = getSandboxProvider("e2b")!;
     expect(e2b.requiresApiKey).toBe(true);
-    await expect(e2b.provision()).rejects.toThrow(/not configured|API key/i);
+    // Without the env key set → not configured on this deployment.
+    await expect(e2b.provision()).rejects.toThrow(/not configured|E2B_API_KEY|SDK/i);
   });
 
   it("sandboxProviders query lists them with availability; RUNNERS-gated", async () => {
@@ -73,12 +90,12 @@ describe("sandbox providers (Tier D)", () => {
       update: { enabled: true },
     });
     invalidateFlagCache();
-    const res = await gql(`query{ sandboxProviders{ key requiresApiKey available } }`);
+    const res = await gql(`query{ sandboxProviders{ key requiresApiKey configured available } }`);
     expect(res.errors).toBeFalsy();
     const local = res.data.sandboxProviders.find((p: { key: string }) => p.key === "local");
-    expect(local).toMatchObject({ available: true, requiresApiKey: false });
+    expect(local).toMatchObject({ available: true, configured: true, requiresApiKey: false });
     const e2b = res.data.sandboxProviders.find((p: { key: string }) => p.key === "e2b");
-    expect(e2b).toMatchObject({ available: false, requiresApiKey: true });
+    expect(e2b).toMatchObject({ available: false, requiresApiKey: true }); // configured depends on env
 
     // gated
     await prisma.featureFlag.upsert({
