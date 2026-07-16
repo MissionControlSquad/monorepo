@@ -23,7 +23,6 @@ import {
   markConnectionDisconnected,
   refreshConnectionToken,
   syncAgentRoutes,
-  clearAgentRoutes,
   drainPendingDeliveries,
   markDeliveriesAttempted,
   markDeliveryReceived,
@@ -626,7 +625,12 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
     if (connectionId) {
       connectionRegistry.remove(connectionId);
       await markConnectionDisconnected(connectionId).catch(() => undefined);
-      await clearAgentRoutes(connectionId).catch(() => undefined);
+      // Intentionally do NOT clear agent routes here. The connection record is stable per machine
+      // (machineFingerprint @unique) and syncAgentRoutes reconciles routes on every reconnect, so
+      // keeping them lets a task assigned during the brief disconnect window still be enqueued
+      // against this connection (findConnectionByAgentSlug resolves it) and drained on reconnect —
+      // instead of being lost from the live path. Liveness for an actual push is decided by the
+      // in-memory connection registry, not by route presence.
       logVMActivity(machineName, `Plugin disconnected (${machineName ?? "unknown host"})`).catch(
         () => undefined,
       );
