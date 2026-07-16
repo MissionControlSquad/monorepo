@@ -10,8 +10,9 @@
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { RunnerCommand } from "@agentcenter/database";
-import { sshExec } from "./ssh";
+import { sshExec, type SSHConfig } from "./ssh";
 import { getVMSSHConfig } from "./cloud-vm-utils";
+import { resolveHostSSHConfig } from "./runner-hosts";
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
@@ -57,22 +58,40 @@ function withCwd(command: string, cwd?: string | null): string {
   return `cd '${cwd.replace(/'/g, "'\\''")}' && ${command}`;
 }
 
+/** Resolve the SSHConfig for an SSH-reachable target (cloud_vm or host). */
+async function resolveTargetSshConfig(
+  workspaceId: string,
+  targetKind: string,
+  targetId: string,
+): Promise<SSHConfig> {
+  if (targetKind === "cloud_vm") {
+    const vm = await prisma.cloudVM.findFirst({
+      where: { id: targetId, workspaceId },
+      select: { id: true, ipv4: true, sshPrivateKey: true },
+    });
+    if (!vm) notFound("Target VM not found");
+    return getVMSSHConfig(vm);
+  }
+  if (targetKind === "host") {
+    return resolveHostSSHConfig(workspaceId, targetId);
+  }
+  return badRequest(
+    `Server-side execution only supports cloud_vm and host targets (got ${targetKind})`,
+  );
+}
+
 /**
- * Execute a queued command against an SSH-reachable target (cloud_vm only in Slice 1) and persist
- * the result on the row. Marks running → done/failed/timeout. Idempotent-ish: only runs if queued.
+ * Execute a queued command against an SSH-reachable target (cloud_vm or host) and persist the result
+ * on the row. Marks running → done/failed/timeout. Idempotent-ish: only runs if queued. The `agent`
+ * target kind is NOT server-executed — its runner daemon pulls it via the poll endpoints instead.
  */
 export async function runQueuedCommand(workspaceId: string, id: string): Promise<RunnerCommand> {
   const cmd = await prisma.runnerCommand.findFirst({ where: { id, workspaceId } });
   if (!cmd) notFound("Runner command not found");
   if (cmd.status !== "queued") badRequest(`Command is not queued (status: ${cmd.status})`);
-  if (cmd.targetKind !== "cloud_vm")
-    badRequest(`Server-side execution only supports cloud_vm targets (got ${cmd.targetKind})`);
 
-  const vm = await prisma.cloudVM.findFirst({
-    where: { id: cmd.targetId, workspaceId },
-    select: { id: true, ipv4: true, sshPrivateKey: true },
-  });
-  if (!vm) notFound("Target VM not found");
+  // Resolve credentials BEFORE flipping to running, so a bad target leaves the row queued.
+  const sshConfig = await resolveTargetSshConfig(workspaceId, cmd.targetKind, cmd.targetId);
 
   await prisma.runnerCommand.update({
     where: { id: cmd.id },
@@ -80,7 +99,6 @@ export async function runQueuedCommand(workspaceId: string, id: string): Promise
   });
 
   try {
-    const sshConfig = getVMSSHConfig(vm);
     const result = await sshExec(sshConfig, withCwd(cmd.command, cmd.cwd), {
       timeoutMs: cmd.timeoutMs,
     });
@@ -121,6 +139,27 @@ export async function runCommandOnVM(input: {
     workspaceId: input.workspaceId,
     targetKind: "cloud_vm",
     targetId: input.vmId,
+    command: input.command,
+    cwd: input.cwd,
+    timeoutMs: input.timeoutMs,
+    requestedByProfileId: input.requestedByProfileId,
+  });
+  return runQueuedCommand(input.workspaceId, created.id);
+}
+
+/** Create + immediately execute against a registered BYO host over direct SSH. */
+export async function runCommandOnHost(input: {
+  workspaceId: string;
+  hostId: string;
+  command: string;
+  cwd?: string | null;
+  timeoutMs?: number | null;
+  requestedByProfileId?: string | null;
+}): Promise<RunnerCommand> {
+  const created = await createRunnerCommand({
+    workspaceId: input.workspaceId,
+    targetKind: "host",
+    targetId: input.hostId,
     command: input.command,
     cwd: input.cwd,
     timeoutMs: input.timeoutMs,

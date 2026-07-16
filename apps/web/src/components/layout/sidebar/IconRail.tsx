@@ -41,6 +41,7 @@ import {
   Images,
   GanttChart,
   Gauge,
+  Cpu,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -79,6 +80,7 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   { href: "/timeline", icon: GanttChart, label: "Timeline" },
   { href: "/analytics", icon: BarChart3, label: "Analytics", flag: FLAG_KEYS.ANALYTICS },
   { href: "/cloud", icon: Cloud, label: "Cloud", flag: FLAG_KEYS.CLOUD_VMS },
+  { href: "/runners", icon: Cpu, label: "Runners", flag: FLAG_KEYS.RUNNERS },
   { href: "/live-gateway", icon: Zap, label: "Live Gateway", flag: FLAG_KEYS.LIVE_GATEWAY },
   { href: "/finance", icon: CreditCard, label: "Finance", flag: FLAG_KEYS.BUDGETS },
   { href: "/ledger", icon: Receipt, label: "Ledger", flag: FLAG_KEYS.LEDGER },
