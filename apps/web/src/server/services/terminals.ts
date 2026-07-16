@@ -11,6 +11,7 @@ import { prisma } from "@/server/prisma";
 import { hashApiKey } from "@/server/api-key";
 import { parseSshCommand, isUnsafeSessionWorkspaceCwd } from "@agentcenter/utils";
 import type { TerminalSession } from "@agentcenter/database";
+import { getHostSSHConfig } from "./runner-hosts";
 
 // The pure SSH parsing, unsafe-cwd guard, and lifecycle-state logic are shared in @agentcenter/utils
 // (web/desktop/mobile). This file mints the token + persists. Re-exported for existing importers.
@@ -123,21 +124,20 @@ export async function activateTerminalByConnectToken(
 }
 
 /**
- * Resolve SSH credentials for a session's target. v1 supports targets that are a managed CloudVM in
- * the same workspace (matched by IP) — we hold their key. Arbitrary BYO hosts need a user-supplied
- * key we do not store; those return null and the relay reports that no credentials are available.
+ * Resolve SSH credentials for a session's target. Targets a BYO RunnerHost in the same workspace,
+ * matched by host/IP — its private key is stored (encrypted) so the relay can connect. A host we do
+ * not have registered returns null and the relay reports that no credentials are available. (Provision
+ * a Hetzner host via `provisionHetznerHost` to get a RunnerHost the terminal can reach.)
  */
 export async function resolveTerminalSshConfig(
   session: Pick<SafeTerminalSession, "workspaceId" | "host" | "port" | "username">,
 ): Promise<import("./ssh").SSHConfig | null> {
   if (!session.host) return null;
-  const vm = await prisma.cloudVM.findFirst({
-    where: { workspaceId: session.workspaceId, ipv4: session.host },
-    select: { id: true, ipv4: true, sshPrivateKey: true },
+  const host = await prisma.runnerHost.findFirst({
+    where: { workspaceId: session.workspaceId, host: session.host },
   });
-  if (!vm) return null;
-  const { getVMSSHConfig } = await import("./cloud-vm-utils");
-  const config = getVMSSHConfig(vm);
+  if (!host) return null;
+  const config = getHostSSHConfig(host);
   return {
     ...config,
     port: session.port ?? config.port,
