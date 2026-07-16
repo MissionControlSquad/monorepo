@@ -1,3 +1,11 @@
+/**
+ * @deprecated Hetzner API client for the operator-MANAGED cloud-VM path. This whole path is
+ * deprecated — all infrastructure is now bring-your-own (BYO runner daemon / registered SSH host /
+ * BYO sandbox providers). No new managed VMs are provisioned (provisioning routes are gated behind
+ * the default-off CLOUD_VMS flag). Retained for reversibility; do not build new features on it.
+ * NOTE: the OpenClaw *runtime* is NOT deprecated — it stays first-class via the live-gateway bridge
+ * and the BYO runner + adapter registry, neither of which imports this file.
+ */
 import { env } from "../env";
 
 const BASE_URL = "https://api.hetzner.cloud/v1";

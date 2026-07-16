@@ -1,3 +1,10 @@
+/**
+ * @deprecated Orchestrator for operator-MANAGED Hetzner VMs (provisionVM installs OpenClaw + the
+ * bridge over SSH). The managed path is deprecated — all infra is BYO; provisioning entry points are
+ * gated behind the default-off CLOUD_VMS flag and retained only for reversibility. The OpenClaw
+ * runtime itself lives on via the live-gateway bridge + BYO runner/adapters (which do not import this).
+ * See docs/RUNNER-ARCHITECTURE.md.
+ */
 import {
   logCloudVMEvent,
   updateCloudVM as updateCloudVMRecord,

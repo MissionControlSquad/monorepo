@@ -3,6 +3,8 @@ export const FLAG_KEYS = {
   CHANNELS: "channels",
   ANALYTICS: "analytics",
   RECURRING_TASKS: "recurring_tasks",
+  /** @deprecated Operator-managed Hetzner VMs are deprecated — all infra is BYO. Default-off; gates
+   * the retained (reversible) managed-provisioning routes + UI. Do not build new features on it. */
   CLOUD_VMS: "cloud_vms",
   REVIEWS: "reviews",
   DOCUMENTS: "documents",

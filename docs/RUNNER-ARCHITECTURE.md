@@ -1,5 +1,20 @@
 # Tier D — Runtime-agnostic execution & connectivity (control-plane → runners)
 
+## Deprecation notice — all infrastructure is bring-your-own (2026-07-16)
+
+> **Operator-managed cloud VMs (Hetzner) are DEPRECATED.** The product is now pure BYO: infrastructure
+> is always the customer's — the BYO **runner daemon** (`@agentcenter/runner`, NAT-safe outbound), a
+> **registered SSH host** (`RunnerHost`), and **BYO sandbox providers** (e2b/daytona/modal/novita/
+> cloudflare/kubernetes/exe-dev), whose credentials come from the **workspace secrets vault**, not from
+> deployment env. We orchestrate; we never own the infra or the credentials.
+>
+> The managed-Hetzner path (`hetzner.ts`, `cloud-vm.ts`, `POST /api/cloud-vms`, `.../retry`, the
+> Deploy-to-Cloud UI) is retained **only for reversibility** and is gated behind the **default-off
+> `CLOUD_VMS`** flag — no new managed VMs are provisioned. The **OpenClaw runtime is NOT deprecated**:
+> it stays first-class via the live-gateway bridge and the BYO runner + adapter registry, none of which
+> import `hetzner.ts`. A future hard-removal (drop the models/routes/UI + a destructive migration) is a
+> separate, explicit step.
+
 ## Implementation status (as-built — 2026-07-16)
 
 > This section records what actually shipped. The design below is the original plan; a few items

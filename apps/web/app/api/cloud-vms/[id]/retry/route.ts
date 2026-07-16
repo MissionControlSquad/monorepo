@@ -8,12 +8,17 @@ import {
 } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { CloudVmStatus } from "@/server/constants";
+import { withFeature } from "../../../_lib/with-feature";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 /**
  * POST /api/cloud-vms/[id]/retry
  * Retry provisioning for a VM in error state.
+ *
+ * DEPRECATED: managed cloud VMs are deprecated (all infra is BYO). Gated behind the default-off
+ * CLOUD_VMS flag so no managed re-provisioning happens; retained for reversibility.
  */
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function retryHandler(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
 
@@ -41,3 +46,5 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return handleError(err);
   }
 }
+
+export const POST = withFeature(FLAG_KEYS.CLOUD_VMS, retryHandler);
