@@ -8,6 +8,19 @@ import { prisma } from "../client";
 import type { CloudVM } from "@prisma/client";
 import { CloudVmStatus } from "@agentcenter/utils";
 
+/**
+ * Atomically begin destroying a VM: transition to DESTROYING only if it is not already destroying or
+ * destroyed. Returns true if THIS caller won. Prevents two concurrent destroy calls from both
+ * tearing down live connections and deleting the same (billable) Hetzner server.
+ */
+export async function tryBeginCloudVMDestroy(id: string): Promise<boolean> {
+  const res = await prisma.cloudVM.updateMany({
+    where: { id, status: { notIn: [CloudVmStatus.DESTROYING, CloudVmStatus.DESTROYED] } },
+    data: { status: CloudVmStatus.DESTROYING },
+  });
+  return res.count > 0;
+}
+
 export async function updateCloudVM(id: string, data: Partial<CloudVM>) {
   return prisma.cloudVM.update({
     where: { id },
