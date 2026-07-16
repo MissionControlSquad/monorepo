@@ -36,12 +36,27 @@ the daemon's git-clone + real runtime spawn against a live control plane.
 
 ---
 
+> **Correction (2026-07-16, after auditing the actual Paperclip repo).** An earlier version of this
+> doc claimed "Paperclip is local: the agent runtime binds to the same machine as the user." That is
+> **wrong / oversimplified.** Paperclip is itself a *control plane* that "orchestrates agents, doesn't
+> run them," and it already has a **richer** remote-execution story than we have: pluggable
+> `local | ssh | sandbox` execution targets, ~7 cloud sandbox providers (e2b/daytona/modal/novita/
+> cloudflare/kubernetes/exe-dev), a `cursor_cloud` adapter, and outbound **gateways**
+> (`openclaw_gateway` over WebSocket ≈ our bridge; `hermes_gateway` over HTTP/SSE), plus 10+
+> per-runtime adapters and generic `process`/`http` adapters. Local child-process spawn is just its
+> zero-config *default* mode, not an invariant. So our design below is **not** "filling a gap Paperclip
+> left"; it is a smaller, independent execution layer with one capability Paperclip lacks — a
+> **NAT-safe outbound daemon that pulls tasks** (Paperclip only dials *out to* gateways). We are NOT at
+> parity: Paperclip's adapter breadth, sandbox-provider count, and memory-provider layer exceed ours.
+> The rest of this doc is the (still-valid) design of what we built; read the framing with that
+> correction in mind.
+
 ## Context
 
-Paperclip is **local**: the agent runtime binds to the same machine as the user, so it has
-direct shell/CLI/filesystem access. AgentCenter is a **hosted control plane ("site
-management")** — we never run untrusted agent code on our own servers and we are not on the
-user's machine. Execution must happen on a **runner** we orchestrate.
+AgentCenter is a **hosted control plane** — we never run untrusted agent code on our own servers and
+we are not on the user's machine. Execution must happen on a **runner** we orchestrate. (Paperclip is
+*also* a control plane with remote execution — see the correction above — so this is a shared model,
+not a differentiator.)
 
 The execution substrate already exists and is mature (~3,800 lines + 24 API routes, essentially
 stub-free), but it is **coupled to two assumptions**:

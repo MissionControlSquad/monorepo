@@ -1,10 +1,14 @@
 /**
  * GET /api/cron/reap-stale-work
  *
- * Self-healing backstop for "running AI work on remote machines". Runs frequently and marks work
- * abandoned by a dead/hung/disconnected worker so it can't sit stuck forever:
- *  - RunnerCommands stuck in `running` past their deadline → `timeout`.
- *  - Terminal sessions past their TTL (orphaned `active`, or never-connected `pending`) → closed/expired.
+ * Self-healing backstop for "running AI work on remote machines". Runs every 5 minutes and recovers
+ * work abandoned by a dead/hung/disconnected worker so it can't sit stuck forever:
+ *  - evaluateWatchdogs — auto-fire task watchdogs (lease_expired / no_heartbeat → release/pause).
+ *  - sweepExpiredCheckouts — release every task checkout whose lease expired.
+ *  - reapStuckRunnerCommands — `running` past their deadline → `timeout`.
+ *  - reapStaleTerminalSessions — orphaned `active` / never-connected `pending` → closed / expired.
+ *  - deadLetterExhaustedDeliveries — un-acked live deliveries past the attempt cap → dead-lettered.
+ *  - redeliverStalePending — re-push un-acked live deliveries to still-connected agents.
  *
  * Registered in vercel.json to run every 5 minutes.
  */

@@ -83,11 +83,21 @@ function cmdLogin(flags: Record<string, string>): void {
     process.exit(1);
   }
   const existing = loadConfigFile();
+  const runtime = (flags.runtime as RunnerConfig["runtime"]) || undefined;
+  // For `custom` the template is an argv (split on whitespace); for `shell` it's a command string.
+  const templateRaw = flags["runtime-template"];
+  const runtimeTemplate =
+    templateRaw === undefined
+      ? undefined
+      : runtime === "custom"
+        ? templateRaw.trim().split(/\s+/)
+        : templateRaw;
   const config: Partial<RunnerConfig> = {
     ...existing,
     apiUrl,
     apiKey,
-    ...(flags.runtime ? { runtime: flags.runtime as RunnerConfig["runtime"] } : {}),
+    ...(runtime ? { runtime } : {}),
+    ...(runtimeTemplate !== undefined ? { runtimeTemplate } : {}),
   };
   saveConfigFile(config);
   logger.info(`saved credentials to ${DEFAULT_CONFIG_PATH}`);
@@ -138,7 +148,8 @@ function usage(): void {
       "agentcenter-runner — stateless, outbound-only runner daemon",
       "",
       "Usage:",
-      "  agentcenter-runner login --api-url <url> --api-key <mc_key> [--runtime openclaw|codex|custom|shell]",
+      "  agentcenter-runner login --api-url <url> --api-key <mc_key> \\",
+      "     [--runtime openclaw|codex|custom|shell] [--runtime-template \"<cmd or argv>\"]",
       "  agentcenter-runner start [--poll-ms <ms>] [--commands-only]",
       "  agentcenter-runner run-once            (process queued raw commands once)",
       "  agentcenter-runner run-task <taskId>   (run one agent task end-to-end)",

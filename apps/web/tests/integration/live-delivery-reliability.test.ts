@@ -4,6 +4,7 @@ import {
   drainPendingDeliveries,
   markDeliveriesAttempted,
   deadLetterExhaustedDeliveries,
+  findStalePendingDeliveries,
 } from "@agentcenter/database";
 
 // Tier D robustness: attempt-count + dead-letter for un-acked live deliveries. Prevents a delivery
@@ -94,5 +95,30 @@ describe("live delivery reliability (Tier D)", () => {
     // The dead-lettered one no longer drains; the healthy one still does.
     const drained = await drainPendingDeliveries(connId);
     expect(drained.map((d) => d.taskId)).toEqual(["t2"]);
+  });
+
+  it("findStalePendingDeliveries selects only pushed-but-stale, under-cap, unexpired rows", async () => {
+    const now = new Date();
+    const old = new Date(now.getTime() - 120_000); // 2 min ago
+    const fresh = new Date(now.getTime() - 5_000); // 5 s ago
+    // stale, eligible
+    await makeDelivery("stale", { attempts: 1, lastAttemptAt: old });
+    // pushed recently → not stale
+    await makeDelivery("recent", { attempts: 1, lastAttemptAt: fresh });
+    // never pushed (attempts=0) → skipped (reconnect drain handles it)
+    await makeDelivery("never", { attempts: 0, lastAttemptAt: null });
+    // at the cap → excluded (dead-letter territory)
+    await makeDelivery("exhausted", { attempts: 5, lastAttemptAt: old });
+    // already delivered / dead-lettered / expired → excluded
+    await makeDelivery("done", { attempts: 1, lastAttemptAt: old, delivered: true });
+    await makeDelivery("dl", { attempts: 1, lastAttemptAt: old, deadLetteredAt: now });
+    await makeDelivery("expired", {
+      attempts: 1,
+      lastAttemptAt: old,
+      expiresAt: new Date(now.getTime() - 1000),
+    });
+
+    const stale = await findStalePendingDeliveries(60_000, 5, now);
+    expect(stale.map((d) => d.taskId)).toEqual(["stale"]);
   });
 });

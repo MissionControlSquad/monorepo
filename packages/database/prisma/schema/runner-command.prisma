@@ -19,7 +19,7 @@ enum RunnerCommandStatus {
 enum RunnerTargetKind {
   cloud_vm // a provisioned CloudVM — server SSHes in (Slice 1)
   agent // an Agent's runner daemon pulls it (Slice 2, NAT-safe)
-  host // a BYO server registered with SSH creds (future)
+  host // a BYO server registered with SSH creds (RunnerHost; server SSHes in directly)
 }
 
 model RunnerCommand {
