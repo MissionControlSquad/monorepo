@@ -46,6 +46,9 @@ builder.prismaObject("Agent", {
     adapterType: t.exposeString("adapterType", { nullable: true }),
     adapterConfig: t.expose("adapterConfig", { type: "JSON", nullable: true }),
     llmModel: t.exposeString("llmModel", { nullable: true }), // per-agent model override
+    runtimeAdapter: t.exposeString("runtimeAdapter", { nullable: true }), // Tier D per-agent runtime
+    runtimeModel: t.exposeString("runtimeModel", { nullable: true }),
+    runtimeTemplate: t.exposeString("runtimeTemplate", { nullable: true }),
 
     // Relations
     profile: t.relation("profile", { nullable: true }),

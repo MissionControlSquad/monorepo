@@ -25,6 +25,7 @@ beforeAll(() => {
   process.env.SYSTEM_SECRET = SECRET;
 });
 beforeEach(async () => {
+  await prisma.$executeRawUnsafe(`TRUNCATE TABLE agents CASCADE`);
   await prisma.featureFlag.deleteMany({ where: { key: "runners" } });
   invalidateFlagCache();
 });
@@ -47,6 +48,39 @@ describe("runtimeAdapters query (Tier D)", () => {
     );
     const shell = res.data.runtimeAdapters.find((a: { key: string }) => a.key === "shell");
     expect(shell.requiresTemplate).toBe(true);
+  });
+
+  it("setAgentRuntime sets + validates an agent's runtime (admin)", async () => {
+    await prisma.featureFlag.upsert({
+      where: { key: "runners" },
+      create: { key: "runners", enabled: true, managedBy: "user" },
+      update: { enabled: true },
+    });
+    invalidateFlagCache();
+    const agent = await prisma.agent.create({
+      data: { name: "RT", role: "worker", workspaceId: WS, setupStatus: "active" },
+    });
+
+    const set = await gql(
+      `mutation{ setAgentRuntime(agentId:"${agent.id}", adapter:"claude", model:"claude-opus-4-8"){ runtimeAdapter runtimeModel } }`,
+      "admin",
+    );
+    expect(set.data.setAgentRuntime).toMatchObject({
+      runtimeAdapter: "claude",
+      runtimeModel: "claude-opus-4-8",
+    });
+
+    const bad = await gql(
+      `mutation{ setAgentRuntime(agentId:"${agent.id}", adapter:"nope"){ id } }`,
+      "admin",
+    );
+    expect(bad.errors).toBeDefined();
+
+    const denied = await gql(
+      `mutation{ setAgentRuntime(agentId:"${agent.id}", adapter:"shell"){ id } }`,
+      "member",
+    );
+    expect(denied.errors).toBeDefined();
   });
 
   it("is RUNNERS-gated", async () => {

@@ -125,13 +125,17 @@ export async function prepareTaskRun(
 ): Promise<{ bundle: AgentContextBundle; written: string[]; plan: AdapterInvocation }> {
   const bundle = await api.getContext(taskId);
   const runDir = join(workDir, taskId);
-  const plan = buildAdapterInvocation(runtime, {
+  // Per-agent runtime from the control plane wins over the runner's own default.
+  const effRuntime = bundle.runtime?.adapter ?? runtime;
+  const effModel = bundle.runtime?.model ?? model ?? null;
+  const effTemplate = bundle.runtime?.template ?? template;
+  const plan = buildAdapterInvocation(effRuntime, {
     taskId,
     workspaceDir: runDir,
     taskTitle: bundle.task.title,
     prompt: taskMarkdown(bundle),
-    template,
-    model: model ?? null,
+    template: effTemplate,
+    model: effModel,
   });
   // http (webhook) adapters run nothing locally → no bundle files to materialise.
   const written =

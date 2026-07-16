@@ -45,4 +45,5 @@ import "./deliverable-votes";
 import "./monitors";
 import "./runner-commands";
 import "./runner-hosts";
+import "./agent-runtime";
 import "./attention";

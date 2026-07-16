@@ -34,6 +34,9 @@ interface AgentLike {
   role: string;
   personality: string | null;
   level: string | null;
+  runtimeAdapter?: string | null;
+  runtimeModel?: string | null;
+  runtimeTemplate?: string | null;
 }
 
 /** Assemble the context bundle for `taskId`, scoped to what `agent` may access. */
@@ -83,6 +86,13 @@ export async function assembleContextBundle(
       personality: agent.personality ?? null,
       level: agent.level ?? null,
     },
+    runtime: agent.runtimeAdapter
+      ? {
+          adapter: agent.runtimeAdapter,
+          model: agent.runtimeModel ?? null,
+          template: agent.runtimeTemplate ?? null,
+        }
+      : null,
     instructions: instructions.map((i) => ({ fileName: i.fileName, content: i.content })),
     skills: agentSkills.map((as) => ({
       key: as.skill.key,

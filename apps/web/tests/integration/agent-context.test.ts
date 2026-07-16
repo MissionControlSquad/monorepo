@@ -144,6 +144,24 @@ describe("agent context endpoint (Tier D Slice 3)", () => {
     expect(body.task.title).toBe("Fix nav");
   });
 
+  it("includes the agent's per-agent runtime when set; null otherwise", async () => {
+    const { taskId } = await makeProjectTask();
+    // default: no runtime configured
+    expect((await (await getContext(taskId)).json()).runtime).toBeNull();
+    // set a runtime on the agent
+    await prisma.agent.update({
+      where: { id: agentId },
+      data: { runtimeAdapter: "claude", runtimeModel: "claude-opus-4-8", runtimeTemplate: null },
+    });
+    agentCache.clear();
+    const body = await (await getContext(taskId)).json();
+    expect(body.runtime).toMatchObject({
+      adapter: "claude",
+      model: "claude-opus-4-8",
+      template: null,
+    });
+  });
+
   it("requires taskId", async () => {
     const res = await getContext(null);
     expect(res.status).toBe(400);

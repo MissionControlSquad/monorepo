@@ -177,12 +177,18 @@ const processAdapter: Adapter = {
   supportsModel: false,
   models: [],
   build: (ctx) => {
-    if (!Array.isArray(ctx.template) || ctx.template.length === 0)
-      throw new Error("process adapter requires a non-empty argv template");
+    // Accept an argv array or a whitespace-separated string (the per-agent DB field is a string).
+    const argv = Array.isArray(ctx.template)
+      ? ctx.template
+      : typeof ctx.template === "string" && ctx.template.trim()
+        ? ctx.template.trim().split(/\s+/)
+        : null;
+    if (!argv || argv.length === 0)
+      throw new Error("process adapter requires a non-empty argv/command template");
     return {
-      argv: ctx.template.map((tok) => substituteAdapterToken(tok, ctx)),
       mode: "spawn",
-    cwd: ctx.workspaceDir,
+      argv: argv.map((tok) => substituteAdapterToken(tok, ctx)),
+      cwd: ctx.workspaceDir,
       useShell: false,
       layout: GENERIC_LAYOUT,
     };

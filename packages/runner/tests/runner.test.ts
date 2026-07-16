@@ -67,6 +67,7 @@ const cmd = (over: Partial<RunnerCommandDTO> = {}): RunnerCommandDTO => ({
 const bundle: AgentContextBundle = {
   version: 1,
   agent: { id: "a1", name: "Nova", role: "worker", personality: "keen", level: "senior" },
+  runtime: null,
   instructions: [{ fileName: "AGENTS.md", content: "be good" }],
   skills: [{ key: "lint", name: "Lint", description: null, markdown: "# lint" }],
   task: {
@@ -177,6 +178,19 @@ describe("prepareTaskRun", () => {
     expect(plan.argv).toEqual(["openclaw", "run", "--task", "t1"]);
     expect(plan.cwd).toBe("/work/t1");
     expect(written.length).toBeGreaterThan(0);
+  });
+
+  it("per-agent runtime from the bundle overrides the runner's default", async () => {
+    const withRuntime = {
+      ...bundle,
+      runtime: { adapter: "shell", model: null, template: "echo hi {taskId}" },
+    };
+    const { api } = fakeApi({ getContext: async () => withRuntime });
+    // deps default is openclaw, but the bundle says shell → shell wins.
+    const { plan } = await prepareTaskRun(api, "t1", "openclaw", "/work", () => {});
+    if (plan.mode !== "spawn") throw new Error("expected spawn");
+    expect(plan.useShell).toBe(true);
+    expect(plan.argv).toEqual(["echo hi t1"]);
   });
 
   it("http adapter produces an http plan and writes no bundle files", async () => {
