@@ -1,5 +1,41 @@
 # Tier D — Runtime-agnostic execution & connectivity (control-plane → runners)
 
+## Implementation status (as-built — 2026-07-16)
+
+> This section records what actually shipped. The design below is the original plan; a few items
+> advanced past it during implementation (noted here). All work is on branch `feat/depth-plugins`,
+> additive, behind the `RUNNERS`/`TERMINALS` flags. The OpenClaw provisioning path is unchanged.
+
+**Shipped + tested (typecheck 12/12; ~62 web + 18 runner-package tests):**
+- **`RunnerCommand`** raw-shell job (model + migration) with server-side SSH execution on a cloud VM;
+  GraphQL + a Run-command panel on the VM page. *(Slice 1)*
+- **NAT-safe poll endpoints** — `GET /api/runner/commands` (atomic claim) + `POST /:id/result`;
+  `queueAgentCommand` dispatch. *(Slice 2)*
+- **Stateless context** — `GET /api/agents/me/context?taskId=` → `AgentContextBundle`
+  (`@agentcenter/types`); no persistent memory store. *(Slice 3)*
+- **`@agentcenter/runner`** standalone daemon — polls, runs **raw commands *and* agent tasks**
+  end-to-end (fetch context → git clone → materialise bundle → spawn runtime → post message + set
+  status), stays stateless. CLI `login`/`start`/`run-once`/`run-task`. *(Slice 4 + task-execution
+  completion — advanced past the plan, which scoped the daemon to prepare-only.)*
+- **Runtime templates** — openclaw/codex/custom/shell → argv + layout (`@agentcenter/utils`).
+  *(Slice 5)*
+- **Browser Cloud-Shell PTY** — `sshShell` + `/api/terminals/pty` relay + `TerminalConsole` UI.
+  *(Slice 6)*
+- **BYO hosts (`host` target)** — `RunnerHost` credential store (key encrypted, never returned) +
+  direct server-side SSH execution + `/runners` dashboard. *(Advanced past the plan, which listed
+  the `host` target as model-ready / execution-deferred.)*
+- **Runners dashboard** (`/runners`) — register BYO hosts + run commands, and queue commands an
+  agent daemon pulls (surfaces `queueAgentCommand`, which the plan left UI-less).
+
+**Still deferred (only remaining item):** generalizing VM **provisioning** to install non-OpenClaw
+runtimes (broaden `DeploymentProvider`, a runtime interface over `cloud-vm.ts`). Large and
+infra-only-verifiable — deliberately out of scope; see "Build order → 7" below.
+
+**Human-verify-on-real-infra (code-audited only):** real Hetzner SSH exec, the live PTY byte stream,
+the daemon's git-clone + real runtime spawn against a live control plane.
+
+---
+
 ## Context
 
 Paperclip is **local**: the agent runtime binds to the same machine as the user, so it has
