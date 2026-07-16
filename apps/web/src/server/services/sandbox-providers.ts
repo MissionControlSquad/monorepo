@@ -10,8 +10,9 @@
  * passes without installing them, and a missing credential OR a missing SDK throws a clear, actionable
  * error. Nothing is faked to look like it works.
  *
- * Credentials are per-DEPLOYMENT env vars (the operator owns them + bills users), same model as
- * HETZNER_API_TOKEN — NOT a per-workspace vault.
+ * Credentials are BYO: each cloud provider reads its keys from the caller's WORKSPACE secrets vault
+ * (resolved by name), never from deployment env — the customer owns the key + bills to their own
+ * provider account. Pure bring-your-own-infra; there is no operator-owned credential tier.
  */
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -21,6 +22,8 @@ import type {
   SandboxExecResult,
   SandboxHandle,
   SandboxProvider,
+  SandboxProvisionContext,
+  SandboxSecretResolver,
   SandboxSpec,
 } from "./sandbox/types";
 import { e2bProvider } from "./sandbox/e2b";
@@ -31,15 +34,29 @@ import { cloudflareProvider } from "./sandbox/cloudflare";
 import { kubernetesProvider } from "./sandbox/kubernetes";
 import { exeDevProvider } from "./sandbox/exe-dev";
 
-export type { SandboxExecResult, SandboxHandle, SandboxProvider, SandboxSpec };
+export type {
+  SandboxExecResult,
+  SandboxHandle,
+  SandboxProvider,
+  SandboxProvisionContext,
+  SandboxSecretResolver,
+  SandboxSpec,
+};
 
-/** Is this provider configured on THIS deployment? (all its credential env keys present + non-empty). */
-export function isSandboxProviderConfigured(
+/**
+ * Is this provider configured for a workspace? (all its credential secret names resolve to a non-empty
+ * value in that workspace's vault). `local` needs nothing. Async because it reads the vault.
+ */
+export async function isSandboxProviderConfigured(
   provider: SandboxProvider,
-  env: Record<string, string | undefined> = process.env,
-): boolean {
-  if (provider.credentialEnvKeys.length === 0) return true; // local — no keys needed
-  return provider.credentialEnvKeys.every((k) => !!env[k]?.trim());
+  resolveSecret: SandboxSecretResolver,
+): Promise<boolean> {
+  if (provider.credentialKeys.length === 0) return true; // local — no keys needed
+  for (const name of provider.credentialKeys) {
+    const value = (await resolveSecret(name))?.trim();
+    if (!value) return false;
+  }
+  return true;
 }
 
 // ─── local reference provider (real, no keys) ────────────────────────────────
@@ -67,7 +84,7 @@ const localProvider: SandboxProvider = {
   key: "local",
   displayName: "Local (this host)",
   requiresApiKey: false,
-  credentialEnvKeys: [],
+  credentialKeys: [],
   provision: async () => {
     const dir = mkdtempSync(join(tmpdir(), "agentcenter-sbx-"));
     return {

@@ -6,17 +6,18 @@ import {
   listSandboxProviders,
   isSandboxProviderConfigured,
 } from "@/server/services/sandbox-providers";
+import { resolveWorkspaceSecret } from "@/server/services/secrets";
 
-// Tier D: list sandbox providers (local runs with no keys; cloud ones require an API key + SDK).
-// RUNNERS-gated, member+.
+// Tier D: list sandbox providers (local runs with no keys; cloud ones are BYO — the workspace stores
+// its own credentials in the secrets vault). RUNNERS-gated, member+.
 const SandboxProviderType = builder.simpleObject("SandboxProvider", {
   fields: (t) => ({
     key: t.string(),
     displayName: t.string(),
     requiresApiKey: t.boolean(),
-    /** configured = this deployment has the provider's credentials (env keys) set. */
+    /** configured = this WORKSPACE has stored the provider's credentials (by secret name) in the vault. */
     configured: t.boolean(),
-    /** available = runnable now (local, or a configured cloud provider with its SDK wired). */
+    /** available = runnable now (local, or a workspace-configured cloud provider — its SDK still needed). */
     available: t.boolean(),
   }),
 });
@@ -26,19 +27,22 @@ builder.queryField("sandboxProviders", (t) =>
     type: [SandboxProviderType],
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      requireRole(ctx, "member");
-      return listSandboxProviders().map((p) => {
-        const configured = isSandboxProviderConfigured(p);
-        return {
-          key: p.key,
-          displayName: p.displayName,
-          requiresApiKey: p.requiresApiKey,
-          configured,
-          // local is always runnable; cloud providers need their SDK wired (pending), so not yet
-          // "available" even when configured — reflected honestly.
-          available: !p.requiresApiKey,
-        };
-      });
+      const tenancy = requireRole(ctx, "member");
+      const resolveSecret = (name: string) => resolveWorkspaceSecret(tenancy.workspaceId, name);
+      return Promise.all(
+        listSandboxProviders().map(async (p) => {
+          const configured = await isSandboxProviderConfigured(p, resolveSecret);
+          return {
+            key: p.key,
+            displayName: p.displayName,
+            requiresApiKey: p.requiresApiKey,
+            configured,
+            // Runnable now = local, or a cloud provider whose BYO creds are present (the vendor SDK
+            // must also be installed on the deployment to actually provision — reflected honestly).
+            available: !p.requiresApiKey || configured,
+          };
+        }),
+      );
     },
   }),
 );

@@ -3,17 +3,25 @@ import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
 import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { createSecret } from "../../src/server/services/secrets";
 import {
   getSandboxProvider,
   listSandboxProviders,
   isSandboxProviderConfigured,
   SANDBOX_PROVIDER_KEYS,
+  type SandboxSecretResolver,
 } from "../../src/server/services/sandbox-providers";
 
-// Tier D: sandbox provider abstraction. `local` is real (no keys); the 7 cloud providers are
-// registered but require an API key + SDK to provision (honest stubs, not faked).
+// Tier D: sandbox providers. `local` is real (no keys); the 7 cloud providers are BYO — credentials
+// come from the caller's WORKSPACE secrets vault (resolved by name), never from deployment env.
 const SECRET = "sbx-secret";
 const WS = "ws_sbx";
+
+/** An in-memory resolver standing in for the workspace vault. */
+const vault =
+  (secrets: Record<string, string>): SandboxSecretResolver =>
+  async (name) =>
+    secrets[name] ?? null;
 
 async function gql(query: string, role: "admin" | "member" = "member") {
   const token = await createJWT({ userId: "h", workspaceId: WS, userRole: role }, SECRET);
@@ -28,15 +36,28 @@ async function gql(query: string, role: "admin" | "member" = "member") {
   };
 }
 
+/** Delete all vault secrets for the test workspace (children first — no reliance on cascade). */
+async function clearVault() {
+  const ids = (
+    await prisma.secret.findMany({ where: { workspaceId: WS }, select: { id: true } })
+  ).map((s) => s.id);
+  if (ids.length) {
+    await prisma.secretVersion.deleteMany({ where: { secretId: { in: ids } } });
+    await prisma.secretAccessEvent.deleteMany({ where: { secretId: { in: ids } } });
+    await prisma.secret.deleteMany({ where: { id: { in: ids } } });
+  }
+}
+
 beforeAll(() => {
   process.env.SYSTEM_SECRET = SECRET;
 });
 beforeEach(async () => {
   await prisma.featureFlag.deleteMany({ where: { key: "runners" } });
   invalidateFlagCache();
+  await clearVault();
 });
 
-describe("sandbox providers (Tier D)", () => {
+describe("sandbox providers (Tier D — BYO)", () => {
   it("registers local + the 7 cloud providers", () => {
     expect(SANDBOX_PROVIDER_KEYS).toEqual([
       "local",
@@ -53,7 +74,7 @@ describe("sandbox providers (Tier D)", () => {
 
   it("the local provider really provisions, execs a command, and tears down", async () => {
     const provider = getSandboxProvider("local")!;
-    const box = await provider.provision();
+    const box = await provider.provision({ workspaceId: WS, resolveSecret: async () => null });
     const r = await box.exec("echo hello-from-sandbox && pwd");
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("hello-from-sandbox");
@@ -61,41 +82,58 @@ describe("sandbox providers (Tier D)", () => {
     await box.destroy();
   });
 
-  it("per-deployment config: a provider is configured only when its env keys are set", () => {
+  it("per-workspace config: a provider is configured only when the vault has its secrets", async () => {
     const e2b = getSandboxProvider("e2b")!;
-    expect(e2b.credentialEnvKeys).toEqual(["E2B_API_KEY"]);
-    expect(isSandboxProviderConfigured(e2b, {})).toBe(false);
-    expect(isSandboxProviderConfigured(e2b, { E2B_API_KEY: "sk_x" })).toBe(true);
-    // multi-key provider needs all keys
+    expect(e2b.credentialKeys).toEqual(["E2B_API_KEY"]);
+    expect(await isSandboxProviderConfigured(e2b, vault({}))).toBe(false);
+    expect(await isSandboxProviderConfigured(e2b, vault({ E2B_API_KEY: "sk_x" }))).toBe(true);
+    // multi-key provider needs all its secrets
     const modal = getSandboxProvider("modal")!;
-    expect(isSandboxProviderConfigured(modal, { MODAL_TOKEN_ID: "a" })).toBe(false);
+    expect(await isSandboxProviderConfigured(modal, vault({ MODAL_TOKEN_ID: "a" }))).toBe(false);
     expect(
-      isSandboxProviderConfigured(modal, { MODAL_TOKEN_ID: "a", MODAL_TOKEN_SECRET: "b" }),
+      await isSandboxProviderConfigured(
+        modal,
+        vault({ MODAL_TOKEN_ID: "a", MODAL_TOKEN_SECRET: "b" }),
+      ),
     ).toBe(true);
     // local needs nothing
-    expect(isSandboxProviderConfigured(getSandboxProvider("local")!, {})).toBe(true);
+    expect(await isSandboxProviderConfigured(getSandboxProvider("local")!, vault({}))).toBe(true);
   });
 
-  it("a cloud provider provision throws a clear error (not-configured vs SDK-pending)", async () => {
+  it("a cloud provision throws a clear not-configured error when the workspace vault lacks the key", async () => {
     const e2b = getSandboxProvider("e2b")!;
     expect(e2b.requiresApiKey).toBe(true);
-    // Without the env key set → not configured on this deployment.
-    await expect(e2b.provision()).rejects.toThrow(/not configured|E2B_API_KEY|SDK/i);
+    await expect(
+      e2b.provision({ workspaceId: WS, resolveSecret: async () => null }),
+    ).rejects.toThrow(/not configured|E2B_API_KEY|vault/i);
   });
 
-  it("sandboxProviders query lists them with availability; RUNNERS-gated", async () => {
+  it("sandboxProviders query reflects the workspace vault; RUNNERS-gated", async () => {
     await prisma.featureFlag.upsert({
       where: { key: "runners" },
       create: { key: "runners", enabled: true, managedBy: "user" },
       update: { enabled: true },
     });
     invalidateFlagCache();
-    const res = await gql(`query{ sandboxProviders{ key requiresApiKey configured available } }`);
+
+    // No secrets yet → cloud providers are not configured; local is always available.
+    let res = await gql(`query{ sandboxProviders{ key requiresApiKey configured available } }`);
     expect(res.errors).toBeFalsy();
     const local = res.data.sandboxProviders.find((p: { key: string }) => p.key === "local");
     expect(local).toMatchObject({ available: true, configured: true, requiresApiKey: false });
-    const e2b = res.data.sandboxProviders.find((p: { key: string }) => p.key === "e2b");
-    expect(e2b).toMatchObject({ available: false, requiresApiKey: true }); // configured depends on env
+    let e2b = res.data.sandboxProviders.find((p: { key: string }) => p.key === "e2b");
+    expect(e2b).toMatchObject({ available: false, configured: false, requiresApiKey: true });
+
+    // Store the workspace's own E2B key in the vault → BYO resolution flips it to configured.
+    await createSecret({
+      workspaceId: WS,
+      name: "E2B_API_KEY",
+      value: "sk_workspace",
+      createdBy: "h",
+    });
+    res = await gql(`query{ sandboxProviders{ key configured available } }`);
+    e2b = res.data.sandboxProviders.find((p: { key: string }) => p.key === "e2b");
+    expect(e2b).toMatchObject({ configured: true, available: true });
 
     // gated
     await prisma.featureFlag.upsert({

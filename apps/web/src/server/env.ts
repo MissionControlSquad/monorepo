@@ -32,32 +32,15 @@ const serverSchema = z.object({
   CRON_SECRET: z.string().min(1, "CRON_SECRET is required"),
 
   // ── Cloud Deployments (optional — only needed for Deploy to Cloud) ──
+  // ── Managed Hetzner (DEPRECATED — all infra is BYO; retained for reversibility, gated off by the
+  //    default-off CLOUD_VMS flag). No new managed VMs are provisioned. ──
   HETZNER_API_TOKEN: z.string().optional(),
   HETZNER_SSH_KEY_ID: z.string().optional(),
-  // ── Sandbox providers (Tier D — per-deployment; the operator owns these + bills users) ──
-  E2B_API_KEY: z.string().optional(),
-  DAYTONA_API_KEY: z.string().optional(),
-  DAYTONA_API_URL: z.string().optional(),
-  DAYTONA_SANDBOX_IMAGE: z.string().optional(),
-  MODAL_TOKEN_ID: z.string().optional(),
-  MODAL_TOKEN_SECRET: z.string().optional(),
-  MODAL_ENVIRONMENT: z.string().optional(),
-  NOVITA_API_KEY: z.string().optional(),
-  // Cloudflare sandbox = a deployed bridge Worker (the @cloudflare/sandbox SDK only runs inside a
-  // Worker), addressed by URL + a static bearer token — NOT a raw Cloudflare account API token.
-  CLOUDFLARE_SANDBOX_BRIDGE_URL: z.string().optional(),
-  CLOUDFLARE_SANDBOX_BRIDGE_TOKEN: z.string().optional(),
-  CLOUDFLARE_API_TOKEN: z.string().optional(),
-  CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
-  EXE_DEV_API_KEY: z.string().optional(),
-  EXE_DEV_API_URL: z.string().optional(),
-  // exe.dev exec runs over SSH (a credential separate from the API token) — key content + user.
-  EXE_DEV_SSH_KEY: z.string().optional(),
-  EXE_DEV_SSH_USER: z.string().optional(),
-  // KUBECONFIG holds the kubeconfig YAML content (or a path); optional namespace + image overrides.
-  KUBECONFIG: z.string().optional(),
-  K8S_NAMESPACE: z.string().optional(),
-  K8S_SANDBOX_IMAGE: z.string().optional(),
+  // ── Sandbox providers (Tier D) ──
+  // BYO: every cloud sandbox provider reads its credentials from the WORKSPACE secrets vault (by
+  // secret name — e.g. E2B_API_KEY, MODAL_TOKEN_ID/SECRET, CLOUDFLARE_SANDBOX_BRIDGE_URL/TOKEN,
+  // KUBECONFIG, EXE_DEV_API_KEY), NOT from deployment env. So there are intentionally no sandbox
+  // provider env vars here.
   DEPLOYMENT_WEBHOOK_BASE_URL: z
     .union([z.string().url(), z.literal("")])
     .optional()

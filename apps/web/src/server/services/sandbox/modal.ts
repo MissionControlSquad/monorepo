@@ -51,17 +51,18 @@ interface ModalModule {
 export const modalProvider = defineCloudProvider({
   key: "modal",
   displayName: "Modal",
-  credentialEnvKeys: ["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"],
-  provision: async (spec, env): Promise<SandboxHandle> => {
+  credentialKeys: ["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"],
+  provision: async (creds, ctx, spec): Promise<SandboxHandle> => {
     const { ModalClient } = await loadOptionalModule<ModalModule>("modal", "Modal");
+    const environment = (await ctx.resolveSecret("MODAL_ENVIRONMENT")) || undefined;
     const client = new ModalClient({
-      tokenId: env.MODAL_TOKEN_ID!,
-      tokenSecret: env.MODAL_TOKEN_SECRET!,
-      environment: env.MODAL_ENVIRONMENT || undefined,
+      tokenId: creds.MODAL_TOKEN_ID,
+      tokenSecret: creds.MODAL_TOKEN_SECRET,
+      environment,
     });
     const app = await client.apps.fromName("agentcenter", {
       createIfMissing: true,
-      environment: env.MODAL_ENVIRONMENT || undefined,
+      environment,
     });
     const image = client.images.fromRegistry(spec?.image ?? "python:3.13");
     const sandbox = await client.sandboxes.create(app, image, {

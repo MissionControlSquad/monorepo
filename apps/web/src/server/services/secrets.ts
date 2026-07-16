@@ -303,6 +303,25 @@ export async function getDecrypted(
   return { value: decryptSecret(row.ciphertext), version: v };
 }
 
+/**
+ * Resolve a workspace secret's plaintext by NAME (SERVER-ONLY). Used to inject BYO cloud-provider
+ * credentials (e.g. a workspace's own E2B_API_KEY) into a sandbox provision at run time. Returns null
+ * when the workspace has no active secret with that name. Does NOT go through the audited human-reveal
+ * path — it's the internal inject path, same trust level as resolveEnvForAgent.
+ */
+export async function resolveWorkspaceSecret(
+  workspaceId: string,
+  name: string,
+): Promise<string | null> {
+  const secret = await prisma.secret.findFirst({
+    where: { workspaceId, name, status: "active" },
+    select: { id: true },
+  });
+  if (!secret) return null;
+  const decrypted = await getDecrypted(workspaceId, secret.id);
+  return decrypted?.value ?? null;
+}
+
 export async function bindSecret(args: {
   workspaceId: string;
   secretId: string;

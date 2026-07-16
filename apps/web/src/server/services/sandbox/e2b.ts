@@ -38,11 +38,11 @@ interface E2bModule {
 export const e2bProvider = defineCloudProvider({
   key: "e2b",
   displayName: "E2B",
-  credentialEnvKeys: ["E2B_API_KEY"],
-  provision: async (spec, env): Promise<SandboxHandle> => {
+  credentialKeys: ["E2B_API_KEY"],
+  provision: async (creds, _ctx, spec): Promise<SandboxHandle> => {
     const { Sandbox } = await loadOptionalModule<E2bModule>("e2b", "E2B");
     const sandbox = await Sandbox.create(spec?.image ?? "base", {
-      apiKey: env.E2B_API_KEY!,
+      apiKey: creds.E2B_API_KEY,
       timeoutMs: DEFAULT_SANDBOX_LIFETIME_MS,
       metadata: { agentcenterProvider: "e2b" },
     });

@@ -14,6 +14,11 @@
  *   • typecheck passes without installing any of them,
  *   • a provider only needs its SDK present on deployments that actually enable it,
  *   • an un-installed SDK or a missing credential fails with a clear, actionable error — never faked.
+ *
+ * CREDENTIALS ARE BYO (bring-your-own): every cloud provider reads its API keys from the caller's
+ * WORKSPACE secrets vault (resolved by name), NOT from deployment env vars. The customer stores their
+ * own e2b/daytona/… key in their workspace; usage bills to THEIR provider account; we only orchestrate.
+ * This is the pure bring-your-own-infra model — there is no operator-owned credential tier.
  */
 
 export interface SandboxSpec {
@@ -36,14 +41,23 @@ export interface SandboxHandle {
   destroy(): Promise<void>;
 }
 
+/** Resolve a per-workspace vault secret by name (BYO credentials). Returns null/undefined if absent. */
+export type SandboxSecretResolver = (name: string) => Promise<string | null | undefined>;
+
+/** Context handed to provision(): the caller's workspace + a resolver over its secrets vault. */
+export interface SandboxProvisionContext {
+  workspaceId: string;
+  resolveSecret: SandboxSecretResolver;
+}
+
 export interface SandboxProvider {
   key: string;
   displayName: string;
   /** true → provision() needs a configured credential (not runnable without it). */
   requiresApiKey: boolean;
-  /** Per-DEPLOYMENT env keys this provider reads (the operator owns these, like HETZNER_API_TOKEN). */
-  credentialEnvKeys: string[];
-  provision(spec?: SandboxSpec): Promise<SandboxHandle>;
+  /** Vault secret NAMES the WORKSPACE must provide (BYO). Empty for `local`. */
+  credentialKeys: string[];
+  provision(ctx: SandboxProvisionContext, spec?: SandboxSpec): Promise<SandboxHandle>;
 }
 
 /** Default absolute sandbox lifetime (ms) — matches Paperclip's e2b/modal default. */
@@ -87,30 +101,41 @@ export async function loadOptionalModule<T>(moduleName: string, providerName: st
 }
 
 /**
- * Build a cloud SandboxProvider that first verifies its per-deployment credentials are present, then
- * delegates to the real provisioning logic. The "not configured" error names the missing env keys so
- * an operator knows exactly what to set — and it is thrown BEFORE any SDK load, so an unconfigured
- * provider never pretends to work.
+ * Build a cloud SandboxProvider that first resolves its BYO credentials from the caller's WORKSPACE
+ * vault, then delegates to the real provisioning logic. The "not configured" error names the missing
+ * secret names so the customer knows exactly what to add — and it is thrown BEFORE any SDK load, so an
+ * unconfigured provider never pretends to work. The inner provision receives the resolved required
+ * `creds` plus the full `ctx` (to look up OPTIONAL settings, e.g. a region/image, from the vault too).
  */
 export function defineCloudProvider(opts: {
   key: string;
   displayName: string;
-  credentialEnvKeys: string[];
-  provision: (spec: SandboxSpec | undefined, env: NodeJS.ProcessEnv) => Promise<SandboxHandle>;
+  credentialKeys: string[];
+  provision: (
+    creds: Record<string, string>,
+    ctx: SandboxProvisionContext,
+    spec: SandboxSpec | undefined,
+  ) => Promise<SandboxHandle>;
 }): SandboxProvider {
   return {
     key: opts.key,
     displayName: opts.displayName,
     requiresApiKey: true,
-    credentialEnvKeys: opts.credentialEnvKeys,
-    provision: async (spec) => {
-      const missing = opts.credentialEnvKeys.filter((k) => !process.env[k]?.trim());
+    credentialKeys: opts.credentialKeys,
+    provision: async (ctx, spec) => {
+      const creds: Record<string, string> = {};
+      const missing: string[] = [];
+      for (const name of opts.credentialKeys) {
+        const value = (await ctx.resolveSecret(name))?.trim();
+        if (value) creds[name] = value;
+        else missing.push(name);
+      }
       if (missing.length > 0) {
         throw new Error(
-          `${opts.displayName} is not configured on this deployment — set ${missing.join(", ")}.`,
+          `${opts.displayName} is not configured for this workspace — add ${missing.join(", ")} to the workspace secrets vault.`,
         );
       }
-      return opts.provision(spec, process.env);
+      return opts.provision(creds, ctx, spec);
     },
   };
 }

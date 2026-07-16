@@ -110,15 +110,15 @@ function execInPod(
 export const kubernetesProvider = defineCloudProvider({
   key: "kubernetes",
   displayName: "Kubernetes",
-  credentialEnvKeys: ["KUBECONFIG"],
-  provision: async (spec, env): Promise<SandboxHandle> => {
+  credentialKeys: ["KUBECONFIG"],
+  provision: async (creds, ctx, spec): Promise<SandboxHandle> => {
     const mod = await loadOptionalModule<KubeModule>("@kubernetes/client-node", "Kubernetes");
-    const kc = loadKubeConfig(mod, env.KUBECONFIG!);
+    const kc = loadKubeConfig(mod, creds.KUBECONFIG);
     const core = kc.makeApiClient(mod.CoreV1Api) as KubeCoreApi;
     const exec = new mod.Exec(kc);
 
-    const namespace = env.K8S_NAMESPACE || "default";
-    const image = spec?.image ?? env.K8S_SANDBOX_IMAGE ?? "ubuntu:22.04";
+    const namespace = (await ctx.resolveSecret("K8S_NAMESPACE")) || "default";
+    const image = spec?.image ?? (await ctx.resolveSecret("K8S_SANDBOX_IMAGE")) ?? "ubuntu:22.04";
     const podName =
       `agentcenter-sbx-${Date.now().toString(36)}-${Math.abs(hash(image)).toString(36)}`.slice(
         0,

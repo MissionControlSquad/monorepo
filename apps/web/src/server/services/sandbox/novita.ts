@@ -43,11 +43,11 @@ const REQUEST_TIMEOUT_MS = 30_000;
 export const novitaProvider = defineCloudProvider({
   key: "novita",
   displayName: "Novita",
-  credentialEnvKeys: ["NOVITA_API_KEY"],
-  provision: async (spec, env): Promise<SandboxHandle> => {
+  credentialKeys: ["NOVITA_API_KEY"],
+  provision: async (creds, _ctx, spec): Promise<SandboxHandle> => {
     const { Sandbox } = await loadOptionalModule<NovitaModule>("novita-sandbox", "Novita");
     const opts: NovitaCreateOpts = {
-      apiKey: env.NOVITA_API_KEY!,
+      apiKey: creds.NOVITA_API_KEY,
       timeoutMs: DEFAULT_SANDBOX_LIFETIME_MS,
       requestTimeoutMs: REQUEST_TIMEOUT_MS,
     };

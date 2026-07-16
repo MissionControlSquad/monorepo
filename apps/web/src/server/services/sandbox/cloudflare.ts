@@ -34,10 +34,10 @@ function bridgeUrl(base: string, path: string): string {
 export const cloudflareProvider = defineCloudProvider({
   key: "cloudflare",
   displayName: "Cloudflare",
-  credentialEnvKeys: ["CLOUDFLARE_SANDBOX_BRIDGE_URL", "CLOUDFLARE_SANDBOX_BRIDGE_TOKEN"],
-  provision: async (_spec, env): Promise<SandboxHandle> => {
-    const base = env.CLOUDFLARE_SANDBOX_BRIDGE_URL!;
-    const token = env.CLOUDFLARE_SANDBOX_BRIDGE_TOKEN!;
+  credentialKeys: ["CLOUDFLARE_SANDBOX_BRIDGE_URL", "CLOUDFLARE_SANDBOX_BRIDGE_TOKEN"],
+  provision: async (creds): Promise<SandboxHandle> => {
+    const base = creds.CLOUDFLARE_SANDBOX_BRIDGE_URL;
+    const token = creds.CLOUDFLARE_SANDBOX_BRIDGE_TOKEN;
     const headers = {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",

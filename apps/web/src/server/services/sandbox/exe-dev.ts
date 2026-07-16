@@ -106,10 +106,10 @@ function runSsh(
 export const exeDevProvider = defineCloudProvider({
   key: "exe-dev",
   displayName: "exe.dev",
-  credentialEnvKeys: ["EXE_DEV_API_KEY"],
-  provision: async (spec, env): Promise<SandboxHandle> => {
-    const apiUrl = normalizeApiUrl(env.EXE_DEV_API_URL);
-    const apiKey = env.EXE_DEV_API_KEY!;
+  credentialKeys: ["EXE_DEV_API_KEY"],
+  provision: async (creds, ctx, spec): Promise<SandboxHandle> => {
+    const apiUrl = normalizeApiUrl((await ctx.resolveSecret("EXE_DEV_API_URL")) || undefined);
+    const apiKey = creds.EXE_DEV_API_KEY;
     const vmName =
       `agentcenter-${Math.abs(hashCode(String(process.hrtime.bigint()))).toString(36)}`.slice(
         0,
@@ -129,13 +129,14 @@ export const exeDevProvider = defineCloudProvider({
     // SSH key (separate from the API token) — required for exec, optional for provision/destroy.
     let keyDir: string | undefined;
     let keyFile: string | undefined;
-    if (env.EXE_DEV_SSH_KEY?.trim()) {
+    const sshKey = (await ctx.resolveSecret("EXE_DEV_SSH_KEY"))?.trim();
+    if (sshKey) {
       keyDir = mkdtempSync(join(tmpdir(), "agentcenter-exe-"));
       keyFile = join(keyDir, "id_ed25519");
-      writeFileSync(keyFile, env.EXE_DEV_SSH_KEY.trim() + "\n");
+      writeFileSync(keyFile, sshKey + "\n");
       chmodSync(keyFile, 0o600);
     }
-    const sshUser = env.EXE_DEV_SSH_USER || "root";
+    const sshUser = (await ctx.resolveSecret("EXE_DEV_SSH_USER")) || "root";
 
     return {
       id: record.name,

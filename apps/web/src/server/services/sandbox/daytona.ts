@@ -49,15 +49,16 @@ const DEFAULT_TIMEOUT_SEC = 300;
 export const daytonaProvider = defineCloudProvider({
   key: "daytona",
   displayName: "Daytona",
-  credentialEnvKeys: ["DAYTONA_API_KEY"],
-  provision: async (spec, env): Promise<SandboxHandle> => {
+  credentialKeys: ["DAYTONA_API_KEY"],
+  provision: async (creds, ctx, spec): Promise<SandboxHandle> => {
     const { Daytona } = await loadOptionalModule<DaytonaModule>("@daytonaio/sdk", "Daytona");
     const client = new Daytona({
-      apiKey: env.DAYTONA_API_KEY!,
-      apiUrl: env.DAYTONA_API_URL || undefined,
+      apiKey: creds.DAYTONA_API_KEY,
+      apiUrl: (await ctx.resolveSecret("DAYTONA_API_URL")) || undefined,
     });
-    // Daytona requires an image (or snapshot). Operator-overridable via env; documented default.
-    const image = spec?.image ?? env.DAYTONA_SANDBOX_IMAGE ?? "ubuntu:22.04";
+    // Daytona requires an image (or snapshot). Overridable via a workspace secret; documented default.
+    const image =
+      spec?.image ?? (await ctx.resolveSecret("DAYTONA_SANDBOX_IMAGE")) ?? "ubuntu:22.04";
     const sandbox = await client.create(
       {
         image,
