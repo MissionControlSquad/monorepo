@@ -7,7 +7,12 @@
  *
  * OpenClaw stays the default; Codex / a custom argv / a raw shell command are just other kinds — no
  * engine rewrite. Kept pure + here so it is unit-testable and shared by the daemon and the server.
+ *
+ * As of the adapter-registry work this is a thin backward-compatible façade over adapters.ts — the
+ * registry is the single engine; new runtimes (claude, gemini, …) + model selection live there.
  */
+
+import { buildAdapterInvocation } from "./adapters";
 
 export const RUNTIME_KINDS = ["openclaw", "codex", "custom", "shell"] as const;
 export type RuntimeKind = (typeof RUNTIME_KINDS)[number];
@@ -68,59 +73,26 @@ const GENERIC_LAYOUT: RuntimeLayout = {
   taskFile: "TASK.md",
 };
 
-function substitute(token: string, input: RuntimeRenderInput): string {
-  return token
-    .replace(/\{taskId\}/g, input.taskId)
-    .replace(/\{taskTitle\}/g, input.taskTitle ?? "")
-    .replace(/\{prompt\}/g, input.prompt ?? "")
-    .replace(/\{workspaceDir\}/g, input.workspaceDir);
-}
 
 /**
- * Render the spawn plan for a runtime + task. Throws on a `custom`/`shell` kind missing its template.
+ * Render the spawn plan for a runtime + task. Backward-compatible façade over the adapter registry
+ * (see adapters.ts) — the four legacy kinds map to adapter keys (`custom` → the generic `process`
+ * adapter). Throws on a `custom`/`shell` kind missing its template. New code should prefer
+ * buildAdapterInvocation, which also supports models + additional runtimes (claude, gemini, …).
  */
 export function renderRuntimeCommand(
   kind: RuntimeKind,
   input: RuntimeRenderInput,
 ): RenderedRuntime {
-  switch (kind) {
-    case "openclaw":
-      // OpenClaw reads the materialised agent files and runs one task cycle in the workspace.
-      return {
-        argv: ["openclaw", "run", "--task", input.taskId],
-        cwd: input.workspaceDir,
-        useShell: false,
-        layout: OPENCLAW_LAYOUT,
-      };
-    case "codex":
-      // A prompt-driven CLI: hand it the brief; it reads the repo in cwd.
-      return {
-        argv: ["codex", "exec", input.prompt ?? input.taskTitle ?? input.taskId],
-        cwd: input.workspaceDir,
-        useShell: false,
-        layout: GENERIC_LAYOUT,
-      };
-    case "custom": {
-      if (!Array.isArray(input.template) || input.template.length === 0)
-        throw new Error("custom runtime requires a non-empty argv template");
-      return {
-        argv: input.template.map((tok) => substitute(tok, input)),
-        cwd: input.workspaceDir,
-        useShell: false,
-        layout: GENERIC_LAYOUT,
-      };
-    }
-    case "shell": {
-      const cmd = typeof input.template === "string" ? input.template : input.template?.join(" ");
-      if (!cmd) throw new Error("shell runtime requires a command template");
-      return {
-        argv: [substitute(cmd, input)],
-        cwd: input.workspaceDir,
-        useShell: true,
-        layout: GENERIC_LAYOUT,
-      };
-    }
-  }
+  const key = kind === "custom" ? "process" : kind;
+  const inv = buildAdapterInvocation(key, {
+    taskId: input.taskId,
+    workspaceDir: input.workspaceDir,
+    taskTitle: input.taskTitle,
+    prompt: input.prompt,
+    template: input.template,
+  });
+  return { argv: inv.argv, cwd: inv.cwd, useShell: inv.useShell, layout: inv.layout };
 }
 
 /** The file layout a runtime expects, without rendering a spawn plan. */

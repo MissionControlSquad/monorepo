@@ -10,6 +10,7 @@ import {
 } from "./config.js";
 import { HttpRunnerApi } from "./api-client.js";
 import { execShell, execPlan } from "./executor.js";
+import { listAdapters } from "@agentcenter/utils";
 import type { AgentContextProject } from "@agentcenter/types";
 import {
   pollLoop,
@@ -67,6 +68,7 @@ async function realCloneRepo(project: AgentContextProject, dir: string): Promise
 function buildTaskDeps(config: RunnerConfig): TaskRunDeps {
   return {
     runtime: config.runtime,
+    model: config.model,
     workDir: config.workDir,
     writeFile: realWriteFile,
     execPlan,
@@ -98,9 +100,20 @@ function cmdLogin(flags: Record<string, string>): void {
     apiKey,
     ...(runtime ? { runtime } : {}),
     ...(runtimeTemplate !== undefined ? { runtimeTemplate } : {}),
+    ...(flags.model ? { model: flags.model } : {}),
   };
   saveConfigFile(config);
   logger.info(`saved credentials to ${DEFAULT_CONFIG_PATH}`);
+}
+
+function cmdAdapters(): void {
+  logger.info("available runtime adapters:");
+  for (const a of listAdapters()) {
+    const flags = [a.requiresTemplate ? "needs --runtime-template" : null, a.supportsModel ? "model" : null]
+      .filter(Boolean)
+      .join(", ");
+    console.log(`  ${a.key.padEnd(10)} ${a.displayName}${flags ? `  (${flags})` : ""}`);
+  }
 }
 
 async function cmdStart(flags: Record<string, string>): Promise<void> {
@@ -149,7 +162,8 @@ function usage(): void {
       "",
       "Usage:",
       "  agentcenter-runner login --api-url <url> --api-key <mc_key> \\",
-      "     [--runtime openclaw|codex|custom|shell] [--runtime-template \"<cmd or argv>\"]",
+      "     [--runtime <adapter>] [--runtime-template \"<cmd or argv>\"] [--model <id>]",
+      "  agentcenter-runner adapters            (list available runtime adapters)",
       "  agentcenter-runner start [--poll-ms <ms>] [--commands-only]",
       "  agentcenter-runner run-once            (process queued raw commands once)",
       "  agentcenter-runner run-task <taskId>   (run one agent task end-to-end)",
@@ -174,6 +188,9 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       break;
     case "run-task":
       await cmdRunTask(rest);
+      break;
+    case "adapters":
+      cmdAdapters();
       break;
     case undefined:
     case "help":

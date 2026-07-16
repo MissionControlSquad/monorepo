@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { RenderedRuntime } from "@agentcenter/utils";
+import type { AdapterInvocation } from "@agentcenter/utils";
 
 export interface ExecResult {
   exitCode: number | null;
@@ -18,7 +18,7 @@ export type ExecFn = (command: string, opts?: ExecOptions) => Promise<ExecResult
 
 /** Run a rendered runtime plan (argv). Injected into the task cycle so tests can substitute a fake. */
 export type ExecPlanFn = (
-  plan: RenderedRuntime,
+  plan: AdapterInvocation,
   opts?: { timeoutMs?: number },
 ) => Promise<ExecResult>;
 

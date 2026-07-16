@@ -1,9 +1,8 @@
 import { join } from "node:path";
 import {
-  renderRuntimeCommand,
-  runtimeLayout,
-  type RuntimeKind,
-  type RenderedRuntime,
+  buildAdapterInvocation,
+  type AdapterInvocation,
+  type AdapterLayout,
 } from "@agentcenter/utils";
 import type { AgentContextBundle, AgentContextProject } from "@agentcenter/types";
 import type { RunnerApi, CommandResultPayload } from "./api-client.js";
@@ -87,11 +86,10 @@ function taskMarkdown(b: AgentContextBundle): string {
  */
 export async function writeBundleFiles(
   bundle: AgentContextBundle,
-  kind: RuntimeKind,
+  layout: AdapterLayout,
   rootDir: string,
   writeFile: WriteFileFn,
 ): Promise<string[]> {
-  const layout = runtimeLayout(kind);
   const written: string[] = [];
 
   const write = async (rel: string, content: string) => {
@@ -119,27 +117,32 @@ export async function writeBundleFiles(
 export async function prepareTaskRun(
   api: RunnerApi,
   taskId: string,
-  kind: RuntimeKind,
+  runtime: string,
   workDir: string,
   writeFile: WriteFileFn,
   template?: string[] | string,
-): Promise<{ bundle: AgentContextBundle; written: string[]; plan: RenderedRuntime }> {
+  model?: string | null,
+): Promise<{ bundle: AgentContextBundle; written: string[]; plan: AdapterInvocation }> {
   const bundle = await api.getContext(taskId);
   const runDir = join(workDir, taskId);
-  const written = await writeBundleFiles(bundle, kind, runDir, writeFile);
-  const plan = renderRuntimeCommand(kind, {
+  const plan = buildAdapterInvocation(runtime, {
     taskId,
     workspaceDir: runDir,
     taskTitle: bundle.task.title,
     prompt: taskMarkdown(bundle),
     template,
+    model: model ?? null,
   });
+  const written = await writeBundleFiles(bundle, plan.layout, runDir, writeFile);
   return { bundle, written, plan };
 }
 
 /** Everything runTaskOnce needs to execute a task run, all injectable for tests. */
 export interface TaskRunDeps {
-  runtime: RuntimeKind;
+  /** Adapter key: openclaw | codex | claude | gemini | process | shell | <registered>. */
+  runtime: string;
+  /** Optional model override passed to the adapter. */
+  model?: string | null;
   workDir: string;
   writeFile: WriteFileFn;
   execPlan: ExecPlanFn;
@@ -168,6 +171,7 @@ export async function runTaskOnce(
     deps.workDir,
     deps.writeFile,
     deps.template,
+    deps.model,
   );
   if (deps.cloneRepo && bundle.project?.repoUrl) {
     log.info(`cloning ${bundle.project.repoUrl} for task ${taskId}`);

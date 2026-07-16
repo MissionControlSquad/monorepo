@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import type { AgentContextBundle, AgentContextProject } from "@agentcenter/types";
 import type { RunnerApi, RunnerCommandDTO, CommandResultPayload } from "../src/api-client.js";
 import type { ExecFn, ExecResult } from "../src/executor.js";
-import type { RenderedRuntime } from "@agentcenter/utils";
+import { getAdapter, type AdapterInvocation } from "@agentcenter/utils";
 import {
   runCommandsOnce,
   writeBundleFiles,
@@ -143,7 +143,8 @@ describe("runCommandsOnce", () => {
 describe("writeBundleFiles", () => {
   it("writes identity/task/instructions/skills into the openclaw layout", async () => {
     const written: Record<string, string> = {};
-    const paths = await writeBundleFiles(bundle, "openclaw", "/run", (p, c) => {
+    const openclawLayout = getAdapter("openclaw")!.build({ taskId: "x", workspaceDir: "/run" }).layout;
+    const paths = await writeBundleFiles(bundle, openclawLayout, "/run", (p, c) => {
       written[p] = c;
     });
     expect(paths).toContain("IDENTITY.md");
@@ -155,7 +156,8 @@ describe("writeBundleFiles", () => {
   });
 
   it("uses the generic skills dir for codex", async () => {
-    const paths = await writeBundleFiles(bundle, "codex", "/run", () => {});
+    const codexLayout = getAdapter("codex")!.build({ taskId: "x", workspaceDir: "/run" }).layout;
+    const paths = await writeBundleFiles(bundle, codexLayout, "/run", () => {});
     expect(paths.some((p) => p === "skills/lint.md")).toBe(true);
   });
 });
@@ -178,7 +180,7 @@ describe("prepareTaskRun", () => {
 });
 
 const okExecPlan = (result: Partial<ExecResult> = {}) =>
-  vi.fn(async (_plan: RenderedRuntime) => ({
+  vi.fn(async (_plan: AdapterInvocation) => ({
     exitCode: 0,
     stdout: "task output",
     stderr: "",
