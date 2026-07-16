@@ -122,6 +122,22 @@ describe("runCommandsOnce", () => {
     await runCommandsOnce(api, exec);
     expect(exec).toHaveBeenCalledWith("echo hi", { cwd: "/srv", timeoutMs: 500 });
   });
+
+  it("a failed result-post does not abort the batch or mislabel a success", async () => {
+    const attempts: string[] = [];
+    const api: RunnerApi = {
+      ...fakeApi().api,
+      getCommands: async () => [cmd({ id: "c1" }), cmd({ id: "c2" })],
+      postCommandResult: async (id, result) => {
+        attempts.push(`${id}:${result.status}`);
+        if (id === "c1") throw new Error("network blip"); // first post fails
+      },
+    };
+    const n = await runCommandsOnce(api, okExec());
+    expect(n).toBe(2);
+    // both commands attempted a post; c1 was reported "done" (not mislabeled "failed"); c2 still ran
+    expect(attempts).toEqual(["c1:done", "c2:done"]);
+  });
 });
 
 describe("writeBundleFiles", () => {

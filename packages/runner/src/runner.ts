@@ -6,7 +6,7 @@ import {
   type RenderedRuntime,
 } from "@agentcenter/utils";
 import type { AgentContextBundle, AgentContextProject } from "@agentcenter/types";
-import type { RunnerApi } from "./api-client.js";
+import type { RunnerApi, CommandResultPayload } from "./api-client.js";
 import type { ExecFn, ExecPlanFn, ExecResult } from "./executor.js";
 
 /** Sink for writing bundle files — real fs in prod, a recorder in tests. */
@@ -32,19 +32,30 @@ export async function runCommandsOnce(
   const commands = await api.getCommands();
   for (const c of commands) {
     log.info(`running command ${c.id}: ${c.command}`);
+    // Execution and reporting are separated so (a) a failed RESULT POST can't mislabel a command
+    // that actually succeeded, and (b) a network hiccup on one post can't abort the whole batch.
+    let result: CommandResultPayload;
     try {
       const r = await exec(c.command, { cwd: c.cwd ?? undefined, timeoutMs: c.timeoutMs });
-      await api.postCommandResult(c.id, {
+      result = {
         exitCode: r.exitCode,
         stdout: r.stdout,
         stderr: r.stderr,
         status: r.timedOut ? "timeout" : "done",
-      });
+      };
       log.info(`command ${c.id} finished (exit ${r.exitCode})`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await api.postCommandResult(c.id, { status: "failed", errorMessage: message });
+      result = { status: "failed", errorMessage: message };
       log.error(`command ${c.id} failed: ${message}`);
+    }
+    try {
+      await api.postCommandResult(c.id, result);
+    } catch (postErr) {
+      // Leave the command claimed/running server-side; a later reconciliation can reclaim it.
+      log.error(
+        `command ${c.id}: failed to post result: ${postErr instanceof Error ? postErr.message : String(postErr)}`,
+      );
     }
   }
   return commands.length;
