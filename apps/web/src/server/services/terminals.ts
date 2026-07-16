@@ -100,6 +100,51 @@ export async function activateTerminalSession(
   return stripToken(updated);
 }
 
+/**
+ * Activate a session from ONLY its id + connect token (no tenancy context) — used by the PTY
+ * WebSocket, which authenticates purely by the one-time token. Verifies token + connect-TTL, flips
+ * pending → active, and returns the full (token-stripped) session so the relay can resolve the host.
+ */
+export async function activateTerminalByConnectToken(
+  id: string,
+  connectToken: string,
+  now: Date = new Date(),
+): Promise<SafeTerminalSession> {
+  const session = await prisma.terminalSession.findFirst({ where: { id } });
+  if (!session) badRequest("Terminal session not found");
+  if (session.status !== "pending") badRequest("Session is not awaiting connection");
+  if (session.connectExpiresAt.getTime() <= now.getTime()) badRequest("Connect token expired");
+  if (session.connectTokenHash !== hashApiKey(connectToken)) badRequest("Invalid connect token");
+  const updated = await prisma.terminalSession.update({
+    where: { id: session.id },
+    data: { status: "active", lastActivityAt: now },
+  });
+  return stripToken(updated);
+}
+
+/**
+ * Resolve SSH credentials for a session's target. v1 supports targets that are a managed CloudVM in
+ * the same workspace (matched by IP) — we hold their key. Arbitrary BYO hosts need a user-supplied
+ * key we do not store; those return null and the relay reports that no credentials are available.
+ */
+export async function resolveTerminalSshConfig(
+  session: Pick<SafeTerminalSession, "workspaceId" | "host" | "port" | "username">,
+): Promise<import("./ssh").SSHConfig | null> {
+  if (!session.host) return null;
+  const vm = await prisma.cloudVM.findFirst({
+    where: { workspaceId: session.workspaceId, ipv4: session.host },
+    select: { id: true, ipv4: true, sshPrivateKey: true },
+  });
+  if (!vm) return null;
+  const { getVMSSHConfig } = await import("./cloud-vm-utils");
+  const config = getVMSSHConfig(vm);
+  return {
+    ...config,
+    port: session.port ?? config.port,
+    username: session.username ?? config.username,
+  };
+}
+
 export async function closeTerminalSession(
   workspaceId: string,
   id: string,

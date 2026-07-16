@@ -6,6 +6,7 @@ import { TERMINAL_STATE } from "@agentcenter/utils";
 import { TERMINAL_SESSIONS_QUERY } from "@/lib/graphql/queries";
 import { OPEN_TERMINAL_SESSION, CLOSE_TERMINAL_SESSION } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
+import { TerminalConsole } from "@/components/terminals/TerminalConsole";
 
 // Epic #9: terminal sessions. TERMINALS-gated (experimental, admin). Authorize a session into an agent
 // environment over SSH; a one-time connect token is minted. NOTE: v1 does not open a live shell — the
@@ -49,7 +50,12 @@ export default function TerminalsPage() {
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [revealed, setRevealed] = useState<{ host: string | null; token: string } | null>(null);
+  const [revealed, setRevealed] = useState<{
+    id: string;
+    host: string | null;
+    token: string;
+  } | null>(null);
+  const [console_, setConsole] = useState<{ id: string; token: string } | null>(null);
   const sessions = data?.terminalSessions ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
@@ -65,7 +71,7 @@ export default function TerminalsPage() {
       });
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Open failed");
       const s = res.data.openTerminalSession;
-      setRevealed({ host: s.host, token: s.connectToken });
+      setRevealed({ id: s.id, host: s.host, token: s.connectToken });
       setCommand("");
       setCwd("");
       setLabel("");
@@ -90,8 +96,8 @@ export default function TerminalsPage() {
       <div>
         <h1 className="text-lg font-semibold text-foreground">Terminals</h1>
         <p className="text-sm text-muted-foreground">
-          Authorize an SSH session into an agent environment. A one-time connect token is minted —
-          the live shell stream is not yet enabled on this instance.
+          Authorize an SSH session into an agent environment. A one-time connect token is minted;
+          click Connect to open a live browser shell to a managed VM target.
         </p>
       </div>
 
@@ -111,11 +117,28 @@ export default function TerminalsPage() {
             <Button size="sm" onClick={() => navigator.clipboard?.writeText(revealed.token)}>
               Copy
             </Button>
+            <Button
+              size="sm"
+              onClick={() => setConsole({ id: revealed.id, token: revealed.token })}
+            >
+              Connect
+            </Button>
             <Button size="sm" variant="secondary" onClick={() => setRevealed(null)}>
               Dismiss
             </Button>
           </div>
         </Card>
+      )}
+
+      {console_ && (
+        <TerminalConsole
+          sessionId={console_.id}
+          connectToken={console_.token}
+          onClose={() => {
+            setConsole(null);
+            refresh();
+          }}
+        />
       )}
 
       <Card className="space-y-2 p-4">

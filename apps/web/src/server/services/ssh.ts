@@ -1,4 +1,4 @@
-import { Client } from "ssh2";
+import { Client, type ClientChannel } from "ssh2";
 
 export interface SSHConfig {
   host: string;
@@ -172,6 +172,51 @@ export function sshExecStream(
       .on("error", (err) => {
         reject(err);
       })
+      .connect({
+        host: config.host,
+        port: config.port ?? 22,
+        username: config.username ?? "root",
+        privateKey: config.privateKey,
+        readyTimeout: 10_000,
+      });
+  });
+}
+
+/**
+ * Handle for an interactive PTY shell over SSH (Tier D — browser Cloud-Shell).
+ * `stream` is a duplex channel: write bytes to send keystrokes, read `data`/`stderr` for output.
+ */
+export interface ShellHandle {
+  client: Client;
+  stream: ClientChannel;
+}
+
+/**
+ * Open an interactive PTY shell over SSH. The caller pipes a browser WebSocket to `stream` (both
+ * ways) and calls `client.end()` to tear it down. This is the byte-stream half the terminal-session
+ * lifecycle deferred (spec D2). Requires a live SSH target — validated by code + unit-tested at the
+ * lifecycle/credential layer; the live relay is exercised against real infra.
+ */
+export function sshShell(
+  config: SSHConfig,
+  opts?: { cols?: number; rows?: number },
+): Promise<ShellHandle> {
+  return new Promise((resolve, reject) => {
+    const conn = new Client();
+    conn
+      .on("ready", () => {
+        conn.shell(
+          { term: "xterm-256color", cols: opts?.cols ?? 80, rows: opts?.rows ?? 24 },
+          (err, stream) => {
+            if (err) {
+              conn.end();
+              return reject(err);
+            }
+            resolve({ client: conn, stream });
+          },
+        );
+      })
+      .on("error", (err) => reject(err))
       .connect({
         host: config.host,
         port: config.port ?? 22,
