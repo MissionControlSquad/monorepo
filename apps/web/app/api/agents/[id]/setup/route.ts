@@ -1,5 +1,4 @@
 import { agentModel } from "@/server/models";
-import { listRunningCloudVMsWithAgents } from "@agentcenter/database";
 import { getTemplate } from "@/server/agent-templates";
 import {
   generateAgentConfig,
@@ -71,9 +70,6 @@ export async function GET(_request: Request, ctx: RouteContext) {
       openclawAgentConfig,
     });
 
-    // Fetch available cloud VMs for the "Deploy to VM" option
-    const cloudVms = await listRunningCloudVMsWithAgents();
-
     return successResponse({
       agent: {
         id: agent.id,
@@ -82,7 +78,6 @@ export async function GET(_request: Request, ctx: RouteContext) {
         setupStatus: agent.setupStatus,
         apiKeyPrefix: agent.apiKeyPrefix,
         hostingType: agent.hostingType,
-        cloudVmId: agent.cloudVmId,
       },
       configFiles,
       bootstrapMessage,
@@ -95,7 +90,6 @@ export async function GET(_request: Request, ctx: RouteContext) {
       // Add "claude", "codex", etc. here when they become required.
       requiredClis: ["openclaw"],
       mcUrl,
-      cloudVms,
     });
   } catch (err) {
     return handleError(err);

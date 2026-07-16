@@ -16,7 +16,6 @@ export const activityDelegate = () => prisma.activity;
 export const adminUserDelegate = () => prisma.adminUser;
 export const agentActionDelegate = () => prisma.agentAction;
 export const agentQueueItemDelegate = () => prisma.agentQueueItem;
-export const cloudVMDelegate = () => prisma.cloudVM;
 export const deliverableVersionDelegate = () => prisma.deliverableVersion;
 export const deliverableDelegate = () => prisma.deliverable;
 export const documentDelegate = () => prisma.document;

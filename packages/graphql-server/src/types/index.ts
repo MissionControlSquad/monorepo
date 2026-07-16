@@ -18,7 +18,6 @@ import "./project";
 import "./project-doc";
 import "./agent-queue";
 import "./channel";
-import "./cloud-vm";
 import "./approval";
 import "./agent-trust";
 import "./finance";

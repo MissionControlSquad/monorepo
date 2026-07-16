@@ -93,8 +93,6 @@ function RootLayoutNav() {
           <Stack.Screen name="kanban/[projectId]" options={{ title: "Kanban" }} />
           <Stack.Screen name="profile" options={{ title: "Profile", presentation: "modal" }} />
           <Stack.Screen name="settings" options={{ title: "Settings", presentation: "modal" }} />
-          <Stack.Screen name="cloud" options={{ title: "Cloud VMs" }} />
-          <Stack.Screen name="cloud/[id]" options={{ title: "VM" }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack>
         <AppDrawer />

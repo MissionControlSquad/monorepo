@@ -17,8 +17,6 @@ export const apiLimiters = {
   messages: createRateLimiter({ max: 60, windowSec: 60, prefix: "rl:msgs" }),
   /** Channel operations */
   channels: createRateLimiter({ max: 60, windowSec: 60, prefix: "rl:chan" }),
-  /** Cloud VM operations — expensive, tight limit */
-  cloudVms: createRateLimiter({ max: 20, windowSec: 60, prefix: "rl:vms" }),
   /** Live gateway install token management — very sensitive, strict limit */
   liveGatewayTokens: createRateLimiter({ max: 10, windowSec: 60, prefix: "rl:lgtok" }),
   /** Live gateway connections list — polled by sidebar + page every 15-30s */

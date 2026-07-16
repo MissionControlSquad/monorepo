@@ -17,34 +17,13 @@ import {
   Send,
   Wrench,
   MessageSquare,
-  Cloud,
-  Server,
   MonitorDown,
 } from "lucide-react";
 import { Button, Badge, Card } from "@/components/ui";
-import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
-import { FLAG_KEYS, type AgentConfigFile, truncateId } from "@agentcenter/utils";
+import { type AgentConfigFile } from "@agentcenter/utils";
 import { useIsElectron } from "@agentcenter/hooks/browser";
 import { DesktopBootstrapButton } from "@/components/common/DesktopBootstrapButton";
 import { SetupStatus } from "@/server/constants";
-
-interface CloudVMAgent {
-  id: string;
-  name: string;
-  identityEmoji?: string | null;
-  username?: string | null;
-  role?: string | null;
-}
-
-interface CloudVMOption {
-  id: string;
-  name: string;
-  status: string;
-  region: string;
-  serverType: string;
-  ipv4: string | null;
-  agents: CloudVMAgent[];
-}
 
 interface SetupData {
   agent: {
@@ -54,7 +33,6 @@ interface SetupData {
     setupStatus: string;
     apiKeyPrefix: string | null;
     hostingType: string;
-    cloudVmId: string | null;
   };
   configFiles: AgentConfigFile[];
   bootstrapMessage: string;
@@ -65,10 +43,9 @@ interface SetupData {
   openclawAgentConfig: { id: string; name: string; workspace: string };
   requiredClis: string[];
   mcUrl: string;
-  cloudVms: CloudVMOption[];
 }
 
-type SetupMode = "cloud" | "auto" | "manual" | "desktop";
+type SetupMode = "auto" | "manual" | "desktop";
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -224,13 +201,6 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
   const [regenerating, setRegenerating] = useState(false);
   const [setupMode, setSetupMode] = useState<SetupMode>("auto");
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
-  const [selectedVmId, setSelectedVmId] = useState<string>("");
-  const [deploying, setDeploying] = useState(false);
-  const [showDeployConfirm, setShowDeployConfirm] = useState(false);
-
-  const isAlreadyOnCloud = setupData?.agent.hostingType === "cloudVM";
-  const hasApiKey = !!setupData?.agent.apiKeyPrefix;
-  const cloudVmsEnabled = useFeatureFlag(FLAG_KEYS.CLOUD_VMS);
 
   // Once isDesktopApp resolves (after hydration), switch to the desktop tab.
   // Only switches if the user hasn't already manually picked a different tab.
@@ -246,15 +216,6 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
           toast.error(data.error);
         } else {
           setSetupData(data);
-          // Default to the first running VM if available
-          const firstRunning = data.cloudVms?.find((vm: CloudVMOption) => vm.status === "running");
-          if (firstRunning) {
-            setSelectedVmId(firstRunning.id);
-          }
-          // If already on cloud, show cloud tab; otherwise default to cloud
-          if (data.agent.hostingType === "cloudVM") {
-            setSetupMode("cloud");
-          }
         }
       })
       .catch(() => toast.error("Failed to load setup data"))
@@ -295,60 +256,6 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
       setRegenerating(false);
     }
   }, [agentId, setupData]);
-
-  const handleDeployToVM = useCallback(async () => {
-    if (!selectedVmId) {
-      toast.error("Please select a VM");
-      return;
-    }
-
-    // Show confirmation for re-deployments or when key already exists
-    if ((isAlreadyOnCloud || hasApiKey) && !showDeployConfirm) {
-      setShowDeployConfirm(true);
-      return;
-    }
-
-    setShowDeployConfirm(false);
-    setDeploying(true);
-
-    try {
-      const res = await fetch(`/api/cloud-vms/${selectedVmId}/agents`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId }),
-      });
-
-      const text = await res.text();
-      let data: Record<string, unknown> = {};
-      try {
-        data = JSON.parse(text);
-      } catch {
-        /* non-JSON response */
-      }
-
-      if (!res.ok) {
-        toast.error(
-          (data.error as string) || `Deploy failed (${res.status}): ${text.slice(0, 200)}`,
-        );
-        return;
-      }
-
-      // Self-healing response (agent already on VM) — show what was fixed
-      if ((data.fixedCount as number) > 0) {
-        toast.success(`Agent verified — fixed ${data.fixedCount} issue(s)`);
-      } else if (data.checks) {
-        toast.success(`Agent verified — everything looks good`);
-      } else {
-        toast.success(`Agent deployed to VM — setting up now`);
-      }
-      router.push(`/cloud/${selectedVmId}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to deploy agent to VM";
-      toast.error(msg);
-    } finally {
-      setDeploying(false);
-    }
-  }, [agentId, selectedVmId, isAlreadyOnCloud, hasApiKey, showDeployConfirm, router]);
 
   if (loading) {
     return (
@@ -393,11 +300,6 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
                   Pending Setup
                 </Badge>
               )}
-              {isAlreadyOnCloud && (
-                <Badge variant="blue" className="ml-2">
-                  Cloud VM
-                </Badge>
-              )}
             </p>
           </div>
         </div>
@@ -440,239 +342,7 @@ export function AgentSetupPage({ agentId }: { agentId: string }) {
               <Wrench className="w-4 h-4" />
               Manual Setup
             </button>
-            {cloudVmsEnabled && (
-              <button
-                onClick={() => setSetupMode("cloud")}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition ${
-                  setupMode === "cloud"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Cloud className="w-4 h-4" />
-                Deploy to VM
-              </button>
-            )}
           </div>
-
-          {/* ==================== CLOUD VM MODE ==================== */}
-          {setupMode === "cloud" && (
-            <>
-              {setupData.cloudVms.length === 0 ? (
-                <Card padding="lg" className="text-center">
-                  <Server className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                  <h3 className="font-semibold text-foreground mb-1">No Cloud VMs Available</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Create a Cloud VM first to deploy agents to it.
-                  </p>
-                  <Button onClick={() => router.push("/cloud")}>
-                    <Cloud className="w-4 h-4" />
-                    Go to Cloud VMs
-                  </Button>
-                </Card>
-              ) : !setupData.cloudVms.some((vm) => vm.status === "running") ? (
-                <Card padding="lg" className="text-center">
-                  <Server className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                  <h3 className="font-semibold text-foreground mb-1">No Running VMs</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Your VM is still provisioning. Wait for it to finish, then come back to deploy.
-                  </p>
-                  <Button onClick={() => router.push("/cloud")}>
-                    <Cloud className="w-4 h-4" />
-                    View Cloud VMs
-                  </Button>
-                </Card>
-              ) : (
-                <>
-                  {/* Already deployed banner */}
-                  {isAlreadyOnCloud && (
-                    <div className="border border-blue-200 bg-blue-50 rounded-xl p-4">
-                      <div className="flex items-start gap-3">
-                        <Cloud className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-blue-800 text-sm">Already Deployed</h3>
-                          <p className="text-sm text-blue-700 mt-0.5">
-                            This agent is already running on a Cloud VM. Re-deploying will reset the
-                            API token and reconfigure the agent.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <Card padding="md">
-                    <h3 className="font-semibold text-foreground mb-1">Deploy to Cloud VM</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Select a running VM to deploy this agent. The agent will be configured
-                      automatically with workspace, config files, and heartbeat cron.
-                    </p>
-
-                    {/* VM Selector */}
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-foreground">Select VM</label>
-                      <select
-                        value={selectedVmId}
-                        onChange={(e) => setSelectedVmId(e.target.value)}
-                        disabled={deploying}
-                        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${deploying ? "opacity-50 cursor-not-allowed bg-muted border-border" : selectedVmId === setupData.agent.cloudVmId ? "border-success/30 bg-success-muted" : "border-border"}`}
-                      >
-                        {setupData.cloudVms.map((vm) => (
-                          <option key={vm.id} value={vm.id} disabled={vm.status !== "running"}>
-                            {vm.name} — {vm.ipv4 || truncateId(vm.id)} — {vm.region} (
-                            {vm.serverType}){vm.status !== "running" ? ` (${vm.status})` : ""}
-                            {setupData.agent.cloudVmId === vm.id ? " ✓ current" : ""}
-                          </option>
-                        ))}
-                      </select>
-                      {selectedVmId === setupData.agent.cloudVmId && (
-                        <p className="text-xs text-success flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
-                          Agent is already deployed on this VM — deploying will upgrade config &amp;
-                          reset the API token
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Agents on selected VM */}
-                    {(() => {
-                      const selectedVM = setupData.cloudVms.find((vm) => vm.id === selectedVmId);
-                      if (!selectedVM || selectedVM.agents.length === 0) return null;
-                      return (
-                        <div className="mt-3 border border-border rounded-lg p-3 bg-muted">
-                          <p className="text-xs font-medium text-muted-foreground mb-2">
-                            {selectedVM.agents.length} agent
-                            {selectedVM.agents.length !== 1 ? "s" : ""} on this VM
-                          </p>
-                          <div className="space-y-1.5">
-                            {selectedVM.agents.map((agent) => (
-                              <div
-                                key={agent.id}
-                                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs ${
-                                  agent.id === agentId
-                                    ? "bg-blue-50 border border-blue-200"
-                                    : "bg-background border border-border"
-                                }`}
-                              >
-                                <span className="text-sm leading-none flex-shrink-0">
-                                  {agent.identityEmoji || "🤖"}
-                                </span>
-                                <span
-                                  className={`font-medium ${agent.id === agentId ? "text-blue-700" : "text-foreground"}`}
-                                >
-                                  {agent.name}
-                                </span>
-                                {agent.role && (
-                                  <span className="text-muted-foreground truncate">
-                                    {agent.role}
-                                  </span>
-                                )}
-                                {agent.id === agentId && (
-                                  <span className="ml-auto text-[10px] text-blue-500 flex-shrink-0">
-                                    (this agent)
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Migration warning — moving agent to a different VM */}
-                    {isAlreadyOnCloud &&
-                      selectedVmId &&
-                      selectedVmId !== setupData.agent.cloudVmId && (
-                        <div className="mt-3 border-2 border-destructive/30 bg-destructive-muted rounded-xl p-4">
-                          <div className="flex items-start gap-3">
-                            <ShieldAlert className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-destructive text-sm">
-                                Moving to a different VM
-                              </h3>
-                              <p className="text-sm text-destructive mt-1">
-                                The agent will be <strong>removed from the current VM</strong>. All
-                                workspace files (MEMORY.md, config, session data) on the old VM will
-                                be <strong>permanently deleted</strong> and cannot be recovered. A
-                                fresh workspace will be created on the new VM.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Confirmation alert */}
-                    {showDeployConfirm && (
-                      <div className="mt-4 border-2 border-warning/30 bg-warning-muted rounded-xl p-4">
-                        <div className="flex items-start gap-3">
-                          <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-warning text-sm">
-                              Confirm Deployment
-                            </h3>
-                            <p className="text-sm text-warning mt-1">
-                              {isAlreadyOnCloud && selectedVmId !== setupData.agent.cloudVmId
-                                ? "The agent will be removed from the old VM and all its files will be permanently deleted. A new API token will be generated on the new VM."
-                                : isAlreadyOnCloud
-                                  ? "This agent is already deployed. Re-deploying will reset the API token and the agent will take some time to spin up again."
-                                  : "The API token will be reset and the agent will take some time to spin up on the VM."}
-                            </p>
-                            <div className="flex items-center gap-2 mt-3">
-                              <Button
-                                variant={
-                                  isAlreadyOnCloud && selectedVmId !== setupData.agent.cloudVmId
-                                    ? "danger"
-                                    : "warning"
-                                }
-                                onClick={handleDeployToVM}
-                                disabled={deploying}
-                              >
-                                {deploying ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Cloud className="w-4 h-4" />
-                                )}
-                                {isAlreadyOnCloud && selectedVmId !== setupData.agent.cloudVmId
-                                  ? "Yes, Move Agent"
-                                  : "Yes, Deploy"}
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                onClick={() => setShowDeployConfirm(false)}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Deploy button (shown when confirm dialog is NOT open) */}
-                    {!showDeployConfirm && (
-                      <Button
-                        onClick={handleDeployToVM}
-                        disabled={deploying || !selectedVmId}
-                        className="mt-4 w-full"
-                      >
-                        {deploying ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Cloud className="w-4 h-4" />
-                        )}
-                        {deploying
-                          ? "Deploying..."
-                          : selectedVmId === setupData.agent.cloudVmId
-                            ? "Upgrade on VM"
-                            : isAlreadyOnCloud
-                              ? "Move to VM"
-                              : "Deploy to VM"}
-                      </Button>
-                    )}
-                  </Card>
-                </>
-              )}
-            </>
-          )}
 
           {/* ==================== DESKTOP APP TAB ==================== */}
           {setupMode === "desktop" && (

@@ -26,8 +26,6 @@ import {
   getProjectSquadLeadAgentIds,
   getWorkspaceSquadLeadAgentIds,
   getAgentsNotifyState,
-  findCloudVMIdByServerName,
-  logCloudVMEvent,
   findStalePendingDeliveries,
   markDeliveriesAttempted,
 } from "@agentcenter/database";
@@ -40,17 +38,11 @@ import { FLAG_KEYS } from "@agentcenter/utils";
 // ─── VM event log helper ──────────────────────────────────────────────────────
 
 async function logVMActivity(
-  machineName: string | null | undefined,
-  message: string,
-  level: "info" | "warn" | "error" = "info",
+  _machineName: string | null | undefined,
+  _message: string,
+  _level: "info" | "warn" | "error" = "info",
 ): Promise<void> {
-  if (!machineName) return;
-  try {
-    const vmId = await findCloudVMIdByServerName(machineName);
-    if (vmId) await logCloudVMEvent(vmId, message, level);
-  } catch {
-    // Never throw — logging is best-effort
-  }
+  // No-op: CloudVM event logging removed (BYO RunnerHost only).
 }
 
 // ─── Feature flag guard ───────────────────────────────────────────────────────

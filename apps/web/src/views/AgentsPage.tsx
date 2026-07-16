@@ -15,7 +15,6 @@ import {
   ArrowRight,
   PowerOff,
   Power,
-  Cloud,
   Search,
   Palmtree,
   WifiOff,
@@ -37,7 +36,6 @@ type AgentFromQuery = {
   currentTask?: string;
   upgradeAvailable?: boolean;
   hostingType?: string;
-  cloudVmId?: string;
   isOnVacation?: boolean;
 };
 
@@ -195,12 +193,6 @@ export function AgentsPage() {
                         <Badge variant="gray">
                           <WifiOff className="w-3 h-3" />
                           Offline
-                        </Badge>
-                      )}
-                      {agent.hostingType === "cloudVM" && (
-                        <Badge variant="purple">
-                          <Cloud className="w-3 h-3" />
-                          Cloud
                         </Badge>
                       )}
                       {agent.upgradeAvailable && <Badge variant="blue">Upgrade available</Badge>}

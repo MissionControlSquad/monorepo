@@ -7,7 +7,6 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.CHANNELS).toBe("channels");
     expect(FLAG_KEYS.ANALYTICS).toBe("analytics");
     expect(FLAG_KEYS.RECURRING_TASKS).toBe("recurring_tasks");
-    expect(FLAG_KEYS.CLOUD_VMS).toBe("cloud_vms");
     expect(FLAG_KEYS.REVIEWS).toBe("reviews");
     expect(FLAG_KEYS.DOCUMENTS).toBe("documents");
     expect(FLAG_KEYS.AGENT_QUEUE).toBe("agent_queue");
@@ -44,8 +43,8 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.MEMORY).toBe("memory");
   });
 
-  it("has exactly 36 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(36);
+  it("has exactly 35 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(35);
   });
 
   it("all values are unique", () => {
@@ -60,10 +59,6 @@ describe("FLAG_DEFAULTS", () => {
       expect(FLAG_DEFAULTS).toHaveProperty(key);
       expect(typeof FLAG_DEFAULTS[key as FlagKey]).toBe("boolean");
     }
-  });
-
-  it("CLOUD_VMS defaults to false", () => {
-    expect(FLAG_DEFAULTS[FLAG_KEYS.CLOUD_VMS]).toBe(false);
   });
 
   it("LIVE_GATEWAY defaults to false", () => {
@@ -124,7 +119,7 @@ describe("FLAG_DEFAULTS", () => {
       FLAG_KEYS.ANNOTATIONS,
       FLAG_KEYS.VOTING,
       FLAG_KEYS.MONITORS,
-    ]; // TERMINALS + PLUGIN_SDK + BOARD_CHAT + CLOUD_VMS + LIVE_GATEWAY + MULTI_PROVIDER_ADAPTERS + RUNNERS default false
+    ]; // TERMINALS + PLUGIN_SDK + BOARD_CHAT + LIVE_GATEWAY + MULTI_PROVIDER_ADAPTERS + RUNNERS default false
     for (const key of expectedTrue) {
       expect(FLAG_DEFAULTS[key]).toBe(true);
     }

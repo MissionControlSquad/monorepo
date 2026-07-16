@@ -34,9 +34,7 @@ import {
   DEFAULT_SETUP_MODE,
   SQUAD_LEAD_ROLE,
   SetupStatus,
-  CloudVmStatus,
   Priority,
-  truncateId,
 } from "@agentcenter/utils";
 import {
   AGENTS_FOR_DELEGATE_QUERY,
@@ -77,14 +75,6 @@ export default function CreateAgentScreen() {
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [delegateStatus, setDelegateStatus] = useState<"idle" | "creating" | "done">("idle");
   const [delegateTaskNumber, setDelegateTaskNumber] = useState<number | null>(null);
-  const [cloudVms, setCloudVms] = useState<Array<{
-    id: string; name?: string | null; serverName?: string | null;
-    region: string; serverType: string; ipv4?: string | null; status: string;
-  }>>([]);
-  const [cloudVmId, setCloudVmId] = useState<string | null>(null);
-  const [cloudVmsLoading, setCloudVmsLoading] = useState(false);
-  const [cloudDeploying, setCloudDeploying] = useState(false);
-  const [selectedVmId, setSelectedVmId] = useState<string>("");
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -222,28 +212,6 @@ export default function CreateAgentScreen() {
     } catch (err) {
       Alert.alert("Error", (err as Error).message);
       setDelegateStatus("idle");
-    }
-  };
-
-  const handleCloudDeploy = async () => {
-    if (!result || !selectedVmId) return;
-    setCloudDeploying(true);
-    try {
-      const res = await fetch(`${serverUrl}/api/cloud-vms/${selectedVmId}/agents`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ agentId: result.agent.id }),
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error || "Failed to deploy agent");
-      }
-      setCloudVmId(selectedVmId);
-    } catch (err) {
-      Alert.alert("Error", (err as Error).message);
-    } finally {
-      setCloudDeploying(false);
     }
   };
 
@@ -673,12 +641,12 @@ export default function CreateAgentScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingVertical: 4, gap: 6, flexDirection: "row" }}
           >
-            {(["auto", "manual", "delegate", "cloud"] as SetupMode[]).map((m) => {
+            {(["auto", "manual", "delegate"] as SetupMode[]).map((m) => {
               const icons: Record<SetupMode, keyof typeof Ionicons.glyphMap> = {
                 auto: "send-outline",
                 manual: "construct-outline",
                 delegate: "hardware-chip-outline",
-                cloud: "cloud-outline",
+                cloud: "cloud-outline", // retired (BYO only), not rendered
                 desktop: "desktop-outline", // not rendered in mobile, Electron-only
               };
               const disabled = m === "delegate" && squadLeads.length === 0;
@@ -692,28 +660,9 @@ export default function CreateAgentScreen() {
                       : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800",
                     disabled ? "opacity-40" : "",
                   ].join(" ")}
-                  onPress={async () => {
+                  onPress={() => {
                     if (disabled) return;
                     setSetupMode(m);
-                    if (m === "cloud" && cloudVms.length === 0) {
-                      setCloudVmsLoading(true);
-                      try {
-                        const res = await fetch(`${serverUrl}/api/cloud-vms`, {
-                          credentials: "include",
-                          headers: authHeader(),
-                        });
-                        if (res.ok) {
-                          const d = await res.json();
-                          setCloudVms(
-                            (d.vms || []).filter(
-                              (vm: { status: string; llmConfigured: boolean }) =>
-                                vm.status === CloudVmStatus.RUNNING && vm.llmConfigured,
-                            ),
-                          );
-                        }
-                      } catch { /* ignore */ }
-                      setCloudVmsLoading(false);
-                    }
                   }}
                   activeOpacity={0.75}
                 >
@@ -994,103 +943,6 @@ export default function CreateAgentScreen() {
                     </Text>
                   </View>
                 </View>
-              )}
-            </>
-          )}
-
-          {/* ── CLOUD MODE ── */}
-          {setupMode === "cloud" && (
-            <>
-              <View
-                className="flex-row gap-3 rounded-xl p-3.5 items-start border"
-                style={{ borderColor: "#e9d5ff", backgroundColor: "#faf5ff" }}
-              >
-                <Ionicons name="cloud-outline" size={18} color="#9333ea" />
-                <View className="flex-1">
-                  <Text className="text-sm font-bold mb-1" style={{ color: "#6b21a8" }}>Host on Cloud VM</Text>
-                  <Text className="text-xs leading-5" style={{ color: "#7c3aed" }}>
-                    Deploy this agent to one of your cloud VMs. The VM will automatically set up and start the agent.
-                  </Text>
-                </View>
-              </View>
-
-              {cloudVmId ? (
-                <View className="flex-row gap-3 border-[1.5px] border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 rounded-xl p-3.5 items-start">
-                  <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
-                  <View className="flex-1">
-                    <Text className="text-sm font-bold text-green-700 dark:text-green-400 mb-0.5">Agent Deployed</Text>
-                    <Text className="text-xs text-green-600 dark:text-green-500 leading-5">
-                      The VM is setting up your agent. You'll see it come online once it sends its first heartbeat.
-                    </Text>
-                  </View>
-                </View>
-              ) : cloudVmsLoading ? (
-                <View className="flex-row items-center gap-2.5 py-4">
-                  <ActivityIndicator size="small" color="#9333ea" />
-                  <Text className="text-sm text-purple-600">Loading VMs…</Text>
-                </View>
-              ) : cloudVms.length === 0 ? (
-                <View className="items-center py-6 gap-2">
-                  <Ionicons name="server-outline" size={32} color="#d1d5db" />
-                  <Text className="text-sm text-gray-700 dark:text-slate-300 font-medium">No running VMs with LLM configured</Text>
-                  <Text className="text-xs text-gray-400 dark:text-slate-500 text-center">
-                    Create and configure a VM on the Cloud page first
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3">
-                    <Text className="text-sm font-bold text-gray-900 dark:text-slate-100">Select a VM</Text>
-                    {cloudVms.map((vm) => (
-                      <TouchableOpacity
-                        key={vm.id}
-                        className={[
-                          "flex-row items-center border rounded-xl p-3 gap-2.5",
-                          selectedVmId === vm.id
-                            ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
-                            : "border-gray-200 dark:border-slate-700",
-                        ].join(" ")}
-                        onPress={() => setSelectedVmId(vm.id)}
-                        activeOpacity={0.75}
-                      >
-                        <View className="w-6">
-                          {selectedVmId === vm.id && (
-                            <Ionicons name="checkmark-circle" size={18} color="#2563eb" />
-                          )}
-                          {selectedVmId !== vm.id && (
-                            <View className="w-5 h-5 rounded-full border-[1.5px] border-gray-300 dark:border-slate-500" />
-                          )}
-                        </View>
-                        <View className="flex-1">
-                          <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100">
-                            {vm.name || vm.serverName || truncateId(vm.id)}
-                          </Text>
-                          <Text className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                            {vm.serverType} / {vm.region}
-                            {vm.ipv4 ? ` · ${vm.ipv4}` : ""}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  {selectedVmId && (
-                    <TouchableOpacity
-                      className={[
-                        "bg-blue-600 rounded-xl py-3.5 items-center",
-                        cloudDeploying ? "opacity-45" : "",
-                      ].join(" ")}
-                      onPress={handleCloudDeploy}
-                      disabled={cloudDeploying}
-                      activeOpacity={0.8}
-                    >
-                      {cloudDeploying ? (
-                        <ActivityIndicator color="#fff" size="small" />
-                      ) : (
-                        <Text className="text-white text-base font-semibold">Deploy to VM</Text>
-                      )}
-                    </TouchableOpacity>
-                  )}
-                </>
               )}
             </>
           )}

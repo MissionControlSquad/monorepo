@@ -9,7 +9,6 @@ export * from "./channel";
 export * from "./profile";
 export * from "./admin-user";
 export * from "./user-notification";
-export * from "./cloud-vm";
 export * from "./agent";
 export * from "./document";
 export * from "./health";

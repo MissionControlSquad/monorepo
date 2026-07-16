@@ -1,11 +1,8 @@
 /**
- * Hetzner Cloud API client. BYO: every call takes a `token` — the CUSTOMER's Hetzner API token,
+ * Hetzner Cloud API client. BYO: every call REQUIRES a `token` — the customer's Hetzner API token,
  * resolved from their workspace secrets vault by the caller (hetzner-provision.ts). We provision on
- * THEIR account; we never own the credential. The legacy operator-managed path (cloud-vm.ts) still
- * calls these without a token during the transition and falls back to env.HETZNER_API_TOKEN — that
- * fallback + cloud-vm.ts are removed once the managed subsystem is retired.
+ * THEIR account and never hold an operator token. There is no env fallback.
  */
-import { env } from "../env";
 
 const BASE_URL = "https://api.hetzner.cloud/v1";
 
@@ -49,21 +46,11 @@ interface CreateServerConfig {
   labels?: Record<string, string>;
 }
 
-async function hetznerFetch<T>(
-  path: string,
-  options: RequestInit = {},
-  token?: string,
-): Promise<T> {
-  // BYO token when provided; else the legacy operator env token (removed with the managed subsystem).
-  const authToken = token ?? env.HETZNER_API_TOKEN;
-  if (!authToken) {
-    throw new Error("Hetzner API token is not available");
-  }
-
+async function hetznerFetch<T>(path: string, options: RequestInit, token: string): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
-      Authorization: `Bearer ${authToken}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       ...options.headers,
     },
@@ -79,7 +66,7 @@ async function hetznerFetch<T>(
 
 export async function createServer(
   config: CreateServerConfig,
-  token?: string,
+  token: string,
 ): Promise<{
   serverId: string;
   ipv4: string;
@@ -118,7 +105,7 @@ export async function createServer(
 
 export async function getServer(
   serverId: string,
-  token?: string,
+  token: string,
 ): Promise<{
   status: string;
   ipv4: string;
@@ -132,7 +119,7 @@ export async function getServer(
   };
 }
 
-export async function powerOn(serverId: string, token?: string): Promise<void> {
+export async function powerOn(serverId: string, token: string): Promise<void> {
   await hetznerFetch<HetznerActionResponse>(
     `/servers/${serverId}/actions/poweron`,
     { method: "POST" },
@@ -140,7 +127,7 @@ export async function powerOn(serverId: string, token?: string): Promise<void> {
   );
 }
 
-export async function powerOff(serverId: string, token?: string): Promise<void> {
+export async function powerOff(serverId: string, token: string): Promise<void> {
   await hetznerFetch<HetznerActionResponse>(
     `/servers/${serverId}/actions/poweroff`,
     { method: "POST" },
@@ -148,7 +135,7 @@ export async function powerOff(serverId: string, token?: string): Promise<void> 
   );
 }
 
-export async function deleteServer(serverId: string, token?: string): Promise<void> {
+export async function deleteServer(serverId: string, token: string): Promise<void> {
   await hetznerFetch<unknown>(`/servers/${serverId}`, { method: "DELETE" }, token);
 }
 
@@ -158,7 +145,7 @@ export async function createSSHKey(
     publicKey: string;
     labels?: Record<string, string>;
   },
-  token?: string,
+  token: string,
 ): Promise<{ sshKeyId: string; fingerprint: string }> {
   const data = await hetznerFetch<HetznerSSHKeyResponse>(
     "/ssh_keys",
@@ -179,6 +166,6 @@ export async function createSSHKey(
   };
 }
 
-export async function deleteSSHKey(sshKeyId: string, token?: string): Promise<void> {
+export async function deleteSSHKey(sshKeyId: string, token: string): Promise<void> {
   await hetznerFetch<unknown>(`/ssh_keys/${sshKeyId}`, { method: "DELETE" }, token);
 }

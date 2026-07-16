@@ -83,12 +83,6 @@ async function ensureFeatureFlags() {
       description: "Recurring/scheduled task templates",
     },
     {
-      key: FLAG_KEYS.CLOUD_VMS,
-      enabled: true,
-      managedBy: "system",
-      description: "Cloud VM provisioning for agents",
-    },
-    {
       key: FLAG_KEYS.REVIEWS,
       enabled: true,
       managedBy: "system",

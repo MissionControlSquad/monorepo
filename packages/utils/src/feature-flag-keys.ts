@@ -3,9 +3,6 @@ export const FLAG_KEYS = {
   CHANNELS: "channels",
   ANALYTICS: "analytics",
   RECURRING_TASKS: "recurring_tasks",
-  /** @deprecated Operator-managed Hetzner VMs are deprecated — all infra is BYO. Default-off; gates
-   * the retained (reversible) managed-provisioning routes + UI. Do not build new features on it. */
-  CLOUD_VMS: "cloud_vms",
   REVIEWS: "reviews",
   DOCUMENTS: "documents",
   AGENT_QUEUE: "agent_queue",
@@ -47,7 +44,6 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.CHANNELS]: true,
   [FLAG_KEYS.ANALYTICS]: true,
   [FLAG_KEYS.RECURRING_TASKS]: true,
-  [FLAG_KEYS.CLOUD_VMS]: false,
   [FLAG_KEYS.REVIEWS]: true,
   [FLAG_KEYS.DOCUMENTS]: true,
   [FLAG_KEYS.AGENT_QUEUE]: true,

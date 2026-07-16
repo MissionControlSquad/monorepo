@@ -5,9 +5,8 @@ import { isSystemShutdown } from "@/server/system-settings";
 import { CURRENT_CONFIG_VERSION } from "@/server/config-version";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { getAgentProjectIds, isSquadLead } from "../../../_lib/project-access";
-import { getAgentPreflightStats, logCloudVMEvent } from "@agentcenter/database";
+import { getAgentPreflightStats } from "@agentcenter/database";
 import { applyAgentStatusUpdate } from "@/server/agent-status";
-import { getAgentSlug } from "@agentcenter/utils";
 
 /**
  * GET /api/agents/me/heartbeat-preflight
@@ -24,12 +23,6 @@ export async function GET(request: Request) {
     const shutdown = await isSystemShutdown();
     if (shutdown) {
       log("preflight", `agent="${agent.name}" shouldWork=false reason=shutdown`, request);
-      if (agent.cloudVmId)
-        logCloudVMEvent(
-          agent.cloudVmId,
-          `@${getAgentSlug(agent)} preflight: system shutdown — skipping`,
-          "warn",
-        ).catch(() => undefined);
       return successResponse({
         shouldWork: false,
         shutdown: true,
@@ -47,12 +40,6 @@ export async function GET(request: Request) {
     // Short-circuit: vacation
     if (agent.isOnVacation) {
       log("preflight", `agent="${agent.name}" shouldWork=false reason=vacation`, request);
-      if (agent.cloudVmId)
-        logCloudVMEvent(
-          agent.cloudVmId,
-          `@${getAgentSlug(agent)} preflight: on vacation — skipping`,
-          "info",
-        ).catch(() => undefined);
       return successResponse({
         shouldWork: false,
         shutdown: false,
@@ -88,12 +75,6 @@ export async function GET(request: Request) {
         `agent="${agent.name}" shouldWork=false reason=overlapping unread=${overlapUnread}`,
         request,
       );
-      if (agent.cloudVmId)
-        logCloudVMEvent(
-          agent.cloudVmId,
-          `@${getAgentSlug(agent)} preflight: another session already active — skipping`,
-          "info",
-        ).catch(() => undefined);
       return successResponse({
         shouldWork: false,
         shutdown: false,
@@ -147,25 +128,6 @@ export async function GET(request: Request) {
       `agent="${agent.name}" shouldWork=${shouldWork} assigned=${activeTaskAssignments} inbox=${inboxTaskCount} unread=${unreadChannelMessages} notifications=${undeliveredMentions} review=${reviewTaskCount}`,
       request,
     );
-
-    if (agent.cloudVmId) {
-      const reasons: string[] = [];
-      if (hasAssignedTasks) reasons.push(`${activeTaskAssignments} assigned task(s)`);
-      if (hasInboxTasks) reasons.push(`${inboxTaskCount} inbox task(s)`);
-      if (hasUnreadMessages) reasons.push(`${unreadChannelMessages} unread message(s)`);
-      if (hasNotifications) reasons.push(`${undeliveredMentions} notification(s)`);
-      if (hasPendingReview) reasons.push(`${reviewTaskCount} pending review(s)`);
-      if (upgradeAvailable) reasons.push("config upgrade available");
-
-      const detail = shouldWork
-        ? `will work — ${reasons.join(", ")}`
-        : "nothing to do — going back to sleep";
-      logCloudVMEvent(
-        agent.cloudVmId,
-        `@${getAgentSlug(agent)} preflight: ${detail}`,
-        "info",
-      ).catch(() => undefined);
-    }
 
     return successResponse({
       shouldWork,

@@ -2,7 +2,7 @@
  * Tier D: runner commands — raw shell/CLI jobs on a runner, WITHOUT an agent runtime.
  *
  * This is the "trigger CLI without OpenClaw" primitive. One `RunnerCommand` model, two movers:
- *   • cloud_vm / host target → the SERVER executes it here via sshExec (this file, Slice 1).
+ *   • host target → the SERVER executes it here via sshExec on a BYO RunnerHost (this file, Slice 1).
  *   • agent target → an outbound runner daemon pulls + posts results (poll endpoints, Slice 2).
  *
  * Nothing here is OpenClaw-specific: sshExec runs an arbitrary command. RUNNERS-gated at the edge.
@@ -11,7 +11,6 @@ import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { RunnerCommand } from "@agentcenter/database";
 import { sshExec, type SSHConfig } from "./ssh";
-import { getVMSSHConfig } from "./cloud-vm-utils";
 import { resolveHostSSHConfig } from "./runner-hosts";
 
 function badRequest(message: string): never {
@@ -24,7 +23,7 @@ function notFound(message: string): never {
 
 export interface CreateRunnerCommandInput {
   workspaceId: string;
-  targetKind: "cloud_vm" | "agent" | "host";
+  targetKind: "agent" | "host";
   targetId: string;
   command: string;
   cwd?: string | null;
@@ -32,7 +31,7 @@ export interface CreateRunnerCommandInput {
   requestedByProfileId?: string | null;
 }
 
-/** Create a queued runner command. Does NOT execute — call runQueuedCommand for cloud_vm/host. */
+/** Create a queued runner command. Does NOT execute — call runQueuedCommand for a host target. */
 export async function createRunnerCommand(input: CreateRunnerCommandInput): Promise<RunnerCommand> {
   const command = input.command.trim();
   if (!command) badRequest("command is required");
@@ -67,30 +66,20 @@ export function capOutput(s: string | null | undefined): string | null {
   return `${kept}\n…[truncated ${s.length - MAX_OUTPUT_BYTES} chars]`;
 }
 
-/** Resolve the SSHConfig for an SSH-reachable target (cloud_vm or host). */
+/** Resolve the SSHConfig for an SSH-reachable host target. */
 async function resolveTargetSshConfig(
   workspaceId: string,
   targetKind: string,
   targetId: string,
 ): Promise<SSHConfig> {
-  if (targetKind === "cloud_vm") {
-    const vm = await prisma.cloudVM.findFirst({
-      where: { id: targetId, workspaceId },
-      select: { id: true, ipv4: true, sshPrivateKey: true },
-    });
-    if (!vm) notFound("Target VM not found");
-    return getVMSSHConfig(vm);
-  }
   if (targetKind === "host") {
     return resolveHostSSHConfig(workspaceId, targetId);
   }
-  return badRequest(
-    `Server-side execution only supports cloud_vm and host targets (got ${targetKind})`,
-  );
+  return badRequest(`Server-side execution only supports host targets (got ${targetKind})`);
 }
 
 /**
- * Execute a queued command against an SSH-reachable target (cloud_vm or host) and persist the result
+ * Execute a queued command against an SSH-reachable host target and persist the result
  * on the row. Marks running → done/failed/timeout. Idempotent-ish: only runs if queued. The `agent`
  * target kind is NOT server-executed — its runner daemon pulls it via the poll endpoints instead.
  */
@@ -133,27 +122,6 @@ export async function runQueuedCommand(workspaceId: string, id: string): Promise
       },
     });
   }
-}
-
-/** Create + immediately execute against a cloud VM. Convenience for the GraphQL mutation. */
-export async function runCommandOnVM(input: {
-  workspaceId: string;
-  vmId: string;
-  command: string;
-  cwd?: string | null;
-  timeoutMs?: number | null;
-  requestedByProfileId?: string | null;
-}): Promise<RunnerCommand> {
-  const created = await createRunnerCommand({
-    workspaceId: input.workspaceId,
-    targetKind: "cloud_vm",
-    targetId: input.vmId,
-    command: input.command,
-    cwd: input.cwd,
-    timeoutMs: input.timeoutMs,
-    requestedByProfileId: input.requestedByProfileId,
-  });
-  return runQueuedCommand(input.workspaceId, created.id);
 }
 
 /** Create + immediately execute against a registered BYO host over direct SSH. */
