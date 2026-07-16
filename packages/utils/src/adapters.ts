@@ -58,9 +58,25 @@ export interface Adapter {
   requiresTemplate: boolean;
   /** Whether this adapter accepts a model override (surfaced in UI). */
   supportsModel: boolean;
-  /** Known model ids (informational; empty = any/unknown). */
+  /** Curated known model ids (empty = any/unknown; live detection may add more). */
   models: string[];
+  /**
+   * Optional live model detection — e.g. shell out to the runtime's CLI to list installed models.
+   * Runs on the machine that has the CLI (the runner). Falls back to `models` when absent/failing.
+   */
+  detectModels?(): Promise<string[]>;
   build(ctx: AdapterContext): AdapterInvocation;
+}
+
+/** Models an adapter offers: live-detected if it supports it (deduped with the curated list), else curated. */
+export async function resolveAdapterModels(adapter: Adapter): Promise<string[]> {
+  if (!adapter.detectModels) return adapter.models;
+  try {
+    const detected = await adapter.detectModels();
+    return [...new Set([...detected, ...adapter.models])];
+  } catch {
+    return adapter.models;
+  }
 }
 
 const OPENCLAW_LAYOUT: AdapterLayout = {
@@ -127,7 +143,8 @@ const claudeAdapter: Adapter = {
   displayName: "Claude Code",
   requiresTemplate: false,
   supportsModel: true,
-  models: [],
+  // Curated Claude model ids; a runner with the CLI can add more via detectModels (not wired here).
+  models: ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5", "claude-fable-5"],
   build: (ctx) => ({
     argv: ["claude", "--print", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
     mode: "spawn",

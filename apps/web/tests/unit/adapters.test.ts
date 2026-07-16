@@ -7,6 +7,7 @@ import {
   buildAdapterInvocation,
   BUILTIN_ADAPTER_KEYS,
   substituteAdapterToken,
+  resolveAdapterModels,
   type Adapter,
   type AdapterInvocation,
 } from "@agentcenter/utils";
@@ -133,6 +134,33 @@ describe("adapter registry", () => {
     registerAdapter(mine);
     expect(isAdapterKey("my-runtime")).toBe(true);
     expect(argvOf(buildAdapterInvocation("my-runtime", base))).toEqual(["my-runtime", "t_1"]);
+  });
+
+  it("claude ships curated model ids", () => {
+    expect(getAdapter("claude")!.models).toContain("claude-opus-4-8");
+  });
+
+  it("resolveAdapterModels: detects live + merges curated; falls back on no-hook or failure", async () => {
+    const noHook: Adapter = { ...getAdapter("claude")!, key: "c1" };
+    expect(await resolveAdapterModels(noHook)).toEqual(noHook.models);
+
+    const withHook: Adapter = {
+      ...getAdapter("openclaw")!,
+      key: "c2",
+      models: ["curated-1"],
+      detectModels: async () => ["live-a", "curated-1"],
+    };
+    expect(await resolveAdapterModels(withHook)).toEqual(["live-a", "curated-1"]);
+
+    const failing: Adapter = {
+      ...getAdapter("openclaw")!,
+      key: "c3",
+      models: ["fallback"],
+      detectModels: async () => {
+        throw new Error("cli missing");
+      },
+    };
+    expect(await resolveAdapterModels(failing)).toEqual(["fallback"]);
   });
 
   it("substituteAdapterToken replaces all tokens", () => {
