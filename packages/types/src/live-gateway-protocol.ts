@@ -173,6 +173,17 @@ export interface MsgNotify {
   fromHandle?: string;
 }
 
+/**
+ * MC acknowledges a vm.task_done it durably persisted. The plugin buffers unacked task_done frames
+ * and resends them (on reconnect / periodically) until this ack arrives, so a completion isn't lost
+ * if the frame is dropped on a half-open socket. handleTaskDone is idempotent, so a resend is safe.
+ */
+export interface MsgTaskDoneAck {
+  type: "mc.task_done_ack";
+  taskId: string;
+  slug: string;
+}
+
 /** Authentication / protocol error — connection will be closed after this. */
 export interface MsgError {
   type: "mc.error";
@@ -185,6 +196,7 @@ export type MCToPlugin =
   | MsgPong
   | MsgDeliverTask
   | MsgNotify
+  | MsgTaskDoneAck
   | MsgError;
 
 // ── Protocol constants ────────────────────────────────────────────────────────

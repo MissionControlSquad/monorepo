@@ -17,11 +17,13 @@ import type {
   MsgDeliverTask,
   MsgNotify,
   MsgSessionDone,
+  MsgTaskDone,
 } from "@agentcenter/types";
 import { LIVE_GATEWAY } from "@agentcenter/types";
 import type { MCBridgeConfig } from "./config-schema";
 import { deriveMachineFingerprint, deliverToLocalAgent, listLocalAgents } from "./openclaw-local";
 import { PLUGIN_VERSION } from "./version";
+import { PendingTaskDone } from "./pending-task-done";
 
 type SendHandler = (msg: PluginToMC) => void;
 
@@ -43,6 +45,7 @@ export class MCBridgeWsClient {
   private dedup: DeliveryDedup; // Dedup buffer (capped; optionally persisted across restarts)
   private pongPending = false; // a ping was sent and its pong not yet received
   private missedPongs = 0; // consecutive unanswered pings
+  private pendingTaskDone = new PendingTaskDone(); // task_done frames awaiting mc.task_done_ack
   private onConnectCallbacks: Array<() => void> = [];
   /** Tracks which agents currently have a running runEmbeddedAgent session. */
   private activeSessions = new Set<string>();
@@ -70,6 +73,15 @@ export class MCBridgeWsClient {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
     }
+  }
+
+  /**
+   * Send a task completion reliably: buffer it until MC acks (mc.task_done_ack), so a frame dropped
+   * on a half-open socket is resent on the next reconnect / ping tick instead of lost.
+   */
+  sendTaskDone(frame: MsgTaskDone): void {
+    this.pendingTaskDone.add(frame, Date.now());
+    this.send(frame);
   }
 
   async start(): Promise<void> {
@@ -150,6 +162,8 @@ export class MCBridgeWsClient {
           );
         }
         this.startPing();
+        // Reconnected: resend every task completion still awaiting an ack.
+        this.resendPendingTaskDone();
         for (const cb of this.onConnectCallbacks) cb();
         break;
 
@@ -157,6 +171,10 @@ export class MCBridgeWsClient {
         // Keepalive acknowledged — the socket is alive.
         this.pongPending = false;
         this.missedPongs = 0;
+        break;
+
+      case "mc.task_done_ack":
+        this.pendingTaskDone.ack(msg.slug, msg.taskId);
         break;
 
       case "mc.deliver_task":
@@ -290,7 +308,17 @@ export class MCBridgeWsClient {
       }
       this.send({ type: "vm.ping", timestamp: Date.now() });
       this.pongPending = true;
+      // Also resend any task completion unacked for longer than one ping interval.
+      this.resendPendingTaskDone(Date.now() - LIVE_GATEWAY.PLUGIN_PING_INTERVAL_MS);
     }, LIVE_GATEWAY.PLUGIN_PING_INTERVAL_MS);
+  }
+
+  /** Resend unacked task_done frames (all when staleBefore omitted; else only stale ones). */
+  private resendPendingTaskDone(staleBefore?: number): void {
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
+    const due = this.pendingTaskDone.due(staleBefore);
+    for (const frame of due) this.send(frame);
+    this.pendingTaskDone.markResent(due, Date.now());
   }
 
   private clearTimers(): void {

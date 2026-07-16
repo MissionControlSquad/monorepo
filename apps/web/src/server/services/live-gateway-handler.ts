@@ -406,10 +406,22 @@ async function handleTaskDone(
       machineName,
       `@${msg.slug} reported task #${task.taskNumber} done (already done — idempotent)`,
     ).catch(() => undefined);
+    // Still ack so the plugin stops resending this (already-durable) completion.
+    connectionRegistry.send(connectionId, {
+      type: "mc.task_done_ack",
+      taskId: msg.taskId,
+      slug: msg.slug,
+    });
     return;
   }
 
   await updateTaskStatus(msg.taskId, TaskStatus.DONE);
+  // Ack now that it's durably persisted — the plugin can drop it from its resend buffer.
+  connectionRegistry.send(connectionId, {
+    type: "mc.task_done_ack",
+    taskId: msg.taskId,
+    slug: msg.slug,
+  });
   logVMActivity(machineName, `@${msg.slug} completed task #${task.taskNumber}`).catch(
     () => undefined,
   );
