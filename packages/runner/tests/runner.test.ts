@@ -15,6 +15,7 @@ import {
 import { resolveConfig } from "../src/config.js";
 
 interface Recorder {
+  memories: { taskId: string; content: string }[];
   posted: { id: string; result: CommandResultPayload }[];
   messages: { taskId: string; content: string }[];
   statuses: { taskId: string; status: string }[];
@@ -22,7 +23,7 @@ interface Recorder {
 
 // A fake api that records posted results/messages/statuses and hands back canned commands/context.
 function fakeApi(overrides: Partial<RunnerApi> = {}): { api: RunnerApi } & Recorder {
-  const rec: Recorder = { posted: [], messages: [], statuses: [] };
+  const rec: Recorder = { posted: [], messages: [], statuses: [], memories: [] };
   const api: RunnerApi = {
     heartbeatPreflight: async () => ({ shouldWork: true }),
     getCommands: async () => [],
@@ -40,6 +41,9 @@ function fakeApi(overrides: Partial<RunnerApi> = {}): { api: RunnerApi } & Recor
       rec.statuses.push({ taskId, status });
     },
     postDeliverable: async () => {},
+    postMemory: async (taskId, content) => {
+      rec.memories.push({ taskId, content });
+    },
     ...overrides,
   };
   return { api, ...rec };
@@ -68,6 +72,7 @@ const bundle: AgentContextBundle = {
   version: 1,
   agent: { id: "a1", name: "Nova", role: "worker", personality: "keen", level: "senior" },
   runtime: null,
+  memory: null,
   instructions: [{ fileName: "AGENTS.md", content: "be good" }],
   skills: [{ key: "lint", name: "Lint", description: null, markdown: "# lint" }],
   task: {
@@ -245,6 +250,28 @@ describe("runTaskOnce", () => {
       { taskId: "t1", status: "in_progress" },
       { taskId: "t1", status: "review" },
     ]);
+  });
+
+  it("db memory provider: captures an updated MEMORY.md back to the control plane", async () => {
+    const withMem = { ...bundle, memory: { provider: "db", content: "old memory" } };
+    const { api, memories } = fakeApi({ getContext: async () => withMem });
+    // the runtime "updated" MEMORY.md — the injected reader returns new content.
+    const result = await runTaskOnce(api, "t1", {
+      ...taskDeps(okExecPlan()),
+      readFile: (p: string) => (p.endsWith("MEMORY.md") ? "new learned memory" : null),
+    });
+    expect(result.exitCode).toBe(0);
+    expect(memories).toEqual([{ taskId: "t1", content: "new learned memory" }]);
+  });
+
+  it("db memory: does not post when MEMORY.md is unchanged", async () => {
+    const withMem = { ...bundle, memory: { provider: "db", content: "same" } };
+    const { api, memories } = fakeApi({ getContext: async () => withMem });
+    await runTaskOnce(api, "t1", {
+      ...taskDeps(okExecPlan()),
+      readFile: () => "same",
+    });
+    expect(memories).toEqual([]);
   });
 
   it("marks blocked on a non-zero exit and includes stderr in the message", async () => {

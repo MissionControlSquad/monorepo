@@ -99,6 +99,8 @@ export async function writeBundleFiles(
 
   await write(layout.identityFile, identityMarkdown(bundle));
   await write(layout.taskFile, taskMarkdown(bundle));
+  // Inject prior memory (db provider) so the runtime can read + update it.
+  if (bundle.memory?.content) await write("MEMORY.md", bundle.memory.content);
   if (bundle.instructions.length) {
     // Concatenate instruction files into the primary AGENTS.md-style file.
     await write(layout.instructionsFile, bundle.instructions.map((i) => i.content).join("\n\n---\n\n"));
@@ -155,6 +157,8 @@ export interface TaskRunDeps {
   template?: string[] | string;
   /** Check out the project repo into the run dir. Real git in prod; omitted/no-op in tests. */
   cloneRepo?: (project: AgentContextProject, dir: string) => Promise<void>;
+  /** Read a file from the run dir (used to capture MEMORY.md for the db memory provider). */
+  readFile?: (path: string) => string | null;
   timeoutMs?: number;
 }
 
@@ -192,6 +196,17 @@ export async function runTaskOnce(
     .join("")
     .slice(-45_000);
   await api.postTaskMessage(taskId, output || "(runner produced no output)");
+
+  // db memory provider: capture the runtime's updated MEMORY.md back to the control plane (provenance).
+  if (plan.mode === "spawn" && bundle.memory?.provider === "db" && deps.readFile) {
+    const mem = deps.readFile(join(plan.cwd, "MEMORY.md"));
+    if (mem && mem.trim() && mem !== (bundle.memory.content ?? "")) {
+      await api.postMemory(taskId, mem).catch((err) =>
+        log.error(`memory post failed: ${err instanceof Error ? err.message : String(err)}`),
+      );
+    }
+  }
+
   const finalStatus = result.timedOut || result.exitCode !== 0 ? "blocked" : "review";
   await api.setTaskStatus(taskId, finalStatus);
   log.info(`task ${taskId} → ${finalStatus} (exit ${result.exitCode})`);

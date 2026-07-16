@@ -27,6 +27,8 @@ export async function GET(request: Request) {
         runtimeAdapter: agent.runtimeAdapter ?? null,
         runtimeModel: agent.runtimeModel ?? null,
         runtimeTemplate: agent.runtimeTemplate ?? null,
+        memoryProvider: agent.memoryProvider ?? null,
+        workspaceId: agent.workspaceId ?? null,
       },
       taskId,
     );

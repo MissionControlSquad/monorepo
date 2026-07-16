@@ -46,4 +46,5 @@ import "./monitors";
 import "./runner-commands";
 import "./runner-hosts";
 import "./agent-runtime";
+import "./agent-memory";
 import "./attention";

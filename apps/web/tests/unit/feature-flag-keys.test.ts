@@ -41,10 +41,11 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.MONITORS).toBe("monitors");
     // Tier D
     expect(FLAG_KEYS.RUNNERS).toBe("runners");
+    expect(FLAG_KEYS.MEMORY).toBe("memory");
   });
 
-  it("has exactly 35 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(35);
+  it("has exactly 36 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(36);
   });
 
   it("all values are unique", () => {
@@ -87,6 +88,10 @@ describe("FLAG_DEFAULTS", () => {
 
   it("RUNNERS defaults to false (Tier D execution surface; opt-in)", () => {
     expect(FLAG_DEFAULTS[FLAG_KEYS.RUNNERS]).toBe(false);
+  });
+
+  it("MEMORY defaults to false (Tier D memory layer; opt-in over stateless)", () => {
+    expect(FLAG_DEFAULTS[FLAG_KEYS.MEMORY]).toBe(false);
   });
 
   it("all other flags default to true", () => {

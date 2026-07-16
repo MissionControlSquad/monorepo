@@ -12,10 +12,25 @@
 import { prisma } from "@/server/prisma";
 import type { AgentContextBundle } from "@agentcenter/types";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
+import { assembleInjectedMemory } from "./agent-memory";
 
 // REST-shaped error so the route's handleError() renders a 404 (not a 500).
 function notFound(message: string): never {
   throw { error: message, status: 404 };
+}
+
+/** Build the memory block for the run: null for the stateless `none` provider; otherwise the binding
+ * (+ injected content for `db`). */
+async function assembleMemoryBlock(
+  agent: AgentLike,
+): Promise<{ provider: string; content: string | null } | null> {
+  const provider = agent.memoryProvider ?? "none";
+  if (provider === "none") return null;
+  const content =
+    provider === "db" && agent.workspaceId
+      ? await assembleInjectedMemory(agent.workspaceId, agent.id)
+      : null;
+  return { provider, content };
 }
 
 /** Project IDs where the agent is an active member (its accessible workspace scope for tasks). */
@@ -37,6 +52,8 @@ interface AgentLike {
   runtimeAdapter?: string | null;
   runtimeModel?: string | null;
   runtimeTemplate?: string | null;
+  memoryProvider?: string | null;
+  workspaceId?: string | null;
 }
 
 /** Assemble the context bundle for `taskId`, scoped to what `agent` may access. */
@@ -93,6 +110,7 @@ export async function assembleContextBundle(
           template: agent.runtimeTemplate ?? null,
         }
       : null,
+    memory: await assembleMemoryBlock(agent),
     instructions: instructions.map((i) => ({ fileName: i.fileName, content: i.content })),
     skills: agentSkills.map((as) => ({
       key: as.skill.key,

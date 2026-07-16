@@ -75,6 +75,7 @@ function buildTaskDeps(config: RunnerConfig): TaskRunDeps {
     execPlan,
     template: config.runtimeTemplate,
     cloneRepo: realCloneRepo,
+    readFile: (p) => (existsSync(p) ? readFileSync(p, "utf8") : null),
   };
 }
 

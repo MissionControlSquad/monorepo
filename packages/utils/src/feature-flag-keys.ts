@@ -35,6 +35,7 @@ export const FLAG_KEYS = {
   VOTING: "voting",
   MONITORS: "monitors",
   RUNNERS: "runners",
+  MEMORY: "memory",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -78,4 +79,6 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.MONITORS]: true,
   // Tier D: runner commands / runtime-agnostic execution. Opt-in operator surface.
   [FLAG_KEYS.RUNNERS]: false,
+  // Tier D: two-layer agent memory (opt-in over the stateless default).
+  [FLAG_KEYS.MEMORY]: false,
 };
