@@ -192,6 +192,36 @@ export async function listRunnerCommands(
   });
 }
 
+/**
+ * Reap commands stuck in `running` because the runner (server exec, or an agent daemon behind NAT)
+ * died before reporting a result. A row is stuck when `claimedAt + timeoutMs + grace` has passed.
+ * Marked `timeout` (guarded by status=running so a command that just finished can't be clobbered).
+ * This is the self-healing backstop for the "dead runner leaves a command running forever" gap —
+ * runs from the reap-stale-work cron. Returns the number reaped.
+ */
+export async function reapStuckRunnerCommands(
+  now: Date = new Date(),
+  graceMs = 60_000,
+): Promise<number> {
+  const running = await prisma.runnerCommand.findMany({
+    where: { status: "running", claimedAt: { not: null } },
+    select: { id: true, claimedAt: true, timeoutMs: true },
+  });
+  const stuckIds = running
+    .filter((r) => r.claimedAt && r.claimedAt.getTime() + r.timeoutMs + graceMs < now.getTime())
+    .map((r) => r.id);
+  if (stuckIds.length === 0) return 0;
+  const res = await prisma.runnerCommand.updateMany({
+    where: { id: { in: stuckIds }, status: "running" },
+    data: {
+      status: "timeout",
+      errorMessage: "Reaped: no result within deadline (runner may have died or disconnected)",
+      finishedAt: now,
+    },
+  });
+  return res.count;
+}
+
 /** Cancel a command that hasn't finished. Returns true if a row transitioned to canceled. */
 export async function cancelRunnerCommand(workspaceId: string, id: string): Promise<boolean> {
   const res = await prisma.runnerCommand.updateMany({

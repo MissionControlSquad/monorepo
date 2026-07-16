@@ -161,6 +161,27 @@ export async function closeTerminalSession(
   return stripToken(updated);
 }
 
+/**
+ * Reap stale terminal sessions (self-healing backstop, run from the reap-stale-work cron):
+ *  - `active`/`pending` sessions past their overall `sessionExpiresAt` → `closed` (covers a session
+ *    orphaned in `active` because the web process died before its PTY teardown ran).
+ *  - `pending` sessions past their one-time `connectExpiresAt` that were never connected → `expired`.
+ * Returns how many rows transitioned in each bucket.
+ */
+export async function reapStaleTerminalSessions(
+  now: Date = new Date(),
+): Promise<{ closed: number; expired: number }> {
+  const closed = await prisma.terminalSession.updateMany({
+    where: { status: { in: ["pending", "active"] }, sessionExpiresAt: { lt: now } },
+    data: { status: "closed", closedAt: now },
+  });
+  const expired = await prisma.terminalSession.updateMany({
+    where: { status: "pending", connectExpiresAt: { lt: now } },
+    data: { status: "expired" },
+  });
+  return { closed: closed.count, expired: expired.count };
+}
+
 export async function listTerminalSessions(workspaceId: string): Promise<SafeTerminalSession[]> {
   const sessions = await prisma.terminalSession.findMany({
     where: { workspaceId },

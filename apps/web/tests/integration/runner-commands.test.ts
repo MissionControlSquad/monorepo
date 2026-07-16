@@ -24,6 +24,7 @@ import {
   runCommandOnVM,
   cancelRunnerCommand,
   capOutput,
+  reapStuckRunnerCommands,
 } from "../../src/server/services/runner-commands";
 
 const mockedSshExec = vi.mocked(sshExec);
@@ -162,6 +163,42 @@ describe("runner-commands service (Tier D)", () => {
     expect(cmd.status).toBe("done");
     expect(cmd.stdout!.length).toBeLessThan(70_000);
     expect(cmd.stdout).toContain("truncated");
+  });
+
+  it("reaps a command stuck in running past its deadline; leaves fresh/finished ones alone", async () => {
+    const vmId = await makeVM();
+    const mk = async (claimedMinsAgo: number, status = "running") => {
+      const c = await createRunnerCommand({
+        workspaceId: WS,
+        targetKind: "agent",
+        targetId: "agent_x",
+        command: "work",
+      });
+      await prisma.runnerCommand.update({
+        where: { id: c.id },
+        data: {
+          status: status as "running" | "done",
+          claimedAt: new Date(Date.now() - claimedMinsAgo * 60_000),
+        },
+      });
+      return c.id;
+    };
+    const stuck = await mk(10); // running, claimed 10 min ago → past 120s+60s deadline
+    const fresh = await mk(0); // running, just claimed → not stuck
+    const doneId = await mk(10, "done"); // finished → must not be touched
+    void vmId;
+
+    const n = await reapStuckRunnerCommands(new Date());
+    expect(n).toBe(1);
+    expect((await prisma.runnerCommand.findUniqueOrThrow({ where: { id: stuck } })).status).toBe(
+      "timeout",
+    );
+    expect((await prisma.runnerCommand.findUniqueOrThrow({ where: { id: fresh } })).status).toBe(
+      "running",
+    );
+    expect((await prisma.runnerCommand.findUniqueOrThrow({ where: { id: doneId } })).status).toBe(
+      "done",
+    );
   });
 
   it("cancels a queued command", async () => {

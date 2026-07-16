@@ -4,6 +4,7 @@ import {
   openTerminalSession,
   activateTerminalByConnectToken,
   resolveTerminalSshConfig,
+  reapStaleTerminalSessions,
 } from "../../src/server/services/terminals";
 
 // Tier D (Slice 6): the token-first activation + SSH-credential resolution that back the browser
@@ -91,5 +92,42 @@ describe("terminal PTY activation (Tier D Slice 6)", () => {
       command: "ssh deploy@10.0.0.9",
     });
     expect(await resolveTerminalSshConfig(session)).toBeNull();
+  });
+
+  it("reaps stale sessions: never-connected pending → expired, orphaned active → closed", async () => {
+    // A never-connected pending session whose connect window has passed.
+    const { session: stale } = await openTerminalSession({ workspaceId: WS, command: "ssh a@b" });
+    await prisma.terminalSession.update({
+      where: { id: stale.id },
+      data: {
+        connectExpiresAt: new Date(Date.now() - 60_000),
+        sessionExpiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    // An active session orphaned past its overall TTL (process died before teardown).
+    const { session: orphan, connectToken } = await openTerminalSession({
+      workspaceId: WS,
+      command: "ssh c@d",
+    });
+    await activateTerminalByConnectToken(orphan.id, connectToken);
+    await prisma.terminalSession.update({
+      where: { id: orphan.id },
+      data: { sessionExpiresAt: new Date(Date.now() - 60_000) },
+    });
+    // A fresh pending session must be left alone.
+    const { session: fresh } = await openTerminalSession({ workspaceId: WS, command: "ssh e@f" });
+
+    const res = await reapStaleTerminalSessions(new Date());
+    expect(res.expired).toBe(1);
+    expect(res.closed).toBe(1);
+    expect(
+      (await prisma.terminalSession.findUniqueOrThrow({ where: { id: stale.id } })).status,
+    ).toBe("expired");
+    expect(
+      (await prisma.terminalSession.findUniqueOrThrow({ where: { id: orphan.id } })).status,
+    ).toBe("closed");
+    expect(
+      (await prisma.terminalSession.findUniqueOrThrow({ where: { id: fresh.id } })).status,
+    ).toBe("pending");
   });
 });

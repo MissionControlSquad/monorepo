@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/cleanup-live-gateway",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/reap-stale-work",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
