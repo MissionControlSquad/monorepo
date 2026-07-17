@@ -17,6 +17,22 @@ export interface TrustDecision {
   reason: string;
 }
 
+/**
+ * True when an agent must be CONTAINED to an isolating sandbox — untrusted/low trust, or a profile
+ * that explicitly sets lowTrustContainment. Such an agent must NEVER run on a shared/control-plane
+ * host (the `local` sandbox provider); it requires an isolating ephemeral box. Fail-closed admission.
+ */
+export function requiresSandboxContainment(profile: {
+  trustLevel: TrustLevel;
+  lowTrustContainment?: boolean | null;
+}): boolean {
+  return (
+    profile.trustLevel === "untrusted" ||
+    profile.trustLevel === "low" ||
+    profile.lowTrustContainment === true
+  );
+}
+
 /** Pure trust decision — no I/O. */
 export function evaluateTrust(
   profile: TrustProfileEval | null,

@@ -10,7 +10,11 @@
  * cloud provider (e2b/daytona/…). Credentials are BYO from the workspace vault via the provision ctx.
  */
 import { GraphQLError } from "graphql";
-import { buildAdapterInvocation } from "@agentcenter/utils";
+import {
+  buildAdapterInvocation,
+  requiresSandboxContainment,
+  type TrustLevel,
+} from "@agentcenter/utils";
 import type { AgentContextBundle } from "@agentcenter/types";
 import { prisma } from "@/server/prisma";
 import { assembleContextBundle } from "./agent-context";
@@ -61,6 +65,7 @@ export async function runTaskInSandbox(input: {
 }): Promise<SandboxRunResult> {
   const agent = await prisma.agent.findFirst({
     where: { id: input.agentId, workspaceId: input.workspaceId },
+    include: { trustProfile: true },
   });
   if (!agent) throw new GraphQLError("Agent not found", { extensions: { code: "NOT_FOUND" } });
 
@@ -75,6 +80,22 @@ export async function runTaskInSandbox(input: {
     throw new GraphQLError(`Unknown sandbox provider: ${providerKey}`, {
       extensions: { code: "BAD_USER_INPUT" },
     });
+  }
+
+  // Fail-closed admission: a low-trust/untrusted (or explicitly contained) agent must run in an
+  // ISOLATING sandbox — never on the control-plane host (the `local` provider).
+  const trustLevel = (agent.trustLevel ?? "standard") as TrustLevel;
+  if (
+    requiresSandboxContainment({
+      trustLevel,
+      lowTrustContainment: agent.trustProfile?.lowTrustContainment,
+    }) &&
+    !provider.isolating
+  ) {
+    throw new GraphQLError(
+      `Agent is ${trustLevel}-trust and must run in an isolated sandbox — provider "${providerKey}" runs on the host. Configure an isolating cloud sandbox provider.`,
+      { extensions: { code: "FORBIDDEN" } },
+    );
   }
 
   const bundle = await assembleContextBundle(

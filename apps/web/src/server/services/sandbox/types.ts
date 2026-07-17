@@ -57,6 +57,12 @@ export interface SandboxProvider {
   requiresApiKey: boolean;
   /** Vault secret NAMES the WORKSPACE must provide (BYO). Empty for `local`. */
   credentialKeys: string[];
+  /**
+   * true = runs untrusted code in an ISOLATED ephemeral box (the customer's own account); false =
+   * runs on the control-plane host (`local`). Low-trust/untrusted agents may only use isolating
+   * providers (fail-closed admission).
+   */
+  isolating: boolean;
   provision(ctx: SandboxProvisionContext, spec?: SandboxSpec): Promise<SandboxHandle>;
 }
 
@@ -122,6 +128,7 @@ export function defineCloudProvider(opts: {
     displayName: opts.displayName,
     requiresApiKey: true,
     credentialKeys: opts.credentialKeys,
+    isolating: true, // ephemeral box on the customer's own account — contains untrusted code
     provision: async (ctx, spec) => {
       const creds: Record<string, string> = {};
       const missing: string[] = [];

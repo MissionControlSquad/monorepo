@@ -102,6 +102,8 @@ const localProvider: SandboxProvider = {
   displayName: "Local (this host)",
   requiresApiKey: false,
   credentialKeys: [],
+  isolating: false, // runs on the control-plane host — NOT for untrusted/low-trust agents
+
   provision: async () => {
     const dir = mkdtempSync(join(tmpdir(), "agentcenter-sbx-"));
     return {

@@ -12,7 +12,10 @@ import { runTaskInSandbox } from "../../src/server/services/sandbox-run";
 // → destroy actually works. Cloud providers reuse this exact seam (their SDK is mocked in their tests).
 const WS = "ws_sbxrun";
 
-async function makeAgent(sandboxProvider?: string): Promise<string> {
+async function makeAgent(
+  sandboxProvider?: string,
+  trustLevel?: "untrusted" | "low" | "standard" | "trusted",
+): Promise<string> {
   const agent = await prisma.agent.create({
     data: {
       name: "Sbx Agent",
@@ -25,6 +28,7 @@ async function makeAgent(sandboxProvider?: string): Promise<string> {
       runtimeAdapter: "shell",
       runtimeTemplate: "echo SANDBOX_RAN && cat TASK.md",
       sandboxProvider: sandboxProvider ?? null,
+      trustLevel: trustLevel ?? null,
     },
   });
   return agent.id;
@@ -154,6 +158,14 @@ describe("sandbox task execution (Tier D)", () => {
     await expect(
       runTaskInSandbox({ workspaceId: WS, taskId, agentId, providerKey: "nope" }),
     ).rejects.toThrow(/Unknown sandbox provider/i);
+  });
+
+  it("fail-closed admission: a low-trust agent cannot run on the non-isolating local provider", async () => {
+    const agentId = await makeAgent("local", "low");
+    const taskId = await makeTask();
+    await expect(runTaskInSandbox({ workspaceId: WS, taskId, agentId })).rejects.toThrow(
+      /low-trust|isolated sandbox|runs on the host/i,
+    );
   });
 
   it("scopes the agent to the workspace (foreign agent → not found)", async () => {
