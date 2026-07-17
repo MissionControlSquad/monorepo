@@ -36,6 +36,7 @@ export const FLAG_KEYS = {
   RUNNERS: "runners",
   MEMORY: "memory",
   ENVIRONMENTS: "environments",
+  EXECUTION_POLICY: "execution_policy",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -82,4 +83,6 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.MEMORY]: false,
   // Tier D / Phase 3: first-class Environment model (where/how a run executes). Opt-in operator surface.
   [FLAG_KEYS.ENVIRONMENTS]: false,
+  // Tier D / Phase 3: workspace execution policy/allowlist (force runs onto isolated k8s). Opt-in.
+  [FLAG_KEYS.EXECUTION_POLICY]: false,
 };

@@ -25,6 +25,7 @@ import { assembleContextBundle } from "./agent-context";
 import { getSandboxProvider } from "./sandbox-providers";
 import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
+import { assertExecutionAllowed } from "./execution-policy";
 
 const MAX_OUTPUT_CHARS = 45_000;
 const MAX_MESSAGE_CHARS = 8_000;
@@ -155,6 +156,10 @@ export async function runTaskInSandbox(input: {
       { extensions: { code: "FORBIDDEN" } },
     );
   }
+
+  // Workspace execution allowlist (Plan 4): if the workspace forces `kubernetes`, deny any non-k8s
+  // target BEFORE provisioning. Fail-closed; default policy (`any`) permits everything.
+  await assertExecutionAllowed(input.workspaceId, { driver: "sandbox", provider: providerKey });
 
   const bundle = await assembleContextBundle(
     {
@@ -350,6 +355,9 @@ export async function enqueueSandboxRun(input: {
       { extensions: { code: "FORBIDDEN" } },
     );
   }
+
+  // Workspace execution allowlist (Plan 4): reject an inadmissible target at enqueue, so it never queues.
+  await assertExecutionAllowed(input.workspaceId, { driver: "sandbox", provider: providerKey });
 
   const run = await prisma.agentRun.create({
     data: {

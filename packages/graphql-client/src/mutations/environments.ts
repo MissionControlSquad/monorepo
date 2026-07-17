@@ -67,3 +67,26 @@ export const DELETE_ENVIRONMENT = gql`
     deleteEnvironment(id: $id)
   }
 `;
+
+export const PROBE_ENVIRONMENT = gql`
+  mutation ProbeEnvironment($id: String!) {
+    probeEnvironment(id: $id) {
+      ok
+      driver
+      summary
+      details
+    }
+  }
+`;
+
+export const SET_WORKSPACE_EXECUTION_MODE = gql`
+  mutation SetWorkspaceExecutionMode($executionMode: String, $enableIsolatedWorkspaces: Boolean) {
+    setWorkspaceExecutionMode(
+      executionMode: $executionMode
+      enableIsolatedWorkspaces: $enableIsolatedWorkspaces
+    ) {
+      executionMode
+      enableIsolatedWorkspaces
+    }
+  }
+`;

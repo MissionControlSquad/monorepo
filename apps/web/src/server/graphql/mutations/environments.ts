@@ -3,15 +3,21 @@ import { requireFeature } from "../require-feature";
 import { GraphQLError } from "graphql";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
-import { EnvironmentType } from "../queries/environments";
+import {
+  EnvironmentType,
+  EnvironmentProbeResultType,
+  WorkspaceExecutionPolicyType,
+} from "../queries/environments";
 import {
   createEnvironment,
   updateEnvironment,
   archiveEnvironment,
   removeEnvironmentIfDeletable,
+  probeEnvironment,
   ENVIRONMENT_DRIVERS,
   type EnvironmentDriver,
 } from "@/server/services/environments";
+import { setWorkspaceExecutionMode, type ExecutionMode } from "@/server/services/execution-policy";
 
 // Tier D / Phase 3: Environment writes. ENVIRONMENTS-gated, admin (drivers wire up credential use +
 // arbitrary execution targets). Config secrets are persisted as {secretRef} pointers by the service;
@@ -103,6 +109,46 @@ builder.mutationField("deleteEnvironment", (t) =>
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
       const tenancy = requireRole(ctx, "admin");
       return removeEnvironmentIfDeletable(tenancy.workspaceId, args.id);
+    },
+  }),
+);
+
+// Probe an environment's connectivity (may provision a throwaway sandbox). Admin (provisions + creds).
+builder.mutationField("probeEnvironment", (t) =>
+  t.field({
+    type: EnvironmentProbeResultType,
+    args: { id: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.ENVIRONMENTS);
+      const tenancy = requireRole(ctx, "admin");
+      return probeEnvironment(tenancy.workspaceId, args.id);
+    },
+  }),
+);
+
+// Set the workspace execution policy (force runs onto isolated k8s, or `any`). EXECUTION_POLICY, admin.
+builder.mutationField("setWorkspaceExecutionMode", (t) =>
+  t.field({
+    type: WorkspaceExecutionPolicyType,
+    args: {
+      executionMode: t.arg.string(),
+      enableIsolatedWorkspaces: t.arg.boolean(),
+    },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.EXECUTION_POLICY);
+      const tenancy = requireRole(ctx, "admin");
+      return setWorkspaceExecutionMode(
+        tenancy.workspaceId,
+        {
+          ...(args.executionMode != null
+            ? { executionMode: args.executionMode as ExecutionMode }
+            : {}),
+          ...(args.enableIsolatedWorkspaces != null
+            ? { enableIsolatedWorkspaces: args.enableIsolatedWorkspaces }
+            : {}),
+        },
+        tenancy.userId,
+      );
     },
   }),
 );

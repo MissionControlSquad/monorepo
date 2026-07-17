@@ -8,6 +8,7 @@ import {
   getEnvironmentCapabilities,
   getEnvironmentDeleteBlastRadius,
 } from "@/server/services/environments";
+import { getWorkspaceExecutionPolicy } from "@/server/services/execution-policy";
 
 // Tier D / Phase 3: Environment reads. ENVIRONMENTS-gated, workspace-scoped, member+.
 // `configPublic` is the MASKED config — secret-refs render as "secret:<name>", never plaintext.
@@ -48,6 +49,23 @@ const EnvironmentDeleteBlastRadiusType = builder.simpleObject("EnvironmentDelete
     deletable: t.boolean(),
     referencingAgentCount: t.int(),
     reasons: t.stringList(),
+  }),
+});
+
+// Shared with the mutation layer (probe + policy).
+export const EnvironmentProbeResultType = builder.simpleObject("EnvironmentProbeResult", {
+  fields: (t) => ({
+    ok: t.boolean(),
+    driver: t.string(),
+    summary: t.string(),
+    details: t.string({ nullable: true }),
+  }),
+});
+
+export const WorkspaceExecutionPolicyType = builder.simpleObject("WorkspaceExecutionPolicy", {
+  fields: (t) => ({
+    executionMode: t.string(),
+    enableIsolatedWorkspaces: t.boolean(),
   }),
 });
 
@@ -93,6 +111,17 @@ builder.queryField("environmentDeleteBlastRadius", (t) =>
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
       const tenancy = requireRole(ctx, "member");
       return getEnvironmentDeleteBlastRadius(tenancy.workspaceId, args.id);
+    },
+  }),
+);
+
+builder.queryField("workspaceExecutionPolicy", (t) =>
+  t.field({
+    type: WorkspaceExecutionPolicyType,
+    resolve: async (_root, _args, ctx) => {
+      await requireFeature(FLAG_KEYS.EXECUTION_POLICY);
+      const tenancy = requireRole(ctx, "member");
+      return getWorkspaceExecutionPolicy(tenancy.workspaceId);
     },
   }),
 );

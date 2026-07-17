@@ -2,15 +2,23 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "urql";
-import { ENVIRONMENTS_QUERY, ENVIRONMENT_CAPABILITIES_QUERY } from "@/lib/graphql/queries";
+import {
+  ENVIRONMENTS_QUERY,
+  ENVIRONMENT_CAPABILITIES_QUERY,
+  WORKSPACE_EXECUTION_POLICY_QUERY,
+} from "@/lib/graphql/queries";
 import {
   CREATE_ENVIRONMENT,
   UPDATE_ENVIRONMENT,
   ARCHIVE_ENVIRONMENT,
   DELETE_ENVIRONMENT,
+  PROBE_ENVIRONMENT,
+  SET_WORKSPACE_EXECUTION_MODE,
 } from "@/lib/graphql/mutations";
+import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
-import { Container } from "lucide-react";
+import { Container, ShieldCheck } from "lucide-react";
 
 // Tier D / Phase 3: Environments dashboard — the first-class "where/how a run executes" model.
 // ENVIRONMENTS-gated in nav; every mutation re-checks the flag + admin server-side. Config secrets are
@@ -63,6 +71,10 @@ export default function EnvironmentsPage() {
   const [, archiveEnv] = useMutation(ARCHIVE_ENVIRONMENT);
   const [, deleteEnv] = useMutation(DELETE_ENVIRONMENT);
   const [, updateEnv] = useMutation(UPDATE_ENVIRONMENT);
+  const [, probeEnvMut] = useMutation(PROBE_ENVIRONMENT);
+
+  const { isEnabled } = useFeatureFlags();
+  const policyEnabled = isEnabled(FLAG_KEYS.EXECUTION_POLICY);
 
   const envs = data?.environments ?? [];
   const caps = capData?.environmentCapabilities;
@@ -71,6 +83,9 @@ export default function EnvironmentsPage() {
 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [probe, setProbe] = useState<
+    Record<string, { ok: boolean; summary: string; details?: string | null }>
+  >({});
   const [form, setForm] = useState({
     name: "",
     driver: "local",
@@ -144,6 +159,19 @@ export default function EnvironmentsPage() {
     try {
       await updateEnv({ id });
       refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onProbe(id: string) {
+    setError(null);
+    setBusy(`probe-${id}`);
+    try {
+      const res = await probeEnvMut({ id });
+      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Probe failed");
+      const r = res.data.probeEnvironment;
+      setProbe((p) => ({ ...p, [id]: { ok: r.ok, summary: r.summary, details: r.details } }));
     } finally {
       setBusy(null);
     }
@@ -259,6 +287,13 @@ export default function EnvironmentsPage() {
                 {env.status === "archived" && <Badge variant="gray">archived</Badge>}
               </div>
               <span className="flex items-center gap-3">
+                <button
+                  onClick={() => onProbe(env.id)}
+                  disabled={busy === `probe-${env.id}`}
+                  className="text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+                >
+                  {busy === `probe-${env.id}` ? "Probing…" : "Probe"}
+                </button>
                 {env.status === "active" ? (
                   <button
                     onClick={() => onArchive(env.id)}
@@ -291,9 +326,66 @@ export default function EnvironmentsPage() {
                 {JSON.stringify(env.configPublic, null, 2)}
               </pre>
             )}
+            {probe[env.id] && (
+              <p className={`text-xs ${probe[env.id].ok ? "text-success" : "text-destructive"}`}>
+                {probe[env.id].ok ? "✓ " : "✗ "}
+                {probe[env.id].summary}
+                {probe[env.id].details ? ` — ${probe[env.id].details}` : ""}
+              </p>
+            )}
           </Card>
         ))}
       </section>
+
+      {policyEnabled && <ExecutionPolicySection />}
     </div>
+  );
+}
+
+// ── Execution policy (Plan 4) — force runs onto isolated kubernetes, or allow any target ──
+function ExecutionPolicySection() {
+  const [{ data }, refetch] = useQuery<{
+    workspaceExecutionPolicy: { executionMode: string; enableIsolatedWorkspaces: boolean };
+  }>({ query: WORKSPACE_EXECUTION_POLICY_QUERY });
+  const [, setMode] = useMutation(SET_WORKSPACE_EXECUTION_MODE);
+  const [busy, setBusy] = useState(false);
+  const policy = data?.workspaceExecutionPolicy;
+  const mode = policy?.executionMode ?? "any";
+
+  async function apply(executionMode: string) {
+    setBusy(true);
+    try {
+      await setMode({ executionMode });
+      refetch({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-sm font-semibold text-foreground">Execution policy</h2>
+      </div>
+      <Card className="space-y-2 p-4">
+        <p className="text-sm text-muted-foreground">
+          Force every run onto an isolated kubernetes sandbox, or allow any target. Enforced
+          fail-closed before a sandbox is provisioned.
+        </p>
+        <div className="flex items-center gap-2">
+          <Badge variant={mode === "kubernetes" ? "green" : "gray"}>{mode}</Badge>
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={busy}
+            disabled={busy}
+            onClick={() => apply(mode === "kubernetes" ? "any" : "kubernetes")}
+          >
+            {mode === "kubernetes" ? "Allow any target" : "Force kubernetes only"}
+          </Button>
+        </div>
+      </Card>
+    </section>
   );
 }

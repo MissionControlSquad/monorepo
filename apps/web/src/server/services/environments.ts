@@ -14,7 +14,13 @@ import { GraphQLError } from "graphql";
 import { z } from "zod";
 import { prisma } from "@/server/prisma";
 import type { Environment, Prisma } from "@agentcenter/database";
-import { getSandboxProvider, listSandboxProviders } from "./sandbox-providers";
+import {
+  getSandboxProvider,
+  listSandboxProviders,
+  isSandboxProviderConfigured,
+} from "./sandbox-providers";
+import { resolveWorkspaceSecret } from "./secrets";
+import { sshTestConnection } from "./ssh";
 
 export const ENVIRONMENT_DRIVERS = ["local", "ssh", "sandbox", "plugin"] as const;
 export type EnvironmentDriver = (typeof ENVIRONMENT_DRIVERS)[number];
@@ -299,6 +305,99 @@ export async function removeEnvironmentIfDeletable(
   }
   await prisma.environment.delete({ where: { id } });
   return true;
+}
+
+// ── probe (feature 20) ──────────────────────────────────────────────────────────
+export interface ProbeResult {
+  ok: boolean;
+  driver: string;
+  summary: string;
+  details?: string | null;
+}
+
+/**
+ * Driver-specific connectivity test. `local` → host reachable (trivially ok). `sandbox` → provision a
+ * throwaway box, run `echo ok`, destroy (fails fast on missing creds). `ssh` → resolve the key from the
+ * vault and open a test connection. `plugin` → not yet supported. Never provisions if creds are absent.
+ */
+export async function probeEnvironment(workspaceId: string, id: string): Promise<ProbeResult> {
+  const env = await prisma.environment.findFirst({ where: { id, workspaceId } });
+  if (!env) notFound();
+  const driver = env.driver;
+  const config = (env.config ?? {}) as Record<string, unknown>;
+
+  if (driver === "local") {
+    return { ok: true, driver, summary: "Local control-plane host is reachable." };
+  }
+
+  if (driver === "sandbox") {
+    const providerKey = String(config.provider ?? "");
+    const provider = getSandboxProvider(providerKey);
+    if (!provider)
+      return { ok: false, driver, summary: `Unknown sandbox provider: ${providerKey}` };
+    const resolveSecret = (name: string) => resolveWorkspaceSecret(workspaceId, name);
+    if (!(await isSandboxProviderConfigured(provider, resolveSecret))) {
+      return {
+        ok: false,
+        driver,
+        summary: `Provider "${providerKey}" is missing credentials in the vault.`,
+        details: `Add: ${provider.credentialKeys.join(", ")}`,
+      };
+    }
+    let handle: Awaited<ReturnType<typeof provider.provision>> | undefined;
+    try {
+      handle = await provider.provision({ workspaceId, resolveSecret });
+      const res = await handle.exec("echo ok", { timeoutMs: 30_000 });
+      const ok = res.exitCode === 0 && res.stdout.includes("ok");
+      return {
+        ok,
+        driver,
+        summary: ok
+          ? `Provisioned a ${providerKey} sandbox and ran a command.`
+          : `Probe command failed (exit ${res.exitCode}).`,
+        details: ok ? null : (res.stderr || res.stdout).slice(0, 500),
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        driver,
+        summary: `Failed to provision ${providerKey}.`,
+        details: String(err).slice(0, 500),
+      };
+    } finally {
+      await handle?.destroy().catch(() => {});
+    }
+  }
+
+  if (driver === "ssh") {
+    const host = String(config.host ?? "");
+    if (!host) return { ok: false, driver, summary: "SSH config has no host." };
+    const username = typeof config.username === "string" ? config.username : "root";
+    const port = typeof config.port === "number" ? config.port : 22;
+    let privateKey: string | null = null;
+    if (isSecretRef(config.privateKey)) {
+      privateKey = await resolveWorkspaceSecret(workspaceId, config.privateKey.secretRef.name);
+      if (!privateKey)
+        return {
+          ok: false,
+          driver,
+          summary: `SSH key secret "${config.privateKey.secretRef.name}" not found in the vault.`,
+        };
+    } else if (typeof config.privateKey === "string") {
+      privateKey = config.privateKey;
+    }
+    if (!privateKey) return { ok: false, driver, summary: "SSH config has no private key." };
+    const ok = await sshTestConnection({ host, port, username, privateKey });
+    return {
+      ok,
+      driver,
+      summary: ok
+        ? `Connected to ${username}@${host}:${port}.`
+        : `Could not connect to ${username}@${host}:${port}.`,
+    };
+  }
+
+  return { ok: false, driver, summary: `Probe is not supported for driver "${driver}".` };
 }
 
 // ── capabilities matrix (feature 21) ────────────────────────────────────────────

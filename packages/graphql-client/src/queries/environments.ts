@@ -40,3 +40,12 @@ export const ENVIRONMENT_DELETE_BLAST_RADIUS_QUERY = gql`
     }
   }
 `;
+
+export const WORKSPACE_EXECUTION_POLICY_QUERY = gql`
+  query WorkspaceExecutionPolicy {
+    workspaceExecutionPolicy {
+      executionMode
+      enableIsolatedWorkspaces
+    }
+  }
+`;
