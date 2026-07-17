@@ -33,6 +33,8 @@ function renderPrompt(b: AgentContextBundle): string {
 }
 
 export interface SandboxRunResult {
+  /** The persisted AgentRun id (run ledger row for this execution). */
+  runId: string;
   providerKey: string;
   sandboxId: string;
   exitCode: number | null;
@@ -54,6 +56,8 @@ export async function runTaskInSandbox(input: {
   /** Override the agent's configured provider (e.g. force `local`). */
   providerKey?: string | null;
   timeoutMs?: number;
+  /** buildbase userId who triggered the run (for the run ledger). */
+  requestedByProfileId?: string | null;
 }): Promise<SandboxRunResult> {
   const agent = await prisma.agent.findFirst({
     where: { id: input.agentId, workspaceId: input.workspaceId },
@@ -125,26 +129,71 @@ export async function runTaskInSandbox(input: {
     resolveSecret: (name: string) => resolveWorkspaceSecret(input.workspaceId, name),
   };
 
-  const handle = await provider.provision(ctx);
-  let exitCode: number | null;
-  let stdout: string;
-  let stderr: string;
-  try {
-    const result = await handle.exec(script, { timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS });
-    exitCode = result.exitCode;
-    stdout = result.stdout.slice(-MAX_OUTPUT_CHARS);
-    stderr = result.stderr.slice(-MAX_OUTPUT_CHARS);
-  } finally {
-    // Always tear the sandbox down, even on failure — never leak a running sandbox.
-    await handle.destroy().catch(() => {});
-  }
+  // Persist the run ledger row up-front (status=running) so a crash mid-run leaves a trace.
+  const run = await prisma.agentRun.create({
+    data: {
+      workspaceId: input.workspaceId,
+      agentId: agent.id,
+      taskId: input.taskId,
+      kind: "sandbox",
+      providerKey,
+      requestedByProfileId: input.requestedByProfileId ?? null,
+    },
+  });
 
-  return {
-    providerKey,
-    sandboxId: handle.id,
-    exitCode,
-    stdout,
-    stderr,
-    status: exitCode === 0 ? "review" : "blocked",
-  };
+  let handle: Awaited<ReturnType<typeof provider.provision>> | undefined;
+  try {
+    handle = await provider.provision(ctx);
+    let exitCode: number | null;
+    let stdout: string;
+    let stderr: string;
+    try {
+      const result = await handle.exec(script, {
+        timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      });
+      exitCode = result.exitCode;
+      stdout = result.stdout.slice(-MAX_OUTPUT_CHARS);
+      stderr = result.stderr.slice(-MAX_OUTPUT_CHARS);
+    } finally {
+      // Always tear the sandbox down, even on failure — never leak a running sandbox.
+      await handle.destroy().catch(() => {});
+    }
+
+    const runStatus = exitCode === 0 ? "done" : exitCode === null ? "timeout" : "failed";
+    await prisma.agentRun.update({
+      where: { id: run.id },
+      data: {
+        sandboxId: handle.id,
+        status: runStatus,
+        exitCode,
+        stdout,
+        stderr,
+        finishedAt: new Date(),
+      },
+    });
+
+    return {
+      runId: run.id,
+      providerKey,
+      sandboxId: handle.id,
+      exitCode,
+      stdout,
+      stderr,
+      status: exitCode === 0 ? "review" : "blocked",
+    };
+  } catch (err) {
+    // Provision/exec threw before we could record a result — mark the run failed, then re-throw.
+    await prisma.agentRun
+      .update({
+        where: { id: run.id },
+        data: {
+          status: "failed",
+          errorMessage: err instanceof Error ? err.message : String(err),
+          finishedAt: new Date(),
+          ...(handle ? { sandboxId: handle.id } : {}),
+        },
+      })
+      .catch(() => {});
+    throw err;
+  }
 }

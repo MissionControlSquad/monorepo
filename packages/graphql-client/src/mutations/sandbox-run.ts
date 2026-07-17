@@ -13,6 +13,7 @@ export const SET_AGENT_SANDBOX_PROVIDER = gql`
 export const RUN_TASK_IN_SANDBOX = gql`
   mutation RunTaskInSandbox($taskId: String!, $agentId: String!, $provider: String, $timeoutMs: Int) {
     runTaskInSandbox(taskId: $taskId, agentId: $agentId, provider: $provider, timeoutMs: $timeoutMs) {
+      runId
       providerKey
       sandboxId
       exitCode

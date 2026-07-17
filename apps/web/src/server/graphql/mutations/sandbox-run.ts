@@ -41,6 +41,7 @@ builder.mutationField("setAgentSandboxProvider", (t) =>
 
 const SandboxRunResult = builder.simpleObject("SandboxRunResult", {
   fields: (t) => ({
+    runId: t.string(),
     providerKey: t.string(),
     sandboxId: t.string(),
     exitCode: t.int({ nullable: true }),
@@ -71,6 +72,7 @@ builder.mutationField("runTaskInSandbox", (t) =>
         agentId: args.agentId,
         providerKey: args.provider ?? undefined,
         timeoutMs: args.timeoutMs ?? undefined,
+        requestedByProfileId: tenancy.userId,
       });
     },
   }),

@@ -47,7 +47,7 @@ beforeAll(() => {
 beforeEach(async () => {
   agentCache.clear();
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE tasks, agent_skills, skills, agent_instructions, agents, profiles CASCADE`,
+    `TRUNCATE TABLE agent_runs, tasks, agent_skills, skills, agent_instructions, agents, profiles CASCADE`,
   );
 });
 
@@ -70,6 +70,20 @@ describe("sandbox task execution (Tier D)", () => {
     expect(result.stdout).toContain("SANDBOX_RAN");
     // …and read TASK.md that the seam materialised (proves the bundle reached the sandbox).
     expect(result.stdout).toContain("Fix nav");
+
+    // The execution is persisted in the AgentRun ledger.
+    expect(result.runId).toBeTruthy();
+    const run = await prisma.agentRun.findUnique({ where: { id: result.runId } });
+    expect(run).toMatchObject({
+      kind: "sandbox",
+      providerKey: "local",
+      status: "done",
+      exitCode: 0,
+      agentId,
+      taskId,
+    });
+    expect(run?.stdout).toContain("SANDBOX_RAN");
+    expect(run?.finishedAt).toBeTruthy();
   });
 
   it("uses the agent's configured sandboxProvider when no override is passed", async () => {

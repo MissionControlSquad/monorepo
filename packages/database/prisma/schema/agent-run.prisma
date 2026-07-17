@@ -1,0 +1,30 @@
+// Tier D keystone: a persisted record of ONE agent execution — the run ledger that sandbox runs,
+// runner tasks, and (later) adapter runs all write to. Closes the "results returned but never stored"
+// gap and is the anchor for run history, retries, per-run cost, and provenance (memory/artifacts).
+model AgentRun {
+  id          String    @id @default(cuid())
+  workspaceId String // buildbase workspace id; no FK (D5)
+  agentId     String?
+  taskId      String?
+  // Where/how it ran: "sandbox" | "runner" | "host" | "local". providerKey = sandbox provider (e2b/…) when kind=sandbox.
+  kind        String
+  providerKey String?
+  sandboxId   String? // the ephemeral sandbox/host id this run used
+  status      String    @default("running") // running | done | failed | timeout | canceled
+  exitCode    Int?
+  stdout      String?   @db.Text
+  stderr      String?   @db.Text
+  errorMessage String?
+  costCents   Int?
+  requestedByProfileId String?
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId, createdAt])
+  @@index([agentId])
+  @@index([taskId])
+  @@index([status])
+  @@map("agent_runs")
+}
