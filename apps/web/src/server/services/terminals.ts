@@ -126,8 +126,8 @@ export async function activateTerminalByConnectToken(
 /**
  * Resolve SSH credentials for a session's target. Targets a BYO RunnerHost in the same workspace,
  * matched by host/IP — its private key is stored (encrypted) so the relay can connect. A host we do
- * not have registered returns null and the relay reports that no credentials are available. (Provision
- * a Hetzner host via `provisionHetznerHost` to get a RunnerHost the terminal can reach.)
+ * not have registered returns null and the relay reports that no credentials are available.
+ * (Register the target as a RunnerHost with its SSH key to make it reachable.)
  */
 export async function resolveTerminalSshConfig(
   session: Pick<SafeTerminalSession, "workspaceId" | "host" | "port" | "username">,

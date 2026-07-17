@@ -21,21 +21,6 @@ export const CREATE_RUNNER_HOST = gql`
       host
       port
       username
-      provider
-    }
-  }
-`;
-
-// Provision a Hetzner VM on the workspace's own account (BYO) and register it as a RunnerHost.
-export const PROVISION_HETZNER_HOST = gql`
-  mutation ProvisionHetznerHost($name: String!, $region: String, $serverType: String) {
-    provisionHetznerHost(name: $name, region: $region, serverType: $serverType) {
-      id
-      name
-      host
-      port
-      username
-      provider
     }
   }
 `;

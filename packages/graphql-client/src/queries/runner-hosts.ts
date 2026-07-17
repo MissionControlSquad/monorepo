@@ -9,7 +9,6 @@ export const RUNNER_HOSTS_QUERY = gql`
       host
       port
       username
-      provider
       createdAt
     }
   }

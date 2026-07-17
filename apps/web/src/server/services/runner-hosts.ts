@@ -9,12 +9,6 @@ import type { RunnerHost } from "@agentcenter/database";
 import { encryptPrivateKey, decryptPrivateKey } from "./ssh-keys";
 import { env } from "../env";
 import type { SSHConfig } from "./ssh";
-import { deleteServer } from "./hetzner";
-import { resolveWorkspaceSecret } from "./secrets";
-
-// Vault secret name holding the workspace's own Hetzner token (mirrors hetzner-provision.ts; kept
-// as a literal to avoid an import cycle with that module, which imports createRunnerHost from here).
-const HETZNER_TOKEN_SECRET = "HETZNER_API_TOKEN";
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
@@ -64,9 +58,6 @@ export async function createRunnerHost(input: {
   username?: string | null;
   privateKey: string;
   createdByProfileId?: string | null;
-  /** Set when we provisioned this host (e.g. "hetzner") so delete can tear the VM down. */
-  provider?: string | null;
-  externalServerId?: string | null;
 }): Promise<SafeRunnerHost> {
   const name = input.name.trim();
   const host = input.host.trim();
@@ -84,8 +75,6 @@ export async function createRunnerHost(input: {
       username: input.username?.trim() || "root",
       sshPrivateKey: encryptKey(input.privateKey),
       createdByProfileId: input.createdByProfileId ?? null,
-      provider: input.provider ?? null,
-      externalServerId: input.externalServerId ?? null,
     },
   });
   return stripHostKey(created);
@@ -100,15 +89,6 @@ export async function listRunnerHosts(workspaceId: string): Promise<SafeRunnerHo
 }
 
 export async function deleteRunnerHost(workspaceId: string, id: string): Promise<boolean> {
-  const host = await prisma.runnerHost.findFirst({ where: { id, workspaceId } });
-  if (!host) return false;
-  // If we provisioned this VM on the customer's Hetzner account, tear it down first so deleting the
-  // host record doesn't orphan a paid server. Best-effort + uses the workspace's own vault token; a
-  // teardown failure (or a missing token) still removes the record — we never block delete on it.
-  if (host.provider === "hetzner" && host.externalServerId) {
-    const token = (await resolveWorkspaceSecret(workspaceId, HETZNER_TOKEN_SECRET))?.trim();
-    if (token) await deleteServer(host.externalServerId, token).catch(() => {});
-  }
   const res = await prisma.runnerHost.deleteMany({ where: { id, workspaceId } });
   return res.count > 0;
 }
