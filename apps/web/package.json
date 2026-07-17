@@ -107,6 +107,7 @@
   },
   "optionalDependencies": {
     "@daytonaio/sdk": "^0.198.0",
+    "@kubernetes/client-node": "^1.4.0",
     "e2b": "^2.34.0",
     "modal": "^0.9.0",
     "novita-sandbox": "^2.0.7"
