@@ -52,3 +52,4 @@ import "./agent-runs";
 import "./runner-hosts";
 import "./runtime-adapters";
 import "./sandbox-providers";
+import "./environments";

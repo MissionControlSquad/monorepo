@@ -35,6 +35,7 @@ export const FLAG_KEYS = {
   MONITORS: "monitors",
   RUNNERS: "runners",
   MEMORY: "memory",
+  ENVIRONMENTS: "environments",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -79,4 +80,6 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.RUNNERS]: false,
   // Tier D: two-layer agent memory (opt-in over the stateless default).
   [FLAG_KEYS.MEMORY]: false,
+  // Tier D / Phase 3: first-class Environment model (where/how a run executes). Opt-in operator surface.
+  [FLAG_KEYS.ENVIRONMENTS]: false,
 };
