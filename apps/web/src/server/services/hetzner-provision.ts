@@ -54,6 +54,11 @@ export async function provisionHetznerHost(input: {
 
   const region = input.region?.trim() || DEFAULT_REGION;
   const type = input.serverType?.trim() || DEFAULT_SERVER_TYPE;
+  // Scrub inputs before they reach the customer's Hetzner API (Hetzner ids are lowercase
+  // alphanumeric + hyphens); reject junk with a clear error instead of an opaque API failure.
+  const SAFE_ID = /^[a-z0-9-]{1,32}$/;
+  if (!SAFE_ID.test(region)) throw new Error(`Invalid Hetzner region: "${region}".`);
+  if (!SAFE_ID.test(type)) throw new Error(`Invalid Hetzner server type: "${type}".`);
   const { publicKey, privateKey } = generateSSHKeyPair();
   const name = serverName(input.name);
 

@@ -61,21 +61,38 @@ export async function isSandboxProviderConfigured(
 
 // ─── local reference provider (real, no keys) ────────────────────────────────
 
+// Bound in-memory capture so a runaway command can't OOM the host running the local sandbox.
+const MAX_CAPTURE_BYTES = 1_000_000;
+
 function runLocal(command: string, cwd: string, timeoutMs?: number): Promise<SandboxExecResult> {
   return new Promise((resolve) => {
     const child = spawn("sh", ["-c", command], { cwd });
     let stdout = "";
     let stderr = "";
+    let outDropped = 0;
+    let errDropped = 0;
     const timer = timeoutMs ? setTimeout(() => child.kill("SIGKILL"), timeoutMs) : undefined;
-    child.stdout?.on("data", (d: Buffer) => (stdout += d.toString()));
-    child.stderr?.on("data", (d: Buffer) => (stderr += d.toString()));
+    child.stdout?.on("data", (d: Buffer) => {
+      if (stdout.length < MAX_CAPTURE_BYTES) stdout += d.toString();
+      else outDropped += d.length;
+    });
+    child.stderr?.on("data", (d: Buffer) => {
+      if (stderr.length < MAX_CAPTURE_BYTES) stderr += d.toString();
+      else errDropped += d.length;
+    });
+    const cap = (s: string, dropped: number) =>
+      dropped > 0 ? `${s}\n…[truncated ${dropped} bytes]` : s;
     child.on("error", (err) => {
       if (timer) clearTimeout(timer);
-      resolve({ exitCode: null, stdout, stderr: stderr + String(err) });
+      resolve({
+        exitCode: null,
+        stdout: cap(stdout, outDropped),
+        stderr: cap(stderr, errDropped) + String(err),
+      });
     });
     child.on("close", (code) => {
       if (timer) clearTimeout(timer);
-      resolve({ exitCode: code, stdout, stderr });
+      resolve({ exitCode: code, stdout: cap(stdout, outDropped), stderr: cap(stderr, errDropped) });
     });
   });
 }

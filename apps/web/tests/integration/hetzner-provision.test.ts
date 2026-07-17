@@ -87,6 +87,23 @@ describe("BYO Hetzner provisioner → RunnerHost", () => {
     expect(hosts[0].host).toBe("203.0.113.7");
   });
 
+  it("scrubs invalid region/serverType before touching Hetzner", async () => {
+    await createSecret({
+      workspaceId: WS,
+      name: "HETZNER_API_TOKEN",
+      value: "hz_tok",
+      createdBy: "h",
+    });
+    await expect(
+      provisionHetznerHost({ workspaceId: WS, name: "x", region: "bad region!" }),
+    ).rejects.toThrow(/Invalid Hetzner region/i);
+    await expect(
+      provisionHetznerHost({ workspaceId: WS, name: "x", serverType: "$(rm -rf /)" }),
+    ).rejects.toThrow(/server type/i);
+    expect(vi.mocked(createSSHKey)).not.toHaveBeenCalled();
+    expect(vi.mocked(createServer)).not.toHaveBeenCalled();
+  });
+
   it("cleans up the server + SSH key when provisioning fails mid-way", async () => {
     await createSecret({
       workspaceId: WS,
