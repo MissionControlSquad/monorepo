@@ -46,6 +46,7 @@ builder.prismaObject("Agent", {
     adapterConfig: t.expose("adapterConfig", { type: "JSON", nullable: true }),
     llmModel: t.exposeString("llmModel", { nullable: true }), // per-agent model override
     runtimeAdapter: t.exposeString("runtimeAdapter", { nullable: true }), // Tier D per-agent runtime
+    sandboxProvider: t.exposeString("sandboxProvider", { nullable: true }), // Tier D sandbox binding
     runtimeModel: t.exposeString("runtimeModel", { nullable: true }),
     runtimeTemplate: t.exposeString("runtimeTemplate", { nullable: true }),
     memoryProvider: t.exposeString("memoryProvider"), // Tier D memory binding

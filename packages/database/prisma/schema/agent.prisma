@@ -113,6 +113,7 @@ model Agent {
   runtimeAdapter  String? // adapter key: openclaw|codex|claude|gemini|process|shell|http|<plugin>
   runtimeModel    String? // model override passed to the adapter
   runtimeTemplate String? // command/argv/URL template for process/shell/http adapters
+  sandboxProvider String? // Tier D: run this agent's tasks inside a provisioned sandbox (provider key). null = local/runner
   memoryProvider  String  @default("none") // Tier D memory binding: none | markdown | db
   createdBy       String?
   createdAt       DateTime        @default(now())
