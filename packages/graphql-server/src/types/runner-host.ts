@@ -10,7 +10,9 @@ builder.prismaObject("RunnerHost", {
     host: t.exposeString("host"),
     port: t.exposeInt("port"),
     username: t.exposeString("username"),
+    // null = user-registered BYO; "hetzner" = we provisioned it. Non-sensitive.
+    provider: t.exposeString("provider", { nullable: true }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
-    // sshPrivateKey is deliberately NOT exposed.
+    // sshPrivateKey + externalServerId are deliberately NOT exposed.
   }),
 });

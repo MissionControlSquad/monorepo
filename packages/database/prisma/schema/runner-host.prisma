@@ -13,6 +13,10 @@ model RunnerHost {
   username           String   @default("root")
   sshPrivateKey      String // encrypted at rest; never returned
   createdByProfileId String? // buildbase userId
+  // Provisioning provenance: null = user-registered BYO host; "hetzner" = we provisioned it on the
+  // customer's account. externalServerId lets delete tear the VM down instead of orphaning it.
+  provider           String?
+  externalServerId   String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

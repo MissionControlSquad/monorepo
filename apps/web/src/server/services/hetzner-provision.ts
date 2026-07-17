@@ -93,6 +93,8 @@ export async function provisionHetznerHost(input: {
       username: "root",
       privateKey,
       createdByProfileId: input.createdByProfileId ?? null,
+      provider: "hetzner",
+      externalServerId: serverId,
     });
   } catch (err) {
     if (serverId) await deleteServer(serverId, token).catch(() => {});

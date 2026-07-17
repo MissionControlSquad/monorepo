@@ -23,7 +23,7 @@ import {
   deleteSSHKey,
 } from "../../src/server/services/hetzner";
 import { provisionHetznerHost } from "../../src/server/services/hetzner-provision";
-import { listRunnerHosts } from "../../src/server/services/runner-hosts";
+import { listRunnerHosts, deleteRunnerHost } from "../../src/server/services/runner-hosts";
 
 const WS = "ws_hz";
 
@@ -102,6 +102,21 @@ describe("BYO Hetzner provisioner → RunnerHost", () => {
     ).rejects.toThrow(/server type/i);
     expect(vi.mocked(createSSHKey)).not.toHaveBeenCalled();
     expect(vi.mocked(createServer)).not.toHaveBeenCalled();
+  });
+
+  it("deleting a provisioned host tears down the Hetzner VM (no orphan)", async () => {
+    await createSecret({
+      workspaceId: WS,
+      name: "HETZNER_API_TOKEN",
+      value: "hz_tok",
+      createdBy: "h",
+    });
+    const host = await provisionHetznerHost({ workspaceId: WS, name: "box" });
+    const ok = await deleteRunnerHost(WS, host.id);
+    expect(ok).toBe(true);
+    // The workspace's own token is used to destroy the server it provisioned.
+    expect(vi.mocked(deleteServer)).toHaveBeenCalledWith("s1", "hz_tok");
+    expect(await listRunnerHosts(WS)).toHaveLength(0);
   });
 
   it("cleans up the server + SSH key when provisioning fails mid-way", async () => {

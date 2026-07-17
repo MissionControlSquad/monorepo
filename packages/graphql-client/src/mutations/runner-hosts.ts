@@ -21,6 +21,7 @@ export const CREATE_RUNNER_HOST = gql`
       host
       port
       username
+      provider
     }
   }
 `;
@@ -34,6 +35,7 @@ export const PROVISION_HETZNER_HOST = gql`
       host
       port
       username
+      provider
     }
   }
 `;
