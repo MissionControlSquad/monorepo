@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "urql";
 import {
   RUNNER_HOSTS_QUERY,
@@ -19,6 +19,8 @@ import {
   SET_AGENT_RUNTIME,
   SET_AGENT_SANDBOX_PROVIDER,
   RUN_TASK_IN_SANDBOX,
+  ENQUEUE_TASK_IN_SANDBOX,
+  CANCEL_AGENT_RUN,
 } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 import { Server, Bot, Box } from "lucide-react";
@@ -88,6 +90,7 @@ const RUN_STATUS_VARIANT: Record<string, "green" | "red" | "gray" | "yellow"> = 
   timeout: "red",
   canceled: "gray",
   running: "yellow",
+  queued: "yellow",
 };
 
 function RunHistory() {
@@ -95,14 +98,38 @@ function RunHistory() {
     query: AGENT_RUNS_QUERY,
     variables: { limit: 20 },
   });
+  const [, cancelRun] = useMutation(CANCEL_AGENT_RUN);
   const [open, setOpen] = useState<string | null>(null);
+  const [busyCancel, setBusyCancel] = useState<string | null>(null);
   const runs = data?.agentRuns ?? [];
+  const refresh = () => refetch({ requestPolicy: "network-only" });
+
+  // Poll while anything is in flight so queued → running → terminal transitions surface live
+  // (the in-process drain loop / cron advance the rows server-side).
+  const hasInFlight = runs.some((r) => r.status === "queued" || r.status === "running");
+  useEffect(() => {
+    if (!hasInFlight) return;
+    const t = setInterval(refresh, 4000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasInFlight]);
+
+  async function onCancel(runId: string) {
+    setBusyCancel(runId);
+    try {
+      await cancelRun({ runId });
+      refresh();
+    } finally {
+      setBusyCancel(null);
+    }
+  }
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-medium text-muted-foreground">Run history</h3>
         <button
-          onClick={() => refetch({ requestPolicy: "network-only" })}
+          onClick={refresh}
           className="text-xs text-muted-foreground transition hover:text-foreground"
         >
           Refresh
@@ -125,6 +152,15 @@ function RunHistory() {
                 <span className="text-xs text-muted-foreground">exit {r.exitCode}</span>
               )}
               <Badge variant={RUN_STATUS_VARIANT[r.status] ?? "gray"}>{r.status}</Badge>
+              {r.status === "queued" && (
+                <button
+                  onClick={() => onCancel(r.id)}
+                  disabled={busyCancel === r.id}
+                  className="text-xs text-destructive transition hover:underline disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              )}
             </span>
           </div>
           {open === r.id && (
@@ -250,6 +286,7 @@ export default function RunnersPage() {
   const [, setAgentRuntime] = useMutation(SET_AGENT_RUNTIME);
   const [, setAgentSandbox] = useMutation(SET_AGENT_SANDBOX_PROVIDER);
   const [, runInSandbox] = useMutation(RUN_TASK_IN_SANDBOX);
+  const [, enqueueInSandbox] = useMutation(ENQUEUE_TASK_IN_SANDBOX);
 
   const hosts = hostData?.runnerHosts ?? [];
   const agents = agentData?.agents ?? [];
@@ -302,6 +339,25 @@ export default function RunnersPage() {
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Run failed");
       setSbxResult(res.data.runTaskInSandbox);
       setHistoryKey((k) => k + 1); // refresh run history
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onEnqueueSandbox() {
+    setError(null);
+    setSbxResult(null);
+    if (!agentId) return setError("Pick an agent");
+    if (!sbx.taskId.trim()) return setError("Task id is required");
+    setBusy("sandbox-enqueue");
+    try {
+      const res = await enqueueInSandbox({
+        taskId: sbx.taskId.trim(),
+        agentId,
+        provider: sbx.provider || null,
+      });
+      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Enqueue failed");
+      setHistoryKey((k) => k + 1); // surface the new queued run below
     } finally {
       setBusy(null);
     }
@@ -665,6 +721,16 @@ export default function RunnersPage() {
               onClick={onRunSandbox}
             >
               Run in sandbox
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={busy === "sandbox-enqueue"}
+              disabled={busy === "sandbox-enqueue" || !agentId}
+              onClick={onEnqueueSandbox}
+              title="Queue a background run — a worker executes it; watch it in Run history below"
+            >
+              Enqueue
             </Button>
           </div>
           {sbxResult && (

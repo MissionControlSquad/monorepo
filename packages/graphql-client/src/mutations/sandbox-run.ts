@@ -23,3 +23,20 @@ export const RUN_TASK_IN_SANDBOX = gql`
     }
   }
 `;
+
+// Enqueue a background run (non-blocking) — returns immediately; a worker executes it.
+export const ENQUEUE_TASK_IN_SANDBOX = gql`
+  mutation EnqueueTaskInSandbox($taskId: String!, $agentId: String!, $provider: String) {
+    enqueueTaskInSandbox(taskId: $taskId, agentId: $agentId, provider: $provider) {
+      runId
+      providerKey
+    }
+  }
+`;
+
+// Cancel a QUEUED run so the worker skips it (a running run can't be cleanly killed in this model).
+export const CANCEL_AGENT_RUN = gql`
+  mutation CancelAgentRun($runId: String!) {
+    cancelAgentRun(runId: $runId)
+  }
+`;

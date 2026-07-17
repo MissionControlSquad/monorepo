@@ -219,5 +219,10 @@ export { CAST_DELIVERABLE_VOTE } from "./deliverable-votes";
 export { CREATE_MONITOR, UPDATE_MONITOR, DELETE_MONITOR } from "./monitors";
 export { CANCEL_RUNNER_COMMAND, QUEUE_AGENT_COMMAND } from "./runner-commands";
 export { CREATE_RUNNER_HOST, DELETE_RUNNER_HOST, RUN_COMMAND_ON_HOST } from "./runner-hosts";
-export { SET_AGENT_SANDBOX_PROVIDER, RUN_TASK_IN_SANDBOX } from "./sandbox-run";
+export {
+  SET_AGENT_SANDBOX_PROVIDER,
+  RUN_TASK_IN_SANDBOX,
+  ENQUEUE_TASK_IN_SANDBOX,
+  CANCEL_AGENT_RUN,
+} from "./sandbox-run";
 export { SET_AGENT_RUNTIME } from "./agent-runtime";
