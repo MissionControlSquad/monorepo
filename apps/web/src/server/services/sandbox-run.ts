@@ -14,10 +14,13 @@ import {
   buildAdapterInvocation,
   getAdapter,
   requiresSandboxContainment,
+  FLAG_KEYS,
   type TrustLevel,
 } from "@agentcenter/utils";
 import type { AgentContextBundle } from "@agentcenter/types";
+import { getProfileAgentId } from "@agentcenter/database";
 import { prisma } from "@/server/prisma";
+import { isFeatureEnabled } from "@/server/feature-flags";
 import { assembleContextBundle } from "./agent-context";
 import { getSandboxProvider } from "./sandbox-providers";
 import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
@@ -407,4 +410,42 @@ export async function cancelAgentRun(workspaceId: string, runId: string): Promis
     data: { status: "canceled", finishedAt: new Date() },
   });
   return res.count > 0;
+}
+
+/**
+ * Auto-dispatch: for each newly-assigned assignee that is a sandbox-bound AGENT, enqueue a background
+ * sandbox run for the task. RUNNERS-gated; deduped against an already-active (queued/running) run so a
+ * re-assignment doesn't double-dispatch. Returns the enqueued run ids. Best-effort per assignee.
+ */
+export async function autoDispatchSandboxForAssignment(
+  taskId: string,
+  addedProfileIds: string[],
+): Promise<string[]> {
+  if (!(await isFeatureEnabled(FLAG_KEYS.RUNNERS))) return [];
+  const enqueued: string[] = [];
+  for (const profileId of addedProfileIds) {
+    const agentId = await getProfileAgentId(profileId);
+    if (!agentId) continue; // human assignee
+    const agent = await prisma.agent.findFirst({
+      where: { id: agentId },
+      select: { sandboxProvider: true, workspaceId: true },
+    });
+    if (!agent?.sandboxProvider || !agent.workspaceId) continue;
+    const active = await prisma.agentRun.findFirst({
+      where: { taskId, agentId, status: { in: ["queued", "running"] } },
+      select: { id: true },
+    });
+    if (active) continue;
+    try {
+      const { runId } = await enqueueSandboxRun({
+        workspaceId: agent.workspaceId,
+        taskId,
+        agentId,
+      });
+      enqueued.push(runId);
+    } catch {
+      // Skip an assignee whose enqueue fails (e.g. inadmissible) — don't block the others.
+    }
+  }
+  return enqueued;
 }

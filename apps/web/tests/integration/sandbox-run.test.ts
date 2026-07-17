@@ -11,7 +11,9 @@ import {
   enqueueSandboxRun,
   drainSandboxRunQueue,
   cancelAgentRun,
+  autoDispatchSandboxForAssignment,
 } from "../../src/server/services/sandbox-run";
+import { getOrCreateAgentProfileId } from "../../src/server/agent-profile";
 
 // Tier D: the sandbox EXECUTION SEAM. Exercised end-to-end against the REAL `local` provider (temp
 // dir + child_process, no keys) — proving provision → materialise the task → run the runtime → capture
@@ -281,5 +283,30 @@ describe("async sandbox runs (enqueue → drain → cancel)", () => {
     await drainSandboxRunQueue();
     // still canceled — never picked up
     expect((await prisma.agentRun.findUnique({ where: { id: runId } }))?.status).toBe("canceled");
+  });
+
+  it("auto-dispatches a queued run when a sandbox-bound agent is assigned (deduped)", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await makeTask();
+    const profileId = await getOrCreateAgentProfileId(agentId);
+
+    const enqueued = await autoDispatchSandboxForAssignment(taskId, [profileId]);
+    expect(enqueued).toHaveLength(1);
+    expect(await prisma.agentRun.findUnique({ where: { id: enqueued[0] } })).toMatchObject({
+      status: "queued",
+      kind: "sandbox",
+      agentId,
+      taskId,
+      providerKey: "local",
+    });
+    // dedup: a re-assignment while a run is queued must NOT double-dispatch
+    expect(await autoDispatchSandboxForAssignment(taskId, [profileId])).toHaveLength(0);
+  });
+
+  it("does not auto-dispatch for an agent without a sandbox provider", async () => {
+    const agentId = await makeAgent(); // no sandboxProvider
+    const taskId = await makeTask();
+    const profileId = await getOrCreateAgentProfileId(agentId);
+    expect(await autoDispatchSandboxForAssignment(taskId, [profileId])).toHaveLength(0);
   });
 });
