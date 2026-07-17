@@ -234,6 +234,37 @@ describe("sandbox task execution (Tier D)", () => {
     );
   });
 
+  it("marks a run that exceeds its timeout as `timeout` (killed), not `failed`", async () => {
+    // An agent whose runtime blocks longer than the timeout budget.
+    const agent = await prisma.agent.create({
+      data: {
+        name: "Slow Agent",
+        role: "worker",
+        personality: "diligent",
+        workspaceId: WS,
+        setupStatus: "active",
+        apiKeyHash: hashApiKey(`mc_slow_${Math.random()}`),
+        runtimeAdapter: "shell",
+        runtimeTemplate: "echo START && sleep 30",
+        sandboxProvider: "local",
+      },
+    });
+    const taskId = await makeTask();
+
+    const result = await runTaskInSandbox({
+      workspaceId: WS,
+      taskId,
+      agentId: agent.id,
+      timeoutMs: 500,
+    });
+    expect(result.exitCode).not.toBe(0);
+    expect(result.status).toBe("blocked");
+
+    const run = await prisma.agentRun.findUnique({ where: { id: result.runId } });
+    expect(run?.status).toBe("timeout");
+    expect(run?.stderr).toContain("exceeded timeout");
+  });
+
   it("scopes the agent to the workspace (foreign agent → not found)", async () => {
     const agentId = await makeAgent("local");
     const taskId = await makeTask();

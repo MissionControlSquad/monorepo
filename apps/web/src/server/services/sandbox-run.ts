@@ -245,6 +245,7 @@ export async function runTaskInSandbox(input: {
     let exitCode: number | null;
     let stdout: string;
     let stderr: string;
+    let timedOut = false;
     try {
       const result = await handle.exec(script, {
         timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
@@ -252,12 +253,13 @@ export async function runTaskInSandbox(input: {
       exitCode = result.exitCode;
       stdout = result.stdout.slice(-MAX_OUTPUT_CHARS);
       stderr = result.stderr.slice(-MAX_OUTPUT_CHARS);
+      timedOut = result.timedOut ?? false;
     } finally {
       // Always tear the sandbox down, even on failure — never leak a running sandbox.
       await handle.destroy().catch(() => {});
     }
 
-    const runStatus = exitCode === 0 ? "done" : exitCode === null ? "timeout" : "failed";
+    const runStatus = timedOut ? "timeout" : exitCode === 0 ? "done" : "failed";
     await prisma.agentRun.update({
       where: { id: run.id },
       data: {

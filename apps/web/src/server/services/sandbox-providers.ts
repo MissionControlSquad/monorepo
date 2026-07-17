@@ -66,12 +66,28 @@ const MAX_CAPTURE_BYTES = 1_000_000;
 
 function runLocal(command: string, cwd: string, timeoutMs?: number): Promise<SandboxExecResult> {
   return new Promise((resolve) => {
-    const child = spawn("sh", ["-c", command], { cwd });
+    // `detached` puts the command in its own process group so a timeout can kill the WHOLE tree
+    // (the shell AND its children). Otherwise a grandchild (e.g. a spawned runtime) keeps the stdio
+    // pipes open and `close` never fires — the timeout would hang and orphans would survive.
+    const child = spawn("sh", ["-c", command], { cwd, detached: true });
     let stdout = "";
     let stderr = "";
     let outDropped = 0;
     let errDropped = 0;
-    const timer = timeoutMs ? setTimeout(() => child.kill("SIGKILL"), timeoutMs) : undefined;
+    let timedOut = false;
+    const killTree = (sig: NodeJS.Signals) => {
+      try {
+        if (child.pid) process.kill(-child.pid, sig); // negative pid → the process group
+      } catch {
+        child.kill(sig); // group already gone / not a leader — fall back to the child
+      }
+    };
+    const timer = timeoutMs
+      ? setTimeout(() => {
+          timedOut = true;
+          killTree("SIGKILL");
+        }, timeoutMs)
+      : undefined;
     child.stdout?.on("data", (d: Buffer) => {
       if (stdout.length < MAX_CAPTURE_BYTES) stdout += d.toString();
       else outDropped += d.length;
@@ -90,9 +106,15 @@ function runLocal(command: string, cwd: string, timeoutMs?: number): Promise<San
         stderr: cap(stderr, errDropped) + String(err),
       });
     });
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       if (timer) clearTimeout(timer);
-      resolve({ exitCode: code, stdout: cap(stdout, outDropped), stderr: cap(stderr, errDropped) });
+      resolve({
+        exitCode: code,
+        stdout: cap(stdout, outDropped),
+        stderr: cap(stderr, errDropped) + (timedOut ? "\n…[killed: exceeded timeout]" : ""),
+        timedOut,
+        signal: signal ?? null,
+      });
     });
   });
 }

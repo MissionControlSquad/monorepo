@@ -32,6 +32,10 @@ export interface SandboxExecResult {
   exitCode: number | null;
   stdout: string;
   stderr: string;
+  /** True when the command was killed because it exceeded its timeout budget. */
+  timedOut?: boolean;
+  /** The signal that terminated the process, if any (e.g. "SIGKILL"). */
+  signal?: string | null;
 }
 
 export interface SandboxHandle {
