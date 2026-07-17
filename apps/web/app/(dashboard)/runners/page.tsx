@@ -7,6 +7,7 @@ import {
   RUNNER_COMMANDS_QUERY,
   AGENTS_FOR_TASK_QUERY,
   RUNTIME_ADAPTERS_QUERY,
+  SANDBOX_PROVIDERS_QUERY,
 } from "@/lib/graphql/queries";
 import {
   CREATE_RUNNER_HOST,
@@ -15,9 +16,11 @@ import {
   QUEUE_AGENT_COMMAND,
   CANCEL_RUNNER_COMMAND,
   SET_AGENT_RUNTIME,
+  SET_AGENT_SANDBOX_PROVIDER,
+  RUN_TASK_IN_SANDBOX,
 } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
-import { Server, Bot } from "lucide-react";
+import { Server, Bot, Box } from "lucide-react";
 
 // Tier D: Runners dashboard. BYO hosts (register a server + run raw commands over direct SSH — the
 // "host" target) and Agent runners (queue a command an outbound daemon pulls — the "agent" target).
@@ -53,6 +56,14 @@ interface RuntimeAdapter {
   requiresTemplate: boolean;
   supportsModel: boolean;
   models: string[];
+}
+interface SandboxProvider {
+  key: string;
+  displayName: string;
+  requiresApiKey: boolean;
+  credentialKeys: string[];
+  configured: boolean;
+  available: boolean;
 }
 
 const STATUS_VARIANT: Record<string, "green" | "red" | "gray" | "yellow"> = {
@@ -147,15 +158,21 @@ export default function RunnersPage() {
   const [{ data: adapterData }] = useQuery<{ runtimeAdapters: RuntimeAdapter[] }>({
     query: RUNTIME_ADAPTERS_QUERY,
   });
+  const [{ data: sbxData }] = useQuery<{ sandboxProviders: SandboxProvider[] }>({
+    query: SANDBOX_PROVIDERS_QUERY,
+  });
   const [, createHost] = useMutation(CREATE_RUNNER_HOST);
   const [, deleteHost] = useMutation(DELETE_RUNNER_HOST);
   const [, runOnHost] = useMutation(RUN_COMMAND_ON_HOST);
   const [, queueAgent] = useMutation(QUEUE_AGENT_COMMAND);
   const [, setAgentRuntime] = useMutation(SET_AGENT_RUNTIME);
+  const [, setAgentSandbox] = useMutation(SET_AGENT_SANDBOX_PROVIDER);
+  const [, runInSandbox] = useMutation(RUN_TASK_IN_SANDBOX);
 
   const hosts = hostData?.runnerHosts ?? [];
   const agents = agentData?.agents ?? [];
   const adapters = adapterData?.runtimeAdapters ?? [];
+  const sandboxProviders = sbxData?.sandboxProviders ?? [];
 
   const [form, setForm] = useState({ name: "", host: "", port: "22", username: "root", key: "" });
   const [hostCmd, setHostCmd] = useState<Record<string, string>>({});
@@ -165,8 +182,47 @@ export default function RunnersPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [historyKey, setHistoryKey] = useState(0); // bump to remount history after a run
+  const [sbx, setSbx] = useState({ provider: "", taskId: "" });
+  const [sbxResult, setSbxResult] = useState<{
+    providerKey: string;
+    exitCode: number | null;
+    stdout: string;
+    stderr: string;
+    status: string;
+  } | null>(null);
 
   const selectedAdapter = adapters.find((a) => a.key === rt.adapter);
+
+  async function onSaveSandbox() {
+    setError(null);
+    if (!agentId) return setError("Pick an agent first");
+    setBusy("sandbox-save");
+    try {
+      const res = await setAgentSandbox({ agentId, provider: sbx.provider || null });
+      if (res.error) setError(res.error.graphQLErrors[0]?.message ?? "Failed to set sandbox");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onRunSandbox() {
+    setError(null);
+    setSbxResult(null);
+    if (!agentId) return setError("Pick an agent");
+    if (!sbx.taskId.trim()) return setError("Task id is required");
+    setBusy("sandbox-run");
+    try {
+      const res = await runInSandbox({
+        taskId: sbx.taskId.trim(),
+        agentId,
+        provider: sbx.provider || null,
+      });
+      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Run failed");
+      setSbxResult(res.data.runTaskInSandbox);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function onSaveRuntime() {
     setError(null);
@@ -446,6 +502,106 @@ export default function RunnersPage() {
           </div>
         </Card>
         <CommandHistory key={`agent-${historyKey}`} targetKind="agent" />
+      </section>
+
+      {/* ── Sandboxes ─────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Box className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold text-foreground">Sandboxes (ephemeral, BYO)</h2>
+        </div>
+        <p className="-mt-1 text-xs text-muted-foreground">
+          Run an agent&apos;s tasks inside a throwaway cloud sandbox. Bring your own provider key —
+          add it in{" "}
+          <a href="/secrets" className="underline">
+            Secrets
+          </a>{" "}
+          under the exact name shown, then pick the provider.
+        </p>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          {sandboxProviders.map((p) => (
+            <Card key={p.key} className="flex items-center justify-between gap-2 p-3">
+              <span className="min-w-0 space-y-0.5">
+                <span className="flex items-center gap-2">
+                  <span className="truncate font-medium text-foreground">{p.displayName}</span>
+                  <code className="text-xs text-muted-foreground">{p.key}</code>
+                </span>
+                {p.credentialKeys.length > 0 && (
+                  <p className="truncate text-xs text-muted-foreground">
+                    secrets: {p.credentialKeys.join(", ")}
+                  </p>
+                )}
+              </span>
+              <Badge variant={p.configured ? "green" : p.requiresApiKey ? "yellow" : "gray"}>
+                {p.requiresApiKey ? (p.configured ? "configured" : "add key") : "ready"}
+              </Badge>
+            </Card>
+          ))}
+        </div>
+
+        <Card className="space-y-2 p-4">
+          <p className="text-xs font-medium text-muted-foreground">
+            Sandbox for the selected agent (uses the agent picker above)
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <select
+              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+              value={sbx.provider}
+              onChange={(e) => setSbx((s) => ({ ...s, provider: e.target.value }))}
+            >
+              <option value="">none (run on runner)</option>
+              {sandboxProviders.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.displayName}
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={busy === "sandbox-save"}
+              disabled={busy === "sandbox-save" || !agentId}
+              onClick={onSaveSandbox}
+            >
+              Save sandbox
+            </Button>
+            <input
+              className="min-w-[10rem] flex-1 rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
+              placeholder="task id to run in the sandbox"
+              value={sbx.taskId}
+              onChange={(e) => setSbx((s) => ({ ...s, taskId: e.target.value }))}
+            />
+            <Button
+              size="sm"
+              loading={busy === "sandbox-run"}
+              disabled={busy === "sandbox-run" || !agentId}
+              onClick={onRunSandbox}
+            >
+              Run in sandbox
+            </Button>
+          </div>
+          {sbxResult && (
+            <div className="space-y-1">
+              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                {sbxResult.providerKey} · exit {sbxResult.exitCode ?? "—"} ·
+                <Badge variant={sbxResult.status === "review" ? "green" : "red"}>
+                  {sbxResult.status}
+                </Badge>
+              </span>
+              {sbxResult.stdout && (
+                <pre className="max-h-48 overflow-auto rounded bg-foreground/90 p-2 text-xs text-background">
+                  {sbxResult.stdout}
+                </pre>
+              )}
+              {sbxResult.stderr && (
+                <pre className="max-h-32 overflow-auto rounded bg-destructive/10 p-2 text-xs text-destructive">
+                  {sbxResult.stderr}
+                </pre>
+              )}
+            </div>
+          )}
+        </Card>
       </section>
     </div>
   );

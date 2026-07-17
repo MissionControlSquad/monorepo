@@ -33,7 +33,6 @@
     "@aws-sdk/client-s3": "^3.986.0",
     "@aws-sdk/s3-request-presigner": "^3.986.0",
     "@buildbase/sdk": "^0.0.44",
-    "ajv": "^8.20.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -43,6 +42,7 @@
     "@types/ssh2": "^1.15.5",
     "@urql/exchange-graphcache": "^9.0.0",
     "@urql/next": "^2.0.0",
+    "ajv": "^8.20.0",
     "autoprefixer": "^10.4.24",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
@@ -104,5 +104,8 @@
     "typescript-eslint": "^8.46.4",
     "vercel": "^50.15.1",
     "vitest": "^4.0.18"
+  },
+  "optionalDependencies": {
+    "e2b": "^2.34.0"
   }
 }
