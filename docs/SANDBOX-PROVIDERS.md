@@ -30,7 +30,17 @@ an agent to a provider with `setAgentSandboxProvider(agentId, provider)`.
    throws a clear `npm i <pkg>` error at run time rather than pretending to work.
 
 `local` is the built-in reference provider — no keys, no SDK; it runs the task in a temp dir on the
-host (useful for testing the whole flow).
+host (useful for testing the whole flow). Low-trust/untrusted agents may NOT use `local` (fail-closed
+admission) — they must run in an isolating cloud sandbox.
+
+### Running a real runtime in the box
+
+- **Runtime install** — for a real runtime adapter (`codex`/`claude`/`gemini`/`openclaw`), the sandbox
+  auto-installs the CLI on first run (`command -v <bin> || npm install -g <pkg>`), so a bare image works.
+- **LLM keys** — bind the agent's provider key (e.g. `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) as an
+  agent secret; it's exported into the box so the runtime can authenticate. Never persisted/logged.
+- **Private repos** — add a workspace secret named `GIT_TOKEN` (or `GITHUB_TOKEN`); a git credential
+  helper uses it for the clone (the token stays in an env var, never in the URL or remote config).
 
 ## Providers & their vault secret names
 

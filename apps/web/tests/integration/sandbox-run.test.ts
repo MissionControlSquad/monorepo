@@ -106,6 +106,30 @@ describe("composeSandboxScript (Phase 2 — runtime install + secrets-into-box)"
     expect(s).not.toContain("git clone");
     expect(s).toContain("echo hi");
   });
+
+  it("wires a git credential helper for a private repo (token never in the URL)", () => {
+    const s = composeSandboxScript({
+      prompt: "x",
+      repoUrl: "https://github.com/acme/private.git",
+      runtimeCmd: "echo hi",
+      gitToken: "ghp_secret",
+    });
+    expect(s).toContain("export PC_GIT_TOKEN='ghp_secret'");
+    expect(s).toContain("credential.helper");
+    expect(s).toContain("git clone --depth 1 'https://github.com/acme/private.git'");
+    // the token must NOT be embedded into the clone URL / remote
+    expect(s).not.toContain("ghp_secret@github.com");
+  });
+
+  it("no git credential helper without a token", () => {
+    const s = composeSandboxScript({
+      prompt: "x",
+      repoUrl: "https://github.com/acme/repo.git",
+      runtimeCmd: "echo hi",
+    });
+    expect(s).not.toContain("PC_GIT_TOKEN");
+    expect(s).not.toContain("credential.helper");
+  });
 });
 
 describe("sandbox task execution (Tier D)", () => {

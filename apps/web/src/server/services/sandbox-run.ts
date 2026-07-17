@@ -50,14 +50,24 @@ export function composeSandboxScript(opts: {
   installGuard?: string | null;
   /** The agent's bound secrets (LLM API keys, etc.) exported into the box. */
   env?: Record<string, string>;
+  /** BYO git token for cloning a PRIVATE repo — wired via a credential helper (stays in an env var). */
+  gitToken?: string | null;
 }): string {
   const exports = Object.entries(opts.env ?? {})
     .map(([k, v]) => `export ${k}=${shq(v)}`)
     .join("\n");
+  // Private-repo auth: a git credential helper reads the token from $PC_GIT_TOKEN (never in the URL or
+  // the git remote config), so a private HTTPS clone works without leaking the token into args.
+  const gitAuth =
+    opts.repoUrl && opts.gitToken
+      ? `export PC_GIT_TOKEN=${shq(opts.gitToken)}\n` +
+        `git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$PC_GIT_TOKEN"; }; f'\n`
+      : "";
   const clone = opts.repoUrl ? `git clone --depth 1 ${shq(opts.repoUrl)} repo && cd repo && ` : "";
   return (
     `set -e\n` +
     (exports ? `${exports}\n` : "") +
+    gitAuth +
     `mkdir -p workspace && cd workspace\n${clone}` +
     `cat > TASK.md <<'PC_TASK_EOF'\n${opts.prompt}\nPC_TASK_EOF\n` +
     (opts.installGuard ? `${opts.installGuard}\n` : "") +
@@ -173,12 +183,18 @@ export async function runTaskInSandbox(input: {
       : null;
   // Inject the agent's OWN bound secrets (LLM API keys, etc.) so a real runtime can authenticate.
   const env = await resolveEnvForAgent(input.workspaceId, agent.id);
+  // BYO git token from the workspace vault (GIT_TOKEN, else GITHUB_TOKEN) — only when a repo is cloned.
+  const gitToken = bundle.project?.repoUrl
+    ? ((await resolveWorkspaceSecret(input.workspaceId, "GIT_TOKEN")) ??
+      (await resolveWorkspaceSecret(input.workspaceId, "GITHUB_TOKEN")))
+    : null;
   const script = composeSandboxScript({
     prompt,
     repoUrl: bundle.project?.repoUrl,
     runtimeCmd,
     installGuard,
     env,
+    gitToken,
   });
 
   const ctx = {
