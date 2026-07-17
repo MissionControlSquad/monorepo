@@ -1,3 +1,4 @@
+import { GraphQLError } from "graphql";
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
@@ -21,6 +22,12 @@ builder.mutationField("queueAgentCommand", (t) =>
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
       const tenancy = requireRole(ctx, "admin");
+      // The target agent must belong to this workspace (no dangling cross-workspace command).
+      const agent = await ctx.prisma.agent.findFirst({
+        where: { id: args.agentId, workspaceId: tenancy.workspaceId },
+        select: { id: true },
+      });
+      if (!agent) throw new GraphQLError("Agent not found", { extensions: { code: "NOT_FOUND" } });
       const cmd = await createRunnerCommand({
         workspaceId: tenancy.workspaceId,
         targetKind: "agent",
