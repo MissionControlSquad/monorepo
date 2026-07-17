@@ -115,6 +115,8 @@ export async function runTaskInSandbox(input: {
   timeoutMs?: number;
   /** buildbase userId who triggered the run (for the run ledger). */
   requestedByProfileId?: string | null;
+  /** Reuse an already-created (claimed) AgentRun row instead of creating one — the queue worker path. */
+  existingRunId?: string;
 }): Promise<SandboxRunResult> {
   const agent = await prisma.agent.findFirst({
     where: { id: input.agentId, workspaceId: input.workspaceId },
@@ -216,17 +218,23 @@ export async function runTaskInSandbox(input: {
     resolveSecret: (name: string) => resolveWorkspaceSecret(input.workspaceId, name),
   };
 
-  // Persist the run ledger row up-front (status=running) so a crash mid-run leaves a trace.
-  const run = await prisma.agentRun.create({
-    data: {
-      workspaceId: input.workspaceId,
-      agentId: agent.id,
-      taskId: input.taskId,
-      kind: "sandbox",
-      providerKey,
-      requestedByProfileId: input.requestedByProfileId ?? null,
-    },
-  });
+  // Persist/claim the run ledger row (status=running). The queue worker passes an existing (claimed)
+  // row; the synchronous path creates a fresh one.
+  const run = input.existingRunId
+    ? await prisma.agentRun.update({
+        where: { id: input.existingRunId },
+        data: { status: "running", startedAt: new Date() },
+      })
+    : await prisma.agentRun.create({
+        data: {
+          workspaceId: input.workspaceId,
+          agentId: agent.id,
+          taskId: input.taskId,
+          kind: "sandbox",
+          providerKey,
+          requestedByProfileId: input.requestedByProfileId ?? null,
+        },
+      });
 
   let handle: Awaited<ReturnType<typeof provider.provision>> | undefined;
   try {
@@ -292,4 +300,111 @@ export async function runTaskInSandbox(input: {
     await postRunToTask(agent.id, input.taskId, `Sandbox run (${providerKey}) failed: ${message}`);
     throw err;
   }
+}
+
+/**
+ * Enqueue a sandbox run to execute in the BACKGROUND (non-blocking). Validates the agent + provider +
+ * fail-closed admission NOW (so an inadmissible run never queues), then persists an AgentRun with
+ * status=queued and returns its id immediately. A worker (drainSandboxRunQueue) executes it later.
+ */
+export async function enqueueSandboxRun(input: {
+  workspaceId: string;
+  taskId: string;
+  agentId: string;
+  providerKey?: string | null;
+  requestedByProfileId?: string | null;
+}): Promise<{ runId: string; providerKey: string }> {
+  const agent = await prisma.agent.findFirst({
+    where: { id: input.agentId, workspaceId: input.workspaceId },
+    include: { trustProfile: true },
+  });
+  if (!agent) throw new GraphQLError("Agent not found", { extensions: { code: "NOT_FOUND" } });
+
+  const providerKey = (input.providerKey ?? agent.sandboxProvider) || null;
+  if (!providerKey) {
+    throw new GraphQLError("No sandbox provider is configured for this agent", {
+      extensions: { code: "BAD_USER_INPUT" },
+    });
+  }
+  const provider = getSandboxProvider(providerKey);
+  if (!provider) {
+    throw new GraphQLError(`Unknown sandbox provider: ${providerKey}`, {
+      extensions: { code: "BAD_USER_INPUT" },
+    });
+  }
+  const trustLevel = (agent.trustLevel ?? "standard") as TrustLevel;
+  if (
+    requiresSandboxContainment({
+      trustLevel,
+      lowTrustContainment: agent.trustProfile?.lowTrustContainment,
+    }) &&
+    !provider.isolating
+  ) {
+    throw new GraphQLError(
+      `Agent is ${trustLevel}-trust and must run in an isolated sandbox — provider "${providerKey}" runs on the host. Configure an isolating cloud sandbox provider.`,
+      { extensions: { code: "FORBIDDEN" } },
+    );
+  }
+
+  const run = await prisma.agentRun.create({
+    data: {
+      workspaceId: input.workspaceId,
+      agentId: agent.id,
+      taskId: input.taskId,
+      kind: "sandbox",
+      providerKey,
+      status: "queued",
+      requestedByProfileId: input.requestedByProfileId ?? null,
+    },
+  });
+  return { runId: run.id, providerKey };
+}
+
+/**
+ * Drain queued sandbox runs — the worker (in-process loop on a persistent server, or the
+ * run-sandbox-queue cron on serverless). Atomically claims each (queued→running so two workers never
+ * double-run) and executes it, reusing its ledger row. Returns how many it started.
+ */
+export async function drainSandboxRunQueue(limit = 5): Promise<number> {
+  const queued = await prisma.agentRun.findMany({
+    where: { status: "queued", kind: "sandbox" },
+    orderBy: { createdAt: "asc" },
+    take: Math.min(limit, 20),
+    select: { id: true, workspaceId: true, agentId: true, taskId: true, providerKey: true },
+  });
+  let started = 0;
+  for (const q of queued) {
+    if (!q.agentId || !q.taskId) continue;
+    // Atomic claim — only one worker wins (and a canceled/claimed row is skipped).
+    const claimed = await prisma.agentRun.updateMany({
+      where: { id: q.id, status: "queued" },
+      data: { status: "running", startedAt: new Date() },
+    });
+    if (claimed.count === 0) continue;
+    started++;
+    try {
+      await runTaskInSandbox({
+        workspaceId: q.workspaceId,
+        agentId: q.agentId,
+        taskId: q.taskId,
+        providerKey: q.providerKey,
+        existingRunId: q.id,
+      });
+    } catch {
+      // runTaskInSandbox marks the row failed in its own catch — nothing more to do here.
+    }
+  }
+  return started;
+}
+
+/**
+ * Cancel a QUEUED sandbox run (queued→canceled, so the worker never picks it up). A run already
+ * executing cannot be cleanly killed in this model — only queued runs are cancellable.
+ */
+export async function cancelAgentRun(workspaceId: string, runId: string): Promise<boolean> {
+  const res = await prisma.agentRun.updateMany({
+    where: { id: runId, workspaceId, status: "queued" },
+    data: { status: "canceled", finishedAt: new Date() },
+  });
+  return res.count > 0;
 }

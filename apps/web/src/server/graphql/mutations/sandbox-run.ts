@@ -4,7 +4,7 @@ import { GraphQLError } from "graphql";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
 import { getSandboxProvider } from "@/server/services/sandbox-providers";
-import { runTaskInSandbox } from "@/server/services/sandbox-run";
+import { runTaskInSandbox, enqueueSandboxRun, cancelAgentRun } from "@/server/services/sandbox-run";
 
 // Tier D: bind an agent to a sandbox provider (its tasks run inside a provisioned sandbox) and run a
 // task in it. RUNNERS-gated, admin (arbitrary code execution + credential use).
@@ -35,6 +35,50 @@ builder.mutationField("setAgentSandboxProvider", (t) =>
         where: { id: agent.id },
         data: { sandboxProvider: args.provider ?? null },
       });
+    },
+  }),
+);
+
+const EnqueuedSandboxRun = builder.simpleObject("EnqueuedSandboxRun", {
+  fields: (t) => ({
+    runId: t.string(),
+    providerKey: t.string(),
+  }),
+});
+
+// Enqueue a background sandbox run (non-blocking). Returns the AgentRun id immediately; a worker
+// executes it. RUNNERS-gated, admin.
+builder.mutationField("enqueueTaskInSandbox", (t) =>
+  t.field({
+    type: EnqueuedSandboxRun,
+    args: {
+      taskId: t.arg.string({ required: true }),
+      agentId: t.arg.string({ required: true }),
+      provider: t.arg.string(),
+    },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.RUNNERS);
+      const tenancy = requireRole(ctx, "admin");
+      return enqueueSandboxRun({
+        workspaceId: tenancy.workspaceId,
+        taskId: args.taskId,
+        agentId: args.agentId,
+        providerKey: args.provider ?? undefined,
+        requestedByProfileId: tenancy.userId,
+      });
+    },
+  }),
+);
+
+// Cancel a QUEUED run (a running one can't be cleanly killed in this model). RUNNERS-gated, admin.
+builder.mutationField("cancelAgentRun", (t) =>
+  t.field({
+    type: "Boolean",
+    args: { runId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.RUNNERS);
+      const tenancy = requireRole(ctx, "admin");
+      return cancelAgentRun(tenancy.workspaceId, args.runId);
     },
   }),
 );

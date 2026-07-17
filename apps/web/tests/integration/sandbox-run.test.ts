@@ -5,7 +5,13 @@ import { agentCache } from "../../src/server/cache";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
 import { invalidateFlagCache } from "../../src/server/feature-flags";
-import { runTaskInSandbox, composeSandboxScript } from "../../src/server/services/sandbox-run";
+import {
+  runTaskInSandbox,
+  composeSandboxScript,
+  enqueueSandboxRun,
+  drainSandboxRunQueue,
+  cancelAgentRun,
+} from "../../src/server/services/sandbox-run";
 
 // Tier D: the sandbox EXECUTION SEAM. Exercised end-to-end against the REAL `local` provider (temp
 // dir + child_process, no keys) — proving provision → materialise the task → run the runtime → capture
@@ -232,5 +238,48 @@ describe("sandbox task execution (Tier D)", () => {
     await expect(runTaskInSandbox({ workspaceId: "ws_other", taskId, agentId })).rejects.toThrow(
       /Agent not found/i,
     );
+  });
+});
+
+describe("async sandbox runs (enqueue → drain → cancel)", () => {
+  it("enqueues a queued run, then the worker drains + executes it", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await makeTask();
+
+    const { runId } = await enqueueSandboxRun({ workspaceId: WS, taskId, agentId });
+    // queued, not yet run
+    let run = await prisma.agentRun.findUnique({ where: { id: runId } });
+    expect(run?.status).toBe("queued");
+    expect(run?.exitCode).toBeNull();
+
+    const started = await drainSandboxRunQueue();
+    expect(started).toBeGreaterThanOrEqual(1);
+
+    run = await prisma.agentRun.findUnique({ where: { id: runId } });
+    expect(run?.status).toBe("done");
+    expect(run?.exitCode).toBe(0);
+    expect(run?.stdout).toContain("SANDBOX_RAN");
+  });
+
+  it("enqueue enforces admission (low-trust → local denied, nothing queued)", async () => {
+    const agentId = await makeAgent("local", "low");
+    const taskId = await makeTask();
+    await expect(enqueueSandboxRun({ workspaceId: WS, taskId, agentId })).rejects.toThrow(
+      /isolated sandbox|low-trust/i,
+    );
+    expect(await prisma.agentRun.count({ where: { agentId } })).toBe(0);
+  });
+
+  it("cancels a queued run so the worker skips it", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await makeTask();
+    const { runId } = await enqueueSandboxRun({ workspaceId: WS, taskId, agentId });
+
+    expect(await cancelAgentRun(WS, runId)).toBe(true);
+    expect((await prisma.agentRun.findUnique({ where: { id: runId } }))?.status).toBe("canceled");
+
+    await drainSandboxRunQueue();
+    // still canceled — never picked up
+    expect((await prisma.agentRun.findUnique({ where: { id: runId } }))?.status).toBe("canceled");
   });
 });
