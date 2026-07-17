@@ -12,6 +12,7 @@
 import { GraphQLError } from "graphql";
 import {
   buildAdapterInvocation,
+  getAdapter,
   requiresSandboxContainment,
   type TrustLevel,
 } from "@agentcenter/utils";
@@ -19,7 +20,7 @@ import type { AgentContextBundle } from "@agentcenter/types";
 import { prisma } from "@/server/prisma";
 import { assembleContextBundle } from "./agent-context";
 import { getSandboxProvider } from "./sandbox-providers";
-import { resolveWorkspaceSecret } from "./secrets";
+import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
 
 const MAX_OUTPUT_CHARS = 45_000;
 const DEFAULT_TIMEOUT_MS = 600_000;
@@ -34,6 +35,34 @@ function renderPrompt(b: AgentContextBundle): string {
   const lines = [`# Task #${t.taskNumber}: ${t.title}`, "", t.description ?? "", ""];
   if (b.project?.repoUrl) lines.push(`Repo: ${b.project.repoUrl} @ ${b.project.repoRef ?? "HEAD"}`);
   return lines.join("\n");
+}
+
+/**
+ * Compose the self-contained shell script the sandbox runs. Pure (exported for tests). Order matters:
+ * export the agent's secrets first (so clone auth + the runtime see them), make a workspace, clone the
+ * repo, write the task, INSTALL the runtime binary (idempotent), then run it.
+ */
+export function composeSandboxScript(opts: {
+  prompt: string;
+  repoUrl?: string | null;
+  runtimeCmd: string;
+  /** `command -v <bin> || <install>` — installs the runtime binary if missing. */
+  installGuard?: string | null;
+  /** The agent's bound secrets (LLM API keys, etc.) exported into the box. */
+  env?: Record<string, string>;
+}): string {
+  const exports = Object.entries(opts.env ?? {})
+    .map(([k, v]) => `export ${k}=${shq(v)}`)
+    .join("\n");
+  const clone = opts.repoUrl ? `git clone --depth 1 ${shq(opts.repoUrl)} repo && cd repo && ` : "";
+  return (
+    `set -e\n` +
+    (exports ? `${exports}\n` : "") +
+    `mkdir -p workspace && cd workspace\n${clone}` +
+    `cat > TASK.md <<'PC_TASK_EOF'\n${opts.prompt}\nPC_TASK_EOF\n` +
+    (opts.installGuard ? `${opts.installGuard}\n` : "") +
+    opts.runtimeCmd
+  );
 }
 
 export interface SandboxRunResult {
@@ -131,19 +160,26 @@ export async function runTaskInSandbox(input: {
   }
 
   const prompt = renderPrompt(bundle);
-  const clone = bundle.project?.repoUrl
-    ? `git clone --depth 1 ${shq(bundle.project.repoUrl)} repo && cd repo && `
-    : "";
   // useShell → argv[0] is already a shell command string (run it as-is); otherwise argv is a real
   // argv the shell must exec with each token quoted.
   const runtimeCmd = invocation.useShell
     ? invocation.argv.join(" ")
     : invocation.argv.map(shq).join(" ");
-  // One self-contained script: make a workspace, (clone repo), write the task, run the runtime.
-  const script =
-    `set -e\nmkdir -p workspace && cd workspace\n${clone}` +
-    `cat > TASK.md <<'PC_TASK_EOF'\n${prompt}\nPC_TASK_EOF\n` +
-    runtimeCmd;
+  // Install the runtime binary in a fresh box if the adapter declares one (idempotent guard).
+  const adapter = getAdapter(runtimeKey);
+  const installGuard =
+    adapter?.installCommand && adapter?.binName
+      ? `command -v ${adapter.binName} >/dev/null 2>&1 || { ${adapter.installCommand}; }`
+      : null;
+  // Inject the agent's OWN bound secrets (LLM API keys, etc.) so a real runtime can authenticate.
+  const env = await resolveEnvForAgent(input.workspaceId, agent.id);
+  const script = composeSandboxScript({
+    prompt,
+    repoUrl: bundle.project?.repoUrl,
+    runtimeCmd,
+    installGuard,
+    env,
+  });
 
   const ctx = {
     workspaceId: input.workspaceId,

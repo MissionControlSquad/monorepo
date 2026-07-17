@@ -5,7 +5,7 @@ import { agentCache } from "../../src/server/cache";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
 import { invalidateFlagCache } from "../../src/server/feature-flags";
-import { runTaskInSandbox } from "../../src/server/services/sandbox-run";
+import { runTaskInSandbox, composeSandboxScript } from "../../src/server/services/sandbox-run";
 
 // Tier D: the sandbox EXECUTION SEAM. Exercised end-to-end against the REAL `local` provider (temp
 // dir + child_process, no keys) — proving provision → materialise the task → run the runtime → capture
@@ -76,6 +76,36 @@ beforeEach(async () => {
     update: { enabled: true },
   });
   invalidateFlagCache();
+});
+
+describe("composeSandboxScript (Phase 2 — runtime install + secrets-into-box)", () => {
+  it("exports the agent's secrets, writes TASK.md, and idempotently installs the runtime", () => {
+    const s = composeSandboxScript({
+      prompt: "# Task #1: Fix nav",
+      repoUrl: "https://github.com/acme/site.git",
+      runtimeCmd: "codex exec",
+      installGuard: "command -v codex >/dev/null 2>&1 || { npm install -g @openai/codex; }",
+      env: { OPENAI_API_KEY: "sk-vault", ANTHROPIC_API_KEY: "ak-vault" },
+    });
+    // secrets exported (so a real runtime + clone auth can use them)
+    expect(s).toContain("export OPENAI_API_KEY='sk-vault'");
+    expect(s).toContain("export ANTHROPIC_API_KEY='ak-vault'");
+    // idempotent runtime install
+    expect(s).toContain("command -v codex");
+    expect(s).toContain("npm install -g @openai/codex");
+    // task materialised + repo cloned + runtime run
+    expect(s).toContain("cat > TASK.md");
+    expect(s).toContain("git clone --depth 1 'https://github.com/acme/site.git'");
+    expect(s).toContain("codex exec");
+  });
+
+  it("omits install/exports when the adapter has no binary and no secrets are bound", () => {
+    const s = composeSandboxScript({ prompt: "x", runtimeCmd: "echo hi" });
+    expect(s).not.toContain("command -v");
+    expect(s).not.toContain("export ");
+    expect(s).not.toContain("git clone");
+    expect(s).toContain("echo hi");
+  });
 });
 
 describe("sandbox task execution (Tier D)", () => {
