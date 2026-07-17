@@ -68,7 +68,7 @@ beforeAll(() => {
 beforeEach(async () => {
   agentCache.clear();
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE agent_runs, tasks, agent_skills, skills, agent_instructions, agents, profiles CASCADE`,
+    `TRUNCATE TABLE agent_runs, messages, tasks, agent_skills, skills, agent_instructions, agents, profiles CASCADE`,
   );
   await prisma.featureFlag.upsert({
     where: { key: "runners" },
@@ -165,6 +165,10 @@ describe("sandbox task execution (Tier D)", () => {
     });
     expect(run?.stdout).toContain("SANDBOX_RAN");
     expect(run?.finishedAt).toBeTruthy();
+
+    // The outcome is posted to the task timeline as a message from the agent.
+    const messages = await prisma.message.findMany({ where: { taskId } });
+    expect(messages.some((m) => m.content.includes("SANDBOX_RAN"))).toBe(true);
   });
 
   it("exposes the persisted run via the agentRuns query (RUNNERS-gated)", async () => {

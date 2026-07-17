@@ -21,9 +21,23 @@ import { prisma } from "@/server/prisma";
 import { assembleContextBundle } from "./agent-context";
 import { getSandboxProvider } from "./sandbox-providers";
 import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
+import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 
 const MAX_OUTPUT_CHARS = 45_000;
+const MAX_MESSAGE_CHARS = 8_000;
 const DEFAULT_TIMEOUT_MS = 600_000;
+
+/** Post the run outcome to the task timeline as a message from the agent (best-effort). */
+async function postRunToTask(agentId: string, taskId: string, summary: string): Promise<void> {
+  try {
+    const fromProfileId = await getOrCreateAgentProfileId(agentId);
+    await prisma.message.create({
+      data: { taskId, fromProfileId, content: summary.slice(0, MAX_MESSAGE_CHARS) },
+    });
+  } catch {
+    // Never fail the run because the timeline post failed.
+  }
+}
 
 function shq(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -245,6 +259,13 @@ export async function runTaskInSandbox(input: {
       },
     });
 
+    // Post the outcome to the task timeline (as the agent) so the run is visible in the workflow.
+    await postRunToTask(
+      agent.id,
+      input.taskId,
+      `Sandbox run (${providerKey}) — ${runStatus}${exitCode != null ? `, exit ${exitCode}` : ""}\n\n${stdout || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
+    );
+
     return {
       runId: run.id,
       providerKey,
@@ -256,17 +277,19 @@ export async function runTaskInSandbox(input: {
     };
   } catch (err) {
     // Provision/exec threw before we could record a result — mark the run failed, then re-throw.
+    const message = err instanceof Error ? err.message : String(err);
     await prisma.agentRun
       .update({
         where: { id: run.id },
         data: {
           status: "failed",
-          errorMessage: err instanceof Error ? err.message : String(err),
+          errorMessage: message,
           finishedAt: new Date(),
           ...(handle ? { sandboxId: handle.id } : {}),
         },
       })
       .catch(() => {});
+    await postRunToTask(agent.id, input.taskId, `Sandbox run (${providerKey}) failed: ${message}`);
     throw err;
   }
 }
