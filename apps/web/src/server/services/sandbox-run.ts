@@ -102,9 +102,9 @@ export interface SandboxRunResult {
 }
 
 /**
- * Run one task inside the agent's configured sandbox provider and return the captured result. Pure
- * orchestration + reads: it provisions, runs, captures, and always destroys the sandbox — it does not
- * write to the task timeline (the caller decides what to persist).
+ * Run one task inside the agent's configured sandbox provider and return the captured result. Enforces
+ * low-trust admission, persists an AgentRun (running→terminal), always destroys the sandbox, and posts
+ * the outcome to the task timeline as the agent.
  */
 export async function runTaskInSandbox(input: {
   workspaceId: string;

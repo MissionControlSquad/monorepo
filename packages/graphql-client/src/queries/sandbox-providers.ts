@@ -8,6 +8,7 @@ export const SANDBOX_PROVIDERS_QUERY = gql`
       displayName
       requiresApiKey
       credentialKeys
+      isolating
       configured
       available
     }

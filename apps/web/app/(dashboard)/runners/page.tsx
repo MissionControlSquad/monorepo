@@ -63,6 +63,7 @@ interface SandboxProvider {
   displayName: string;
   requiresApiKey: boolean;
   credentialKeys: string[];
+  isolating: boolean;
   configured: boolean;
   available: boolean;
 }
@@ -608,6 +609,9 @@ export default function RunnersPage() {
                 <span className="flex items-center gap-2">
                   <span className="truncate font-medium text-foreground">{p.displayName}</span>
                   <code className="text-xs text-muted-foreground">{p.key}</code>
+                  {!p.isolating && (
+                    <span className="text-xs text-yellow-600">on-host · not for low-trust</span>
+                  )}
                 </span>
                 {p.credentialKeys.length > 0 && (
                   <p className="truncate text-xs text-muted-foreground">
