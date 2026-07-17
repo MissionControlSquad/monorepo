@@ -2,6 +2,9 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
 import { agentCache } from "../../src/server/cache";
+import { createJWT } from "../../src/lib/jwt";
+import { POST as GRAPHQL } from "../../app/api/graphql/route";
+import { invalidateFlagCache } from "../../src/server/feature-flags";
 import { runTaskInSandbox } from "../../src/server/services/sandbox-run";
 
 // Tier D: the sandbox EXECUTION SEAM. Exercised end-to-end against the REAL `local` provider (temp
@@ -41,14 +44,34 @@ async function makeTask(): Promise<string> {
   return task.id;
 }
 
+const GQL_SECRET = "sbxrun-secret";
+async function gql(query: string) {
+  const token = await createJWT({ userId: "h", workspaceId: WS, userRole: "member" }, GQL_SECRET);
+  const req = new Request("http://test/api/graphql", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: `bb-workspace-token=${token}` },
+    body: JSON.stringify({ query }),
+  });
+  return JSON.parse(await (await GRAPHQL(req)).text()) as {
+    data?: any;
+    errors?: { message: string }[];
+  };
+}
+
 beforeAll(() => {
-  process.env.SYSTEM_SECRET = "sbxrun-secret";
+  process.env.SYSTEM_SECRET = GQL_SECRET;
 });
 beforeEach(async () => {
   agentCache.clear();
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE agent_runs, tasks, agent_skills, skills, agent_instructions, agents, profiles CASCADE`,
   );
+  await prisma.featureFlag.upsert({
+    where: { key: "runners" },
+    create: { key: "runners", enabled: true, managedBy: "user" },
+    update: { enabled: true },
+  });
+  invalidateFlagCache();
 });
 
 describe("sandbox task execution (Tier D)", () => {
@@ -84,6 +107,29 @@ describe("sandbox task execution (Tier D)", () => {
     });
     expect(run?.stdout).toContain("SANDBOX_RAN");
     expect(run?.finishedAt).toBeTruthy();
+  });
+
+  it("exposes the persisted run via the agentRuns query (RUNNERS-gated)", async () => {
+    const agentId = await makeAgent();
+    const taskId = await makeTask();
+    const result = await runTaskInSandbox({
+      workspaceId: WS,
+      taskId,
+      agentId,
+      providerKey: "local",
+    });
+
+    const res = await gql(
+      `query{ agentRuns(taskId:"${taskId}"){ id kind providerKey status exitCode } }`,
+    );
+    expect(res.errors).toBeFalsy();
+    const run = res.data.agentRuns.find((r: { id: string }) => r.id === result.runId);
+    expect(run).toMatchObject({
+      kind: "sandbox",
+      providerKey: "local",
+      status: "done",
+      exitCode: 0,
+    });
   });
 
   it("uses the agent's configured sandboxProvider when no override is passed", async () => {

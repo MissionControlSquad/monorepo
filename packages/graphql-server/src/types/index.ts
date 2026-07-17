@@ -40,3 +40,4 @@ import "./agent-instruction";
 import "./monitor";
 import "./runner-command";
 import "./runner-host";
+import "./agent-run";

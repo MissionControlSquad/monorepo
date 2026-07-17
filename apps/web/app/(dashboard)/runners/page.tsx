@@ -8,6 +8,7 @@ import {
   AGENTS_FOR_TASK_QUERY,
   RUNTIME_ADAPTERS_QUERY,
   SANDBOX_PROVIDERS_QUERY,
+  AGENT_RUNS_QUERY,
 } from "@/lib/graphql/queries";
 import {
   CREATE_RUNNER_HOST,
@@ -64,6 +65,86 @@ interface SandboxProvider {
   credentialKeys: string[];
   configured: boolean;
   available: boolean;
+}
+interface AgentRun {
+  id: string;
+  agentId: string | null;
+  taskId: string | null;
+  kind: string;
+  providerKey: string | null;
+  status: string;
+  exitCode: number | null;
+  stdout: string | null;
+  stderr: string | null;
+  errorMessage: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+const RUN_STATUS_VARIANT: Record<string, "green" | "red" | "gray" | "yellow"> = {
+  done: "green",
+  failed: "red",
+  timeout: "red",
+  canceled: "gray",
+  running: "yellow",
+};
+
+function RunHistory() {
+  const [{ data }, refetch] = useQuery<{ agentRuns: AgentRun[] }>({
+    query: AGENT_RUNS_QUERY,
+    variables: { limit: 20 },
+  });
+  const [open, setOpen] = useState<string | null>(null);
+  const runs = data?.agentRuns ?? [];
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-medium text-muted-foreground">Run history</h3>
+        <button
+          onClick={() => refetch({ requestPolicy: "network-only" })}
+          className="text-xs text-muted-foreground transition hover:text-foreground"
+        >
+          Refresh
+        </button>
+      </div>
+      {runs.length === 0 && <p className="text-sm text-muted-foreground">No runs yet.</p>}
+      {runs.map((r) => (
+        <Card key={r.id} className="p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button
+              className="flex-1 truncate text-left font-mono text-xs text-foreground"
+              onClick={() => setOpen(open === r.id ? null : r.id)}
+            >
+              {r.kind}
+              {r.providerKey ? `:${r.providerKey}` : ""} ·{" "}
+              {r.startedAt.slice(0, 19).replace("T", " ")}
+            </button>
+            <span className="flex items-center gap-2">
+              {r.exitCode != null && (
+                <span className="text-xs text-muted-foreground">exit {r.exitCode}</span>
+              )}
+              <Badge variant={RUN_STATUS_VARIANT[r.status] ?? "gray"}>{r.status}</Badge>
+            </span>
+          </div>
+          {open === r.id && (
+            <div className="mt-2 space-y-2">
+              {r.stdout && (
+                <pre className="max-h-48 overflow-auto rounded bg-foreground/90 p-2 text-xs text-background">
+                  {r.stdout}
+                </pre>
+              )}
+              {r.stderr && (
+                <pre className="max-h-32 overflow-auto rounded bg-destructive/10 p-2 text-xs text-destructive">
+                  {r.stderr}
+                </pre>
+              )}
+              {r.errorMessage && <p className="text-xs text-destructive">{r.errorMessage}</p>}
+            </div>
+          )}
+        </Card>
+      ))}
+    </div>
+  );
 }
 
 const STATUS_VARIANT: Record<string, "green" | "red" | "gray" | "yellow"> = {
@@ -219,6 +300,7 @@ export default function RunnersPage() {
       });
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Run failed");
       setSbxResult(res.data.runTaskInSandbox);
+      setHistoryKey((k) => k + 1); // refresh run history
     } finally {
       setBusy(null);
     }
@@ -602,6 +684,8 @@ export default function RunnersPage() {
             </div>
           )}
         </Card>
+
+        <RunHistory key={`runs-${historyKey}`} />
       </section>
     </div>
   );
