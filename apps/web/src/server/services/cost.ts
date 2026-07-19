@@ -9,6 +9,7 @@
  * (`events/handlers/budget.ts` → `checkBreach`), never synchronously in this write.
  */
 import { prisma } from "@/server/prisma";
+import { normalizeBillingType } from "@agentcenter/utils";
 import type { BudgetScope, BudgetWindow, CostEvent } from "@agentcenter/database";
 import { Prisma } from "@agentcenter/database";
 import { emit } from "@/server/events";
@@ -95,7 +96,7 @@ export async function recordCostEvent(input: RecordCostEventInput): Promise<Cost
     tokensIn: input.tokensIn ?? 0,
     tokensOut: input.tokensOut ?? 0,
     amountCents,
-    billingType: input.billingType === "subscription" ? "subscription" : "api",
+    billingType: normalizeBillingType(input.billingType),
     source: input.source ?? "agent",
     idempotencyKey: input.idempotencyKey ?? null,
     occurredAt,

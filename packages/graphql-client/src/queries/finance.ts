@@ -69,6 +69,20 @@ export const COST_BREAKDOWN_QUERY = gql`
   }
 `;
 
+// Domain 12 GAP-6 A14: metered vs subscription vs other spend split.
+export const COST_BILLING_SPLIT_QUERY = gql`
+  query CostBillingSplit($from: DateTime, $to: DateTime) {
+    costBillingSplit(from: $from, to: $to) {
+      meteredCents
+      subscriptionCents
+      otherCents
+      meteredCount
+      subscriptionCount
+      otherCount
+    }
+  }
+`;
+
 // Domain 12 GAP-6 A12: recursive issue-tree cost + runtime rollup.
 export const COST_BY_TASK_TREE_QUERY = gql`
   query CostByTaskTree($rootTaskId: String!, $excludeRoot: Boolean) {

@@ -131,6 +131,7 @@ export {
   FINANCE_EVENTS_QUERY,
   COST_WINDOW_SPEND_QUERY,
   COST_BY_TASK_TREE_QUERY,
+  COST_BILLING_SPLIT_QUERY,
 } from "./finance";
 
 export {

@@ -334,6 +334,15 @@ See 03-sandbox-depth.mdx.
       name). Typecheck 12/12, web build ✓ (optional deps correctly unresolved at build). Remaining Domain 12: GAP-3 telemetry,
       GAP-5 pino/run-log, GAP-6 A13 unpriced + A14 billingType split.
 
+- [x] **Cost/observability Domain 12 — GAP-6 A14 billingType widen + split reporting** DONE (next commit). Pure
+      billing-types.ts in @agentcenter/utils: BILLING_TYPES (metered_api/subscription_included/subscription_overage/credits/
+      fixed + legacy api/subscription aliases), normalizeBillingType (legacy+unknown→metered_api), billingFamily (metered/
+      subscription/other — overage counts as metered), splitByBillingFamily. recordCostEvent now normalizes on write.
+      GraphQL costBillingSplit query (BUDGETS, member) splits spend metered-vs-subscription-vs-other + shared client op.
+      (Behavior change: default/"api" store as metered_api — updated the pre-existing costBreakdown billingType test.)
+      Tests: 4 unit + 1 integration. Typecheck 12/12, web build ✓. Remaining Domain 12: GAP-3 telemetry, GAP-5 pino/run-log,
+      GAP-6 A13 unpriced cost state.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

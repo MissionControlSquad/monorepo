@@ -1,6 +1,11 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS, COST_WINDOWS, summarizeCostWindows } from "@agentcenter/utils";
+import {
+  FLAG_KEYS,
+  COST_WINDOWS,
+  summarizeCostWindows,
+  splitByBillingFamily,
+} from "@agentcenter/utils";
 import type { BudgetWindow, IncidentStatus } from "@agentcenter/database";
 import { requireRole, scoped, requireTenancy } from "@/server/tenancy";
 import { prisma } from "@/server/prisma";
@@ -323,6 +328,43 @@ builder.queryField("costByTaskTree", (t) =>
       await requireFeature(FLAG_KEYS.BUDGETS);
       const tenancy = requireRole(ctx, "member");
       return costByTaskTree(tenancy.workspaceId, args.rootTaskId, args.excludeRoot ?? false);
+    },
+  }),
+);
+
+// Domain 12 GAP-6 A14: split spend into metered (API) vs subscription vs other families.
+const BillingSplit = builder.simpleObject("BillingSplit", {
+  fields: (t) => ({
+    meteredCents: t.int(),
+    subscriptionCents: t.int(),
+    otherCents: t.int(),
+    meteredCount: t.int(),
+    subscriptionCount: t.int(),
+    otherCount: t.int(),
+  }),
+});
+
+builder.queryField("costBillingSplit", (t) =>
+  t.field({
+    type: BillingSplit,
+    args: { from: t.arg({ type: "DateTime" }), to: t.arg({ type: "DateTime" }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      requireRole(ctx, "member");
+      const rows = await prisma.costEvent.findMany({
+        where: scoped(ctx, {
+          ...(args.from || args.to
+            ? {
+                occurredAt: {
+                  ...(args.from ? { gte: args.from } : {}),
+                  ...(args.to ? { lte: args.to } : {}),
+                },
+              }
+            : {}),
+        }),
+        select: { billingType: true, amountCents: true },
+      });
+      return splitByBillingFamily(rows);
     },
   }),
 );

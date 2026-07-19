@@ -124,7 +124,7 @@ describe("cost ingestion + summary (Epic #4)", () => {
       undefined,
       admin,
     );
-    // an unspecified event defaults to api
+    // an unspecified event defaults to the metered API family
     await runGraphQL(
       `mutation{ ingestCostEvent(amountCents:200){ id billingType } }`,
       undefined,
@@ -142,8 +142,9 @@ describe("cost ingestion + summary (Epic #4)", () => {
         (b) => [b.key, b],
       ),
     );
-    expect(byKey.api).toMatchObject({ amountCents: 500, eventCount: 2 }); // 300 + 200 default
-    expect(byKey.subscription).toMatchObject({ amountCents: 1000, eventCount: 1 });
+    // "api" and the default now normalize to "metered_api"; "subscription" → "subscription_included"
+    expect(byKey.metered_api).toMatchObject({ amountCents: 500, eventCount: 2 }); // 300 + 200 default
+    expect(byKey.subscription_included).toMatchObject({ amountCents: 1000, eventCount: 1 });
   });
 });
 
@@ -355,3 +356,42 @@ describe("issue-tree cost rollup (Domain 12 GAP-6 A12)", () => {
 async function gqlQ(query: string, variables: Record<string, unknown>, cookie: string) {
   return runGraphQL(query, variables, cookie);
 }
+
+describe("billing-type split reporting (Domain 12 GAP-6 A14)", () => {
+  it("accepts widened billing types and splits spend by family", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    await runGraphQL(
+      `mutation{ ingestCostEvent(amountCents:100, billingType:"metered_api"){ billingType } }`,
+      undefined,
+      admin,
+    );
+    await runGraphQL(
+      `mutation{ ingestCostEvent(amountCents:1000, billingType:"subscription_included"){ billingType } }`,
+      undefined,
+      admin,
+    );
+    await runGraphQL(
+      `mutation{ ingestCostEvent(amountCents:5, billingType:"credits"){ billingType } }`,
+      undefined,
+      admin,
+    );
+    // legacy "api" still normalizes to metered
+    await runGraphQL(
+      `mutation{ ingestCostEvent(amountCents:20, billingType:"api"){ billingType } }`,
+      undefined,
+      admin,
+    );
+
+    const r = await runGraphQL(
+      `query{ costBillingSplit{ meteredCents subscriptionCents otherCents meteredCount } }`,
+      undefined,
+      admin,
+    );
+    expect(r.data.costBillingSplit).toMatchObject({
+      meteredCents: 120, // 100 + 20
+      subscriptionCents: 1000,
+      otherCents: 5,
+      meteredCount: 2,
+    });
+  });
+});

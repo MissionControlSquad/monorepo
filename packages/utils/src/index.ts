@@ -39,6 +39,7 @@ export * from "./skill-policy";
 export * from "./work-products";
 export * from "./cost-windows";
 export * from "./otel";
+export * from "./billing-types";
 export * from "./profile-analytics";
 export * from "./project-source";
 export * from "./cli-auth";
