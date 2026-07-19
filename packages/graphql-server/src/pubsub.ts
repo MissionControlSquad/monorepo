@@ -27,6 +27,10 @@ export const PubSubEvent = {
     CONNECTED: "vm:connected" as const,
     DISCONNECTED: "vm:disconnected" as const,
   },
+  BUDGET: {
+    /** Per-workspace budget incident open/resolve: use budgetIncidentTopic(workspaceId). */
+    INCIDENT_CHANGED: "budget:incidentChanged" as const,
+  },
   // NOTIFICATION and MESSAGE use per-entity topics only (notificationTopic, messageTopic, messageReactionTopic)
   // No global constants needed — subscribers always scope by agentId/taskId.
   CHANNEL_MESSAGE: {
@@ -93,6 +97,11 @@ export function vmConnectionTopic(vmId: string) {
   return `vm:connection:${vmId}` as const;
 }
 
+/** Per-workspace budget incident topic (open/resolve). */
+export function budgetIncidentTopic(workspaceId: string) {
+  return `budget:incidentChanged:${workspaceId}` as const;
+}
+
 /** Per-project action topic. */
 export function agentActionProjectTopic(projectId: string) {
   return `agentAction:project:${projectId}` as const;
@@ -139,6 +148,8 @@ export type PubSubEvents = {
   [key: `agent:stream:${string}`]: [AgentDmPayload];
   // Per-VM connection topics
   [key: `vm:connection:${string}`]: [{ vmId: string; connected: boolean }];
+  // Per-workspace budget incident topics
+  [key: `budget:incidentChanged:${string}`]: [{ incidentId: string; workspaceId: string }];
 };
 
 /**

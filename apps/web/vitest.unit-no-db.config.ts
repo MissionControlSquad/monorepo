@@ -18,6 +18,7 @@ export default defineConfig({
       "tests/unit/license.test.ts",
       "tests/unit/tenancy.test.ts",
       "tests/unit/trust.test.ts",
+      "tests/unit/budget-window.test.ts",
     ],
   },
   resolve: {

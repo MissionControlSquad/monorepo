@@ -6,8 +6,11 @@ import { applyAgentStatusUpdate } from "../agent-status";
 import { ensureAgentProfile } from "../agent-profile";
 import { isSystemShutdown } from "../system-settings";
 import { SetupStatus, AgentStatus, type AgentStatusValue } from "../constants";
-import { trimAndCap, getAgentSlug } from "@agentcenter/utils";
+import { trimAndCap, getAgentSlug, FLAG_KEYS } from "@agentcenter/utils";
 import { logCloudVMEvent } from "@agentcenter/database";
+import { isFeatureEnabled } from "../feature-flags";
+import { recordCostEvent } from "../services/cost";
+import { DEFAULT_WORKSPACE_ID } from "../tenancy";
 
 const ACTION_TO_DETAILED_STATUS: Record<string, string> = {
   file_edited: "coding",
@@ -65,6 +68,19 @@ const heartbeatSchema = baseEventSchema.extend({
   type: z.literal("agent.heartbeat"),
   detailedStatus: z.string().nullish(),
   statusMessage: z.string().nullish(),
+  // Epic #4: agents may piggyback LLM/run cost on the heartbeat (funnels recordCostEvent).
+  costDelta: z
+    .object({
+      amountCents: z.number(),
+      model: z.string().nullish(),
+      provider: z.string().nullish(),
+      tokensIn: z.number().nullish(),
+      tokensOut: z.number().nullish(),
+      taskId: z.string().nullish(),
+      projectId: z.string().nullish(),
+      idempotencyKey: z.string().nullish(),
+    })
+    .nullish(),
 });
 
 const actionLoggedSchema = baseEventSchema.extend({
@@ -281,6 +297,28 @@ export async function processEvent(event: unknown, apiKey: string): Promise<unkn
           `@${getAgentSlug(agent)} heartbeat [${e.detailedStatus}]`,
           "info",
         ).catch(() => undefined);
+      }
+
+      // Epic #4: record piggybacked cost when the feature is on and the delta is valid.
+      if (
+        e.costDelta &&
+        Number.isFinite(e.costDelta.amountCents) &&
+        e.costDelta.amountCents >= 0 &&
+        (await isFeatureEnabled(FLAG_KEYS.BUDGETS))
+      ) {
+        await recordCostEvent({
+          workspaceId: agent.workspaceId ?? DEFAULT_WORKSPACE_ID,
+          agentId: agent.id,
+          amountCents: Math.trunc(e.costDelta.amountCents),
+          model: e.costDelta.model ?? null,
+          provider: e.costDelta.provider ?? null,
+          tokensIn: e.costDelta.tokensIn ?? 0,
+          tokensOut: e.costDelta.tokensOut ?? 0,
+          taskId: e.costDelta.taskId ?? null,
+          projectId: e.costDelta.projectId ?? null,
+          source: "agent",
+          idempotencyKey: e.costDelta.idempotencyKey ?? null,
+        });
       }
 
       return { agentId: agent.id, systemShutdown: await isSystemShutdown() };

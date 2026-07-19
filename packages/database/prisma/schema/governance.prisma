@@ -14,6 +14,7 @@ enum ApprovalSubjectType {
   task
   deliverable
   hire_agent
+  budget_override
 }
 
 enum TrustLevel {

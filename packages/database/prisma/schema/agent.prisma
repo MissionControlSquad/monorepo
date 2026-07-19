@@ -131,6 +131,10 @@ model Agent {
   trustLevel   TrustLevel? // Epic #3: denormalized cache of AgentTrustProfile.trustLevel
   trustProfile AgentTrustProfile?
 
+  costEvents      CostEvent[] // Epic #4
+  budgetPolicies  BudgetPolicy[]
+  budgetIncidents BudgetIncident[]
+
   @@index([username])
   @@index([cloudVmId])
   @@index([workspaceId])

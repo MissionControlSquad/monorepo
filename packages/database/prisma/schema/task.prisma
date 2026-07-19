@@ -61,7 +61,8 @@ model Task {
   @@index([blockedByTaskId])
   @@index([projectId])
   @@index([projectId, status])
-  approvals Approval[] @relation("ApprovalTask")
+  approvals  Approval[]   @relation("ApprovalTask")
+  costEvents CostEvent[] // Epic #4
 
   @@index([projectId, createdAt])
   @@index([deletedAt])
