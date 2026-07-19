@@ -155,3 +155,5 @@ export { CREATE_GOAL, UPDATE_GOAL, DELETE_GOAL } from "./goals";
 export { SEND_BOARD_MESSAGE } from "./boardroom";
 
 export { INSTALL_PLUGIN, SET_PLUGIN_ENABLED, UNINSTALL_PLUGIN } from "./plugins";
+
+export { MINT_API_KEY, REVOKE_API_KEY } from "./api-keys";

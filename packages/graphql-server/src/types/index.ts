@@ -33,3 +33,4 @@ import "./portability";
 import "./goal";
 import "./boardroom";
 import "./plugin";
+import "./api-key";

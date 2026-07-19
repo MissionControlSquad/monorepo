@@ -32,3 +32,4 @@ import "./goals";
 import "./observability";
 import "./boardroom";
 import "./plugins";
+import "./api-keys";
