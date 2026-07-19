@@ -57,6 +57,10 @@ model Profile {
   recurringTaskAssignments RecurringTaskAssignee[]
   documents                Document[]
 
+  approvalsRequested Approval[]        @relation("ApprovalRequestedBy")
+  approvalsDecided   Approval[]        @relation("ApprovalDecidedBy")
+  approvalComments   ApprovalComment[] @relation("ApprovalCommentAuthor")
+
   @@index([kind])
   @@index([username])
   @@map("profiles")

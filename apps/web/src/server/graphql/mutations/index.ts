@@ -18,3 +18,4 @@ import "./events";
 import "./system";
 import "./profile";
 import "./feature-flags";
+import "./approvals";

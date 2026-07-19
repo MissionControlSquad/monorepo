@@ -61,6 +61,8 @@ model Task {
   @@index([blockedByTaskId])
   @@index([projectId])
   @@index([projectId, status])
+  approvals Approval[] @relation("ApprovalTask")
+
   @@index([projectId, createdAt])
   @@index([deletedAt])
   @@index([status, deletedAt])

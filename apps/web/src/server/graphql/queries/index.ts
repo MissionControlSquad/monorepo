@@ -18,3 +18,4 @@ import "./reviews";
 import "./analytics";
 import "./search";
 import "./feature-flags";
+import "./approvals";

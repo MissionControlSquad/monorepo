@@ -114,3 +114,5 @@ export {
 export { GLOBAL_SEARCH_QUERY } from "./search";
 
 export { FEATURE_FLAGS_QUERY } from "./feature-flags";
+
+export { APPROVALS_QUERY } from "./approvals";
