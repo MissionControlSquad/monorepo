@@ -149,6 +149,12 @@ async function ensureFeatureFlags() {
       managedBy: "user",
       description: "Routines (scheduled workflows) + Pipelines (multi-stage cases) (Epic #7)",
     },
+    {
+      key: FLAG_KEYS.TASK_AUTONOMY,
+      enabled: true,
+      managedBy: "system",
+      description: "Task autonomy: lease checkout, watchdogs, recovery, decomposition (Epic #8)",
+    },
   ];
 
   let created = 0;

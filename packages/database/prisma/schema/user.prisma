@@ -65,6 +65,8 @@ model Profile {
   routineRevisions  RoutineRevision[] @relation("RoutineRevisionEditedBy")
   claimedCases      PipelineCase[]    @relation("PipelineCaseClaimedBy")
 
+  checkedOutTasks Task[] @relation("TaskCheckedOutBy") // Epic #8
+
   @@index([kind])
   @@index([username])
   @@map("profiles")

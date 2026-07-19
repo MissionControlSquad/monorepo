@@ -66,6 +66,20 @@ model Task {
   routineRuns   RoutineRun[]   @relation("TaskFromRoutineRun") // Epic #7
   pipelineCases PipelineCase[] @relation("TaskFromPipelineCase")
 
+  // Epic #8: lease-based atomic checkout + autonomy hardening.
+  checkedOutByProfileId  String?
+  checkedOutAt           DateTime?
+  checkoutLeaseExpiresAt DateTime? // lease TTL; an expired lease is reclaimable
+  checkoutToken          String? // opaque fencing token per checkout
+
+  checkedOutBy    Profile?             @relation("TaskCheckedOutBy", fields: [checkedOutByProfileId], references: [id], onDelete: SetNull)
+  watchdogs       TaskWatchdog[]
+  decompositions  PlanDecomposition[]
+  treeHold        TaskTreeHold?
+  recoveryActions TaskRecoveryAction[]
+
+  @@index([checkedOutByProfileId])
+  @@index([checkoutLeaseExpiresAt])
   @@index([projectId, createdAt])
   @@index([deletedAt])
   @@index([status, deletedAt])

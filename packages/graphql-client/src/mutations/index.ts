@@ -122,3 +122,10 @@ export {
   TRANSITION_CASE,
   REJECT_CASE,
 } from "./pipelines";
+
+export {
+  REVIEW_DECOMPOSITION,
+  APPLY_DECOMPOSITION,
+  RELEASE_SUBTREE_HOLD,
+  EVALUATE_WATCHDOGS_NOW,
+} from "./task-autonomy";

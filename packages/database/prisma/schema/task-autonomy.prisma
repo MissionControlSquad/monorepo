@@ -1,0 +1,133 @@
+// ─── Task Autonomy / Reliability (Epic #8) ────────────────────────
+// Watchdogs (fire recovery when a run stalls), recovery actions, plan decompositions (review-gated
+// subtask generation), and tree holds (pause a whole subtree). Lease-based atomic checkout lives on
+// the Task row itself (conditional UPDATE + fencing token) — no separate checkout table.
+//
+// Gated by the buildbase feature `task_autonomy` (no retired License). Base task lifecycle keeps
+// working when the feature is off (additive).
+
+enum WatchdogScope {
+  task
+  subtree
+  agent
+}
+
+enum WatchdogCondition {
+  lease_expired
+  no_heartbeat
+  no_progress
+  stuck_in_status
+}
+
+enum WatchdogActionType {
+  release_checkout
+  reassign
+  escalate
+  pause_subtree
+  notify
+}
+
+enum WatchdogDecisionOutcome {
+  no_action
+  action_taken
+  action_failed
+}
+
+enum RecoveryStatus {
+  detected
+  attempting
+  resolved
+  failed
+}
+
+enum DecompositionStatus {
+  proposed
+  approved
+  rejected
+  applied
+}
+
+model TaskWatchdog {
+  id           String             @id @default(cuid())
+  taskId       String
+  scope        WatchdogScope      @default(task)
+  condition    WatchdogCondition
+  thresholdSec Int
+  action       WatchdogActionType
+  isEnabled    Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+
+  task      Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  decisions WatchdogDecision[]
+
+  @@index([taskId])
+  @@index([isEnabled, condition])
+  @@map("task_watchdogs")
+}
+
+model WatchdogDecision {
+  id         String                  @id @default(cuid())
+  watchdogId String
+  taskId     String
+  outcome    WatchdogDecisionOutcome
+  reason     String
+  metadata   Json?
+  createdAt  DateTime                @default(now())
+
+  watchdog TaskWatchdog @relation(fields: [watchdogId], references: [id], onDelete: Cascade)
+
+  @@index([watchdogId, createdAt])
+  @@index([taskId, createdAt])
+  @@map("watchdog_decisions")
+}
+
+model TaskRecoveryAction {
+  id          String         @id @default(cuid())
+  taskId      String
+  detectedBy  String // "cron" | watchdogId
+  reason      String
+  status      RecoveryStatus @default(detected)
+  resolution  String?
+  attemptedAt DateTime?
+  resolvedAt  DateTime?
+  createdAt   DateTime       @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("task_recovery_actions")
+}
+
+model PlanDecomposition {
+  id                  String              @id @default(cuid())
+  parentTaskId        String
+  status              DecompositionStatus @default(proposed)
+  plan                Json // [{title, description, priority?, tags?}] — TaskTemplate.subtasks shape
+  generatedByAgentId  String?
+  reviewedByProfileId String?
+  appliedAt           DateTime?
+  createdAt           DateTime            @default(now())
+
+  parentTask Task @relation(fields: [parentTaskId], references: [id], onDelete: Cascade)
+
+  @@index([parentTaskId])
+  @@index([status])
+  @@map("plan_decompositions")
+}
+
+model TaskTreeHold {
+  id              String    @id @default(cuid())
+  rootTaskId      String    @unique // one active hold per subtree root
+  reason          String
+  heldByProfileId String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  releasedAt      DateTime?
+
+  rootTask Task @relation(fields: [rootTaskId], references: [id], onDelete: Cascade)
+
+  @@index([isActive])
+  @@map("task_tree_holds")
+}
