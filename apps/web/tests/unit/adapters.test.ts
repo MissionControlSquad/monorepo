@@ -29,13 +29,61 @@ describe("adapter registry", () => {
       "codex",
       "claude",
       "gemini",
+      "cursor",
+      "grok",
+      "opencode",
+      "pi",
+      "hermes",
       "process",
       "shell",
       "http",
     ]);
     for (const k of BUILTIN_ADAPTER_KEYS) expect(isAdapterKey(k)).toBe(true);
     expect(isAdapterKey("nope")).toBe(false);
-    expect(listAdapters().length).toBeGreaterThanOrEqual(6);
+    expect(listAdapters().length).toBeGreaterThanOrEqual(12);
+  });
+
+  it("ships the newly-ported local runtimes (cursor/grok/opencode/pi/hermes) with install guards", () => {
+    // cursor uses its own installer script (not npm); the rest are npm globals; hermes probe-only.
+    expect(getAdapter("cursor")).toMatchObject({ binName: "cursor-agent" });
+    expect(getAdapter("cursor")!.installCommand).toContain("cursor.com/install");
+    expect(getAdapter("grok")!.installCommand).toContain("@vibe-kit/grok-cli");
+    expect(getAdapter("opencode")!.installCommand).toContain("opencode-ai");
+    expect(getAdapter("pi")!.installCommand).toContain("@mariozechner/pi-coding-agent");
+    // hermes: package name deployment-specific → probe-only (binName, no install)
+    expect(getAdapter("hermes")).toMatchObject({ binName: "hermes" });
+    expect(getAdapter("hermes")!.installCommand).toBeUndefined();
+
+    expect(argvOf(buildAdapterInvocation("opencode", { ...base, model: "gpt-x" }))).toEqual([
+      "opencode",
+      "run",
+      "--model",
+      "gpt-x",
+      "the brief",
+    ]);
+    expect(argvOf(buildAdapterInvocation("cursor", base))).toEqual([
+      "cursor-agent",
+      "-p",
+      "the brief",
+    ]);
+  });
+
+  it("resolves Tier-A / *_local key aliases to the canonical code module (gap 4.0)", () => {
+    // the seeded DB row key resolves to the openclaw runtime
+    expect(getAdapter("openclaw-gateway")!.key).toBe("openclaw");
+    expect(isAdapterKey("openclaw-gateway")).toBe(true);
+    // *_local spellings map to their canonical keys
+    expect(getAdapter("cursor_local")!.key).toBe("cursor");
+    expect(getAdapter("claude_local")!.key).toBe("claude");
+    expect(argvOf(buildAdapterInvocation("codex_local", { ...base, model: "o4" }))).toEqual([
+      "codex",
+      "exec",
+      "-m",
+      "o4",
+      "the brief",
+    ]);
+    // an unaliased unknown key is still unknown
+    expect(isAdapterKey("totally-unknown")).toBe(false);
   });
 
   it("openclaw builds a run argv + openclaw layout; model flows through", () => {

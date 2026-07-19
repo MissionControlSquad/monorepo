@@ -171,6 +171,16 @@ See 03-sandbox-depth.mdx.
       32/32 unaffected. Typecheck 12/12, web build ✓. Remaining Memory: GAP-D inspect UI, GAP-E adapter iface,
       GAP-F tools/search, GAP-G cost linkage, GAP-H evals.
 
+- [x] **Adapters Domain 2 — gap 4.8 + 4.0 (partial)** DONE (next commit). Ported 5 missing local runtimes to the
+      Tier-D code registry (cursor/grok/opencode/pi/hermes) with build() + idempotent install guards
+      (cursor→cursor.com/install script, grok→@vibe-kit/grok-cli, opencode→opencode-ai, pi→@mariozechner/
+      pi-coding-agent, hermes→probe-only pending pkg). Fixed the openclaw-gateway↔openclaw key mismatch via
+      canonicalAdapterKey + an alias table (also *_local spellings) wired into getAdapter/isAdapterKey/
+      buildAdapterInvocation. Invocations are best-effort mirrors of Paperclip's per-runtime adapters (never
+      executed for real yet — reconfirm vs a live CLI when a key lands). Tests: adapters 18/18. Typecheck 12/12,
+      web build ✓. Remaining Domain 2: 4.1 adapter-owned execute+structured result, 4.2 testEnvironment, 4.3 model
+      discovery wiring, 4.4 streaming/transcript parse, 4.6 ssh target, 4.7 real openclaw/hermes gateway, 4.9-4.12.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   hire_agent approval, auto-sleep cron, secret audit-on-resolve, adapter Tier-A↔Tier-D disconnect. → Phase 1 sweeps these.

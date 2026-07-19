@@ -257,15 +257,133 @@ const httpAdapter: Adapter = {
   },
 };
 
+// ─── Additional local-CLI runtimes (Domain 2, gap 4.8) ──────────────────────
+// Ported as thin code modules mirroring the four above: build() an argv launch + an idempotent
+// sandbox install (`command -v binName || installCommand`) + a model flag. Invocations follow each
+// CLI's print/non-interactive form; they are best-effort mirrors of Paperclip's per-runtime adapters
+// and should be reconfirmed against a live CLI when a real key lands (nothing has run for real yet).
+
+const cursorAdapter: Adapter = {
+  key: "cursor",
+  displayName: "Cursor Agent",
+  requiresTemplate: false,
+  supportsModel: true,
+  models: [],
+  // The Cursor CLI installs via its own script (not npm); binary is `cursor-agent`.
+  installCommand: "curl https://cursor.com/install -fsS | bash",
+  binName: "cursor-agent",
+  build: (ctx) => ({
+    argv: ["cursor-agent", "-p", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    mode: "spawn",
+    cwd: ctx.workspaceDir,
+    useShell: false,
+    layout: GENERIC_LAYOUT,
+  }),
+};
+
+const grokAdapter: Adapter = {
+  key: "grok",
+  displayName: "Grok CLI",
+  requiresTemplate: false,
+  supportsModel: true,
+  models: [],
+  installCommand: "npm install -g @vibe-kit/grok-cli",
+  binName: "grok",
+  build: (ctx) => ({
+    argv: ["grok", "-p", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    mode: "spawn",
+    cwd: ctx.workspaceDir,
+    useShell: false,
+    layout: GENERIC_LAYOUT,
+  }),
+};
+
+const opencodeAdapter: Adapter = {
+  key: "opencode",
+  displayName: "opencode",
+  requiresTemplate: false,
+  supportsModel: true,
+  models: [],
+  installCommand: "npm install -g opencode-ai",
+  binName: "opencode",
+  build: (ctx) => ({
+    argv: ["opencode", "run", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    mode: "spawn",
+    cwd: ctx.workspaceDir,
+    useShell: false,
+    layout: GENERIC_LAYOUT,
+  }),
+};
+
+const piAdapter: Adapter = {
+  key: "pi",
+  displayName: "Pi Coding Agent",
+  requiresTemplate: false,
+  supportsModel: true,
+  models: [],
+  installCommand: "npm install -g @mariozechner/pi-coding-agent",
+  binName: "pi",
+  build: (ctx) => ({
+    argv: ["pi", "-p", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    mode: "spawn",
+    cwd: ctx.workspaceDir,
+    useShell: false,
+    layout: GENERIC_LAYOUT,
+  }),
+};
+
+const hermesAdapter: Adapter = {
+  key: "hermes",
+  displayName: "Hermes",
+  requiresTemplate: false,
+  supportsModel: true,
+  models: [],
+  // Hermes CLI package name is deployment-specific; leave install unset (probe-only) until confirmed.
+  binName: "hermes",
+  build: (ctx) => ({
+    argv: ["hermes", "run", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    mode: "spawn",
+    cwd: ctx.workspaceDir,
+    useShell: false,
+    layout: GENERIC_LAYOUT,
+  }),
+};
+
 const BUILTIN_ADAPTERS: Adapter[] = [
   openclawAdapter,
   codexAdapter,
   claudeAdapter,
   geminiAdapter,
+  cursorAdapter,
+  grokAdapter,
+  opencodeAdapter,
+  piAdapter,
+  hermesAdapter,
   processAdapter,
   shellAdapter,
   httpAdapter,
 ];
+
+// Adapter key aliases (Domain 2, gap 4.0): the Tier-A `AgentAdapter` DB rows and some external configs
+// use different spellings than the Tier-D code keys. Resolve them to the one canonical module so an
+// agent bound to e.g. "openclaw-gateway" (the seeded DB row) still runs the `openclaw` runtime.
+const ADAPTER_KEY_ALIASES: Record<string, string> = {
+  "openclaw-gateway": "openclaw",
+  openclaw_gateway: "openclaw",
+  claude_local: "claude",
+  codex_local: "codex",
+  gemini_local: "gemini",
+  cursor_local: "cursor",
+  grok_local: "grok",
+  opencode_local: "opencode",
+  pi_local: "pi",
+  hermes_local: "hermes",
+};
+
+/** Canonicalize an adapter key through the alias table (identity when not aliased). */
+export function canonicalAdapterKey(key: string): string {
+  return ADAPTER_KEY_ALIASES[key] ?? key;
+}
 
 // ─── Registry ───────────────────────────────────────────────────────────────
 
@@ -277,7 +395,7 @@ export function registerAdapter(adapter: Adapter): void {
 }
 
 export function getAdapter(key: string): Adapter | undefined {
-  return registry.get(key);
+  return registry.get(key) ?? registry.get(canonicalAdapterKey(key));
 }
 
 export function listAdapters(): Adapter[] {
@@ -285,14 +403,14 @@ export function listAdapters(): Adapter[] {
 }
 
 export function isAdapterKey(key: string): boolean {
-  return registry.has(key);
+  return registry.has(key) || registry.has(canonicalAdapterKey(key));
 }
 
 export const BUILTIN_ADAPTER_KEYS = BUILTIN_ADAPTERS.map((a) => a.key);
 
 /** Resolve an adapter and build its invocation, or throw a clear error if the key is unknown. */
 export function buildAdapterInvocation(key: string, ctx: AdapterContext): AdapterInvocation {
-  const adapter = registry.get(key);
+  const adapter = getAdapter(key);
   if (!adapter) throw new Error(`Unknown runtime adapter: ${key}`);
   return adapter.build(ctx);
 }
