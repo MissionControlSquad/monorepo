@@ -193,7 +193,7 @@ export { WORK_TIMELINE_QUERY } from "./timeline";
 
 export { AGENT_GOVERNANCE_QUERY } from "./agent-governance";
 
-export { TASK_RELATIONS_QUERY } from "./task-relations";
+export { TASK_RELATIONS_QUERY, BLOCKER_DIAGNOSTICS_QUERY } from "./task-relations";
 
 export { TASK_EXTERNAL_LINKS_QUERY } from "./external-links";
 

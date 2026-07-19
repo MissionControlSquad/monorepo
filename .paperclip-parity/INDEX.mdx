@@ -351,6 +351,14 @@ See 03-sandbox-depth.mdx.
       QuotaWindow tracks the delta). Typecheck 12/12, web build ✓. **Domain 12 cost is now largely complete** (GAP-1 finance
       ledger, GAP-2 quota, GAP-4 OTel, GAP-6 A10/A12/A13/A14). Remaining: GAP-3 telemetry (XL epic), GAP-5 pino/run-log.
 
+- [x] **Work-items Domain 8 — G6.1 blocker diagnostics** DONE (next commit). Pure blocker-diagnostics.ts in
+      @agentcenter/utils: computeBlockerDiagnostics(blockers) → {readiness ready|blocked, unresolvedCount, blockers[], human
+      reasons}; a blocker resolves only when its task is `done`; dedupes a blocker seen via both edges (prefers blocked_by).
+      GraphQL blockerDiagnostics(taskId) query (TASK_RELATIONS) collects blockers from the direct blockedByTaskId edge + typed
+      `blocks` relations, loads their statuses, computes readiness + shared client op. Tests: 5 unit + 3 integration.
+      Typecheck 12/12, web build ✓. Remaining Domain 8 G6: dependency-resolved wakeups, G6.2 rich comments, G6.3 external-object
+      sync, G6.4 origin/idempotency, G6.5 thread interactions, G6.6 subtree cancel/restore, G6.7 status enum.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

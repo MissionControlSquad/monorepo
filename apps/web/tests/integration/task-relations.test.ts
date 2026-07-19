@@ -134,3 +134,47 @@ describe("task relations GraphQL (Tier C)", () => {
     }
   });
 });
+
+describe("blocker diagnostics (Domain 8 G6.1)", () => {
+  const DIAG = `query($id:String!){ blockerDiagnostics(taskId:$id){ readiness unresolvedCount reasons blockers{ taskId status source resolved } } }`;
+
+  it("reports ready when there are no blockers", async () => {
+    const t = await makeTask("free");
+    const r = await gql(DIAG, { id: t });
+    expect(r.data.blockerDiagnostics.readiness).toBe("ready");
+    expect(r.data.blockerDiagnostics.unresolvedCount).toBe(0);
+  });
+
+  it("reports blocked with reasons from the direct edge + a blocks relation", async () => {
+    const target = await makeTask("target");
+    const directBlocker = await makeTask("direct"); // still in progress
+    const relBlocker = await makeTask("rel");
+    await prisma.task.update({
+      where: { id: target },
+      data: { blockedByTaskId: directBlocker, status: "in_progress" },
+    });
+    await prisma.task.update({ where: { id: directBlocker }, data: { status: "in_progress" } });
+    // rel blocks target, but rel is done → resolved
+    await linkTasks({ sourceTaskId: relBlocker, targetTaskId: target, type: "blocks" });
+    await prisma.task.update({ where: { id: relBlocker }, data: { status: "done" } });
+
+    const r = await gql(DIAG, { id: target });
+    expect(r.data.blockerDiagnostics.readiness).toBe("blocked");
+    expect(r.data.blockerDiagnostics.unresolvedCount).toBe(1); // only the direct one
+    const byId = Object.fromEntries(
+      r.data.blockerDiagnostics.blockers.map((b: any) => [b.taskId, b]),
+    );
+    expect(byId[directBlocker]).toMatchObject({ source: "blocked_by", resolved: false });
+    expect(byId[relBlocker]).toMatchObject({ source: "relation", resolved: true });
+  });
+
+  it("becomes ready once the blocker is done", async () => {
+    const target = await makeTask("t");
+    const blocker = await makeTask("b");
+    await prisma.task.update({ where: { id: target }, data: { blockedByTaskId: blocker } });
+    await prisma.task.update({ where: { id: blocker }, data: { status: "in_progress" } });
+    expect((await gql(DIAG, { id: target })).data.blockerDiagnostics.readiness).toBe("blocked");
+    await prisma.task.update({ where: { id: blocker }, data: { status: "done" } });
+    expect((await gql(DIAG, { id: target })).data.blockerDiagnostics.readiness).toBe("ready");
+  });
+});
