@@ -112,6 +112,31 @@ async function ensureFeatureFlags() {
       managedBy: "user",
       description: "Push and email notifications",
     },
+    {
+      key: FLAG_KEYS.GOVERNANCE,
+      enabled: true,
+      managedBy: "system",
+      description: "Agent governance: approvals + trust profiles (Epic #3)",
+    },
+    {
+      key: FLAG_KEYS.BUDGETS,
+      enabled: true,
+      managedBy: "system",
+      description: "Agent budgets: cost tracking + auto-pause (Epic #4)",
+    },
+    {
+      key: FLAG_KEYS.LEDGER,
+      enabled: true,
+      managedBy: "user",
+      description: "Business finance ledger: revenue + expenses (Epic #16)",
+    },
+    {
+      // Opt-in: OpenClaw (builtIn) always works; other providers unlock only when enabled.
+      key: FLAG_KEYS.MULTI_PROVIDER_ADAPTERS,
+      enabled: false,
+      managedBy: "system",
+      description: "Multi-provider agent adapters beyond OpenClaw (Epic #2)",
+    },
   ];
 
   let created = 0;

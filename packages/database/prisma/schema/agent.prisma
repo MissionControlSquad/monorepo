@@ -135,9 +135,14 @@ model Agent {
   budgetPolicies  BudgetPolicy[]
   budgetIncidents BudgetIncident[]
 
+  adapterType   String? // Epic #2: FK → AgentAdapter.type; nullable during rollout, backfilled "openclaw-gateway"
+  adapterConfig Json? // per-agent config, validated vs AgentAdapter.configSchema
+  adapter       AgentAdapter? @relation("AgentAdapterType", fields: [adapterType], references: [type], onDelete: Restrict)
+
   @@index([username])
   @@index([cloudVmId])
   @@index([workspaceId])
+  @@index([adapterType])
   @@map("agents")
 }
 

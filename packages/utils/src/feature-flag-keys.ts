@@ -12,6 +12,7 @@ export const FLAG_KEYS = {
   GOVERNANCE: "governance",
   BUDGETS: "budgets",
   LEDGER: "ledger",
+  MULTI_PROVIDER_ADAPTERS: "multi_provider_adapters",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -30,4 +31,6 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.GOVERNANCE]: true,
   [FLAG_KEYS.BUDGETS]: true,
   [FLAG_KEYS.LEDGER]: true,
+  // Opt-in: OpenClaw (builtIn) always works; extra providers unlock when enabled.
+  [FLAG_KEYS.MULTI_PROVIDER_ADAPTERS]: false,
 };
