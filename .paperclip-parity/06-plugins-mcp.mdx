@@ -1,0 +1,231 @@
+---
+title: "Parity Gap Analysis — Plugins SDK & MCP"
+domain: plugins-mcp
+paperclip_root: /Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/paperclip
+monorepo_root: /Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo
+status: draft
+generated: 2026-07-17
+---
+
+# Plugins SDK & MCP — Parity Gap Analysis
+
+## TL;DR
+
+This domain is **two large, mature Paperclip subsystems** where our monorepo has a thin install-time
+shell of one and **zero of the other**.
+
+- **Plugin framework** — Paperclip ships a first-party, out-of-process **plugin runtime**:
+  plugins are npm packages that run as *forked Node child processes* speaking JSON-RPC 2.0 over
+  stdio, gated by a ~90-value **capability permission model**, with a rich `PluginContext` SDK
+  (issues, agents, sessions, projects, db-namespace, secrets, events, jobs, webhooks, scoped API
+  routes, managed agents/routines/skills, 15 UI extension slots, environment/sandbox drivers). It
+  has a manifest+JSON-Schema config contract, a scaffolder (`create-paperclip-plugin`), a testing
+  harness, hot lifecycle (install/enable/disable without restart), per-company enablement, dev
+  hot-reload, and 10 example/real plugins. Our monorepo has an **install-time registry only**
+  (validate manifest → store in `Plugin` table → admin UI toggles), with runtime **explicitly
+  deferred** and capabilities "declared, not granted."
+- **MCP** — Paperclip has a full **MCP Access Governance** platform (Apps v2): Paperclip acts as
+  both an **MCP endpoint** (a stdio `@modelcontextprotocol/sdk` server exposing ~30 task/agent tools
+  to Claude Code/IDEs, plus named HTTP **MCP gateways** with scoped tokens) **and an MCP gateway/proxy**
+  that connects Paperclip agents to upstream third-party MCP servers (GitHub, Linear, …) through a
+  policy engine: applications → connections (remote_http/local_stdio) → tool catalog with risk
+  classification & quarantine → allow/deny **profiles** bound to agent/project/routine/issue/company
+  → orthogonal **policies** (allow / block / require_approval / rate_limit / trust_rule) → human
+  **action requests** → **audit** call-event log → supervised **runtime slots** with health, OAuth,
+  redaction, and a 7-tab admin UI. **Our monorepo has literally none of this** — the only MCP
+  reference is an `mcp-builder` agent-persona *template string*.
+
+Net: **plugin registry is 🟡 (install-time only, no runtime); the entire plugin execution runtime is
+❌; the entire MCP subsystem is ❌.** MCP is the single largest greenfield build in the parity effort.
+
+---
+
+## Part 1 — Plugin Framework
+
+### 1.1 Feature inventory & status
+
+| # | Feature | Paperclip (file:line) | Monorepo status |
+|---|---------|----------------------|-----------------|
+| P1 | Plugin SDK authoring factory + lifecycle hooks | `packages/plugins/sdk/src/define-plugin.ts:183` (`PluginDefinition`), `:416` (`definePlugin`); hooks `setup/onHealth/onConfigChanged/onShutdown/onValidateConfig/onWebhook/onApiRequest` + external-object + environment-driver hooks | ❌ none (we ship no runnable SDK; a plugin is inert JSON) |
+| P2 | `PluginContext` runtime API surface | `packages/plugins/sdk/src/types.ts:1853` — clients: `config, localFolders, events, jobs, launchers, db, http, secrets, activity, state, entities, projects, executionWorkspaces, routines, skills, companies, issues(:1338), agents+sessions(:1487/:1550), goals, access, authorization(:1736), data, actions, streams, tools(:988), metrics, telemetry, logger` | ❌ |
+| P3 | Manifest schema (V1) | `packages/shared/src/types/plugin.ts:569` `PaperclipPluginManifestV1` — id/apiVersion/version/displayName/description/author/categories/minimumHostVersion/capabilities/entrypoints{worker,ui}/instanceConfigSchema + jobs/webhooks/tools/database/apiRoutes/environmentDrivers/agents/projects/routines/skills/localFolders/objectReferences/launchers/ui | 🟡 `packages/utils/src/plugins.ts:36` zod `manifestSchema` — apiVersion/id/version/displayName/category/capabilities/tools/jobs/configSchema. Much narrower (no entrypoints, ui slots, apiRoutes, db, environmentDrivers, managed resources) |
+| P4 | Config schema (JSON-Schema, operator-editable) + secret refs | `instanceConfigSchema` JSON Schema; secrets as `{type:"secret_ref",secretId}` resolved via `ctx.secrets.resolve()` (`types.ts:653`) | 🟡 `configSchema` (JSON-Schema draft-07) stored + validated (`services/plugins.ts` `validateAdapterConfig`); **no secret-ref indirection** |
+| P5 | Capability permission model (~90 fine-grained) | `packages/shared/src/constants.ts:1218` `PLUGIN_CAPABILITIES`; enforced at runtime `server/src/services/plugin-capability-validator.ts` + `host-client-factory.ts` `getRequiredCapability`/`CapabilityDeniedError` | 🟡 `packages/utils/src/plugin-constants.ts:11` lists 25 capability strings — **declared metadata only, never granted/enforced** (no runtime to gate) |
+| P6 | Plugin loading / discovery / install | `server/src/services/plugin-loader.ts` (~2394 lines) — scans `~/.paperclip/plugins` + `node_modules/paperclip-plugin-*` + bundled `packages/plugins`; npm-or-local install, activate, shutdownAll | 🟡 `installPlugin` upserts DB record only (`apps/web/src/server/services/plugins.ts:87`); no fetch/resolve/activate |
+| P7 | **Plugin isolation (out-of-process)** | `server/src/services/plugin-worker-manager.ts:730` `fork(entrypoint,{stdio:[pipe,pipe,pipe,ipc]})`, NDJSON JSON-RPC; minimal env (`:718` — no `process.env` spread, blocks `DATABASE_URL` leak); crash backoff (`MAX_CONSECUTIVE_CRASHES=10`), graceful 10s→SIGTERM→5s→SIGKILL. Secondary vm sandbox `plugin-runtime-sandbox.ts` | ❌ none — no worker/child-process/vm isolation of any kind |
+| P8 | Host↔worker RPC protocol | `packages/plugins/sdk/src/protocol.ts` (method maps `HostToWorkerMethods`/`WorkerToHostMethods`), `worker-rpc-host.ts`, host impl `server/src/services/plugin-host-services.ts` (~2759 lines) | ❌ |
+| P9 | Agent-tool contributions (plugin → agent tools) | manifest `tools[]` + `ctx.tools.register` (namespaced by plugin id); dispatch `server/src/services/plugin-tool-dispatcher.ts` + `plugin-tool-registry.ts` | 🟡 manifest can *list* `tools[]` (`plugins.ts`), but `agent.tools.register` is declared-only; no dispatcher, no consumer |
+| P10 | Scheduled jobs (cron) | manifest `jobs[]` + `ctx.jobs.register`; `plugin-job-scheduler.ts`/`-store`/`-coordinator` | 🟡 manifest lists `jobs[]` with cron (validated `isValidCron`); no scheduler execution |
+| P11 | Webhooks | manifest `webhooks[]` + `onWebhook`; routed `/api/plugins/:id/webhooks/:key` | ❌ |
+| P12 | Scoped plugin API routes | manifest `apiRoutes[]` (`types/plugin.ts:519`) + `onApiRequest`; mount `/api/plugins/:id/api/*`, auth modes board/agent/webhook | ❌ |
+| P13 | UI extension surfaces (15 slot types) | `constants.ts:1352` (page, detailTab, taskDetailView, dashboardWidget, sidebar, sidebarPanel, projectSidebarItem, toolbarButton, contextMenuItem, commentAnnotation, settingsPage, companySettingsPage, …) + launchers; host UI kit `@paperclipai/plugin-sdk/ui`; slot render `ui/src/plugins/slots.tsx`, bridge `ui/src/plugins/bridge.ts` | ❌ (our UI only shows manifest metadata; no runtime slot rendering) |
+| P14 | Environment / sandbox drivers as plugins | `types/plugin.ts:133` `environmentDrivers[]`; real impls `packages/plugins/sandbox-providers/{cloudflare,daytona,e2b,exe-dev,kubernetes,modal,novita}` | ❌ (covered separately in 02-adapters; sandbox providers are hardcoded services in our repo, not plugins) |
+| P15 | Restricted DB namespace per plugin | manifest `database{namespaceSlug,migrationsDir,coreReadTables}` → dedicated Postgres schema + `ctx.db`; `plugin-database.ts`, migrations `0059_plugin_database_namespaces.sql` | ❌ |
+| P16 | Managed resources (agents/projects/routines/skills) reconciled by key | `ctx.projects.managed`, `plugin-managed-agents.ts`/`-routines.ts`/`-skills.ts`; example `plugin-llm-wiki` | ❌ |
+| P17 | Plugin state KV + entities + activity + streams(SSE) | `ctx.state` (5-part scoped, `types.ts:762`), `ctx.entities`, `ctx.activity`, `ctx.streams` (worker→UI push); `plugin-state-store.ts`, `plugin-stream-bus.ts` | ❌ |
+| P18 | Scaffolder CLI | `packages/plugins/create-paperclip-plugin/src/index.ts:123` `scaffoldPluginProject` (default/connector/workspace/environment templates, esbuild presets, SDK test harness) | ❌ |
+| P19 | Testing harness | `packages/plugins/sdk/src/testing.ts` (~2601 lines) `createTestHarness`/`createEnvironmentTestHarness` | ❌ |
+| P20 | Dev hot-reload watcher | `server/src/services/plugin-dev-watcher.ts`; SDK `dev-server.ts`/`dev-cli.ts` | ❌ |
+| P21 | Persistence & lifecycle status | `packages/db/src/schema/plugins.ts` (+ `plugin_config`, `plugin_company_settings` per-company enablement, `plugin_state`, `plugin_entities`, `plugin_jobs`, `plugin_webhooks`, `plugin_logs`, `plugin_database`, `plugin_managed_resources`); migration `0029_plugin_tables.sql`; status enum installed/ready/disabled/error/upgrade_pending/uninstalled | 🟡 single `Plugin` model (`packages/database/prisma/schema/plugin.prisma`), status installed/disabled/error, workspace-scoped enable/config; no state/jobs/webhooks/company-settings/managed tables |
+| P22 | Admin API + UI | REST `server/src/routes/plugins.ts:474` (install/enable/disable/config/config-test/tools/tools-execute/ui-contributions/bridge); UI `ui/src/pages/{PluginManager,PluginSettings,PluginPage,CompanySettingsPluginPage}.tsx` | ✅ registry CRUD: GraphQL `plugins`/`plugin` queries + `installPlugin/setPluginEnabled/uninstallPlugin/setPluginConfig/clearPluginError` (`packages/graphql-server/src/types/plugin.ts`, client `queries|mutations/plugins.ts`); UI `apps/web/app/(dashboard)/plugins/page.tsx` + `apps/web/src/views/PluginDetailPage.tsx`; `IconRail.tsx:101` nav, gated `FLAG_KEYS.PLUGIN_SDK` (default off) |
+
+**Docs:** `doc/plugins/PLUGIN_SPEC.md` (1837 lines, normative), `PLUGIN_AUTHORING_GUIDE.md` (604),
+`LOCAL_PLUGIN_DEVELOPMENT.md` (216), `ideas-from-opencode.md`. Note PLUGIN_SPEC §11 caveats: today
+plugin UI runs same-origin (trusted, not sandboxed); capabilities gate worker-side RPC only;
+single-tenant/self-hosted/filesystem-persistent; not yet cloud-horizontal.
+
+### 1.2 Plugin gaps — monorepo implementation plan
+
+Our registry (P3/P4/P21/P22) is a solid **install-time contract**; the gap is the entire **execution
+runtime**. Recommended phasing — treat as a multi-epic effort; do **not** attempt full parity at once.
+
+**Phase A — Runtime skeleton (worker isolation + RPC + capability gating).** *Size: L.*
+- **Server:** add `apps/web/src/server/services/plugin-runtime/` — a `PluginWorkerManager` that
+  `fork()`s a per-plugin child (mirror `plugin-worker-manager.ts`: minimal env, NDJSON JSON-RPC,
+  crash backoff, SIGTERM→SIGKILL drain). Ship a `@mc/plugin-sdk` package (new `packages/plugin-sdk`)
+  with `definePlugin`, a `PluginContext` factory, and the worker-side RPC loop.
+- **Security/gating:** a `PluginCapabilityValidator` that maps each host-RPC method → required
+  capability and rejects if the installed plugin's granted set omits it. **Change "declared → granted":**
+  add an admin **grant** step (per-company `plugin_grants`) so install ≠ authorize.
+- **Prisma:** `PluginProcess`/`PluginRuntimeStatus`, `PluginLog` (worker stderr capture), `PluginGrant`.
+- **Tests:** worker spawn/crash/backoff, capability-denied path, env-leak assertion (no `DATABASE_URL`).
+
+**Phase B — First useful capability slices.** *Size: L (split per slice).*
+- Pick the highest-value host clients first: **state KV** (`plugin_state`), **scoped API routes**
+  (`/api/plugins/:id/*`), **webhooks**, **jobs (cron scheduler)**, **http.outbound**, **secrets.resolve**
+  (secret-ref indirection + vault). Each = a Prisma table (where stateful) + a host-RPC handler +
+  capability + tests. **agent.tools.register** (P9) is the slice that bridges into MCP tool exposure —
+  build it once the tool-invocation surface (Part 2) exists so plugin tools and MCP tools share one
+  dispatcher.
+- **UI:** manifest-declared **UI slots** (P13) require a host slot renderer + a `postMessage` bridge
+  (`apps/web/src/views/plugin-slots/`). Start with `page` and `settingsPage` slots only. Treat plugin
+  UI as trusted same-origin initially (match Paperclip's documented caveat) or invest in iframe
+  sandboxing (larger).
+
+**Phase C — Ecosystem & DX.** *Size: M.*
+- Scaffolder (`create-mc-plugin`), SDK testing harness, dev hot-reload watcher, example plugins.
+- Restricted DB namespace (P15) and managed resources (P16) are advanced — defer unless a concrete
+  connector needs them.
+
+**Sequencing note:** Phase A is a hard prerequisite for everything else and overlaps the MCP runtime
+(both need a tool-invocation + audit spine). Build the **tool-invocation/audit core once** and let
+both plugin-contributed tools and MCP-catalog tools flow through it.
+
+---
+
+## Part 2 — MCP (the big gap)
+
+Paperclip splits MCP into two directions. **Endpoint mode** = external clients call *Paperclip*.
+**Gateway mode** = *Paperclip agents* call upstream MCP servers, fully governed. Mental model &
+runbooks: `doc/MCP-ACCESS-GOVERNANCE.md`, `doc/MCP-RUNTIME-OPERATIONS.md`, `doc/TASKS-mcp.md`,
+`doc/MCP-DEMO-SCRIPT.md`, `doc/RELEASE-NOTES-mcp-access-governance.md`.
+
+### 2.1 MCP feature inventory & status (all ❌ in monorepo)
+
+| # | Feature | Paperclip (file:line) | Monorepo |
+|---|---------|----------------------|----------|
+| M1 | **Endpoint mode**: Paperclip-as-MCP-server (stdio only) | `packages/mcp-server/src/index.ts:8` (`McpServer` from `@modelcontextprotocol/sdk`), stdio transport `:28` (published `@paperclipai/mcp-server`, run via npx, env-configured bearer); **~40 tools only (no resources/prompts)** `tools.ts:237` via `PaperclipApiClient` — issues/comments/agents/projects/docs/goals/approvals/workspace-runtime + interaction creators + `paperclipApiRequest` arbitrary-path escape hatch (`:623`). Not policy-governed (standard Paperclip auth) | ❌ |
+| M2 | Endpoint tool contract (aspirational) | `doc/TASKS-mcp.md` — a Linear-flavored task-MCP design spec (teams/workflow-states/initiatives); **does not match** shipped `packages/mcp-server` tool names — treat as intent, not implemented | ❌ |
+| M3 | Example hosted MCP servers | `packages/google-sheets-mcp-server`, `packages/kv-demo-mcp-server` | ❌ |
+| M4 | **Named MCP gateways** (Paperclip exposes governed HTTP `/mcp` endpoints w/ scoped tokens) | migration `0159_named_mcp_gateways.sql` (`tool_mcp_gateways`, `tool_mcp_gateway_tokens` — token_hash, expires/revoke, actions `tools/list`,`tools/call` `constants.ts:1021`), `0160_mcp_gateway_contract_expansion.sql`; svc `server/src/services/tool-gateway.ts`, route `server/src/routes/tool-gateway.ts` | ❌ |
+| M5 | **Gateway mode**: agents → upstream MCP proxy | `server/src/services/tool-gateway.ts` (~6267 lines; spawn stdio / HTTP proxy), Streamable-HTTP client `server/src/services/mcp-http.ts`; core service `tool-access.ts` (~6622 lines: connections/catalog refresh via upstream `tools/list`); gateway MCP JSON-RPC endpoint `server/src/routes/tool-gateway.ts:58` (`initialize` protocolVersion `2025-03-26`, `tools/list` = governed list, `tools/call` = `executeTool` through policy) | ❌ |
+| M5a | **Agent → MCP wiring** (how agents actually receive tools) | `server/src/services/heartbeat.ts:2132` `buildPaperclipRuntimeMcpServers()` — computes agent effective profiles, finds/creates a **named gateway** per permitted `remote_http` connection, mints a **1h run-scoped token** (`allowedActions: tools/list,tools/call`), returns `AdapterRuntimeMcpAccess`; adapter writes `mcpServers` config → `packages/adapters/claude-local/src/server/claude-config.ts:152` (mode 0600, Bearer). Tokens revoked at run end (`:2115`). Managed-local path `createManagedMcpRunConfig` (`:2295`). Agents see the **governed façade**, never the raw upstream | ❌ (our agents get on-disk skills + a runtime adapter; no per-run scoped tool config) |
+| M6 | Applications / Connections model | migration `0148_tool_access_mcp_connections.sql`: `tool_applications` (logical), `tool_connections` (transport remote_http/local_stdio, config, `credential_refs`, health_status, catalog_refresh) | ❌ |
+| M7 | Tool **catalog** + risk classification + quarantine | `tool_catalog_entries` (input_schema, `risk_level` read/write/destructive, status active/quarantined, version_hash); `0157_tool_profile_new_tools_review.sql` (new-tool review); catalog snapshots `0150` | ❌ |
+| M8 | **Profiles** (allow/deny bundles) + **bindings** to scopes | `0149_agent_access_phase2_contracts.sql`: `tool_profiles` (default_action deny), `tool_profile_entries` (selector/effect include-exclude, by app/connection/catalog/tool_name/risk + conditions), `tool_profile_bindings` (target agent/project/routine/issue/company + priority); precedence `server/src/services/tool-profile-binding-precedence.ts` | ❌ |
+| M9 | **Policy engine** (allow/block/require_approval/rate_limit/trust_rule; deny beats allow) | `tool_policies` (policy_type, priority, selectors, conditions); decision engine `server/src/services/tool-access-policy.ts` (`ToolAccessDecision`, reason codes, rate-limit counters) | ❌ |
+| M10 | **Human approval / action requests + trust rules** | `tool_action_requests` (signed, expiry via `PAPERCLIP_TOOL_ACTION_SIGNING_SECRET`); trust rules built from an approval (exact arg-hash match) | ❌ |
+| M11 | **Audit** call-event log | `tool_invocations` (policy_decision, arguments_hash/summary), `tool_access_audit_events`, `tool_call_events`; `audit_write_failed` durable counter (audit-write failure = incident) | ❌ |
+| M12 | **Runtime slots** (supervised MCP processes) | `tool_runtime_slots` (slot_key, status, provider_ref, health, idle-evict); gateway sessions `0151`, rate-limit counters `0162`/`0169` | ❌ |
+| M13 | OAuth to upstream MCP + stdio command templates + installs | `0154_tool_oauth_states.sql` (+ actor/session binding `0155`/`0156`), `0153_tool_stdio_command_templates.sql`, `0168_tool_connection_installs.sql` | ❌ |
+| M14 | RBAC for the tool-access surface | permissions `constants.ts:915` (`tools:admin`, `tools:manage_connections`, `tools:manage_profiles`, `tools:view_audit`, `tools:use`, `tools:manage_runtime`) | ❌ |
+| M15 | Admin UI (2 surfaces) | (a) "Tools & Access" `ui/src/pages/tools/ToolsAccess.tsx` + tabs `Gateways/Policies/Profiles/Audit/Runtime/PasteConfig/SmokeLab/RunYourOwn`; profile wizard `ui/src/pages/tools/profiles/*`. (b) newer **Apps v2** store/connection UX `ui/src/pages/apps/*` (`Browse`, `AppsConnect`, `Connections`, `AppDetail` + Setup/Test/Activity panels, `AppsReview` catalog/quarantine queue). Per-agent effective access `ui/src/pages/AgentToolsTab.tsx` | ❌ |
+| M16 | REST API surface | `server/src/routes/tool-access.ts` (~40 endpoints: apps/connections CRUD, catalog refresh, health-check, oauth start/callback, action-requests, examples/install/smoke, test-calls, per-agent connection token) | ❌ |
+| M17 | Runtime ops / alerting | `doc/MCP-RUNTIME-OPERATIONS.md` — runtime-health API, 8 alert classes (stuck slot, timeout rate, restart storm, missing-secret, audit-write-failure), redaction rules | ❌ |
+| M18 | Tenant isolation & secrets | company_id on every table; `credential_refs` → secret store; redaction of tokens in all responses | ❌ |
+
+> Endpoint mode is **not** policy-governed (uses standard Paperclip auth); only **gateway mode**
+> carries the profile/policy/approval/audit stack. Governance is a **containment** feature for
+> Paperclip-launched agents, not a host firewall.
+
+### 2.2 MCP implementation plan (greenfield)
+
+This is a new **service domain**. Recommend an epic split so a first vertical slice ships before the
+full governance stack. Order matters; each phase is independently valuable.
+
+**Phase M0 — MCP client core (agents can call one upstream MCP).** *Size: M.*
+- **Deps:** add `@modelcontextprotocol/sdk`.
+- **Server:** `apps/web/src/server/services/mcp/` — a Streamable-HTTP client (port `mcp-http.ts`:
+  `Accept: application/json, text/event-stream`, SSE-framed JSON-RPC) and an optional stdio client.
+- **Prisma:** `McpApplication`, `McpConnection` (transport, config Json, credentialRefs, health).
+- **Catalog:** `McpCatalogEntry` (name, inputSchema, riskLevel enum read/write/destructive, status,
+  versionHash) + a `refreshCatalog(connectionId)` that calls `tools/list` and diffs.
+- **Tool dispatch:** a `ToolInvocation` spine (`McpToolInvocation` table: actor/agent/issue,
+  connectionId, toolName, argumentsHash, decision, latency) — **shared with plugin tools (P9)**.
+- **Wiring to agents:** our agents run through a runtime adapter (`adapters.ts`) with on-disk context;
+  the analog of Paperclip "writes adapter MCP config pointing at named gateway endpoints" is: generate
+  an MCP config file into the agent workspace listing allowed connections + short-lived scoped tokens.
+- **Tests:** catalog refresh diff, risk classification, a real `tools/call` round-trip (mock server).
+
+**Phase M1 — Governance: profiles + policies + audit.** *Size: L.*
+- **Prisma:** `McpProfile` (defaultAction deny), `McpProfileEntry` (selector/effect), `McpProfileBinding`
+  (targetType agent/project/routine/issue/company, priority), `McpPolicy` (type allow/block/
+  require_approval/rate_limit/trust_rule, selectors, conditions), `McpAuditEvent`, `McpRateLimitCounter`.
+- **Server:** a decision engine (`evaluateToolAccess(actor, tool, args) → decision + reasonCode`)
+  porting `tool-access-policy.ts` semantics: narrowest-scope binding precedence, **deny-beats-allow**,
+  arg-hash-based trust rules. Every call writes an audit event; **audit-write failure must hard-fail
+  the call** (control-plane incident, per runbook).
+- **Security:** RBAC perms (`tools:admin/manage_connections/manage_profiles/view_audit/use`), redaction
+  of all tokens/secrets in API responses, company_id tenant isolation on every query.
+- **GraphQL:** queries `mcpConnections/mcpCatalog/mcpProfiles/mcpPolicies/mcpAuditEvents/mcpActionRequests`;
+  mutations for connection/profile/policy CRUD, catalog refresh, health-check, approve/reject action.
+- **Flags:** add `MCP` / `MCP_GATEWAY` keys to `packages/utils/src/feature-flag-keys.ts` (none exist today).
+- **Tests:** allow/deny/approval/rate-limit decision matrix; binding precedence; tenant leakage.
+
+**Phase M2 — Human approval + runtime slots + OAuth.** *Size: L.*
+- `McpActionRequest` (signed, expiry) + approval UI card + trust-rule creation from an approval.
+- `McpRuntimeSlot` supervisor for local_stdio (spawn/health/idle-evict/restart-storm suppression) —
+  reuse the Phase-A `PluginWorkerManager` process-supervision patterns.
+- OAuth-to-upstream (`McpOAuthState` with actor/session binding), stdio command templates.
+- Runtime-health API + the 8 alert classes; secret store for `credentialRefs`.
+
+**Phase M3 — Endpoint mode (Paperclip-as-MCP-server) + named gateways.** *Size: M–L.*
+- A stdio `McpServer` (`packages/mc-mcp-server`) exposing our task/agent operations as tools
+  (port `packages/mcp-server`), driven by a REST/GraphQL API client.
+- Named HTTP **MCP gateways** (`McpGateway`, `McpGatewayToken` with token_hash/expiry/revoke, actions
+  `tools/list`,`tools/call`) so IDEs/agents connect over authenticated HTTP with scoped tokens.
+
+**UI (Phases M1–M3).** *Size: L.* New `apps/web/src/views/tools-access/` mirroring Paperclip's tabs:
+Connections/Gateways, Profiles (+ wizard with a risk-aware tool picker), Policies, Audit, Runtime,
+Paste-Config, Smoke-Lab. Gate behind an admin route + `tools:admin`.
+
+### 2.3 Cross-cutting: unify plugin tools and MCP tools
+
+Both plugin-contributed tools (P9) and MCP catalog tools terminate in the same conceptual pipe:
+*actor requests a tool call → policy decision → (approval?) → execute → audit*. Build **one**
+`ToolInvocation` + decision + audit core (Phase M0/M1) and register **both** sources into it, rather
+than two parallel stacks. This is also how Paperclip's `plugin-tool-dispatcher.ts` and gateway share
+the `ToolRunContext` type (`server/src/services/tool-gateway.ts` imports `ToolRunContext` from
+`@paperclipai/plugin-sdk`).
+
+---
+
+## Sizing summary
+
+| Work item | Size |
+|-----------|------|
+| Plugin config/secret-ref + narrow manifest gaps (P3/P4) | S–M |
+| Plugin runtime skeleton: worker isolation + RPC + capability grant (Phase A) | L |
+| Plugin capability slices (state/api-routes/webhooks/jobs/http/secrets) (Phase B) | L (per-slice M) |
+| Plugin UI slots + bridge (P13) | L |
+| Plugin scaffolder + testing harness + dev-reload (Phase C) | M |
+| MCP client core + catalog + tool dispatch (M0) | M |
+| MCP governance: profiles + policies + audit (M1) | L |
+| MCP approval + runtime slots + OAuth (M2) | L |
+| MCP endpoint mode + named gateways (M3) | M–L |
+| Tools-Access admin UI (7 tabs + wizard) | L |
+
+**Bottom line:** the plugin registry is real but shallow (no runtime, capabilities not enforced);
+MCP is a complete greenfield build and the largest single item in the parity backlog. Sequence them
+around a **shared tool-invocation + audit core**, and ship a governed single-connection MCP vertical
+slice (M0→M1) before attempting endpoint mode or full plugin execution.

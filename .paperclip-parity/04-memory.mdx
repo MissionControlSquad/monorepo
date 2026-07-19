@@ -1,0 +1,176 @@
+---
+domain: memory
+title: "Memory — Paperclip → Monorepo Parity Gap Analysis"
+generated: 2026-07-17
+paperclip_root: /Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/paperclip
+monorepo_root: /Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo
+---
+
+# Memory Parity
+
+## TL;DR
+
+Paperclip's memory story is **two things**:
+
+1. A **fully-specified but not-yet-implemented control-plane memory service** (`doc/plans/2026-03-17-memory-service-surface-api.md`, backed by `doc/memory-landscape.md`). No server tables, adapters, or routes exist in Paperclip yet — it is a design + adapter contract + rollout plan. Evals (`evals/promptfoo/tests/phase5-memory-control-surfaces.yaml`) assert the *intended* agent behavior (binding resolution, provenance audit, cost attribution).
+2. A **shipped, runner-side, agent-facing file memory skill** (`skills/para-memory-files/`) — the PARA knowledge graph + daily notes + tacit `MEMORY.md` + `qmd` semantic recall + memory decay. This is the concrete "markdown provider" today.
+
+Our monorepo implements a **deliberately simplified two-layer subset**: `Agent.memoryProvider` enum (`none|markdown|db`), an `AgentMemory` table with `sourceTaskId` provenance, pre-run injection for the `db` provider, and an admin mutation to set the binding — all MEMORY-flag gated. We have the *skeleton* of Paperclip's Layer 1 (binding + provenance) and Layer 2 (provider), but almost none of the control-plane depth (operations audit, cost attribution, hooks, adapters, inspect UI, extraction jobs, search tools).
+
+Because Paperclip's server side is itself unbuilt, **parity here means matching the design intent**, not a shipped implementation. The high-value, differentiated pieces to build are: the **operations audit log**, **hook wiring (esp. post-run auto-capture, currently dead code)**, **cost attribution**, and a **memory inspect UI**.
+
+---
+
+## Feature Inventory & Status
+
+Legend: ✅ present · 🟡 partial · ❌ missing. Paperclip refs are design-level unless marked `[skill]` (shipped runner code) or `[eval]`.
+
+### Layer 1 — Binding / control plane
+
+| # | Feature | Description | Paperclip ref | Monorepo status |
+|---|---------|-------------|---------------|-----------------|
+| 1 | Company-scoped binding record | `memory_bindings`: company-scoped, stable provider key, provider/plugin id, config blob, enabled | plan §"Suggested Data Model Additions" L616-621; §Concepts L112-116 | ❌ We have no binding *record*; provider is an enum column `Agent.memoryProvider` (`agent.prisma:117`). No key, config, or enabled flag. |
+| 2 | Binding by stable key | Agents/tools/hooks resolve provider by key (`default`, `mem0-prod`, `local-markdown`), not vendor logic | plan §Decision 2 L41-51 | ❌ No key concept; single hardcoded enum of 3 built-ins (`packages/utils/src/memory-providers.ts`). |
+| 3 | Company default + agent override resolution | Resolution order: agent override → company default; no per-project override in V1 | plan §Decision 1 L26-37; `[eval]` phase5 L14-40 | 🟡 Only the **agent** layer exists. No company default; no resolution fallback. `agent-context.ts:27` reads `agent.memoryProvider ?? "none"`. |
+| 4 | Binding targets | `memory_binding_targets`: map (`company`\|`agent`) → binding | plan §Concepts L118-126; DM L622-625 | ❌ No targets table; binding is inlined on `Agent`. |
+| 5 | Set/change binding | Config API to bind provider; audited in activity, no approval gate (OSS) | plan §Decision 7 L92-96 | 🟡 `setAgentMemoryProvider` GraphQL mutation (`graphql/mutations/agent-memory.ts`), admin + MEMORY-gated. No activity log entry; no company-level setter. |
+| 6 | Authz / gating | Who may call memory ops; company scoping | plan §Decision 4 L59-70 | ✅ `requireRole(ctx,"admin")` + `requireFeature(FLAG_KEYS.MEMORY)` on the mutation; workspace-scoped queries. |
+| 7 | Feature flag | Rollout gate | (implicit) | ✅ `FLAG_KEYS.MEMORY` (`feature-flag-keys.ts:37`), default `false` (L81). |
+
+### Layer 2 — Provider adapters
+
+| # | Feature | Description | Paperclip ref | Monorepo status |
+|---|---------|-------------|---------------|-----------------|
+| 8 | Adapter contract | `MemoryAdapter`: `capture`, `upsertRecords`, `query`, `list`, `get`, `forget` + capability flags | plan §"Required Adapter Contract" L177-343 | ❌ No adapter interface; provider is a `switch`-like branch in `agent-context.ts` (`db` vs `markdown` vs `none`). |
+| 9 | Capability flags | `profile`, `correction`, `multimodal`, `providerManagedExtraction`, `asyncExtraction`, `providerNativeBrowse` | plan L178-185 | ❌ None. |
+| 10 | Plugin-provided providers | Plugins are the primary provider path; core stays small | plan §Decision 3 L52-56 | ❌ No plugin runtime hook for memory providers. |
+| 11 | Built-in local markdown provider | Zero-config markdown + optional semantic index; inspectable on disk | plan §"Recommended First Built-In" L651-662 | 🟡 `markdown` provider *value* exists but is a no-op control-plane-side (runner holds files). The concrete PARA impl is the Paperclip skill, not ported. |
+| 12 | `db` / control-plane-stored provider | Entries stored in Postgres + injected into context | (our extension; not in Paperclip plan) | ✅ `AgentMemory` table + `appendAgentMemory`/`readAgentMemory`/`assembleInjectedMemory` (`services/agent-memory.ts`). |
+
+### PARA memory skill (runner-side, shipped in Paperclip)
+
+| # | Feature | Description | Paperclip ref | Monorepo status |
+|---|---------|-------------|---------------|-----------------|
+| 13 | PARA knowledge graph | `life/{projects,areas/people,areas/companies,resources,archives}` entities; `summary.md` + `items.yaml` two-tier load | `[skill]` SKILL.md L15-58 | ❌ Not ported. Our `markdown` provider names the analog but ships no structure/prompting. |
+| 14 | Atomic-fact schema | `items.yaml` facts w/ category, status, `superseded_by`, `related_entities`, access metadata | `[skill]` references/schemas.md L5-18 | ❌ |
+| 15 | Daily notes (timeline) | `memory/YYYY-MM-DD.md` raw event log; heartbeat extracts durable facts | `[skill]` SKILL.md L60-66 | ❌ |
+| 16 | Tacit knowledge | `MEMORY.md` — how the *user* operates (patterns/prefs) | `[skill]` SKILL.md L67-73 | ❌ |
+| 17 | Memory decay / recency tiers | Hot/warm/cold retrieval priority, access_count resists decay, supersede-not-delete | `[skill]` references/schemas.md L20-35 | ❌ Our `db` provider just injects newest-20 oldest-first, char-capped (`agent-memory.ts:45-56`). No decay, no supersede. |
+| 18 | Semantic recall (`qmd`) | `qmd query/search/vsearch` vectors+BM25+rerank over the memory folder | `[skill]` SKILL.md L84-95 | ❌ No search; bulk inject only. |
+
+### Provenance, hooks, cost, inspect
+
+| # | Feature | Description | Paperclip ref | Monorepo status |
+|---|---------|-------------|---------------|-----------------|
+| 19 | Operations audit log | `memory_operations`: op type (`capture`/`upsert`/`query`/`list`/`get`/`forget`/`correct`), scope, source refs, usage, latency, attribution, run/cost links, success/error | plan §Cost L560-576; DM L627-637 | ❌ No audit table at all. Only side effect is the created `AgentMemory` row. |
+| 20 | Rich provenance / source refs | `MemorySourceRef` kinds: `issue_comment`, `issue_document`, `issue`, `run`, `activity`, `manual_note`, `external_document` | plan §Concepts L142-154; contract L198-214 | 🟡 Only `sourceTaskId` on the content row (`agent-memory.prisma`). Single source kind (task/run), no comment/doc/activity/manual. |
+| 20b| Scope normalization | `MemoryScope`: company/agent/project/issue/run/subject/session/namespace | plan contract L187-196 | 🟡 Effective scope = `(workspaceId, agentId)` only. |
+| 21 | Hook surface | Shared hook registry: `pre_run_hydrate`, `post_run_capture`, `issue_comment_capture`, `issue_document_capture`, `manual_capture` | plan §"Hook Model" L471-509; contract L216-227 | 🟡 **Only pre_run_hydrate** is wired (for `db`, via `assembleMemoryBlock` `agent-context.ts:24-34`). |
+| 22 | Post-run auto-capture | After a run, `capture(...)` structured run residue w/ provenance | plan §Decision 6 L84-90; hook L502-503 | ❌ **Dead code**: `appendAgentMemory` exists but has **zero call sites** — nothing writes memory after a run. `db` provider can only be populated manually. |
+| 23 | Issue comment/document capture | Opt-in capture of selected comments/docs | plan hook L504-509 | ❌ |
+| 24 | Extraction jobs (async) | `memory_extraction_jobs`: provider job id, status, hook kind, source, retry, timestamps | plan §Concepts L315-324; DM L638-647; AWS lessons L429-438 | ❌ |
+| 25 | Cost / usage attribution | `MemoryUsage` (tokens/embeddingTokens/costCents/latency/billingType/attributionMode); link to `cost_events` (metered) / `finance_events` (subscription); dedupe when included-in-run | plan §"Cost And Evaluation" L558-610; contract L236-249 | ❌ No memory cost capture or linkage. |
+| 26 | Evaluation metrics | recall hit rate, empty-query rate, correction count, extraction-failure count, per-binding success/fail | plan §Cost.4 L600-610 | ❌ |
+| 27 | Agent tools | `memory.search` / `memory.note` / `memory.forget` / `memory.correct` | plan §"Explicit tools" L510-538 | ❌ No agent-callable memory tools. |
+| 28 | Inspect UI | Company/agent memory settings; operation explorer; record list+detail w/ source backlinks; query results; extraction status; filters; usage/cost summaries | plan §"Browse And Inspect" L540-556; rollout Phase 4 L683-689 | ❌ **No UI whatsoever** (no `views/**/memory`, no GraphQL read query). |
+| 29 | Correction flows | NL correction: mutate / supersede / both by capability | plan §Optional L349-356; open Q L701 | ❌ |
+| 30 | Behavior evals | Prompt tests for binding resolution / provenance / cost | `[eval]` phase5 L14-90 | 🟡 We have unit-level gating tests but no memory-behavior eval suite mirroring phase5. |
+
+---
+
+## Gap Implementation Plans
+
+Ordered by value/effort. Each is additive behind `FLAG_KEYS.MEMORY`.
+
+### GAP-A — Memory operations audit log (features 19, 20, 25 foundation) · **Size: M**
+
+The single most load-bearing missing table; everything else (cost, inspect, hooks) hangs off it.
+
+- **prisma** (`packages/database/prisma/schema/memory-operation.prisma`):
+  ```prisma
+  model MemoryOperation {
+    id             String   @id @default(cuid())
+    workspaceId    String
+    agentId        String?
+    provider       String   // resolved binding value/key
+    opType         String   // capture|record_upsert|query|list|get|forget|correct
+    // scope
+    projectId      String?
+    taskId         String?
+    runId          String?
+    subjectId      String?
+    // provenance
+    sourceKind     String?  // issue_comment|issue_document|issue|run|activity|manual_note|external_document
+    sourceRefId    String?  // commentId/documentKey/taskId/activityId/externalRef
+    // outcome + usage
+    success        Boolean  @default(true)
+    error          String?
+    latencyMs      Int?
+    inputTokens    Int?
+    embeddingTokens Int?
+    outputTokens   Int?
+    costCents      Int?
+    attributionMode String? // billed_directly|included_in_run|external_invoice|untracked
+    costEventId    String?
+    createdAt      DateTime @default(now())
+    @@index([workspaceId, agentId, createdAt])
+    @@index([workspaceId, opType, createdAt])
+    @@map("memory_operations")
+  }
+  ```
+- **server**: add `recordMemoryOperation(input)` in `services/agent-memory.ts`; call it from every memory code path (`assembleInjectedMemory` → `query`, `appendAgentMemory` → `capture`).
+- **migration**: additive create-table (follow repo's migration-safety lint, per recent commit `22001bbd2`).
+- **tests**: unit — op row written on inject + append; provenance & scope fields populated; failure path sets `success=false,error`.
+- Extend `AgentMemory` with `sourceKind`/`sourceRefId` (currently only `sourceTaskId`) to satisfy feature 20 — small migration.
+
+### GAP-B — Wire post-run auto-capture hook (features 21, 22) · **Size: S**
+
+`appendAgentMemory` is already written and unused — just needs a trigger. This is the highest-ROI fix (turns `db` from write-only-by-hand into a working loop).
+
+- **server**: at run completion (where `heartbeat`/`sandbox-run` finalizes a task; `sandbox-run.ts` already threads `memoryProvider`), if provider === `db`, call `appendAgentMemory({workspaceId, agentId, content: <run summary/residue>, sourceTaskId})` and `recordMemoryOperation({opType:"capture"})`.
+- Add a tiny hook dispatcher `runMemoryHooks(kind, ctx)` so `pre_run_hydrate` (existing) and `post_run_capture` share one surface (extensible to comment/doc capture later).
+- **tests**: run completion with `db` provider creates one memory row + one capture op; `none`/`markdown` create none.
+
+### GAP-C — Company default + resolution (features 1, 3, 4) · **Size: M**
+
+- **prisma**: `MemoryBinding { id, workspaceId, key, provider, configJson, enabled }` + optional `MemoryBindingTarget { targetType(company|agent), targetId, bindingId }`. Minimal path: add `Workspace.defaultMemoryProvider` (or a single company binding row) first, keep `Agent.memoryProvider` as override.
+- **server**: `resolveMemoryProvider(agent)` = `agent.memoryProvider (if set) ?? companyDefault ?? "none"`; replace the direct read in `agent-context.ts:27`.
+- **graphql**: `setCompanyMemoryProvider` mutation (admin, MEMORY-gated), mirror of `setAgentMemoryProvider`; write an activity/audit entry on change (feature 5 gap).
+- **tests**: resolution precedence (agent > company > none) — mirrors phase5 eval L14-40.
+
+### GAP-D — Memory inspect UI (feature 28) · **Size: L**
+
+Depends on GAP-A. New view under `apps/web/src/views/**` (follow `design-guide` + `frontend-design` skills; run Lazyweb for the dashboard/table pattern before building).
+
+- **graphql** read queries: `agentMemoryEntries(agentId, cursor)`, `memoryOperations(filter, cursor)` (cursor pagination per plan AWS-lesson L406-416).
+- **pages/components**:
+  - *Agent settings → Memory* panel: current binding + provider picker (wraps `setAgentMemoryProvider`), company default indicator.
+  - *Memory Operations Explorer*: filterable table (agent/task/run/source kind/date), success/latency/cost columns, source backlinks to task/comment/doc.
+  - *Record list + detail*: entries with `sourceTaskId` backlink, supersede action (feature 29 hook).
+  - Usage/cost summary tiles (use `dataviz` skill for any charts).
+- **gating**: whole surface behind `MEMORY` flag + role check.
+- **tests**: RTL render of panel/table; query returns workspace-scoped rows only.
+
+### GAP-E — Adapter interface + provider registry (features 8-11) · **Size: L**
+
+Formalize the current `switch` into a `MemoryAdapter` interface (`services/memory/adapters/`), with `db` and `markdown` (runner-file/no-op) built-ins implementing it, and capability flags. Enables later plugin/hosted (mem0/supermemory) adapters. Do this only after A-D prove the shape; otherwise it is premature abstraction over 2 providers.
+
+### GAP-F — Agent memory tools + search (features 18, 27) · **Size: M**
+
+Expose `memory.search`/`memory.note`/`memory.forget` to agents (tool-calls that hit `query`/`upsert`/`forget` + log ops). `db` provider search can start with Postgres `ILIKE`/`pg_trgm`; `markdown` maps to the runner `qmd` analog. Replaces the crude newest-20 bulk inject with real recall (feature 17/18 gap).
+
+### GAP-G — Cost attribution + finance linkage (features 25, 26) · **Size: M**
+
+Populate `MemoryOperation` usage fields from provider responses; when a memory op makes a *direct metered* model/embedding call, create a linked `cost_event`; subscription costs → `finance_events`; dedupe when `attributionMode = included_in_run`. Depends on our having a `cost_events`/`finance_events` ledger (verify separately). Add eval-metric counters (recall hit rate, extraction failures).
+
+### GAP-H — Behavior eval suite (feature 30) · **Size: S**
+
+Port `phase5-memory-control-surfaces.yaml` intent into our eval harness: binding-resolution precedence, provenance-audit field presence, no cross-company/global-default leakage.
+
+---
+
+## Notes / Caveats
+
+- **Paperclip has no shipped server memory service** — its Layer-1 is design-only. Our `db` provider is actually *ahead* of Paperclip on control-plane *storage* (they store residue in the provider, not Postgres), but *behind* on operations audit, hooks, cost, and inspect.
+- **Deferred async extraction, provider-native browse/graph, multimodal, cross-company sharing** (plan §"Not automatic" L520-527, Phase 5 L690-695) are explicitly out of scope even for Paperclip V1 — do not build.
+- **BOUNDARY**: none of this touches human auth (buildbase-owned). Binding auth reuses existing `requireRole`/tenancy.

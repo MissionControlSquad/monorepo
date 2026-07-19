@@ -1,0 +1,173 @@
+# Parity Gap Analysis — Domain 05: Skills & Knowledge
+
+> Paperclip: `/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/paperclip`
+> Monorepo: `/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo`
+> Boundary: buildbase owns human auth/billing only. All skill/knowledge state is app-owned, `workspaceId`-scoped (D5, no FK).
+> Prior art: `docs/gap-plans/10-skills-teams.md` already ships the skills library + teams foundation (Epic #10). This doc extends it to the **depth** features (catalog package, import, update/audit, runtime sync, skill studio, policy engine, PARA).
+
+---
+
+## 0. Executive summary
+
+Paperclip's "Skills & Knowledge" is much larger than a markdown library. It has **eight** distinct sub-systems:
+
+1. **Skill format** — `SKILL.md` + YAML frontmatter, multi-file bundles (`references/`, `scripts/`, `assets/`).
+2. **App-shipped catalog package** — `@paperclipai/skills-catalog`, a build-time content-addressed manifest of bundled/optional skills across categories, some pinned to GitHub commits.
+3. **Company skill library** — DB-backed install/inspect/read, versions, stars, comments, forks with lineage, provenance.
+4. **External import** — skills.sh registry, GitHub, URL, local path, plus project-workspace scanning.
+5. **Update / audit / reset** — origin tracking, drift detection, security audit verdicts, reset-to-origin.
+6. **Runtime agent skill sync** — `desiredSkills` → adapter skill state machine (persistent/ephemeral), real push to agent runtimes.
+7. **Skill Studio test runs** — *real execution*: spawns a hidden harness issue, runs an agent against skill+input, captures output/cost, with test inputs + run templates + retention.
+8. **Skill governance policy engine** — per-company allow/deny policy over 8 actions × subjects (agents/roles) × resource selectors.
+
+Plus a **PARA knowledge model** (`para-memory-files` skill) — a file-based persistent memory system (knowledge graph + daily notes + tacit memory) with `qmd` semantic recall.
+
+**Monorepo today (Epic #10) covers ~sub-system 1+3 (partial):** a queryable `Skill`/`SkillVersion`/`SkillStar`/`SkillFile`/`AgentSkill` model with create/update/fork/star/assign/upsert-file, a cross-workspace "public" copy-install, and a pure static `lintSkill`. Everything in sub-systems 2, 4, 5, 6, 7, 8 and the PARA model is **absent**.
+
+Net: the library **authoring** core is at parity (and arguably cleaner — queryable `AgentSkill` join vs Paperclip's `adapter_config` blob). The **distribution, provenance/security, runtime activation, execution, and governance** layers are the real gap, and they are what make skills useful at runtime rather than just stored text.
+
+---
+
+## 1. Feature inventory & parity table
+
+Legend: ✅ at parity · 🟡 partial · ❌ missing
+
+| # | Feature | Description | Paperclip (file:line) | Monorepo status | Monorepo ref |
+|---|---------|-------------|-----------------------|-----------------|--------------|
+| F1 | **Skill entry format** | `SKILL.md` + YAML frontmatter (`name`, `description`, `key`, `slug`, `recommendedForRoles`, `requires`, `tags`, `defaultInstall`); entrypoint is always `SKILL.md` | `packages/skills-catalog/catalog/bundled/quality/qa-acceptance/SKILL.md:1`; parsing `packages/skills-catalog/src/catalog-builder.ts:276-301` | 🟡 | `Skill.markdown` is free text; no frontmatter parse/validate. `packages/database/prisma/schema/skill.prisma:47` |
+| F2 | **Multi-file bundles** | Supporting files by kind: `references/`, `scripts/`, `assets/`, other; classified + trust-derived | `catalog-builder.ts:754-767` (`classifyCatalogFile`, `deriveTrustLevel`) | 🟡 | `SkillFile{path,content}` stored/display only, no kind classification. `schema/skill.prisma:91`; svc `apps/web/src/server/services/skills.ts:355-398` |
+| F3 | **Trust ladder** | `markdown_only \| assets \| scripts_executables` derived from file kinds; teams add `external_sources` | `src/types.ts:3`; `catalog-builder.ts:763` | ✅ | enum `SkillTrustLevel` + `TeamTrustLevel`. `schema/skill.prisma:17,34` |
+| F4 | **App-shipped catalog package** | Build-time manifest (`generated/catalog.json`) discovered from `catalog/<bundled\|optional>/<category>/<slug>/`; content-addressed (`sha256`, `contentHash`); `getCatalogSkill`/`resolveCatalogSkillRef` by id/key/slug | `packages/skills-catalog/src/catalog-builder.ts:99-135`; `src/index.ts:24-39` | ❌ | No bundled catalog package; `installCatalogSkill` reads DB `sharingScope="public"` rows only. `services/skills.ts:207-278` |
+| F5 | **Catalog categories / kinds** | `bundled` vs `optional`; categories (`software-development`, `quality`, `docs`, `product`, `paperclip-operations`, `research`, `content`, `browser`, `finance`, …) | dir structure `catalog-builder.ts:200-232` | 🟡 | `Skill.categories String[]` free-form; no kind, no category taxonomy/counts. `schema/skill.prisma:64` |
+| F6 | **GitHub-referenced skills** | `catalog-ref.json` pins a skill to `{owner,repo,ref,commit,path}`; builder fetches GitHub tree + raw files at pinned commit, validates 40-char SHA, size caps, path safety | `catalog-builder.ts:331-433, 611-665` | ❌ | none |
+| F7 | **Catalog validation lint** | Slug pattern, frontmatter-required, duplicate id/key/slug, misplaced files, `>1MB` caps, symlink-escape safety, stale-manifest check | `catalog-builder.ts:137-161, 667-810`; `scripts/validate-catalog.ts` | 🟡 | `lintSkill` checks only: empty entry, no `# Title`, size, duplicate/empty bundle files. `packages/utils/src/skill-lint.ts:35` |
+| F8 | **Company skill library CRUD** | Create (managed local), read, update, delete workspace-scoped skills w/ version snapshots | svc referenced by `skills/paperclip/references/company-skills.md:39-51` | ✅ | `createSkill`/`updateSkill`/`deleteSkill`. `services/skills.ts:53,96,151`; gql `graphql/mutations/skills.ts:29,70,113` |
+| F9 | **Immutable versions** | Every markdown change snapshots a new revision; label; author (agent/user) | `packages/db/.../0099_skills_store_foundation.sql` (`company_skill_versions`); `types/company-skill.ts:150` | ✅ | `SkillVersion` rev++ on markdown change. `services/skills.ts:116,135`; `schema/skill.prisma:106` |
+| F10 | **Fork lineage** | Clone skill+current version into new skill; `forkedFrom{SkillId,CompanyId}`, reassign agents, precheck, "diverged" detection | `types/company-skill.ts:194-239` | 🟡 | `forkSkill` copies markdown + bumps `forkCount`; no reassign/precheck/diverged. `services/skills.ts:158` |
+| F11 | **Stars** | Per-actor star toggle, `starCount` counter | `0099_…sql` (`company_skill_stars`) | ✅ | `starSkill`/`unstarSkill`. `services/skills.ts:280,295` |
+| F12 | **Comments / threads** | Threaded comments on a skill (`parentCommentId`, author agent/user, soft-delete) | `types/company-skill.ts:172-192`; `0099_…sql` (`company_skill_comments`) | ❌ | none |
+| F13 | **Appearance / provenance metadata** | `iconUrl`, `color`, `tagline`, `authorName`, `homepageUrl`; plus `originHash`, `packageName`, `packageVersion`, `catalogKind`, `sourceLabel`, `sourceBadge` | `types/company-skill.ts:34-107` | 🟡 | Appearance fields present (`icon/color/tagline/author/homepage`); provenance (`originHash`/`packageName`/`packageVersion`/`catalogKind`/`sourceBadge`) absent. `schema/skill.prisma:55-63` |
+| F14 | **Sharing scope** | `private \| company \| public_link` (+ `publicShareToken`) | `types/company-skill.ts:12` | 🟡 | `private \| workspace \| public` (no shareable token link). `schema/skill.prisma:23` |
+| F15 | **Catalog install (copy-in)** | Install a catalog skill into company lib; records provenance; `force` replaces same-key; never bypasses hard-stop audit | `company-skills.md:88-100`; `types/company-skill.ts:649-660` | 🟡 | `installCatalogSkill` copies a public DB skill (+files) into caller ws; no provenance/force/audit. `services/skills.ts:217` |
+| F16 | **External import** | Import from skills.sh registry, GitHub URL, key-style `org/repo/skill`, URL, local path | `company-skills.md:102-153`; `types/company-skill.ts:304-311` | ❌ | none |
+| F17 | **Project-workspace scan** | Discover `SKILL.md`s across project working dirs; preview/import w/ conflict + collision handling | `types/company-skill.ts:313-374`; UI `ui/src/pages/skills/ImportSkillsFromProjectDialog.tsx` | ❌ | none |
+| F18 | **Update-status / drift** | Track pinned origin, detect `hasUpdate`, hold reasons (`local_modifications`, `audit_hard_stop`, `origin_unavailable`, …), `install-update` | `types/company-skill.ts:252-276` | ❌ | none |
+| F19 | **Security audit** | Scan installed vs origin; verdict `pass\|warning\|fail`; findings w/ codes+severity; hard-stops block update/reset | `types/company-skill.ts:267-298` | ❌ | none (only static `lintSkill`) |
+| F20 | **Reset to origin** | Restore a catalog/imported skill to its pinned origin content | `company-skills.md:51`; `types/company-skill.ts:300-302` | ❌ | none |
+| F21 | **Agent skill assignment** | Attach/detach skills to an agent | `company-skills.md:181-207` | ✅ | queryable `AgentSkill` join (agentId, skillId, pinnedVersion). `services/skills.ts:316,344`; UI `apps/web/src/components/agent/AgentSkillsCard.tsx` |
+| F22 | **Runtime skill sync** | `desiredSkills` → adapter skill state machine: `mode ∈ {unsupported,persistent,ephemeral}`, `state ∈ {available,configured,installed,missing,stale,external}`, `origin`; pushes to agent runtime; hire/create composition | `packages/shared/src/types/adapter-skills.ts:1-51`; `company-skills.md:53-58, 209-247` | ❌ | `AgentSkill` is a static DB link; nothing reaches the agent runtime |
+| F23 | **Skill Studio test runs (execution)** | Run a skill: spawn hidden harness issue, run chosen agent against a test input, capture output docs/artifacts/interactions + token cost; status machine; retention/expiry | `types/company-skill.ts:418-585`; migrations `0137_skill_studio_server_foundation.sql`, `0138_…run_retention.sql` | ❌ | none (no agent-runtime engine; `skill-lint.ts` header explicitly says "no execution") |
+| F24 | **Test inputs + run templates** | Named reusable test inputs; built-in + custom run templates w/ rendered body snapshots | `types/company-skill.ts:420-474`; `0139_skill_studio_run_templates.sql` | ❌ | none |
+| F25 | **Skill governance policy engine** | Per-company allow/deny doc; 8 actions (`create/import/install/edit/update/test/reset/remove`) × subjects (`all_agents/agents/roles`) × resource selectors (`skillIds/skillKeys/sourceTypes/sourceLocators`); priority rule eval → decision+remediation; credential-scrubbed locators | `packages/shared/src/validators/skill-policy.ts:3-157`; migration `0170_company_skill_policies.sql` | ❌ | only `requireRole(ctx,"member")` + `SKILLS_TEAMS` flag; no per-action/per-resource policy |
+| F26 | **Skill-create permission** | `skills:create` grant + `canCreateSkills` setting; default open to same-company actors unless explicit policy denies | `company-skills.md:22-27`; migration `0112_rename_skill_create_permission_key.sql` | 🟡 | coarse `requireRole` member gate only |
+| F27 | **Teams catalog** | Installable bundles of agent roles; install creates agents; collision strategy | `packages/teams-catalog/src/catalog-builder.ts`; `docs/gap-plans/10-skills-teams.md` | ✅ | `Team`/`TeamMember`/`TeamInstall` DB tables + `installTeam`. `schema/skill.prisma:154-213`; `services/teams.ts` |
+| F28 | **PARA knowledge model** | File-based persistent memory: knowledge graph (`life/` PARA folders, `summary.md`+`items.yaml`), daily notes, tacit `MEMORY.md`; `qmd` semantic recall; supersede-not-delete | `skills/para-memory-files/SKILL.md:1-101`; `references/schemas.md` | ❌ | shipped only as an agent-template markdown skill; no product surface / storage / recall |
+| F29 | **Feature gating flag** | Skills feature behind a flag | (Paperclip uses company settings) | ✅ | `FLAG_KEYS.SKILLS_TEAMS`. `packages/utils/src/feature-flag-keys.ts:19,61` |
+| F30 | **Skill Studio UI surfaces** | Provenance panel, "agents using this skill", fork dialog, policy surfaces, agent-skills runtime tab | `ui/src/components/skill-studio/*`, `ui/src/pages/agent-skills/*` | 🟡 | Basic `/skills` page + `AgentSkillsCard`; no provenance/policy/runtime/studio surfaces. `apps/web/app/(dashboard)/skills/page.tsx` |
+
+---
+
+## 2. Gap plans
+
+Ordered by leverage. Each is independently shippable and reuses the Epic #10 foundation.
+
+### GAP-A — Skill frontmatter format + richer bundle model (F1, F2, F5, F7)  ·  **Size: M**
+
+Bring the stored `Skill` up to the `SKILL.md` contract so imported/catalog skills round-trip and lint is meaningful.
+
+- **Prisma** (`schema/skill.prisma`): add to `SkillFile` a `kind SkillFileKind` enum (`skill|markdown|reference|script|asset|other`) computed on write; add `Skill.frontmatter Json?` (parsed `recommendedForRoles`, `requires`, `tags`, `defaultInstall`). Migration under `packages/database/prisma/migrations`.
+- **Utils** (`packages/utils`): new `parse-skill-frontmatter.ts` (YAML frontmatter → typed record) + extend `skill-lint.ts` to validate: frontmatter present, `name`/`description` required, slug pattern `^[a-z0-9]+(?:-[a-z0-9]+)*$`, `SKILL.md` entry present, per-file `>100KB`/bundle `>1MB` caps, path-traversal (`..`, `//`, `\`) — port the checks from `catalog-builder.ts:667-810` (pure, no fs/network).
+- **Server** (`services/skills.ts`): classify `SkillFile.kind` on `upsertSkillFile` (reuse `classifyCatalogFile` logic); derive `trustLevel` from file kinds on write.
+- **API**: extend `lintSkill` query to return the new findings; no new mutation.
+- **UI** (`views/`): show file-kind badges + trust ladder in the skill file list; surface lint findings inline in the editor.
+- **Security/gating**: unchanged (member).
+- **Tests**: frontmatter parse table tests; lint findings for each rule; trust-derivation from bundle.
+
+### GAP-B — Bundled catalog package + typed catalog browse/install (F4, F5, F6, F13, F15)  ·  **Size: L**
+
+Replace the "public DB rows == catalog" shortcut with a real app-shipped catalog, so a workspace can install curated skills with provenance.
+
+- **New package** `packages/skills-catalog` (port Paperclip's): `catalog/<bundled|optional>/<category>/<slug>/SKILL.md` sources, a `build-manifest` script → `generated/catalog.json` (content-addressed `sha256`/`contentHash`, `trustLevel`, `defaultInstall`, `recommendedForRoles`, `requires`, `tags`), and a `validate-catalog` CI lint. Port `catalog-builder.ts` largely as-is. Optional: `catalog-ref.json` GitHub-pinned skills (F6) — defer network fetch to a build step, ship pinned SHAs.
+- **Prisma**: add provenance to `Skill`: `catalogId String?`, `catalogKey String?`, `packageName String?`, `packageVersion String?`, `originHash String?`, `catalogKind` enum. Migration.
+- **Server** (`services/skills-catalog.ts`): `listCatalog({kind,category,q})`, `getCatalogSkill(ref)` (id|key|slug), `catalogSkillFiles(id,path)`, and rework `installCatalogSkill` to copy from the **package manifest** (not DB), stamping provenance + `originHash`; `force` replaces a same-key catalog-managed skill.
+- **GraphQL** (`queries/skills.ts`, `mutations/skills.ts`): `catalog`, `catalogSkill`, `catalogSkillFile` queries; repurpose `installCatalogSkill` mutation to take a `catalogRef`.
+- **UI**: a catalog browse view (`views/skills/CatalogBrowser`) with kind/category filters + category counts + install button; provenance badge on installed skills.
+- **Security/gating**: reads member; install writes member; `SKILLS_TEAMS` flag.
+- **Tests**: manifest builder golden test; ref resolution (id/key/slug ambiguity); install stamps provenance; force-replace path.
+
+### GAP-C — External import + project scan (F16, F17)  ·  **Size: L**
+
+- **Server** (`services/skill-import.ts`): resolvers for skills.sh (registry API), GitHub repo/subdir, raw URL, and local path (dev). Normalize source → `{markdown, files[], provenance}`; reuse GAP-A lint before persist. `scanProjects` walks agent working dirs for `SKILL.md` (mode `preview|import`, conflict + collision handling). Note: local-path/project-scan only make sense where the control plane can reach a filesystem — gate to workspaces that have a runner (see remote-exec memory).
+- **Prisma**: `sourceType` already has `github|url|catalog|local_path`; add `skills_sh`. Store `sourceRef`/`sourceLocator`.
+- **GraphQL**: `importSkill(source)`, `scanProjectSkills(input)` mutations returning `{imported, warnings, conflicts}`.
+- **UI**: "Import skill" dialog (paste skills.sh/GitHub URL) + port `ImportSkillsFromProjectDialog` for scan/preview.
+- **Security/gating**: policy action `skills.import` (see GAP-F); credential-scrub source locators (port `isSafeSourceLocator`, `skill-policy.ts:30-42`).
+- **Tests**: each source-type resolver (mock fetch); conflict/collision matrix; locator credential-stripping.
+
+### GAP-D — Update / audit / reset (F18, F19, F20)  ·  **Size: M** (depends on GAP-B provenance)
+
+- **Server** (`services/skill-lifecycle.ts`): `updateStatus(skillId)` compares stored `originHash` vs current catalog/origin hash → `hasUpdate` + hold reason; `installUpdate(force)`; `resetToOrigin(force)`; `audit(skillId)` — a static security scan (secrets/exec/path patterns) → verdict `pass|warning|fail`, findings w/ codes; **hard-stop findings block update/reset**.
+- **Prisma**: `Skill.userModifiedAt DateTime?`, `Skill.lastAuditVerdict`/`lastAuditAt`; optional `SkillAuditFinding` table for history.
+- **GraphQL**: `skillUpdateStatus` query; `installSkillUpdate`, `resetSkill`, `auditSkill` mutations.
+- **UI**: "Update available" banner + audit verdict badge on skill detail; diff view origin vs local.
+- **Gating**: policy actions `skills.update` / `skills.reset`.
+- **Tests**: drift detection (hash change); hold-reason matrix; hard-stop blocks update.
+
+### GAP-E — Runtime agent skill sync (F22)  ·  **Size: L** (cross-domain: agents/adapters)
+
+This is what turns an `AgentSkill` row into a skill the running agent actually has. Depends on the agent/adapter runtime (Domain: agents/execution).
+
+- **Server**: an adapter capability descriptor per `Agent.adapterType`: `mode ∈ {unsupported,persistent,ephemeral}`. Reconcile `desiredSkills` (the `AgentSkill` set + `pinnedVersion`) vs runtime `actualState`, computing `AgentSkillEntry.state` (`available/configured/installed/missing/stale/external`). Port `adapter-skills.ts` types verbatim. Push happens where the agent runs (runner/gateway) — materialize skill bundle files into the agent's skills dir.
+- **Prisma**: reuse `AgentSkill`; add `Agent.desiredSkillsSyncedAt`, per-entry runtime status cache if needed.
+- **GraphQL**: `agentSkillSnapshot(agentId)` query (adapter type, mode, entries, warnings); `syncAgentSkills(agentId, desiredSkills[])` mutation; accept `desiredSkills` in agent hire/create.
+- **UI**: port `AgentSkillsTab` — per-skill runtime state rows, filter, source label, sync button.
+- **Gating**: same as updating that agent.
+- **Tests**: reconcile state machine (desired vs actual → state); unsupported-adapter path; pinned-version staleness.
+
+### GAP-F — Skill governance policy engine (F25, F26)  ·  **Size: M**
+
+- **Prisma**: `SkillPolicy` table per workspace (`schemaVersion`, `revision`, `defaultEffect allow|deny`, `rules Json`). Port `company_skill_policies` (`0170_…sql`).
+- **Utils/validators**: port `skill-policy.ts` (zod schemas for actions/subjects/resource selectors/rules + `normalizeSkillPolicySourceLocator` + `isSafeSourceLocator`) into `packages/utils`.
+- **Server** (`services/skill-policy.ts`): `evaluate(action, resource, principal)` → priority-ordered rule match → `{allowed, reason, matchedRuleId, remediation}`; `getPolicy`/`replacePolicy(expectedRevision)` (optimistic concurrency). Wire an `assertSkillAction(ctx, action, resource)` guard into every skill mutation (create/import/install/edit/update/test/reset/remove).
+- **GraphQL**: `skillPolicy` query, `replaceSkillPolicy` mutation (admin), `evaluateSkillPolicy` query (debug).
+- **UI**: policy editor (`views/skills/PolicyEditor`) + a read-only "why blocked" surface (port `SkillPolicySurfaces`).
+- **Gating**: policy replace is admin; evaluation runs on every skill write.
+- **Tests**: rule priority/precedence; default-effect; subject (agent/role) match; resource selector (skillKey/sourceType/locator) match; platform-invariant deny.
+
+### GAP-G — Skill Studio test runs + inputs/templates (F23, F24)  ·  **Size: XL** (depends on GAP-E runtime + agent-run/harness infra)
+
+Real execution. Only viable once the monorepo can run an agent against an issue/harness (Domain: execution). Model it after Paperclip's hidden-harness-issue approach.
+
+- **Prisma**: `SkillTestInput`, `SkillTestRun` (input snapshot, skill version snapshot, agent config snapshot, harness issue id, status, output doc key, cost, retention/expiry), `SkillTestRunTemplate` (built-in + custom). Port migrations `0137/0138/0139`.
+- **Server**: `createTestRun` spawns a hidden harness issue, runs the pinned skill version + input via the agent runtime, streams status, captures output/artifacts/cost; retention job expires harness issues.
+- **GraphQL**: run/input/template CRUD + `testRun`/`testRuns` queries.
+- **UI**: Skill Studio run panel (input picker, template picker, agent picker, output/cost/artifacts viewer).
+- **Gating**: policy action `skills.test`.
+- **Tests**: run lifecycle status machine; version/config snapshotting; retention expiry; cost accounting.
+
+### GAP-H — PARA knowledge model (F28)  ·  **Size: L** (product decision required)
+
+Today PARA exists only as instructional markdown. Two options:
+
+1. **Ship-as-skill (Size S):** package `skills/para-memory-files` into the bundled catalog (GAP-B) so agents adopt the file-based convention on their own working dir. No new product surface. **Recommended first step.**
+2. **Product-native knowledge store (Size L):** DB-backed PARA — `KnowledgeEntity` (project/area/resource/archive, `summary`, `items Json`, `status`, `supersededBy`), `DailyNote`, workspace `TacitMemory`, plus semantic recall (pgvector or a `qmd`-style index). New `/knowledge` views, entity CRUD, recall search, weekly-synthesis job. This is a whole feature epic; scope separately.
+
+- **Security/gating**: knowledge is workspace-scoped, member read/write; recall respects `scoped(ctx)`.
+- **Tests**: entity lifecycle (create→supersede→archive); recall ranking; daily-note→entity extraction.
+
+---
+
+## 3. Notable monorepo strengths over Paperclip
+
+- **Queryable `AgentSkill` join** (agentId, skillId, pinnedVersion) vs Paperclip's `agents.adapter_config.paperclipSkillSync` blob — cleaner, indexable, gives free `installCount`. (`schema/skill.prisma:137`)
+- **Teams get first-class DB tables** (`Team`/`TeamMember`/`TeamInstall`) vs Paperclip's file-only catalog — authoring + install history are queryable. (`schema/skill.prisma:154`)
+- **Trust as a capability ladder enum**, not a boolean (already ported). (`schema/skill.prisma:17`)
+
+## 4. Sequencing recommendation
+
+1. **GAP-A** (format/lint) — cheap, unblocks everything downstream.
+2. **GAP-F** (policy engine) — pure port, no runtime dep, closes the biggest governance hole.
+3. **GAP-B** (catalog package) + **GAP-C** (import) — distribution.
+4. **GAP-D** (update/audit/reset) — needs B's provenance.
+5. **GAP-H option 1** (PARA-as-skill) — trivial once B exists.
+6. **GAP-E** (runtime sync) then **GAP-G** (studio/execution) — gated on the agent-execution domain; highest effort, highest payoff.

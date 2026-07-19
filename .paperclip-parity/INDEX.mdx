@@ -1,0 +1,168 @@
+# Paperclip → Monorepo parity — master tracker
+
+**Purpose:** local (gitignored) working cache so we never lose track of what Paperclip has that our
+monorepo is missing, and the production-readiness work to close each gap. NOT pushed to git.
+
+**Repos**
+- Paperclip (reference): `/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/paperclip`
+- Monorepo (ours): `/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo`
+
+**Boundary (do NOT port):** human auth, billing, human orgs/workspaces/RBAC — provided by `@buildbase/sdk`.
+Those are marked "buildbase-owned", not gaps.
+
+**Status legend:** ✅ Present · 🟡 Partial · ❌ Missing · 🚫 buildbase-owned (skip)
+
+## Domain docs (each written by an exploration pass)
+
+| # | Domain | Doc | Headline |
+|---|--------|-----|--------|
+| 1 | Environments & execution | `01-environments-execution.mdx` | ✅4/🟡14/❌16 — keystone: Environment model; quick wins: allowlist+low-trust ports |
+| 2 | Adapters & runtimes | `02-adapters-runtimes.mdx` | two disconnected registries, neither runs a real runtime; missing cursor/grok/opencode/pi/hermes/ACP |
+| 3 | Sandbox depth | `03-sandbox-depth.mdx` | narrowing was right; real work = prod-readiness (H3 persist→H1 runtime-install+H2 repo-auth+secrets-in-box) |
+| 4 | Memory | `04-memory.mdx` | post-run capture is DEAD CODE; no audit/hooks/cost/inspect UI |
+| 5 | Skills & knowledge | `05-skills-knowledge.mdx` | authoring at parity; gaps: catalog/import/update-audit/runtime-sync/studio/policy |
+| 6 | Plugins & MCP | `06-plugins-mcp.mdx` | **MCP = ZERO (largest epic)**; plugin runtime deferred |
+| 7 | Secrets & governance | `07-secrets.mdx` | ~40% subset; audit-on-resolve enum defined-but-never-written; no ext providers |
+| 8 | Work items | `08-work-items.mdx` | no TaskRun; work-product taxonomy; requireUntrustedPrReview is a DEAD TOGGLE |
+| 9 | Heartbeat / scheduling | `09-heartbeat-scheduling.mdx` | at parity on lease/redelivery; ❌ central scheduler, retries, stranded-work reconcile; auto-sleep cron unregistered |
+| 10 | Connectivity | `10-connectivity.mdx` | match/beat on WS; ❌ hermes/cursor_cloud, inbound MCP gateway, device pairing |
+| 11 | UI | `11-ui.mdx` | broad but thin; unblocker: JsonSchemaForm; ❌ environments/apps-MCP/plugin config UIs |
+| 12 | Cost / observability | `12-cost-observability.mdx` | near-parity; gaps: FinanceEvent ledger, quota polling, telemetry, OTel, log redaction |
+| 13 | Deployment / CLI | `13-deployment-cli.mdx` | ❌ deploy modes, operator CLI; 🟡 trust presets (no runtime fail-closed admission) |
+| 14 | Teams / governance | `14-teams-governance.mdx` | at parity; ❌ Agent-Companies package model; hire_agent approval unwired |
+
+## KEYSTONES (converge across many domains — build these FIRST)
+
+1. **`AgentRun` model (run persistence)** — referenced by sandbox(H3), heartbeat(run ledger), work-items(G3 TaskRun),
+   environments(leases keyed by run), cost(per-run attribution), memory(provenance→run). One table: every agent
+   execution (agentId, taskId, environment/provider, status, started/finished, exitCode, log ref, cost, provenance).
+   **Unblocks the most; build first.** Applied to sandbox = closes the "results returned but never stored" gap.
+2. **`Environment` model + CRUD** — unifies where/how a run executes (local|ssh|sandbox|host) + config + probe.
+   Ties runTaskInSandbox + RunnerHost + adapters into one selectable thing. UI needs (3).
+3. **`JsonSchemaForm` UI primitive** — gates every rich config screen (environments, adapters, plugins).
+
+## PHASED BACKLOG (dependency-ordered; value × cost)
+
+### Phase 1 — foundation + cheap security wire-ups (IN PROGRESS)
+- [x] **AgentRun model** (keystone #1) DONE (decbe4d) — agent_runs + runTaskInSandbox persists running→done/failed/timeout.
+- [x] **AgentRun surfaced** DONE (a7c142c) — AgentRun GraphQL type + agentRuns query (RUNNERS/member) + client + Run-history UI on /runners.
+- [x] **auto-sleep cron** registered in vercel.json (a7c142c).
+- [~] DEAD-toggle sweep — CORRECTIONS after verification:
+      • memory `appendAgentMemory` is NOT dead — wired via POST /api/agents/me/memory (runner path). The real gap is the
+        SANDBOX-run path doesn't capture MEMORY.md back (future, tie to run→memory-provenance).
+      • `requireUntrustedPrReview` is set/defined but ENFORCEMENT needs the PR-review flow (work-items G2, L) — not a cheap win.
+      • `hire_agent` approval — no hit in apps/web/src grep; re-check under a different name before wiring.
+- [ ] Secrets **audit-on-resolve** — DEFERRED w/ note: resolveWorkspaceSecret is shared by the presence-check (listing) AND
+      the real-access (provision) paths, so blind auditing spams events. Correct fix = audit at the USE site (defineCloudProvider
+      resolving required creds for a real provision, w/ secretId + runId). [S–M, do in Phase 2 with run context]
+- [ ] run→task-message (post sandbox output to the task timeline) — needs messageModel author/pipeline. [M]
+- [x] **Fail-closed low-trust sandbox admission** DONE (b901fd9) — SandboxProvider.isolating (local=false, cloud=true) +
+      utils.requiresSandboxContainment + runTaskInSandbox denies contained agents on non-isolating providers.
+      STILL TODO in this vein: execution allowlist enforcement (evaluateTrust "command" kind) on the runtime command;
+      surface `isolating` in the sandboxProviders query so the UI warns.
+
+### Phase 2 — sandbox production-readiness (IN PROGRESS)
+See 03-sandbox-depth.mdx.
+- [x] **H1 runtime-binary install + secrets-into-box** DONE (8dc7845) — Adapter.installCommand+binName (real Paperclip
+      commands) → idempotent `command -v||install` guard in the box; resolveEnvForAgent exports the agent's bound vault
+      secrets (LLM keys) into the run. Pure composeSandboxScript + unit tests.
+- [x] **H2 private-repo clone auth** DONE (fdf0882) — BYO GIT_TOKEN/GITHUB_TOKEN from vault → git credential helper
+      (`$PC_GIT_TOKEN`, never in URL/args/remote). Tests + docs.
+- [x] **run→task-message** DONE (1d5fc15) — runTaskInSandbox posts the outcome (status/exit/output) to the task
+      timeline as the agent, best-effort. (NOTE: the runTaskInSandbox docstring still says "does not write to the
+      task timeline" — stale, fix on next edit.)
+- [x] **Surface isolating** DONE (13aa44a) — query+client+UI expose provider isolation; low-trust UX visible.
+- [ ] Cancellation + retain-on-failure — BLOCKED on a decision: needs ASYNC runs (cancellation) and provider
+      reconnect-to-destroy (retain, else a billed box leaks). Do NOT ship leaky. Decide async-runs infra first.
+- [ ] Cloudflare bridge Worker artifact + deploy docs — large UNVERIFIABLE artifact (needs a CF account to test);
+      defer until CF is actually chosen for use.
+- [ ] Live-key verification — BLOCKED on the user handing over ONE real provider key (e.g. e2b).
+
+### RESOLVED decisions
+1. **Async runs — DONE (72dbb27).** enqueueSandboxRun (queued, non-blocking) → drainSandboxRunQueue worker
+   (atomic claim, /api/cron/run-sandbox-queue */1 + in-process-capable) → cancelAgentRun. GraphQL enqueue+cancel.
+   Caveat: on Vercel a run > function limit only completes on the persistent-server deploy.
+2. **MCP → 🚫 buildbase-boundary.** User: buildbase SDK provides MCP. Current @buildbase/sdk has no MCP module yet,
+   but per the user it's coming → DO NOT build MCP ourselves (removed from backlog; wait for the SDK). 06-plugins-mcp.mdx
+   MCP section is now advisory-only.
+
+### STILL OPEN (Phase 2 tail + next)
+- [x] Auto-dispatch: enqueue a sandbox run automatically when a task is assigned to a sandbox-bound agent — DONE (2dee1b5).
+      `autoDispatchSandboxForAssignment` on TASK_ASSIGNEES_CHANGED (events/handlers/auto-dispatch-sandbox.ts), RUNNERS-gated,
+      deduped vs queued/running, human/non-sandbox skipped. Tests: enqueue+dedup, no-provider no-op (16/16).
+- [x] Persistent-server in-process drain loop (server.ts) so long runs complete off-Vercel — DONE (bc02691).
+      sandbox-drain-loop.ts: RUNNERS-gated, non-overlapping, error-swallowing, unref'd; cadence/batch via env. Tests 3/3.
+- [x] Enqueue/cancel + queued/canceled states in the Runs UI — DONE (a4c5fe2). Enqueue button, Cancel on queued rows,
+      queued badge, 4s polling while in-flight. Client mutations ENQUEUE_TASK_IN_SANDBOX + CANCEL_AGENT_RUN (shared → web+mobile).
+- [ ] Live-key verification — needs a real key from the user.
+- [ ] Cloudflare bridge Worker — deferred (needs a CF account to verify).
+
+### Phase 3 — Environments (01-environments-execution.mdx)
+- [x] **PLAN 1 — Environment model + CRUD** — DONE (b220096). Prisma Environment (+Agent.environmentId), driver/status TEXT,
+      config secret-refs (masked configPublic) + zod per-driver validation, partial-unique (one local/one managed-sandbox) w/ app guard,
+      blast-radius delete guard, capabilities matrix. GraphQL (member reads / admin writes, ENVIRONMENTS-gated) + shared client + /environments UI + nav. Tests 10/10.
+- [x] **PLAN 1 wiring — Environment drives the run seam** — DONE (3e3c3a5). resolveEnvironmentExecution + shared resolveAndAdmitTarget
+      (run + enqueue can't diverge); env envVars merged into run env; auto-dispatch fires for env-bound agents; setAgentEnvironment mutation
+      + Agent.environmentId exposed + "Agent bindings" UI. ssh/plugin drivers rejected (need Plan 6). Tests: sandbox-run 22/22.
+- [x] PLAN 4 — probe + execution policy/allowlist — DONE (e387228). Pure evaluateExecutionAllowlist (kubernetes-forces-k8s),
+      WorkspaceExecutionPolicy model + EXECUTION_POLICY flag, wired fail-closed into runTaskInSandbox + enqueueSandboxRun admission,
+      probeEnvironment (local/sandbox/ssh), GraphQL + client + UI (Probe button + policy toggle). Tests 9/9.
+      Still open from Plan 4: low-trust-containment assertions (requiresSandboxContainment already enforces the sandbox case) + pre-dispatch config gate.
+- [x] **PLAN 2 — lease lifecycle + reuse/retain/reaper** — DONE (baa2296). EnvironmentLease model, provider resume/destroyById (local),
+      acquireLease (atomic reuse claim) / releaseLease (ephemeral destroy · reuse keep · retain-on-failure) / reapStaleLeases (CAS, in reap cron) /
+      destroyLeaseNow; wired into runTaskInSandbox; GraphQL + client + UI (policy picker + Leases table). Tests 6/6 (reuse/ephemeral/retain/reaper/concurrent/manual).
+- [x] **PLAN 3 — execution workspaces + project setup commands** — DONE (8b88582). Pure workspace-policy resolver (@agentcenter/utils),
+      ProjectWorkspace/ExecutionWorkspace/WorkspaceOperation models, composeSandboxScript setupCommand, per-run recording in runTaskInSandbox
+      (EXECUTION_WORKSPACES-gated), GraphQL + client + UI (Recent execution workspaces panel). Tests: resolver 9/9 + integration 6/6.
+      Deferred sub-items: git-worktree host-side realization, branch reconciliation, ProjectWorkspace settings UI (needs project routing), WorkspaceRuntimeService.
+- [x] **PLAN 6 — streaming + in-sandbox bridge + transport resolver** — DONE (a1a2b4c + 770aadf + 196ce7f). (1) onLog + run-runtime-status
+      (redacted, 90s TTL) + agentRunLiveStatus GraphQL/UI live tail; (2) run-scoped in-sandbox API bridge (bridgeTokenHash, rbt_ token, verify-only-while-running,
+      POST /api/runner/bridge/message least-privilege); (3) pure execution-target/transport resolver (19) → Environment.transport label in UI. Tests: status 6/6, bridge 6/6, target 8/8.
+      Deferred (optional, refactor risk / marginal): unified runtime-driver interface merging ssh+local under one seam (22/23) — SandboxProvider already unifies the sandbox case.
+- [x] **PLAN 5 — custom-image capture (core)** — DONE (17fb059). Pure fingerprint + classifyConfigChange (none/relinkable/breaking),
+      SandboxProvider.snapshot (local stub), EnvironmentCustomImageTemplate (one-active partial-unique + supersede chain), captureCustomImage/
+      rollback/disable/resolveActiveImageRef/classifyActiveTemplateDrift, active-image overlay wired into acquireLease→runTaskInSandbox, GraphQL + client + per-card UI. Tests: policy 5/5 + service 6/6.
+      Deferred (infra-dependent): interactive setup-terminal capture flow (live SSH PTY into a setup box) + real cloud-provider snapshot() impls (e2b/daytona/k8s).
+
+### Phase 2 — sandbox production-readiness (the original ask)
+- [x] **Runtime binary install in sandbox** (H1) — DONE. `installGuard` via getAdapter installCommand/binName in composeSandboxScript (idempotent `command -v || install`).
+- [x] **Private-repo clone auth** (H2) + **secrets injected into the box** — DONE. git credential helper reading $PC_GIT_TOKEN (never in URL) + resolveEnvForAgent exports.
+- [x] `timedOut`/`signal` in exec result + timeout tree-kill — DONE (8435159). detached process-group kill (no hang/orphans),
+      run status derived from explicit timedOut flag. Queued-run cancel done (cancelAgentRun). Still open: in-flight cancel of a RUNNING run; retain-on-failure.
+- [ ] Cloudflare **bridge Worker** artifact + deploy docs. [M]
+- [ ] Live-key verification harness (needs a real key from user) — 1 provider at a time. [—]
+
+### Phase 3 — Environment model + config UI
+- [ ] Environment model + CRUD + probe + GraphQL + `JsonSchemaForm` + Environments UI. [L]
+- [ ] Unify the two adapter registries (Tier A DB metadata ↔ Tier D code registry); fix `openclaw-gateway`/`openclaw` key mismatch. [M]
+
+### Phase 4 — big epics (schedule explicitly; each multi-session)
+- [ ] **MCP** (largest): client core → gateway (catalog/policy/approval/audit/run-scoped tokens) → endpoint server → admin UI. [XL]
+- [ ] Plugin **runtime** (out-of-process worker + capabilities + SDK). [L]
+- [ ] Missing **adapters**: cursor(_cloud), grok, opencode, pi, hermes(_gateway), ACP; real openclaw_gateway NAT-pull. [M×n]
+- [ ] **Agent-Companies** package model (COMPANY/TEAM/AGENTS.md + GitHub import + org-chart export). [L]
+- [ ] Skills: catalog pkg, external import, update/audit/reset, runtime-sync, Skill Studio execution, policy engine. [L]
+- [ ] Secrets: external providers (AWS/GCP/Vault), richer binding targets (tool_connection for MCP). [L]
+- [ ] Heartbeat: central agent-wake scheduler, scheduled retries+backoff, stranded-work reconciliation. [L]
+- [ ] Cost/obs: FinanceEvent ledger, provider quota polling, telemetry pipeline, OTel, pino+redaction+log store. [L]
+- [ ] Work-items: work-product taxonomy (PR/branch/commit/preview), artifact upload pipeline, document annotation depth. [L]
+- [ ] Deployment: operator CLI (doctor/env/db:backup), untrusted-PR-review container, deploy modes. [M–L]
+- [ ] Rich config UIs: apps/MCP, plugins, agent-detail unification, secrets tabs. [L]
+
+## Cross-domain recurring themes (the "loopholes")
+- **Dead code / unwired features**: memory capture, requireUntrustedPrReview, hire_agent approval, auto-sleep cron,
+  secret audit-on-resolve, adapter Tier-A↔Tier-D disconnect. → Phase 1 sweeps these.
+- **No run persistence** anywhere (sandbox/heartbeat/work-items all point at it). → keystone #1.
+- **Low-trust containment is declared but not enforced at runtime** (sandbox admission, PR review, execution allowlist). → Phase 1/2.
+- **MCP entirely absent** — the single biggest capability gap for a tool-using agent platform.
+
+## Sandbox production-readiness (known, from prior work)
+
+- [x] Runtime binary now installed in sandbox via installGuard (idempotent) — DONE
+- [ ] Never run against a real provider key (all SDK-mocked) — **critical** (needs user key)
+- [x] runTaskInSandbox result posted to task timeline (postRunToTask) + review/blocked status — DONE
+- [x] Auto-dispatch on assignment — DONE (2dee1b5)
+- [ ] Cloudflare bridge Worker not built/deployed
+- [x] Private-repo clone auth wired (git credential helper, token never in URL) — DONE
+- [x] Run persistence (AgentRun ledger) + queued-run cancellation — DONE; cost tracking / in-flight kill / rate-limit still open
+- [ ] Sandbox UI web-only (not mobile)

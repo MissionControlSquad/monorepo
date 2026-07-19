@@ -1,0 +1,510 @@
+---
+title: "Parity Gap Analysis — Environments & Execution Targets"
+domain: environments-execution
+source_product: paperclip
+target_product: MissionControlSquad-monorepo
+generated: 2026-07-17
+boundary_note: "human auth / billing / orgs / workspaces / RBAC are @buildbase/sdk-owned (🚫). Where our monorepo already has a per-workspace secrets vault, adapter registry and RUNNERS seam, we build ON them."
+legend: "✅ Present · 🟡 Partial · ❌ Missing · 🚫 SDK-owned boundary (do not build)"
+---
+
+# Environments & Execution Targets — Paperclip → Monorepo Parity
+
+## 0. Executive summary
+
+Paperclip models **"where and how an agent run executes"** as a first-class, durable subsystem:
+a normalized **Environment** (driver = `local` | `ssh` | `sandbox` | `plugin`), a **lease** that binds a
+run to a live provider machine with reuse/retain policies, a **realized execution workspace**
+(project-primary / git-worktree / adapter-managed / cloud-sandbox), **custom-image capture** with
+interactive setup terminals, **probes**, an **execution allowlist / low-trust containment** security
+layer, and a **plugin driver** RPC layer. Roughly **34 discrete capabilities**.
+
+Our monorepo (Tier D) has deliberately ported the **thin ephemeral seam** — a `SandboxProvider`
+registry (`local` + 7 cloud, BYO creds), `runTaskInSandbox` (provision→exec→destroy), `RunnerHost`
+(BYO SSH), `RunnerCommand` (NAT-pull runner with atomic claim + reaper), a strong **adapter registry**
+(`AgentAdapter` + `packages/utils/src/adapters.ts`), terminal sessions with live PTY, and a full
+GraphQL + Runners UI — all `RUNNERS`/`TERMINALS`/`MULTI_PROVIDER_ADAPTERS` feature-gated. It
+**intentionally dropped** the lease table, first-class Environment model, custom-image build, execution
+workspaces, execution policy/allowlist, and probes (source-file headers say so explicitly).
+
+Verdicts across 34 features: **✅ 4 · 🟡 14 · ❌ 16.** The four biggest missing pillars, in build order:
+**(1) first-class Environment model + CRUD** (M), **(2) Environment lease lifecycle + reuse** (L),
+**(3) Execution workspace model + strategies** (L), **(4) Execution policy / allowlist / low-trust
+containment** (M). Custom-image capture (L) and probes (S) round out the depth gap.
+
+> **Data-layer note:** Paperclip is **Drizzle**; our monorepo is **Prisma** (`packages/database/prisma/schema/*.prisma`).
+> All plans below are written for Prisma + our Next.js/GraphQL shape.
+
+---
+
+## 1. Feature inventory & mapping
+
+Each row: Paperclip capability + key `file:line`, then our verdict + monorepo refs.
+
+### A. Data model
+
+| # | Feature | Paperclip (file:line) | Verdict | Monorepo refs |
+|---|---------|-----------------------|---------|---------------|
+| 1 | **Environment model** — normalized execution env (`driver`, `config`, `envVars`, `metadata`, `status`); partial-unique one-local / one-managed-sandbox | `packages/db/src/schema/environments.ts:4,20,23` | ❌ | No `Environment` model. Closest: per-`Agent.sandboxProvider` (`agent.prisma`) + `RunnerHost` (`runner-host.prisma`). |
+| 2 | **EnvironmentLease model** — run↔env↔provider-lease binding; `status`, `leasePolicy`, `provider/providerLeaseId`, `cleanupStatus` | `packages/db/src/schema/environment_leases.ts:8,17-20,26` | ❌ | No lease table (dropped by design — see `sandbox-run.ts` header). Nearest: `RunnerCommand.claimedAt` atomic claim. |
+| 3 | **ExecutionWorkspace model** — realized per-run workspace (`mode`, `strategyType`, `cwd`, repo/branch, `providerType`, `derivedFrom`) | `packages/db/src/schema/execution_workspaces.ts:15,23-24,31,33` | ❌ | None. `runTaskInSandbox` clones inline into an ephemeral `workspace/` dir, nothing persisted. |
+| 4 | **ProjectWorkspace model** — project-level source (local_path/repo, `remoteProvider`, setup/cleanup cmds, `sharedWorkspaceKey`) | `packages/db/src/schema/project_workspaces.ts:14,29-31` | 🟡 | `Project.repoUrl/repoRef` only; no named workspaces / setup-cleanup commands. |
+| 5 | **EnvironmentCustomImageTemplate** — captured snapshot/image/provider-template per env+provider, active-uniqueness + supersede chain + config fingerprint | `packages/db/src/schema/environment_custom_image_templates.ts:16,22-25,47` | ❌ | None. Only passthrough `SandboxSpec.image` (`sandbox/types.ts`). |
+| 6 | **EnvironmentCustomImageSetupSession** — interactive image-setup lifecycle + SSH connection summary | `packages/db/src/schema/environment_custom_image_setup_sessions.ts:12,22,41` | 🟡 | `TerminalSession` (`terminal.prisma`) exists (SSH PTY) but not bound to image capture. |
+| 7 | **WorkspaceRuntimeService** — long-lived dev/runtime processes scoped to workspace/project/issue (`port`, `url`, `health`, `reuseKey`, `stopPolicy`) | `packages/db/src/schema/workspace_runtime_services.ts:18,27-32,45` | ❌ | None. No long-lived side-process / dev-server model. |
+| 8 | **WorkspaceOperation** — audit log of workspace phase commands (provision/setup/cleanup) w/ exit code + log refs | `packages/db/src/schema/workspace_operations.ts:17,31-40` | ❌ | None (RunnerCommand logs single commands, not workspace phases). |
+
+### B. Environment CRUD & lifecycle
+
+| # | Feature | Paperclip (file:line) | Verdict | Monorepo refs |
+|---|---------|-----------------------|---------|---------------|
+| 9 | **Environment CRUD service** — list/get/create/update/remove w/ driver+name uniqueness conflict mapping | `server/src/services/environments.ts:183,388,424,456` + `routes/environments.ts:363-817` | ❌ | No env CRUD. `runner-hosts.ts` create/list/delete is the analogue for SSH hosts only. |
+| 10 | **Ensure default Local env** — idempotent singleton `driver:"local"` | `server/src/services/environments.ts:215` | 🟡 | Implicit: `local` sandbox provider always exists (`sandbox-providers.ts:100`), but no env row. |
+| 11 | **Ensure managed Kubernetes sandbox env** — config-driven managed hosted-tenant env | `server/src/services/environments.ts:270,370` | 🟡 | `kubernetesProvider` exists (`sandbox/kubernetes.ts`) but not a managed/seeded environment. |
+| 12 | **Delete blast-radius / deletability guard** — static refs + active runtime use + blocked reasons before delete | `server/src/services/environments.ts:465,483` | ❌ | N/A (no Environment). `deleteRunnerHost` has no blast-radius check. |
+| 13 | **Lease management API** — acquire/release/retain/expire, per-run bulk release, metadata patch | `server/src/services/environments.ts:598,641,666,683` | ❌ | None (no lease). `claimCommandsForAgent`/`reapStuckRunnerCommands` are the closest pattern. |
+
+### C. Config, validation & secrets
+
+| # | Feature | Paperclip (file:line) | Verdict | Monorepo refs |
+|---|---------|-----------------------|---------|---------------|
+| 14 | **Per-driver config validation** — zod schemas (ssh/fake-sandbox/plugin-sandbox/plugin) for probe/persist/runtime | `server/src/services/environment-config.ts:39,70,90,98,349,659` | 🟡 | `AgentAdapter.configSchema` (JSON Schema, `adapter.prisma:32`) validates adapter config; no env-driver config schema. |
+| 15 | **Config secret-ref resolution** — persist plaintext as `secret_ref` at save, resolve at runtime/probe | `server/src/services/environment-config.ts:203,241,279,318` | 🟡 | `Secret`/`SecretVersion`/`SecretBinding` vault + `resolveWorkspaceSecret` (`services/secrets.ts`); no config-embedded secret_refs. |
+| 16 | **Runtime config resolution + custom-image overlay** — resolve SSH keys/sandbox refs, apply active image template | `server/src/services/environment-config.ts:561,634` | ❌ | No custom-image overlay (no templates). |
+| 17 | **Environment env-vars injection** — instance-scoped `env_vars` column merged into run env | `schema/environments.ts:13`, migration `0105_instance_scoped_environments.sql` | 🟡 | Per-agent `adapterConfig` + secrets; no env-level env-var bag. |
+
+### D. Run orchestration & execution targets
+
+| # | Feature | Paperclip (file:line) | Verdict | Monorepo refs |
+|---|---------|-----------------------|---------|---------------|
+| 18 | **Run orchestrator** — resolve env → acquire lease → realize workspace → provision → resolve target → release/retain; error taxonomy | `server/src/services/environment-run-orchestrator.ts:148,256,332,509,54-66` | 🟡 | `runTaskInSandbox` (`sandbox-run.ts:50`) does provision→exec→destroy only — no lease, no workspace realize, no persisted result. |
+| 19 | **Execution target/transport resolution** — map leased env+adapter → `AdapterExecutionTarget` (`local`/`ssh`/`sandbox` remote) + in-sandbox runner shim + run-log streaming | `server/src/services/environment-execution-target.ts:13,27,35,78,139,158` | 🟡 | `RunnerTargetKind{agent,host,cloud_vm(dep)}` (`runner-command.prisma:29`) is the target enum; no per-adapter transport resolver, no run-log streaming. |
+| 20 | **Environment probe** — driver-specific connectivity test; sandbox probe can boot a throwaway lease | `server/src/services/environment-probe.ts:15,37,50,142,186` + `routes:879,917` | ❌ | None. `isSandboxProviderConfigured` (`sandbox-providers.ts:50`) checks creds presence only. |
+| 21 | **Capabilities matrix** — per-adapter supported drivers + per-provider capabilities (probe/lease/template/setup) | `server/src/services/environments.ts` capabilities route `routes:382`, `packages/shared/src/environment-support.ts:53` | 🟡 | `sandboxProviders`/`runtimeAdapters` GraphQL queries list providers, but no adapter×driver support matrix. |
+
+### E. Runtime drivers & sandbox provider layer
+
+| # | Feature | Paperclip (file:line) | Verdict | Monorepo refs |
+|---|---------|-----------------------|---------|---------------|
+| 22 | **Runtime driver registry** — dispatch acquire/release/realize/execute per driver | `server/src/services/environment-runtime.ts:1659,188` | 🟡 | `sandbox-providers.ts` registry covers sandbox only (provision/exec/destroy), not ssh/local/plugin drivers under one interface. |
+| 23 | **Local / SSH / Sandbox runtime drivers** | `environment-runtime.ts:503,547,610` | 🟡 | Sandbox: ✅ (`sandbox/*`). SSH: 🟡 via `RunnerHost`+`runCommandOnHost` (not a driver). Local: 🟡 `localProvider`. |
+| 24 | **Sandbox provider registry + fake provider + reuse/reconstruct-from-metadata** | `server/src/services/sandbox-provider-runtime.ts:79,119,219,249,283,331` | ✅ | `sandbox-providers.ts` (local + e2b/daytona/modal/novita/cloudflare/kubernetes/exe-dev), `registerSandboxProvider`, BYO creds. **No** reuse/resume/reconstruct (ephemeral). |
+| 25 | **Plugin environment driver + RPC (validate/probe/lease/execute/realize/setup/template)** | `server/src/services/plugin-environment-driver.ts:66,88,117,188,322,347,389` | 🟡 | `registerSandboxProvider` + `adapter-plugins.json` (`packages/utils/src/adapters.ts:loadAdapterPlugins`); no plugin-worker RPC or interactive setup/template RPC. |
+| 26 | **Plugin VM sandbox loader** — load plugin CJS in `node:vm` w/ module allow-list + root-escape guard + timeout | `server/src/services/plugin-runtime-sandbox.ts:76,56,193,219` | ❌ | None. Cloud SDKs loaded via `loadOptionalModule` (`sandbox/types.ts`) — no sandboxed plugin execution. |
+
+### F. Custom images
+
+| # | Feature | Paperclip (file:line) | Verdict | Monorepo refs |
+|---|---------|-----------------------|---------|---------------|
+| 27 | **Custom-image service** — overview/capture/refresh/finish/cancel/rollback/disable + expiry cleanup | `server/src/services/environment-custom-images.ts:253,634,660,782,1002,1053,1079` | ❌ | None. `spec.image` is a passthrough ref only. |
+| 28 | **Custom-image runtime overlay + fingerprint + change classification** (none/relinkable/breaking) | `server/src/services/environment-custom-image-runtime.ts:97,110,177,243` | ❌ | None. |
+| 29 | **Custom-image terminal broker** — short-TTL SSH terminal tokens into setup sandbox, host-key pin | `server/src/services/environment-custom-image-terminal-sessions.ts:77,109,182,253` | 🟡 | `TerminalSession` + `terminal-pty-handler.ts` (browser WS↔SSH, `ts_` token) exists but not wired to image capture. |
+
+### G. Execution workspaces & policy
+
+| # | Feature | Paperclip (file:line) | Verdict | Monorepo refs |
+|---|---------|-----------------------|---------|---------------|
+| 30 | **Execution workspace service** — CRUD + overview/close-readiness + git-worktree contention + env-selection clearing | `server/src/services/execution-workspaces.ts:905,950,1206,1338,1589,1916` | ❌ | None. |
+| 31 | **Workspace strategy/policy resolver (pure)** — effective mode/strategy from project policy + issue pins; unrunnable-worktree detection; env-id precedence (agent→instance→default) | `server/src/services/execution-workspace-policy.ts:48,84,209,263,284` | ❌ | None. |
+| 32 | **Workspace realization / branch reconciliation** — materialize workspace in env; forward/override/quarantine branch reconcile | `server/src/services/workspace-realization.ts`, `execution-workspaces.ts:1608` | 🟡 | Inline `git clone --depth 1` in `sandbox-run.ts:109`; no branch/worktree logic. |
+| 33 | **Project-workspace runtime config** — desiredState + per-service run/stop/manual states | `server/src/services/project-workspace-runtime-config.ts:24,40` | ❌ | None. |
+
+### H. Execution policy / security containment
+
+| # | Feature | Paperclip (file:line) | Verdict | Monorepo refs |
+|---|---------|-----------------------|---------|---------------|
+| 34 | **Execution allowlist guard (pure)** — `executionMode=kubernetes` forces all runs onto k8s sandbox, denies local/ssh/plugin/non-k8s | `server/src/services/execution-allowlist.ts:54,62,76` | ❌ | None in execution domain. `agent-authz.prisma`/`governance.prisma` are a *different* (capability) domain. |
+| 35 | **Execution-policy bootstrap from env** — parse `PAPERCLIP_EXECUTION_MODE`/`K8S_*`, persist mode, ensure managed env | `server/src/services/execution-policy-bootstrap.ts:70,139,187` | ❌ | None. |
+| 36 | **Low-trust runtime containment** — require sandbox driver + isolated workspace + trust-boundary membership; gate runtime-service startup | `server/src/services/low-trust-runtime-containment.ts:13,44,82,89` | ❌ | None. |
+| 37 | **Pre-dispatch config/secret-binding validation** — missing bindings ⇒ `configuration_incomplete` blocker, not a failed run | `server/src/services/heartbeat.ts:344,393-397`, `secrets.ts MissingRuntimeBinding` | 🟡 | Secrets vault exists; no pre-dispatch gate — a missing key surfaces as a runtime error mid-run. |
+
+### I. Adapter registry / environment wiring
+
+| # | Feature | Paperclip (file:line) | Verdict | Monorepo refs |
+|---|---------|-----------------------|---------|---------------|
+| 38 | **Adapter registry bootstrap (env-driven)** — `PAPERCLIP_ADAPTERS[_FILE]` reconcile availability + feed k8s image/env | `server/src/services/adapter-registry-bootstrap.ts:27,71` | ✅ | `packages/utils/src/adapters.ts` (`registerAdapter`/`listAdapters`/`buildAdapterInvocation`) + `AgentAdapter` model + `setAdapterEnabled`. |
+| 39 | **Adapter plugin store (file-backed)** — `~/.paperclip/adapter-plugins.json` external registrations + disabled-set | `server/src/services/adapter-plugin-store.ts:133,137,177` | ✅ | `adapter-plugins.json` + `loadAdapterPlugins` + `AgentAdapter.enabled/builtIn`. |
+| 40 | **Adapter models env** — operator `PAPERCLIP_ADAPTER_MODELS` per-adapter model lists (gateway models) | `server/src/services/adapter-models-env.ts:12` | ✅ | `AdapterModelProfile` (`adapter.prisma:47`) — DB-backed model profiles (`detected`/`isDefault`). |
+| 41 | **Live run runtime status** — in-mem run phase/tool/snippet, 90s TTL, redaction (liveness surface) | `server/src/services/heartbeat-run-runtime-status.ts:4,9,39` | ❌ | Sandbox runs are batch-captured (`sandbox-run.ts` returns final stdout); no live phase surface. |
+| 42 | **In-sandbox API bridge** — run-scoped token, inject `PAPERCLIP_API_URL/KEY`, forward allowed API calls with run id | `doc/execution-semantics.md:337-339`, execution-target runner shim | ❌ | None. Sandbox has no callback bridge to the control plane. |
+
+**Counts:** ✅ 4 (24,38,39,40) · 🟡 14 · ❌ 16. (Features 41–42 folded from the doc; 34 primary rows.)
+
+---
+
+## 2. Implementation plans (each 🟡/❌)
+
+Ordering/sizes are summarized in §3. Plans reuse our existing seams (`sandbox-providers.ts`,
+`runner-*`, `Secret*` vault, adapter registry) rather than rebuild them. All new surfaces are
+**feature-flag gated** and **admin-checked server-side**, consistent with the current `RUNNERS` pattern.
+
+> **New flags** (`packages/utils/src/feature-flag-keys.ts`, all default `false`):
+> `ENVIRONMENTS: "environments"`, `EXECUTION_WORKSPACES: "execution_workspaces"`,
+> `CUSTOM_IMAGES: "custom_images"`, `EXECUTION_POLICY: "execution_policy"`.
+
+---
+
+### PLAN 1 — First-class Environment model + CRUD (features 1, 9, 10, 11, 12, 14, 17, 21) — **M**
+
+The keystone. Everything downstream (leases, workspaces, policy) references `Environment`.
+
+**Prisma** (`packages/database/prisma/schema/environment.prisma`):
+```prisma
+enum EnvironmentDriver { local ssh sandbox plugin }
+enum EnvironmentStatus { active archived }
+
+model Environment {
+  id          String            @id @default(cuid())
+  workspaceId String            // buildbase workspace _id; no FK (D5 convention)
+  name        String
+  description String?
+  driver      EnvironmentDriver @default(local)
+  status      EnvironmentStatus @default(active)
+  config      Json              @default("{}")   // driver-specific; secrets stored as {secretRef}
+  envVars     Json              @default("{}")   // merged into run env
+  metadata    Json?
+  createdByProfileId String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  leases      EnvironmentLease[]
+  @@unique([workspaceId, name])
+  // partial-unique (one local / one managed-sandbox) via raw migration index
+}
+```
+Add SQL partial-unique indexes (migration): one `driver='local'` and one managed `sandbox` per workspace
+(mirrors `environments.ts:20,23`).
+
+**Server services** (`apps/web/src/server/services/environments.ts` — new):
+`listEnvironments`, `getEnvironment`, `createEnvironment` (validates driver config via zod schemas ported
+from `environment-config.ts:39-140`), `updateEnvironment`, `ensureLocalEnvironment` (idempotent),
+`ensureManagedSandboxEnvironment` (k8s), `getEnvironmentDeleteBlastRadius` (count active leases +
+referencing agents), `removeEnvironmentIfDeletable`. Reuse the existing `sandbox-providers.ts` registry
+to validate `driver:"sandbox"` `config.provider`. Config-secret handling reuses `resolveWorkspaceSecret`
++ a new `persistConfigSecretRefs`/`resolveConfigSecretRefs` helper (port `environment-config.ts:203,241`,
+storing `{secretRef:{name}}` pointers into the vault instead of plaintext).
+
+**GraphQL** (`apps/web/src/server/graphql/{queries,mutations}/environments.ts`):
+- queries: `environments(workspaceId)`, `environment(id)`, `environmentCapabilities` (adapter×driver
+  support matrix built from `listSandboxProviders` + adapter registry — feature 21).
+- mutations: `createEnvironment`, `updateEnvironment`, `archiveEnvironment`, `deleteEnvironment`
+  (guarded by blast-radius), `probeEnvironment` (Plan 4).
+- Register in `queries/index.ts` + `mutations/index.ts`. Never return raw `config` secret values —
+  return `configPublic` with secret paths masked.
+
+**UI** (`apps/web/app/(dashboard)/environments/page.tsx` + `src/views/EnvironmentsView.tsx`):
+- Environments list (name, driver badge, status, active-lease count), Create/Edit drawer with a
+  driver-switch form (local | ssh | sandbox-provider | plugin), a **Probe** button (Plan 4), and a
+  delete-confirm showing blast radius. New components: `EnvironmentDriverForm.tsx`,
+  `EnvironmentCard.tsx`, `EnvironmentProbeResult.tsx`. Follow the `/design-guide` tokens; reuse the
+  existing Runners-page data-fetching patterns.
+- Add an **Environment** selector to the agent config card (`AgentAdapterConfigCard.tsx`) so an agent
+  picks an environment instead of a bare `sandboxProvider`.
+
+**Security:** gate on `ENVIRONMENTS` flag; admin-only mutations (reuse the Runners server-side admin
+check). SSH private keys / provider API keys are written ONLY as vault secret-refs; the resolved
+plaintext never leaves the server. `workspaceId` scoping on every query (multi-tenant isolation).
+
+**Tests:** unit — driver-config zod validation (valid/invalid per driver), blast-radius counting,
+secret-ref persist/resolve round-trip, partial-unique enforcement. Integration — GraphQL create→probe→
+delete; deletion blocked while a lease is active. Reuse the `local` provider for no-network tests.
+
+---
+
+### PLAN 2 — Environment lease lifecycle + reuse/retain (features 2, 13, 18, 24-reuse) — **L**
+
+Turns the ephemeral `runTaskInSandbox` into a leased, reusable, recoverable run.
+
+**Prisma** (`environment.prisma`):
+```prisma
+enum LeaseStatus  { active released expired failed retained pending_cleanup }
+enum LeasePolicy  { ephemeral reuse_by_environment reuse_by_execution_workspace retain_on_failure }
+enum CleanupStatus { pending success failed }
+
+model EnvironmentLease {
+  id                  String        @id @default(cuid())
+  workspaceId         String
+  environmentId       String
+  environment         Environment   @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  executionWorkspaceId String?
+  taskId              String?       // our issue analogue
+  runId               String?       // agent run id
+  status              LeaseStatus   @default(active)
+  leasePolicy         LeasePolicy   @default(ephemeral)
+  provider            String?       // sandbox provider key
+  providerLeaseId     String?       // e.g. e2b sandbox id, k8s pod name
+  acquiredAt          DateTime      @default(now())
+  lastUsedAt          DateTime      @default(now())
+  expiresAt           DateTime?
+  releasedAt          DateTime?
+  failureReason       String?
+  cleanupStatus       CleanupStatus?
+  metadata            Json?
+  @@index([workspaceId, environmentId, status])
+  @@index([status, expiresAt])
+}
+```
+
+**Server services** (`apps/web/src/server/services/environment-leases.ts` + upgrade `sandbox-run.ts`):
+- `acquireLease({workspaceId, environmentId, policy, executionWorkspaceId?})` — for `reuse_*` policies,
+  first look for a live reusable lease (port `findReusableSandboxProviderLeaseId`,
+  `sandbox-provider-runtime.ts:283`) via a guarded `updateMany` (atomic claim, mirrors
+  `claimCommandsForAgent`, `runner-commands.ts:209`); else `provider.provision` and insert a new lease.
+- `releaseLease(id, status)` / `releaseLeasesForRun(runId)` — for `ephemeral`, `handle.destroy()` +
+  mark `released`; for `reuse_*`, keep provider machine, mark `released` but retain `providerLeaseId`;
+  for `retain_on_failure` on error, mark `retained` (don't destroy).
+- `reapStaleLeases(now, graceMs)` — reaper cron: leases past `expiresAt` or whose run is terminal →
+  destroy provider machine + mark `expired`/`pending_cleanup`→`success`. **Reuse the existing
+  reap-stale-work cron** that already runs `reapStuckRunnerCommands` (`runner-commands.ts:170`).
+- Requires `SandboxProvider` to gain **resume/destroy-by-id**: extend `sandbox/types.ts`
+  (`provider.resume(providerLeaseId)` + `provider.destroyById(id)`) — implement for `local`
+  (dir still exists) + `kubernetes` (pod by name); cloud providers throw "reuse unsupported" until wired.
+- Rewrite `runTaskInSandbox` to: `acquireLease` → run in leased handle → `releaseLease(policy)`
+  (replaces its always-destroy `finally`). Persist result on the lease `metadata` for recovery.
+
+**GraphQL:** `environmentLeases(workspaceId, environmentId?)` query; `releaseLease`/`destroyLease`
+admin mutations. Surface `providerLeaseId`, `status`, `lastUsedAt`.
+
+**UI:** a "Leases" tab on the Environment detail page — live table (status pill, provider, age,
+last-used, task/run link, manual **Release**/**Destroy**). Component `EnvironmentLeaseTable.tsx`.
+
+**Security:** reuse only within the SAME `workspaceId` + environment (never cross-tenant machine reuse).
+Reaper is idempotent and must not destroy a lease already re-claimed by a live run (compare-and-set on
+`status`, port the finalization CAS discipline from `doc/execution-semantics.md:124-133`).
+
+**Tests:** acquire→reuse hits the same `providerLeaseId`; ephemeral destroys; retain_on_failure keeps
+the machine; reaper expires stale + skips live; concurrent acquire (two runs) yields exactly one new
+lease (atomic-claim test). Local provider only — no cloud creds.
+
+---
+
+### PLAN 3 — Execution workspace model + strategies + realization (features 3, 4, 30, 31, 32, 33) — **L**
+
+**Prisma** (`execution-workspace.prisma`):
+```prisma
+model ProjectWorkspace {
+  id String @id @default(cuid())
+  workspaceId String
+  projectId   String
+  name        String
+  sourceType  String  @default("local_path") // local_path | repo | remote
+  cwd String?  repoUrl String?  repoRef String?  defaultRef String?
+  setupCommand String?  cleanupCommand String?
+  remoteProvider String?  remoteWorkspaceRef String?  sharedWorkspaceKey String?
+  isPrimary Boolean @default(false)
+  metadata Json?
+  @@unique([projectId, name])
+}
+model ExecutionWorkspace {
+  id String @id @default(cuid())
+  workspaceId String  projectId String  projectWorkspaceId String?  sourceTaskId String?
+  mode String  strategyType String  // project_primary|git_worktree|adapter_managed|cloud_sandbox
+  name String  status String @default("active")
+  cwd String?  repoUrl String?  baseRef String?  branchName String?
+  providerType String @default("local_fs")  providerRef String?
+  derivedFromExecutionWorkspaceId String?
+  lastUsedAt DateTime @default(now())  closedAt DateTime?  cleanupEligibleAt DateTime?
+  metadata Json?
+  @@index([workspaceId, projectId, status])
+}
+model WorkspaceOperation {
+  id String @id @default(cuid())
+  executionWorkspaceId String  phase String  command String?
+  exitCode Int?  status String  logRef String?  startedAt DateTime  finishedAt DateTime?
+}
+```
+
+**Server services** (`apps/web/src/server/services/execution-workspaces.ts` +
+`execution-workspace-policy.ts`):
+- Port the **pure resolver** first (`execution-workspace-policy.ts:48-284`) — no DB — it's the
+  highest-value, lowest-risk piece: `resolveEffectiveWorkspaceStrategyType`, `isUnrunnableWorktreeCombo`
+  (worktree needs a project or a bound reusable workspace — the recent `git-worktree` heartbeat fix
+  suggests this is load-bearing), `resolveExecutionWorkspaceEnvironmentId` (agent→instance→default
+  precedence).
+- `realizeExecutionWorkspace({strategy, projectWorkspace, lease})` — replaces the inline clone in
+  `sandbox-run.ts:109`: `project_primary` (clone/pull into cwd), `git_worktree` (git worktree add off
+  baseRef), `adapter_managed` (metadata-only), `cloud_sandbox` (clone inside the leased sandbox). Each
+  phase writes a `WorkspaceOperation` row. `findGitWorktreeContention` before creating a worktree.
+- `closeExecutionWorkspace` + `getCloseReadiness` (uncommitted changes / running services check) +
+  `reconcileBranch` (forward/override/quarantine — port `execution-workspaces.ts:1608`).
+- `WorkspaceRuntimeService` (feature 7) can be a **follow-up** slice: long-lived dev servers with
+  `port`/`url`/`health`/`reuseKey`/`stopPolicy`; out of scope for the first cut.
+
+**GraphQL:** `executionWorkspaces(workspaceId, projectId?)`, `executionWorkspace(id)` +
+`closeExecutionWorkspace`, `reconcileWorkspaceBranch` mutations. `projectWorkspaces(projectId)` CRUD.
+
+**UI:** Project settings → "Workspaces" tab (named ProjectWorkspaces with setup/cleanup commands +
+default strategy). Task detail → show the realized ExecutionWorkspace (branch, cwd, close-readiness).
+Components `ProjectWorkspaceForm.tsx`, `ExecutionWorkspacePanel.tsx`, `WorkspaceOperationLog.tsx`.
+
+**Security:** `EXECUTION_WORKSPACES` flag; validate setup/cleanup commands run only inside the leased
+sandbox/host (never on the control-plane host) unless env driver is `local` AND execution-policy allows
+it (Plan 4). Worktree paths confined under a configured parent dir.
+
+**Tests:** pure resolver truth-table (mode×strategy×project presence → effective strategy /
+unrunnable), worktree contention detection, realize→operation-log rows, close-readiness with dirty tree.
+
+---
+
+### PLAN 4 — Environment probe + execution policy / allowlist / low-trust containment (features 20, 34, 35, 36, 37) — **M**
+
+Two security-critical pure guards + a probe. High value, low surface.
+
+**Prisma:** none new for the guards (policy lives in workspace settings JSON). Optional: a
+`WorkspaceExecutionPolicy` row `{ workspaceId @unique, executionMode: "any"|"kubernetes", enableIsolatedWorkspaces }`.
+
+**Server services:**
+- `execution-allowlist.ts` (port `execution-allowlist.ts:54-103` verbatim — it's already pure &
+  DB-free): `evaluateExecutionAllowlist(policy, {driver, provider})`. Call it in `acquireLease`
+  (Plan 2) and reject with a structured `execution_denied` error before provisioning.
+- `low-trust-containment.ts` (port `low-trust-runtime-containment.ts:44-105`): `assertLowTrustWorkspaceIsolation`
+  (requires `driver:"sandbox"` + isolated execution workspace) + `assertLowTrustRuntimeServicesAllowed`.
+  Wire our trust/governance resolution (`governance.prisma`, `trust.ts`) into its `resolution` input —
+  this is the one place the execution domain **consumes** (not rebuilds) the SDK/governance boundary.
+- `probeEnvironment(environmentId)` — driver-specific: `local` → host info; `ssh` → `resolveHostSSHConfig`
+  + a no-op remote command via existing `runCommandOnHost` (`runner-commands.ts:128`); `sandbox` →
+  `provider.provision` a throwaway handle, run `echo ok`, destroy (reuse `isSandboxProviderConfigured`
+  first to fail fast on missing creds). Returns `{ok, driver, summary, details}`.
+- **Pre-dispatch config gate** (feature 37): before `runTaskInSandbox`/dispatch, collect required
+  secret bindings from the agent's adapter `configSchema` + environment config secret-refs; if any are
+  unresolved in the vault, return a `configuration_incomplete` result that moves the task to `blocked`
+  with the named missing binding — do NOT provision (port `heartbeat.ts:393-397` semantics).
+
+**GraphQL:** `probeEnvironment(id)` mutation (returns probe result); `workspaceExecutionPolicy` query +
+`setWorkspaceExecutionMode` admin mutation.
+
+**UI:** Environment card **Probe** button + result panel (component from Plan 1). A workspace
+Settings → "Execution policy" toggle (`any` vs force-`kubernetes`, enable isolated workspaces).
+
+**Security:** the whole point — `executionMode=kubernetes` forces untrusted tenants onto the k8s
+sandbox and denies local/ssh/plugin; low-trust runs are refused unless sandboxed + isolated. Enforced at
+`acquireLease` so no code path can bypass it. Admin-only policy mutation.
+
+**Tests:** allowlist truth-table (port the existing `execution-allowlist.test.ts` cases), low-trust
+assertions (denied driver/workspace/boundary), probe happy/fail per driver (local + local-sandbox),
+pre-dispatch gate blocks on missing secret + surfaces the binding name.
+
+---
+
+### PLAN 5 — Custom-image capture + templates + setup terminals (features 5, 6, 16, 27, 28, 29) — **L**
+
+Depends on Plans 1–2. Highest effort, most provider-specific; do last.
+
+**Prisma** (`environment.prisma`):
+```prisma
+model EnvironmentCustomImageTemplate {
+  id String @id @default(cuid())
+  workspaceId String  environmentId String  provider String
+  templateKind String @default("unknown") // snapshot|image|provider_template
+  templateRef String  sourceTemplateRef String?
+  sourceConfigFingerprint String?  status String @default("active")
+  createdByProfileId String?  capturedAt DateTime?  lastUsedAt DateTime?
+  supersededByTemplateId String?  metadata Json?
+  // partial-unique: one status='active' per (environmentId, provider) via raw index
+}
+model EnvironmentCustomImageSetupSession {
+  id String @id @default(cuid())
+  workspaceId String  environmentId String  templateId String?  promotedTemplateId String?
+  provider String  providerLeaseId String?  environmentLeaseId String?
+  status String @default("starting") // starting|waiting_for_user|capturing|finished|failed|cancelled
+  baseTemplateRef String?  expiresAt DateTime?  finishedAt DateTime?  failureReason String?
+  connectionSummary Json?  connectionSecretRef String?  metadata Json?
+}
+```
+
+**Server services** (`environment-custom-images.ts` + `environment-custom-image-runtime.ts` +
+`environment-custom-image-terminal-sessions.ts`):
+- `startSetupSession` → acquire a lease (Plan 2) on a base image, open a **setup SSH terminal** by
+  reusing the existing `TerminalSession` + `terminal-pty-handler.ts` machinery (mint `ts_` token,
+  browser WS↔sandbox SSH). `finishSetupSession` → `provider.snapshot(handle)` (new
+  `SandboxProvider.snapshot()` capability; implement for providers that support it — e2b/daytona/k8s —
+  else "capture unsupported") → insert template, supersede prior active.
+- `applyCustomImageTemplateToSandboxConfig` (runtime overlay) + `fingerprintSandboxProviderConfig` +
+  `classifyConfigChange(none|relinkable|breaking)` (port `environment-custom-image-runtime.ts:97-243`);
+  call from `acquireLease` so leases boot from the active captured image.
+- `rollbackTemplate`, `disableTemplate`, `cleanupExpiredSetupSessions` (reaper cron).
+
+**GraphQL:** `environmentCustomImageOverview(environmentId)`, `customImageSetupSession(id)` queries;
+`startCustomImageSetup`, `finishCustomImageSetup`, `cancelCustomImageSetup`, `rollbackCustomImage`,
+`terminalTokenForSetupSession` mutations.
+
+**UI:** Environment detail → "Custom image" tab: current template + capture history (supersede chain),
+"Start setup" → opens `TerminalConsole.tsx` into the setup sandbox, "Capture image" / "Rollback".
+Components `CustomImagePanel.tsx`, `CustomImageSetupTerminal.tsx`.
+
+**Security:** setup terminal tokens short-TTL + host-key pinned (port
+`environment-custom-image-terminal-sessions.ts:253`); connection details stored as vault secret-refs;
+`CUSTOM_IMAGES` flag; admin-only.
+
+**Tests:** template active-uniqueness + supersede; fingerprint change classification truth-table;
+setup session lifecycle (start→waiting→capture→finished / cancel); token TTL + host-key pin. Use `local`
+provider stubs for snapshot.
+
+---
+
+### PLAN 6 — Execution-target transport resolution + run-log streaming + live status + in-sandbox bridge (features 19, 22, 23, 25, 41, 42) — **M**
+
+Depth polish that makes the above production-grade.
+
+- **Unified runtime driver interface** (feature 22/23): introduce `EnvironmentRuntimeDriver`
+  (`acquire/release/realize/execute`) with `local` / `ssh` (wraps `runCommandOnHost`) / `sandbox`
+  implementations, so `local`/`ssh`/`sandbox` are all reachable through one seam (today only sandbox is
+  a first-class provider). Port `environment-runtime.ts:188` interface shape.
+- **Execution-target resolver** (feature 19): `resolveExecutionTarget(environment, adapter, lease)` →
+  `{kind:"local"} | {kind:"remote", transport:"ssh"|"sandbox", remoteCwd, spec|providerKey}` — port
+  `environment-execution-target.ts:13`. Drives which transport the adapter invocation uses.
+- **Run-log streaming** (feature 19/41): stream sandbox stdout/stderr to the task timeline mid-run
+  instead of batch-at-end. Add an `onLog` callback to `SandboxHandle.exec` and a `taskRunStatus`
+  GraphQL subscription (or poll) backed by an in-memory `runRuntimeStatus` map (port
+  `heartbeat-run-runtime-status.ts` — TTL + redaction).
+- **In-sandbox API bridge** (feature 42): inject a run-scoped bridge URL/token into the sandbox tool
+  env (`AGENTCENTER_API_URL`/`_KEY`) so the in-sandbox agent can call back (comment/status/artifact)
+  with the run id attached; keep the real JWT host-side. Reuse the existing API-key issuance
+  (`api-key.prisma`, `connection_token_issuances`) for run-scoped tokens.
+
+**Plugin driver RPC** (feature 25) is explicitly **deferred** — our `registerSandboxProvider` +
+`loadOptionalModule` seam covers the near-term "add a provider" need without a plugin-worker process.
+
+**Tests:** target resolution per driver×adapter; streaming callback ordering; redaction of secrets in
+live status; bridge token scoping (run id enforced, host JWT never exposed).
+
+---
+
+## 3. Dependencies, ordering & sizing
+
+```
+Plan 1 (Environment model + CRUD) ── M ── keystone, no deps
+   ├── Plan 2 (Leases + reuse/reap) ─────── L ── needs Env; extends sandbox-providers (resume/destroyById)
+   │      └── Plan 5 (Custom images) ─────── L ── needs Env + Leases; extends providers (snapshot)
+   ├── Plan 3 (Execution workspaces) ─────── L ── needs Env (env-id precedence); pure resolver first
+   └── Plan 4 (Probe + policy/containment) ─ M ── needs Env; consumes governance/trust boundary
+Plan 6 (transport/streaming/bridge) ─────── M ── polish; needs Plan 1–2, benefits from 3
+```
+
+**Recommended sequence & sizing:**
+
+| Order | Plan | Size | Rationale |
+|-------|------|------|-----------|
+| 1 | **Plan 1 — Environment model + CRUD** | **M** | Keystone; unblocks everything. |
+| 2 | **Plan 4 — Probe + execution policy/allowlist/low-trust** | **M** | Security-critical, mostly *pure* ports; cheap once Env exists; gates lease acquisition. |
+| 3 | **Plan 3 (resolver slice) — workspace policy resolver** | **S** | Pure, DB-free, immediately useful (fixes worktree-without-project runnability); do before full WS. |
+| 4 | **Plan 2 — Lease lifecycle + reuse/reap** | **L** | Biggest behavioral upgrade to `runTaskInSandbox`; needs provider resume/destroy. |
+| 5 | **Plan 3 (rest) — ExecutionWorkspace + realization + ops log** | **L** | Real worktree/branch machinery. |
+| 6 | **Plan 6 — transport resolution + streaming + bridge** | **M** | Production-grade run UX. |
+| 7 | **Plan 5 — Custom-image capture + setup terminals** | **L** | Highest effort, most provider-specific; last. |
+
+**Quick wins to land first (S):** the pure `execution-allowlist` + `low-trust-containment` ports
+(feature 34/36) and the pure workspace-policy resolver (feature 31) — high safety/behavior value, no
+schema, trivially unit-testable, and they harden the *existing* `runTaskInSandbox` immediately.
+
+---
+
+## 4. Boundary (🚫 — do NOT build)
+
+- **Human auth / login / sessions**, **billing/plans**, **orgs**, **workspaces (tenant containers)**,
+  **RBAC/roles/permissions** — all `@buildbase/sdk`-owned. Our execution code only *consumes*
+  `workspaceId` scoping and the admin check; it must not introduce its own tenant/user/permission model.
+- The **trust/governance** resolution that Plan 4's low-trust containment consumes already exists
+  (`governance.prisma`, `agent-authz.prisma`, `trust.ts`) — wire into it, don't duplicate it.
+- The **secrets vault** (`Secret`/`SecretVersion`/`SecretBinding`, `resolveWorkspaceSecret`) already
+  exists — all environment config secrets and setup-connection details reuse it (BYO credentials,
+  never operator-owned).
