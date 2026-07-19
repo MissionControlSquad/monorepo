@@ -41,6 +41,7 @@ export const FLAG_KEYS = {
   CUSTOM_IMAGES: "custom_images",
   LOW_TRUST_REVIEW: "low_trust_review",
   WORK_PRODUCTS: "work_products",
+  PROVIDER_QUOTA: "provider_quota",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -95,4 +96,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.CUSTOM_IMAGES]: false,
   [FLAG_KEYS.LOW_TRUST_REVIEW]: false,
   [FLAG_KEYS.WORK_PRODUCTS]: false,
+  [FLAG_KEYS.PROVIDER_QUOTA]: false,
 };

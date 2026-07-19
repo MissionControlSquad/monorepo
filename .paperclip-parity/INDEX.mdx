@@ -295,6 +295,15 @@ See 03-sandbox-depth.mdx.
       board-only approval, illegal-transition). Typecheck 12/12, web build ✓. Remaining Domain 8: G3 TaskRun depth, G4 upload
       pipeline, G5 doc annotations, G6 lifecycle refinements.
 
+- [x] **Cost/observability Domain 12 — GAP-2 provider quota-windows polling** DONE (next commit). New optional adapter hook
+      getQuotaWindows() + ProviderQuotaWindow/ProviderQuotaResult types in @agentcenter/utils. Service provider-quota.ts:
+      fetchAllProviderQuota — fans out over adapters implementing the hook, per-provider timeout-guarded, Promise.allSettled,
+      failures SHAPED to {ok:false, errorFamily: timeout|provider_error|unsupported} not thrown (one slow provider never
+      blocks others); unsupported adapters omitted. GraphQL providerQuotaWindows query (admin, new PROVIDER_QUOTA flag,
+      default off until a real adapter implements the hook). Tests: 4 unit with mock adapters (fan-out filter, error shaping,
+      timeout isolation, empty). Typecheck 12/12, web build ✓. Remaining Domain 12: GAP-3 telemetry, GAP-4 OTel, GAP-5 pino/
+      run-log, GAP-6 rollups (A10 window spend / A12 issue-tree / A14 billingType).
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

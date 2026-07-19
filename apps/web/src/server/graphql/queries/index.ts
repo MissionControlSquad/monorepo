@@ -52,6 +52,7 @@ import "./agent-runs";
 import "./memory";
 import "./finance-events";
 import "./work-products";
+import "./provider-quota";
 import "./runner-hosts";
 import "./runtime-adapters";
 import "./sandbox-providers";

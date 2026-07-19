@@ -10,6 +10,28 @@
  * by the @agentcenter/runner daemon and the control plane.
  */
 
+/** A single provider quota/rate-limit window (Domain 12 GAP-2). */
+export interface ProviderQuotaWindow {
+  /** e.g. "requests (5h)" | "credits" | "tokens (24h)". */
+  label: string;
+  /** 0-100 percent of the window consumed; null when unknown. */
+  usedPercent: number | null;
+  /** ISO timestamp when the window resets; null when unknown. */
+  resetsAt: string | null;
+  /** Human display value, e.g. "1,234 / 5,000". */
+  valueLabel?: string | null;
+  detail?: string | null;
+}
+
+/** The result of polling one provider's quota (never throws — failures are shaped). */
+export interface ProviderQuotaResult {
+  provider: string;
+  ok: boolean;
+  windows: ProviderQuotaWindow[];
+  errorFamily?: "timeout" | "provider_error" | "unsupported";
+  error?: string;
+}
+
 /** Where an adapter expects the context bundle materialised on disk (relative to cwd). */
 export interface AdapterLayout {
   instructionsFile: string; // AGENTS.md-style
@@ -65,6 +87,13 @@ export interface Adapter {
    * Runs on the machine that has the CLI (the runner). Falls back to `models` when absent/failing.
    */
   detectModels?(): Promise<string[]>;
+  /**
+   * Optional live provider quota/rate-limit windows (Domain 12 GAP-2) — e.g. poll the provider API for
+   * remaining requests/credits in the current window. Runs where the adapter can reach the provider
+   * (the runner). Absent → the provider reports no quota windows. Never throws to the fan-out; the
+   * service timeout-guards + shapes failures.
+   */
+  getQuotaWindows?(): Promise<ProviderQuotaWindow[]>;
   /**
    * Shell command that installs the runtime binary inside a fresh sandbox. The sandbox seam runs it
    * idempotently: `command -v <binName> || <installCommand>`. Omit for adapters with no binary
