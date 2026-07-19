@@ -37,6 +37,7 @@ export const FLAG_KEYS = {
   MEMORY: "memory",
   ENVIRONMENTS: "environments",
   EXECUTION_POLICY: "execution_policy",
+  EXECUTION_WORKSPACES: "execution_workspaces",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -85,4 +86,6 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.ENVIRONMENTS]: false,
   // Tier D / Phase 3: workspace execution policy/allowlist (force runs onto isolated k8s). Opt-in.
   [FLAG_KEYS.EXECUTION_POLICY]: false,
+  // Tier D / Phase 3: named project workspaces + per-run execution-workspace recording. Opt-in.
+  [FLAG_KEYS.EXECUTION_WORKSPACES]: false,
 };

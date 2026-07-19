@@ -207,3 +207,7 @@ export {
   ENVIRONMENT_LEASES_QUERY,
   WORKSPACE_EXECUTION_POLICY_QUERY,
 } from "./environments";
+export {
+  PROJECT_WORKSPACES_QUERY,
+  EXECUTION_WORKSPACES_QUERY,
+} from "./execution-workspaces";

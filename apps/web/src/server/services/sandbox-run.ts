@@ -14,6 +14,7 @@ import {
   buildAdapterInvocation,
   getAdapter,
   requiresSandboxContainment,
+  resolveEffectiveWorkspaceStrategyType,
   FLAG_KEYS,
   type TrustLevel,
 } from "@agentcenter/utils";
@@ -28,6 +29,11 @@ import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertExecutionAllowed } from "./execution-policy";
 import { resolveEnvironmentExecution, type EnvExecutionResolution } from "./environments";
 import { acquireLease, releaseLease, coerceLeasePolicy } from "./environment-leases";
+import {
+  getPrimaryProjectWorkspace,
+  recordExecutionWorkspace,
+  recordWorkspaceOperation,
+} from "./execution-workspaces";
 import type { SandboxProvider, SandboxHandle } from "./sandbox/types";
 import type { AgentTrustProfile, EnvironmentLease } from "@agentcenter/database";
 
@@ -146,6 +152,8 @@ export function composeSandboxScript(opts: {
   env?: Record<string, string>;
   /** BYO git token for cloning a PRIVATE repo — wired via a credential helper (stays in an env var). */
   gitToken?: string | null;
+  /** Project workspace setup command, run after clone + before the runtime (Plan 3). */
+  setupCommand?: string | null;
 }): string {
   const exports = Object.entries(opts.env ?? {})
     .map(([k, v]) => `export ${k}=${shq(v)}`)
@@ -164,6 +172,7 @@ export function composeSandboxScript(opts: {
     gitAuth +
     `mkdir -p workspace && cd workspace\n${clone}` +
     `cat > TASK.md <<'PC_TASK_EOF'\n${opts.prompt}\nPC_TASK_EOF\n` +
+    (opts.setupCommand ? `${opts.setupCommand}\n` : "") +
     (opts.installGuard ? `${opts.installGuard}\n` : "") +
     opts.runtimeCmd
   );
@@ -205,7 +214,7 @@ export async function runTaskInSandbox(input: {
   if (!agent) throw new GraphQLError("Agent not found", { extensions: { code: "NOT_FOUND" } });
 
   // Resolve the target (Environment → provider) + enforce trust containment + execution allowlist.
-  const { provider, providerKey, envRes } = await resolveAndAdmitTarget(
+  const { provider, providerKey, execDriver, envRes } = await resolveAndAdmitTarget(
     input.workspaceId,
     agent,
     input.providerKey,
@@ -267,6 +276,18 @@ export async function runTaskInSandbox(input: {
     ? ((await resolveWorkspaceSecret(input.workspaceId, "GIT_TOKEN")) ??
       (await resolveWorkspaceSecret(input.workspaceId, "GITHUB_TOKEN")))
     : null;
+  // Execution-workspace realization (Plan 3, flag-gated + additive): resolve the project's named
+  // workspace (setup command + default strategy) and the effective strategy for this run. With the
+  // flag off, nothing here runs and behavior is unchanged.
+  const wsEnabled = await isFeatureEnabled(FLAG_KEYS.EXECUTION_WORKSPACES);
+  const projectId = bundle.project?.id ?? null;
+  const projectWorkspace =
+    wsEnabled && projectId ? await getPrimaryProjectWorkspace(input.workspaceId, projectId) : null;
+  const strategyType = resolveEffectiveWorkspaceStrategyType({
+    driver: execDriver,
+    projectDefaultStrategy: projectWorkspace?.defaultStrategy,
+  });
+
   const script = composeSandboxScript({
     prompt,
     repoUrl: bundle.project?.repoUrl,
@@ -274,6 +295,7 @@ export async function runTaskInSandbox(input: {
     installGuard,
     env,
     gitToken,
+    setupCommand: projectWorkspace?.setupCommand ?? null,
   });
 
   const ctx = {
@@ -353,6 +375,40 @@ export async function runTaskInSandbox(input: {
         finishedAt: new Date(),
       },
     });
+
+    // Record the realized execution workspace + phase operations (Plan 3, flag-gated). Best-effort —
+    // never fail a run because bookkeeping failed.
+    if (wsEnabled) {
+      try {
+        const ew = await recordExecutionWorkspace({
+          workspaceId: input.workspaceId,
+          projectId,
+          projectWorkspaceId: projectWorkspace?.id ?? null,
+          taskId: input.taskId,
+          runId: run.id,
+          strategyType,
+          name: `run-${run.id.slice(0, 8)}`,
+          repoUrl: bundle.project?.repoUrl ?? null,
+          baseRef: bundle.project?.repoRef ?? null,
+          providerType: providerKey,
+          providerRef: handle.id,
+        });
+        if (bundle.project?.repoUrl) {
+          await recordWorkspaceOperation(ew.id, "clone", {
+            command: `git clone ${bundle.project.repoUrl}`,
+          });
+        }
+        if (projectWorkspace?.setupCommand) {
+          await recordWorkspaceOperation(ew.id, "setup", {
+            command: projectWorkspace.setupCommand,
+            status: exitCode === 0 ? "done" : "failed",
+          });
+        }
+        await recordWorkspaceOperation(ew.id, "run", { command: runtimeCmd, exitCode });
+      } catch {
+        // ignore recording failures
+      }
+    }
 
     // Post the outcome to the task timeline (as the agent) so the run is visible in the workflow.
     await postRunToTask(

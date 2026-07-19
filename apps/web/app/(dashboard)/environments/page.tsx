@@ -7,6 +7,7 @@ import {
   ENVIRONMENT_CAPABILITIES_QUERY,
   AGENT_ENVIRONMENT_BINDINGS_QUERY,
   ENVIRONMENT_LEASES_QUERY,
+  EXECUTION_WORKSPACES_QUERY,
   WORKSPACE_EXECUTION_POLICY_QUERY,
 } from "@/lib/graphql/queries";
 import {
@@ -22,7 +23,7 @@ import {
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
-import { Container, ShieldCheck, Bot, Boxes } from "lucide-react";
+import { Container, ShieldCheck, Bot, Boxes, GitBranch } from "lucide-react";
 
 // Tier D / Phase 3: Environments dashboard — the first-class "where/how a run executes" model.
 // ENVIRONMENTS-gated in nav; every mutation re-checks the flag + admin server-side. Config secrets are
@@ -79,6 +80,7 @@ export default function EnvironmentsPage() {
 
   const { isEnabled } = useFeatureFlags();
   const policyEnabled = isEnabled(FLAG_KEYS.EXECUTION_POLICY);
+  const workspacesEnabled = isEnabled(FLAG_KEYS.EXECUTION_WORKSPACES);
 
   const envs = data?.environments ?? [];
   const caps = capData?.environmentCapabilities;
@@ -364,8 +366,74 @@ export default function EnvironmentsPage() {
 
       <LeasesSection />
 
+      {workspacesEnabled && <RecentWorkspacesSection />}
+
       {policyEnabled && <ExecutionPolicySection />}
     </div>
+  );
+}
+
+// ── Recent execution workspaces — the realized workspace + phase log per run ──
+interface WsOp {
+  id: string;
+  phase: string;
+  exitCode: number | null;
+  status: string;
+}
+interface ExecWorkspace {
+  id: string;
+  runId: string | null;
+  strategyType: string;
+  providerType: string;
+  status: string;
+  createdAt: string;
+  operations: WsOp[];
+}
+function RecentWorkspacesSection() {
+  const [{ data }, refetch] = useQuery<{ executionWorkspaces: ExecWorkspace[] }>({
+    query: EXECUTION_WORKSPACES_QUERY,
+  });
+  const rows = (data?.executionWorkspaces ?? []).slice(0, 15);
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <GitBranch className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold text-foreground">Recent execution workspaces</h2>
+        </div>
+        <button
+          onClick={() => refetch({ requestPolicy: "network-only" })}
+          className="text-xs text-muted-foreground transition hover:text-foreground"
+        >
+          Refresh
+        </button>
+      </div>
+      <Card className="space-y-2 p-4">
+        <p className="text-sm text-muted-foreground">
+          Each run records its realized workspace (strategy + provider) and a phase log
+          (clone/setup/run) for observability.
+        </p>
+        {rows.length === 0 && (
+          <p className="text-sm text-muted-foreground">No runs recorded yet.</p>
+        )}
+        {rows.map((w) => (
+          <div key={w.id} className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-2 truncate font-mono text-xs text-muted-foreground">
+              <Badge variant="gray">{w.strategyType}</Badge>
+              {w.providerType} · {w.createdAt.slice(0, 19).replace("T", " ")}
+            </span>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              {w.operations.map((o) => (
+                <Badge key={o.id} variant={o.status === "failed" ? "red" : "green"}>
+                  {o.phase}
+                  {o.exitCode != null ? `:${o.exitCode}` : ""}
+                </Badge>
+              ))}
+            </span>
+          </div>
+        ))}
+      </Card>
+    </section>
   );
 }
 

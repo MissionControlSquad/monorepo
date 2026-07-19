@@ -1,0 +1,79 @@
+// ─── Execution workspaces (Tier D / Phase 3 — Plan 3) ─────────────
+// ProjectWorkspace = a project-level named source (repo/ref + setup/cleanup commands) reused across
+// runs. ExecutionWorkspace = the realized per-run workspace (strategy, cwd, branch, provider) recorded
+// for observability + recovery. WorkspaceOperation = the phase log (clone/setup/cleanup) with exit
+// codes. All TEXT status/strategy (D5 convention). Ported from Paperclip's execution-workspace model,
+// adapted to our clone-inside-the-sandbox seam. EXECUTION_WORKSPACES-flag-gated, workspace-scoped.
+
+model ProjectWorkspace {
+  id                 String   @id @default(cuid())
+  workspaceId        String // buildbase workspace _id; no FK (D5)
+  projectId          String
+  name               String
+  sourceType         String   @default("repo") // repo | local_path | remote
+  cwd                String?
+  repoUrl            String?
+  repoRef            String?
+  defaultRef         String?
+  setupCommand       String?
+  cleanupCommand     String?
+  defaultStrategy    String? // resolveEffectiveWorkspaceStrategyType default for the project
+  remoteProvider     String?
+  remoteWorkspaceRef String?
+  sharedWorkspaceKey String?
+  isPrimary          Boolean  @default(false)
+  metadata           Json?
+  createdByProfileId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([projectId, name])
+  @@index([workspaceId, projectId])
+  @@map("project_workspaces")
+}
+
+model ExecutionWorkspace {
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  projectId          String?
+  projectWorkspaceId String?
+  taskId             String?
+  runId              String? // AgentRun id
+  mode               String   @default("run") // run | setup
+  strategyType       String // project_primary | git_worktree | adapter_managed | cloud_sandbox
+  name               String
+  status             String   @default("active") // active | closed
+  cwd                String?
+  repoUrl            String?
+  baseRef            String?
+  branchName         String?
+  providerType       String   @default("local_fs") // local_fs | <sandbox provider key>
+  providerRef        String? // sandbox id / lease id
+  lastUsedAt         DateTime @default(now())
+  closedAt           DateTime?
+  metadata           Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  operations WorkspaceOperation[]
+
+  @@index([workspaceId, projectId, status])
+  @@index([runId])
+  @@map("execution_workspaces")
+}
+
+model WorkspaceOperation {
+  id                   String   @id @default(cuid())
+  executionWorkspaceId String
+  executionWorkspace   ExecutionWorkspace @relation(fields: [executionWorkspaceId], references: [id], onDelete: Cascade)
+  phase                String // provision | clone | setup | cleanup | run
+  command              String?
+  exitCode             Int?
+  status               String   @default("done") // done | failed | skipped
+  detail               String?
+  startedAt            DateTime @default(now())
+  finishedAt           DateTime?
+
+  @@index([executionWorkspaceId])
+  @@map("workspace_operations")
+}

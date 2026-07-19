@@ -236,3 +236,8 @@ export {
   DESTROY_ENVIRONMENT_LEASE,
   SET_WORKSPACE_EXECUTION_MODE,
 } from "./environments";
+export {
+  CREATE_PROJECT_WORKSPACE,
+  UPDATE_PROJECT_WORKSPACE,
+  DELETE_PROJECT_WORKSPACE,
+} from "./execution-workspaces";
