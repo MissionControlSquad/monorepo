@@ -10,15 +10,10 @@ export default defineConfig({
     globals: true,
     environment: "node",
     testTimeout: 15000,
-    // E2E tests share DB state so they run sequentially with their own setup.
+    // Integration files share the DB + process.env, so each runs in its own isolated worker (default
+    // isolate:true) with no cross-file file parallelism. See tests/setup.ts for the per-file DB
+    // truncation + DISABLE_FLAG_CACHE that keep cross-file state clean.
     fileParallelism: false,
-    // Run every file in ONE reused fork. Integration files each set process.env.SYSTEM_SECRET in
-    // beforeAll; across multiple forks that env bleeds (a file can execute in a worker still holding a
-    // previous file's secret), so auth breaks non-deterministically for whole files. A single
-    // sequential fork keeps SYSTEM_SECRET correct for the file currently running. Combined with
-    // DISABLE_FLAG_CACHE + per-file feature_flags/licenses truncation, cross-file state stays clean.
-    pool: "forks",
-    poolOptions: { forks: { singleFork: true } },
     setupFiles: ["./tests/setup.ts"],
     // Read feature flags fresh from the DB on every check (bypass the 60s cache). Integration tests
     // toggle flags constantly and share one worker process, so a live cache goes stale relative to

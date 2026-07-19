@@ -28,11 +28,16 @@ model Routine {
   name               String
   description        String?
   definition         Json
-  isActive           Boolean  @default(true)
-  timezone           String   @default("UTC")
-  currentVersion     Int      @default(1)
+  isActive           Boolean   @default(true)
+  timezone           String    @default("UTC")
+  currentVersion     Int       @default(1)
   createdByProfileId String?
   projectId          String?
+  // Metadata applied to each generated task (no FK — D5). Lets a routine assign/prioritize/attribute
+  // the work it produces instead of dropping bare tasks into the inbox.
+  assigneeAgentId    String? // the agent whose profile the generated task is assigned to
+  priority           Priority?
+  goalId             String? // the goal generated tasks advance
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -116,6 +121,7 @@ enum CaseStatus {
 enum PipelineCaseEventType {
   created
   claimed
+  released
   transitioned
   commented
   breakdown
@@ -130,6 +136,7 @@ model Pipeline {
   name        String
   description String?
   isActive    Boolean  @default(true)
+  sequentialOnly Boolean @default(false) // cases must advance one stage at a time (no skipping)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -145,10 +152,11 @@ model Pipeline {
 model PipelineStage {
   id            String  @id @default(cuid())
   pipelineId    String
-  name          String
-  order         Int
-  isReviewStage Boolean @default(false) // surfaces cases in the review-cases inbox
-  slaMinutes    Int? // liveness/health: stage SLA
+  name            String
+  order           Int
+  isReviewStage   Boolean @default(false) // surfaces cases in the review-cases inbox
+  requireApproval Boolean @default(false) // a case can only leave this stage via an admin (approval gate)
+  slaMinutes      Int? // liveness/health: stage SLA
 
   pipeline     Pipeline       @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   casesAtStage PipelineCase[] @relation("CaseCurrentStage")

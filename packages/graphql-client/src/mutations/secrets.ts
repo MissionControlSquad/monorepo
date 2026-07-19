@@ -2,9 +2,49 @@ import { gql } from "urql";
 
 // Epic #5: secrets vault mutations (admin). `value` is write-only.
 export const CREATE_SECRET = gql`
-  mutation CreateSecret($name: String!, $value: String!, $description: String) {
-    createSecret(name: $name, value: $value, description: $description) {
+  mutation CreateSecret(
+    $name: String!
+    $value: String!
+    $description: String
+    $providerId: String
+  ) {
+    createSecret(name: $name, value: $value, description: $description, providerId: $providerId) {
       id
+    }
+  }
+`;
+
+export const CREATE_USER_SECRET = gql`
+  mutation CreateUserSecret($name: String!, $value: String!, $description: String) {
+    createUserSecret(name: $name, value: $value, description: $description) {
+      id
+    }
+  }
+`;
+
+export const CREATE_SECRET_PROVIDER = gql`
+  mutation CreateSecretProvider($name: String!, $kind: String!, $config: JSON) {
+    createSecretProvider(name: $name, kind: $kind, config: $config) {
+      id
+      name
+      kind
+    }
+  }
+`;
+
+export const DELETE_SECRET_PROVIDER = gql`
+  mutation DeleteSecretProvider($id: String!) {
+    deleteSecretProvider(id: $id)
+  }
+`;
+
+export const IMPORT_SECRETS = gql`
+  mutation ImportSecrets($text: String!, $overwrite: Boolean) {
+    importSecrets(text: $text, overwrite: $overwrite) {
+      created
+      skipped
+      rotated
+      invalidLines
     }
   }
 `;
@@ -43,5 +83,24 @@ export const BIND_SECRET = gql`
 export const UNBIND_SECRET = gql`
   mutation UnbindSecret($id: String!) {
     unbindSecret(id: $id)
+  }
+`;
+
+export const UPDATE_SECRET = gql`
+  mutation UpdateSecret($id: String!, $name: String, $description: String) {
+    updateSecret(id: $id, name: $name, description: $description) {
+      id
+      name
+      description
+    }
+  }
+`;
+
+export const SET_SECRET_STATUS = gql`
+  mutation SetSecretStatus($id: String!, $status: String!) {
+    setSecretStatus(id: $id, status: $status) {
+      id
+      status
+    }
   }
 `;

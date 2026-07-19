@@ -17,3 +17,24 @@ export const PLUGINS_QUERY = gql`
     }
   }
 `;
+
+// Single plugin + manifest + config + error, for the detail page.
+export const PLUGIN_QUERY = gql`
+  query Plugin($pluginId: String!) {
+    plugin(pluginId: $pluginId) {
+      id
+      pluginId
+      name
+      version
+      displayName
+      description
+      category
+      capabilities
+      status
+      enabled
+      manifest
+      config
+      lastError
+    }
+  }
+`;

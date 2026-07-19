@@ -26,3 +26,22 @@ export const UNINSTALL_PLUGIN = gql`
     uninstallPlugin(pluginId: $pluginId)
   }
 `;
+
+export const SET_PLUGIN_CONFIG = gql`
+  mutation SetPluginConfig($pluginId: String!, $config: JSON!) {
+    setPluginConfig(pluginId: $pluginId, config: $config) {
+      id
+      config
+    }
+  }
+`;
+
+export const CLEAR_PLUGIN_ERROR = gql`
+  mutation ClearPluginError($pluginId: String!) {
+    clearPluginError(pluginId: $pluginId) {
+      id
+      status
+      lastError
+    }
+  }
+`;

@@ -85,6 +85,42 @@ describe("routines (Epic #7)", () => {
     expect(task?.title).toBe("Daily report");
   });
 
+  it("applies assignee / priority / goal metadata to the generated task", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    const agent = await prisma.agent.create({
+      data: { name: "Reporter", role: "worker", workspaceId: WS_A },
+    });
+    const goal = await prisma.goal.create({ data: { workspaceId: WS_A, title: "Weekly OKR" } });
+
+    const r = await gql(
+      `mutation($d:JSON!,$a:String!,$g:String!){ createRoutine(name:"Report", definition:$d, assigneeAgentId:$a, priority:"high", goalId:$g){ id assigneeAgentId priority goalId } }`,
+      { d: { steps: ["a"] }, a: agent.id, g: goal.id },
+      admin,
+    );
+    expect(r.errors).toBeFalsy();
+    expect(r.data.createRoutine).toMatchObject({
+      assigneeAgentId: agent.id,
+      priority: "high",
+      goalId: goal.id,
+    });
+
+    const run = await gql(
+      `mutation($id:String!){ triggerRoutineNow(routineId:$id){ generatedTaskId } }`,
+      { id: r.data.createRoutine.id },
+      admin,
+    );
+    const taskId = run.data.triggerRoutineNow.generatedTaskId;
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: { assignees: true },
+    });
+    expect(task?.priority).toBe("high");
+    expect(task?.goalId).toBe(goal.id);
+    // the task is assigned to the agent's profile
+    const agentProfile = await prisma.profile.findFirst({ where: { agentId: agent.id } });
+    expect(task?.assignees.map((a) => a.profileId)).toContain(agentProfile?.id);
+  });
+
   it("updateRoutine snapshots a new revision only when the definition changes", async () => {
     const admin = await cookieFor(WS_A, "admin");
     const id = (
@@ -187,6 +223,233 @@ describe("pipeline cases (Epic #7)", () => {
   });
 });
 
+describe("case release + claim lease (Epic #7)", () => {
+  async function makeClaimedCase() {
+    const { pid } = await pipelineWithStages(WS_A);
+    const member = await cookieFor(WS_A, "member");
+    const caseId = (
+      await gql(
+        `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"lease"){ id } }`,
+        { p: pid },
+        member,
+      )
+    ).data.createPipelineCase.id;
+    await gql(`mutation($c:String!){ claimCase(caseId:$c){ id status } }`, { c: caseId }, member);
+    return { pid, caseId, member };
+  }
+
+  it("releaseCase returns a claimed case to open, clearing the claimer", async () => {
+    const { caseId, member } = await makeClaimedCase();
+    const r = await gql(
+      `mutation($c:String!){ releaseCase(caseId:$c){ id status } }`,
+      { c: caseId },
+      member,
+    );
+    expect(r.errors).toBeFalsy();
+    expect(r.data.releaseCase.status).toBe("open");
+    const row = await prisma.pipelineCase.findUniqueOrThrow({ where: { id: caseId } });
+    expect(row.claimedByProfileId).toBeNull();
+    expect(row.claimedAt).toBeNull();
+    // a `released` event was appended.
+    expect(await prisma.pipelineCaseEvent.count({ where: { caseId, type: "released" } })).toBe(1);
+  });
+
+  it("releasing an unclaimed (open) case is rejected", async () => {
+    const { pid } = await pipelineWithStages(WS_A);
+    const member = await cookieFor(WS_A, "member");
+    const caseId = (
+      await gql(
+        `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"open"){ id } }`,
+        { p: pid },
+        member,
+      )
+    ).data.createPipelineCase.id;
+    const r = await gql(
+      `mutation($c:String!){ releaseCase(caseId:$c){ id } }`,
+      { c: caseId },
+      member,
+    );
+    expect(r.errors).toBeDefined();
+  });
+
+  it("staleClaims surfaces a case claimed longer than the lease window", async () => {
+    const { caseId, member } = await makeClaimedCase();
+    // Backdate the claim to 2h ago so a 60-minute lease has expired.
+    await prisma.pipelineCase.update({
+      where: { id: caseId },
+      data: { claimedAt: new Date(Date.now() - 120 * 60000) },
+    });
+    const stale = await gql(
+      `query{ staleClaims(leaseMinutes:60){ caseId title minutesClaimed leaseMinutes } }`,
+      undefined,
+      member,
+    );
+    expect(stale.errors).toBeFalsy();
+    expect(stale.data.staleClaims).toHaveLength(1);
+    expect(stale.data.staleClaims[0].caseId).toBe(caseId);
+    expect(stale.data.staleClaims[0].minutesClaimed).toBeGreaterThanOrEqual(60);
+
+    // A fresh claim is NOT stale under the same lease.
+    const fresh = await gql(
+      `query{ staleClaims(leaseMinutes:10000){ caseId } }`,
+      undefined,
+      member,
+    );
+    expect(fresh.data.staleClaims).toHaveLength(0);
+  });
+});
+
+describe("stage edit + delete (Epic #7)", () => {
+  it("updatePipelineStage toggles approval; deletePipelineStage removes an empty stage but not an occupied one", async () => {
+    const { pid, stageIds } = await pipelineWithStages(WS_A);
+    const admin = await cookieFor(WS_A, "admin");
+
+    // toggle requireApproval on stage 1
+    const up = await gql(
+      `mutation($s:String!){ updatePipelineStage(stageId:$s, requireApproval:true, name:"Gate"){ id name requireApproval } }`,
+      { s: stageIds[1] },
+      admin,
+    );
+    expect(up.errors).toBeFalsy();
+    expect(up.data.updatePipelineStage).toMatchObject({ name: "Gate", requireApproval: true });
+
+    // a member cannot edit structure
+    const denied = await gql(
+      `mutation($s:String!){ updatePipelineStage(stageId:$s, name:"x"){ id } }`,
+      { s: stageIds[1] },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+
+    // put a case on stage 0 → its stage cannot be deleted
+    await gql(
+      `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"c"){ id } }`,
+      { p: pid },
+      admin,
+    );
+    const blocked = await gql(
+      `mutation($s:String!){ deletePipelineStage(stageId:$s) }`,
+      { s: stageIds[0] },
+      admin,
+    );
+    expect(blocked.errors).toBeDefined();
+
+    // an empty stage (order 2, no cases) deletes fine
+    const ok = await gql(
+      `mutation($s:String!){ deletePipelineStage(stageId:$s) }`,
+      { s: stageIds[2] },
+      admin,
+    );
+    expect(ok.data.deletePipelineStage).toBe(true);
+    expect(await prisma.pipelineStage.count({ where: { pipelineId: pid } })).toBe(2);
+  });
+});
+
+describe("sequential-only transitions (Epic #7)", () => {
+  it("blocks skipping a stage when sequentialOnly is on; allows one-at-a-time", async () => {
+    const { pid, stageIds } = await pipelineWithStages(WS_A);
+    const admin = await cookieFor(WS_A, "admin");
+    await gql(
+      `mutation($p:String!){ setPipelineSequential(pipelineId:$p, sequentialOnly:true){ id sequentialOnly } }`,
+      { p: pid },
+      admin,
+    );
+    const member = await cookieFor(WS_A, "member");
+    const caseId = (
+      await gql(
+        `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"seq"){ id } }`,
+        { p: pid },
+        member,
+      )
+    ).data.createPipelineCase.id;
+
+    // stage 0 → stage 2 (skip) is rejected.
+    const skip = await gql(
+      `mutation($c:String!,$s:String!){ transitionCase(caseId:$c, toStageId:$s){ id } }`,
+      { c: caseId, s: stageIds[2] },
+      member,
+    );
+    expect(skip.errors).toBeDefined();
+
+    // stage 0 → stage 1 (immediate next) is allowed…
+    const step1 = await gql(
+      `mutation($c:String!,$s:String!){ transitionCase(caseId:$c, toStageId:$s){ currentStageId } }`,
+      { c: caseId, s: stageIds[1] },
+      member,
+    );
+    expect(step1.data.transitionCase.currentStageId).toBe(stageIds[1]);
+
+    // …then stage 1 → stage 2 is allowed.
+    const step2 = await gql(
+      `mutation($c:String!,$s:String!){ transitionCase(caseId:$c, toStageId:$s){ currentStageId } }`,
+      { c: caseId, s: stageIds[2] },
+      member,
+    );
+    expect(step2.data.transitionCase.currentStageId).toBe(stageIds[2]);
+  });
+
+  it("a member cannot toggle the sequential rule", async () => {
+    const { pid } = await pipelineWithStages(WS_A);
+    const r = await gql(
+      `mutation($p:String!){ setPipelineSequential(pipelineId:$p, sequentialOnly:true){ id } }`,
+      { p: pid },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(r.errors).toBeDefined();
+  });
+});
+
+describe("case comments + timeline (Epic #7)", () => {
+  it("commentCase appends a commented event; caseEvents returns the timeline oldest-first", async () => {
+    const { pid } = await pipelineWithStages(WS_A);
+    const member = await cookieFor(WS_A, "member");
+    const caseId = (
+      await gql(
+        `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"c"){ id } }`,
+        { p: pid },
+        member,
+      )
+    ).data.createPipelineCase.id;
+
+    const empty = await gql(
+      `mutation($c:String!){ commentCase(caseId:$c, note:"   "){ id } }`,
+      { c: caseId },
+      member,
+    );
+    expect(empty.errors).toBeDefined(); // blank comment rejected
+
+    const ok = await gql(
+      `mutation($c:String!){ commentCase(caseId:$c, note:"looks good"){ id } }`,
+      { c: caseId },
+      member,
+    );
+    expect(ok.errors).toBeFalsy();
+
+    const events = await gql(
+      `query($c:String!){ pipelineCaseEvents(caseId:$c){ type note } }`,
+      { c: caseId },
+      member,
+    );
+    // created (from case creation) then commented.
+    expect(events.data.pipelineCaseEvents.map((e: { type: string }) => e.type)).toEqual([
+      "created",
+      "commented",
+    ]);
+    const comment = events.data.pipelineCaseEvents.find(
+      (e: { type: string }) => e.type === "commented",
+    );
+    expect(comment.note).toBe("looks good");
+
+    // cross-workspace cannot read this case's timeline.
+    const cross = await gql(
+      `query($c:String!){ pipelineCaseEvents(caseId:$c){ type } }`,
+      { c: caseId },
+      await cookieFor(WS_B, "member"),
+    );
+    expect(cross.data.pipelineCaseEvents).toHaveLength(0);
+  });
+});
+
 describe("review inbox + health (Epic #7)", () => {
   it("reviewCases returns only cases on a review stage", async () => {
     const { pid, stageIds } = await pipelineWithStages(WS_A, /* reviewAtOrder1 */ true);
@@ -280,5 +543,55 @@ describe("isolation + gate (Epic #7)", () => {
       await prisma.featureFlag.deleteMany({ where: { key: "pipelines_routines" } });
       invalidateFlagCache();
     }
+  });
+});
+
+describe("stage approval gate (Epic #7)", () => {
+  it("a member cannot advance a case out of a requireApproval stage; an admin can", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    const p = await gql(`mutation{ createPipeline(name:"Gated"){ id } }`, undefined, admin);
+    const pid = p.data.createPipeline.id;
+    const stageIds: string[] = [];
+    for (const [order, gated] of [
+      [0, false],
+      [1, true], // approval gate
+      [2, false],
+    ] as [number, boolean][]) {
+      const s = await gql(
+        `mutation($p:String!,$n:String!,$o:Int!,$g:Boolean){ addPipelineStage(pipelineId:$p, name:$n, order:$o, requireApproval:$g){ id requireApproval } }`,
+        { p: pid, n: `S${order}`, o: order, g: gated },
+        admin,
+      );
+      stageIds.push(s.data.addPipelineStage.id);
+    }
+
+    const c = await gql(
+      `mutation($p:String!){ createPipelineCase(pipelineId:$p, title:"c"){ id } }`,
+      { p: pid },
+      admin,
+    );
+    const caseId = c.data.createPipelineCase.id;
+    // move into the gated stage (order 1) — allowed for anyone
+    await gql(
+      `mutation($c:String!,$s:String!){ transitionCase(caseId:$c, toStageId:$s){ id } }`,
+      { c: caseId, s: stageIds[1] },
+      await cookieFor(WS_A, "member"),
+    );
+
+    // leaving the gated stage: member is blocked, admin is allowed
+    const denied = await gql(
+      `mutation($c:String!,$s:String!){ transitionCase(caseId:$c, toStageId:$s){ id } }`,
+      { c: caseId, s: stageIds[2] },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+
+    const ok = await gql(
+      `mutation($c:String!,$s:String!){ transitionCase(caseId:$c, toStageId:$s){ currentStageId } }`,
+      { c: caseId, s: stageIds[2] },
+      admin,
+    );
+    expect(ok.errors).toBeFalsy();
+    expect(ok.data.transitionCase.currentStageId).toBe(stageIds[2]);
   });
 });

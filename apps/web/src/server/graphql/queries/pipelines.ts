@@ -2,7 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole, scoped, requireTenancy } from "@/server/tenancy";
-import { reviewCases, computePipelineHealth } from "@/server/services/pipelines";
+import { reviewCases, computePipelineHealth, staleClaimedCases } from "@/server/services/pipelines";
 
 // Epic #7: routines + pipelines reads — PIPELINES_ROUTINES-gated, workspace-scoped, member+.
 
@@ -13,6 +13,16 @@ const StaleCase = builder.simpleObject("StaleCase", {
     stageId: t.string(),
     minutesInStage: t.int(),
     slaMinutes: t.int(),
+  }),
+});
+
+const StaleClaim = builder.simpleObject("StaleClaim", {
+  fields: (t) => ({
+    caseId: t.string(),
+    title: t.string(),
+    claimedByProfileId: t.string({ nullable: true }),
+    minutesClaimed: t.int(),
+    leaseMinutes: t.int(),
   }),
 });
 
@@ -143,6 +153,45 @@ builder.queryField("pipelineHealth", (t) =>
       const tenancy = requireTenancy(ctx);
       requireRole(ctx, "member");
       return computePipelineHealth(tenancy.workspaceId, args.pipelineId);
+    },
+  }),
+);
+
+// A case's event timeline (created/claimed/released/transitioned/commented/…), oldest first.
+builder.queryField("pipelineCaseEvents", (t) =>
+  t.prismaField({
+    type: ["PipelineCaseEvent"],
+    args: { caseId: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
+      const tenancy = requireTenancy(ctx);
+      requireRole(ctx, "member");
+      // Scope through the owning case so another workspace's timeline is never returned.
+      const c = await ctx.prisma.pipelineCase.findFirst({
+        where: { id: args.caseId, pipeline: { workspaceId: tenancy.workspaceId } },
+        select: { id: true },
+      });
+      if (!c) return [];
+      return ctx.prisma.pipelineCaseEvent.findMany({
+        ...query,
+        where: { caseId: c.id },
+        orderBy: { createdAt: "asc" },
+      });
+    },
+  }),
+);
+
+// Cases whose claim lease has expired (claimed > leaseMinutes ago, still not advanced).
+builder.queryField("staleClaims", (t) =>
+  t.field({
+    type: [StaleClaim],
+    args: { leaseMinutes: t.arg.int(), pipelineId: t.arg.string() },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
+      const tenancy = requireTenancy(ctx);
+      requireRole(ctx, "member");
+      const lease = Math.min(Math.max(args.leaseMinutes ?? 60, 1), 100000);
+      return staleClaimedCases(tenancy.workspaceId, lease, args.pipelineId ?? null);
     },
   }),
 );

@@ -33,10 +33,18 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.ORG_CHART).toBe("org_chart");
     expect(FLAG_KEYS.ATTENTION).toBe("attention");
     expect(FLAG_KEYS.AGENT_AUTHZ).toBe("agent_authz");
+    // Tier C subsystems
+    expect(FLAG_KEYS.TASK_RELATIONS).toBe("task_relations");
+    expect(FLAG_KEYS.EXTERNAL_LINKS).toBe("external_links");
+    expect(FLAG_KEYS.ANNOTATIONS).toBe("annotations");
+    expect(FLAG_KEYS.VOTING).toBe("voting");
+    expect(FLAG_KEYS.MONITORS).toBe("monitors");
+    // Tier D
+    expect(FLAG_KEYS.RUNNERS).toBe("runners");
   });
 
-  it("has exactly 29 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(29);
+  it("has exactly 35 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(35);
   });
 
   it("all values are unique", () => {
@@ -77,6 +85,10 @@ describe("FLAG_DEFAULTS", () => {
     expect(FLAG_DEFAULTS[FLAG_KEYS.TERMINALS]).toBe(false);
   });
 
+  it("RUNNERS defaults to false (Tier D execution surface; opt-in)", () => {
+    expect(FLAG_DEFAULTS[FLAG_KEYS.RUNNERS]).toBe(false);
+  });
+
   it("all other flags default to true", () => {
     const expectedTrue: FlagKey[] = [
       FLAG_KEYS.CHANNELS,
@@ -102,7 +114,12 @@ describe("FLAG_DEFAULTS", () => {
       FLAG_KEYS.ORG_CHART,
       FLAG_KEYS.ATTENTION,
       FLAG_KEYS.AGENT_AUTHZ,
-    ]; // TERMINALS + PLUGIN_SDK + BOARD_CHAT default false (asserted above)
+      FLAG_KEYS.TASK_RELATIONS,
+      FLAG_KEYS.EXTERNAL_LINKS,
+      FLAG_KEYS.ANNOTATIONS,
+      FLAG_KEYS.VOTING,
+      FLAG_KEYS.MONITORS,
+    ]; // TERMINALS + PLUGIN_SDK + BOARD_CHAT + CLOUD_VMS + LIVE_GATEWAY + MULTI_PROVIDER_ADAPTERS + RUNNERS default false
     for (const key of expectedTrue) {
       expect(FLAG_DEFAULTS[key]).toBe(true);
     }

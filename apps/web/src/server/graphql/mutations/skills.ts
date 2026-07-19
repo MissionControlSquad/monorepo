@@ -12,11 +12,15 @@ import { requireRole } from "@/server/tenancy";
 import {
   createSkill,
   updateSkill,
+  deleteSkill,
   forkSkill,
   starSkill,
   unstarSkill,
   assignSkillToAgent,
   unassignSkillFromAgent,
+  upsertSkillFile,
+  deleteSkillFile,
+  installCatalogSkill,
 } from "@/server/services/skills";
 import { createTeam, addTeamMember, installTeam } from "@/server/services/teams";
 
@@ -33,6 +37,11 @@ builder.mutationField("createSkill", (t) =>
       categories: t.arg.stringList(),
       trustLevel: t.arg.string(),
       sharingScope: t.arg.string(),
+      icon: t.arg.string(),
+      color: t.arg.string(),
+      tagline: t.arg.string(),
+      author: t.arg.string(),
+      homepage: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
@@ -47,6 +56,11 @@ builder.mutationField("createSkill", (t) =>
         categories: args.categories ?? null,
         trustLevel: (args.trustLevel as SkillTrustLevel) ?? null,
         sharingScope: (args.sharingScope as SkillSharingScope) ?? null,
+        icon: args.icon ?? null,
+        color: args.color ?? null,
+        tagline: args.tagline ?? null,
+        author: args.author ?? null,
+        homepage: args.homepage ?? null,
       });
       return ctx.prisma.skill.findUniqueOrThrow({ ...query, where: { id: s.id } });
     },
@@ -64,6 +78,11 @@ builder.mutationField("updateSkill", (t) =>
       categories: t.arg.stringList(),
       trustLevel: t.arg.string(),
       sharingScope: t.arg.string(),
+      icon: t.arg.string(),
+      color: t.arg.string(),
+      tagline: t.arg.string(),
+      author: t.arg.string(),
+      homepage: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
@@ -78,10 +97,27 @@ builder.mutationField("updateSkill", (t) =>
           categories: args.categories ?? null,
           trustLevel: (args.trustLevel as SkillTrustLevel) ?? null,
           sharingScope: (args.sharingScope as SkillSharingScope) ?? null,
+          icon: args.icon ?? undefined,
+          color: args.color ?? undefined,
+          tagline: args.tagline ?? undefined,
+          author: args.author ?? undefined,
+          homepage: args.homepage ?? undefined,
         },
         tenancy.userId,
       );
       return ctx.prisma.skill.findUniqueOrThrow({ ...query, where: { id: s.id } });
+    },
+  }),
+);
+
+builder.mutationField("deleteSkill", (t) =>
+  t.field({
+    type: "Boolean",
+    args: { id: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      return deleteSkill(tenancy.workspaceId, args.id);
     },
   }),
 );
@@ -157,6 +193,51 @@ builder.mutationField("unassignSkill", (t) =>
   }),
 );
 
+builder.mutationField("installCatalogSkill", (t) =>
+  t.prismaField({
+    type: "Skill",
+    args: { skillId: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      const skill = await installCatalogSkill(tenancy.workspaceId, args.skillId, tenancy.userId);
+      return ctx.prisma.skill.findUniqueOrThrow({ ...query, where: { id: skill.id } });
+    },
+  }),
+);
+
+builder.mutationField("upsertSkillFile", (t) =>
+  t.prismaField({
+    type: "SkillFile",
+    args: {
+      skillId: t.arg.string({ required: true }),
+      path: t.arg.string({ required: true }),
+      content: t.arg.string({ required: true }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      const file = await upsertSkillFile(tenancy.workspaceId, args.skillId, {
+        path: args.path,
+        content: args.content,
+      });
+      return ctx.prisma.skillFile.findUniqueOrThrow({ ...query, where: { id: file.id } });
+    },
+  }),
+);
+
+builder.mutationField("deleteSkillFile", (t) =>
+  t.field({
+    type: "Boolean",
+    args: { skillId: t.arg.string({ required: true }), path: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "member");
+      return deleteSkillFile(tenancy.workspaceId, args.skillId, args.path);
+    },
+  }),
+);
+
 builder.mutationField("createTeam", (t) =>
   t.prismaField({
     type: "Team",
@@ -166,6 +247,10 @@ builder.mutationField("createTeam", (t) =>
       description: t.arg.string(),
       kind: t.arg.string(),
       trustLevel: t.arg.string(),
+      icon: t.arg.string(),
+      tagline: t.arg.string(),
+      author: t.arg.string(),
+      tags: t.arg.stringList(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
@@ -178,6 +263,10 @@ builder.mutationField("createTeam", (t) =>
         description: args.description ?? null,
         kind: (args.kind as TeamKind) ?? null,
         trustLevel: (args.trustLevel as TeamTrustLevel) ?? null,
+        icon: args.icon ?? null,
+        tagline: args.tagline ?? null,
+        author: args.author ?? null,
+        tags: args.tags ?? null,
       });
       return ctx.prisma.team.findUniqueOrThrow({ ...query, where: { id: team.id } });
     },

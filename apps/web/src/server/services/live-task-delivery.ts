@@ -28,6 +28,8 @@ import {
   getAgentsNotifyState,
   findCloudVMIdByServerName,
   logCloudVMEvent,
+  findStalePendingDeliveries,
+  markDeliveriesAttempted,
 } from "@agentcenter/database";
 import { connectionRegistry } from "./live-connection-registry";
 import { LIVE_GATEWAY } from "@agentcenter/types";
@@ -536,4 +538,44 @@ export async function tryDeliverChannelMentionNotification(
     channelId: opts.channelId,
     fromHandle: opts.fromHandle,
   });
+}
+
+// ─── Redelivery of stale un-acked deliveries (Tier D robustness #5) ────────────
+
+/** Send a frame to a connection by id; returns whether the connection was live. */
+type FrameSender = (
+  connectionId: string,
+  msg: Parameters<typeof connectionRegistry.send>[1],
+) => boolean;
+
+const REDELIVER_STALE_MS = 60_000; // re-push a delivery un-acked for this long
+const MAX_DELIVERY_ATTEMPTS = 5; // matches the dead-letter cap
+
+/**
+ * Re-push stale un-acked deliveries to still-connected agents, without waiting for a reconnect
+ * drain. Runs from the reap-stale-work cron (in the web process, where the connection registry holds
+ * the live sockets). Only re-pushes to currently-live connections; offline ones are covered by the
+ * reconnect drain and exhausted ones are dead-lettered elsewhere. The sender is injectable for tests.
+ * Returns the number actually re-pushed.
+ */
+export async function redeliverStalePending(
+  now: Date = new Date(),
+  sender: FrameSender = (id, msg) => connectionRegistry.send(id, msg),
+): Promise<number> {
+  if (!(await isLiveGatewayEnabled())) return 0;
+  const stale = await findStalePendingDeliveries(REDELIVER_STALE_MS, MAX_DELIVERY_ATTEMPTS, now);
+  const repushed: string[] = [];
+  for (const d of stale) {
+    const isLive = sender(d.connectionId, {
+      type: "mc.deliver_task",
+      deliveryId: d.id,
+      agentSlug: d.agentSlug,
+      taskId: d.taskId,
+      message: d.message,
+      priority: d.priority as never,
+    });
+    if (isLive) repushed.push(d.id);
+  }
+  await markDeliveriesAttempted(repushed);
+  return repushed.length;
 }

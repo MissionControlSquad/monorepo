@@ -48,7 +48,9 @@ beforeAll(() => {
   process.env.SYSTEM_SECRET = SECRET;
 });
 beforeEach(async () => {
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE skills, teams, agents, profiles CASCADE`);
+  await prisma.$executeRawUnsafe(
+    `TRUNCATE TABLE skills, teams, agents, profiles, agent_governance_policies CASCADE`,
+  );
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Skills Human" } });
   humanId = p.id;
 });
@@ -127,6 +129,167 @@ describe("skills library (Epic #10)", () => {
   });
 });
 
+describe("skill bundle files (Epic #10)", () => {
+  const UPSERT = `mutation($s:String!,$p:String!,$c:String!){ upsertSkillFile(skillId:$s, path:$p, content:$c){ id path content } }`;
+
+  it("upsert creates then updates by path; list is sorted; delete removes", async () => {
+    const skillId = (await makeSkill(WS_A)).data.createSkill.id;
+    const member = await cookieFor(WS_A, "member");
+
+    // create two files
+    await gql(UPSERT, { s: skillId, p: "scripts/run.py", c: "print(1)" }, member);
+    const first = await gql(UPSERT, { s: skillId, p: "SKILL.md", c: "# entry" }, member);
+    expect(first.errors).toBeFalsy();
+
+    // upsert same path updates content (no duplicate row)
+    await gql(UPSERT, { s: skillId, p: "scripts/run.py", c: "print(2)" }, member);
+    expect(await prisma.skillFile.count({ where: { skillId } })).toBe(2);
+
+    // list reflects both files and the update
+    const list = await gql(
+      `query($s:String!){ skillFiles(skillId:$s){ path content } }`,
+      { s: skillId },
+      member,
+    );
+    const byPath = Object.fromEntries(
+      list.data.skillFiles.map((f: { path: string; content: string }) => [f.path, f.content]),
+    );
+    expect(Object.keys(byPath).sort()).toEqual(["SKILL.md", "scripts/run.py"]);
+    expect(byPath["scripts/run.py"]).toBe("print(2)");
+
+    // delete
+    const del = await gql(
+      `mutation($s:String!,$p:String!){ deleteSkillFile(skillId:$s, path:$p) }`,
+      { s: skillId, p: "SKILL.md" },
+      member,
+    );
+    expect(del.data.deleteSkillFile).toBe(true);
+    expect(await prisma.skillFile.count({ where: { skillId } })).toBe(1);
+  });
+
+  it("lintSkill validates the skill + its files (test-run, no execution)", async () => {
+    // A skill with an empty entry doc would be rejected at create, so create a valid one then
+    // add an empty file to trigger a warn.
+    const skillId = (await makeSkill(WS_A, "Lintable", "# Title\ncontent")).data.createSkill.id;
+    const member = await cookieFor(WS_A, "member");
+    await gql(UPSERT, { s: skillId, p: "empty.txt", c: "" }, member);
+
+    const r = await gql(
+      `query($s:String!){ lintSkill(skillId:$s){ level path message } }`,
+      { s: skillId },
+      member,
+    );
+    expect(r.errors).toBeFalsy();
+    const findings = r.data.lintSkill as { level: string; path: string | null; message: string }[];
+    expect(findings).toContainEqual({
+      level: "warn",
+      path: "empty.txt",
+      message: "file is empty",
+    });
+  });
+
+  it("rejects a path-traversal path and isolates across workspaces", async () => {
+    const skillId = (await makeSkill(WS_A)).data.createSkill.id;
+    const bad = await gql(
+      UPSERT,
+      { s: skillId, p: "../etc/passwd", c: "x" },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(bad.errors).toBeDefined();
+
+    // WS_B cannot add a file to WS_A's skill (scoped → skill not found).
+    const cross = await gql(
+      UPSERT,
+      { s: skillId, p: "a.md", c: "x" },
+      await cookieFor(WS_B, "member"),
+    );
+    expect(cross.errors).toBeDefined();
+  });
+});
+
+describe("public skill catalog (Epic #10)", () => {
+  // publish a skill in WS_B, install it into WS_A.
+  async function publishInB(name = "Shared Runbook") {
+    const created = await gql(
+      `mutation($n:String!,$m:String!){ createSkill(name:$n, markdown:$m){ id } }`,
+      { n: name, m: "# shared" },
+      await cookieFor(WS_B, "member"),
+    );
+    const id = created.data.createSkill.id;
+    await gql(
+      `mutation($id:String!,$s:String!){ updateSkill(id:$id, sharingScope:$s){ id sharingScope } }`,
+      { id, s: "public" },
+      await cookieFor(WS_B, "member"),
+    );
+    // add a bundle file so we can prove install copies files too
+    await gql(
+      `mutation($s:String!,$p:String!,$c:String!){ upsertSkillFile(skillId:$s, path:$p, content:$c){ id } }`,
+      { s: id, p: "run.sh", c: "echo hi" },
+      await cookieFor(WS_B, "member"),
+    );
+    return id;
+  }
+
+  it("catalog lists other workspaces' PUBLIC skills only; private/workspace never leak", async () => {
+    const publicId = await publishInB();
+    // a NON-public skill in WS_B must never appear
+    await gql(
+      `mutation($n:String!,$m:String!){ createSkill(name:$n, markdown:$m){ id } }`,
+      { n: "Secret WS_B", m: "# private" },
+      await cookieFor(WS_B, "member"),
+    );
+
+    const cat = await gql(
+      `query{ skillCatalog{ id name } }`,
+      undefined,
+      await cookieFor(WS_A, "member"),
+    );
+    const ids = (cat.data.skillCatalog as { id: string }[]).map((s) => s.id);
+    expect(ids).toContain(publicId);
+    expect(cat.data.skillCatalog).toHaveLength(1); // only the public one
+
+    // WS_B does not see its OWN skill in its catalog (catalog excludes own workspace)
+    const ownCat = await gql(
+      `query{ skillCatalog{ id } }`,
+      undefined,
+      await cookieFor(WS_B, "member"),
+    );
+    expect(ownCat.data.skillCatalog).toHaveLength(0);
+  });
+
+  it("install copies the skill + its files into the caller's workspace and bumps source forkCount", async () => {
+    const publicId = await publishInB();
+    const inst = await gql(
+      `mutation($id:String!){ installCatalogSkill(skillId:$id){ id name workspaceId sharingScope forkedFromSkillId } }`,
+      { id: publicId },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(inst.errors).toBeFalsy();
+    const copy = inst.data.installCatalogSkill;
+    expect(copy.workspaceId).toBe(WS_A);
+    expect(copy.sharingScope).toBe("workspace"); // the copy is private by default
+    expect(copy.forkedFromSkillId).toBe(publicId);
+    // files were copied
+    expect(await prisma.skillFile.count({ where: { skillId: copy.id, path: "run.sh" } })).toBe(1);
+    // source forkCount bumped
+    expect((await prisma.skill.findUniqueOrThrow({ where: { id: publicId } })).forkCount).toBe(1);
+  });
+
+  it("a non-public skill id cannot be installed", async () => {
+    const priv = await gql(
+      `mutation($n:String!,$m:String!){ createSkill(name:$n, markdown:$m){ id } }`,
+      { n: "NotShared", m: "# x" },
+      await cookieFor(WS_B, "member"),
+    );
+    const r = await gql(
+      `mutation($id:String!){ installCatalogSkill(skillId:$id){ id } }`,
+      { id: priv.data.createSkill.id },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(r.errors).toBeDefined();
+  });
+});
+
 describe("teams install collision strategies (Epic #10)", () => {
   async function teamWithMember(memberName: string) {
     const team = await createTeam({
@@ -184,6 +347,83 @@ describe("teams install collision strategies (Epic #10)", () => {
     );
     expect(denied.errors).toBeDefined();
   });
+
+  it("previewTeamInstall (admin) is a dry-run: reports the plan without creating agents", async () => {
+    await agentInWs(WS_A, "Eve");
+    const teamId = await teamWithMember("Eve");
+    const before = await prisma.agent.count({ where: { workspaceId: WS_A, name: "Eve" } });
+    const r = await gql(
+      `query($t:String!){ previewTeamInstall(teamId:$t, collisionStrategy:"rename"){ member action agentName } }`,
+      { t: teamId },
+      await cookieFor(WS_A, "admin"),
+    );
+    expect(r.errors).toBeFalsy();
+    expect(r.data.previewTeamInstall).toEqual([
+      { member: "Eve", action: "create", agentName: "Eve-2" },
+    ]);
+    // dry-run: no new agent was created.
+    expect(
+      await prisma.agent.count({ where: { workspaceId: WS_A, name: { startsWith: "Eve" } } }),
+    ).toBe(before);
+    // member cannot preview an install.
+    const denied = await gql(
+      `query($t:String!){ previewTeamInstall(teamId:$t){ member } }`,
+      { t: teamId },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+  });
+});
+
+describe("agent governance (Epic A.4)", () => {
+  it("requireAgentApproval provisions installed agents as pending_setup (blocked from work)", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    // Turn on the governance knob.
+    const set = await gql(
+      `mutation($r:Boolean){ setAgentGovernance(requireAgentApproval:$r){ requireAgentApproval } }`,
+      { r: true },
+      admin,
+    );
+    expect(set.data.setAgentGovernance.requireAgentApproval).toBe(true);
+    // A member cannot change governance.
+    const denied = await gql(
+      `mutation($r:Boolean){ setAgentGovernance(requireAgentApproval:$r){ requireAgentApproval } }`,
+      { r: false },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+
+    // Install a team → its new agent must be pending_setup.
+    const team = await createTeam({ workspaceId: WS_A, name: "Gov", createdByProfileId: humanId });
+    await addTeamMember(WS_A, team.id, { name: "Newbie", role: "Worker" });
+    const res = await installTeam({
+      workspaceId: WS_A,
+      teamId: team.id,
+      collisionStrategy: "rename",
+    });
+    const agent = await prisma.agent.findUniqueOrThrow({ where: { id: res.createdAgentIds[0] } });
+    expect(agent.setupStatus).toBe("pending_setup");
+
+    // With governance OFF, a freshly installed agent is active.
+    await gql(
+      `mutation{ setAgentGovernance(requireAgentApproval:false){ requireAgentApproval } }`,
+      undefined,
+      admin,
+    );
+    const team2 = await createTeam({
+      workspaceId: WS_A,
+      name: "Gov2",
+      createdByProfileId: humanId,
+    });
+    await addTeamMember(WS_A, team2.id, { name: "Active", role: "Worker" });
+    const res2 = await installTeam({
+      workspaceId: WS_A,
+      teamId: team2.id,
+      collisionStrategy: "rename",
+    });
+    const agent2 = await prisma.agent.findUniqueOrThrow({ where: { id: res2.createdAgentIds[0] } });
+    expect(agent2.setupStatus).toBe("active");
+  });
 });
 
 describe("isolation + gate (Epic #10)", () => {
@@ -206,5 +446,67 @@ describe("isolation + gate (Epic #10)", () => {
       await prisma.featureFlag.deleteMany({ where: { key: "skills_teams" } });
       invalidateFlagCache();
     }
+  });
+});
+
+describe("skill appearance + delete (Epic #10)", () => {
+  it("stores appearance metadata on create and deletes a skill", async () => {
+    const member = await cookieFor(WS_A, "member");
+    const created = await gql(
+      `mutation{ createSkill(name:"Deploy", markdown:"# md", icon:"🚀", tagline:"ship it", author:"acme"){ id icon tagline author } }`,
+      undefined,
+      member,
+    );
+    expect(created.errors).toBeFalsy();
+    expect(created.data.createSkill).toMatchObject({
+      icon: "🚀",
+      tagline: "ship it",
+      author: "acme",
+    });
+    const id = created.data.createSkill.id;
+
+    const del = await gql(`mutation($id:String!){ deleteSkill(id:$id) }`, { id }, member);
+    expect(del.data.deleteSkill).toBe(true);
+    expect(await prisma.skill.count({ where: { id } })).toBe(0);
+  });
+
+  it("cannot delete another workspace's skill", async () => {
+    const inB = await gql(
+      `mutation{ createSkill(name:"B skill", markdown:"# x"){ id } }`,
+      undefined,
+      await cookieFor(WS_B, "member"),
+    );
+    const idB = inB.data.createSkill.id;
+    const cross = await gql(
+      `mutation($id:String!){ deleteSkill(id:$id) }`,
+      { id: idB },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(cross.errors).toBeDefined();
+    expect(await prisma.skill.count({ where: { id: idB } })).toBe(1);
+  });
+});
+
+describe("team catalog metadata (Epic #10)", () => {
+  it("stores appearance + tags on create and exposes them", async () => {
+    const member = await cookieFor(WS_A, "member");
+    const r = await gql(
+      `mutation{ createTeam(name:"Growth Pod", icon:"📈", tagline:"scale it", author:"acme", tags:["growth","sales"]){ id icon tagline author tags } }`,
+      undefined,
+      member,
+    );
+    expect(r.errors).toBeFalsy();
+    expect(r.data.createTeam).toMatchObject({
+      icon: "📈",
+      tagline: "scale it",
+      author: "acme",
+    });
+    expect(r.data.createTeam.tags).toEqual(["growth", "sales"]);
+
+    const list = await gql(`query{ teams{ id tags tagline } }`, undefined, member);
+    const found = (list.data.teams as { id: string; tags: string[] }[]).find(
+      (t) => t.id === r.data.createTeam.id,
+    );
+    expect(found?.tags).toContain("growth");
   });
 });

@@ -16,6 +16,7 @@ const GROUP_BY_COLUMN = {
   project: "projectId",
   biller: "billerId",
   issue: "issueId",
+  billingType: "billingType",
 } as const;
 type CostGroupBy = keyof typeof GROUP_BY_COLUMN;
 

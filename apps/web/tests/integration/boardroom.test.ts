@@ -112,3 +112,39 @@ describe("boardroom guards (Epic #15)", () => {
     expect(r.errors).toBeDefined();
   });
 });
+
+describe("boardroom feedback (Epic #15)", () => {
+  const FEEDBACK = `mutation($m:String!,$s:Int!,$r:String){ setBoardMessageFeedback(messageId:$m, score:$s, reason:$r){ id feedbackScore feedbackReason } }`;
+
+  it("rates an assistant turn up with a reason, then clears it", async () => {
+    await setBoardChat(true);
+    const admin = await cookieFor(WS_A, "admin");
+    const sent = await gql(SEND, { b: "status?" }, admin);
+    const assistantId = sent.data.sendBoardMessage.id;
+
+    const up = await gql(FEEDBACK, { m: assistantId, s: 1, r: "helpful" }, admin);
+    expect(up.errors).toBeFalsy();
+    expect(up.data.setBoardMessageFeedback).toMatchObject({
+      feedbackScore: 1,
+      feedbackReason: "helpful",
+    });
+
+    const clear = await gql(FEEDBACK, { m: assistantId, s: 0 }, admin);
+    expect(clear.data.setBoardMessageFeedback.feedbackScore).toBeNull();
+    expect(clear.data.setBoardMessageFeedback.feedbackReason).toBeNull();
+  });
+
+  it("refuses to rate a user turn and is workspace-scoped", async () => {
+    await setBoardChat(true);
+    const admin = await cookieFor(WS_A, "admin");
+    await gql(SEND, { b: "hello" }, admin);
+    const userMsg = await prisma.boardMessage.findFirst({
+      where: { role: "user", thread: { workspaceId: WS_A } },
+    });
+    const rateUser = await gql(FEEDBACK, { m: userMsg!.id, s: 1 }, admin);
+    expect(rateUser.errors).toBeDefined();
+
+    const other = await gql(FEEDBACK, { m: userMsg!.id, s: 1 }, await cookieFor(WS_B, "admin"));
+    expect(other.errors).toBeDefined();
+  });
+});

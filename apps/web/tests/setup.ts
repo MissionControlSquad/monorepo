@@ -9,14 +9,6 @@ import {
 } from "../src/server/cache";
 import { afterAll, beforeAll } from "vitest";
 
-// Read feature flags fresh from the DB on every check (bypass the 60s cache). Integration tests
-// toggle flags constantly and share a worker process, so a live cache goes stale relative to the DB
-// and causes order-dependent flaky failures. Set here — this setup file runs inside every forked
-// worker, unlike vitest.config `test.env` which does not reliably propagate to the fork pool.
-// cacheTtl() reads this at call time, so setting it at module load (before any test) is sufficient.
-// The feature-flags cache unit test deletes it in its own beforeEach to still exercise caching.
-process.env.DISABLE_FLAG_CACHE = "1";
-
 /**
  * Global test setup.
  *
@@ -116,6 +108,15 @@ async function truncateAll() {
 }
 
 beforeAll(async () => {
+  // Read feature flags fresh from the DB on every check (bypass the 60s cache). Integration tests
+  // toggle flags constantly and share a reused worker process, so a live cache goes stale relative to
+  // the DB and causes order-dependent flaky failures. This MUST be set per file (not once at module
+  // load): the feature-flags cache unit test deletes this env var in its own beforeEach, and because a
+  // worker is reused across files, a module-level assignment would stay deleted for every later file
+  // in that worker — reviving the cache and bleeding flag state. Setting it in this per-file beforeAll
+  // re-asserts it for each file. cacheTtl() reads it at call time.
+  process.env.DISABLE_FLAG_CACHE = "1";
+
   // Push schema to test database
   execSync(
     "npx prisma db push --skip-generate --accept-data-loss --schema ../../packages/database/prisma/schema",

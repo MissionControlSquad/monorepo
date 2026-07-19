@@ -13,6 +13,7 @@ import { prisma } from "@/server/prisma";
 import type { CollisionStrategy } from "@agentcenter/database";
 import { resolveCollision } from "./teams";
 import { createSkill, slugify } from "./skills";
+import { provisionSetupStatus } from "./agent-governance";
 
 export const BUNDLE_VERSION = 1;
 
@@ -144,6 +145,8 @@ export async function importWorkspaceBundle(args: {
     select: { id: true, name: true },
   });
   const agentNames = existingAgents.map((a) => a.name);
+  // Governance: imported agents also honor requireAgentApproval (pending_setup until activated).
+  const setupStatus = await provisionSetupStatus(args.workspaceId);
   for (const a of bundle.agents) {
     if (!a?.name || !a?.role) continue;
     const res = resolveCollision(agentNames, a.name, args.collisionStrategy);
@@ -173,6 +176,7 @@ export async function importWorkspaceBundle(args: {
         identityEmoji: a.identityEmoji ?? null,
         llmModel: a.llmModel ?? null,
         username: `${slugify(res.name)}-${randomUUID().slice(0, 6)}`,
+        setupStatus,
       },
     });
     createdAgentIds.push(agent.id);

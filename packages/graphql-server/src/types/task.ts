@@ -41,3 +41,28 @@ builder.prismaObject("Task", {
     documents: t.relation("documents"),
   }),
 });
+
+// Tier C: typed task dependency graph.
+builder.prismaObject("TaskRelation", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    type: t.exposeString("type"),
+    sourceTaskId: t.exposeString("sourceTaskId"),
+    targetTaskId: t.exposeString("targetTaskId"),
+    sourceTask: t.relation("sourceTask"),
+    targetTask: t.relation("targetTask"),
+    createdAt: t.expose("createdAt", { type: "DateTime" }),
+  }),
+});
+
+// Tier C: external object links.
+builder.prismaObject("ExternalLink", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    taskId: t.exposeString("taskId"),
+    kind: t.exposeString("kind"),
+    url: t.exposeString("url"),
+    title: t.exposeString("title", { nullable: true }),
+    createdAt: t.expose("createdAt", { type: "DateTime" }),
+  }),
+});

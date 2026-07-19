@@ -52,6 +52,12 @@ model Skill {
   name               String
   description        String?
   markdown           String
+  // Appearance / provenance metadata (Paperclip skill catalog parity). All optional, display-only.
+  icon               String? // emoji or short glyph
+  color              String? // hex/tailwind token for the card accent
+  tagline            String?
+  author             String?
+  homepage           String?
   sourceType         SkillSourceType   @default(local_path)
   sourceRef          String?
   trustLevel         SkillTrustLevel   @default(markdown_only)
@@ -72,11 +78,29 @@ model Skill {
   versions         SkillVersion[]
   agentSkills      AgentSkill[]
   stars            SkillStar[]
+  files            SkillFile[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId])
   @@index([workspaceId, sharingScope])
   @@map("skills")
+}
+
+// Multi-file skill bundles (Paperclip parity): a skill's `markdown` is its entry doc; supporting
+// files (scripts, references) live here as path→content. No execution — content is display/storage.
+model SkillFile {
+  id        String   @id @default(cuid())
+  skillId   String
+  path      String // e.g. "SKILL.md", "scripts/run.py", "reference/api.md"
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([skillId, path])
+  @@index([skillId])
+  @@map("skill_files")
 }
 
 model SkillVersion {
@@ -133,6 +157,11 @@ model Team {
   key                String
   name               String
   description        String?
+  // Catalog appearance / discovery metadata (Paperclip team catalog parity). Display + filtering only.
+  icon               String?
+  tagline            String?
+  author             String?
+  tags               String[]       @default([])
   kind               TeamKind       @default(optional)
   trustLevel         TeamTrustLevel @default(markdown_only)
   sourceRef          String?

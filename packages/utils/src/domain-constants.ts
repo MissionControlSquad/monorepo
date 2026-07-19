@@ -200,7 +200,12 @@ export const DeliverableKind = {
   LINK: "link",
 } as const;
 
+export const DELIVERABLE_KINDS = Object.values(DeliverableKind);
 export type DeliverableKindValue = (typeof DeliverableKind)[keyof typeof DeliverableKind];
+
+export function isDeliverableKind(v: string): v is DeliverableKindValue {
+  return (DELIVERABLE_KINDS as readonly string[]).includes(v);
+}
 
 // ─── Project Member Statuses ──────────────────────────────
 export const ProjectMemberStatus = {
@@ -307,3 +312,28 @@ export const ApprovalSubjectType = {
 } as const;
 export type ApprovalSubjectTypeValue =
   (typeof ApprovalSubjectType)[keyof typeof ApprovalSubjectType];
+
+// Secret lifecycle status (Epic #5). Only `active` secrets resolve into an agent's env.
+export const SecretStatus = {
+  ACTIVE: "active",
+  DISABLED: "disabled",
+  ARCHIVED: "archived",
+} as const;
+export const SECRET_STATUSES = Object.values(SecretStatus);
+export type SecretStatusValue = (typeof SecretStatus)[keyof typeof SecretStatus];
+
+export function isSecretStatus(v: string): v is SecretStatusValue {
+  return (SECRET_STATUSES as readonly string[]).includes(v);
+}
+
+// Cost billing type (Epic #4). Splits metered API spend from flat subscription spend in reports.
+export const CostBillingType = {
+  API: "api",
+  SUBSCRIPTION: "subscription",
+} as const;
+export const COST_BILLING_TYPES = Object.values(CostBillingType);
+export type CostBillingTypeValue = (typeof CostBillingType)[keyof typeof CostBillingType];
+
+export function isCostBillingType(v: string): v is CostBillingTypeValue {
+  return (COST_BILLING_TYPES as readonly string[]).includes(v);
+}

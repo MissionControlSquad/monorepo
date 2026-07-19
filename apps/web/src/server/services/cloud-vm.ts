@@ -8,6 +8,7 @@ import {
   updateAgent,
   findAgentsByCloudVmId,
   updateManyAgentsByVm,
+  tryBeginCloudVMDestroy,
   findAgentByVmAndSlug,
   listRunningCloudVMsForRepair,
   createLiveGatewayToken,
@@ -1055,11 +1056,11 @@ export async function unassignAgentFromVM(agentId: string): Promise<void> {
 
 export async function destroyCloudVM(vmId: string): Promise<void> {
   const vm = await getCloudVMOrThrow(vmId);
-  if (vm.status === CloudVmStatus.DESTROYED) {
-    throw new Error("VM is already destroyed");
+  // Atomically claim the destroy so two concurrent calls can't both tear down + delete the same
+  // (billable) Hetzner server. The loser gets a clear error instead of a double teardown.
+  if (!(await tryBeginCloudVMDestroy(vmId))) {
+    throw new Error("VM is already being destroyed or is destroyed");
   }
-
-  await updateVM(vmId, { status: CloudVmStatus.DESTROYING });
 
   // Unassign all agents
   await updateManyAgentsByVm(vmId, { cloudVmId: null, hostingType: "selfHosted" });

@@ -37,6 +37,13 @@ export async function checkRateLimit(
   limiter: ReturnType<typeof createRateLimiter>,
   request: Request,
 ): Promise<Response | null> {
+  // Disabled under test. The limiters are module-level (and Redis-backed when REDIS_URL is set),
+  // keyed by a single shared client IP, so their counters accumulate across every test file in the
+  // suite and trip non-deterministically — surfacing as whole files failing with 429 (a body of
+  // `{error}` not `{errors}`, so tests that assert `!errors` then read `data` see undefined). Real
+  // requests still get rate limited in dev/prod.
+  if (process.env.VITEST || process.env.NODE_ENV === "test") return null;
+
   const ip = getClientIp(request.headers);
   const check = await limiter.checkAsync(ip);
   if (!check.allowed) {

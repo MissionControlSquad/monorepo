@@ -9,6 +9,9 @@ export const ROUTINES_QUERY = gql`
       description
       isActive
       currentVersion
+      assigneeAgentId
+      priority
+      goalId
       triggers {
         id
         type
@@ -38,11 +41,13 @@ export const PIPELINES_QUERY = gql`
       id
       name
       description
+      sequentialOnly
       stages {
         id
         name
         order
         isReviewStage
+        requireApproval
         slaMinutes
       }
     }
@@ -79,6 +84,30 @@ export const PIPELINE_HEALTH_QUERY = gql`
       title
       minutesInStage
       slaMinutes
+    }
+  }
+`;
+
+export const PIPELINE_CASE_EVENTS_QUERY = gql`
+  query PipelineCaseEvents($caseId: String!) {
+    pipelineCaseEvents(caseId: $caseId) {
+      id
+      type
+      note
+      actorProfileId
+      createdAt
+    }
+  }
+`;
+
+export const STALE_CLAIMS_QUERY = gql`
+  query StaleClaims($pipelineId: String, $leaseMinutes: Int) {
+    staleClaims(pipelineId: $pipelineId, leaseMinutes: $leaseMinutes) {
+      caseId
+      title
+      claimedByProfileId
+      minutesClaimed
+      leaseMinutes
     }
   }
 `;

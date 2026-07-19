@@ -37,6 +37,11 @@ import {
   Inbox,
   Lock,
   Boxes,
+  Search,
+  Images,
+  GanttChart,
+  Gauge,
+  Cpu,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -52,6 +57,7 @@ interface IconRailProps {
 
 const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; flag?: string }[] = [
   { href: "/", icon: LayoutDashboard, label: "Home" },
+  { href: "/search", icon: Search, label: "Search" },
   { href: "/attention", icon: Inbox, label: "Attention", flag: FLAG_KEYS.ATTENTION },
   { href: "/agents", icon: Bot, label: "Agents" },
   {
@@ -70,8 +76,11 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   { href: "/agent-authz", icon: Lock, label: "Agent access", flag: FLAG_KEYS.AGENT_AUTHZ },
   { href: "/channels", icon: MessageSquare, label: "Channels", flag: FLAG_KEYS.CHANNELS },
   { href: "/projects", icon: FolderKanban, label: "Projects" },
+  { href: "/artifacts", icon: Images, label: "Artifacts" },
+  { href: "/timeline", icon: GanttChart, label: "Timeline" },
   { href: "/analytics", icon: BarChart3, label: "Analytics", flag: FLAG_KEYS.ANALYTICS },
   { href: "/cloud", icon: Cloud, label: "Cloud", flag: FLAG_KEYS.CLOUD_VMS },
+  { href: "/runners", icon: Cpu, label: "Runners", flag: FLAG_KEYS.RUNNERS },
   { href: "/live-gateway", icon: Zap, label: "Live Gateway", flag: FLAG_KEYS.LIVE_GATEWAY },
   { href: "/finance", icon: CreditCard, label: "Finance", flag: FLAG_KEYS.BUDGETS },
   { href: "/ledger", icon: Receipt, label: "Ledger", flag: FLAG_KEYS.LEDGER },
@@ -89,6 +98,7 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
     label: "Observability",
     flag: FLAG_KEYS.OBSERVABILITY,
   },
+  { href: "/monitors", icon: Gauge, label: "Monitors", flag: FLAG_KEYS.MONITORS },
   { href: "/boardroom", icon: Landmark, label: "Boardroom", flag: FLAG_KEYS.BOARD_CHAT },
   { href: "/plugins", icon: Plug, label: "Plugins", flag: FLAG_KEYS.PLUGIN_SDK },
   { href: "/api-keys", icon: Terminal, label: "API keys", flag: FLAG_KEYS.API_KEYS },

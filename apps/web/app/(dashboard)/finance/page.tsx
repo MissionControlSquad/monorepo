@@ -7,6 +7,7 @@ import {
   BUDGET_POLICIES_QUERY,
   BUDGET_INCIDENTS_QUERY,
   COST_BREAKDOWN_QUERY,
+  COST_TREND_QUERY,
 } from "@/lib/graphql/queries";
 import {
   CREATE_BUDGET_POLICY,
@@ -84,9 +85,14 @@ export default function FinancePage() {
     query: BUDGET_INCIDENTS_QUERY,
     variables: { status: "open" },
   });
+  const [breakdownBy, setBreakdownBy] = useState("model");
   const [{ data: costData }] = useQuery<{ costBreakdown: Bucket[] }>({
     query: COST_BREAKDOWN_QUERY,
-    variables: { groupBy: "model" },
+    variables: { groupBy: breakdownBy },
+  });
+  const [{ data: trendData }] = useQuery<{ costTrend: { date: string; amountCents: number }[] }>({
+    query: COST_TREND_QUERY,
+    variables: { days: 30 },
   });
 
   const [, createPolicy] = useMutation(CREATE_BUDGET_POLICY);
@@ -255,9 +261,51 @@ export default function FinancePage() {
         </section>
       )}
 
-      {/* Spend by model */}
+      {/* Spend trend (last 30 days) */}
+      {(() => {
+        const trend = trendData?.costTrend ?? [];
+        const max = trend.reduce((m, p) => Math.max(m, p.amountCents), 0) || 1;
+        return (
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold text-foreground">Spend trend (30d)</h2>
+            <Card className="p-4">
+              {trend.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No spend recorded.</p>
+              ) : (
+                <div className="flex h-24 items-end gap-0.5">
+                  {trend.map((p) => (
+                    <div
+                      key={p.date}
+                      title={`${p.date}: ${money(p.amountCents)}`}
+                      className="flex-1 rounded-t bg-primary/70"
+                      style={{ height: `${Math.max((p.amountCents / max) * 100, 2)}%` }}
+                    />
+                  ))}
+                </div>
+              )}
+            </Card>
+          </section>
+        );
+      })()}
+
+      {/* Spend breakdown */}
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-foreground">Spend by model</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Spend by {breakdownBy}</h2>
+          <select
+            className="rounded border border-border bg-background px-2 py-1 text-xs"
+            value={breakdownBy}
+            onChange={(e) => setBreakdownBy(e.target.value)}
+          >
+            <option value="model">model</option>
+            <option value="agent">agent</option>
+            <option value="provider">provider</option>
+            <option value="project">project</option>
+            <option value="biller">biller</option>
+            <option value="issue">issue</option>
+            <option value="billingType">billing type</option>
+          </select>
+        </div>
         <Card className="space-y-3 p-4">
           {buckets.length === 0 && (
             <p className="text-sm text-muted-foreground">No cost recorded yet.</p>

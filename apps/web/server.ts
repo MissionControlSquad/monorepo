@@ -25,6 +25,7 @@ import {
   handlePluginConnection,
   startEvictionLoop,
 } from "./src/server/services/live-gateway-handler";
+import { handleTerminalConnection } from "./src/server/services/terminal-pty-handler";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
@@ -56,6 +57,11 @@ const wss = new WebSocketServer({ noServer: true });
 // Requires a server restart to pick up flag changes (intentional — avoids
 // running unused WebSocket infrastructure when the feature is off).
 let liveGatewayWss: WebSocketServer | null = null;
+
+// ── WebSocket server for browser Cloud-Shell PTY (Tier D) ─────────────
+// Created at startup only if the TERMINALS feature flag is enabled. Relays a browser terminal to an
+// interactive SSH shell, authenticated by the one-time terminal connect token.
+let terminalPtyWss: WebSocketServer | null = null;
 
 setupGraphQLWS(
   {
@@ -107,6 +113,17 @@ const originalEmit = server.emit.bind(server);
       });
       return true;
     }
+    if (pathname === "/api/terminals/pty") {
+      if (!terminalPtyWss) {
+        socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+        socket.destroy();
+        return true;
+      }
+      terminalPtyWss.handleUpgrade(req, socket, head, (ws: WebSocket) => {
+        terminalPtyWss!.emit("connection", ws, req);
+      });
+      return true;
+    }
   }
   return originalEmit(event, ...args);
 };
@@ -126,13 +143,24 @@ app.prepare().then(async () => {
     startEvictionLoop();
   }
 
+  // TERMINALS flag gates the browser Cloud-Shell PTY relay (checked once at startup).
+  const terminalsEnabled = await isFeatureEnabled(FLAG_KEYS.TERMINALS);
+  if (terminalsEnabled) {
+    terminalPtyWss = new WebSocketServer({ noServer: true });
+    terminalPtyWss.on("connection", handleTerminalConnection);
+  }
+
   server.on("request", async (req, res) => {
     const parsedUrl = parse(req.url!, true);
     await handle(req, res, parsedUrl);
   });
 
   server.listen(port, hostname, () => {
-    const ws = ["graphql-ws", liveGatewayEnabled ? "live-gateway" : null]
+    const ws = [
+      "graphql-ws",
+      liveGatewayEnabled ? "live-gateway" : null,
+      terminalsEnabled ? "terminal-pty" : null,
+    ]
       .filter(Boolean)
       .join(", ");
     console.log(`> Ready on http://${hostname}:${port} (ws: ${ws})`);

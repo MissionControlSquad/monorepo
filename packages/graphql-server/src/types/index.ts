@@ -37,3 +37,7 @@ import "./plugin";
 import "./api-key";
 import "./terminal";
 import "./agent-instruction";
+
+import "./monitor";
+import "./runner-command";
+import "./runner-host";

@@ -1,0 +1,49 @@
+// ─── Runner commands (Tier D) ─────────────────────────────────────
+// A raw shell/CLI job run on a runner — the "trigger CLI WITHOUT an agent runtime" primitive.
+// Two execution routes share one model:
+//   • SSH-reachable target (cloud_vm / host): the SERVER executes it directly via sshExec and
+//     persists the result on the row (Slice 1).
+//   • Outbound-only target (agent daemon behind NAT): the daemon pulls queued commands and posts
+//     results back (Slice 2). Same row, different mover.
+// Additive to the OpenClaw path — nothing here assumes a specific runtime. RUNNERS-gated.
+
+enum RunnerCommandStatus {
+  queued // created, not yet picked up
+  running // claimed / executing
+  done // finished, exitCode captured
+  failed // transport/exec error (no exit code, or non-zero surfaced by caller)
+  timeout // exceeded the execution deadline
+  canceled // canceled before completion
+}
+
+enum RunnerTargetKind {
+  cloud_vm // a provisioned CloudVM — server SSHes in (Slice 1)
+  agent // an Agent's runner daemon pulls it (Slice 2, NAT-safe)
+  host // a BYO server registered with SSH creds (RunnerHost; server SSHes in directly)
+}
+
+model RunnerCommand {
+  id          String              @id @default(cuid())
+  workspaceId String // buildbase workspace _id; no FK (D5)
+  targetKind  RunnerTargetKind
+  targetId    String // vmId | agentId | hostId depending on targetKind
+  command     String // the shell command to run
+  cwd         String? // optional working directory
+  timeoutMs   Int                 @default(120000)
+  status      RunnerCommandStatus @default(queued)
+  exitCode    Int?
+  stdout      String?
+  stderr      String?
+  errorMessage String?
+
+  requestedByProfileId String? // buildbase userId that requested it
+  claimedAt            DateTime? // when a poller/server claimed it (atomic lease)
+  startedAt            DateTime?
+  finishedAt           DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([targetKind, targetId, status])
+  @@map("runner_commands")
+}

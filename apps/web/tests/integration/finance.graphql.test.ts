@@ -111,6 +111,40 @@ describe("cost ingestion + summary (Epic #4)", () => {
     expect(summary.data.financeSummary.totalSpendCents).toBe(750);
     expect(summary.data.financeSummary.windowSpendCents).toBe(750);
   });
+
+  it("splits spend by billing type (api vs subscription) in costBreakdown", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    await runGraphQL(
+      `mutation{ ingestCostEvent(amountCents:300, billingType:"api"){ id billingType } }`,
+      undefined,
+      admin,
+    );
+    await runGraphQL(
+      `mutation{ ingestCostEvent(amountCents:1000, billingType:"subscription"){ id billingType } }`,
+      undefined,
+      admin,
+    );
+    // an unspecified event defaults to api
+    await runGraphQL(
+      `mutation{ ingestCostEvent(amountCents:200){ id billingType } }`,
+      undefined,
+      admin,
+    );
+
+    const bd = await runGraphQL(
+      `query{ costBreakdown(groupBy:"billingType"){ key amountCents eventCount } }`,
+      undefined,
+      admin,
+    );
+    expect(bd.errors).toBeFalsy();
+    const byKey = Object.fromEntries(
+      (bd.data.costBreakdown as { key: string; amountCents: number; eventCount: number }[]).map(
+        (b) => [b.key, b],
+      ),
+    );
+    expect(byKey.api).toMatchObject({ amountCents: 500, eventCount: 2 }); // 300 + 200 default
+    expect(byKey.subscription).toMatchObject({ amountCents: 1000, eventCount: 1 });
+  });
 });
 
 describe("BUDGETS feature gate (Epic #4)", () => {

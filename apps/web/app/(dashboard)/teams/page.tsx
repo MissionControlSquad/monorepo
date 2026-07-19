@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "urql";
-import { TEAMS_QUERY } from "@/lib/graphql/queries";
+import { useQuery, useMutation, useClient } from "urql";
+import { TEAMS_QUERY, PREVIEW_TEAM_INSTALL_QUERY } from "@/lib/graphql/queries";
 import { CREATE_TEAM, ADD_TEAM_MEMBER, INSTALL_TEAM } from "@/lib/graphql/mutations";
 import { COLLISION_STRATEGIES } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
@@ -19,24 +19,44 @@ interface Team {
   id: string;
   name: string;
   key: string;
+  icon: string | null;
+  tagline: string | null;
+  tags: string[];
   installCount: number;
   members: Member[];
 }
+interface PlanItem {
+  member: string;
+  action: string;
+  agentName: string;
+}
 
 const STRATEGIES = COLLISION_STRATEGIES;
+
+function actionVariant(action: string): "green" | "yellow" | "gray" | "red" {
+  if (action === "create") return "green";
+  if (action === "replace") return "yellow";
+  if (action === "skip") return "gray";
+  return "gray";
+}
 
 export default function TeamsPage() {
   const [{ data }, refetch] = useQuery<{ teams: Team[] }>({ query: TEAMS_QUERY });
   const [, createTeam] = useMutation(CREATE_TEAM);
   const [, addMember] = useMutation(ADD_TEAM_MEMBER);
   const [, installTeam] = useMutation(INSTALL_TEAM);
+  const client = useClient();
 
   const [busy, setBusy] = useState<string | null>(null);
-  const [teamName, setTeamName] = useState("");
+  const [form, setForm] = useState({ name: "", icon: "", tagline: "", tags: "" });
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [memberForm, setMemberForm] = useState<Record<string, { name: string; role: string }>>({});
   const [strategy, setStrategy] = useState<Record<string, string>>({});
   const [result, setResult] = useState<Record<string, string>>({});
-  const teams = data?.teams ?? [];
+  const [preview, setPreview] = useState<Record<string, PlanItem[]>>({});
+  const allTeams = data?.teams ?? [];
+  const allTags = [...new Set(allTeams.flatMap((t) => t.tags))].sort();
+  const teams = tagFilter ? allTeams.filter((t) => t.tags.includes(tagFilter)) : allTeams;
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
   async function act(fn: () => Promise<unknown>, key: string) {
@@ -56,26 +76,70 @@ export default function TeamsPage() {
         Installable bundles of agent roles. Installing creates one agent per member.
       </p>
 
-      <Card className="flex gap-2 p-4">
+      <Card className="space-y-2 p-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[4rem_1fr]">
+          <input
+            className="rounded border border-border bg-background px-3 py-1.5 text-center text-sm"
+            placeholder="👥"
+            value={form.icon}
+            onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
+          />
+          <input
+            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+            placeholder="New team name"
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          />
+        </div>
         <input
           className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-          placeholder="New team name"
-          value={teamName}
-          onChange={(e) => setTeamName(e.target.value)}
+          placeholder="Tagline (optional)"
+          value={form.tagline}
+          onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))}
         />
-        <Button
-          size="sm"
-          disabled={!teamName.trim() || busy === "create"}
-          onClick={() =>
-            act(async () => {
-              await createTeam({ name: teamName.trim() });
-              setTeamName("");
-            }, "create")
-          }
-        >
-          Create team
-        </Button>
+        <div className="flex gap-2">
+          <input
+            className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
+            placeholder="Tags, comma-separated (optional)"
+            value={form.tags}
+            onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+          />
+          <Button
+            size="sm"
+            disabled={!form.name.trim() || busy === "create"}
+            onClick={() =>
+              act(async () => {
+                await createTeam({
+                  name: form.name.trim(),
+                  icon: form.icon.trim() || null,
+                  tagline: form.tagline.trim() || null,
+                  tags: form.tags
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                });
+                setForm({ name: "", icon: "", tagline: "", tags: "" });
+              }, "create")
+            }
+          >
+            Create team
+          </Button>
+        </div>
       </Card>
+
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          <FilterChip label="All" active={tagFilter === null} onClick={() => setTagFilter(null)} />
+          {allTags.map((tag) => (
+            <FilterChip
+              key={tag}
+              label={tag}
+              active={tagFilter === tag}
+              onClick={() => setTagFilter(tag)}
+            />
+          ))}
+        </div>
+      )}
 
       {teams.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No teams yet.</Card>
@@ -85,10 +149,19 @@ export default function TeamsPage() {
         return (
           <Card key={tm.id} className="space-y-3 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="flex items-center gap-2">
+              <span className="flex flex-wrap items-center gap-2">
+                {tm.icon && <span className="text-base">{tm.icon}</span>}
                 <span className="font-medium text-foreground">{tm.name}</span>
+                {tm.tagline && (
+                  <span className="text-xs text-muted-foreground">— {tm.tagline}</span>
+                )}
                 <Badge variant="gray">{tm.members.length} roles</Badge>
                 <span className="text-xs text-muted-foreground">{tm.installCount} installs</span>
+                {tm.tags.map((tag) => (
+                  <Badge key={tag} variant="blue">
+                    {tag}
+                  </Badge>
+                ))}
               </span>
               <span className="flex items-center gap-2">
                 <select
@@ -104,6 +177,26 @@ export default function TeamsPage() {
                 </select>
                 <Button
                   size="sm"
+                  variant="secondary"
+                  disabled={tm.members.length === 0 || busy === tm.id}
+                  onClick={() =>
+                    act(async () => {
+                      const res = await client
+                        .query<{ previewTeamInstall: PlanItem[] }>(
+                          PREVIEW_TEAM_INSTALL_QUERY,
+                          { teamId: tm.id, collisionStrategy: strategy[tm.id] ?? "rename" },
+                          { requestPolicy: "network-only" },
+                        )
+                        .toPromise();
+                      setPreview((p) => ({ ...p, [tm.id]: res.data?.previewTeamInstall ?? [] }));
+                      setResult((r) => ({ ...r, [tm.id]: "" }));
+                    }, tm.id)
+                  }
+                >
+                  Preview
+                </Button>
+                <Button
+                  size="sm"
                   disabled={tm.members.length === 0 || busy === tm.id}
                   onClick={() =>
                     act(async () => {
@@ -113,6 +206,7 @@ export default function TeamsPage() {
                       });
                       const ids = res.data?.installTeam?.createdAgentIds ?? [];
                       setResult((r) => ({ ...r, [tm.id]: `installed — ${ids.length} agent(s)` }));
+                      setPreview((p) => ({ ...p, [tm.id]: [] }));
                     }, tm.id)
                   }
                 >
@@ -120,6 +214,22 @@ export default function TeamsPage() {
                 </Button>
               </span>
             </div>
+            {preview[tm.id] && preview[tm.id].length > 0 && (
+              <div className="space-y-1 rounded border border-dashed border-border p-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Install preview ({strategy[tm.id] ?? "rename"} on collision)
+                </p>
+                {preview[tm.id].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs">
+                    <Badge variant={actionVariant(item.action)}>{item.action}</Badge>
+                    <span className="text-foreground">{item.member}</span>
+                    {item.agentName !== item.member && (
+                      <span className="text-muted-foreground">→ {item.agentName}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             {result[tm.id] && <p className="text-xs text-muted-foreground">{result[tm.id]}</p>}
             <div className="flex flex-wrap gap-2">
               {tm.members.map((m) => (
@@ -163,5 +273,28 @@ export default function TeamsPage() {
         );
       })}
     </div>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+        active
+          ? "border-transparent bg-foreground text-background"
+          : "border-border text-muted-foreground hover:bg-muted"
+      }`}
+    >
+      {label}
+    </button>
   );
 }

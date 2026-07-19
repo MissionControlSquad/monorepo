@@ -19,6 +19,8 @@ builder.prismaObject("BoardMessage", {
     role: t.exposeString("role"),
     body: t.exposeString("body"),
     authorId: t.exposeString("authorId", { nullable: true }),
+    feedbackScore: t.exposeInt("feedbackScore", { nullable: true }),
+    feedbackReason: t.exposeString("feedbackReason", { nullable: true }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
   }),
 });

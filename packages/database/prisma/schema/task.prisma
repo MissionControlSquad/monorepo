@@ -69,6 +69,10 @@ model Task {
   routineRuns   RoutineRun[]   @relation("TaskFromRoutineRun") // Epic #7
   pipelineCases PipelineCase[] @relation("TaskFromPipelineCase")
   caseLinks     CaseTaskLink[] @relation("CaseTaskLink") // Epic #17
+  // Tier C: typed task dependency graph (beyond the single blockedByTaskId).
+  relationsFrom TaskRelation[] @relation("TaskRelationSource")
+  relationsTo   TaskRelation[] @relation("TaskRelationTarget")
+  externalLinks ExternalLink[] @relation("TaskExternalLinks")
 
   // Epic #8: lease-based atomic checkout + autonomy hardening.
   checkedOutByProfileId  String?
@@ -88,6 +92,55 @@ model Task {
   @@index([deletedAt])
   @@index([status, deletedAt])
   @@map("tasks")
+}
+
+// Tier C: typed task dependency graph. `blocks` is directional (source blocks target); `relates_to`
+// and `duplicates` describe non-blocking links. Complements the single blockedByTaskId with a full
+// many-to-many graph.
+enum TaskRelationType {
+  blocks
+  relates_to
+  duplicates
+}
+
+model TaskRelation {
+  id           String           @id @default(cuid())
+  sourceTaskId String
+  targetTaskId String
+  type         TaskRelationType @default(relates_to)
+  createdByProfileId String?
+  createdAt    DateTime         @default(now())
+
+  sourceTask Task @relation("TaskRelationSource", fields: [sourceTaskId], references: [id], onDelete: Cascade)
+  targetTask Task @relation("TaskRelationTarget", fields: [targetTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceTaskId, targetTaskId, type])
+  @@index([sourceTaskId])
+  @@index([targetTaskId])
+  @@map("task_relations")
+}
+
+// Tier C: external object links — attach a task to an external system (GitHub issue/PR, GitLab, a
+// generic URL). Storage/display only; no live sync (that would be an integration = out of scope).
+enum ExternalLinkKind {
+  github
+  gitlab
+  url
+}
+
+model ExternalLink {
+  id                 String           @id @default(cuid())
+  taskId             String
+  kind               ExternalLinkKind @default(url)
+  url                String
+  title              String?
+  createdByProfileId String?
+  createdAt          DateTime         @default(now())
+
+  task Task @relation("TaskExternalLinks", fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("external_links")
 }
 
 model TaskAssignee {

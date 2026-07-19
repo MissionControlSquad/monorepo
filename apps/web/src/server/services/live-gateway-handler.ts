@@ -23,8 +23,8 @@ import {
   markConnectionDisconnected,
   refreshConnectionToken,
   syncAgentRoutes,
-  clearAgentRoutes,
   drainPendingDeliveries,
+  markDeliveriesAttempted,
   markDeliveryReceived,
   findPendingDeliveryConnection,
   resolveAgentBySlugOrId,
@@ -406,10 +406,22 @@ async function handleTaskDone(
       machineName,
       `@${msg.slug} reported task #${task.taskNumber} done (already done — idempotent)`,
     ).catch(() => undefined);
+    // Still ack so the plugin stops resending this (already-durable) completion.
+    connectionRegistry.send(connectionId, {
+      type: "mc.task_done_ack",
+      taskId: msg.taskId,
+      slug: msg.slug,
+    });
     return;
   }
 
   await updateTaskStatus(msg.taskId, TaskStatus.DONE);
+  // Ack now that it's durably persisted — the plugin can drop it from its resend buffer.
+  connectionRegistry.send(connectionId, {
+    type: "mc.task_done_ack",
+    taskId: msg.taskId,
+    slug: msg.slug,
+  });
   logVMActivity(machineName, `@${msg.slug} completed task #${task.taskNumber}`).catch(
     () => undefined,
   );
@@ -505,6 +517,9 @@ async function drainAndDeliver(
       `Task delivered to agent @${task.agentSlug} (task: ${task.taskId})`,
     ).catch(() => undefined);
   }
+  // Count this push against each delivery's attempt budget; the reap cron dead-letters any that
+  // keep failing to ack so we stop re-draining them forever.
+  await markDeliveriesAttempted(pending.map((p) => p.id)).catch(() => undefined);
 }
 
 // ─── Connection entry point ───────────────────────────────────────────────────
@@ -622,7 +637,12 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
     if (connectionId) {
       connectionRegistry.remove(connectionId);
       await markConnectionDisconnected(connectionId).catch(() => undefined);
-      await clearAgentRoutes(connectionId).catch(() => undefined);
+      // Intentionally do NOT clear agent routes here. The connection record is stable per machine
+      // (machineFingerprint @unique) and syncAgentRoutes reconciles routes on every reconnect, so
+      // keeping them lets a task assigned during the brief disconnect window still be enqueued
+      // against this connection (findConnectionByAgentSlug resolves it) and drained on reconnect —
+      // instead of being lost from the live path. Liveness for an actual push is decided by the
+      // in-memory connection registry, not by route presence.
       logVMActivity(machineName, `Plugin disconnected (${machineName ?? "unknown host"})`).catch(
         () => undefined,
       );

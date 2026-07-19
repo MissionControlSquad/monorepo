@@ -1,0 +1,21 @@
+// ─── Runner hosts (Tier D) ────────────────────────────────────────
+// A registered BYO server (public IP + SSH) that the control plane can run raw commands on directly
+// via server-side SSH — the "host" RunnerCommand target. The private key is encrypted at rest
+// (SSH_KEY_ENCRYPTION_SECRET) and is NEVER returned by any read path (only its presence is exposed),
+// mirroring the secrets-vault boundary. Code/creds stay on the user's server; we connect inbound.
+
+model RunnerHost {
+  id                 String   @id @default(cuid())
+  workspaceId        String // buildbase workspace _id; no FK (D5)
+  name               String
+  host               String // hostname or IP
+  port               Int      @default(22)
+  username           String   @default("root")
+  sshPrivateKey      String // encrypted at rest; never returned
+  createdByProfileId String? // buildbase userId
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@map("runner_hosts")
+}

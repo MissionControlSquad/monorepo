@@ -143,6 +143,47 @@ describe("summary + aggregates (Epic #16)", () => {
     expect(sales).toMatchObject({ kind: "revenue", totalCents: 10055, eventCount: 2 });
   });
 
+  it("byProject nets revenue−expense per linked project and labels unlinked as (no project)", async () => {
+    const project = await prisma.project.create({
+      data: { workspaceId: WS_A, name: "Website Rebuild" },
+    });
+    const admin = await cookieFor(WS_A, "admin");
+    const withProject = `mutation($k:String!,$c:String!,$a:Int!,$o:DateTime!,$p:String!){
+      createLedgerEvent(kind:$k, category:$c, amountCents:$a, occurredAt:$o, projectId:$p){ id } }`;
+    await gql(
+      withProject,
+      { k: "revenue", c: "Sales", a: 30000, o: "2026-03-09T00:00:00.000Z", p: project.id },
+      admin,
+    );
+    await gql(
+      withProject,
+      { k: "expense", c: "SaaS", a: 12000, o: "2026-03-09T00:00:00.000Z", p: project.id },
+      admin,
+    );
+
+    const r = await gql(
+      `query{ ledgerByProject{ projectId projectName revenueCents expenseCents netCents eventCount } }`,
+      undefined,
+      await cookieFor(WS_A, "member"),
+    );
+    const rows = r.data.ledgerByProject as any[];
+    const linked = rows.find((x) => x.projectId === project.id);
+    expect(linked).toMatchObject({
+      projectName: "Website Rebuild",
+      revenueCents: 30000,
+      expenseCents: 12000,
+      netCents: 18000,
+      eventCount: 2,
+    });
+    // The base events (no projectId) roll up under a (no project) bucket.
+    const unlinked = rows.find((x) => x.projectId === null);
+    expect(unlinked?.projectName).toBe("(no project)");
+    // Sorted by net descending.
+    expect(rows.map((x) => x.netCents)).toEqual(
+      [...rows.map((x) => x.netCents)].sort((a, b) => b - a),
+    );
+  });
+
   it("range filter restricts the summary window", async () => {
     const r = await gql(
       `query($f:DateTime,$t:DateTime){ ledgerSummary(from:$f,to:$t){ revenueCents expenseCents } }`,

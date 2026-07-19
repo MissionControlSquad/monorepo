@@ -8,6 +8,9 @@ import { prisma } from "@/server/prisma";
 import { validateManifest } from "@agentcenter/utils";
 import type { PluginCategory } from "@agentcenter/utils";
 import type { Plugin, Prisma } from "@agentcenter/database";
+// A generic JSON-Schema (draft-07) validator — named for adapters but schema-agnostic; reused here so
+// plugin config validation matches the adapter config path exactly (no second validator).
+import { validateAdapterConfig as validateAgainstSchema } from "@/server/adapters/registry";
 
 // Manifest validation (validateManifest + isValidCron + the manifest schema) is shared in
 // @agentcenter/utils. This file is the registry DB layer. Re-exported for existing importers.
@@ -24,6 +27,56 @@ function badRequest(message: string): never {
 
 export function listPlugins(workspaceId: string): Promise<Plugin[]> {
   return prisma.plugin.findMany({ where: { workspaceId }, orderBy: { displayName: "asc" } });
+}
+
+/** Single plugin (for the detail page). Null if it isn't installed in this workspace. */
+export function getPlugin(workspaceId: string, pluginId: string): Promise<Plugin | null> {
+  return prisma.plugin.findUnique({ where: { workspaceId_pluginId: { workspaceId, pluginId } } });
+}
+
+async function requirePlugin(workspaceId: string, pluginId: string): Promise<Plugin> {
+  const p = await prisma.plugin.findUnique({
+    where: { workspaceId_pluginId: { workspaceId, pluginId } },
+  });
+  if (!p) badRequest("Plugin not found");
+  return p;
+}
+
+/** The configSchema a plugin declared in its manifest, or null if it has no configurable settings. */
+function manifestConfigSchema(manifest: Prisma.JsonValue): Record<string, unknown> | null {
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) return null;
+  const cs = (manifest as Record<string, unknown>).configSchema;
+  return cs && typeof cs === "object" && !Array.isArray(cs)
+    ? (cs as Record<string, unknown>)
+    : null;
+}
+
+/** Save per-workspace config, validated against the plugin's declared configSchema. */
+export async function setPluginConfig(
+  workspaceId: string,
+  pluginId: string,
+  config: Record<string, unknown>,
+): Promise<Plugin> {
+  const plugin = await requirePlugin(workspaceId, pluginId);
+  const schema = manifestConfigSchema(plugin.manifest);
+  if (!schema) badRequest("This plugin has no configurable settings");
+
+  const result = validateAgainstSchema(schema, config ?? {});
+  if (!result.valid) badRequest(`config invalid: ${result.errors.join("; ")}`);
+
+  return prisma.plugin.update({
+    where: { id: plugin.id },
+    data: { config: (config ?? {}) as Prisma.InputJsonValue },
+  });
+}
+
+/** Operator clears a plugin's error state (a manual "retry") → back to installed, lastError null. */
+export async function clearPluginError(workspaceId: string, pluginId: string): Promise<Plugin> {
+  const plugin = await requirePlugin(workspaceId, pluginId);
+  return prisma.plugin.update({
+    where: { id: plugin.id },
+    data: { status: plugin.enabled ? "installed" : "disabled", lastError: null },
+  });
 }
 
 /**

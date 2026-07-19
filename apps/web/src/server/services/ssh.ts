@@ -1,4 +1,4 @@
-import { Client } from "ssh2";
+import { Client, type ClientChannel } from "ssh2";
 
 export interface SSHConfig {
   host: string;
@@ -61,6 +61,7 @@ export function sshExec(
       })
       .on("error", (err) => {
         clearTimeout(timer);
+        conn.end();
         reject(err);
       })
       .connect({
@@ -74,44 +75,44 @@ export function sshExec(
 }
 
 /**
- * Upload a file via SFTP.
+ * Upload a file via SFTP. Has an overall timeout so a stalled SFTP write (connect succeeds, transfer
+ * hangs) can't block a provisioning step forever.
  */
 export function sshUploadFile(
   config: SSHConfig,
   remotePath: string,
   content: string,
   mode?: number,
+  opts?: { timeoutMs?: number },
 ): Promise<void> {
+  const timeoutMs = opts?.timeoutMs ?? 60_000;
   return new Promise((resolve, reject) => {
     const conn = new Client();
+    let settled = false;
+    const finish = (err?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      conn.end();
+      if (err) reject(err);
+      else resolve();
+    };
+    const timer = setTimeout(
+      () => finish(new Error(`SFTP upload timed out after ${timeoutMs}ms: ${remotePath}`)),
+      timeoutMs,
+    );
 
     conn
       .on("ready", () => {
         conn.sftp((err, sftp) => {
-          if (err) {
-            conn.end();
-            return reject(err);
-          }
-
-          const stream = sftp.createWriteStream(remotePath, {
-            mode: mode ?? 0o644,
-          });
-
-          stream.on("close", () => {
-            conn.end();
-            resolve();
-          });
-          stream.on("error", (writeErr: Error) => {
-            conn.end();
-            reject(writeErr);
-          });
-
+          if (err) return finish(err);
+          const stream = sftp.createWriteStream(remotePath, { mode: mode ?? 0o644 });
+          stream.on("close", () => finish());
+          stream.on("error", (writeErr: Error) => finish(writeErr));
           stream.end(content);
         });
       })
-      .on("error", (err) => {
-        reject(err);
-      })
+      .on("error", (err) => finish(err))
       .connect({
         host: config.host,
         port: config.port ?? 22,
@@ -170,6 +171,55 @@ export function sshExecStream(
         });
       })
       .on("error", (err) => {
+        conn.end();
+        reject(err);
+      })
+      .connect({
+        host: config.host,
+        port: config.port ?? 22,
+        username: config.username ?? "root",
+        privateKey: config.privateKey,
+        readyTimeout: 10_000,
+      });
+  });
+}
+
+/**
+ * Handle for an interactive PTY shell over SSH (Tier D — browser Cloud-Shell).
+ * `stream` is a duplex channel: write bytes to send keystrokes, read `data`/`stderr` for output.
+ */
+export interface ShellHandle {
+  client: Client;
+  stream: ClientChannel;
+}
+
+/**
+ * Open an interactive PTY shell over SSH. The caller pipes a browser WebSocket to `stream` (both
+ * ways) and calls `client.end()` to tear it down. This is the byte-stream half the terminal-session
+ * lifecycle deferred (spec D2). Requires a live SSH target — validated by code + unit-tested at the
+ * lifecycle/credential layer; the live relay is exercised against real infra.
+ */
+export function sshShell(
+  config: SSHConfig,
+  opts?: { cols?: number; rows?: number },
+): Promise<ShellHandle> {
+  return new Promise((resolve, reject) => {
+    const conn = new Client();
+    conn
+      .on("ready", () => {
+        conn.shell(
+          { term: "xterm-256color", cols: opts?.cols ?? 80, rows: opts?.rows ?? 24 },
+          (err, stream) => {
+            if (err) {
+              conn.end();
+              return reject(err);
+            }
+            resolve({ client: conn, stream });
+          },
+        );
+      })
+      .on("error", (err) => {
+        conn.end();
         reject(err);
       })
       .connect({
@@ -201,6 +251,7 @@ export function sshTestConnection(config: SSHConfig, timeoutMs = 10_000): Promis
       })
       .on("error", () => {
         clearTimeout(timer);
+        conn.end();
         resolve(false);
       })
       .connect({

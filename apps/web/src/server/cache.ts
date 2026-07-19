@@ -78,6 +78,7 @@ export const ledgerSummaryCache = new TTLCache<any>(60);
 export const ledgerByKindCache = new TTLCache<any>(60);
 export const ledgerByBillerCache = new TTLCache<any>(60);
 export const ledgerByCategoryCache = new TTLCache<any>(60);
+export const ledgerByProjectCache = new TTLCache<any>(60);
 export const ledgerTimelineCache = new TTLCache<any>(60);
 
 /** Clear all ledger aggregate caches (called after any ledger mutation; low write volume). */
@@ -86,6 +87,7 @@ export function invalidateLedger(): void {
   ledgerByKindCache.clear();
   ledgerByBillerCache.clear();
   ledgerByCategoryCache.clear();
+  ledgerByProjectCache.clear();
   ledgerTimelineCache.clear();
 }
 

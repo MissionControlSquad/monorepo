@@ -66,6 +66,7 @@ export {
   DELIVERABLE_WITH_CONTEXT_QUERY,
   DELIVERABLES_BY_CHILD_TASKS_QUERY,
   DELIVERABLE_VERSIONS_QUERY,
+  WORKSPACE_DELIVERABLES_QUERY,
 } from "./deliverables";
 
 export { AGENT_ACTIONS_BY_AGENT_QUERY } from "./agent-actions";
@@ -111,7 +112,7 @@ export {
   ACTIVITY_TREND_QUERY,
 } from "./analytics";
 
-export { GLOBAL_SEARCH_QUERY } from "./search";
+export { GLOBAL_SEARCH_QUERY, SEARCH_ALL_QUERY } from "./search";
 
 export { FEATURE_FLAGS_QUERY } from "./feature-flags";
 
@@ -122,17 +123,20 @@ export {
   BUDGET_POLICIES_QUERY,
   BUDGET_INCIDENTS_QUERY,
   COST_BREAKDOWN_QUERY,
+  COST_TREND_QUERY,
 } from "./finance";
 
 export {
   LEDGER_SUMMARY_QUERY,
   LEDGER_BY_CATEGORY_QUERY,
+  LEDGER_BY_BILLER_QUERY,
+  LEDGER_BY_PROJECT_QUERY,
   LEDGER_TIMELINE_QUERY,
   LEDGER_EVENTS_QUERY,
   LEDGER_CATEGORIES_QUERY,
 } from "./ledger";
 
-export { SECRETS_QUERY, SECRET_ACCESS_EVENTS_QUERY } from "./secrets";
+export { SECRETS_QUERY, SECRET_PROVIDERS_QUERY, SECRET_ACCESS_EVENTS_QUERY } from "./secrets";
 
 export {
   ROUTINES_QUERY,
@@ -141,6 +145,8 @@ export {
   CASES_IN_PIPELINE_QUERY,
   REVIEW_CASES_QUERY,
   PIPELINE_HEALTH_QUERY,
+  STALE_CLAIMS_QUERY,
+  PIPELINE_CASE_EVENTS_QUERY,
 } from "./pipelines";
 
 export {
@@ -151,12 +157,20 @@ export {
 
 export { CASES_QUERY, CASE_QUERY, LABELS_QUERY, CASE_EVENTS_QUERY } from "./cases";
 
-export { SKILLS_QUERY, TEAMS_QUERY } from "./skills";
+export {
+  SKILLS_QUERY,
+  SKILL_FILES_QUERY,
+  SKILL_CATALOG_QUERY,
+  LINT_SKILL_QUERY,
+  AGENT_SKILLS_QUERY,
+  TEAMS_QUERY,
+  PREVIEW_TEAM_INSTALL_QUERY,
+} from "./skills";
 export { EXPORT_WORKSPACE_BUNDLE, WORKSPACE_IMPORTS } from "./portability";
 export { GOALS_QUERY, GOAL_QUERY, DEFAULT_GOAL_QUERY } from "./goals";
 export { WORKSPACE_SUMMARY_QUERY } from "./observability";
 export { BOARD_THREAD_QUERY } from "./boardroom";
-export { PLUGINS_QUERY } from "./plugins";
+export { PLUGINS_QUERY, PLUGIN_QUERY } from "./plugins";
 export { API_KEYS_QUERY } from "./api-keys";
 export { TERMINAL_SESSIONS_QUERY } from "./terminals";
 export { AGENT_INSTRUCTIONS_QUERY } from "./agent-instructions";
@@ -166,3 +180,19 @@ export { AGENT_CAPABILITY_GRANTS_QUERY, AGENT_AUTHZ_EVENTS_QUERY } from "./agent
 export { PROFILE_ANALYTICS_QUERY } from "./profile-analytics";
 
 export { CLI_AUTH_CHALLENGE_QUERY } from "./cli-auth";
+
+export { WORK_TIMELINE_QUERY } from "./timeline";
+
+export { AGENT_GOVERNANCE_QUERY } from "./agent-governance";
+
+export { TASK_RELATIONS_QUERY } from "./task-relations";
+
+export { TASK_EXTERNAL_LINKS_QUERY } from "./external-links";
+
+export { DELIVERABLE_ANNOTATIONS_QUERY } from "./deliverable-annotations";
+
+export { DELIVERABLE_VOTES_QUERY } from "./deliverable-votes";
+
+export { MONITORS_QUERY } from "./monitors";
+export { RUNNER_COMMANDS_QUERY } from "./runner-commands";
+export { RUNNER_HOSTS_QUERY } from "./runner-hosts";

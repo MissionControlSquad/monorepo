@@ -26,4 +26,10 @@ export interface MCBridgeConfig {
   /** Maximum reconnect backoff (ms). Default: 30000 */
   reconnectMaxMs?: number;
 
+  /**
+   * Optional path to persist recently-handled deliveryIds across restarts. When set, a task the
+   * plugin already ran won't run again after a restart + reconnect re-delivery. Leave unset for
+   * in-memory-only dedup (a plugin restart can then re-run an un-acked task once).
+   */
+  dedupStatePath?: string;
 }

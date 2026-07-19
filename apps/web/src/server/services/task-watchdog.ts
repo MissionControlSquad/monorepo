@@ -33,17 +33,26 @@ export async function createWatchdog(args: {
   });
 }
 
-/** Pure: does the watchdog's condition currently hold for this task? (v1 implements lease_expired.) */
+/** Pure: does the watchdog's condition currently hold? Implements lease_expired + no_heartbeat. */
 export function conditionHolds(
   condition: WatchdogCondition,
   task: { checkedOutByProfileId: string | null; checkoutLeaseExpiresAt: Date | null },
   now: Date,
+  ctx?: { thresholdSec?: number; agentLastHeartbeat?: Date | null },
 ): boolean {
   switch (condition) {
     case "lease_expired":
       return task.checkedOutByProfileId != null && isLeaseExpired(task.checkoutLeaseExpiresAt, now);
-    // no_heartbeat / no_progress / stuck_in_status need agent/heartbeat wiring — evaluated by the
-    // (deferred) liveness cron. They report false here so v1 never false-fires.
+    case "no_heartbeat": {
+      // The task is claimed but the owning agent has gone silent past the threshold. A null
+      // heartbeat is treated as "can't confirm death" (defers to lease_expired) to avoid releasing
+      // a freshly-claimed task from an agent that simply hasn't reported yet.
+      if (task.checkedOutByProfileId == null) return false;
+      const hb = ctx?.agentLastHeartbeat ?? null;
+      if (hb == null) return false;
+      return now.getTime() - hb.getTime() > (ctx?.thresholdSec ?? 0) * 1000;
+    }
+    // no_progress / stuck_in_status still need richer signals — deferred, report false.
     default:
       return false;
   }
@@ -84,9 +93,31 @@ export async function evaluateWatchdogs(now: Date = new Date()): Promise<Watchdo
     },
   });
 
+  // For no_heartbeat we need the owning agent's last heartbeat: profileId → agent.lastHeartbeat.
+  const profileIds = [
+    ...new Set(watchdogs.map((w) => w.task.checkedOutByProfileId).filter((v): v is string => !!v)),
+  ];
+  const heartbeatByProfile = new Map<string, Date | null>();
+  if (profileIds.length) {
+    const profiles = await prisma.profile.findMany({
+      where: { id: { in: profileIds } },
+      select: { id: true, agent: { select: { lastHeartbeat: true } } },
+    });
+    for (const p of profiles) heartbeatByProfile.set(p.id, p.agent?.lastHeartbeat ?? null);
+  }
+
   const decisions: WatchdogDecision[] = [];
   for (const wd of watchdogs) {
-    if (!conditionHolds(wd.condition, wd.task, now)) continue;
+    const agentLastHeartbeat = wd.task.checkedOutByProfileId
+      ? (heartbeatByProfile.get(wd.task.checkedOutByProfileId) ?? null)
+      : null;
+    if (
+      !conditionHolds(wd.condition, wd.task, now, {
+        thresholdSec: wd.thresholdSec,
+        agentLastHeartbeat,
+      })
+    )
+      continue;
 
     // Idempotency: skip if this task already has an open recovery action.
     const open = await prisma.taskRecoveryAction.findFirst({

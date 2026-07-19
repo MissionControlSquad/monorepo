@@ -8,6 +8,9 @@ export const SECRETS_QUERY = gql`
       name
       description
       currentVersion
+      status
+      personal
+      providerId
       createdAt
       bindings {
         id
@@ -22,6 +25,20 @@ export const SECRETS_QUERY = gql`
         retiredAt
         createdAt
       }
+    }
+  }
+`;
+
+export const SECRET_PROVIDERS_QUERY = gql`
+  query SecretProviders {
+    secretProviders {
+      id
+      name
+      kind
+      config
+      healthy
+      lastError
+      createdAt
     }
   }
 `;

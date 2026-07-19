@@ -6,11 +6,20 @@
  */
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
-import type { Secret, SecretBinding, SecretAccessAction } from "@agentcenter/database";
+import type {
+  Secret,
+  SecretBinding,
+  SecretAccessAction,
+  SecretProviderConfig,
+  SecretProviderKind,
+} from "@agentcenter/database";
 import { encryptSecret, decryptSecret, CURRENT_KEY_ID } from "./secrets-crypto";
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
+}
+function notFound(what: string): never {
+  throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
 }
 
 /** Append a secret access-event (audit). Centralized so no path skips the log. */
@@ -42,7 +51,26 @@ export interface CreateSecretInput {
   value: string;
   description?: string | null;
   providerId?: string | null;
+  personal?: boolean;
   createdBy: string;
+}
+
+/** An actor for secret-management authorization. */
+export interface SecretActor {
+  userId: string;
+  role: string;
+}
+
+/**
+ * Who may manage a secret: a PERSONAL secret only by its owner (createdBy); a WORKSPACE secret only
+ * by an admin/owner. Pure — the single source of truth reused by every mutating secret op.
+ */
+export function canManageSecret(
+  secret: { personal: boolean; createdBy: string | null },
+  actor: SecretActor,
+): boolean {
+  if (secret.personal) return secret.createdBy === actor.userId;
+  return actor.role === "admin" || actor.role === "owner";
 }
 
 export async function createSecret(input: CreateSecretInput): Promise<Secret> {
@@ -54,6 +82,15 @@ export async function createSecret(input: CreateSecretInput): Promise<Secret> {
   });
   if (dup) badRequest(`a secret named "${name}" already exists in this workspace`);
 
+  // A provider, if given, must belong to this workspace (never bind to another tenant's backend).
+  if (input.providerId) {
+    const provider = await prisma.secretProviderConfig.findFirst({
+      where: { id: input.providerId, workspaceId: input.workspaceId },
+      select: { id: true },
+    });
+    if (!provider) badRequest("provider not found in this workspace");
+  }
+
   const ciphertext = encryptSecret(input.value);
   const secret = await prisma.$transaction(async (tx) => {
     const s = await tx.secret.create({
@@ -62,6 +99,7 @@ export async function createSecret(input: CreateSecretInput): Promise<Secret> {
         name,
         description: input.description ?? null,
         providerId: input.providerId ?? null,
+        personal: input.personal ?? false,
         currentVersion: 1,
         createdBy: input.createdBy,
       },
@@ -87,18 +125,133 @@ export async function createSecret(input: CreateSecretInput): Promise<Secret> {
   return secret;
 }
 
+export interface ImportSecretsResult {
+  created: number;
+  skipped: number; // already existed and overwrite=false
+  rotated: number; // already existed and overwrite=true → new version appended
+}
+
+/**
+ * Bulk-import name/value pairs (e.g. a pasted .env). Each is created; on a name collision the entry
+ * is either skipped or rotated (new version) per `overwrite`. Plaintext values are encrypted on the
+ * way in exactly like createSecret/rotateSecret — none are logged or returned.
+ */
+export async function importSecrets(args: {
+  workspaceId: string;
+  createdBy: string;
+  entries: { name: string; value: string }[];
+  overwrite?: boolean;
+}): Promise<ImportSecretsResult> {
+  const result: ImportSecretsResult = { created: 0, skipped: 0, rotated: 0 };
+  for (const raw of args.entries) {
+    const name = raw.name.trim();
+    if (!name || !raw.value) continue; // ignore empties defensively
+    const existing = await prisma.secret.findFirst({
+      where: { workspaceId: args.workspaceId, name },
+      select: { id: true },
+    });
+    if (existing) {
+      if (!args.overwrite) {
+        result.skipped++;
+        continue;
+      }
+      await rotateSecret({
+        workspaceId: args.workspaceId,
+        secretId: existing.id,
+        value: raw.value,
+        createdBy: args.createdBy,
+      });
+      result.rotated++;
+      continue;
+    }
+    await createSecret({
+      workspaceId: args.workspaceId,
+      createdBy: args.createdBy,
+      name,
+      value: raw.value,
+    });
+    result.created++;
+  }
+  return result;
+}
+
+/** Load a secret scoped to its workspace; 404 for missing / cross-workspace ids. */
+async function findScopedSecret(secretId: string, workspaceId: string): Promise<Secret> {
+  const secret = await prisma.secret.findFirst({ where: { id: secretId, workspaceId } });
+  if (!secret) throw new GraphQLError("Secret not found", { extensions: { code: "NOT_FOUND" } });
+  return secret;
+}
+
+function forbidden(): never {
+  throw new GraphQLError("Not authorized to manage this secret", {
+    extensions: { code: "FORBIDDEN" },
+  });
+}
+
+/** Load a secret AND authorize the actor to manage it (owner for personal, admin for workspace). */
+async function loadManageableSecret(
+  secretId: string,
+  workspaceId: string,
+  actor: SecretActor,
+): Promise<Secret> {
+  const secret = await findScopedSecret(secretId, workspaceId);
+  if (!canManageSecret(secret, actor)) forbidden();
+  return secret;
+}
+
+/** Where-clause for the secrets a member may SEE: all workspace secrets + only their own personal. */
+export function visibleSecretsWhere(userId: string): Record<string, unknown> {
+  return { OR: [{ personal: false }, { personal: true, createdBy: userId }] };
+}
+
+/** Edit a secret's metadata (name/description) — never touches the encrypted value. */
+export async function updateSecret(
+  workspaceId: string,
+  secretId: string,
+  patch: { name?: string | null; description?: string | null },
+  actor: SecretActor,
+): Promise<Secret> {
+  await loadManageableSecret(secretId, workspaceId, actor);
+  const name = patch.name?.trim();
+  if (patch.name != null && !name) badRequest("name cannot be empty");
+  return prisma.secret.update({
+    where: { id: secretId },
+    data: {
+      ...(name ? { name } : {}),
+      ...(patch.description !== undefined ? { description: patch.description } : {}),
+    },
+  });
+}
+
+/**
+ * Lifecycle: active | disabled | archived. Only `active` secrets resolve into an agent's env, so
+ * disabling instantly cuts off a leaked or rotated-out credential without deleting its history.
+ */
+export async function setSecretStatus(
+  workspaceId: string,
+  secretId: string,
+  status: "active" | "disabled" | "archived",
+  actor: SecretActor,
+): Promise<Secret> {
+  await loadManageableSecret(secretId, workspaceId, actor);
+  return prisma.secret.update({ where: { id: secretId }, data: { status } });
+}
+
 /** Rotate: append version N+1, retire the prior, repoint currentVersion. Reversible via history. */
 export async function rotateSecret(args: {
   workspaceId: string;
   secretId: string;
   value: string;
   createdBy: string;
+  actor?: SecretActor;
 }): Promise<Secret> {
   if (!args.value) badRequest("value is required");
   const secret = await prisma.secret.findFirst({
     where: { id: args.secretId, workspaceId: args.workspaceId },
   });
   if (!secret) throw new GraphQLError("Secret not found", { extensions: { code: "NOT_FOUND" } });
+  // actor is optional so internal callers (bulk import) keep working; when present, enforce it.
+  if (args.actor && !canManageSecret(secret, args.actor)) forbidden();
 
   const nextVersion = secret.currentVersion + 1;
   const ciphertext = encryptSecret(args.value);
@@ -159,6 +312,7 @@ export async function bindSecret(args: {
   envVarName: string;
   pinnedVersion?: number | null;
   createdBy: string;
+  actor?: SecretActor;
 }): Promise<SecretBinding> {
   const envVarName = args.envVarName.trim();
   if (!/^[A-Z_][A-Z0-9_]*$/.test(envVarName))
@@ -172,6 +326,9 @@ export async function bindSecret(args: {
     where: { id: args.secretId, workspaceId: args.workspaceId },
   });
   if (!secret) throw new GraphQLError("Secret not found", { extensions: { code: "NOT_FOUND" } });
+  // Only the owner may bind a personal secret; workspace secrets require admin. Prevents an admin
+  // from routing someone else's private credential into an agent (and vice-versa).
+  if (args.actor && !canManageSecret(secret, args.actor)) forbidden();
 
   // Agent-scoped bindings must target an agent in the same workspace.
   if (args.scope === "agent") {
@@ -208,12 +365,15 @@ export async function unbindSecret(
   workspaceId: string,
   bindingId: string,
   actorId: string,
+  actor?: SecretActor,
 ): Promise<boolean> {
   // Join through the secret to enforce workspace isolation on the binding.
   const binding = await prisma.secretBinding.findFirst({
     where: { id: bindingId, secret: { workspaceId } },
+    include: { secret: { select: { personal: true, createdBy: true } } },
   });
   if (!binding) return false;
+  if (actor && !canManageSecret(binding.secret, actor)) forbidden();
   await prisma.secretBinding.delete({ where: { id: binding.id } });
   await recordSecretAccess({
     secretId: binding.secretId,
@@ -260,7 +420,8 @@ export async function resolveEnvForAgent(
           ? [{ scope: "adapter" as const, adapterType: agent.adapterType }]
           : []),
       ],
-      secret: { workspaceId },
+      // Only active secrets resolve — a disabled/archived secret is instantly cut off from agents.
+      secret: { workspaceId, status: "active" },
     },
     include: { secret: { select: { currentVersion: true } } },
   });
@@ -279,4 +440,54 @@ export async function resolveEnvForAgent(
     });
   }
   return mergeEnvBindings(entries);
+}
+
+// ─── Provider configs ─────────────────────────────────────────────
+// A SecretProviderConfig points the vault at an external backend (aws/vault) or the default local
+// envelope (env). `config` holds only NON-secret settings (region, path prefix); the backend's own
+// credentials are themselves Secrets. Nothing here ever stores or returns a plaintext secret.
+const PROVIDER_KINDS: SecretProviderKind[] = ["env", "aws", "vault"];
+
+export function isSecretProviderKind(v: string): v is SecretProviderKind {
+  return (PROVIDER_KINDS as string[]).includes(v);
+}
+
+export async function createSecretProvider(input: {
+  workspaceId: string;
+  name: string;
+  kind: SecretProviderKind;
+  config?: Record<string, unknown> | null;
+}): Promise<SecretProviderConfig> {
+  const name = input.name.trim();
+  if (!name) badRequest("name is required");
+  const dup = await prisma.secretProviderConfig.findFirst({
+    where: { workspaceId: input.workspaceId, name },
+  });
+  if (dup) badRequest(`a provider named "${name}" already exists in this workspace`);
+  return prisma.secretProviderConfig.create({
+    data: {
+      workspaceId: input.workspaceId,
+      name,
+      kind: input.kind,
+      config: (input.config ?? {}) as never,
+    },
+  });
+}
+
+export function listSecretProviders(workspaceId: string) {
+  return prisma.secretProviderConfig.findMany({
+    where: { workspaceId },
+    orderBy: { name: "asc" },
+  });
+}
+
+/** Delete a provider. Its secrets are NOT deleted — providerId is SetNull, falling back to local. */
+export async function deleteSecretProvider(workspaceId: string, id: string): Promise<boolean> {
+  const provider = await prisma.secretProviderConfig.findFirst({
+    where: { id, workspaceId },
+    select: { id: true },
+  });
+  if (!provider) notFound("Provider");
+  await prisma.secretProviderConfig.delete({ where: { id: provider.id } });
+  return true;
 }
