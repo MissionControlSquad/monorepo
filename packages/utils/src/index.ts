@@ -38,6 +38,7 @@ export * from "./skill-frontmatter";
 export * from "./skill-policy";
 export * from "./work-products";
 export * from "./cost-windows";
+export * from "./otel";
 export * from "./profile-analytics";
 export * from "./project-source";
 export * from "./cli-auth";

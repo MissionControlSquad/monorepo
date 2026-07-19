@@ -325,6 +325,15 @@ See 03-sandbox-depth.mdx.
       diagram. Tests: 4 unit (structure/edges, XML-escape, determinism+empty, styled:false). Typecheck 12/12, web build ✓.
       Remaining Domain 14: #10-12 Agent-Companies package model (L), #13 delegation, #14 quorum, #15 policy engine.
 
+- [x] **Cost/observability Domain 12 — GAP-4 OpenTelemetry opt-in tracing** DONE (next commit). Pure resolveOtelConfig(env)
+      in @agentcenter/utils: resolves the OTLP exporter (grpc/http-protobuf/http-json) + endpoint + serviceName from env
+      WITHOUT importing any @opentelemetry package; enabled only when OTEL_EXPORTER_OTLP_ENDPOINT is set; unknown protocol →
+      grpc + one warning. otel-bootstrap.ts startOtel() (called from instrumentation.register()) dynamically imports the SDK +
+      protocol exporter ONLY when enabled — zero import/overhead when off; missing optional packages log one diagnostic and
+      the server stays up. Tests: 5 unit (disabled-by-default, protocol→exporter selection, unknown-protocol fallback, service
+      name). Typecheck 12/12, web build ✓ (optional deps correctly unresolved at build). Remaining Domain 12: GAP-3 telemetry,
+      GAP-5 pino/run-log, GAP-6 A13 unpriced + A14 billingType split.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

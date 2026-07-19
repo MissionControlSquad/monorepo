@@ -1,6 +1,11 @@
 export async function register() {
   // Only run on the Node.js server runtime, not on Edge or during build
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // OpenTelemetry (Domain 12 GAP-4): starts ONLY when OTEL_EXPORTER_OTLP_ENDPOINT is set; imports
+    // nothing otherwise. Best-effort — never blocks server startup.
+    const { startOtel } = await import("./src/server/otel-bootstrap");
+    await startOtel().catch(() => {});
+
     const { runStartupMigrations } = await import("./src/server/startup-migrations");
     await runStartupMigrations();
 
