@@ -40,6 +40,7 @@ export const FLAG_KEYS = {
   EXECUTION_WORKSPACES: "execution_workspaces",
   CUSTOM_IMAGES: "custom_images",
   LOW_TRUST_REVIEW: "low_trust_review",
+  WORK_PRODUCTS: "work_products",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -93,4 +94,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   // Tier D / Phase 3: custom sandbox image capture (snapshot a configured box into a reusable image).
   [FLAG_KEYS.CUSTOM_IMAGES]: false,
   [FLAG_KEYS.LOW_TRUST_REVIEW]: false,
+  [FLAG_KEYS.WORK_PRODUCTS]: false,
 };

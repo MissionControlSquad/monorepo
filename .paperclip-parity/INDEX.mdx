@@ -283,6 +283,18 @@ See 03-sandbox-depth.mdx.
       clear, maxAttempts disarm). Typecheck 12/12, web build ✓. Heartbeat scheduling now: #6 retries + #8 stranded + #11
       monitors + #12 cron all in the reap cron. Remaining Domain 9: #1/#2 central wake queue+tick, #10 silent-run watchdog, #9 subtree watchdog.
 
+- [x] **Work-items Domain 8 — G1 work-product taxonomy** DONE (next commit). Deliverable extended into a governed work
+      product: DeliverableKind gains pull_request/branch/commit/preview_url/runtime_service output types; new columns
+      provider/externalId/reviewState/outputStatus/healthStatus/isPrimary/createdByRunId (migration 20260719270000, D5 TEXT
+      + enum-add). Pure helpers work-products.ts in @agentcenter/utils (WORK_PRODUCT_KINDS/REVIEW_STATES/STATUSES,
+      canTransitionWorkProductStatus DAG, initialWorkProductGate ties to G2 source-trust). Service work-products.ts:
+      createWorkProduct (demotes prior primary of same (task,kind) in a txn → one canonical), setWorkProductReviewState
+      (board-only approve/changes, agent-cannot-self-approve, transition-guarded), setWorkProductStatus (legal transitions).
+      New WORK_PRODUCTS flag. GraphQL: fields on Deliverable + createWorkProduct/setWorkProductReviewState/setWorkProductStatus
+      mutations + workProductsByTask query + shared client ops. Tests: 5 unit + 4 integration (create+gate, single-primary,
+      board-only approval, illegal-transition). Typecheck 12/12, web build ✓. Remaining Domain 8: G3 TaskRun depth, G4 upload
+      pipeline, G5 doc annotations, G6 lifecycle refinements.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

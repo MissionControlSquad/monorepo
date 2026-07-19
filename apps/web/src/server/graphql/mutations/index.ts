@@ -6,6 +6,7 @@ import "./message-reactions";
 import "./documents";
 import "./notifications";
 import "./deliverables";
+import "./work-products";
 import "./agent-actions";
 import "./agent-queue";
 import "./projects";

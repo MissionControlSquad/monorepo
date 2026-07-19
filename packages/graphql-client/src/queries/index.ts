@@ -68,6 +68,7 @@ export {
   DELIVERABLE_VERSIONS_QUERY,
   WORKSPACE_DELIVERABLES_QUERY,
 } from "./deliverables";
+export { WORK_PRODUCTS_BY_TASK_QUERY } from "./work-products";
 
 export { AGENT_ACTIONS_BY_AGENT_QUERY } from "./agent-actions";
 

@@ -36,6 +36,11 @@ export { CREATE_DOCUMENT, UPDATE_DOCUMENT, DELETE_DOCUMENT } from "./documents";
 export { MARK_NOTIFICATION_DELIVERED, MARK_MANY_NOTIFICATIONS_DELIVERED } from "./notifications";
 
 export { SUBMIT_DELIVERABLE, DELETE_DELIVERABLE } from "./deliverables";
+export {
+  CREATE_WORK_PRODUCT,
+  SET_WORK_PRODUCT_REVIEW_STATE,
+  SET_WORK_PRODUCT_STATUS,
+} from "./work-products";
 
 export { LOG_AGENT_ACTION } from "./agent-actions";
 
