@@ -34,6 +34,7 @@ import {
   recordExecutionWorkspace,
   recordWorkspaceOperation,
 } from "./execution-workspaces";
+import { beginRunStatus, setRunPhase, appendRunLog } from "./run-runtime-status";
 import type { SandboxProvider, SandboxHandle } from "./sandbox/types";
 import type { AgentTrustProfile, EnvironmentLease } from "@agentcenter/database";
 
@@ -321,6 +322,10 @@ export async function runTaskInSandbox(input: {
         },
       });
 
+  // Live status (Plan 6): track a redacted, TTL'd tail of this run so the UI can watch it mid-flight.
+  // Secret VALUES (env + git token) are scrubbed from every streamed chunk.
+  beginRunStatus(run.id, [...Object.values(env), ...(gitToken ? [gitToken] : [])]);
+
   let handle: SandboxHandle | undefined;
   let lease: EnvironmentLease | null = null;
   try {
@@ -337,6 +342,7 @@ export async function runTaskInSandbox(input: {
     });
     handle = acquired.handle;
     lease = acquired.lease;
+    setRunPhase(run.id, "running");
 
     let exitCode: number | null;
     let stdout: string;
@@ -345,6 +351,7 @@ export async function runTaskInSandbox(input: {
     try {
       const result = await handle.exec(script, {
         timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        onLog: (chunk) => appendRunLog(run.id, chunk.data),
       });
       exitCode = result.exitCode;
       stdout = result.stdout.slice(-MAX_OUTPUT_CHARS);
@@ -352,6 +359,7 @@ export async function runTaskInSandbox(input: {
       timedOut = result.timedOut ?? false;
     } catch (execErr) {
       // exec itself blew up — release as a failure (retain_on_failure keeps the box), then re-throw.
+      setRunPhase(run.id, "failed");
       await releaseLease({ lease, handle, outcome: "failure" });
       throw execErr;
     }
@@ -364,6 +372,7 @@ export async function runTaskInSandbox(input: {
     });
 
     const runStatus = timedOut ? "timeout" : exitCode === 0 ? "done" : "failed";
+    setRunPhase(run.id, runStatus);
     await prisma.agentRun.update({
       where: { id: run.id },
       data: {
@@ -428,6 +437,7 @@ export async function runTaskInSandbox(input: {
     };
   } catch (err) {
     // Provision/exec threw before we could record a result — mark the run failed, then re-throw.
+    setRunPhase(run.id, "failed");
     const message = err instanceof Error ? err.message : String(err);
     await prisma.agentRun
       .update({

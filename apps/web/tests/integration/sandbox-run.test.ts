@@ -15,6 +15,8 @@ import {
 } from "../../src/server/services/sandbox-run";
 import { getOrCreateAgentProfileId } from "../../src/server/agent-profile";
 import { createEnvironment } from "../../src/server/services/environments";
+import { getRunRuntimeStatus } from "../../src/server/services/run-runtime-status";
+import { createSecret, bindSecret } from "../../src/server/services/secrets";
 
 // Tier D: the sandbox EXECUTION SEAM. Exercised end-to-end against the REAL `local` provider (temp
 // dir + child_process, no keys) — proving provision → materialise the task → run the runtime → capture
@@ -77,7 +79,7 @@ beforeAll(() => {
 beforeEach(async () => {
   agentCache.clear();
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE agent_runs, messages, tasks, agent_skills, skills, agent_instructions, agents, profiles, environments CASCADE`,
+    `TRUNCATE TABLE agent_runs, messages, tasks, agent_skills, skills, agent_instructions, agents, profiles, environments, secrets CASCADE`,
   );
   await prisma.featureFlag.upsert({
     where: { key: "runners" },
@@ -178,6 +180,46 @@ describe("sandbox task execution (Tier D)", () => {
     // The outcome is posted to the task timeline as a message from the agent.
     const messages = await prisma.message.findMany({ where: { taskId } });
     expect(messages.some((m) => m.content.includes("SANDBOX_RAN"))).toBe(true);
+  });
+
+  it("streams a redacted live tail into the run runtime status (Plan 6)", async () => {
+    // The agent's runtime echoes a marker AND a value we bind as a secret — the secret must be redacted.
+    const agent = await prisma.agent.create({
+      data: {
+        name: "Streamer",
+        role: "worker",
+        personality: "x",
+        workspaceId: WS,
+        setupStatus: "active",
+        apiKeyHash: hashApiKey(`mc_stream_${Math.random()}`),
+        runtimeAdapter: "shell",
+        runtimeTemplate: "echo LIVE_MARKER && echo secret=$MY_SECRET",
+        sandboxProvider: "local",
+      },
+    });
+    // Bind MY_SECRET into the agent's env so it is exported into the box + registered for redaction.
+    const secret = await createSecret({
+      workspaceId: WS,
+      name: "MY_SECRET",
+      value: "sk-streamed-secret",
+      createdBy: "h",
+    });
+    await bindSecret({
+      workspaceId: WS,
+      secretId: secret.id,
+      scope: "agent",
+      agentId: agent.id,
+      envVarName: "MY_SECRET",
+      createdBy: "h",
+    });
+    const taskId = await makeTask();
+
+    const result = await runTaskInSandbox({ workspaceId: WS, taskId, agentId: agent.id });
+    const live = getRunRuntimeStatus(result.runId);
+    expect(live).not.toBeNull();
+    expect(live!.phase).toBe("done");
+    expect(live!.tail).toContain("LIVE_MARKER"); // streamed output captured
+    expect(live!.tail).not.toContain("sk-streamed-secret"); // secret value scrubbed
   });
 
   it("exposes the persisted run via the agentRuns query (RUNNERS-gated)", async () => {

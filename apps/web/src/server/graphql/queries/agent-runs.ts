@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { getRunRuntimeStatus } from "@/server/services/run-runtime-status";
 
 // Tier D: the run ledger — list agent executions (sandbox/runner). RUNNERS-gated, member+.
 builder.queryField("agentRuns", (t) =>
@@ -25,6 +26,34 @@ builder.queryField("agentRuns", (t) =>
         orderBy: { createdAt: "desc" },
         take: Math.min(args.limit ?? 50, 200),
       });
+    },
+  }),
+);
+
+// Live run status (Plan 6): the redacted, in-memory tail + phase of a run mid-flight (poll target).
+// Returns null when nothing is tracked (never started, or the 90s TTL evicted it). RUNNERS-gated,
+// member+, workspace-scoped (the run must belong to the caller's workspace).
+const AgentRunLiveStatusType = builder.simpleObject("AgentRunLiveStatus", {
+  fields: (t) => ({
+    phase: t.string(),
+    tail: t.string(),
+  }),
+});
+
+builder.queryField("agentRunLiveStatus", (t) =>
+  t.field({
+    type: AgentRunLiveStatusType,
+    nullable: true,
+    args: { runId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.RUNNERS);
+      const tenancy = requireRole(ctx, "member");
+      const run = await ctx.prisma.agentRun.findFirst({
+        where: { id: args.runId, workspaceId: tenancy.workspaceId },
+        select: { id: true },
+      });
+      if (!run) return null; // not this workspace's run → no leak
+      return getRunRuntimeStatus(args.runId);
     },
   }),
 );

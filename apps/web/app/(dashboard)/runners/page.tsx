@@ -9,6 +9,7 @@ import {
   RUNTIME_ADAPTERS_QUERY,
   SANDBOX_PROVIDERS_QUERY,
   AGENT_RUNS_QUERY,
+  AGENT_RUN_LIVE_STATUS_QUERY,
 } from "@/lib/graphql/queries";
 import {
   CREATE_RUNNER_HOST,
@@ -93,6 +94,30 @@ const RUN_STATUS_VARIANT: Record<string, "green" | "red" | "gray" | "yellow"> = 
   queued: "yellow",
 };
 
+// Plan 6: the redacted live tail of an in-flight run, polled every 2s while open.
+function LiveTail({ runId }: { runId: string }) {
+  const [{ data }, refetch] = useQuery<{
+    agentRunLiveStatus: { phase: string; tail: string } | null;
+  }>({ query: AGENT_RUN_LIVE_STATUS_QUERY, variables: { runId } });
+  useEffect(() => {
+    const t = setInterval(() => refetch({ requestPolicy: "network-only" }), 2000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runId]);
+  const status = data?.agentRunLiveStatus;
+  if (!status) return <p className="text-xs text-muted-foreground">Waiting for output…</p>;
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">● live · {status.phase}</p>
+      {status.tail && (
+        <pre className="max-h-48 overflow-auto rounded bg-foreground/90 p-2 text-xs text-background">
+          {status.tail}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 function RunHistory() {
   const [{ data }, refetch] = useQuery<{ agentRuns: AgentRun[] }>({
     query: AGENT_RUNS_QUERY,
@@ -165,6 +190,7 @@ function RunHistory() {
           </div>
           {open === r.id && (
             <div className="mt-2 space-y-2">
+              {(r.status === "running" || r.status === "queued") && <LiveTail runId={r.id} />}
               {r.stdout && (
                 <pre className="max-h-48 overflow-auto rounded bg-foreground/90 p-2 text-xs text-background">
                   {r.stdout}

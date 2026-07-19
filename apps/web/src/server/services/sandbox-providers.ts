@@ -64,7 +64,12 @@ export async function isSandboxProviderConfigured(
 // Bound in-memory capture so a runaway command can't OOM the host running the local sandbox.
 const MAX_CAPTURE_BYTES = 1_000_000;
 
-function runLocal(command: string, cwd: string, timeoutMs?: number): Promise<SandboxExecResult> {
+function runLocal(
+  command: string,
+  cwd: string,
+  timeoutMs?: number,
+  onLog?: (chunk: { stream: "stdout" | "stderr"; data: string }) => void,
+): Promise<SandboxExecResult> {
   return new Promise((resolve) => {
     // `detached` puts the command in its own process group so a timeout can kill the WHOLE tree
     // (the shell AND its children). Otherwise a grandchild (e.g. a spawned runtime) keeps the stdio
@@ -89,12 +94,16 @@ function runLocal(command: string, cwd: string, timeoutMs?: number): Promise<San
         }, timeoutMs)
       : undefined;
     child.stdout?.on("data", (d: Buffer) => {
-      if (stdout.length < MAX_CAPTURE_BYTES) stdout += d.toString();
+      const s = d.toString();
+      if (stdout.length < MAX_CAPTURE_BYTES) stdout += s;
       else outDropped += d.length;
+      onLog?.({ stream: "stdout", data: s });
     });
     child.stderr?.on("data", (d: Buffer) => {
-      if (stderr.length < MAX_CAPTURE_BYTES) stderr += d.toString();
+      const s = d.toString();
+      if (stderr.length < MAX_CAPTURE_BYTES) stderr += s;
       else errDropped += d.length;
+      onLog?.({ stream: "stderr", data: s });
     });
     const cap = (s: string, dropped: number) =>
       dropped > 0 ? `${s}\n…[truncated ${dropped} bytes]` : s;
@@ -124,7 +133,7 @@ function localHandle(dir: string): SandboxHandle {
   return {
     id: dir,
     providerKey: "local",
-    exec: (command, opts) => runLocal(command, opts?.cwd ?? dir, opts?.timeoutMs),
+    exec: (command, opts) => runLocal(command, opts?.cwd ?? dir, opts?.timeoutMs, opts?.onLog),
     destroy: async () => {
       rmSync(dir, { recursive: true, force: true });
     },

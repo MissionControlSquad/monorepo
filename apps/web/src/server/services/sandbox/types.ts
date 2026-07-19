@@ -38,10 +38,23 @@ export interface SandboxExecResult {
   signal?: string | null;
 }
 
+/** A chunk of live output as a sandbox command runs (for streaming to the run's live status). */
+export interface SandboxLogChunk {
+  stream: "stdout" | "stderr";
+  data: string;
+}
+
+export interface SandboxExecOpts {
+  cwd?: string;
+  timeoutMs?: number;
+  /** Called with each output chunk as it arrives — enables mid-run streaming (Plan 6). */
+  onLog?: (chunk: SandboxLogChunk) => void;
+}
+
 export interface SandboxHandle {
   id: string;
   providerKey: string;
-  exec(command: string, opts?: { cwd?: string; timeoutMs?: number }): Promise<SandboxExecResult>;
+  exec(command: string, opts?: SandboxExecOpts): Promise<SandboxExecResult>;
   destroy(): Promise<void>;
 }
 
