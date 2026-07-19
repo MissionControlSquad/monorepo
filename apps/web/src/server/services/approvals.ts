@@ -4,12 +4,13 @@
  * agent review flow); the agent-comment-heavy review path (performApproveTask) is left for the
  * existing agent auto-review mutations and is intentionally not reused here (it is agent-coupled).
  */
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/server/prisma";
 import {
   ApprovalStatus as ApprovalStatusConst,
   ApprovalSubjectType as ApprovalSubjectTypeConst,
 } from "@agentcenter/utils";
-import type { ApprovalSubjectType } from "@agentcenter/database";
+import type { ApprovalSubjectType, Prisma, AgentLevel } from "@agentcenter/database";
 import { TaskStatus } from "../constants";
 
 export interface CreateApprovalInput {
@@ -20,10 +21,72 @@ export interface CreateApprovalInput {
   title: string;
   reason?: string | null;
   requestedById: string; // Profile id
+  payload?: Prisma.InputJsonValue;
 }
 
 export function createApproval(input: CreateApprovalInput) {
   return prisma.approval.create({ data: { ...input } });
+}
+
+/** The spec carried by a hire_agent approval's payload (Domain 14 #3). */
+export interface AgentHireSpec {
+  name: string;
+  role: string;
+  reportsToAgentId?: string | null;
+  level?: string | null;
+  personality?: string | null;
+}
+
+const VALID_AGENT_LEVELS = new Set(["intern", "specialist", "lead"]);
+
+function slugify(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "agent"
+  );
+}
+
+/**
+ * Propose hiring an agent (Domain 14 #3). Creates a pending hire_agent approval carrying the agent
+ * spec in `payload`; the agent is NOT created until the approval is approved (decideApproval fulfils
+ * it). Workspace-scoped; the manager the new agent reports to must be in the same workspace.
+ */
+export async function requestAgentHire(input: {
+  workspaceId: string;
+  spec: AgentHireSpec;
+  requestedById: string;
+  reason?: string | null;
+}) {
+  const name = input.spec.name?.trim();
+  if (!name) throw Object.assign(new Error("hire spec requires a name"), { status: 400 });
+  if (!input.spec.role?.trim())
+    throw Object.assign(new Error("hire spec requires a role"), { status: 400 });
+  if (input.spec.reportsToAgentId) {
+    const mgr = await prisma.agent.findFirst({
+      where: { id: input.spec.reportsToAgentId, workspaceId: input.workspaceId },
+      select: { id: true },
+    });
+    if (!mgr)
+      throw Object.assign(new Error("reportsToAgentId not found in workspace"), { status: 400 });
+  }
+  return createApproval({
+    workspaceId: input.workspaceId,
+    subjectType: ApprovalSubjectTypeConst.HIRE_AGENT as ApprovalSubjectType,
+    subjectId: slugify(name),
+    title: `Hire agent: ${name}`,
+    reason: input.reason ?? null,
+    requestedById: input.requestedById,
+    payload: {
+      name,
+      role: input.spec.role,
+      reportsToAgentId: input.spec.reportsToAgentId ?? null,
+      level: input.spec.level ?? null,
+      personality: input.spec.personality ?? null,
+    },
+  });
 }
 
 /** Load an approval scoped to its workspace; throws 404 for missing / cross-workspace ids. */
@@ -78,6 +141,35 @@ export async function decideApproval(input: {
         });
       }
     }
+
+    // Domain 14 #3: fulfil a hire_agent approval — approving it actually CREATES the agent from the
+    // spec carried in payload (previously the subject type was defined but never did anything). The
+    // new agent id is recorded back onto the approval payload for traceability.
+    let payloadUpdate: Prisma.InputJsonValue | undefined;
+    if (
+      input.decision === "approve" &&
+      approval.subjectType === ApprovalSubjectTypeConst.HIRE_AGENT
+    ) {
+      const spec = (approval.payload ?? null) as AgentHireSpec | null;
+      if (spec?.name && spec.role) {
+        const hired = await tx.agent.create({
+          data: {
+            name: spec.name,
+            role: spec.role,
+            workspaceId: input.workspaceId,
+            username: `${slugify(spec.name)}-${randomUUID().slice(0, 6)}`,
+            setupStatus: "active",
+            ...(spec.level && VALID_AGENT_LEVELS.has(spec.level)
+              ? { level: spec.level as AgentLevel }
+              : {}),
+            ...(spec.personality ? { personality: spec.personality } : {}),
+            ...(spec.reportsToAgentId ? { reportsToAgentId: spec.reportsToAgentId } : {}),
+          },
+        });
+        payloadUpdate = { ...spec, hiredAgentId: hired.id } as Prisma.InputJsonValue;
+      }
+    }
+
     return tx.approval.update({
       where: { id: input.approvalId },
       data: {
@@ -85,6 +177,7 @@ export async function decideApproval(input: {
         decidedById: input.decidedById,
         decidedAt: new Date(),
         decisionNote: input.decisionNote ?? null,
+        ...(payloadUpdate !== undefined ? { payload: payloadUpdate } : {}),
       },
     });
   });

@@ -155,4 +155,55 @@ describe("GraphQL governance / approvals (Epic #3)", () => {
     );
     expect(afterApprove.errors).toBeDefined();
   });
+
+  // Domain 14 #3: wire the hire_agent approval — approving it actually creates the agent.
+  it("requestAgentHire proposes a pending hire; approving it creates the agent", async () => {
+    const admin = await cookieFor(profileId, WS_A, "admin");
+    const proposed = await runGraphQL(
+      `mutation{ requestAgentHire(name:"Nova QA", role:"qa", level:"specialist"){ id status subjectType payload } }`,
+      undefined,
+      admin,
+    );
+    expect(proposed.errors).toBeFalsy();
+    expect(proposed.data.requestAgentHire).toMatchObject({
+      status: "pending",
+      subjectType: "hire_agent",
+    });
+    expect(proposed.data.requestAgentHire.payload).toMatchObject({ name: "Nova QA", role: "qa" });
+    const approvalId = proposed.data.requestAgentHire.id;
+
+    // No agent exists yet — the hire is only a proposal.
+    expect(await prisma.agent.count({ where: { workspaceId: WS_A, name: "Nova QA" } })).toBe(0);
+
+    // Approve → the agent is actually created, and its id is recorded on the payload.
+    const approved = await runGraphQL(
+      `mutation($id:String!){ approveApproval(id:$id){ status payload } }`,
+      { id: approvalId },
+      admin,
+    );
+    expect(approved.data.approveApproval.status).toBe("approved");
+    const hiredId = approved.data.approveApproval.payload.hiredAgentId;
+    expect(hiredId).toBeTruthy();
+
+    const hired = await prisma.agent.findUniqueOrThrow({ where: { id: hiredId } });
+    expect(hired).toMatchObject({
+      name: "Nova QA",
+      role: "qa",
+      workspaceId: WS_A,
+      level: "specialist",
+      setupStatus: "active",
+    });
+  });
+
+  it("rejecting a hire_agent approval does NOT create an agent", async () => {
+    const admin = await cookieFor(profileId, WS_A, "admin");
+    const proposed = await runGraphQL(
+      `mutation{ requestAgentHire(name:"Ghost Hire", role:"worker"){ id } }`,
+      undefined,
+      admin,
+    );
+    const id = proposed.data.requestAgentHire.id;
+    await runGraphQL(`mutation($id:String!){ rejectApproval(id:$id){ status } }`, { id }, admin);
+    expect(await prisma.agent.count({ where: { workspaceId: WS_A, name: "Ghost Hire" } })).toBe(0);
+  });
 });

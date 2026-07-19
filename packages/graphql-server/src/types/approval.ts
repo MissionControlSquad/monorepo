@@ -7,6 +7,7 @@ builder.prismaObject("Approval", {
     workspaceId: t.exposeString("workspaceId"),
     subjectType: t.exposeString("subjectType"),
     subjectId: t.exposeString("subjectId"),
+    payload: t.expose("payload", { type: "JSON", nullable: true }),
     taskId: t.exposeString("taskId", { nullable: true }),
     status: t.exposeString("status"),
     title: t.exposeString("title"),

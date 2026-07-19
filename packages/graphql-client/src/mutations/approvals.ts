@@ -63,3 +63,29 @@ export const ADD_APPROVAL_COMMENT = gql`
     }
   }
 `;
+
+// Domain 14 #3: propose hiring an agent (creates a pending hire_agent approval; approving it hires).
+export const REQUEST_AGENT_HIRE = gql`
+  mutation RequestAgentHire(
+    $name: String!
+    $role: String!
+    $reportsToAgentId: String
+    $level: String
+    $personality: String
+    $reason: String
+  ) {
+    requestAgentHire(
+      name: $name
+      role: $role
+      reportsToAgentId: $reportsToAgentId
+      level: $level
+      personality: $personality
+      reason: $reason
+    ) {
+      id
+      status
+      subjectType
+      payload
+    }
+  }
+`;

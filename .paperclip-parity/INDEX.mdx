@@ -223,11 +223,21 @@ See 03-sandbox-depth.mdx.
       (ingest RBAC, net debit−credit, group-by, idempotency dedup, workspace isolation). Typecheck 12/12, web build ✓.
       Remaining Domain 12: GAP-2 provider quota polling, GAP-3 telemetry, GAP-4 OTel, GAP-5 pino/run-log, GAP-6 rollups.
 
+- [x] **Teams Domain 14 — #3 wire hire_agent** DONE (next commit). The hire_agent approval subject type was defined
+      but never DID anything; now approving a hire_agent approval actually CREATES the agent. Approval gains a payload
+      Json (migration 20260719210000) carrying the hire spec. Service: requestAgentHire (validates name/role + manager
+      in-workspace, creates a pending hire_agent Approval with payload) + decideApproval fulfilment (on approve, creates
+      the Agent from payload inside the txn, records hiredAgentId back on payload; reject creates nothing). GraphQL:
+      requestAgentHire mutation (member+ proposes, GOVERNANCE-gated) + payload on Approval type + shared client op.
+      Tests: hire→approve creates agent (governance test 8/8, +2). Typecheck 12/12, web build ✓. Remaining Domain 14:
+      #10/#11/#12 Agent-Companies package model (L), #13 delegation presets, #14 quorum, #15 policy engine.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
-  hire_agent approval, auto-sleep cron, ~~secret audit-on-resolve~~ (FIXED — P1), ~~adapter Tier-A↔Tier-D disconnect~~
-  (FIXED — canonicalAdapterKey aliases), ~~requireUntrustedPrReview~~ (FIXED — Domain 8 G2, now consumed at run finalize).
-  → Phase 1 sweeps these.
+  ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
+  (FIXED — P1), ~~adapter Tier-A↔Tier-D disconnect~~ (FIXED — canonicalAdapterKey aliases), ~~requireUntrustedPrReview~~
+  (FIXED — Domain 8 G2, consumed at run finalize). → Phase 1 sweeps these. (Remaining loophole: auto-sleep cron IS
+  registered per INDEX line 51 — verify; memory capture FIXED in GAP-B.)
 - **No run persistence** anywhere (sandbox/heartbeat/work-items all point at it). → keystone #1.
 - **Low-trust containment is declared but not enforced at runtime** (sandbox admission, PR review, execution allowlist). → Phase 1/2.
 - **MCP entirely absent** — the single biggest capability gap for a tool-using agent platform.

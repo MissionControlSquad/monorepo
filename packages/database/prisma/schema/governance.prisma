@@ -29,6 +29,7 @@ model Approval {
   workspaceId   String // buildbase workspace _id; no FK
   subjectType   ApprovalSubjectType
   subjectId     String // Task.id | Deliverable.id | agent-spec id (polymorphic, no FK)
+  payload       Json? // subject-specific spec (e.g. hire_agent: {name, role, reportsToAgentId, level})
   taskId        String? // explicit approval↔task link
   status        ApprovalStatus      @default(pending)
   title         String

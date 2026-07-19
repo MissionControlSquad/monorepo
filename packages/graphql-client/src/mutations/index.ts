@@ -99,6 +99,7 @@ export {
   RESUBMIT_APPROVAL,
   CANCEL_APPROVAL,
   ADD_APPROVAL_COMMENT,
+  REQUEST_AGENT_HIRE,
 } from "./approvals";
 
 export {

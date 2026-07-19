@@ -10,6 +10,7 @@ import {
   resubmitApproval,
   cancelApproval,
   addComment,
+  requestAgentHire,
 } from "@/server/services/approvals";
 import { setTrustProfile } from "@/server/services/trust";
 
@@ -38,6 +39,39 @@ builder.mutationField("createApproval", (t) =>
         title: args.title,
         reason: args.reason ?? null,
         requestedById: tenancy.userId,
+      });
+      return ctx.prisma.approval.findUniqueOrThrow({ ...query, where: { id: created.id } });
+    },
+  }),
+);
+
+// Domain 14 #3: propose hiring an agent — creates a pending hire_agent approval; approving it
+// actually creates the agent (decideApproval fulfils it). GOVERNANCE-gated, member+ may propose.
+builder.mutationField("requestAgentHire", (t) =>
+  t.prismaField({
+    type: "Approval",
+    args: {
+      name: t.arg.string({ required: true }),
+      role: t.arg.string({ required: true }),
+      reportsToAgentId: t.arg.string(),
+      level: t.arg.string(),
+      personality: t.arg.string(),
+      reason: t.arg.string(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.GOVERNANCE);
+      const tenancy = requireRole(ctx, "member");
+      const created = await requestAgentHire({
+        workspaceId: tenancy.workspaceId,
+        spec: {
+          name: args.name,
+          role: args.role,
+          reportsToAgentId: args.reportsToAgentId ?? null,
+          level: args.level ?? null,
+          personality: args.personality ?? null,
+        },
+        requestedById: tenancy.userId,
+        reason: args.reason ?? null,
       });
       return ctx.prisma.approval.findUniqueOrThrow({ ...query, where: { id: created.id } });
     },
