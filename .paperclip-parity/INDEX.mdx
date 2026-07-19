@@ -190,6 +190,17 @@ See 03-sandbox-depth.mdx.
       query expose the new fields. Tests: secrets 43/43 (incl. injected-with-context / none-without). Typecheck 12/12,
       web build ✓. Remaining Domain 7: P2 external providers (aws/gcp/vault), P3 rich bindings, P4 user secrets, P5 MCP gov.
 
+- [x] **Heartbeat Domain 9 — #12 routine cron scanner + parser** DONE (next commit). Pure 5-field cron parser
+      packages/utils/src/cron.ts (parseCron/isValidCron/nextCronTick, Vixie dom-or-dow rule, IANA-timezone-aware via
+      Intl, time-bounded ~4yr search). Consolidated the weaker regex isValidCron from plugins.ts into it (plugins now
+      import). RoutineTrigger gains cronExpression/timezone (migration 20260719180000); addRoutineTrigger validates +
+      computes first nextFireAt; tickRoutineTriggers scans due cron triggers, optimistically claims the exact due-time
+      (updateMany WHERE nextFireAt=observed → no double-fire under concurrent crons), advances to next tick, fires via
+      triggerRoutineNow — wired into the reap-stale-work cron. Inactive routine → schedule still advances (self-heal).
+      GraphQL addRoutineTrigger gains cronExpression/timezone args. Tests: cron 7 unit + routines 3 integration (21 total
+      in pipelines.test). Typecheck 12/12, web build ✓. Remaining Domain 9: #1/#2 wake queue+tick, #6 retries+backoff,
+      #8 stranded-work reconcile, #10 silent-run watchdog, #11 issue monitors, #9 subtree watchdog.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   hire_agent approval, auto-sleep cron, ~~secret audit-on-resolve~~ (FIXED — P1), ~~adapter Tier-A↔Tier-D disconnect~~

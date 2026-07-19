@@ -58,6 +58,8 @@ model RoutineTrigger {
   routineId        String
   type             RoutineTriggerType
   recurrenceConfig Json? // reuses RecurringTask.recurrenceConfig shape (cron)
+  cronExpression   String? // 5-field cron (Domain 9 #12); drives nextFireAt for type=cron triggers
+  timezone         String? // IANA tz the cron is interpreted in; falls back to the routine's timezone
   nextFireAt       DateTime?
   publicId         String?            @unique // nanoid; public fire URL (webhook)
   isEnabled        Boolean            @default(true)

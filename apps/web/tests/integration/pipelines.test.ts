@@ -3,6 +3,11 @@ import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
 import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  createRoutine,
+  addRoutineTrigger,
+  tickRoutineTriggers,
+} from "../../src/server/services/routines";
 
 /**
  * Epic #7 routines + pipelines — real GraphQL route + Postgres, human auth via bb-workspace-token.
@@ -147,6 +152,68 @@ describe("routines (Epic #7)", () => {
     );
     expect(up.data.updateRoutine.currentVersion).toBe(2);
     expect(await prisma.routineRevision.count({ where: { routineId: id } })).toBe(2);
+  });
+});
+
+describe("cron routine triggers (Domain 9 #12)", () => {
+  it("computes nextFireAt from the cron expression and validates it", async () => {
+    const routine = await createRoutine({ workspaceId: WS_A, name: "Nightly", definition: {} });
+    const now = new Date("2026-07-19T08:30:00Z");
+    const trig = await addRoutineTrigger(
+      WS_A,
+      routine.id,
+      { type: "cron", cronExpression: "0 9 * * *" },
+      now,
+    );
+    expect(trig.cronExpression).toBe("0 9 * * *");
+    expect(trig.nextFireAt?.toISOString()).toBe("2026-07-19T09:00:00.000Z");
+
+    await expect(
+      addRoutineTrigger(WS_A, routine.id, { type: "cron", cronExpression: "not a cron" }, now),
+    ).rejects.toThrow(/cron/i);
+  });
+
+  it("tickRoutineTriggers fires due triggers, advances nextFireAt, and skips not-due", async () => {
+    const routine = await createRoutine({ workspaceId: WS_A, name: "Hourly", definition: {} });
+    const arm = new Date("2026-07-19T08:30:00Z");
+    const trig = await addRoutineTrigger(
+      WS_A,
+      routine.id,
+      { type: "cron", cronExpression: "0 * * * *" }, // top of every hour
+      arm,
+    );
+    expect(trig.nextFireAt?.toISOString()).toBe("2026-07-19T09:00:00.000Z");
+
+    // Not yet due → nothing fires, nextFireAt unchanged.
+    expect(await tickRoutineTriggers(new Date("2026-07-19T08:59:00Z"))).toBe(0);
+    expect(await prisma.routineRun.count({ where: { routineId: routine.id } })).toBe(0);
+
+    // Now due → fires once, generates a run, and advances to the next hour.
+    const fired = await tickRoutineTriggers(new Date("2026-07-19T09:05:00Z"));
+    expect(fired).toBe(1);
+    const runs = await prisma.routineRun.findMany({ where: { routineId: routine.id } });
+    expect(runs).toHaveLength(1);
+    expect(runs[0].triggeredBy).toBe("cron");
+    const advanced = await prisma.routineTrigger.findUniqueOrThrow({ where: { id: trig.id } });
+    expect(advanced.nextFireAt?.toISOString()).toBe("2026-07-19T10:00:00.000Z");
+  });
+
+  it("does not fire an inactive routine but still advances its schedule (self-heal)", async () => {
+    const routine = await createRoutine({ workspaceId: WS_A, name: "Paused", definition: {} });
+    const trig = await addRoutineTrigger(
+      WS_A,
+      routine.id,
+      { type: "cron", cronExpression: "0 * * * *" },
+      new Date("2026-07-19T08:30:00Z"),
+    );
+    await prisma.routine.update({ where: { id: routine.id }, data: { isActive: false } });
+
+    const fired = await tickRoutineTriggers(new Date("2026-07-19T09:05:00Z"));
+    expect(fired).toBe(0);
+    expect(await prisma.routineRun.count({ where: { routineId: routine.id } })).toBe(0);
+    // schedule still advanced so it self-heals once reactivated
+    const advanced = await prisma.routineTrigger.findUniqueOrThrow({ where: { id: trig.id } });
+    expect(advanced.nextFireAt?.toISOString()).toBe("2026-07-19T10:00:00.000Z");
   });
 });
 
