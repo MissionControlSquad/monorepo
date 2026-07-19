@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateManifest, isValidCron } from "@/server/services/plugins";
+import { validateManifest, isValidCron } from "@agentcenter/utils";
 
 // Epic #6: pure manifest validation + cron. No DB.
 

@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  bucketAgentCounts,
-  bucketTaskCounts,
-  getUtcMonthStart,
-} from "@/server/services/observability";
+import { bucketAgentCounts, bucketTaskCounts, getUtcMonthStart } from "@agentcenter/utils";
 
 // Epic #13: pure summary bucketers. No DB.
 const c = (status: string, n: number) => ({ status, _count: { _all: n } });

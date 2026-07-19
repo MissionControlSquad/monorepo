@@ -149,6 +149,8 @@ model Agent {
   reportsTo        Agent?  @relation("AgentOrg", fields: [reportsToAgentId], references: [id], onDelete: SetNull)
   reports          Agent[] @relation("AgentOrg")
 
+  capabilityGrants AgentCapabilityGrant[] @relation("AgentGrants") // Epic #21
+
   @@index([username])
   @@index([cloudVmId])
   @@index([workspaceId])

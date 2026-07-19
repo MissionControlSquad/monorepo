@@ -4,6 +4,7 @@
  */
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
+import { wouldCreateCycle, type HierarchyEdge } from "@agentcenter/utils";
 import type { Goal, GoalLevel, GoalStatus } from "@agentcenter/database";
 
 function badRequest(message: string): never {
@@ -11,22 +12,13 @@ function badRequest(message: string): never {
 }
 
 /**
- * Pure: reject a re-parent that would create a cycle. `edges` is every goal's (id → parentId) in the
- * workspace. Walking ancestors up from `parentId` must never reach `id` (and `parentId !== id`).
+ * Reject a re-parent that would create a cycle (throwing wrapper over the shared `wouldCreateCycle`).
+ * `edges` is every goal's (id → parentId) in the workspace.
  */
-export function assertNoCycle(
-  edges: { id: string; parentId: string | null }[],
-  id: string,
-  parentId: string | null,
-): void {
-  if (!parentId) return;
+export function assertNoCycle(edges: HierarchyEdge[], id: string, parentId: string | null): void {
   if (parentId === id) badRequest("A goal cannot be its own parent");
-  const byId = new Map(edges.map((e) => [e.id, e.parentId]));
-  let cursor: string | null | undefined = parentId;
-  let guard = edges.length + 1; // bound the walk even if the stored tree already has a cycle
-  while (cursor && guard-- > 0) {
-    if (cursor === id) badRequest("A goal cannot be moved under its own descendant");
-    cursor = byId.get(cursor) ?? null;
+  if (wouldCreateCycle(edges, id, parentId)) {
+    badRequest("A goal cannot be moved under its own descendant");
   }
 }
 

@@ -28,6 +28,7 @@ export const FLAG_KEYS = {
   AGENT_INSTRUCTIONS: "agent_instructions",
   ORG_CHART: "org_chart",
   ATTENTION: "attention",
+  AGENT_AUTHZ: "agent_authz",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -63,4 +64,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.AGENT_INSTRUCTIONS]: true,
   [FLAG_KEYS.ORG_CHART]: true,
   [FLAG_KEYS.ATTENTION]: true,
+  [FLAG_KEYS.AGENT_AUTHZ]: true,
 };

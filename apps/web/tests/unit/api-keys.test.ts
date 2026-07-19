@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isApiKeyActive, redactKey } from "@/server/services/api-keys";
+import { isApiKeyActive, redactKey } from "@agentcenter/utils";
 import { generateApiKey, hashApiKey } from "@/server/api-key";
 
 // Epic #12: pure key helpers + hash discipline. No DB.

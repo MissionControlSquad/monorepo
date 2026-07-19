@@ -5,102 +5,25 @@
  * `environment-custom-image-terminal-sessions.ts` (`parseCustomImageSetupSshCommand`) +
  * `session-workspace-cwd.ts` (`isUnsafeSessionWorkspaceCwd`) verbatim.
  */
-import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import { hashApiKey } from "@/server/api-key";
+import { parseSshCommand, isUnsafeSessionWorkspaceCwd } from "@agentcenter/utils";
 import type { TerminalSession } from "@agentcenter/database";
+
+// The pure SSH parsing, unsafe-cwd guard, and lifecycle-state logic are shared in @agentcenter/utils
+// (web/desktop/mobile). This file mints the token + persists. Re-exported for existing importers.
+export {
+  parseSshCommand,
+  isUnsafeSessionWorkspaceCwd,
+  terminalSessionState,
+  type ParsedSshCommand,
+  type TerminalState,
+} from "@agentcenter/utils";
 
 const CONNECT_TTL_MS = 5 * 60 * 1000; // token good for 5 min
 const SESSION_TTL_MS = 60 * 60 * 1000; // session good for 60 min
-
-export interface ParsedSshCommand {
-  username: string;
-  host: string;
-  port: number;
-}
-
-// ── Pure SSH-command parsing (verbatim port — injection-safe: only known shapes pass) ──
-function parsePort(value: string): number | null {
-  if (!/^\d{1,5}$/.test(value)) return null;
-  const port = Number(value);
-  return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : null;
-}
-
-function parseDestination(value: string): Pick<ParsedSshCommand, "username" | "host"> | null {
-  if (value.startsWith("-")) return null;
-  const parts = value.split("@");
-  if (parts.length !== 2) return null;
-  const [username, host] = parts;
-  if (!username || !host) return null;
-  if (!/^[^\s@/]+$/.test(username)) return null;
-  if (!/^[^\s@/:]+$/.test(host)) return null;
-  return { username, host };
-}
-
-export function parseSshCommand(command: string): ParsedSshCommand | null {
-  const tokens = command.trim().split(/\s+/).filter(Boolean);
-  if (tokens[0] !== "ssh") return null;
-
-  if (tokens.length === 2) {
-    const destination = parseDestination(tokens[1]!);
-    return destination ? { ...destination, port: 22 } : null;
-  }
-
-  if (tokens.length !== 4) return null;
-
-  if (tokens[1] === "-p") {
-    const port = parsePort(tokens[2]!);
-    const destination = parseDestination(tokens[3]!);
-    return port && destination ? { ...destination, port } : null;
-  }
-
-  if (tokens[2] === "-p") {
-    const destination = parseDestination(tokens[1]!);
-    const port = parsePort(tokens[3]!);
-    return port && destination ? { ...destination, port } : null;
-  }
-
-  return null;
-}
-
-// ── Pure unsafe-cwd guard (verbatim port) ──
-const SESSION_CWD_SYSTEM_ROOTS = new Set([
-  "/",
-  "/tmp",
-  "/var",
-  "/var/tmp",
-  "/var/run",
-  "/usr",
-  "/etc",
-  "/proc",
-  "/sys",
-  "/dev",
-  "/run",
-  "/private",
-  "/private/tmp",
-]);
-
-export function isUnsafeSessionWorkspaceCwd(cwd: string | null | undefined): boolean {
-  const value = typeof cwd === "string" && cwd.trim().length > 0 ? cwd.trim() : null;
-  if (!value) return false;
-  const normalized = path.normalize(value.replace(/\/+$/, "") || "/");
-  return SESSION_CWD_SYSTEM_ROOTS.has(normalized);
-}
-
-// ── Pure lifecycle state ──
-export type TerminalState = "pending" | "active" | "closed" | "expired";
-
-/** Derive the effective state: a closed session stays closed; a past-its-session-expiry one is expired. */
-export function terminalSessionState(
-  session: { status: string; sessionExpiresAt: Date; closedAt: Date | null },
-  now: Date = new Date(),
-): TerminalState {
-  if (session.closedAt || session.status === "closed") return "closed";
-  if (session.sessionExpiresAt.getTime() <= now.getTime()) return "expired";
-  return session.status === "active" ? "active" : "pending";
-}
 
 export type SafeTerminalSession = Omit<TerminalSession, "connectTokenHash">;
 function stripToken(s: TerminalSession): SafeTerminalSession {

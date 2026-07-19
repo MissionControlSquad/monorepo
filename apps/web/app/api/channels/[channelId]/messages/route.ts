@@ -12,6 +12,8 @@ import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS, parseMentionIds } from "@agentcenter/utils";
 import { resolveAgent } from "../../../_lib/resolve-agent";
+import { requireAgentCapability } from "@/server/services/agent-authz";
+import { AGENT_CAPABILITY } from "@agentcenter/utils";
 import {
   successResponse,
   errorResponse,
@@ -72,6 +74,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const v = await validateBody(request, createChannelMessageSchema);
     if (v.error) return v.error;
     const agent = await resolveAgent(request);
+    await requireAgentCapability(agent, AGENT_CAPABILITY.CHANNELS_POST);
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
     const membership = await findChannelMember(channelId, agentProfileId);

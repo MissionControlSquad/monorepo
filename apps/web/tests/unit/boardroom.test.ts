@@ -4,7 +4,7 @@ import {
   stripActionSignals,
   assembleHistory,
   buildBoardPrompt,
-} from "@/server/services/boardroom";
+} from "@agentcenter/utils";
 
 // Epic #15: pure prompt-assembly + injection defenses. No DB.
 

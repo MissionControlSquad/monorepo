@@ -32,6 +32,7 @@ import "./skill";
 import "./portability";
 import "./goal";
 import "./boardroom";
+import "./agent-authz";
 import "./plugin";
 import "./api-key";
 import "./terminal";

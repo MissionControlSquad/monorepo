@@ -6,52 +6,23 @@
  * functional and testable without a live model.
  */
 import { prisma } from "@/server/prisma";
+import {
+  DEFAULT_BOARD_SKILL,
+  assembleHistory,
+  buildBoardPrompt,
+  stripActionSignals,
+} from "@agentcenter/utils";
 import type { BoardMessage, BoardThread } from "@agentcenter/database";
 
-const HISTORY_TURNS = 20;
-
-/**
- * Default board-assistant preamble (Paperclip's fallback when the skill file is absent). A real
- * deployment can inject a fuller skill via the relay.
- */
-export const DEFAULT_BOARD_SKILL =
-  "You are a board-level assistant helping a human manage their AI-agent company. Help them create " +
-  "projects, hire agents, approve tasks, and monitor their organization. Be conversational, " +
-  "strategic, and concise.";
-
-/**
- * Serialize a comment body as a tagged conversation turn. Bodies are untrusted: without structure, a
- * message containing a literal `</turn>`/`<turn>` could fabricate turns in the prompt (history
- * injection). Neutralizing `<(/?turn)` keeps each body inside exactly one turn. Ported verbatim.
- */
-export function serializeTurn(role: "user" | "assistant", body: string): string {
-  const safeBody = body.replace(/<(\/?turn\b)/gi, "&lt;$1");
-  return `<turn role="${role}">\n${safeBody}\n</turn>`;
-}
-
-/**
- * Strip structured action signals (`%%ACTIONS%%{...}%%/ACTIONS%%`) from a reply before persisting —
- * they are a UI observer channel and must never enter the durable body. Ported verbatim.
- */
-export function stripActionSignals(response: string): string {
-  return response.replace(/%%ACTIONS%%[\s\S]*?%%\/ACTIONS%%/g, "").trim();
-}
-
-/** Pure: last `n` turns, oldest-first, each role-tagged + injection-safe, joined. */
-export function assembleHistory(
-  messages: { role: "user" | "assistant"; body: string }[],
-  n: number = HISTORY_TURNS,
-): string {
-  return messages
-    .slice(-n)
-    .map((m) => serializeTurn(m.role, m.body))
-    .join("\n\n");
-}
-
-/** Pure: assemble the full prompt — skill preamble + tagged history + the new user turn. */
-export function buildBoardPrompt(skill: string, history: string, userMessage: string): string {
-  return [skill.trim(), history, serializeTurn("user", userMessage)].filter(Boolean).join("\n\n");
-}
+// The prompt assembly + injection defenses (serializeTurn/stripActionSignals/assembleHistory/
+// buildBoardPrompt) are shared in @agentcenter/utils (web/desktop/mobile). This file is persistence.
+export {
+  serializeTurn,
+  stripActionSignals,
+  assembleHistory,
+  buildBoardPrompt,
+  DEFAULT_BOARD_SKILL,
+} from "@agentcenter/utils";
 
 export interface BoardRelayInput {
   workspaceId: string;

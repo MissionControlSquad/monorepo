@@ -6,39 +6,21 @@
 import { randomUUID } from "node:crypto";
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
-import type {
-  Team,
-  TeamMember,
-  TeamKind,
-  TeamTrustLevel,
-  CollisionStrategy,
-} from "@agentcenter/database";
+import type { Team, TeamMember, TeamKind, TeamTrustLevel } from "@agentcenter/database";
 import { slugify } from "./skills";
+import { resolveCollision } from "@agentcenter/utils";
+import type { CollisionAction, CollisionStrategy } from "@agentcenter/utils";
+
+// resolveCollision is a shared pure helper in @agentcenter/utils (reused by skills, teams,
+// portability). Imported for internal use here and re-exported for existing importers.
+export { resolveCollision };
+export type { CollisionAction, CollisionStrategy };
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
 }
 function notFound(what: string): never {
   throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
-}
-
-export type CollisionAction = "create" | "skip" | "replace";
-
-/** Pure: resolve a member-name collision against existing names. Unit-testable. */
-export function resolveCollision(
-  existing: string[],
-  name: string,
-  strategy: CollisionStrategy,
-): { action: CollisionAction; name: string } {
-  const set = new Set(existing);
-  if (!set.has(name)) return { action: "create", name };
-  if (strategy === "skip") return { action: "skip", name };
-  if (strategy === "replace") return { action: "replace", name };
-  // rename → find the first free "<name>-N".
-  let n = 2;
-  let candidate = `${name}-${n}`;
-  while (set.has(candidate)) candidate = `${name}-${++n}`;
-  return { action: "create", name: candidate };
 }
 
 export async function createTeam(input: {

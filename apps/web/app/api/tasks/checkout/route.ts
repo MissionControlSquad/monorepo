@@ -1,4 +1,6 @@
 import { resolveAgent } from "../../_lib/resolve-agent";
+import { requireAgentCapability } from "@/server/services/agent-authz";
+import { AGENT_CAPABILITY } from "@agentcenter/utils";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
@@ -12,6 +14,7 @@ export async function POST(request: Request) {
     if (!(await isFeatureEnabled(FLAG_KEYS.TASK_AUTONOMY)))
       return errorResponse("Task autonomy is not enabled", 403, "FEATURE_DISABLED");
     const agent = await resolveAgent(request);
+    await requireAgentCapability(agent, AGENT_CAPABILITY.TASKS_CHECKOUT);
 
     const body = (await request.json()) as {
       taskId?: string;

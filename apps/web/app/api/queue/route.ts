@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 import { taskModel } from "@/server/models/task";
 import { agentQueueItemModel } from "@/server/models";
 import { resolveAgent } from "../_lib/resolve-agent";
+import { requireAgentCapability } from "@/server/services/agent-authz";
+import { AGENT_CAPABILITY } from "@agentcenter/utils";
 import { successResponse, errorResponse, handleError } from "../_lib/json-response";
 import { validateBody, createQueueItemSchema } from "../_lib/validation";
 import { log } from "../_lib/logger";
@@ -55,6 +57,7 @@ export async function POST(request: Request) {
     const v = await validateBody(request, createQueueItemSchema);
     if (v.error) return v.error;
     const agent = await resolveAgent(request);
+    await requireAgentCapability(agent, AGENT_CAPABILITY.QUEUE_CONSUME);
 
     const {
       title,

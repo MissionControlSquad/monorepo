@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  getAgentOrgChainHealth,
-  assertNoReportingCycle,
-  buildOrgTree,
-} from "@/server/services/org-chart";
+import { getAgentOrgChainHealth, buildOrgTree } from "@agentcenter/utils";
+import { assertNoReportingCycle } from "@/server/services/org-chart";
 
 // Epic #19: pure org-chain health + tree + cycle guard. Chain cases ported from Paperclip
 // agent-eligibility (cycle + missing_manager modes).

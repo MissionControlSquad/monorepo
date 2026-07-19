@@ -3,7 +3,7 @@ import {
   isValidInstructionFileName,
   defaultBundleFor,
   DEFAULT_AGENTS_MD,
-} from "@/server/services/agent-instructions";
+} from "@agentcenter/utils";
 
 // Epic #18: pure file-name validation + default bundles. No DB.
 
