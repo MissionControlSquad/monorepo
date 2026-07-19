@@ -5,6 +5,7 @@
 enum GoalLevel {
   company
   team
+  agent // Domain 14 #9 — company → team → agent → task alignment
   task
 }
 

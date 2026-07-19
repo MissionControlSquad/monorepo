@@ -399,6 +399,11 @@ See 03-sandbox-depth.mdx.
       no-op on missing; GraphQL member-reads/admin-forgets). Typecheck 12/12, web build ✓. Remaining Domain 4: GAP-D inspect
       UI, GAP-E adapter interface, GAP-G cost linkage, GAP-H evals (memory.note = existing appendAgentMemory).
 
+- [x] **Teams Domain 14 — #9 agent goal level** DONE (next commit). GoalLevel gains `agent` (company → team → agent → task
+      alignment, migration 20260719310000 ALTER TYPE ADD VALUE) + GOAL_LEVEL.AGENT in @agentcenter/utils; createGoal already
+      validates via isGoalLevel so no resolver change. Tests: 1 integration (full 4-level hierarchy). Typecheck 12/12, web
+      build ✓. Remaining Domain 14: #10-12 Agent-Companies package model (L), #13 delegation presets, #14 quorum, #15 policy.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
