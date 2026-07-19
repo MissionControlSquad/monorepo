@@ -1,0 +1,139 @@
+---
+title: "Handoff — continue the Paperclip→monorepo parity port"
+audience: "Claude (or any agent) picking up this work on a fresh machine"
+branch: "feat/paperclip-parity"
+updated: "2026-07-19"
+---
+
+# Handoff: continue where we left off
+
+You are continuing a long-running effort to **port Paperclip (a competitor product) feature-parity into
+this monorepo** — production-grade, end-to-end, everything behind feature flags, fully tested. Read this
+whole file, then read `.paperclip-parity/INDEX.mdx` (the master tracker) before writing any code.
+
+## 0. First moves (do these before anything else)
+
+1. Confirm the branch: `git branch --show-current` → should be **`feat/paperclip-parity`**. If not,
+   `git checkout feat/paperclip-parity`.
+2. Read **`.paperclip-parity/INDEX.mdx`** — the phased backlog with ✅/🟡/❌ per item and commit refs for
+   everything already done. That file is the source of truth for "what's done / what's left".
+3. Skim the relevant domain doc in `.paperclip-parity/NN-*.mdx` for whatever you pick up (each has a
+   feature inventory + implementation plans + the Paperclip `file:line` references).
+4. Install + generate: from the repo root `npm install`, then
+   `cd packages/database && npx prisma generate`.
+5. Point the test DB at your machine and apply the schema (see §3).
+
+> The Paperclip reference repo was at a machine-specific path on the original machine and **may not exist
+> here**. You don't need it — the `.paperclip-parity/*.mdx` docs captured the needed detail (models,
+> method names, file:line). If you do have it, its path is noted at the top of `INDEX.mdx`.
+
+## 1. What this repo is (architecture)
+
+- **Monorepo**: Turborepo + npm workspaces. Next.js 15.3 App Router + React 19, Prisma (split schema
+  `packages/database/prisma/schema/*.prisma`), Pothos code-first GraphQL + graphql-yoga, urql client,
+  Postgres, vitest.
+- Packages: `@agentcenter/{utils,database,graphql-server,graphql-client,types,hooks,config}`,
+  `@agentcenter/runner` (standalone daemon), and the app at `apps/web`.
+- **`@buildbase/sdk` is the tenancy boundary.** Human auth, billing, orgs, workspaces, RBAC/roles are
+  ALL SDK-owned — **never rebuild them**. Your code only *consumes* `workspaceId` scoping + the admin
+  check. **MCP is also buildbase-provided → do NOT build MCP** (it's advisory-only in `06-plugins-mcp.mdx`).
+- Auth in the app: `resolveAgent(request)` (Bearer `mc_` key, REST) and `requireRole(ctx, "admin"|"member")`
+  (workspace JWT cookie, GraphQL). Feature flags: `packages/utils/src/feature-flag-keys.ts`
+  (`FLAG_KEYS`, all new work default **off**).
+
+## 2. What's already DONE (don't redo it)
+
+**Phase 2 tail (async sandbox runs) + ALL of Phase 3 (the Environment/execution subsystem) are complete
+and committed on this branch.** 15 commits. See `INDEX.mdx` for the per-item detail + commit hashes. In short:
+
+- **Domain 1 — Environments & execution: DONE.** Environment model + CRUD + per-driver validation +
+  secret-refs; execution policy/allowlist (fail-closed) + probe; leases (reuse/retain/reaper, atomic
+  claim); execution workspaces + project setup commands + phase log; live streamed run status + a
+  run-scoped in-sandbox callback bridge; execution-target/transport resolver; custom-image capture
+  (snapshot/supersede/rollback/overlay). Flags: `ENVIRONMENTS`, `EXECUTION_POLICY`,
+  `EXECUTION_WORKSPACES`, `CUSTOM_IMAGES` (all default off).
+- **Domain 3 — Sandbox depth: DONE** (run persistence `AgentRun`, runtime-install, private-repo auth,
+  secrets-into-box, async enqueue/drain/cancel, timeout tree-kill, auto-dispatch).
+- Central seam: `apps/web/src/server/services/sandbox-run.ts` (`runTaskInSandbox`, `enqueueSandboxRun`,
+  `drainSandboxRunQueue`, `resolveAndAdmitTarget`, `composeSandboxScript`). Providers:
+  `sandbox-providers.ts` + `sandbox/*`. Env services: `environments.ts`, `environment-leases.ts`,
+  `execution-workspaces.ts`, `execution-policy.ts`, `environment-custom-images.ts`, `run-runtime-status.ts`,
+  `run-bridge.ts`. Env UI: `apps/web/app/(dashboard)/environments/page.tsx`.
+
+## 3. Verification loop (run these; keep them green)
+
+From the **repo root** unless noted. Clear stale Next types first if typecheck complains.
+
+```bash
+# typecheck (all packages) — expect "12 successful"
+rm -rf apps/web/.next/types && npx turbo run typecheck
+
+# apply the DB schema to YOUR test DB (edit apps/web/.env.test DATABASE_URL first)
+cd packages/database && npx prisma generate \
+  && npx dotenv -e ../../apps/web/.env.test -- npx prisma db push --accept-data-loss --skip-generate
+
+# run a test file (from apps/web). NOTE the --hookTimeout: a global beforeAll in tests/setup.ts
+# reads flags from the DB and flakily times out at the default 10s under load — 40s makes it reliable.
+cd apps/web && DISABLE_FLAG_CACHE=1 npx dotenv -e .env.test -- \
+  npx vitest run tests/integration/<file>.test.ts --hookTimeout=40000
+
+# build the web app — expect "Compiled successfully"
+rm -rf apps/web/.next && npx turbo run build --filter=@agentcenter/web
+```
+
+Prisma models live in `packages/database/prisma/schema/*.prisma`; write a matching migration under
+`packages/database/prisma/migrations/<timestamp>_<name>/migration.sql` (the CI/deploy path uses
+`prisma migrate`, but tests use `db push`, so raw partial-unique indexes in a migration are NOT present in
+the test DB — enforce those in app code too, as the Environment code does).
+
+## 4. Conventions (match these — the reviewer will)
+
+- **Every new surface is feature-flag-gated** (add to `FLAG_KEYS` + `FLAG_DEFAULTS: false`), **workspace-
+  scoped**, and **admin-gated for mutations** (`requireRole(ctx, "admin")`), member for reads.
+- **Secrets never leave the server.** Store config secrets as `{secretRef:{name}}` vault pointers; return
+  masked values only. SSH keys encrypted at rest. Scrub secret values from any streamed/logged output.
+- Shared GraphQL queries/mutations go in **`@agentcenter/graphql-client`** (so web + mobile + desktop get
+  them free), re-exported through `apps/web/src/lib/graphql/{queries,mutations}`.
+- Build vertical slices: schema → service → GraphQL → shared client → UI → tests, and **verify after each**
+  (typecheck + the slice's test + build). Prefer pure, unit-testable resolvers in `@agentcenter/utils`.
+- **Commit only when asked; push only when asked.** End commit messages with:
+  `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
+- After finishing an item, **update `.paperclip-parity/INDEX.mdx`** (check it off with the commit hash +
+  a one-line summary) — that file IS the handoff memory.
+
+## 5. What's NOT done — pick from here
+
+Two buckets. See `INDEX.mdx` §"Phase 4 — big epics" for the full list; the domain docs have the plans.
+
+**A. Blocked on infrastructure (need a real credential / live host — do only if the user provides one):**
+- Live-key verification of any cloud sandbox provider (all currently SDK-mocked).
+- Real cloud-provider `snapshot()` / lease `resume()` impls (e2b/daytona/kubernetes).
+- Interactive custom-image **setup-terminal** capture (live SSH PTY).
+- Cloudflare bridge Worker (needs a CF account).
+
+**B. Buildable now (Phase-4 domains, each multi-session — pick by the user's priority):**
+- **`JsonSchemaForm` UI primitive** (keystone #3) — unblocks every rich config screen. Good next.
+- **Domain 4 — Memory**: the two-layer memory service (binding resolution + provenance + cost + inspect
+  UI); default = local-markdown. See `04-memory.mdx`.
+- **Domain 2 — Adapters & runtimes**: unify the two adapter registries; add missing adapters
+  (cursor/grok/opencode/pi/hermes/ACP). See `02-adapters-runtimes.mdx`.
+- **Domain 5 — Skills**: catalog pkg, external import, update/audit, runtime-sync, Skill Studio, policy.
+- **Domain 7 — Secrets**: external providers (AWS/GCP/Vault), audit-on-resolve at the USE site, richer
+  binding targets. See `07-secrets.mdx`.
+- **Domain 8 — Work items**: `TaskRun` + work-product taxonomy (PR/branch/commit/preview) + the
+  untrusted-PR-review flow (this also unblocks `requireUntrustedPrReview`, currently a dead toggle).
+- **Domain 9 — Heartbeat**: central agent-wake scheduler, scheduled retries + backoff, stranded-work
+  reconcile. Also: register the `auto-sleep` cron if still unregistered.
+- **Domain 12 — Cost/observability**: FinanceEvent ledger, provider quota polling, OTel, pino redaction.
+- **Domain 14 — Teams**: Agent-Companies package model; wire `hire_agent` approval.
+- **Domain 13 — Deployment/CLI**: operator CLI (doctor/env/db:backup), deploy modes.
+
+## 6. How to start (suggested first message to yourself)
+
+> "Read `.paperclip-parity/HANDOFF.mdx` and `.paperclip-parity/INDEX.mdx`. Confirm typecheck + build are
+> green on `feat/paperclip-parity`. Then implement <the domain the user names> as a flag-gated vertical
+> slice (schema → service → GraphQL → shared client → UI → tests), verifying after each step, and update
+> INDEX.mdx when done."
+
+If the user hasn't named a target, propose the **`JsonSchemaForm` primitive** or **Memory service** as the
+next keystone and ask which they want.
