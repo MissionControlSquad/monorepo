@@ -13,6 +13,7 @@ import {
   setSecretStatus,
   createSecretProvider,
   deleteSecretProvider,
+  checkSecretProviderHealth,
   importSecrets,
   isSecretProviderKind,
 } from "@/server/services/secrets";
@@ -203,6 +204,23 @@ builder.mutationField("deleteSecretProvider", (t) =>
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
       const tenancy = requireRole(ctx, "admin");
       return deleteSecretProvider(tenancy.workspaceId, args.id);
+    },
+  }),
+);
+
+// Domain 7 P2: run a provider health check and persist healthy/lastCheckedAt/lastError.
+builder.mutationField("checkSecretProviderHealth", (t) =>
+  t.prismaField({
+    type: "SecretProviderConfig",
+    args: { id: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SECRETS_VAULT);
+      const tenancy = requireRole(ctx, "admin");
+      const provider = await checkSecretProviderHealth(tenancy.workspaceId, args.id);
+      return ctx.prisma.secretProviderConfig.findUniqueOrThrow({
+        ...query,
+        where: { id: provider.id },
+      });
     },
   }),
 );

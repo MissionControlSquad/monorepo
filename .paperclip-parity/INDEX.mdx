@@ -382,6 +382,15 @@ See 03-sandbox-depth.mdx.
       type + shared client op. Tests: 2 integration (cancel active, refuse done). Typecheck 12/12, web build ✓. Remaining
       Domain 8 G6: G6.2 rich comments, G6.3 external-object sync, G6.4 origin/idempotency, G6.6 subtree cancel/restore verbs.
 
+- [x] **Secrets Domain 7 — P2 provider modules + health checks** DONE (next commit). Pure secret-providers.ts in
+      @agentcenter/utils: SecretProviderModule registry (env implemented + always healthy; aws/vault stubs that validateConfig
+      required keys [aws:region, vault:address/path] + report `coming_soon` health until a real resolver lands) +
+      validateSecretProviderConfig / checkSecretProviderConfigHealth. Service checkSecretProviderHealth(ws, id) runs the module
+      health check and PERSISTS healthy/lastCheckedAt/lastError — fields the model always had but NOTHING ever wrote (closes the
+      A2 "never written" gap). GraphQL checkSecretProviderHealth mutation (admin, SECRETS_VAULT) + shared client op. Tests: 3 unit
+      + 1 integration (env healthy, unconfigured vault coming_soon, member denied). Typecheck 12/12, web build ✓. Remaining
+      Domain 7: P2 real AWS/GCP/Vault resolvers (infra), P3 rich bindings, P4 user secrets, P5 MCP governance.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

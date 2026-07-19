@@ -14,6 +14,7 @@ import type {
   SecretProviderKind,
 } from "@agentcenter/database";
 import { encryptSecret, decryptSecret, CURRENT_KEY_ID } from "./secrets-crypto";
+import { checkSecretProviderConfigHealth } from "@agentcenter/utils";
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
@@ -528,6 +529,8 @@ export async function createSecretProvider(input: {
     where: { workspaceId: input.workspaceId, name },
   });
   if (dup) badRequest(`a provider named "${name}" already exists in this workspace`);
+  // Domain 7 P2: a provider may be created then configured — config completeness is surfaced by the
+  // health check (checkSecretProviderHealth), not enforced here, so a bare provider row is allowed.
   return prisma.secretProviderConfig.create({
     data: {
       workspaceId: input.workspaceId,
@@ -542,6 +545,27 @@ export function listSecretProviders(workspaceId: string) {
   return prisma.secretProviderConfig.findMany({
     where: { workspaceId },
     orderBy: { name: "asc" },
+  });
+}
+
+/**
+ * Run a provider's health check (Domain 7 P2) and PERSIST the outcome onto healthy/lastCheckedAt/
+ * lastError — fields the model has always had but nothing ever wrote. Pure module logic lives in
+ * @agentcenter/utils; env is healthy, aws/vault report `coming_soon` until a real resolver lands.
+ */
+export async function checkSecretProviderHealth(
+  workspaceId: string,
+  id: string,
+): Promise<SecretProviderConfig> {
+  const provider = await prisma.secretProviderConfig.findFirst({ where: { id, workspaceId } });
+  if (!provider) notFound("Provider");
+  const health = checkSecretProviderConfigHealth(
+    provider.kind,
+    (provider.config ?? {}) as Record<string, unknown>,
+  );
+  return prisma.secretProviderConfig.update({
+    where: { id: provider.id },
+    data: { healthy: health.healthy, lastCheckedAt: new Date(), lastError: health.error },
   });
 }
 

@@ -343,6 +343,34 @@ describe("provider configs (Epic #5)", () => {
     const again = await gql(CREATE_PROVIDER, { n: "dup", k: "env" }, admin);
     expect(again.errors).toBeDefined();
   });
+
+  // Domain 7 P2: health check writes the previously-never-written healthy/lastCheckedAt/lastError.
+  it("checkSecretProviderHealth persists health: env healthy, unconfigured vault coming_soon", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    const CHECK = `mutation($id:String!){ checkSecretProviderHealth(id:$id){ id healthy lastCheckedAt lastError } }`;
+
+    const env = await gql(CREATE_PROVIDER, { n: "local", k: "env" }, admin);
+    const envHealth = await gql(CHECK, { id: env.data.createSecretProvider.id }, admin);
+    expect(envHealth.data.checkSecretProviderHealth).toMatchObject({
+      healthy: true,
+      lastError: null,
+    });
+    expect(envHealth.data.checkSecretProviderHealth.lastCheckedAt).toBeTruthy();
+
+    // a vault with no config → unhealthy with a missing-config error
+    const vault = await gql(CREATE_PROVIDER, { n: "v", k: "vault" }, admin);
+    const vaultHealth = await gql(CHECK, { id: vault.data.createSecretProvider.id }, admin);
+    expect(vaultHealth.data.checkSecretProviderHealth.healthy).toBe(false);
+    expect(vaultHealth.data.checkSecretProviderHealth.lastError).toMatch(/missing required config/);
+
+    // member cannot run a health check
+    const denied = await gql(
+      CHECK,
+      { id: env.data.createSecretProvider.id },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+  });
 });
 
 describe("bulk import (Epic #5)", () => {
