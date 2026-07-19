@@ -41,7 +41,8 @@ model Project {
 
   workspaceId String? // buildbase workspace _id (Epic #1, D5); no FK; backfilled to default workspace
 
-  costEvents CostEvent[] // Epic #4
+  costEvents    CostEvent[] // Epic #4
+  ledgerEvents  LedgerEvent[] @relation("ProjectLedgerEvents") // Epic #16
 
   @@index([status])
   @@index([createdAt])

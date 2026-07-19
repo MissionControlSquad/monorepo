@@ -31,6 +31,8 @@ async function truncateAll() {
   clearCaches();
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      ledger_events,
+      ledger_categories,
       budget_incidents,
       quota_windows,
       budget_policies,

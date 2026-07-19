@@ -11,6 +11,7 @@ export const FLAG_KEYS = {
   LIVE_GATEWAY: "live_gateway",
   GOVERNANCE: "governance",
   BUDGETS: "budgets",
+  LEDGER: "ledger",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -28,4 +29,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.LIVE_GATEWAY]: false,
   [FLAG_KEYS.GOVERNANCE]: true,
   [FLAG_KEYS.BUDGETS]: true,
+  [FLAG_KEYS.LEDGER]: true,
 };
