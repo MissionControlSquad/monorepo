@@ -224,6 +224,7 @@ export {
   RUN_TASK_IN_SANDBOX,
   ENQUEUE_TASK_IN_SANDBOX,
   CANCEL_AGENT_RUN,
+  PROMOTE_AGENT_RUN_REVIEW,
 } from "./sandbox-run";
 export { SET_AGENT_RUNTIME } from "./agent-runtime";
 export { SET_AGENT_MEMORY_PROVIDER, SET_COMPANY_MEMORY_PROVIDER } from "./memory";

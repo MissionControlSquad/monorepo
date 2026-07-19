@@ -5,6 +5,8 @@ import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
 import { getSandboxProvider } from "@/server/services/sandbox-providers";
 import { runTaskInSandbox, enqueueSandboxRun, cancelAgentRun } from "@/server/services/sandbox-run";
+import { promoteAgentRunReview } from "@/server/services/run-review";
+import type { RunReviewState } from "@agentcenter/utils";
 
 // Tier D: bind an agent to a sandbox provider (its tasks run inside a provisioned sandbox) and run a
 // task in it. RUNNERS-gated, admin (arbitrary code execution + credential use).
@@ -79,6 +81,29 @@ builder.mutationField("cancelAgentRun", (t) =>
       await requireFeature(FLAG_KEYS.RUNNERS);
       const tenancy = requireRole(ctx, "admin");
       return cancelAgentRun(tenancy.workspaceId, args.runId);
+    },
+  }),
+);
+
+// Domain 8 G2: a board/admin reviewer promotes (or requests changes on) a quarantined run's output —
+// the ONLY path out of `needs_review`. LOW_TRUST_REVIEW-gated, admin.
+builder.mutationField("promoteAgentRunReview", (t) =>
+  t.prismaField({
+    type: "AgentRun",
+    args: {
+      runId: t.arg.string({ required: true }),
+      decision: t.arg.string({ required: true }), // "approved" | "changes_requested"
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.LOW_TRUST_REVIEW);
+      const tenancy = requireRole(ctx, "admin");
+      const run = await promoteAgentRunReview({
+        workspaceId: tenancy.workspaceId,
+        runId: args.runId,
+        decision: args.decision as RunReviewState,
+        reviewedByProfileId: tenancy.userId,
+      });
+      return ctx.prisma.agentRun.findUniqueOrThrow({ ...query, where: { id: run.id } });
     },
   }),
 );

@@ -14,6 +14,7 @@ import {
   autoDispatchSandboxForAssignment,
 } from "../../src/server/services/sandbox-run";
 import { getOrCreateAgentProfileId } from "../../src/server/agent-profile";
+import { promoteAgentRunReview } from "../../src/server/services/run-review";
 import { createEnvironment } from "../../src/server/services/environments";
 import { getRunRuntimeStatus } from "../../src/server/services/run-runtime-status";
 import { createSecret, bindSecret } from "../../src/server/services/secrets";
@@ -487,5 +488,91 @@ describe("environment-driven execution (Plan 1 wiring)", () => {
     });
     expect(result.providerKey).toBe("local");
     expect(result.exitCode).toBe(0);
+  });
+});
+
+describe("untrusted-output review gate (Domain 8 G2)", () => {
+  async function enableLowTrustReview(on = true) {
+    await prisma.featureFlag.upsert({
+      where: { key: "low_trust_review" },
+      create: { key: "low_trust_review", enabled: on, managedBy: "user" },
+      update: { enabled: on },
+    });
+    invalidateFlagCache();
+  }
+
+  it("stamps needs_review + quarantined sourceTrust for a review-required agent (flag on)", async () => {
+    await enableLowTrustReview();
+    // A STANDARD-trust agent (so it may run on `local`) whose profile requires untrusted-PR review.
+    const agentId = await makeAgent("local", "standard");
+    await prisma.agentTrustProfile.create({
+      data: { agentId, workspaceId: WS, trustLevel: "standard", requireUntrustedPrReview: true },
+    });
+    const taskId = await makeTask();
+    const result = await runTaskInSandbox({ workspaceId: WS, taskId, agentId });
+    expect(result.exitCode).toBe(0);
+
+    const run = await prisma.agentRun.findUniqueOrThrow({ where: { id: result.runId } });
+    expect(run.reviewState).toBe("needs_review");
+    expect(run.sourceTrust).toMatchObject({
+      preset: "low_trust_review",
+      disposition: "quarantined",
+    });
+  });
+
+  it("stamps approved for a standard agent, and is a no-op when the flag is off", async () => {
+    // flag ON, plain standard agent → approved
+    await enableLowTrustReview();
+    const trusted = await makeAgent("local", "standard");
+    const t1 = await makeTask();
+    const r1 = await runTaskInSandbox({ workspaceId: WS, taskId: t1, agentId: trusted });
+    expect((await prisma.agentRun.findUniqueOrThrow({ where: { id: r1.runId } })).reviewState).toBe(
+      "approved",
+    );
+
+    // flag OFF → not evaluated at all (reviewState stays null)
+    await enableLowTrustReview(false);
+    const agentId = await makeAgent("local", "standard");
+    await prisma.agentTrustProfile.create({
+      data: { agentId, workspaceId: WS, trustLevel: "standard", requireUntrustedPrReview: true },
+    });
+    const t2 = await makeTask();
+    const r2 = await runTaskInSandbox({ workspaceId: WS, taskId: t2, agentId });
+    expect(
+      (await prisma.agentRun.findUniqueOrThrow({ where: { id: r2.runId } })).reviewState,
+    ).toBeNull();
+  });
+
+  it("promoteAgentRunReview flips a quarantined run to approved (only from needs_review)", async () => {
+    await enableLowTrustReview();
+    const agentId = await makeAgent("local", "standard");
+    await prisma.agentTrustProfile.create({
+      data: { agentId, workspaceId: WS, trustLevel: "standard", requireUntrustedPrReview: true },
+    });
+    const taskId = await makeTask();
+    const { runId } = await runTaskInSandbox({ workspaceId: WS, taskId, agentId });
+
+    const promoted = await promoteAgentRunReview({
+      workspaceId: WS,
+      runId,
+      decision: "approved",
+      reviewedByProfileId: "profile_board",
+    });
+    expect(promoted.reviewState).toBe("approved");
+    expect(promoted.sourceTrust).toMatchObject({
+      disposition: "trusted",
+      promotedByProfileId: "profile_board",
+    });
+    expect(promoted.reviewedByProfileId).toBe("profile_board");
+
+    // a run not awaiting review can't be promoted
+    await expect(
+      promoteAgentRunReview({
+        workspaceId: WS,
+        runId,
+        decision: "approved",
+        reviewedByProfileId: "profile_board",
+      }),
+    ).rejects.toThrow(/awaiting review/);
   });
 });

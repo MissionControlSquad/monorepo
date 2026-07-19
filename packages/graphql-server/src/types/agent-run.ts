@@ -17,6 +17,11 @@ builder.prismaObject("AgentRun", {
     stderr: t.exposeString("stderr", { nullable: true }),
     errorMessage: t.exposeString("errorMessage", { nullable: true }),
     costCents: t.exposeInt("costCents", { nullable: true }),
+    // Domain 8 G2 — untrusted-output review gate.
+    reviewState: t.exposeString("reviewState", { nullable: true }),
+    sourceTrust: t.expose("sourceTrust", { type: "JSON", nullable: true }),
+    reviewedByProfileId: t.exposeString("reviewedByProfileId", { nullable: true }),
+    reviewedAt: t.expose("reviewedAt", { type: "DateTime", nullable: true }),
     startedAt: t.expose("startedAt", { type: "DateTime" }),
     finishedAt: t.expose("finishedAt", { type: "DateTime", nullable: true }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),

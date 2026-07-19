@@ -201,10 +201,22 @@ See 03-sandbox-depth.mdx.
       in pipelines.test). Typecheck 12/12, web build ✓. Remaining Domain 9: #1/#2 wake queue+tick, #6 retries+backoff,
       #8 stranded-work reconcile, #10 silent-run watchdog, #11 issue monitors, #9 subtree watchdog.
 
+- [x] **Work-items Domain 8 — G2 (make requireUntrustedPrReview real)** DONE (next commit). Pure source-trust helpers
+      packages/utils/src/source-trust.ts (runRequiresReview/resolveRunReviewState/buildRunSourceTrust/buildPromotedSourceTrust/
+      isQuarantined) — finally CONSUME the dead requireUntrustedPrReview toggle. AgentRun gains reviewState/sourceTrust/
+      reviewedByProfileId/reviewedAt (migration 20260719190000). run-review.ts: stampRunReview at run finalization (a
+      low-trust/untrusted agent, or one whose profile requires it → needs_review + quarantined sourceTrust; standard/
+      trusted → approved) wired into runTaskInSandbox behind the new LOW_TRUST_REVIEW flag (default off); promoteAgentRunReview
+      (admin) is the ONLY path out of needs_review. GraphQL: reviewState/sourceTrust on AgentRun + promoteAgentRunReview
+      mutation + shared client op + AGENT_RUNS_QUERY fields. Tests: source-trust 4 unit + 3 sandbox-run integration.
+      Typecheck 12/12, web build ✓. NOTE: reviewState currently lives on AgentRun (the run entity we already have) rather
+      than a full WorkProduct taxonomy — G1 work-product types + G3 richer TaskRun + G2 read-path redaction remain.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   hire_agent approval, auto-sleep cron, ~~secret audit-on-resolve~~ (FIXED — P1), ~~adapter Tier-A↔Tier-D disconnect~~
-  (FIXED — canonicalAdapterKey aliases). → Phase 1 sweeps these.
+  (FIXED — canonicalAdapterKey aliases), ~~requireUntrustedPrReview~~ (FIXED — Domain 8 G2, now consumed at run finalize).
+  → Phase 1 sweeps these.
 - **No run persistence** anywhere (sandbox/heartbeat/work-items all point at it). → keystone #1.
 - **Low-trust containment is declared but not enforced at runtime** (sandbox admission, PR review, execution allowlist). → Phase 1/2.
 - **MCP entirely absent** — the single biggest capability gap for a tool-using agent platform.

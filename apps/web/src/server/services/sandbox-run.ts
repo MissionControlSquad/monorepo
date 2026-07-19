@@ -26,6 +26,7 @@ import { assembleContextBundle } from "./agent-context";
 import { getSandboxProvider } from "./sandbox-providers";
 import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
 import { captureRunMemory } from "./agent-memory";
+import { stampRunReview } from "./run-review";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertExecutionAllowed } from "./execution-policy";
 import { resolveEnvironmentExecution, type EnvExecutionResolution } from "./environments";
@@ -468,6 +469,22 @@ export async function runTaskInSandbox(input: {
       summary:
         `Run ${runStatus} (${providerKey}${exitCode != null ? `, exit ${exitCode}` : ""}).\n${stdout || ""}`.trim(),
     });
+
+    // Untrusted-output review gate (Domain 8 G2, LOW_TRUST_REVIEW-gated): stamp the run's reviewState +
+    // source-trust from the agent's trust profile. A low-trust/untrusted agent (or one whose profile
+    // requires it) → `needs_review` + quarantined; standard/trusted → `approved`. Makes the previously
+    // dead requireUntrustedPrReview toggle real. Best-effort — never fails the run.
+    if (await isFeatureEnabled(FLAG_KEYS.LOW_TRUST_REVIEW)) {
+      await stampRunReview(
+        run.id,
+        {
+          trustLevel: agent.trustLevel ?? null,
+          lowTrustContainment: agent.trustProfile?.lowTrustContainment ?? null,
+          requireUntrustedPrReview: agent.trustProfile?.requireUntrustedPrReview ?? null,
+        },
+        { agentId: agent.id },
+      );
+    }
 
     return {
       runId: run.id,

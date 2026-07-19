@@ -16,6 +16,13 @@ model AgentRun {
   stderr      String?   @db.Text
   errorMessage String?
   costCents   Int?
+  // Domain 8 G2 — untrusted-output review gate. A run by a low-trust/untrusted agent (or one whose
+  // trust profile requires it) finalizes `needs_review` with a quarantined sourceTrust marker; a board
+  // reviewer promotes it. Standard/trusted output is auto-`approved`. LOW_TRUST_REVIEW-gated.
+  reviewState String? // approved | needs_review | changes_requested (null = not evaluated / feature off)
+  sourceTrust Json? // { preset, disposition, sourceAgentId, sourceRunId, promotedByProfileId }
+  reviewedByProfileId String?
+  reviewedAt  DateTime?
   requestedByProfileId String?
   bridgeTokenHash String? // Plan 6: hash of the run-scoped in-sandbox bridge token (null when inactive)
   startedAt   DateTime  @default(now())
