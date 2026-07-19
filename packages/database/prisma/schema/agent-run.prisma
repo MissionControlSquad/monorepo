@@ -17,6 +17,7 @@ model AgentRun {
   errorMessage String?
   costCents   Int?
   requestedByProfileId String?
+  bridgeTokenHash String? // Plan 6: hash of the run-scoped in-sandbox bridge token (null when inactive)
   startedAt   DateTime  @default(now())
   finishedAt  DateTime?
   createdAt   DateTime  @default(now())
@@ -25,6 +26,7 @@ model AgentRun {
   @@index([workspaceId, createdAt])
   @@index([agentId])
   @@index([taskId])
+  @@index([bridgeTokenHash])
   @@index([status])
   @@map("agent_runs")
 }

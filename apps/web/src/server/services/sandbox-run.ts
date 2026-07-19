@@ -35,6 +35,8 @@ import {
   recordWorkspaceOperation,
 } from "./execution-workspaces";
 import { beginRunStatus, setRunPhase, appendRunLog } from "./run-runtime-status";
+import { attachRunBridgeToken } from "./run-bridge";
+import { env as env_ } from "../env";
 import type { SandboxProvider, SandboxHandle } from "./sandbox/types";
 import type { AgentTrustProfile, EnvironmentLease } from "@agentcenter/database";
 
@@ -265,13 +267,42 @@ export async function runTaskInSandbox(input: {
     adapter?.installCommand && adapter?.binName
       ? `command -v ${adapter.binName} >/dev/null 2>&1 || { ${adapter.installCommand}; }`
       : null;
+  // Persist/claim the run ledger row (status=running) BEFORE composing the script — the in-sandbox
+  // bridge token is scoped to this run id. The queue worker passes an existing (claimed) row; the
+  // synchronous path creates a fresh one.
+  const run = input.existingRunId
+    ? await prisma.agentRun.update({
+        where: { id: input.existingRunId },
+        data: { status: "running", startedAt: new Date() },
+      })
+    : await prisma.agentRun.create({
+        data: {
+          workspaceId: input.workspaceId,
+          agentId: agent.id,
+          taskId: input.taskId,
+          kind: "sandbox",
+          providerKey,
+          requestedByProfileId: input.requestedByProfileId ?? null,
+        },
+      });
+
   // Inject the agent's OWN bound secrets (LLM API keys, etc.) so a real runtime can authenticate.
   // The Environment's instance-scoped envVars (a non-secret bag) go in first; the agent's resolved
   // secrets take precedence on any key collision.
-  const env = {
+  const env: Record<string, string> = {
     ...(envRes?.envVars ?? {}),
     ...(await resolveEnvForAgent(input.workspaceId, agent.id)),
   };
+
+  // In-sandbox API bridge (Plan 6): a run-scoped token the in-box agent can use to post progress back
+  // to its task. Only injected when a public MC URL is configured; invalidated when the run finishes.
+  const bridgeBaseUrl = env_.NEXT_PUBLIC_MC_URL?.replace(/\/$/, "");
+  if (bridgeBaseUrl) {
+    const bridgeToken = await attachRunBridgeToken(run.id);
+    env.AGENTCENTER_API_URL = `${bridgeBaseUrl}/api/runner/bridge`;
+    env.AGENTCENTER_RUN_ID = run.id;
+    env.AGENTCENTER_RUN_TOKEN = bridgeToken;
+  }
   // BYO git token from the workspace vault (GIT_TOKEN, else GITHUB_TOKEN) — only when a repo is cloned.
   const gitToken = bundle.project?.repoUrl
     ? ((await resolveWorkspaceSecret(input.workspaceId, "GIT_TOKEN")) ??
@@ -303,24 +334,6 @@ export async function runTaskInSandbox(input: {
     workspaceId: input.workspaceId,
     resolveSecret: (name: string) => resolveWorkspaceSecret(input.workspaceId, name),
   };
-
-  // Persist/claim the run ledger row (status=running). The queue worker passes an existing (claimed)
-  // row; the synchronous path creates a fresh one.
-  const run = input.existingRunId
-    ? await prisma.agentRun.update({
-        where: { id: input.existingRunId },
-        data: { status: "running", startedAt: new Date() },
-      })
-    : await prisma.agentRun.create({
-        data: {
-          workspaceId: input.workspaceId,
-          agentId: agent.id,
-          taskId: input.taskId,
-          kind: "sandbox",
-          providerKey,
-          requestedByProfileId: input.requestedByProfileId ?? null,
-        },
-      });
 
   // Live status (Plan 6): track a redacted, TTL'd tail of this run so the UI can watch it mid-flight.
   // Secret VALUES (env + git token) are scrubbed from every streamed chunk.
@@ -382,6 +395,7 @@ export async function runTaskInSandbox(input: {
         stdout,
         stderr,
         finishedAt: new Date(),
+        bridgeTokenHash: null, // invalidate the in-sandbox bridge token now the run is over
       },
     });
 
@@ -446,6 +460,7 @@ export async function runTaskInSandbox(input: {
           status: "failed",
           errorMessage: message,
           finishedAt: new Date(),
+          bridgeTokenHash: null, // invalidate the in-sandbox bridge token
           ...(handle ? { sandboxId: handle.id } : {}),
         },
       })
