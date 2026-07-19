@@ -49,6 +49,7 @@ export {
 export {
   CREATE_PROJECT,
   UPDATE_PROJECT,
+  SET_PROJECT_SOURCE,
   ARCHIVE_PROJECT,
   RESTORE_PROJECT,
   ADD_PROJECT_MEMBER,
@@ -91,7 +92,14 @@ export { UPDATE_MY_PROFILE } from "./profile";
 
 export { UPDATE_FEATURE_FLAG } from "./feature-flags";
 
-export { APPROVE_APPROVAL, REJECT_APPROVAL } from "./approvals";
+export {
+  APPROVE_APPROVAL,
+  REJECT_APPROVAL,
+  REQUEST_APPROVAL_CHANGES,
+  RESUBMIT_APPROVAL,
+  CANCEL_APPROVAL,
+  ADD_APPROVAL_COMMENT,
+} from "./approvals";
 
 export {
   CREATE_BUDGET_POLICY,
@@ -133,10 +141,12 @@ export {
 export {
   CREATE_CASE,
   SET_CASE_STATUS,
+  UPDATE_CASE,
   CREATE_LABEL,
   ADD_CASE_LABEL,
   REMOVE_CASE_LABEL,
   LINK_TASK_TO_CASE,
+  UNLINK_TASK_FROM_CASE,
 } from "./cases";
 
 export {
@@ -173,3 +183,5 @@ export { GRANT_AGENT_CAPABILITY, REVOKE_AGENT_CAPABILITY } from "./agent-authz";
 export { SET_PROJECT_DEFAULT_GOAL } from "./goal-task";
 
 export { DISMISS_ATTENTION_ITEM, UNDISMISS_ATTENTION_ITEM } from "./attention";
+
+export { APPROVE_CLI_AUTH, DENY_CLI_AUTH } from "./cli-auth";

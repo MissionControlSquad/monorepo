@@ -52,3 +52,36 @@ builder.mutationField("setAgentAdapter", (t) =>
     },
   }),
 );
+
+// Epic #2 (Adapter Manager): enable/disable an installed adapter, instance-admin action. Global
+// capability config (no workspaceId). The builtIn openclaw-gateway can never be disabled — existing
+// agents must always be able to resolve it — so disabling it is rejected.
+builder.mutationField("setAdapterEnabled", (t) =>
+  t.prismaField({
+    type: "AgentAdapter",
+    args: {
+      adapterType: t.arg.string({ required: true }),
+      enabled: t.arg.boolean({ required: true }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, "admin");
+
+      const adapter = await getAdapter(args.adapterType);
+      if (!adapter)
+        throw new GraphQLError(`Unknown adapter '${args.adapterType}'`, {
+          extensions: { code: "NOT_FOUND" },
+        });
+
+      if (adapter.builtIn && !args.enabled)
+        throw new GraphQLError("The built-in adapter cannot be disabled", {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+
+      return ctx.prisma.agentAdapter.update({
+        ...query,
+        where: { type: adapter.type },
+        data: { enabled: args.enabled },
+      });
+    },
+  }),
+);

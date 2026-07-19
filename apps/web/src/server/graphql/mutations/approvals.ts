@@ -6,6 +6,7 @@ import { requireRole } from "@/server/tenancy";
 import {
   createApproval,
   decideApproval,
+  requestChanges,
   resubmitApproval,
   cancelApproval,
   addComment,
@@ -73,6 +74,24 @@ builder.mutationField("rejectApproval", (t) =>
         approvalId: args.id,
         workspaceId: tenancy.workspaceId,
         decision: "reject",
+        decidedById: tenancy.userId,
+        decisionNote: args.decisionNote ?? null,
+      });
+      return ctx.prisma.approval.findUniqueOrThrow({ ...query, where: { id: args.id } });
+    },
+  }),
+);
+
+builder.mutationField("requestApprovalChanges", (t) =>
+  t.prismaField({
+    type: "Approval",
+    args: { id: t.arg.string({ required: true }), decisionNote: t.arg.string() },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.GOVERNANCE);
+      const tenancy = requireRole(ctx, "admin");
+      await requestChanges({
+        approvalId: args.id,
+        workspaceId: tenancy.workspaceId,
         decidedById: tenancy.userId,
         decisionNote: args.decisionNote ?? null,
       });

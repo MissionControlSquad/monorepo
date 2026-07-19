@@ -9,6 +9,7 @@ import Link from "next/link";
 import { AGENT_QUERY } from "../lib/graphql/queries";
 import { UPDATE_AGENT_PROFILE } from "../lib/graphql/mutations/agents";
 import { Breadcrumbs, Button, Card, PageLayout } from "../components/ui";
+import { AgentAdapterConfigCard } from "../components/agent/AgentAdapterConfigCard";
 import { Input } from "@/components/ui/shadcn/input";
 import { ProfileAvatar } from "../components/ui/ProfileAvatar";
 import { MentionTextArea } from "../components/common/MentionTextArea";
@@ -112,9 +113,19 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
       />
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-sm px-5 py-4 text-white">
-        <div className="flex items-center gap-3">
-          <ProfileAvatar agentId={agentId} size="lg" className="ring-2 ring-white/30" />
-          <h1 className="text-xl font-bold">Edit Agent</h1>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <ProfileAvatar agentId={agentId} size="lg" className="ring-2 ring-white/30" />
+            <h1 className="text-xl font-bold">Edit Agent</h1>
+          </div>
+          {agent.profile?.id && (
+            <Link
+              href={`/profile/${agent.profile.id}`}
+              className="rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium hover:bg-white/25"
+            >
+              View analytics
+            </Link>
+          )}
         </div>
       </div>
 
@@ -227,6 +238,13 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
           </form>
         </Form>
       </Card>
+
+      <AgentAdapterConfigCard
+        agentId={agentId}
+        adapterType={agent.adapterType ?? null}
+        adapterConfig={(agent.adapterConfig as Record<string, unknown> | null) ?? null}
+        llmModel={agent.llmModel ?? null}
+      />
     </PageLayout>
   );
 }

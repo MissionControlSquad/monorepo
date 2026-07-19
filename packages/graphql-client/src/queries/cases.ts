@@ -21,6 +21,54 @@ export const CASES_QUERY = gql`
   }
 `;
 
+// Single case + fields, labels, documents, linked tasks — for the detail page.
+export const CASE_QUERY = gql`
+  query Case($id: String!) {
+    case(id: $id) {
+      id
+      identifier
+      caseNumber
+      caseType
+      key
+      title
+      summary
+      status
+      fields
+      parentCaseId
+      projectId
+      createdAt
+      updatedAt
+      labels {
+        id
+        label {
+          id
+          name
+          color
+        }
+      }
+      documents {
+        id
+        key
+        document {
+          id
+          title
+        }
+      }
+      taskLinks {
+        id
+        taskId
+        role
+        task {
+          id
+          title
+          taskNumber
+          status
+        }
+      }
+    }
+  }
+`;
+
 export const LABELS_QUERY = gql`
   query Labels {
     labels {

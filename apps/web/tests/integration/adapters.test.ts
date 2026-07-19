@@ -58,6 +58,12 @@ beforeEach(async () => {
 afterEach(async () => {
   await prisma.featureFlag.deleteMany({ where: { key: "multi_provider_adapters" } });
   invalidateFlagCache();
+  // agent_adapters is global seed data (not truncated between files), so restore any adapter this
+  // file toggled back to enabled so the disabled state can't bleed into other test files.
+  await prisma.agentAdapter.updateMany({
+    where: { type: { in: ["claude-local"] } },
+    data: { enabled: true },
+  });
 });
 
 describe("adapter registry listing (Epic #2)", () => {
@@ -163,5 +169,55 @@ describe("setAgentAdapter (Epic #2)", () => {
       await cookieFor(WS_A, "admin"),
     );
     expect(r.errors).toBeDefined();
+  });
+});
+
+describe("setAdapterEnabled — Adapter Manager (Epic #2)", () => {
+  const TOGGLE = `mutation($t:String!,$e:Boolean!){ setAdapterEnabled(adapterType:$t, enabled:$e){ type enabled } }`;
+
+  it("admin disables then re-enables a non-builtIn adapter", async () => {
+    const off = await gql(TOGGLE, { t: "claude-local", e: false }, await cookieFor(WS_A, "admin"));
+    expect(off.errors).toBeFalsy();
+    expect(off.data.setAdapterEnabled).toMatchObject({ type: "claude-local", enabled: false });
+    const row = await prisma.agentAdapter.findUniqueOrThrow({ where: { type: "claude-local" } });
+    expect(row.enabled).toBe(false);
+
+    const on = await gql(TOGGLE, { t: "claude-local", e: true }, await cookieFor(WS_A, "admin"));
+    expect(on.data.setAdapterEnabled.enabled).toBe(true);
+  });
+
+  it("a disabled adapter drops out of the enabledOnly listing", async () => {
+    await setFeature(true);
+    await gql(TOGGLE, { t: "claude-local", e: false }, await cookieFor(WS_A, "admin"));
+    const r = await gql(
+      `query{ agentAdapters(enabledOnly:true){ type } }`,
+      undefined,
+      await cookieFor(WS_A, "member"),
+    );
+    expect(r.data.agentAdapters.map((a: any) => a.type)).not.toContain("claude-local");
+  });
+
+  it("refuses to disable the builtIn adapter", async () => {
+    const r = await gql(
+      TOGGLE,
+      { t: "openclaw-gateway", e: false },
+      await cookieFor(WS_A, "admin"),
+    );
+    expect(r.errors).toBeDefined();
+    const row = await prisma.agentAdapter.findUniqueOrThrow({
+      where: { type: "openclaw-gateway" },
+    });
+    expect(row.enabled).toBe(true);
+  });
+
+  it("rejects an unknown adapter and a non-admin", async () => {
+    const unknown = await gql(TOGGLE, { t: "nope", e: false }, await cookieFor(WS_A, "admin"));
+    expect(unknown.errors).toBeDefined();
+    const member = await gql(
+      TOGGLE,
+      { t: "claude-local", e: false },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(member.errors).toBeDefined();
   });
 });

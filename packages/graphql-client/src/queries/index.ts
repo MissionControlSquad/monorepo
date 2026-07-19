@@ -115,7 +115,7 @@ export { GLOBAL_SEARCH_QUERY } from "./search";
 
 export { FEATURE_FLAGS_QUERY } from "./feature-flags";
 
-export { APPROVALS_QUERY } from "./approvals";
+export { APPROVALS_QUERY, APPROVAL_QUERY } from "./approvals";
 
 export {
   FINANCE_SUMMARY_QUERY,
@@ -149,11 +149,11 @@ export {
   TASK_RECOVERY_ACTIONS_QUERY,
 } from "./task-autonomy";
 
-export { CASES_QUERY, LABELS_QUERY, CASE_EVENTS_QUERY } from "./cases";
+export { CASES_QUERY, CASE_QUERY, LABELS_QUERY, CASE_EVENTS_QUERY } from "./cases";
 
 export { SKILLS_QUERY, TEAMS_QUERY } from "./skills";
 export { EXPORT_WORKSPACE_BUNDLE, WORKSPACE_IMPORTS } from "./portability";
-export { GOALS_QUERY, DEFAULT_GOAL_QUERY } from "./goals";
+export { GOALS_QUERY, GOAL_QUERY, DEFAULT_GOAL_QUERY } from "./goals";
 export { WORKSPACE_SUMMARY_QUERY } from "./observability";
 export { BOARD_THREAD_QUERY } from "./boardroom";
 export { PLUGINS_QUERY } from "./plugins";
@@ -163,3 +163,6 @@ export { AGENT_INSTRUCTIONS_QUERY } from "./agent-instructions";
 export { ORG_CHART_QUERY } from "./org-chart";
 export { ATTENTION_FEED_QUERY } from "./attention";
 export { AGENT_CAPABILITY_GRANTS_QUERY, AGENT_AUTHZ_EVENTS_QUERY } from "./agent-authz";
+export { PROFILE_ANALYTICS_QUERY } from "./profile-analytics";
+
+export { CLI_AUTH_CHALLENGE_QUERY } from "./cli-auth";

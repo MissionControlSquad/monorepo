@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation } from "urql";
 import { CASES_QUERY, LABELS_QUERY } from "@/lib/graphql/queries";
 import {
@@ -152,7 +153,12 @@ export default function CasesPage() {
               <span className="flex flex-wrap items-center gap-2">
                 <Badge variant={statusVariant(c.status)}>{c.status}</Badge>
                 <span className="font-mono text-xs text-muted-foreground">{c.identifier}</span>
-                <span className="font-medium text-foreground">{c.title}</span>
+                <Link
+                  href={`/cases/${c.id}`}
+                  className="font-medium text-foreground hover:underline"
+                >
+                  {c.title}
+                </Link>
                 <Badge variant="gray">{c.caseType}</Badge>
               </span>
               <select

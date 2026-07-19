@@ -9,6 +9,10 @@ builder.prismaObject("Project", {
     status: t.exposeString("status"),
     shutdownActive: t.exposeBoolean("shutdownActive"),
     defaultGoalId: t.exposeString("goalId", { nullable: true }), // Epic #11b
+    sourceType: t.exposeString("sourceType", { nullable: true }), // source config
+    repoUrl: t.exposeString("repoUrl", { nullable: true }),
+    repoRef: t.exposeString("repoRef", { nullable: true }),
+    visibility: t.exposeString("visibility"),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
 

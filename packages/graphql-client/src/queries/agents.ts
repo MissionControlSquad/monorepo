@@ -60,6 +60,9 @@ export const AGENT_QUERY = gql`
       currentConfigVersion
       upgradeAvailable
       hostingType
+      adapterType
+      adapterConfig
+      llmModel
       cloudVmId
       cloudVm {
         id
@@ -75,6 +78,9 @@ export const AGENT_QUERY = gql`
         title
         taskNumber
         status
+      }
+      profile {
+        id
       }
     }
   }

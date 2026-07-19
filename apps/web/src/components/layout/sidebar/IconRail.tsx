@@ -36,6 +36,7 @@ import {
   Network,
   Inbox,
   Lock,
+  Boxes,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -53,6 +54,12 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   { href: "/", icon: LayoutDashboard, label: "Home" },
   { href: "/attention", icon: Inbox, label: "Attention", flag: FLAG_KEYS.ATTENTION },
   { href: "/agents", icon: Bot, label: "Agents" },
+  {
+    href: "/adapters",
+    icon: Boxes,
+    label: "Adapters",
+    flag: FLAG_KEYS.MULTI_PROVIDER_ADAPTERS,
+  },
   {
     href: "/instructions",
     icon: FileText,

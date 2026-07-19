@@ -68,9 +68,11 @@ export default function ApprovalsPage() {
       <div className="space-y-3">
         {approvals.map((a) => (
           <Card key={a.id} className="flex items-start justify-between gap-4 p-4">
-            <div className="min-w-0">
+            <Link href={`/approvals/${a.id}`} className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="truncate font-medium text-foreground">{a.title}</span>
+                <span className="truncate font-medium text-foreground hover:underline">
+                  {a.title}
+                </span>
                 <span
                   className={`rounded px-2 py-0.5 text-xs font-medium ${statusClasses(a.status)}`}
                 >
@@ -84,7 +86,7 @@ export default function ApprovalsPage() {
               <p className="mt-1 text-xs text-muted-foreground">
                 Requested by {a.requestedBy?.displayName ?? "—"}
               </p>
-            </div>
+            </Link>
             {a.status === "pending" && a.subjectType === "budget_override" && (
               // A budget override can't be actioned with a plain approve — resuming needs a new
               // limit. Send the admin to Finance where Raise & resume lives.
