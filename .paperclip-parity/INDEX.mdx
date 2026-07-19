@@ -241,6 +241,16 @@ See 03-sandbox-depth.mdx.
       failed / exhausted budget → no retry. Tests: 4 unit + 2 integration. Typecheck 12/12, web build ✓. Remaining Domain 9:
       #1/#2 wake queue+tick, #8 stranded-work reconcile, #10 silent-run watchdog, #11 issue monitors, #9 subtree watchdog.
 
+- [x] **Skills Domain 5 — GAP-A skill frontmatter + richer lint + file-kind classification** DONE (next commit). Pure
+      skill-frontmatter.ts in @agentcenter/utils: parseSkillFrontmatter (minimal YAML-subset — scalars/inline+block lists/
+      bool coercion, no dep) + splitFrontmatter + classifySkillFile (skill|markdown|reference|script|asset|other) +
+      deriveSkillTrustLevel (markdown_only/assets/scripts_executables ladder). skill-lint.ts extended: opt-in
+      requireFrontmatter (name/description required, slug pattern), unsafe-path (traversal/absolute) errors, per-file
+      100KB cap. Schema: Skill.frontmatter Json + SkillFile.kind (migration 20260719230000); createSkill/updateSkill parse
+      + store frontmatter, upsertSkillFile classifies kind. GraphQL: frontmatter on Skill + kind on SkillFile. Tests:
+      skill-frontmatter 11 unit + 1 integration (35 in skills-teams). Typecheck 12/12, web build ✓. Remaining Domain 5:
+      GAP-B catalog package, GAP-C import, GAP-D update/audit/reset, GAP-E runtime sync, GAP-F policy engine, GAP-G studio.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

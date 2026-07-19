@@ -5,7 +5,12 @@
  */
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
-import { slugify as coreSlugify } from "@agentcenter/utils";
+import {
+  slugify as coreSlugify,
+  parseSkillFrontmatter,
+  classifySkillFile,
+} from "@agentcenter/utils";
+import type { Prisma } from "@agentcenter/database";
 import type {
   Skill,
   SkillFile,
@@ -66,6 +71,8 @@ export async function createSkill(input: CreateSkillInput): Promise<Skill> {
         slug: slugify(name),
         name,
         markdown: input.markdown,
+        frontmatter: (parseSkillFrontmatter(input.markdown) ?? undefined) as
+          Prisma.InputJsonValue | undefined,
         description: input.description ?? null,
         categories: input.categories ?? [],
         icon: input.icon ?? null,
@@ -129,7 +136,14 @@ export async function updateSkill(
         ...(patch.tagline !== undefined ? { tagline: patch.tagline } : {}),
         ...(patch.author !== undefined ? { author: patch.author } : {}),
         ...(patch.homepage !== undefined ? { homepage: patch.homepage } : {}),
-        ...(markdownChanged ? { markdown: patch.markdown!, currentVersion: nextVersion } : {}),
+        ...(markdownChanged
+          ? {
+              markdown: patch.markdown!,
+              currentVersion: nextVersion,
+              frontmatter: (parseSkillFrontmatter(patch.markdown!) ?? undefined) as
+                Prisma.InputJsonValue | undefined,
+            }
+          : {}),
       },
     });
     if (markdownChanged) {
@@ -375,10 +389,11 @@ export async function upsertSkillFile(
 ): Promise<SkillFile> {
   await loadSkill(workspaceId, skillId); // 404s cross-workspace / missing
   const path = normalizeSkillFilePath(input.path);
+  const kind = classifySkillFile(path);
   return prisma.skillFile.upsert({
     where: { skillId_path: { skillId, path } },
-    create: { skillId, path, content: input.content },
-    update: { content: input.content },
+    create: { skillId, path, content: input.content, kind },
+    update: { content: input.content, kind },
   });
 }
 

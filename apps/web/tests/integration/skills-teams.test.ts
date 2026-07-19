@@ -167,6 +167,36 @@ describe("skill bundle files (Epic #10)", () => {
     expect(await prisma.skillFile.count({ where: { skillId } })).toBe(1);
   });
 
+  it("classifies file kind on upsert and parses SKILL.md frontmatter on create (GAP-A)", async () => {
+    const member = await cookieFor(WS_A, "member");
+    // create a skill whose markdown carries frontmatter
+    const created = await gql(
+      `mutation($n:String!,$m:String!){ createSkill(name:$n, markdown:$m){ id frontmatter } }`,
+      {
+        n: "Fronted",
+        m: "---\nname: Fronted\ndescription: has fm\ntags: [a, b]\n---\n# Fronted",
+      },
+      member,
+    );
+    expect(created.data.createSkill.frontmatter).toMatchObject({
+      name: "Fronted",
+      description: "has fm",
+      tags: ["a", "b"],
+    });
+    const skillId = created.data.createSkill.id;
+
+    await gql(UPSERT, { s: skillId, p: "scripts/run.py", c: "print(1)" }, member);
+    await gql(UPSERT, { s: skillId, p: "references/api.md", c: "# api" }, member);
+    await gql(UPSERT, { s: skillId, p: "assets/logo.png", c: "binary" }, member);
+
+    const kinds = Object.fromEntries(
+      (await prisma.skillFile.findMany({ where: { skillId } })).map((f) => [f.path, f.kind]),
+    );
+    expect(kinds["scripts/run.py"]).toBe("script");
+    expect(kinds["references/api.md"]).toBe("reference");
+    expect(kinds["assets/logo.png"]).toBe("asset");
+  });
+
   it("lintSkill validates the skill + its files (test-run, no execution)", async () => {
     // A skill with an empty entry doc would be rejected at create, so create a valid one then
     // add an empty file to trigger a warn.
