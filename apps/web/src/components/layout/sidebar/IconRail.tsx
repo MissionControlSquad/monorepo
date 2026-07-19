@@ -17,6 +17,7 @@ import {
   Cloud,
   CreditCard,
   Receipt,
+  KeyRound,
   Zap,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
@@ -41,6 +42,7 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   { href: "/live-gateway", icon: Zap, label: "Live Gateway", flag: FLAG_KEYS.LIVE_GATEWAY },
   { href: "/finance", icon: CreditCard, label: "Finance", flag: FLAG_KEYS.BUDGETS },
   { href: "/ledger", icon: Receipt, label: "Ledger", flag: FLAG_KEYS.LEDGER },
+  { href: "/secrets", icon: KeyRound, label: "Secrets", flag: FLAG_KEYS.SECRETS_VAULT },
 ];
 
 function isActive(pathname: string | null, href: string): boolean {

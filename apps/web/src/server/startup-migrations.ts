@@ -137,6 +137,12 @@ async function ensureFeatureFlags() {
       managedBy: "system",
       description: "Multi-provider agent adapters beyond OpenClaw (Epic #2)",
     },
+    {
+      key: FLAG_KEYS.SECRETS_VAULT,
+      enabled: true,
+      managedBy: "system",
+      description: "Encrypted secrets vault with versioning + bindings (Epic #5)",
+    },
   ];
 
   let created = 0;

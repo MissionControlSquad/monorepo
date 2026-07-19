@@ -21,6 +21,7 @@ export default defineConfig({
       "tests/unit/budget-window.test.ts",
       "tests/unit/ledger-bucket.test.ts",
       "tests/unit/adapters-registry.test.ts",
+      "tests/unit/secrets-crypto.test.ts",
     ],
   },
   resolve: {

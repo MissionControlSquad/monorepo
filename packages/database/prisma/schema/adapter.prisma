@@ -36,8 +36,9 @@ model AgentAdapter {
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
-  modelProfiles AdapterModelProfile[]
-  agents        Agent[]               @relation("AgentAdapterType")
+  modelProfiles  AdapterModelProfile[]
+  agents         Agent[]               @relation("AgentAdapterType")
+  secretBindings SecretBinding[] // Epic #5
 
   @@index([enabled])
   @@map("agent_adapters")

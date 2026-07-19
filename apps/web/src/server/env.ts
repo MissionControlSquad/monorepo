@@ -39,6 +39,9 @@ const serverSchema = z.object({
     .optional()
     .transform((v) => v || undefined),
   SSH_KEY_ENCRYPTION_SECRET: z.string().optional(),
+  // Master key for the Epic #5 secrets vault (AES-256-GCM). Required (>=32 chars) in production;
+  // dev/test fall back to an insecure default in secrets-crypto.ts.
+  SECRET_ENCRYPTION_KEY: z.string().optional(),
 
   // ── Web Push (optional — only needed for push notifications) ──
   VAPID_PUBLIC_KEY: z
