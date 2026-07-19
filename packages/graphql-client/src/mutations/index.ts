@@ -149,3 +149,5 @@ export {
 } from "./skills";
 
 export { IMPORT_WORKSPACE_BUNDLE } from "./portability";
+
+export { CREATE_GOAL, UPDATE_GOAL, DELETE_GOAL } from "./goals";
