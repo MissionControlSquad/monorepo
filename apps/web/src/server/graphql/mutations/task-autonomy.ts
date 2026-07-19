@@ -9,6 +9,7 @@ import {
   applyDecomposition,
 } from "@/server/services/plan-decomposition";
 import { holdSubtree, releaseSubtreeHold } from "@/server/services/task-tree-hold";
+import { cancelSubtree, restoreSubtree } from "@/server/services/subtree-control";
 import { createWatchdog, evaluateWatchdogs } from "@/server/services/task-watchdog";
 import { armTaskMonitor, clearTaskMonitor } from "@/server/services/task-monitors";
 import {
@@ -245,6 +246,31 @@ builder.mutationField("cancelTask", (t) =>
         data: { status: "cancelled", cancelledAt: new Date() },
       });
       return ctx.prisma.task.findUniqueOrThrow({ ...query, where: { id: task.id } });
+    },
+  }),
+);
+
+// Domain 8 G6.6: cancel / restore a whole task subtree. admin (destructive across the tree).
+builder.mutationField("cancelSubtree", (t) =>
+  t.field({
+    type: "Int",
+    args: { rootTaskId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
+      requireRole(ctx, "admin");
+      return cancelSubtree(args.rootTaskId);
+    },
+  }),
+);
+
+builder.mutationField("restoreSubtree", (t) =>
+  t.field({
+    type: "Int",
+    args: { rootTaskId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
+      requireRole(ctx, "admin");
+      return restoreSubtree(args.rootTaskId);
     },
   }),
 );

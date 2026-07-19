@@ -157,6 +157,8 @@ export {
   CREATE_THREAD_INTERACTION,
   RESOLVE_THREAD_INTERACTION,
   CANCEL_TASK,
+  CANCEL_SUBTREE,
+  RESTORE_SUBTREE,
 } from "./task-autonomy";
 
 export {

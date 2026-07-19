@@ -80,3 +80,15 @@ export const CANCEL_TASK = gql`
     }
   }
 `;
+
+// Domain 8 G6.6: cancel / restore a whole task subtree.
+export const CANCEL_SUBTREE = gql`
+  mutation CancelSubtree($rootTaskId: String!) {
+    cancelSubtree(rootTaskId: $rootTaskId)
+  }
+`;
+export const RESTORE_SUBTREE = gql`
+  mutation RestoreSubtree($rootTaskId: String!) {
+    restoreSubtree(rootTaskId: $rootTaskId)
+  }
+`;

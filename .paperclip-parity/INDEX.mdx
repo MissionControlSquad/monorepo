@@ -404,6 +404,13 @@ See 03-sandbox-depth.mdx.
       validates via isGoalLevel so no resolver change. Tests: 1 integration (full 4-level hierarchy). Typecheck 12/12, web
       build ✓. Remaining Domain 14: #10-12 Agent-Companies package model (L), #13 delegation presets, #14 quorum, #15 policy.
 
+- [x] **Work-items Domain 8 — G6.6 subtree cancel/restore verbs** DONE (next commit). subtree-control.ts:
+      cancelSubtree(rootTaskId) recursive-CTE walks root+descendants → moves non-terminal (not done/cancelled) tasks to
+      cancelled+cancelledAt; restoreSubtree un-cancels cancelled tasks → assigned (never resurrects a done one). Builds on the
+      G6.7 cancelled status. GraphQL cancelSubtree/restoreSubtree mutations (admin, TASK_AUTONOMY) + shared client ops. Tests:
+      1 integration (cancel 2 skip 1 done, restore). Typecheck 12/12, web build ✓. Remaining Domain 8 G6: G6.2 rich comments,
+      G6.3 external-object sync, G6.4 origin/idempotency; dependency-resolved wakeups.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
