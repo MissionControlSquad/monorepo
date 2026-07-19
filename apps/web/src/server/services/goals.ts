@@ -7,6 +7,7 @@ import { prisma } from "@/server/prisma";
 import {
   wouldCreateCycle,
   resolveIssueGoalId,
+  resolveNextIssueGoalId,
   FLAG_KEYS,
   type HierarchyEdge,
 } from "@agentcenter/utils";
@@ -48,6 +49,60 @@ export async function resolveTaskGoalId(args: {
     projectId: args.projectId ?? null,
     goalId: args.goalId ?? null,
     projectGoalId,
+    defaultGoalId: defaultGoal?.id ?? null,
+  });
+}
+
+/** Look up a project's default goal id (null if the project or its goal is absent). */
+async function projectDefaultGoalId(projectId: string | null | undefined): Promise<string | null> {
+  if (!projectId) return null;
+  const p = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { goalId: true },
+  });
+  return p?.goalId ?? null;
+}
+
+/**
+ * Epic #11c: re-resolve a task's goal on update, faithful to the shared `resolveNextIssueGoalId`
+ * ("undefined = unchanged"). Only pass `patchProjectId`/`patchGoalId` for fields actually changing.
+ * Preserves an explicit goal; switches to the new project's goal / workspace default as appropriate.
+ * No-op (returns the current goal) when GOALS is off.
+ */
+export async function resolveTaskGoalIdOnUpdate(args: {
+  currentProjectId: string | null;
+  currentGoalId: string | null;
+  changingProject: boolean;
+  patchProjectId?: string | null;
+  changingGoal: boolean;
+  patchGoalId?: string | null;
+  fallbackWorkspaceId?: string | null;
+}): Promise<string | null> {
+  if (!(await isFeatureEnabled(FLAG_KEYS.GOALS))) {
+    return args.changingGoal ? (args.patchGoalId ?? null) : args.currentGoalId;
+  }
+  const effectiveProjectId = args.changingProject
+    ? (args.patchProjectId ?? null)
+    : args.currentProjectId;
+  let workspaceId = args.fallbackWorkspaceId ?? null;
+  if (effectiveProjectId) {
+    const p = await prisma.project.findUnique({
+      where: { id: effectiveProjectId },
+      select: { workspaceId: true },
+    });
+    if (p?.workspaceId) workspaceId = p.workspaceId;
+  }
+  const defaultGoal = workspaceId ? await resolveDefaultGoal(workspaceId) : null;
+
+  return resolveNextIssueGoalId({
+    currentProjectId: args.currentProjectId,
+    currentGoalId: args.currentGoalId,
+    currentProjectGoalId: await projectDefaultGoalId(args.currentProjectId),
+    projectId: args.changingProject ? (args.patchProjectId ?? null) : undefined,
+    goalId: args.changingGoal ? (args.patchGoalId ?? null) : undefined,
+    projectGoalId: args.changingProject
+      ? await projectDefaultGoalId(args.patchProjectId)
+      : undefined,
     defaultGoalId: defaultGoal?.id ?? null,
   });
 }
