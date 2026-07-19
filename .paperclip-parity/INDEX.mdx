@@ -262,6 +262,17 @@ See 03-sandbox-depth.mdx.
       enforcement, admin-only+optimistic-concurrency, evaluate-explains). Typecheck 12/12, web build ✓. Remaining Domain 5:
       GAP-B catalog package, GAP-C import, GAP-D update/audit/reset, GAP-E runtime sync, GAP-G studio.
 
+- [x] **Heartbeat Domain 9 — #8 stranded-work reconciliation** DONE (next commit). The #1-priority "don't let remote
+      work sit dead forever" ladder. Service stranded-work.ts: reconcileStrandedWork(now) — a task whose latest sandbox
+      AgentRun is failed/timeout with NO queued/running run and NO pending scheduled retry, an actionable status
+      (assigned/in_progress), no live checkout, and a sandbox-capable assignee, is STRANDED. First detection → re-dispatch
+      once owner-preserving (enqueueSandboxRun) + TaskRecoveryAction(attempting); a second failure → escalate task to
+      blocked + TaskRecoveryAction(failed, escalated_to_blocked). Bounded (MAX_RECOVERY_ATTEMPTS=1) + idempotent (an
+      in-flight queued run removes it from the candidate set; a blocked task drops out). Runs AFTER promoteDueRunRetries in
+      reap-stale-work so a just-promoted retry isn't mistaken for stranded. TaskRecoveryAction.attemptCount added (migration
+      20260719250000). Tests: 3 integration (redispatch→escalate ladder, ignore pending-retry, ignore non-sandbox agent).
+      Typecheck 12/12, web build ✓. Remaining Domain 9: #1/#2 wake queue+tick, #10 silent-run watchdog, #11 issue monitors, #9 subtree watchdog.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

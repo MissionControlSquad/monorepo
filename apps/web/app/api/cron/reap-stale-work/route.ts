@@ -12,6 +12,7 @@
  *  - redeliverStalePending — re-push un-acked live deliveries to still-connected agents.
  *  - tickRoutineTriggers — fire cron routine triggers whose nextFireAt has passed (Domain 9 #12).
  *  - promoteDueRunRetries — re-dispatch transiently-failed runs whose backoff has elapsed (Domain 9 #6).
+ *  - reconcileStrandedWork — re-dispatch (once) then escalate-to-blocked tasks whose run died (Domain 9 #8).
  *
  * Registered in vercel.json to run every 5 minutes.
  */
@@ -26,6 +27,7 @@ import { deadLetterExhaustedDeliveries } from "@agentcenter/database";
 import { redeliverStalePending } from "@/server/services/live-task-delivery";
 import { tickRoutineTriggers } from "@/server/services/routines";
 import { promoteDueRunRetries } from "@/server/services/run-retry";
+import { reconcileStrandedWork } from "@/server/services/stranded-work";
 
 export async function GET(request: Request) {
   try {
@@ -57,6 +59,9 @@ export async function GET(request: Request) {
       tickRoutineTriggers(now),
       promoteDueRunRetries(now),
     ]);
+    // Stranded-work reconciliation runs AFTER retry promotion so a run that just earned a retry (now
+    // queued) is not mistaken for stranded. Owner-preserving re-dispatch → escalate-to-blocked ladder.
+    const stranded = await reconcileStrandedWork(now);
     return successResponse({
       ok: true,
       watchdogsFired: watchdogDecisions.length,
@@ -69,6 +74,8 @@ export async function GET(request: Request) {
       deliveriesRepushed,
       routinesFired,
       retriesPromoted,
+      strandedRedispatched: stranded.redispatched,
+      strandedEscalated: stranded.escalated,
       at: now.toISOString(),
     });
   } catch (err) {

@@ -19,6 +19,7 @@ import {
   scheduleRunRetryIfTransient,
   promoteDueRunRetries,
 } from "../../src/server/services/run-retry";
+import { reconcileStrandedWork } from "../../src/server/services/stranded-work";
 import { createEnvironment } from "../../src/server/services/environments";
 import { getRunRuntimeStatus } from "../../src/server/services/run-runtime-status";
 import { createSecret, bindSecret } from "../../src/server/services/secrets";
@@ -644,5 +645,89 @@ describe("scheduled run retries (Domain 9 #6)", () => {
     expect(
       await scheduleRunRetryIfTransient({ id: exhausted.id, status: "timeout", retryCount: 4 }),
     ).toBeNull();
+  });
+});
+
+describe("stranded-work reconciliation (Domain 9 #8)", () => {
+  async function failedRun(agentId: string, taskId: string) {
+    return prisma.agentRun.create({
+      data: {
+        workspaceId: WS,
+        agentId,
+        taskId,
+        kind: "sandbox",
+        providerKey: "local",
+        status: "failed",
+        scheduledRetryAt: null,
+      },
+    });
+  }
+  // Move a task to an actionable status (makeTask creates it 'assigned' already).
+  async function assignedTask() {
+    return makeTask();
+  }
+
+  it("re-dispatches a stranded task once (owner-preserving), then escalates to blocked", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await assignedTask();
+    await failedRun(agentId, taskId);
+
+    // First reconcile → one re-dispatch (a fresh queued run) + a recovery action.
+    const r1 = await reconcileStrandedWork(new Date());
+    expect(r1.redispatched).toBe(1);
+    expect(r1.escalated).toBe(0);
+    const queued = await prisma.agentRun.findFirst({
+      where: { taskId, status: "queued" },
+    });
+    expect(queued).not.toBeNull();
+    expect(
+      await prisma.taskRecoveryAction.count({ where: { taskId, reason: "stranded_work" } }),
+    ).toBe(1);
+
+    // While a queued run exists, the task is in-flight → a second reconcile is a no-op.
+    const r2 = await reconcileStrandedWork(new Date());
+    expect(r2).toMatchObject({ redispatched: 0, escalated: 0 });
+
+    // The re-dispatch also fails (simulate): mark the queued run failed, then reconcile → escalate.
+    await prisma.agentRun.update({ where: { id: queued!.id }, data: { status: "failed" } });
+    const r3 = await reconcileStrandedWork(new Date());
+    expect(r3.escalated).toBe(1);
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
+    expect(task.status).toBe("blocked");
+    // a blocked task drops out → no further recovery
+    expect(await reconcileStrandedWork(new Date())).toMatchObject({
+      redispatched: 0,
+      escalated: 0,
+    });
+  });
+
+  it("ignores a run pending a scheduled retry (the retry system owns it)", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await assignedTask();
+    await prisma.agentRun.create({
+      data: {
+        workspaceId: WS,
+        agentId,
+        taskId,
+        kind: "sandbox",
+        providerKey: "local",
+        status: "timeout",
+        scheduledRetryAt: new Date(Date.now() + 60_000), // retry pending
+      },
+    });
+    expect(await reconcileStrandedWork(new Date())).toMatchObject({
+      redispatched: 0,
+      escalated: 0,
+    });
+  });
+
+  it("ignores a non-sandbox agent (nothing to re-dispatch)", async () => {
+    const agentId = await makeAgent(); // no sandboxProvider / environment
+    const taskId = await assignedTask();
+    await failedRun(agentId, taskId);
+    expect(await reconcileStrandedWork(new Date())).toMatchObject({
+      redispatched: 0,
+      escalated: 0,
+    });
   });
 });

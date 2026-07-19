@@ -88,6 +88,7 @@ model TaskRecoveryAction {
   reason      String
   status      RecoveryStatus @default(detected)
   resolution  String?
+  attemptCount Int           @default(1) // Domain 9 #8: which recovery attempt this is (ladder bound)
   attemptedAt DateTime?
   resolvedAt  DateTime?
   createdAt   DateTime       @default(now())
