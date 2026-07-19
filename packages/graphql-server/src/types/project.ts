@@ -8,6 +8,7 @@ builder.prismaObject("Project", {
     description: t.exposeString("description", { nullable: true }),
     status: t.exposeString("status"),
     shutdownActive: t.exposeBoolean("shutdownActive"),
+    defaultGoalId: t.exposeString("goalId", { nullable: true }), // Epic #11b
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
 

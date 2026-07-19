@@ -169,3 +169,5 @@ export {
 export { SET_AGENT_REPORTS_TO } from "./org-chart";
 
 export { GRANT_AGENT_CAPABILITY, REVOKE_AGENT_CAPABILITY } from "./agent-authz";
+
+export { SET_PROJECT_DEFAULT_GOAL } from "./goal-task";

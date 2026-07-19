@@ -15,6 +15,7 @@ builder.prismaObject("Task", {
     taskNumber: t.exposeInt("taskNumber"),
     parentTaskId: t.exposeString("parentTaskId", { nullable: true }),
     projectId: t.exposeString("projectId", { nullable: true }),
+    goalId: t.exposeString("goalId", { nullable: true }), // Epic #11b
     blockedByTaskId: t.exposeString("blockedByTaskId", { nullable: true }),
     recurringTaskId: t.exposeString("recurringTaskId", { nullable: true }),
 
