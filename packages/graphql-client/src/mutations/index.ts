@@ -159,3 +159,9 @@ export { INSTALL_PLUGIN, SET_PLUGIN_ENABLED, UNINSTALL_PLUGIN } from "./plugins"
 export { MINT_API_KEY, REVOKE_API_KEY } from "./api-keys";
 
 export { OPEN_TERMINAL_SESSION, CLOSE_TERMINAL_SESSION } from "./terminals";
+
+export {
+  UPSERT_AGENT_INSTRUCTION,
+  DELETE_AGENT_INSTRUCTION,
+  SEED_AGENT_INSTRUCTIONS,
+} from "./agent-instructions";

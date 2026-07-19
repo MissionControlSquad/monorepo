@@ -1,0 +1,19 @@
+// ─── Agent instructions — AGENTS.md bundles (Epic #18) ────────────
+// A per-agent bundle of named markdown instruction files (AGENTS.md, and for a CEO HEARTBEAT/SOUL/
+// TOOLS). Closes the "Easy AGENTS.md configurations" parity gap. Scoped to the agent (which carries
+// workspaceId); the filesystem sync into a live agent process is deferred (spec D2).
+
+model AgentInstruction {
+  id                 String   @id @default(cuid())
+  agentId            String
+  agent              Agent    @relation("AgentInstructions", fields: [agentId], references: [id], onDelete: Cascade)
+  fileName           String
+  content            String
+  updatedByProfileId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([agentId, fileName])
+  @@index([agentId])
+  @@map("agent_instructions")
+}

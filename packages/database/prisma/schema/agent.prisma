@@ -143,6 +143,7 @@ model Agent {
   agentSkills    AgentSkill[] // Epic #10
   goals          Goal[]         @relation("AgentGoals") // Epic #11
   terminalSessions TerminalSession[] @relation("AgentTerminals") // Epic #9
+  instructions   AgentInstruction[] @relation("AgentInstructions") // Epic #18
 
   @@index([username])
   @@index([cloudVmId])

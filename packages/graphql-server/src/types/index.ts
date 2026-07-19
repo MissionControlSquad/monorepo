@@ -35,3 +35,4 @@ import "./boardroom";
 import "./plugin";
 import "./api-key";
 import "./terminal";
+import "./agent-instruction";

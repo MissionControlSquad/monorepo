@@ -29,10 +29,11 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.PLUGIN_SDK).toBe("plugin_sdk");
     expect(FLAG_KEYS.API_KEYS).toBe("api_keys");
     expect(FLAG_KEYS.TERMINALS).toBe("terminals");
+    expect(FLAG_KEYS.AGENT_INSTRUCTIONS).toBe("agent_instructions");
   });
 
-  it("has exactly 25 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(25);
+  it("has exactly 26 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(26);
   });
 
   it("all values are unique", () => {
@@ -94,6 +95,7 @@ describe("FLAG_DEFAULTS", () => {
       FLAG_KEYS.GOALS,
       FLAG_KEYS.OBSERVABILITY,
       FLAG_KEYS.API_KEYS,
+      FLAG_KEYS.AGENT_INSTRUCTIONS,
     ]; // TERMINALS + PLUGIN_SDK + BOARD_CHAT default false (asserted above)
     for (const key of expectedTrue) {
       expect(FLAG_DEFAULTS[key]).toBe(true);
