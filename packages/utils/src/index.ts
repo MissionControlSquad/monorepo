@@ -41,6 +41,7 @@ export * from "./cost-windows";
 export * from "./otel";
 export * from "./billing-types";
 export * from "./blocker-diagnostics";
+export * from "./thread-interactions";
 export * from "./profile-analytics";
 export * from "./project-source";
 export * from "./cli-auth";

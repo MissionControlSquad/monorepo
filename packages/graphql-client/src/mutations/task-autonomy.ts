@@ -46,3 +46,26 @@ export const CLEAR_TASK_MONITOR = gql`
     clearTaskMonitor(taskId: $taskId)
   }
 `;
+
+// Domain 8 G6.5: create + resolve typed thread interactions.
+export const CREATE_THREAD_INTERACTION = gql`
+  mutation CreateThreadInteraction($taskId: String!, $kind: String!, $payload: JSON!, $sourceRunId: String) {
+    createThreadInteraction(taskId: $taskId, kind: $kind, payload: $payload, sourceRunId: $sourceRunId) {
+      id
+      kind
+      status
+      payload
+    }
+  }
+`;
+
+export const RESOLVE_THREAD_INTERACTION = gql`
+  mutation ResolveThreadInteraction($id: String!, $decision: String!, $result: JSON) {
+    resolveThreadInteraction(id: $id, decision: $decision, result: $result) {
+      id
+      status
+      result
+      resolvedAt
+    }
+  }
+`;

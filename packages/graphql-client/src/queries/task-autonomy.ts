@@ -37,3 +37,19 @@ export const TASK_RECOVERY_ACTIONS_QUERY = gql`
     }
   }
 `;
+
+// Domain 8 G6.5: typed thread interactions on a task.
+export const THREAD_INTERACTIONS_QUERY = gql`
+  query ThreadInteractions($taskId: String!, $status: String) {
+    threadInteractions(taskId: $taskId, status: $status) {
+      id
+      kind
+      status
+      sourceRunId
+      payload
+      result
+      createdAt
+      resolvedAt
+    }
+  }
+`;

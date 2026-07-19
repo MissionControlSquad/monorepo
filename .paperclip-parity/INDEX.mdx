@@ -359,6 +359,15 @@ See 03-sandbox-depth.mdx.
       Typecheck 12/12, web build ✓. Remaining Domain 8 G6: dependency-resolved wakeups, G6.2 rich comments, G6.3 external-object
       sync, G6.4 origin/idempotency, G6.5 thread interactions, G6.6 subtree cancel/restore, G6.7 status enum.
 
+- [x] **Work-items Domain 8 — G6.5 typed thread interactions** DONE (next commit). TaskThreadInteraction model (migration
+      20260719290000) — a structured ask an agent posts on a task thread. Pure vocabulary thread-interactions.ts in
+      @agentcenter/utils (KINDS suggest_tasks/ask_user_questions/request_confirmation, STATUSES pending/resolved/dismissed,
+      canResolveThreadInteraction transition, resolutionWakesRun). Service create/list/resolve (only pending can transition).
+      GraphQL: TaskThreadInteraction type + threadInteractions query + createThreadInteraction/resolveThreadInteraction
+      mutations (member, new THREAD_INTERACTIONS flag) + shared client ops. Tests: 3 unit + 2 integration (create→list→resolve→
+      re-resolve-rejected, unknown-kind). Typecheck 12/12, web build ✓. Remaining Domain 8 G6: G6.2 rich comments, G6.3
+      external-object sync, G6.4 origin/idempotency, G6.6 subtree cancel/restore, G6.7 status enum; dependency-resolved wakeups.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

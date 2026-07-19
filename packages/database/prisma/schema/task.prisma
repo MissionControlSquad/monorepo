@@ -85,6 +85,7 @@ model Task {
   decompositions  PlanDecomposition[]
   treeHold        TaskTreeHold?
   recoveryActions TaskRecoveryAction[]
+  threadInteractions TaskThreadInteraction[]
 
   // Domain 9 #11: issue monitor — a one-shot deferred "check back later" wake an agent arms while
   // working (e.g. poll a GitHub check / deploy). When monitorNextCheckAt passes, the reap cron

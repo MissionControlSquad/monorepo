@@ -51,3 +51,21 @@ builder.prismaObject("TaskWatchdog", {
     createdAt: t.expose("createdAt", { type: "DateTime" }),
   }),
 });
+
+// Domain 8 G6.5: typed thread interaction.
+builder.prismaObject("TaskThreadInteraction", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    taskId: t.exposeString("taskId"),
+    kind: t.exposeString("kind"),
+    status: t.exposeString("status"),
+    sourceMessageId: t.exposeString("sourceMessageId", { nullable: true }),
+    sourceRunId: t.exposeString("sourceRunId", { nullable: true }),
+    payload: t.expose("payload", { type: "JSON" }),
+    result: t.expose("result", { type: "JSON", nullable: true }),
+    createdByProfileId: t.exposeString("createdByProfileId", { nullable: true }),
+    resolvedByProfileId: t.exposeString("resolvedByProfileId", { nullable: true }),
+    createdAt: t.expose("createdAt", { type: "DateTime" }),
+    resolvedAt: t.expose("resolvedAt", { type: "DateTime", nullable: true }),
+  }),
+});

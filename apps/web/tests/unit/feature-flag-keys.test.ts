@@ -43,8 +43,8 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.MEMORY).toBe("memory");
   });
 
-  it("has exactly 42 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(42);
+  it("has exactly 43 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(43);
   });
 
   it("all values are unique", () => {

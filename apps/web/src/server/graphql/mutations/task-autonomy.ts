@@ -11,6 +11,10 @@ import {
 import { holdSubtree, releaseSubtreeHold } from "@/server/services/task-tree-hold";
 import { createWatchdog, evaluateWatchdogs } from "@/server/services/task-watchdog";
 import { armTaskMonitor, clearTaskMonitor } from "@/server/services/task-monitors";
+import {
+  createThreadInteraction,
+  resolveThreadInteraction,
+} from "@/server/services/thread-interactions";
 import { GraphQLError } from "graphql";
 
 // Epic #8: task-autonomy mutations. Proposing is member; reviewing/applying/holding/watchdogs are
@@ -165,6 +169,57 @@ builder.mutationField("evaluateWatchdogsNow", (t) =>
       requireRole(ctx, "admin");
       const decisions = await evaluateWatchdogs();
       return decisions.length;
+    },
+  }),
+);
+
+// Domain 8 G6.5: create + resolve typed thread interactions. Create is member+ (an agent posts an
+// ask); resolving/dismissing is member+ (a human decides). THREAD_INTERACTIONS-gated.
+builder.mutationField("createThreadInteraction", (t) =>
+  t.prismaField({
+    type: "TaskThreadInteraction",
+    args: {
+      taskId: t.arg.string({ required: true }),
+      kind: t.arg.string({ required: true }),
+      payload: t.arg({ type: "JSON", required: true }),
+      sourceRunId: t.arg.string(),
+      sourceMessageId: t.arg.string(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.THREAD_INTERACTIONS);
+      const tenancy = requireRole(ctx, "member");
+      const it = await createThreadInteraction({
+        taskId: args.taskId,
+        kind: args.kind,
+        payload: args.payload as never,
+        sourceRunId: args.sourceRunId ?? null,
+        sourceMessageId: args.sourceMessageId ?? null,
+        createdByProfileId: tenancy.userId,
+      });
+      return ctx.prisma.taskThreadInteraction.findUniqueOrThrow({ ...query, where: { id: it.id } });
+    },
+  }),
+);
+
+builder.mutationField("resolveThreadInteraction", (t) =>
+  t.prismaField({
+    type: "TaskThreadInteraction",
+    args: {
+      id: t.arg.string({ required: true }),
+      decision: t.arg.string({ required: true }), // resolved | dismissed
+      result: t.arg({ type: "JSON" }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.THREAD_INTERACTIONS);
+      const tenancy = requireRole(ctx, "member");
+      const decision = args.decision === "dismissed" ? "dismissed" : "resolved";
+      const it = await resolveThreadInteraction({
+        id: args.id,
+        decision,
+        result: (args.result ?? null) as never,
+        resolvedByProfileId: tenancy.userId,
+      });
+      return ctx.prisma.taskThreadInteraction.findUniqueOrThrow({ ...query, where: { id: it.id } });
     },
   }),
 );

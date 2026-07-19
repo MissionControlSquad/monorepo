@@ -54,3 +54,20 @@ builder.queryField("taskRecoveryActions", (t) =>
     },
   }),
 );
+
+// Domain 8 G6.5: typed thread interactions on a task. THREAD_INTERACTIONS-gated, member+.
+builder.queryField("threadInteractions", (t) =>
+  t.prismaField({
+    type: ["TaskThreadInteraction"],
+    args: { taskId: t.arg.string({ required: true }), status: t.arg.string() },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.THREAD_INTERACTIONS);
+      requireRole(ctx, "member");
+      return ctx.prisma.taskThreadInteraction.findMany({
+        ...query,
+        where: { taskId: args.taskId, ...(args.status ? { status: args.status } : {}) },
+        orderBy: { createdAt: "desc" },
+      });
+    },
+  }),
+);
