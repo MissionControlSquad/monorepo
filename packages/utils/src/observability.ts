@@ -2,6 +2,7 @@
  * Observability summary — shared pure bucketers (Epic #13). Shared across all apps. Import from
  * @agentcenter/utils. The web service runs the DB group-by queries and calls these to shape the result.
  */
+import { AgentStatus, TaskStatus } from "./domain-constants";
 export interface AgentSummary {
   total: number;
   operational: number; // idle + active
@@ -26,13 +27,13 @@ export function bucketAgentCounts(rows: Count[]): AgentSummary {
   for (const row of rows) {
     const n = row._count._all;
     s.total += n;
-    if (row.status === "idle") {
+    if (row.status === AgentStatus.IDLE) {
       s.idle += n;
       s.operational += n;
-    } else if (row.status === "active") {
+    } else if (row.status === AgentStatus.ACTIVE) {
       s.active += n;
       s.operational += n;
-    } else if (row.status === "blocked") {
+    } else if (row.status === AgentStatus.BLOCKED) {
       s.blocked += n;
     }
   }
@@ -45,13 +46,13 @@ export function bucketTaskCounts(rows: Count[]): TaskSummary {
   for (const row of rows) {
     const n = row._count._all;
     s.total += n;
-    if (row.status === "done") {
+    if (row.status === TaskStatus.DONE) {
       s.done += n;
     } else {
       s.open += n;
-      if (row.status === "in_progress") s.inProgress += n;
-      else if (row.status === "review") s.review += n;
-      else if (row.status === "blocked") s.blocked += n;
+      if (row.status === TaskStatus.IN_PROGRESS) s.inProgress += n;
+      else if (row.status === TaskStatus.REVIEW) s.review += n;
+      else if (row.status === TaskStatus.BLOCKED) s.blocked += n;
     }
   }
   return s;

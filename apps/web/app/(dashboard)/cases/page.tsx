@@ -10,7 +10,7 @@ import {
   ADD_CASE_LABEL,
   REMOVE_CASE_LABEL,
 } from "@/lib/graphql/mutations";
-import { CASE_STATES } from "@agentcenter/utils";
+import { CASE_STATES, CaseState } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
 
 // Epic #17: cases (support-ticket / work-item). CASES-gated + buildbase role (member works cases;
@@ -33,10 +33,10 @@ interface CaseRow {
 }
 
 function statusVariant(s: string): "gray" | "blue" | "yellow" | "green" | "red" {
-  if (s === "done" || s === "approved") return "green";
-  if (s === "cancelled") return "red";
-  if (s === "in_review") return "yellow";
-  if (s === "in_progress") return "blue";
+  if (s === CaseState.DONE || s === CaseState.APPROVED) return "green";
+  if (s === CaseState.CANCELLED) return "red";
+  if (s === CaseState.IN_REVIEW) return "yellow";
+  if (s === CaseState.IN_PROGRESS) return "blue";
   return "gray";
 }
 

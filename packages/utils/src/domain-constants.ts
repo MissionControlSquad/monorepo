@@ -281,3 +281,29 @@ export const BudgetWindow = {
 } as const;
 export const BUDGET_WINDOWS = Object.values(BudgetWindow);
 export type BudgetWindowValue = (typeof BUDGET_WINDOWS)[number];
+
+// ─── Budget Incident threshold + status (Epic #4) ────────
+export const IncidentThreshold = { SOFT: "soft", HARD: "hard" } as const;
+export type IncidentThresholdValue = (typeof IncidentThreshold)[keyof typeof IncidentThreshold];
+
+export const IncidentStatus = { OPEN: "open", RESOLVED: "resolved" } as const;
+export type IncidentStatusValue = (typeof IncidentStatus)[keyof typeof IncidentStatus];
+
+// ─── Approvals (Epic #3) ─────────────────────────────────
+export const ApprovalStatus = {
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  NEEDS_CHANGES: "needs_changes",
+  CANCELLED: "cancelled",
+} as const;
+export type ApprovalStatusValue = (typeof ApprovalStatus)[keyof typeof ApprovalStatus];
+
+export const ApprovalSubjectType = {
+  TASK: "task",
+  DELIVERABLE: "deliverable",
+  HIRE_AGENT: "hire_agent",
+  BUDGET_OVERRIDE: "budget_override",
+} as const;
+export type ApprovalSubjectTypeValue =
+  (typeof ApprovalSubjectType)[keyof typeof ApprovalSubjectType];

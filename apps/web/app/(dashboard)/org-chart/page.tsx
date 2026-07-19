@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { ORG_CHART_QUERY } from "@/lib/graphql/queries";
 import { SET_AGENT_REPORTS_TO } from "@/lib/graphql/mutations";
+import { AgentStatus } from "@agentcenter/utils";
 import { Card, Badge } from "@/components/ui";
 
 // Epic #19: org chart — agent reporting hierarchy. ORG_CHART-gated. Renders the tree by reportsTo and
@@ -59,7 +60,9 @@ export default function OrgChartPage() {
           <span className="flex items-center gap-2">
             <span className="font-medium text-foreground">{node.name}</span>
             <Badge variant="gray">{node.role}</Badge>
-            <Badge variant={node.status === "blocked" ? "yellow" : "green"}>{node.status}</Badge>
+            <Badge variant={node.status === AgentStatus.BLOCKED ? "yellow" : "green"}>
+              {node.status}
+            </Badge>
           </span>
           <label className="flex items-center gap-1 text-xs text-muted-foreground">
             reports to

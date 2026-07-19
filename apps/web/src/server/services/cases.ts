@@ -4,6 +4,7 @@
  * mutation funnels through `appendCaseEvent` so the timeline is never skipped.
  */
 import { randomUUID } from "node:crypto";
+import { CaseState as CaseStateConst } from "@agentcenter/utils";
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Case, CaseState, CaseEventKind, CaseTaskRole } from "@agentcenter/database";
@@ -22,7 +23,8 @@ export function caseIdentifier(caseNumber: number): string {
 
 /** Pure: done/cancelled stamp completedAt (preserving an existing one); any other status clears it. */
 export function completedAtForStatus(status: CaseState, existing: Date | null): Date | null {
-  if (status === "done" || status === "cancelled") return existing ?? new Date();
+  if (status === CaseStateConst.DONE || status === CaseStateConst.CANCELLED)
+    return existing ?? new Date();
   return null;
 }
 

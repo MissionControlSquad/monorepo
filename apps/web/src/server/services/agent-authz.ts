@@ -7,7 +7,7 @@
  */
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
-import { isAgentCapability, agentCan, FLAG_KEYS } from "@agentcenter/utils";
+import { isAgentCapability, agentCan, FLAG_KEYS, AGENT_AUTHZ_DECISION } from "@agentcenter/utils";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import type { AgentCapabilityGrant, AgentAuthzEvent } from "@agentcenter/database";
 
@@ -115,7 +115,7 @@ export async function requireAgentCapability(
       data: {
         agentId: agent.id,
         capability,
-        decision: "deny",
+        decision: AGENT_AUTHZ_DECISION.DENY,
         projectScope: scope?.projectId ?? null,
         reason: decision.reason,
       },

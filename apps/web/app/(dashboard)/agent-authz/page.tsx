@@ -9,6 +9,7 @@ import {
   AGENT_AUTHZ_EVENTS_QUERY,
 } from "@/lib/graphql/queries";
 import { GRANT_AGENT_CAPABILITY, REVOKE_AGENT_CAPABILITY } from "@/lib/graphql/mutations";
+import { AGENT_AUTHZ_DECISION } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
 
 // Epic #21: agent authorization. AGENT_AUTHZ-gated. Grant capabilities to an agent (the agent analog
@@ -166,7 +167,9 @@ export default function AgentAuthzPage() {
                 className="flex items-center justify-between border-b border-border pb-1 text-sm last:border-0"
               >
                 <span className="flex items-center gap-2">
-                  <Badge variant={e.decision === "deny" ? "red" : "green"}>{e.decision}</Badge>
+                  <Badge variant={e.decision === AGENT_AUTHZ_DECISION.DENY ? "red" : "green"}>
+                    {e.decision}
+                  </Badge>
                   <code className="font-mono text-xs">{e.capability}</code>
                   <span className="text-xs text-muted-foreground">{e.reason}</span>
                 </span>

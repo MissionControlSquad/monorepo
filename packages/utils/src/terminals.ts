@@ -105,7 +105,7 @@ export function terminalSessionState(
   session: { status: string; sessionExpiresAt: Date; closedAt: Date | null },
   now: Date = new Date(),
 ): TerminalState {
-  if (session.closedAt || session.status === "closed") return "closed";
-  if (session.sessionExpiresAt.getTime() <= now.getTime()) return "expired";
-  return session.status === "active" ? "active" : "pending";
+  if (session.closedAt || session.status === TERMINAL_STATE.CLOSED) return TERMINAL_STATE.CLOSED;
+  if (session.sessionExpiresAt.getTime() <= now.getTime()) return TERMINAL_STATE.EXPIRED;
+  return session.status === TERMINAL_STATE.ACTIVE ? TERMINAL_STATE.ACTIVE : TERMINAL_STATE.PENDING;
 }
