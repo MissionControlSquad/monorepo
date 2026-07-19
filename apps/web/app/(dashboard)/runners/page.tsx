@@ -6,6 +6,7 @@ import {
   RUNNER_HOSTS_QUERY,
   RUNNER_COMMANDS_QUERY,
   AGENTS_FOR_TASK_QUERY,
+  RUNTIME_ADAPTERS_QUERY,
 } from "@/lib/graphql/queries";
 import {
   CREATE_RUNNER_HOST,
@@ -13,6 +14,7 @@ import {
   RUN_COMMAND_ON_HOST,
   QUEUE_AGENT_COMMAND,
   CANCEL_RUNNER_COMMAND,
+  SET_AGENT_RUNTIME,
 } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 import { Server, Bot } from "lucide-react";
@@ -44,6 +46,13 @@ interface AgentLite {
   id: string;
   name: string;
   identityEmoji: string | null;
+}
+interface RuntimeAdapter {
+  key: string;
+  displayName: string;
+  requiresTemplate: boolean;
+  supportsModel: boolean;
+  models: string[];
 }
 
 const STATUS_VARIANT: Record<string, "green" | "red" | "gray" | "yellow"> = {
@@ -135,21 +144,46 @@ export default function RunnersPage() {
     query: RUNNER_HOSTS_QUERY,
   });
   const [{ data: agentData }] = useQuery<{ agents: AgentLite[] }>({ query: AGENTS_FOR_TASK_QUERY });
+  const [{ data: adapterData }] = useQuery<{ runtimeAdapters: RuntimeAdapter[] }>({
+    query: RUNTIME_ADAPTERS_QUERY,
+  });
   const [, createHost] = useMutation(CREATE_RUNNER_HOST);
   const [, deleteHost] = useMutation(DELETE_RUNNER_HOST);
   const [, runOnHost] = useMutation(RUN_COMMAND_ON_HOST);
   const [, queueAgent] = useMutation(QUEUE_AGENT_COMMAND);
+  const [, setAgentRuntime] = useMutation(SET_AGENT_RUNTIME);
 
   const hosts = hostData?.runnerHosts ?? [];
   const agents = agentData?.agents ?? [];
+  const adapters = adapterData?.runtimeAdapters ?? [];
 
   const [form, setForm] = useState({ name: "", host: "", port: "22", username: "root", key: "" });
   const [hostCmd, setHostCmd] = useState<Record<string, string>>({});
   const [agentId, setAgentId] = useState("");
   const [agentCmd, setAgentCmd] = useState("");
+  const [rt, setRt] = useState({ adapter: "", model: "", template: "" });
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [historyKey, setHistoryKey] = useState(0); // bump to remount history after a run
+
+  const selectedAdapter = adapters.find((a) => a.key === rt.adapter);
+
+  async function onSaveRuntime() {
+    setError(null);
+    if (!agentId) return setError("Pick an agent first");
+    setBusy("runtime");
+    try {
+      const res = await setAgentRuntime({
+        agentId,
+        adapter: rt.adapter || null,
+        model: rt.model.trim() || null,
+        template: rt.template.trim() || null,
+      });
+      if (res.error) setError(res.error.graphQLErrors[0]?.message ?? "Failed to set runtime");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function onCreateHost() {
     setError(null);
@@ -350,6 +384,66 @@ export default function RunnersPage() {
           >
             Queue
           </Button>
+        </Card>
+
+        {/* Per-agent runtime: which adapter + model the runner uses for the selected agent. */}
+        <Card className="space-y-2 p-4">
+          <p className="text-xs font-medium text-muted-foreground">
+            Runtime for the selected agent (overrides the runner default)
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <select
+              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+              value={rt.adapter}
+              onChange={(e) => setRt((r) => ({ ...r, adapter: e.target.value }))}
+            >
+              <option value="">runner default</option>
+              {adapters.map((a) => (
+                <option key={a.key} value={a.key}>
+                  {a.displayName}
+                </option>
+              ))}
+            </select>
+            {selectedAdapter?.supportsModel &&
+              (selectedAdapter.models.length > 0 ? (
+                <select
+                  className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+                  value={rt.model}
+                  onChange={(e) => setRt((r) => ({ ...r, model: e.target.value }))}
+                >
+                  <option value="">default model</option>
+                  {selectedAdapter.models.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+                  placeholder="model (optional)"
+                  value={rt.model}
+                  onChange={(e) => setRt((r) => ({ ...r, model: e.target.value }))}
+                />
+              ))}
+            {selectedAdapter?.requiresTemplate && (
+              <input
+                className="min-w-[12rem] flex-1 rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
+                placeholder="command / argv / URL template"
+                value={rt.template}
+                onChange={(e) => setRt((r) => ({ ...r, template: e.target.value }))}
+              />
+            )}
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={busy === "runtime"}
+              disabled={busy === "runtime" || !agentId}
+              onClick={onSaveRuntime}
+            >
+              Save runtime
+            </Button>
+          </div>
         </Card>
         <CommandHistory key={`agent-${historyKey}`} targetKind="agent" />
       </section>

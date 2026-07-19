@@ -24,6 +24,11 @@ export async function GET(request: Request) {
         role: agent.role,
         personality: agent.personality ?? null,
         level: agent.level ?? null,
+        runtimeAdapter: agent.runtimeAdapter ?? null,
+        runtimeModel: agent.runtimeModel ?? null,
+        runtimeTemplate: agent.runtimeTemplate ?? null,
+        memoryProvider: agent.memoryProvider ?? null,
+        workspaceId: agent.workspaceId ?? null,
       },
       taskId,
     );

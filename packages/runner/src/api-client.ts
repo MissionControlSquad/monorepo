@@ -52,6 +52,8 @@ export interface RunnerApi {
   postTaskMessage(taskId: string, content: string): Promise<void>;
   setTaskStatus(taskId: string, status: string): Promise<void>;
   postDeliverable(taskId: string, deliverable: DeliverableInput): Promise<void>;
+  /** Persist a memory entry (db memory provider). */
+  postMemory(taskId: string, content: string): Promise<void>;
 }
 
 export class HttpRunnerApi implements RunnerApi {
@@ -132,6 +134,13 @@ export class HttpRunnerApi implements RunnerApi {
     await this.request(`/api/tasks/${encodeURIComponent(taskId)}/deliverables`, {
       method: "POST",
       body: JSON.stringify(deliverable),
+    });
+  }
+
+  async postMemory(taskId: string, content: string): Promise<void> {
+    await this.request("/api/agents/me/memory", {
+      method: "POST",
+      body: JSON.stringify({ taskId, content }),
     });
   }
 }

@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
-import { isRuntimeKind, type RuntimeKind } from "@agentcenter/utils";
+import { isAdapterKey } from "@agentcenter/utils";
 
 /**
  * Runner daemon configuration. Persisted as JSON (default ~/.agentcenter/runner.json) or supplied
@@ -12,9 +12,12 @@ export interface RunnerConfig {
   apiUrl: string;
   apiKey: string;
   pollIntervalMs: number;
-  /** Which runtime an agent_task runs under, and the template for custom/shell kinds. */
-  runtime: RuntimeKind;
+  /** Adapter key the agent_task runs under (openclaw|codex|claude|gemini|process|shell|…). */
+  runtime: string;
+  /** For process/shell adapters — the argv/command template. */
   runtimeTemplate?: string[] | string;
+  /** Optional model override passed to the adapter. */
+  model?: string | null;
   /** Directory the runner uses as a scratch workspace for task runs (cloned repos, bundle files). */
   workDir: string;
 }
@@ -23,7 +26,7 @@ export const DEFAULT_CONFIG_PATH = join(homedir(), ".agentcenter", "runner.json"
 
 const DEFAULTS = {
   pollIntervalMs: 5000,
-  runtime: "openclaw" as RuntimeKind,
+  runtime: "openclaw",
   workDir: join(homedir(), ".agentcenter", "work"),
 };
 
@@ -38,7 +41,8 @@ export function resolveConfig(
   if (!apiKey) throw new Error("apiKey is required (set AGENTCENTER_API_KEY or run `login`)");
 
   const runtimeRaw = partial.runtime ?? env.AGENTCENTER_RUNTIME ?? DEFAULTS.runtime;
-  if (!isRuntimeKind(runtimeRaw)) throw new Error(`Unknown runtime: ${runtimeRaw}`);
+  if (!isAdapterKey(runtimeRaw))
+    throw new Error(`Unknown runtime adapter: ${runtimeRaw} (run \`agentcenter-runner adapters\`)`);
 
   const pollIntervalMs =
     partial.pollIntervalMs ?? (Number(env.AGENTCENTER_POLL_MS) || DEFAULTS.pollIntervalMs);
@@ -49,6 +53,7 @@ export function resolveConfig(
     pollIntervalMs,
     runtime: runtimeRaw,
     runtimeTemplate: partial.runtimeTemplate,
+    model: partial.model ?? env.AGENTCENTER_MODEL ?? null,
     workDir: partial.workDir ?? env.AGENTCENTER_WORK_DIR ?? DEFAULTS.workDir,
   };
 }

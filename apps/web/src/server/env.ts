@@ -32,8 +32,15 @@ const serverSchema = z.object({
   CRON_SECRET: z.string().min(1, "CRON_SECRET is required"),
 
   // ── Cloud Deployments (optional — only needed for Deploy to Cloud) ──
+  // ── Managed Hetzner (DEPRECATED — all infra is BYO; retained for reversibility, gated off by the
+  //    default-off CLOUD_VMS flag). No new managed VMs are provisioned. ──
   HETZNER_API_TOKEN: z.string().optional(),
   HETZNER_SSH_KEY_ID: z.string().optional(),
+  // ── Sandbox providers (Tier D) ──
+  // BYO: every cloud sandbox provider reads its credentials from the WORKSPACE secrets vault (by
+  // secret name — e.g. E2B_API_KEY, MODAL_TOKEN_ID/SECRET, CLOUDFLARE_SANDBOX_BRIDGE_URL/TOKEN,
+  // KUBECONFIG, EXE_DEV_API_KEY), NOT from deployment env. So there are intentionally no sandbox
+  // provider env vars here.
   DEPLOYMENT_WEBHOOK_BASE_URL: z
     .union([z.string().url(), z.literal("")])
     .optional()

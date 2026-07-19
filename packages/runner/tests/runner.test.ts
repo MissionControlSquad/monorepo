@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import type { AgentContextBundle, AgentContextProject } from "@agentcenter/types";
 import type { RunnerApi, RunnerCommandDTO, CommandResultPayload } from "../src/api-client.js";
 import type { ExecFn, ExecResult } from "../src/executor.js";
-import type { RenderedRuntime } from "@agentcenter/utils";
+import { getAdapter, type AdapterInvocation } from "@agentcenter/utils";
 import {
   runCommandsOnce,
   writeBundleFiles,
@@ -15,6 +15,7 @@ import {
 import { resolveConfig } from "../src/config.js";
 
 interface Recorder {
+  memories: { taskId: string; content: string }[];
   posted: { id: string; result: CommandResultPayload }[];
   messages: { taskId: string; content: string }[];
   statuses: { taskId: string; status: string }[];
@@ -22,7 +23,7 @@ interface Recorder {
 
 // A fake api that records posted results/messages/statuses and hands back canned commands/context.
 function fakeApi(overrides: Partial<RunnerApi> = {}): { api: RunnerApi } & Recorder {
-  const rec: Recorder = { posted: [], messages: [], statuses: [] };
+  const rec: Recorder = { posted: [], messages: [], statuses: [], memories: [] };
   const api: RunnerApi = {
     heartbeatPreflight: async () => ({ shouldWork: true }),
     getCommands: async () => [],
@@ -40,6 +41,9 @@ function fakeApi(overrides: Partial<RunnerApi> = {}): { api: RunnerApi } & Recor
       rec.statuses.push({ taskId, status });
     },
     postDeliverable: async () => {},
+    postMemory: async (taskId, content) => {
+      rec.memories.push({ taskId, content });
+    },
     ...overrides,
   };
   return { api, ...rec };
@@ -67,6 +71,8 @@ const cmd = (over: Partial<RunnerCommandDTO> = {}): RunnerCommandDTO => ({
 const bundle: AgentContextBundle = {
   version: 1,
   agent: { id: "a1", name: "Nova", role: "worker", personality: "keen", level: "senior" },
+  runtime: null,
+  memory: null,
   instructions: [{ fileName: "AGENTS.md", content: "be good" }],
   skills: [{ key: "lint", name: "Lint", description: null, markdown: "# lint" }],
   task: {
@@ -143,7 +149,8 @@ describe("runCommandsOnce", () => {
 describe("writeBundleFiles", () => {
   it("writes identity/task/instructions/skills into the openclaw layout", async () => {
     const written: Record<string, string> = {};
-    const paths = await writeBundleFiles(bundle, "openclaw", "/run", (p, c) => {
+    const openclawLayout = getAdapter("openclaw")!.build({ taskId: "x", workspaceDir: "/run" }).layout;
+    const paths = await writeBundleFiles(bundle, openclawLayout, "/run", (p, c) => {
       written[p] = c;
     });
     expect(paths).toContain("IDENTITY.md");
@@ -155,7 +162,8 @@ describe("writeBundleFiles", () => {
   });
 
   it("uses the generic skills dir for codex", async () => {
-    const paths = await writeBundleFiles(bundle, "codex", "/run", () => {});
+    const codexLayout = getAdapter("codex")!.build({ taskId: "x", workspaceDir: "/run" }).layout;
+    const paths = await writeBundleFiles(bundle, codexLayout, "/run", () => {});
     expect(paths.some((p) => p === "skills/lint.md")).toBe(true);
   });
 });
@@ -171,14 +179,47 @@ describe("prepareTaskRun", () => {
       () => {},
     );
     expect(got.task.title).toBe("Fix nav");
+    if (plan.mode !== "spawn") throw new Error("expected a spawn plan");
     expect(plan.argv).toEqual(["openclaw", "run", "--task", "t1"]);
     expect(plan.cwd).toBe("/work/t1");
     expect(written.length).toBeGreaterThan(0);
   });
+
+  it("per-agent runtime from the bundle overrides the runner's default", async () => {
+    const withRuntime = {
+      ...bundle,
+      runtime: { adapter: "shell", model: null, template: "echo hi {taskId}" },
+    };
+    const { api } = fakeApi({ getContext: async () => withRuntime });
+    // deps default is openclaw, but the bundle says shell → shell wins.
+    const { plan } = await prepareTaskRun(api, "t1", "openclaw", "/work", () => {});
+    if (plan.mode !== "spawn") throw new Error("expected spawn");
+    expect(plan.useShell).toBe(true);
+    expect(plan.argv).toEqual(["echo hi t1"]);
+  });
+
+  it("http adapter produces an http plan and writes no bundle files", async () => {
+    const { api } = fakeApi({ getContext: async () => bundle });
+    const { plan, written } = await prepareTaskRun(
+      api,
+      "t1",
+      "http",
+      "/work",
+      () => {
+        throw new Error("should not write files for http mode");
+      },
+      "https://hooks.example/agent?task={taskId}",
+    );
+    if (plan.mode !== "http") throw new Error("expected an http plan");
+    expect(plan.url).toBe("https://hooks.example/agent?task=t1");
+    expect(plan.method).toBe("POST");
+    expect(JSON.parse(plan.body)).toMatchObject({ taskId: "t1" });
+    expect(written).toEqual([]);
+  });
 });
 
 const okExecPlan = (result: Partial<ExecResult> = {}) =>
-  vi.fn(async (_plan: RenderedRuntime) => ({
+  vi.fn(async (_plan: AdapterInvocation) => ({
     exitCode: 0,
     stdout: "task output",
     stderr: "",
@@ -209,6 +250,28 @@ describe("runTaskOnce", () => {
       { taskId: "t1", status: "in_progress" },
       { taskId: "t1", status: "review" },
     ]);
+  });
+
+  it("db memory provider: captures an updated MEMORY.md back to the control plane", async () => {
+    const withMem = { ...bundle, memory: { provider: "db", content: "old memory" } };
+    const { api, memories } = fakeApi({ getContext: async () => withMem });
+    // the runtime "updated" MEMORY.md — the injected reader returns new content.
+    const result = await runTaskOnce(api, "t1", {
+      ...taskDeps(okExecPlan()),
+      readFile: (p: string) => (p.endsWith("MEMORY.md") ? "new learned memory" : null),
+    });
+    expect(result.exitCode).toBe(0);
+    expect(memories).toEqual([{ taskId: "t1", content: "new learned memory" }]);
+  });
+
+  it("db memory: does not post when MEMORY.md is unchanged", async () => {
+    const withMem = { ...bundle, memory: { provider: "db", content: "same" } };
+    const { api, memories } = fakeApi({ getContext: async () => withMem });
+    await runTaskOnce(api, "t1", {
+      ...taskDeps(okExecPlan()),
+      readFile: () => "same",
+    });
+    expect(memories).toEqual([]);
   });
 
   it("marks blocked on a non-zero exit and includes stderr in the message", async () => {

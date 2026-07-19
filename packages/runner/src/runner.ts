@@ -1,9 +1,8 @@
 import { join } from "node:path";
 import {
-  renderRuntimeCommand,
-  runtimeLayout,
-  type RuntimeKind,
-  type RenderedRuntime,
+  buildAdapterInvocation,
+  type AdapterInvocation,
+  type AdapterLayout,
 } from "@agentcenter/utils";
 import type { AgentContextBundle, AgentContextProject } from "@agentcenter/types";
 import type { RunnerApi, CommandResultPayload } from "./api-client.js";
@@ -87,11 +86,10 @@ function taskMarkdown(b: AgentContextBundle): string {
  */
 export async function writeBundleFiles(
   bundle: AgentContextBundle,
-  kind: RuntimeKind,
+  layout: AdapterLayout,
   rootDir: string,
   writeFile: WriteFileFn,
 ): Promise<string[]> {
-  const layout = runtimeLayout(kind);
   const written: string[] = [];
 
   const write = async (rel: string, content: string) => {
@@ -101,6 +99,8 @@ export async function writeBundleFiles(
 
   await write(layout.identityFile, identityMarkdown(bundle));
   await write(layout.taskFile, taskMarkdown(bundle));
+  // Inject prior memory (db provider) so the runtime can read + update it.
+  if (bundle.memory?.content) await write("MEMORY.md", bundle.memory.content);
   if (bundle.instructions.length) {
     // Concatenate instruction files into the primary AGENTS.md-style file.
     await write(layout.instructionsFile, bundle.instructions.map((i) => i.content).join("\n\n---\n\n"));
@@ -119,33 +119,46 @@ export async function writeBundleFiles(
 export async function prepareTaskRun(
   api: RunnerApi,
   taskId: string,
-  kind: RuntimeKind,
+  runtime: string,
   workDir: string,
   writeFile: WriteFileFn,
   template?: string[] | string,
-): Promise<{ bundle: AgentContextBundle; written: string[]; plan: RenderedRuntime }> {
+  model?: string | null,
+): Promise<{ bundle: AgentContextBundle; written: string[]; plan: AdapterInvocation }> {
   const bundle = await api.getContext(taskId);
   const runDir = join(workDir, taskId);
-  const written = await writeBundleFiles(bundle, kind, runDir, writeFile);
-  const plan = renderRuntimeCommand(kind, {
+  // Per-agent runtime from the control plane wins over the runner's own default.
+  const effRuntime = bundle.runtime?.adapter ?? runtime;
+  const effModel = bundle.runtime?.model ?? model ?? null;
+  const effTemplate = bundle.runtime?.template ?? template;
+  const plan = buildAdapterInvocation(effRuntime, {
     taskId,
     workspaceDir: runDir,
     taskTitle: bundle.task.title,
     prompt: taskMarkdown(bundle),
-    template,
+    template: effTemplate,
+    model: effModel,
   });
+  // http (webhook) adapters run nothing locally → no bundle files to materialise.
+  const written =
+    plan.mode === "spawn" ? await writeBundleFiles(bundle, plan.layout, runDir, writeFile) : [];
   return { bundle, written, plan };
 }
 
 /** Everything runTaskOnce needs to execute a task run, all injectable for tests. */
 export interface TaskRunDeps {
-  runtime: RuntimeKind;
+  /** Adapter key: openclaw | codex | claude | gemini | process | shell | <registered>. */
+  runtime: string;
+  /** Optional model override passed to the adapter. */
+  model?: string | null;
   workDir: string;
   writeFile: WriteFileFn;
   execPlan: ExecPlanFn;
   template?: string[] | string;
   /** Check out the project repo into the run dir. Real git in prod; omitted/no-op in tests. */
   cloneRepo?: (project: AgentContextProject, dir: string) => Promise<void>;
+  /** Read a file from the run dir (used to capture MEMORY.md for the db memory provider). */
+  readFile?: (path: string) => string | null;
   timeoutMs?: number;
 }
 
@@ -168,8 +181,9 @@ export async function runTaskOnce(
     deps.workDir,
     deps.writeFile,
     deps.template,
+    deps.model,
   );
-  if (deps.cloneRepo && bundle.project?.repoUrl) {
+  if (plan.mode === "spawn" && deps.cloneRepo && bundle.project?.repoUrl) {
     log.info(`cloning ${bundle.project.repoUrl} for task ${taskId}`);
     await deps.cloneRepo(bundle.project, plan.cwd);
   }
@@ -182,6 +196,17 @@ export async function runTaskOnce(
     .join("")
     .slice(-45_000);
   await api.postTaskMessage(taskId, output || "(runner produced no output)");
+
+  // db memory provider: capture the runtime's updated MEMORY.md back to the control plane (provenance).
+  if (plan.mode === "spawn" && bundle.memory?.provider === "db" && deps.readFile) {
+    const mem = deps.readFile(join(plan.cwd, "MEMORY.md"));
+    if (mem && mem.trim() && mem !== (bundle.memory.content ?? "")) {
+      await api.postMemory(taskId, mem).catch((err) =>
+        log.error(`memory post failed: ${err instanceof Error ? err.message : String(err)}`),
+      );
+    }
+  }
+
   const finalStatus = result.timedOut || result.exitCode !== 0 ? "blocked" : "review";
   await api.setTaskStatus(taskId, finalStatus);
   log.info(`task ${taskId} → ${finalStatus} (exit ${result.exitCode})`);

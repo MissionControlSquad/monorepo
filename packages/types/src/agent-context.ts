@@ -70,10 +70,29 @@ export interface AgentContextSubtask {
   status: string;
 }
 
+/** The agent's control-plane-dictated runtime (adapter + model + template). null = runner default. */
+export interface AgentContextRuntime {
+  adapter: string;
+  model: string | null;
+  template: string | null;
+}
+
+/** Memory binding for the run: which provider is active + any control-plane content to inject. */
+export interface AgentContextMemory {
+  /** none | markdown | db */
+  provider: string;
+  /** For the `db` provider: prior memory to inject. null for none/markdown (runner-owned). */
+  content: string | null;
+}
+
 export interface AgentContextBundle {
   /** Bump when the shape changes so runners can guard on it. */
   version: 1;
   agent: AgentContextIdentity;
+  /** Per-agent runtime selection; the runner prefers this over its own default when present. */
+  runtime: AgentContextRuntime | null;
+  /** Memory binding + any injected content for this run. */
+  memory: AgentContextMemory | null;
   instructions: AgentContextInstruction[];
   skills: AgentContextSkill[];
   task: AgentContextTask;

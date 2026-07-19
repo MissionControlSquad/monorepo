@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { RenderedRuntime } from "@agentcenter/utils";
+import type { AdapterInvocation } from "@agentcenter/utils";
 
 export interface ExecResult {
   exitCode: number | null;
@@ -18,7 +18,7 @@ export type ExecFn = (command: string, opts?: ExecOptions) => Promise<ExecResult
 
 /** Run a rendered runtime plan (argv). Injected into the task cycle so tests can substitute a fake. */
 export type ExecPlanFn = (
-  plan: RenderedRuntime,
+  plan: AdapterInvocation,
   opts?: { timeoutMs?: number },
 ) => Promise<ExecResult>;
 
@@ -59,11 +59,41 @@ function runChild(
 export const execShell: ExecFn = (command, opts = {}) =>
   isWin ? runChild("cmd", ["/c", command], opts) : runChild("sh", ["-c", command], opts);
 
+/** Fire an HTTP invocation (webhook adapter). 2xx → success; anything else → failure. */
+async function execHttp(
+  plan: Extract<AdapterInvocation, { mode: "http" }>,
+  opts: { timeoutMs?: number },
+): Promise<ExecResult> {
+  const controller = new AbortController();
+  const timer = opts.timeoutMs ? setTimeout(() => controller.abort(), opts.timeoutMs) : undefined;
+  try {
+    const res = await fetch(plan.url, {
+      method: plan.method,
+      headers: plan.headers,
+      body: plan.body,
+      signal: controller.signal,
+    });
+    const text = await res.text();
+    return {
+      exitCode: res.ok ? 0 : 1,
+      stdout: text,
+      stderr: res.ok ? "" : `HTTP ${res.status} ${res.statusText}`,
+      timedOut: false,
+    };
+  } catch (err) {
+    const timedOut = err instanceof Error && err.name === "AbortError";
+    return { exitCode: null, stdout: "", stderr: String(err), timedOut };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /**
- * Execute a rendered runtime plan. `shell` plans run through the platform shell; every other runtime
- * is spawned directly (argv[0] + args) with no shell, so arguments can't be re-interpreted.
+ * Execute a rendered runtime plan. `http` plans fire a webhook; `shell` plans run through the
+ * platform shell; every other runtime is spawned directly (argv[0] + args) with no shell.
  */
 export const execPlan: ExecPlanFn = (plan, opts = {}) => {
+  if (plan.mode === "http") return execHttp(plan, opts);
   const runOpts = { cwd: plan.cwd, timeoutMs: opts.timeoutMs };
   if (plan.useShell) {
     return isWin
