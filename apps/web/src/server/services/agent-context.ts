@@ -12,7 +12,7 @@
 import { prisma } from "@/server/prisma";
 import type { AgentContextBundle } from "@agentcenter/types";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
-import { assembleInjectedMemory } from "./agent-memory";
+import { assembleInjectedMemory, resolveEffectiveMemoryProvider } from "./agent-memory";
 
 // REST-shaped error so the route's handleError() renders a 404 (not a 500).
 function notFound(message: string): never {
@@ -24,7 +24,8 @@ function notFound(message: string): never {
 async function assembleMemoryBlock(
   agent: AgentLike,
 ): Promise<{ provider: string; content: string | null } | null> {
-  const provider = agent.memoryProvider ?? "none";
+  // Resolution order (GAP-C): agent override → company default → none.
+  const provider = await resolveEffectiveMemoryProvider(agent.workspaceId, agent.memoryProvider);
   if (provider === "none") return null;
   const content =
     provider === "db" && agent.workspaceId

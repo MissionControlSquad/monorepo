@@ -1,0 +1,54 @@
+// ─── Memory operations audit + company binding default (Tier D, Domain 4 GAP-A/-C) ──────────────
+// Every memory code path (query on pre-run hydrate, capture on post-run) writes a MemoryOperation row:
+// the single load-bearing audit surface that cost + inspect hang off. Company-scoped, no FK (D5);
+// opType/sourceKind/attributionMode are TEXT with app-level validation (no PG enums, per D5). MEMORY-gated.
+
+model MemoryOperation {
+  id          String @id @default(cuid())
+  workspaceId String // buildbase workspace _id; no FK (D5)
+  agentId     String?
+  provider    String // resolved binding value (none|markdown|db) at op time
+
+  opType String // capture | query | list | get | forget | correct | record_upsert
+
+  // scope
+  projectId String?
+  taskId    String?
+  runId     String?
+  subjectId String?
+
+  // provenance
+  sourceKind  String? // run | issue_comment | issue_document | issue | activity | manual_note | external_document
+  sourceRefId String? // taskId / commentId / documentKey / activityId / externalRef
+
+  // outcome + usage
+  success         Boolean @default(true)
+  error           String? @db.Text
+  latencyMs       Int?
+  resultCount     Int? // rows returned (query/list) or written (capture/upsert)
+  inputTokens     Int?
+  embeddingTokens Int?
+  outputTokens    Int?
+  costCents       Int?
+  attributionMode String? // billed_directly | included_in_run | external_invoice | untracked
+  costEventId     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([workspaceId, agentId, createdAt])
+  @@index([workspaceId, opType, createdAt])
+  @@map("memory_operations")
+}
+
+// Company-wide default memory provider (GAP-C). Resolution order: Agent.memoryProvider override →
+// this company default → "none". One row per workspace. Mirrors WorkspaceExecutionPolicy.
+model WorkspaceMemorySetting {
+  id                 String   @id @default(cuid())
+  workspaceId        String   @unique // buildbase workspace _id; no FK (D5)
+  defaultProvider    String   @default("none") // none | markdown | db
+  updatedByProfileId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("workspace_memory_settings")
+}

@@ -149,15 +149,31 @@ See 03-sandbox-depth.mdx.
 - [ ] **Agent-Companies** package model (COMPANY/TEAM/AGENTS.md + GitHub import + org-chart export). [L]
 - [ ] Skills: catalog pkg, external import, update/audit/reset, runtime-sync, Skill Studio execution, policy engine. [L]
 - [ ] Secrets: external providers (AWS/GCP/Vault), richer binding targets (tool_connection for MCP). [L]
+- [~] **Memory (Domain 4)** — GAP-A/-B/-C DONE. See "Phase 4 progress" below. Remaining: GAP-D inspect UI,
+      GAP-E adapter interface, GAP-F agent tools+search, GAP-G cost linkage, GAP-H eval suite.
 - [ ] Heartbeat: central agent-wake scheduler, scheduled retries+backoff, stranded-work reconciliation. [L]
 - [ ] Cost/obs: FinanceEvent ledger, provider quota polling, telemetry pipeline, OTel, pino+redaction+log store. [L]
 - [ ] Work-items: work-product taxonomy (PR/branch/commit/preview), artifact upload pipeline, document annotation depth. [L]
 - [ ] Deployment: operator CLI (doctor/env/db:backup), untrusted-PR-review container, deploy modes. [M–L]
 - [ ] Rich config UIs: apps/MCP, plugins, agent-detail unification, secrets tabs. [L]
 
+## Phase 4 progress (autonomous continuation — fresh machine, test DB stood up)
+- [x] **Keystone #3 — JsonSchemaForm** DONE (f4ebf8e). Pure parse/validate/defaults in @agentcenter/utils +
+      reusable React component; dogfooded into AgentAdapterConfigCard. Unblocks env/adapter/plugin/secret config UIs.
+- [x] **Memory Domain 4 — GAP-A + GAP-B + GAP-C** DONE (this commit). GAP-A: MemoryOperation audit table +
+      recordMemoryOperation (logged on query/capture, provenance+scope+outcome fields) + AgentMemory.sourceKind/
+      sourceRefId. GAP-B: captureRunMemory post-run hook wired into runTaskInSandbox finalization — the dead
+      appendAgentMemory now fires after a run for `db` agents (best-effort, no-op for none/markdown). GAP-C:
+      WorkspaceMemorySetting company default + resolveMemoryProvider (agent override→company default→none) +
+      resolveEffectiveMemoryProvider used by the pre-run hydrate path. GraphQL: memoryOperations / agentMemoryEntries /
+      companyMemoryDefault queries + setCompanyMemoryProvider mutation (+ MemoryOperation/AgentMemory pothos types)
+      + shared client ops. Migration 20260719160000_add_memory_operations. Tests: agent-memory 10/10, sandbox+context
+      32/32 unaffected. Typecheck 12/12, web build ✓. Remaining Memory: GAP-D inspect UI, GAP-E adapter iface,
+      GAP-F tools/search, GAP-G cost linkage, GAP-H evals.
+
 ## Cross-domain recurring themes (the "loopholes")
-- **Dead code / unwired features**: memory capture, requireUntrustedPrReview, hire_agent approval, auto-sleep cron,
-  secret audit-on-resolve, adapter Tier-A↔Tier-D disconnect. → Phase 1 sweeps these.
+- **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
+  hire_agent approval, auto-sleep cron, secret audit-on-resolve, adapter Tier-A↔Tier-D disconnect. → Phase 1 sweeps these.
 - **No run persistence** anywhere (sandbox/heartbeat/work-items all point at it). → keystone #1.
 - **Low-trust containment is declared but not enforced at runtime** (sandbox admission, PR review, execution allowlist). → Phase 1/2.
 - **MCP entirely absent** — the single biggest capability gap for a tool-using agent platform.

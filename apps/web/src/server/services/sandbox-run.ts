@@ -25,6 +25,7 @@ import { isFeatureEnabled } from "@/server/feature-flags";
 import { assembleContextBundle } from "./agent-context";
 import { getSandboxProvider } from "./sandbox-providers";
 import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
+import { captureRunMemory } from "./agent-memory";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertExecutionAllowed } from "./execution-policy";
 import { resolveEnvironmentExecution, type EnvExecutionResolution } from "./environments";
@@ -447,6 +448,18 @@ export async function runTaskInSandbox(input: {
       input.taskId,
       `Sandbox run (${providerKey}) — ${runStatus}${exitCode != null ? `, exit ${exitCode}` : ""}\n\n${stdout || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
     );
+
+    // Post-run memory auto-capture (Domain 4 GAP-B): persist run residue when the agent's effective
+    // provider is `db`. Best-effort — never fails the run; no-op for none/markdown.
+    await captureRunMemory({
+      workspaceId: input.workspaceId,
+      agentId: agent.id,
+      agentProvider: agent.memoryProvider ?? null,
+      taskId: input.taskId,
+      runId: run.id,
+      summary:
+        `Run ${runStatus} (${providerKey}${exitCode != null ? `, exit ${exitCode}` : ""}).\n${stdout || ""}`.trim(),
+    });
 
     return {
       runId: run.id,

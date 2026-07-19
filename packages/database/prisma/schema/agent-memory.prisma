@@ -12,6 +12,8 @@ model AgentMemory {
   agentId      String
   content      String   @db.Text
   sourceTaskId String? // provenance: the task run that produced this entry
+  sourceKind   String? // provenance kind: run | issue_comment | issue_document | manual_note | ... (default run)
+  sourceRefId  String? // provenance ref: the specific comment/doc/activity id when sourceKind isn't a task
   createdAt    DateTime @default(now())
 
   @@index([workspaceId, agentId, createdAt])

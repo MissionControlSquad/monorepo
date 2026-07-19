@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { GraphQLError } from "graphql";
 import { FLAG_KEYS, isMemoryProvider } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { setCompanyDefaultMemoryProvider } from "@/server/services/agent-memory";
 
 // Tier D: bind an agent's memory provider (none | markdown | db). MEMORY-gated, admin.
 builder.mutationField("setAgentMemoryProvider", (t) =>
@@ -29,6 +30,25 @@ builder.mutationField("setAgentMemoryProvider", (t) =>
         where: { id: agent.id },
         data: { memoryProvider: args.provider },
       });
+    },
+  }),
+);
+
+// GAP-C: set the company-wide default memory provider. Resolution order is agent override → this
+// default → none. MEMORY-gated, admin. Returns the new default.
+builder.mutationField("setCompanyMemoryProvider", (t) =>
+  t.string({
+    args: {
+      provider: t.arg.string({ required: true }),
+    },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.MEMORY);
+      const tenancy = requireRole(ctx, "admin");
+      if (!isMemoryProvider(args.provider))
+        throw new GraphQLError(`Unknown memory provider: ${args.provider}`, {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      return setCompanyDefaultMemoryProvider(tenancy.workspaceId, args.provider, tenancy.userId);
     },
   }),
 );

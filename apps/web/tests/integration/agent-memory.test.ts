@@ -11,7 +11,13 @@ import {
   appendAgentMemory,
   readAgentMemory,
   assembleInjectedMemory,
+  recordMemoryOperation,
+  captureRunMemory,
+  getCompanyDefaultMemoryProvider,
+  setCompanyDefaultMemoryProvider,
+  resolveEffectiveMemoryProvider,
 } from "../../src/server/services/agent-memory";
+import { resolveMemoryProvider } from "@agentcenter/utils";
 
 // Tier D: two-layer memory — control-plane binding + `db` provider storage/provenance + injection.
 const SECRET = "mem-secret";
@@ -74,7 +80,9 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   agentCache.clear();
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE agent_memories, tasks, agents CASCADE`);
+  await prisma.$executeRawUnsafe(
+    `TRUNCATE TABLE agent_memories, memory_operations, workspace_memory_settings, agent_runs, tasks, agents CASCADE`,
+  );
   await prisma.featureFlag.deleteMany({ where: { key: { in: ["memory", "runners"] } } });
   invalidateFlagCache();
   await enableMemory();
@@ -134,5 +142,132 @@ describe("agent memory (Tier D two-layer)", () => {
       `mutation{ setAgentMemoryProvider(agentId:"${agentId}", provider:"nope"){ id } }`,
     );
     expect(bad.errors).toBeDefined();
+  });
+});
+
+describe("memory operations audit + capture + resolution (Domain 4 GAP-A/-B/-C)", () => {
+  it("GAP-C: resolveMemoryProvider precedence — agent override > company default > none", () => {
+    expect(resolveMemoryProvider("db", "markdown")).toBe("db"); // override wins
+    expect(resolveMemoryProvider(null, "markdown")).toBe("markdown"); // company default
+    expect(resolveMemoryProvider(null, null)).toBe("none"); // nothing bound
+    expect(resolveMemoryProvider("bogus", "db")).toBe("db"); // invalid override falls through
+  });
+
+  it("GAP-C: company default is get/set and drives effective resolution", async () => {
+    expect(await getCompanyDefaultMemoryProvider(WS)).toBe("none");
+    await setCompanyDefaultMemoryProvider(WS, "db", "profile_x");
+    expect(await getCompanyDefaultMemoryProvider(WS)).toBe("db");
+    // no agent override → company default applies
+    expect(await resolveEffectiveMemoryProvider(WS, null)).toBe("db");
+    // agent override beats company default
+    expect(await resolveEffectiveMemoryProvider(WS, "markdown")).toBe("markdown");
+  });
+
+  it("GAP-A: recordMemoryOperation writes an audit row; assembleInjectedMemory logs a query op", async () => {
+    await recordMemoryOperation({
+      workspaceId: WS,
+      agentId,
+      provider: "db",
+      opType: "forget",
+      taskId: "t1",
+      success: false,
+      error: "boom",
+    });
+    await appendAgentMemory({ workspaceId: WS, agentId, content: "note", sourceTaskId: "t1" });
+    await assembleInjectedMemory(WS, agentId, { taskId: "t1", runId: "r1" });
+
+    const ops = await prisma.memoryOperation.findMany({
+      where: { workspaceId: WS, agentId },
+      orderBy: { createdAt: "asc" },
+    });
+    const forget = ops.find((o) => o.opType === "forget");
+    const query = ops.find((o) => o.opType === "query");
+    expect(forget).toMatchObject({ success: false, error: "boom", taskId: "t1" });
+    expect(query).toMatchObject({
+      resultCount: 1,
+      runId: "r1",
+      attributionMode: "included_in_run",
+    });
+    expect(query?.latencyMs).not.toBeNull();
+  });
+
+  it("GAP-B: captureRunMemory writes an entry + capture op for db; no-op for none/markdown", async () => {
+    // none provider (no company default) → nothing captured
+    expect(
+      await captureRunMemory({
+        workspaceId: WS,
+        agentId,
+        agentProvider: "none",
+        taskId: "t1",
+        runId: "r1",
+        summary: "should not persist",
+      }),
+    ).toBeNull();
+
+    // markdown → also no control-plane capture
+    expect(
+      await captureRunMemory({
+        workspaceId: WS,
+        agentId,
+        agentProvider: "markdown",
+        taskId: "t1",
+        runId: "r1",
+        summary: "runner holds this",
+      }),
+    ).toBeNull();
+
+    // db → one entry + one capture op with run provenance
+    const entry = await captureRunMemory({
+      workspaceId: WS,
+      agentId,
+      agentProvider: "db",
+      taskId: "t2",
+      runId: "r2",
+      summary: "Run done. built the thing.",
+    });
+    expect(entry).not.toBeNull();
+    expect(entry).toMatchObject({ sourceTaskId: "t2", sourceKind: "run", sourceRefId: "r2" });
+
+    const entries = await readAgentMemory(WS, agentId);
+    expect(entries).toHaveLength(1);
+    const captures = await prisma.memoryOperation.findMany({
+      where: { workspaceId: WS, agentId, opType: "capture" },
+    });
+    expect(captures).toHaveLength(1);
+    expect(captures[0]).toMatchObject({ runId: "r2", sourceKind: "run", resultCount: 1 });
+  });
+
+  it("GAP-B: captureRunMemory uses the company default when the agent has no override", async () => {
+    await setCompanyDefaultMemoryProvider(WS, "db");
+    const entry = await captureRunMemory({
+      workspaceId: WS,
+      agentId,
+      agentProvider: null, // no override → falls to company default (db)
+      taskId: "t3",
+      runId: "r3",
+      summary: "captured via company default",
+    });
+    expect(entry).not.toBeNull();
+    expect(await readAgentMemory(WS, agentId)).toHaveLength(1);
+  });
+
+  it("GAP-C: setCompanyMemoryProvider + companyMemoryDefault + memoryOperations over GraphQL", async () => {
+    const set = await gql(`mutation{ setCompanyMemoryProvider(provider:"db") }`);
+    expect(set.data.setCompanyMemoryProvider).toBe("db");
+    const read = await gql(`query{ companyMemoryDefault }`, "member");
+    expect(read.data.companyMemoryDefault).toBe("db");
+
+    // member cannot set (admin-only)
+    const denied = await gql(`mutation{ setCompanyMemoryProvider(provider:"markdown") }`, "member");
+    expect(denied.errors).toBeDefined();
+
+    // audit query returns workspace-scoped rows
+    await recordMemoryOperation({ workspaceId: WS, agentId, provider: "db", opType: "query" });
+    const ops = await gql(
+      `query{ memoryOperations(agentId:"${agentId}"){ opType provider } }`,
+      "member",
+    );
+    expect(ops.data.memoryOperations.length).toBeGreaterThan(0);
+    expect(ops.data.memoryOperations[0].opType).toBe("query");
   });
 });

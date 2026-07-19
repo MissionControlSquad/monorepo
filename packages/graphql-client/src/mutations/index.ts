@@ -226,6 +226,7 @@ export {
   CANCEL_AGENT_RUN,
 } from "./sandbox-run";
 export { SET_AGENT_RUNTIME } from "./agent-runtime";
+export { SET_AGENT_MEMORY_PROVIDER, SET_COMPANY_MEMORY_PROVIDER } from "./memory";
 export {
   CREATE_ENVIRONMENT,
   UPDATE_ENVIRONMENT,
