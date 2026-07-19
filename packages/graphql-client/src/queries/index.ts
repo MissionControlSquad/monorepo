@@ -155,3 +155,4 @@ export { SKILLS_QUERY, TEAMS_QUERY } from "./skills";
 export { EXPORT_WORKSPACE_BUNDLE, WORKSPACE_IMPORTS } from "./portability";
 export { GOALS_QUERY, DEFAULT_GOAL_QUERY } from "./goals";
 export { WORKSPACE_SUMMARY_QUERY } from "./observability";
+export { BOARD_THREAD_QUERY } from "./boardroom";

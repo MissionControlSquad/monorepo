@@ -29,3 +29,4 @@ import "./cases";
 import "./skills";
 import "./portability";
 import "./goals";
+import "./boardroom";

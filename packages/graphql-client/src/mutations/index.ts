@@ -151,3 +151,5 @@ export {
 export { IMPORT_WORKSPACE_BUNDLE } from "./portability";
 
 export { CREATE_GOAL, UPDATE_GOAL, DELETE_GOAL } from "./goals";
+
+export { SEND_BOARD_MESSAGE } from "./boardroom";

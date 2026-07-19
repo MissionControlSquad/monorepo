@@ -30,3 +30,4 @@ import "./skills";
 import "./portability";
 import "./goals";
 import "./observability";
+import "./boardroom";

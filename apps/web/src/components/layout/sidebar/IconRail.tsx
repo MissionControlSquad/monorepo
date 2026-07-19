@@ -28,6 +28,7 @@ import {
   PackageOpen,
   Target,
   Activity,
+  Landmark,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -65,6 +66,7 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
     label: "Observability",
     flag: FLAG_KEYS.OBSERVABILITY,
   },
+  { href: "/boardroom", icon: Landmark, label: "Boardroom", flag: FLAG_KEYS.BOARD_CHAT },
   {
     href: "/portability",
     icon: PackageOpen,
