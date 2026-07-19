@@ -343,6 +343,14 @@ See 03-sandbox-depth.mdx.
       Tests: 4 unit + 1 integration. Typecheck 12/12, web build ✓. Remaining Domain 12: GAP-3 telemetry, GAP-5 pino/run-log,
       GAP-6 A13 unpriced cost state.
 
+- [x] **Cost/observability Domain 12 — GAP-6 A13 unpriced cost state + reprice** DONE (next commit). CostEvent.costStatus
+      (reported|unpriced, migration 20260719280000). recordCostEvent accepts costStatus; repriceCostEvent(ws, id, amount)
+      sets the real amount + marks reported + adjusts the running QuotaWindow budgets by the DELTA (new−old) so budgets stay
+      correct whether the event was unpriced (0) or an estimate. GraphQL: costStatus on CostEvent + ingest arg +
+      repriceCostEvent mutation (BUDGETS, member) + shared client op. Tests: 1 integration (unpriced 0 → reprice 400 →
+      QuotaWindow tracks the delta). Typecheck 12/12, web build ✓. **Domain 12 cost is now largely complete** (GAP-1 finance
+      ledger, GAP-2 quota, GAP-4 OTel, GAP-6 A10/A12/A13/A14). Remaining: GAP-3 telemetry (XL epic), GAP-5 pino/run-log.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

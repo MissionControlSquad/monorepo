@@ -29,6 +29,8 @@ export interface RecordCostEventInput {
   tokensOut?: number;
   amountCents: number;
   billingType?: string;
+  /** "unpriced" defers the real amount until a provider reprice; default "reported". (A13) */
+  costStatus?: string;
   source?: string;
   idempotencyKey?: string | null;
   occurredAt?: Date;
@@ -97,6 +99,7 @@ export async function recordCostEvent(input: RecordCostEventInput): Promise<Cost
     tokensOut: input.tokensOut ?? 0,
     amountCents,
     billingType: normalizeBillingType(input.billingType),
+    costStatus: input.costStatus === "unpriced" ? "unpriced" : "reported",
     source: input.source ?? "agent",
     idempotencyKey: input.idempotencyKey ?? null,
     occurredAt,
@@ -158,4 +161,47 @@ export async function recordCostEvent(input: RecordCostEventInput): Promise<Cost
   });
 
   return costEvent;
+}
+
+/**
+ * Reprice a cost event once the provider's real amount is known (Domain 12 GAP-6 A13). Sets the new
+ * amount, marks it `reported`, and adjusts the running quota windows by the DELTA (new − old) so
+ * budgets stay correct whether the event was originally unpriced (0) or an estimate. Workspace-scoped.
+ */
+export async function repriceCostEvent(
+  workspaceId: string,
+  costEventId: string,
+  newAmountCents: number,
+): Promise<CostEvent> {
+  const existing = await prisma.costEvent.findFirst({
+    where: { id: costEventId, workspaceId },
+  });
+  if (!existing) throw new Error("Cost event not found");
+  const newAmount = Math.trunc(newAmountCents);
+  const delta = newAmount - existing.amountCents;
+
+  const updated = await prisma.costEvent.update({
+    where: { id: costEventId },
+    data: { amountCents: newAmount, costStatus: "reported" },
+  });
+
+  if (delta !== 0) {
+    const policies = await prisma.budgetPolicy.findMany({
+      where: {
+        workspaceId,
+        isActive: true,
+        OR: [
+          { scope: "workspace" as BudgetScope },
+          ...(existing.agentId
+            ? [{ scope: "agent" as BudgetScope, agentId: existing.agentId }]
+            : []),
+        ],
+      },
+      select: { id: true, window: true },
+    });
+    for (const policy of policies) {
+      await incrementQuotaWindow(workspaceId, policy.id, policy.window, existing.occurredAt, delta);
+    }
+  }
+  return updated;
 }

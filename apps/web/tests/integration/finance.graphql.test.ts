@@ -395,3 +395,47 @@ describe("billing-type split reporting (Domain 12 GAP-6 A14)", () => {
     });
   });
 });
+
+describe("unpriced cost + reprice (Domain 12 GAP-6 A13)", () => {
+  it("records an unpriced event (0) then reprices it, adjusting the running budget by the delta", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    // a workspace budget whose QuotaWindow spend must track the reprice (QuotaWindow is not cached)
+    const pol = await runGraphQL(
+      `mutation{ createBudgetPolicy(scope:"workspace", name:"cap", limitCents:100000, window:"monthly"){ id } }`,
+      undefined,
+      admin,
+    );
+    const policyId = pol.data.createBudgetPolicy.id;
+
+    // unpriced ingest at 0 → costStatus unpriced, no spend yet
+    const ing = await runGraphQL(
+      `mutation{ ingestCostEvent(amountCents:0, provider:"anthropic", costStatus:"unpriced"){ id costStatus amountCents } }`,
+      undefined,
+      admin,
+    );
+    expect(ing.data.ingestCostEvent).toMatchObject({ costStatus: "unpriced", amountCents: 0 });
+    const qwBefore = await prisma.quotaWindow.aggregate({
+      where: { policyId },
+      _sum: { spendCents: true },
+    });
+    expect(qwBefore._sum.spendCents ?? 0).toBe(0);
+
+    // reprice to 400 → reported, the running budget catches up by the delta
+    const rp = await runGraphQL(
+      `mutation($id:String!){ repriceCostEvent(costEventId:$id, amountCents:400){ costStatus amountCents } }`,
+      { id: ing.data.ingestCostEvent.id },
+      admin,
+    );
+    expect(rp.data.repriceCostEvent).toMatchObject({ costStatus: "reported", amountCents: 400 });
+
+    const row = await prisma.costEvent.findUniqueOrThrow({
+      where: { id: ing.data.ingestCostEvent.id },
+    });
+    expect(row).toMatchObject({ amountCents: 400, costStatus: "reported" });
+    const qwAfter = await prisma.quotaWindow.aggregate({
+      where: { policyId },
+      _sum: { spendCents: true },
+    });
+    expect(qwAfter._sum.spendCents ?? 0).toBe(400);
+  });
+});

@@ -114,6 +114,7 @@ export {
   RESOLVE_BUDGET_INCIDENT,
   RAISE_BUDGET_AND_RESUME,
   INGEST_FINANCE_EVENT,
+  REPRICE_COST_EVENT,
 } from "./finance";
 
 export {

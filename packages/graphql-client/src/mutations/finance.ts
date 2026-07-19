@@ -99,3 +99,14 @@ export const INGEST_FINANCE_EVENT = gql`
     }
   }
 `;
+
+// Domain 12 GAP-6 A13: reprice an unpriced/estimated cost event.
+export const REPRICE_COST_EVENT = gql`
+  mutation RepriceCostEvent($costEventId: String!, $amountCents: Int!) {
+    repriceCostEvent(costEventId: $costEventId, amountCents: $amountCents) {
+      id
+      amountCents
+      costStatus
+    }
+  }
+`;

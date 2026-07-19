@@ -16,6 +16,7 @@ builder.prismaObject("CostEvent", {
     tokensOut: t.exposeInt("tokensOut"),
     amountCents: t.exposeInt("amountCents"),
     billingType: t.exposeString("billingType"),
+    costStatus: t.exposeString("costStatus"),
     source: t.exposeString("source"),
     occurredAt: t.expose("occurredAt", { type: "DateTime" }),
   }),

@@ -3,7 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { BudgetScope, BudgetWindow } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
-import { recordCostEvent } from "@/server/services/cost";
+import { recordCostEvent, repriceCostEvent } from "@/server/services/cost";
 import { recordFinanceEvent } from "@/server/services/finance-events";
 import {
   createBudgetPolicy,
@@ -101,6 +101,7 @@ builder.mutationField("ingestCostEvent", (t) =>
       tokensOut: t.arg.int(),
       amountCents: t.arg.int({ required: true }),
       billingType: t.arg.string(),
+      costStatus: t.arg.string(),
       source: t.arg.string(),
       idempotencyKey: t.arg.string(),
     },
@@ -120,6 +121,7 @@ builder.mutationField("ingestCostEvent", (t) =>
         tokensOut: args.tokensOut ?? 0,
         amountCents: args.amountCents,
         billingType: args.billingType ?? undefined,
+        costStatus: args.costStatus ?? undefined,
         source: args.source ?? "manual",
         idempotencyKey: args.idempotencyKey ?? null,
       });
@@ -208,6 +210,23 @@ builder.mutationField("ingestFinanceEvent", (t) =>
         occurredAt: args.occurredAt ?? undefined,
       });
       return ctx.prisma.financeEvent.findUniqueOrThrow({ ...query, where: { id: ev.id } });
+    },
+  }),
+);
+
+// Domain 12 GAP-6 A13: reprice an unpriced/estimated cost event once the provider amount is known.
+builder.mutationField("repriceCostEvent", (t) =>
+  t.prismaField({
+    type: "CostEvent",
+    args: {
+      costEventId: t.arg.string({ required: true }),
+      amountCents: t.arg.int({ required: true }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      const tenancy = requireRole(ctx, "member");
+      const ev = await repriceCostEvent(tenancy.workspaceId, args.costEventId, args.amountCents);
+      return ctx.prisma.costEvent.findUniqueOrThrow({ ...query, where: { id: ev.id } });
     },
   }),
 );
