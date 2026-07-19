@@ -26,6 +26,7 @@ export default defineConfig({
       "tests/unit/task-autonomy.test.ts",
       "tests/unit/cases.test.ts",
       "tests/unit/skills-teams.test.ts",
+      "tests/unit/portability.test.ts",
     ],
   },
   resolve: {

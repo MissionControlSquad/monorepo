@@ -18,6 +18,7 @@ export const FLAG_KEYS = {
   TASK_AUTONOMY: "task_autonomy",
   CASES: "cases",
   SKILLS_TEAMS: "skills_teams",
+  WORKSPACE_PORTABILITY: "workspace_portability",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -43,4 +44,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.TASK_AUTONOMY]: true,
   [FLAG_KEYS.CASES]: true,
   [FLAG_KEYS.SKILLS_TEAMS]: true,
+  [FLAG_KEYS.WORKSPACE_PORTABILITY]: true,
 };
