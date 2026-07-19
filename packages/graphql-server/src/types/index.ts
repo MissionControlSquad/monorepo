@@ -28,3 +28,4 @@ import "./secret";
 import "./pipeline";
 import "./task-autonomy";
 import "./case";
+import "./skill";

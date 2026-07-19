@@ -26,3 +26,4 @@ import "./secrets";
 import "./pipelines";
 import "./task-autonomy";
 import "./cases";
+import "./skills";

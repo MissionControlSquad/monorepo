@@ -17,6 +17,7 @@ export const FLAG_KEYS = {
   PIPELINES_ROUTINES: "pipelines_routines",
   TASK_AUTONOMY: "task_autonomy",
   CASES: "cases",
+  SKILLS_TEAMS: "skills_teams",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -41,4 +42,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.PIPELINES_ROUTINES]: true,
   [FLAG_KEYS.TASK_AUTONOMY]: true,
   [FLAG_KEYS.CASES]: true,
+  [FLAG_KEYS.SKILLS_TEAMS]: true,
 };

@@ -1,0 +1,184 @@
+// ─── Skills library + Teams catalog (Epic #10) ────────────────────
+// Skills: per-workspace reusable capability modules (markdown + metadata) with versions, stars,
+// fork lineage, and agent assignment. Teams: installable bundles of agent roles. Ports Paperclip's
+// company_skills* + teams catalog.
+//
+// Deviations (see docs/gap-plans/10-skills-teams.md): agent→skill is a queryable AgentSkill join
+// (Paperclip uses adapterConfig); teams get real DB tables (Paperclip is file-only). Trust is a
+// capability ladder, not a boolean. workspaceId-scoped (buildbase, D5 — no FK).
+
+enum SkillSourceType {
+  local_path
+  github
+  url
+  catalog
+}
+
+enum SkillTrustLevel {
+  markdown_only
+  assets
+  scripts_executables
+}
+
+enum SkillSharingScope {
+  private
+  workspace
+  public
+}
+
+enum TeamKind {
+  bundled
+  optional
+}
+
+enum TeamTrustLevel {
+  markdown_only
+  assets
+  scripts_executables
+  external_sources
+}
+
+enum CollisionStrategy {
+  rename
+  skip
+  replace
+}
+
+model Skill {
+  id                 String            @id @default(cuid())
+  workspaceId        String // buildbase workspace _id; no FK (D5)
+  key                String
+  slug               String
+  name               String
+  description        String?
+  markdown           String
+  sourceType         SkillSourceType   @default(local_path)
+  sourceRef          String?
+  trustLevel         SkillTrustLevel   @default(markdown_only)
+  categories         String[]          @default([])
+  sharingScope       SkillSharingScope @default(workspace)
+  forkedFromSkillId  String?
+  starCount          Int               @default(0)
+  installCount       Int               @default(0)
+  forkCount          Int               @default(0)
+  currentVersion     Int               @default(1)
+  createdByProfileId String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  forkedFrom       Skill?         @relation("SkillFork", fields: [forkedFromSkillId], references: [id], onDelete: SetNull)
+  forks            Skill[]        @relation("SkillFork")
+  createdByProfile Profile?       @relation("SkillCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: SetNull)
+  versions         SkillVersion[]
+  agentSkills      AgentSkill[]
+  stars            SkillStar[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+  @@index([workspaceId, sharingScope])
+  @@map("skills")
+}
+
+model SkillVersion {
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  skillId            String
+  revisionNumber     Int
+  label              String?
+  content            String // markdown snapshot
+  createdByProfileId String?
+  createdAt          DateTime @default(now())
+
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([skillId, revisionNumber])
+  @@index([skillId, createdAt])
+  @@map("skill_versions")
+}
+
+model SkillStar {
+  id          String   @id @default(cuid())
+  workspaceId String
+  skillId     String
+  profileId   String
+  createdAt   DateTime @default(now())
+
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([skillId, profileId])
+  @@index([skillId])
+  @@map("skill_stars")
+}
+
+model AgentSkill {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  agentId       String
+  skillId       String
+  pinnedVersion Int? // null = follow Skill.currentVersion
+  createdAt     DateTime @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, skillId])
+  @@index([skillId])
+  @@index([workspaceId])
+  @@map("agent_skills")
+}
+
+model Team {
+  id                 String         @id @default(cuid())
+  workspaceId        String
+  key                String
+  name               String
+  description        String?
+  kind               TeamKind       @default(optional)
+  trustLevel         TeamTrustLevel @default(markdown_only)
+  sourceRef          String?
+  installCount       Int            @default(0)
+  createdByProfileId String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  members  TeamMember[]
+  installs TeamInstall[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id          String   @id @default(cuid())
+  workspaceId String
+  teamId      String
+  name        String
+  role        String
+  templateId  String? // may reference a code-level AGENT_TEMPLATES id
+  skills      String[] @default([])
+  config      Json?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@map("team_members")
+}
+
+model TeamInstall {
+  id                   String            @id @default(cuid())
+  workspaceId          String
+  teamId               String
+  collisionStrategy    CollisionStrategy @default(rename)
+  createdAgentIds      String[]          @default([])
+  installedByProfileId String?
+  installedAt          DateTime          @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([workspaceId])
+  @@map("team_installs")
+}
