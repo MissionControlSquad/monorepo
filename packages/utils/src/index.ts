@@ -36,6 +36,7 @@ export * from "./finance-events";
 export * from "./run-retry";
 export * from "./skill-frontmatter";
 export * from "./skill-policy";
+export * from "./skill-audit";
 export * from "./work-products";
 export * from "./cost-windows";
 export * from "./otel";

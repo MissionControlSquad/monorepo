@@ -368,6 +368,14 @@ See 03-sandbox-depth.mdx.
       re-resolve-rejected, unknown-kind). Typecheck 12/12, web build ✓. Remaining Domain 8 G6: G6.2 rich comments, G6.3
       external-object sync, G6.4 origin/idempotency, G6.6 subtree cancel/restore, G6.7 status enum; dependency-resolved wakeups.
 
+- [x] **Skills Domain 5 — GAP-D (audit) static skill security audit** DONE (next commit). Pure skill-audit.ts in
+      @agentcenter/utils: auditSkill(markdown, files) statically scans for hardcoded secrets (AWS key ids, ghp_/sk-/xox
+      tokens → critical), curl|bash pipe-to-shell (critical), rm -rf / eval|exec / path-traversal (warning) → verdict
+      pass|warning|fail with coded per-file findings; auditHardStops (fail blocks update/reset). GraphQL auditSkill(skillId)
+      query (SKILLS_TEAMS, member) + shared client op. Tests: 4 unit + 2 integration (fail on curl|bash+rm, clean→pass).
+      Typecheck 12/12, web build ✓. (GAP-D update/reset paths still need GAP-B catalog provenance.) Remaining Domain 5:
+      GAP-B catalog package, GAP-C external import, GAP-D update/reset, GAP-E runtime sync, GAP-G studio.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

@@ -1,6 +1,12 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS, isCollisionStrategy, lintSkill, isSkillAction } from "@agentcenter/utils";
+import {
+  FLAG_KEYS,
+  isCollisionStrategy,
+  lintSkill,
+  isSkillAction,
+  auditSkill,
+} from "@agentcenter/utils";
 import type { CollisionStrategy } from "@agentcenter/utils";
 import { requireRole, scoped } from "@/server/tenancy";
 import { previewTeamInstall } from "@/server/services/teams";
@@ -248,6 +254,39 @@ builder.queryField("evaluateSkillPolicy", (t) =>
           sourceType: args.sourceType ?? null,
         },
       );
+    },
+  }),
+);
+
+// Domain 5 GAP-D: static security audit of a skill bundle → verdict + coded findings.
+const SkillAuditFinding = builder.simpleObject("SkillAuditFinding", {
+  fields: (t) => ({
+    code: t.string(),
+    severity: t.string(),
+    message: t.string(),
+    path: t.string({ nullable: true }),
+  }),
+});
+const SkillAuditResult = builder.simpleObject("SkillAuditResult", {
+  fields: (t) => ({
+    verdict: t.string(),
+    findings: t.field({ type: [SkillAuditFinding] }),
+  }),
+});
+
+builder.queryField("auditSkill", (t) =>
+  t.field({
+    type: SkillAuditResult,
+    args: { skillId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      requireRole(ctx, "member");
+      const skill = await ctx.prisma.skill.findFirst({
+        where: scoped(ctx, { id: args.skillId }),
+        select: { markdown: true, files: { select: { path: true, content: true } } },
+      });
+      if (!skill) return { verdict: "pass", findings: [] };
+      return auditSkill({ markdown: skill.markdown, files: skill.files });
     },
   }),
 );
