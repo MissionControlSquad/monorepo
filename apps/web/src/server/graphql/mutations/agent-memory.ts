@@ -3,7 +3,7 @@ import { requireFeature } from "../require-feature";
 import { GraphQLError } from "graphql";
 import { FLAG_KEYS, isMemoryProvider } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
-import { setCompanyDefaultMemoryProvider } from "@/server/services/agent-memory";
+import { setCompanyDefaultMemoryProvider, forgetAgentMemory } from "@/server/services/agent-memory";
 
 // Tier D: bind an agent's memory provider (none | markdown | db). MEMORY-gated, admin.
 builder.mutationField("setAgentMemoryProvider", (t) =>
@@ -49,6 +49,18 @@ builder.mutationField("setCompanyMemoryProvider", (t) =>
           extensions: { code: "BAD_USER_INPUT" },
         });
       return setCompanyDefaultMemoryProvider(tenancy.workspaceId, args.provider, tenancy.userId);
+    },
+  }),
+);
+
+// Domain 4 GAP-F: forget a single memory entry. MEMORY-gated, admin.
+builder.mutationField("forgetAgentMemory", (t) =>
+  t.boolean({
+    args: { agentId: t.arg.string({ required: true }), memoryId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.MEMORY);
+      const tenancy = requireRole(ctx, "admin");
+      return forgetAgentMemory(tenancy.workspaceId, args.agentId, args.memoryId);
     },
   }),
 );

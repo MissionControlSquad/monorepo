@@ -391,6 +391,14 @@ See 03-sandbox-depth.mdx.
       + 1 integration (env healthy, unconfigured vault coming_soon, member denied). Typecheck 12/12, web build ✓. Remaining
       Domain 7: P2 real AWS/GCP/Vault resolvers (infra), P3 rich bindings, P4 user secrets, P5 MCP governance.
 
+- [x] **Memory Domain 4 — GAP-F search + forget** DONE (next commit). Real recall replacing the crude newest-20 bulk inject:
+      searchAgentMemory(ws, agentId, query, limit) — case-insensitive ILIKE (`contains`, mode insensitive) over content,
+      newest-first, records a `query` op; forgetAgentMemory(ws, agentId, id) — workspace+agent-scoped deleteMany (one agent
+      can't delete another's), records a `forget` op. GraphQL searchAgentMemory query (member) + forgetAgentMemory mutation
+      (admin) + shared client ops. Tests: 2 integration (ILIKE recall + query-op recorded, forget deletes + forget-op +
+      no-op on missing; GraphQL member-reads/admin-forgets). Typecheck 12/12, web build ✓. Remaining Domain 4: GAP-D inspect
+      UI, GAP-E adapter interface, GAP-G cost linkage, GAP-H evals (memory.note = existing appendAgentMemory).
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

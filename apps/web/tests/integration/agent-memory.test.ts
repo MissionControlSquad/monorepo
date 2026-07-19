@@ -271,3 +271,64 @@ describe("memory operations audit + capture + resolution (Domain 4 GAP-A/-B/-C)"
     expect(ops.data.memoryOperations[0].opType).toBe("query");
   });
 });
+
+describe("memory search + forget (Domain 4 GAP-F)", () => {
+  it("searchAgentMemory does an ILIKE recall + records a query op; forget deletes + records forget", async () => {
+    const { searchAgentMemory, forgetAgentMemory } =
+      await import("../../src/server/services/agent-memory");
+    await appendAgentMemory({
+      workspaceId: WS,
+      agentId,
+      content: "Deploy uses Vercel and Postgres",
+    });
+    await appendAgentMemory({ workspaceId: WS, agentId, content: "The user prefers dark mode" });
+
+    // case-insensitive substring recall
+    const hits = await searchAgentMemory(WS, agentId, "postgres");
+    expect(hits).toHaveLength(1);
+    expect(hits[0].content).toContain("Postgres");
+    // empty query → all (newest first)
+    expect(await searchAgentMemory(WS, agentId, "")).toHaveLength(2);
+    // a query op was recorded
+    expect(
+      await prisma.memoryOperation.count({ where: { workspaceId: WS, agentId, opType: "query" } }),
+    ).toBeGreaterThanOrEqual(2);
+
+    // forget removes the entry + records a forget op
+    const removed = await forgetAgentMemory(WS, agentId, hits[0].id);
+    expect(removed).toBe(true);
+    expect(await searchAgentMemory(WS, agentId, "postgres")).toHaveLength(0);
+    expect(
+      await prisma.memoryOperation.count({ where: { workspaceId: WS, agentId, opType: "forget" } }),
+    ).toBe(1);
+
+    // forgetting a non-existent / other-workspace entry is a no-op
+    expect(await forgetAgentMemory(WS, agentId, "nope")).toBe(false);
+  });
+
+  it("searchAgentMemory + forgetAgentMemory over GraphQL (member reads, admin forgets)", async () => {
+    const m = await appendAgentMemory({
+      workspaceId: WS,
+      agentId,
+      content: "graphql recall target",
+    });
+    const search = await gql(
+      `query{ searchAgentMemory(agentId:"${agentId}", query:"recall"){ id content } }`,
+      "member",
+    );
+    expect(search.data.searchAgentMemory).toHaveLength(1);
+
+    // member cannot forget
+    const denied = await gql(
+      `mutation{ forgetAgentMemory(agentId:"${agentId}", memoryId:"${m.id}") }`,
+      "member",
+    );
+    expect(denied.errors).toBeDefined();
+    // admin can
+    const ok = await gql(
+      `mutation{ forgetAgentMemory(agentId:"${agentId}", memoryId:"${m.id}") }`,
+      "admin",
+    );
+    expect(ok.data.forgetAgentMemory).toBe(true);
+  });
+});

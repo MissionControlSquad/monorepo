@@ -2,7 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
-import { getCompanyDefaultMemoryProvider } from "@/server/services/agent-memory";
+import { getCompanyDefaultMemoryProvider, searchAgentMemory } from "@/server/services/agent-memory";
 
 // Tier D / Domain 4: memory read surfaces (inspect). All MEMORY-gated, member+, workspace-scoped.
 
@@ -62,6 +62,33 @@ builder.queryField("companyMemoryDefault", (t) =>
       await requireFeature(FLAG_KEYS.MEMORY);
       const tenancy = requireRole(ctx, "member");
       return getCompanyDefaultMemoryProvider(tenancy.workspaceId);
+    },
+  }),
+);
+
+// Domain 4 GAP-F: recall — search an agent's stored memory (ILIKE). MEMORY-gated, member+.
+builder.queryField("searchAgentMemory", (t) =>
+  t.prismaField({
+    type: ["AgentMemory"],
+    args: {
+      agentId: t.arg.string({ required: true }),
+      query: t.arg.string(),
+      limit: t.arg.int(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.MEMORY);
+      const tenancy = requireRole(ctx, "member");
+      const rows = await searchAgentMemory(
+        tenancy.workspaceId,
+        args.agentId,
+        args.query ?? "",
+        args.limit ?? 20,
+      );
+      return ctx.prisma.agentMemory.findMany({
+        ...query,
+        where: { id: { in: rows.map((r) => r.id) } },
+        orderBy: { createdAt: "desc" },
+      });
     },
   }),
 );

@@ -214,3 +214,60 @@ export async function captureRunMemory(input: {
     return null; // capture is best-effort
   }
 }
+
+/**
+ * Search an agent's stored memory (Domain 4 GAP-F) — real recall instead of the crude newest-20 bulk
+ * inject. Case-insensitive substring match over content (ILIKE via `contains`), newest first. Records
+ * a `query` operation with the hit count. Empty query → recent entries.
+ */
+export async function searchAgentMemory(
+  workspaceId: string,
+  agentId: string,
+  query: string,
+  limit = 20,
+): Promise<AgentMemory[]> {
+  const start = Date.now();
+  const q = query.trim();
+  const rows = await prisma.agentMemory.findMany({
+    where: {
+      workspaceId,
+      agentId,
+      ...(q ? { content: { contains: q, mode: "insensitive" } } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    take: Math.min(limit, 100),
+  });
+  await recordMemoryOperation({
+    workspaceId,
+    agentId,
+    provider: "db",
+    opType: "query",
+    resultCount: rows.length,
+    latencyMs: Date.now() - start,
+    sourceKind: "manual_note",
+  }).catch(() => {});
+  return rows;
+}
+
+/**
+ * Forget (delete) a single memory entry (Domain 4 GAP-F). Workspace + agent scoped so one agent can't
+ * delete another's memory. Records a `forget` operation. Returns true when a row was removed.
+ */
+export async function forgetAgentMemory(
+  workspaceId: string,
+  agentId: string,
+  memoryId: string,
+): Promise<boolean> {
+  const res = await prisma.agentMemory.deleteMany({
+    where: { id: memoryId, workspaceId, agentId },
+  });
+  await recordMemoryOperation({
+    workspaceId,
+    agentId,
+    provider: "db",
+    opType: "forget",
+    resultCount: res.count,
+    success: res.count > 0,
+  }).catch(() => {});
+  return res.count > 0;
+}

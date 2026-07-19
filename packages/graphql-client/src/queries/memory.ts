@@ -43,3 +43,16 @@ export const COMPANY_MEMORY_DEFAULT_QUERY = gql`
     companyMemoryDefault
   }
 `;
+
+// Domain 4 GAP-F: search an agent's stored memory (recall).
+export const SEARCH_AGENT_MEMORY_QUERY = gql`
+  query SearchAgentMemory($agentId: String!, $query: String, $limit: Int) {
+    searchAgentMemory(agentId: $agentId, query: $query, limit: $limit) {
+      id
+      content
+      sourceTaskId
+      sourceKind
+      createdAt
+    }
+  }
+`;

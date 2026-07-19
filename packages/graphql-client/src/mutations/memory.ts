@@ -16,3 +16,10 @@ export const SET_COMPANY_MEMORY_PROVIDER = gql`
     setCompanyMemoryProvider(provider: $provider)
   }
 `;
+
+// Domain 4 GAP-F: forget a memory entry.
+export const FORGET_AGENT_MEMORY = gql`
+  mutation ForgetAgentMemory($agentId: String!, $memoryId: String!) {
+    forgetAgentMemory(agentId: $agentId, memoryId: $memoryId)
+  }
+`;
