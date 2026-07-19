@@ -162,6 +162,46 @@ describe("bindings + env resolution (Epic #5)", () => {
     );
     expect(r.errors).toBeDefined();
   });
+
+  // Domain 7 P1: audit-on-resolve at the USE site.
+  it("writes an `injected` access event per bound secret ONLY when a consumer context is passed", async () => {
+    const agentId = await makeAgentInWs(WS_A);
+    const s = await makeSecret(WS_A, "OPENAI", "sk-xyz");
+    await gql(
+      `mutation($s:String!,$a:String!){ bindSecret(secretId:$s, scope:"agent", agentId:$a, envVarName:"OPENAI_API_KEY"){ id } }`,
+      { s: s.data.createSecret.id, a: agentId },
+      await cookieFor(WS_A, "admin"),
+    );
+    const secretId = s.data.createSecret.id;
+
+    // Presence-check path (no context) → NO injected audit (avoids spamming the ledger).
+    await resolveEnvForAgent(WS_A, agentId);
+    expect(await prisma.secretAccessEvent.count({ where: { secretId, action: "injected" } })).toBe(
+      0,
+    );
+
+    // Real USE path (run injection) → one `injected` event with full provenance.
+    const env = await resolveEnvForAgent(WS_A, agentId, {
+      actorType: "agent",
+      actorId: agentId,
+      consumerType: "agent",
+      consumerId: agentId,
+      runId: "run_abc",
+    });
+    expect(env).toEqual({ OPENAI_API_KEY: "sk-xyz" });
+    const injected = await prisma.secretAccessEvent.findFirst({
+      where: { secretId, action: "injected" },
+    });
+    expect(injected).toMatchObject({
+      actorType: "agent",
+      agentId,
+      consumerType: "agent",
+      consumerId: agentId,
+      configPath: "env.OPENAI_API_KEY",
+      outcome: "success",
+      runId: "run_abc",
+    });
+  });
 });
 
 describe("lifecycle status (Epic #5)", () => {

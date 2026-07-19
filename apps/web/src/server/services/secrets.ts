@@ -30,6 +30,13 @@ export function recordSecretAccess(input: {
   actorId?: string | null;
   agentId?: string | null;
   version?: number | null;
+  // Audit-on-resolve provenance (Domain 7 P1).
+  consumerType?: string | null;
+  consumerId?: string | null;
+  configPath?: string | null;
+  outcome?: string | null;
+  errorCode?: string | null;
+  runId?: string | null;
   metadata?: Record<string, unknown> | null;
 }) {
   return prisma.secretAccessEvent.create({
@@ -40,9 +47,28 @@ export function recordSecretAccess(input: {
       actorId: input.actorId ?? null,
       agentId: input.agentId ?? null,
       version: input.version ?? null,
+      consumerType: input.consumerType ?? null,
+      consumerId: input.consumerId ?? null,
+      configPath: input.configPath ?? null,
+      outcome: input.outcome ?? null,
+      errorCode: input.errorCode ?? null,
+      runId: input.runId ?? null,
       metadata: (input.metadata ?? undefined) as never,
     },
   });
+}
+
+/**
+ * Who/what is resolving a secret, for audit-on-resolve (Domain 7 P1). Passed ONLY at real USE sites
+ * (run injection), NOT the presence-check/listing paths — auditing those would spam the ledger (the
+ * Phase-1 note). When present, resolveEnvForAgent writes one `injected` event per resolved binding.
+ */
+export interface SecretConsumerContext {
+  actorType: "user" | "agent" | "system";
+  actorId?: string | null;
+  consumerType: string; // "agent" | "environment" | "system"
+  consumerId: string;
+  runId?: string | null;
 }
 
 export interface CreateSecretInput {
@@ -424,6 +450,7 @@ export function mergeEnvBindings(
 export async function resolveEnvForAgent(
   workspaceId: string,
   agentId: string,
+  consumer?: SecretConsumerContext,
 ): Promise<Record<string, string>> {
   const agent = await prisma.agent.findFirst({
     where: { id: agentId, workspaceId },
@@ -451,6 +478,24 @@ export async function resolveEnvForAgent(
     const row = await prisma.secretVersion.findUnique({
       where: { secretId_version: { secretId: b.secretId, version } },
     });
+    // Audit-on-resolve at the USE site (Domain 7 P1): write one event per binding — `injected` on
+    // success, `missing` when the pinned version row is gone. Best-effort; never block the run.
+    if (consumer) {
+      await recordSecretAccess({
+        secretId: b.secretId,
+        action: "injected",
+        actorType: consumer.actorType,
+        actorId: consumer.actorId ?? null,
+        agentId: agent.id,
+        version,
+        consumerType: consumer.consumerType,
+        consumerId: consumer.consumerId,
+        configPath: `env.${b.envVarName}`,
+        outcome: row ? "success" : "missing",
+        errorCode: row ? null : "version_not_found",
+        runId: consumer.runId ?? null,
+      }).catch(() => {});
+    }
     if (!row) continue;
     entries.push({
       envVarName: b.envVarName,

@@ -293,7 +293,15 @@ export async function runTaskInSandbox(input: {
   // secrets take precedence on any key collision.
   const env: Record<string, string> = {
     ...(envRes?.envVars ?? {}),
-    ...(await resolveEnvForAgent(input.workspaceId, agent.id)),
+    // Audit-on-resolve (Domain 7 P1): this is a REAL use of the agent's secrets (injected into the
+    // run), so pass a consumer context — one `injected` access event is written per bound secret.
+    ...(await resolveEnvForAgent(input.workspaceId, agent.id, {
+      actorType: "agent",
+      actorId: agent.id,
+      consumerType: "agent",
+      consumerId: agent.id,
+      runId: run.id,
+    })),
   };
 
   // In-sandbox API bridge (Plan 6): a run-scoped token the in-box agent can use to post progress back

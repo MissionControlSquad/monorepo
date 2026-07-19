@@ -181,9 +181,19 @@ See 03-sandbox-depth.mdx.
       web build ✓. Remaining Domain 2: 4.1 adapter-owned execute+structured result, 4.2 testEnvironment, 4.3 model
       discovery wiring, 4.4 streaming/transcript parse, 4.6 ssh target, 4.7 real openclaw/hermes gateway, 4.9-4.12.
 
+- [x] **Secrets Domain 7 — P1 audit-on-resolve** DONE (next commit). Widened SecretAccessEvent with consumerType/
+      consumerId/configPath/outcome/errorCode/runId (migration 20260719170000). recordSecretAccess carries the new
+      provenance; resolveEnvForAgent(ws, agentId, consumer?) now writes one `injected` event per bound secret AT THE
+      USE SITE (sandbox-run run injection passes {actorType:agent, consumerId, runId}) — respecting the Phase-1 note
+      (audit at the USE site, NOT the presence-check/listing path, which passes no context → no audit → no ledger spam).
+      Closes the "read/injected actions defined-but-never-written" enum gap. GraphQL SecretAccessEvent type + client
+      query expose the new fields. Tests: secrets 43/43 (incl. injected-with-context / none-without). Typecheck 12/12,
+      web build ✓. Remaining Domain 7: P2 external providers (aws/gcp/vault), P3 rich bindings, P4 user secrets, P5 MCP gov.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
-  hire_agent approval, auto-sleep cron, secret audit-on-resolve, adapter Tier-A↔Tier-D disconnect. → Phase 1 sweeps these.
+  hire_agent approval, auto-sleep cron, ~~secret audit-on-resolve~~ (FIXED — P1), ~~adapter Tier-A↔Tier-D disconnect~~
+  (FIXED — canonicalAdapterKey aliases). → Phase 1 sweeps these.
 - **No run persistence** anywhere (sandbox/heartbeat/work-items all point at it). → keystone #1.
 - **Low-trust containment is declared but not enforced at runtime** (sandbox admission, PR review, execution allowlist). → Phase 1/2.
 - **MCP entirely absent** — the single biggest capability gap for a tool-using agent platform.
