@@ -24,6 +24,7 @@ export default defineConfig({
       "tests/unit/secrets-crypto.test.ts",
       "tests/unit/pipelines.test.ts",
       "tests/unit/task-autonomy.test.ts",
+      "tests/unit/cases.test.ts",
     ],
   },
   resolve: {

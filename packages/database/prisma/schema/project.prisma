@@ -45,6 +45,7 @@ model Project {
   ledgerEvents  LedgerEvent[] @relation("ProjectLedgerEvents") // Epic #16
   routines      Routine[] // Epic #7
   pipelines     Pipeline[]
+  cases         Case[] // Epic #17
 
   @@index([status])
   @@index([createdAt])

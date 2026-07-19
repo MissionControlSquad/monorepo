@@ -10,7 +10,7 @@ import {
 import {
   CREATE_PIPELINE,
   ADD_PIPELINE_STAGE,
-  CREATE_CASE,
+  CREATE_PIPELINE_CASE,
   CLAIM_CASE,
   TRANSITION_CASE,
   REJECT_CASE,
@@ -59,7 +59,7 @@ function PipelineCard({ pipeline }: { pipeline: Pipeline }) {
     pipelineHealth: { caseId: string; title: string; minutesInStage: number; slaMinutes: number }[];
   }>({ query: PIPELINE_HEALTH_QUERY, variables: { pipelineId: pipeline.id } });
 
-  const [, createCase] = useMutation(CREATE_CASE);
+  const [, createCase] = useMutation(CREATE_PIPELINE_CASE);
   const [, claimCase] = useMutation(CLAIM_CASE);
   const [, transitionCase] = useMutation(TRANSITION_CASE);
   const [, rejectCase] = useMutation(REJECT_CASE);

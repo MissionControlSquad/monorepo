@@ -148,3 +148,5 @@ export {
   TASK_TREE_HOLDS_QUERY,
   TASK_RECOVERY_ACTIONS_QUERY,
 } from "./task-autonomy";
+
+export { CASES_QUERY, LABELS_QUERY, CASE_EVENTS_QUERY } from "./cases";

@@ -155,6 +155,13 @@ async function ensureFeatureFlags() {
       managedBy: "system",
       description: "Task autonomy: lease checkout, watchdogs, recovery, decomposition (Epic #8)",
     },
+    {
+      key: FLAG_KEYS.CASES,
+      enabled: true,
+      managedBy: "user",
+      description:
+        "Cases domain: support-ticket/work-item entity with labels + task links (Epic #17)",
+    },
   ];
 
   let created = 0;

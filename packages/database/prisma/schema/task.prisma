@@ -65,6 +65,7 @@ model Task {
   costEvents    CostEvent[] // Epic #4
   routineRuns   RoutineRun[]   @relation("TaskFromRoutineRun") // Epic #7
   pipelineCases PipelineCase[] @relation("TaskFromPipelineCase")
+  caseLinks     CaseTaskLink[] @relation("CaseTaskLink") // Epic #17
 
   // Epic #8: lease-based atomic checkout + autonomy hardening.
   checkedOutByProfileId  String?

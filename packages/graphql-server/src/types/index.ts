@@ -27,3 +27,4 @@ import "./adapter";
 import "./secret";
 import "./pipeline";
 import "./task-autonomy";
+import "./case";
