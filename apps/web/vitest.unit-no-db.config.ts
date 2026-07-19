@@ -28,6 +28,7 @@ export default defineConfig({
       "tests/unit/skills-teams.test.ts",
       "tests/unit/portability.test.ts",
       "tests/unit/goals.test.ts",
+      "tests/unit/observability.test.ts",
     ],
   },
   resolve: {

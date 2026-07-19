@@ -20,6 +20,7 @@ export const FLAG_KEYS = {
   SKILLS_TEAMS: "skills_teams",
   WORKSPACE_PORTABILITY: "workspace_portability",
   GOALS: "goals",
+  OBSERVABILITY: "observability",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -47,4 +48,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.SKILLS_TEAMS]: true,
   [FLAG_KEYS.WORKSPACE_PORTABILITY]: true,
   [FLAG_KEYS.GOALS]: true,
+  [FLAG_KEYS.OBSERVABILITY]: true,
 };
