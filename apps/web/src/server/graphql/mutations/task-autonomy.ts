@@ -10,6 +10,8 @@ import {
 } from "@/server/services/plan-decomposition";
 import { holdSubtree, releaseSubtreeHold } from "@/server/services/task-tree-hold";
 import { createWatchdog, evaluateWatchdogs } from "@/server/services/task-watchdog";
+import { armTaskMonitor, clearTaskMonitor } from "@/server/services/task-monitors";
+import { GraphQLError } from "graphql";
 
 // Epic #8: task-autonomy mutations. Proposing is member; reviewing/applying/holding/watchdogs are
 // admin (the human review gate). Checkout itself is agent-only via REST (POST /api/tasks/checkout).
@@ -56,6 +58,47 @@ builder.mutationField("applyDecomposition", (t) =>
       requireRole(ctx, "admin");
       const { taskIds } = await applyDecomposition(args.id);
       return taskIds;
+    },
+  }),
+);
+
+// Domain 9 #11: arm a one-shot "check back later" monitor on a task. member+, TASK_AUTONOMY-gated.
+builder.mutationField("armTaskMonitor", (t) =>
+  t.prismaField({
+    type: "Task",
+    args: {
+      taskId: t.arg.string({ required: true }),
+      nextCheckAt: t.arg({ type: "DateTime", required: true }),
+      notes: t.arg.string(),
+      maxAttempts: t.arg.int(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
+      requireRole(ctx, "member");
+      if (args.maxAttempts != null && args.maxAttempts < 1)
+        throw new GraphQLError("maxAttempts must be >= 1", {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      await armTaskMonitor({
+        taskId: args.taskId,
+        nextCheckAt: args.nextCheckAt,
+        notes: args.notes ?? null,
+        maxAttempts: args.maxAttempts ?? null,
+      });
+      return ctx.prisma.task.findUniqueOrThrow({ ...query, where: { id: args.taskId } });
+    },
+  }),
+);
+
+builder.mutationField("clearTaskMonitor", (t) =>
+  t.field({
+    type: "Boolean",
+    args: { taskId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
+      requireRole(ctx, "member");
+      await clearTaskMonitor(args.taskId);
+      return true;
     },
   }),
 );

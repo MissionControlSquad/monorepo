@@ -86,10 +86,19 @@ model Task {
   treeHold        TaskTreeHold?
   recoveryActions TaskRecoveryAction[]
 
+  // Domain 9 #11: issue monitor — a one-shot deferred "check back later" wake an agent arms while
+  // working (e.g. poll a GitHub check / deploy). When monitorNextCheckAt passes, the reap cron
+  // re-dispatches the assignee and clears the schedule; re-arm is explicit. Bounded by maxAttempts.
+  monitorNextCheckAt  DateTime?
+  monitorNotes        String?
+  monitorAttemptCount Int       @default(0)
+  monitorMaxAttempts  Int? // null = unbounded
+
   @@index([checkedOutByProfileId])
   @@index([checkoutLeaseExpiresAt])
   @@index([projectId, createdAt])
   @@index([deletedAt])
+  @@index([monitorNextCheckAt])
   @@index([status, deletedAt])
   @@map("tasks")
 }

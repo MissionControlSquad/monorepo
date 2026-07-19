@@ -273,6 +273,16 @@ See 03-sandbox-depth.mdx.
       20260719250000). Tests: 3 integration (redispatch→escalate ladder, ignore pending-retry, ignore non-sandbox agent).
       Typecheck 12/12, web build ✓. Remaining Domain 9: #1/#2 wake queue+tick, #10 silent-run watchdog, #11 issue monitors, #9 subtree watchdog.
 
+- [x] **Heartbeat Domain 9 — #11 issue monitors (one-shot deferred wake)** DONE (next commit). Agent-armed "check back
+      later" — Task gains monitorNextCheckAt/monitorNotes/monitorAttemptCount/monitorMaxAttempts (migration 20260719260000).
+      Service task-monitors.ts: armTaskMonitor / clearTaskMonitor + tickDueTaskMonitors (reap cron, RUNNERS-gated): finds
+      due monitors, optimistic-claims the one-shot schedule (clear guarded by observed → no double-fire), re-dispatches
+      each sandbox-bound assignee (enqueueSandboxRun, dedup vs in-flight), bumps attempt, stops at maxAttempts. Distinct
+      from workspace-health Monitor + retry/stranded ladders. GraphQL: monitor fields on Task + armTaskMonitor/
+      clearTaskMonitor mutations (member, TASK_AUTONOMY) + shared client ops. Tests: 2 integration (arm→due→fire→one-shot
+      clear, maxAttempts disarm). Typecheck 12/12, web build ✓. Heartbeat scheduling now: #6 retries + #8 stranded + #11
+      monitors + #12 cron all in the reap cron. Remaining Domain 9: #1/#2 central wake queue+tick, #10 silent-run watchdog, #9 subtree watchdog.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

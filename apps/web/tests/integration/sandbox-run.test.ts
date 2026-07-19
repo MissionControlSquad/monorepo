@@ -20,6 +20,7 @@ import {
   promoteDueRunRetries,
 } from "../../src/server/services/run-retry";
 import { reconcileStrandedWork } from "../../src/server/services/stranded-work";
+import { armTaskMonitor, tickDueTaskMonitors } from "../../src/server/services/task-monitors";
 import { createEnvironment } from "../../src/server/services/environments";
 import { getRunRuntimeStatus } from "../../src/server/services/run-runtime-status";
 import { createSecret, bindSecret } from "../../src/server/services/secrets";
@@ -729,5 +730,56 @@ describe("stranded-work reconciliation (Domain 9 #8)", () => {
       redispatched: 0,
       escalated: 0,
     });
+  });
+});
+
+describe("issue monitors — one-shot deferred wake (Domain 9 #11)", () => {
+  async function assignAgent(taskId: string, agentId: string) {
+    const profileId = await getOrCreateAgentProfileId(agentId);
+    await prisma.taskAssignee.create({ data: { taskId, profileId } });
+  }
+
+  it("arms then fires a due monitor: re-dispatches the assignee + clears the one-shot schedule", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await makeTask();
+    await assignAgent(taskId, agentId);
+
+    await armTaskMonitor({
+      taskId,
+      nextCheckAt: new Date("2026-07-19T12:00:00Z"),
+      notes: "poll deploy",
+    });
+
+    // not due yet → nothing fires, schedule intact
+    expect(await tickDueTaskMonitors(new Date("2026-07-19T11:59:00Z"))).toBe(0);
+    expect(
+      (await prisma.task.findUniqueOrThrow({ where: { id: taskId } })).monitorNextCheckAt,
+    ).not.toBeNull();
+
+    // due → one dispatch, schedule cleared (one-shot), attempt counted
+    expect(await tickDueTaskMonitors(new Date("2026-07-19T12:01:00Z"))).toBe(1);
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
+    expect(task.monitorNextCheckAt).toBeNull();
+    expect(task.monitorAttemptCount).toBe(1);
+    expect(await prisma.agentRun.count({ where: { taskId, status: "queued" } })).toBe(1);
+
+    // one-shot: a second tick does nothing (must be re-armed)
+    expect(await tickDueTaskMonitors(new Date("2026-07-19T12:05:00Z"))).toBe(0);
+  });
+
+  it("does not fire past maxAttempts (disarms without dispatching)", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await makeTask();
+    await assignAgent(taskId, agentId);
+    // already at the cap
+    await armTaskMonitor({ taskId, nextCheckAt: new Date("2026-07-19T12:00:00Z"), maxAttempts: 1 });
+    await prisma.task.update({ where: { id: taskId }, data: { monitorAttemptCount: 1 } });
+
+    expect(await tickDueTaskMonitors(new Date("2026-07-19T12:01:00Z"))).toBe(0);
+    expect(await prisma.agentRun.count({ where: { taskId } })).toBe(0);
+    // schedule still cleared (consumed)
+    expect(
+      (await prisma.task.findUniqueOrThrow({ where: { id: taskId } })).monitorNextCheckAt,
+    ).toBeNull();
   });
 });

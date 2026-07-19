@@ -146,6 +146,8 @@ export {
   APPLY_DECOMPOSITION,
   RELEASE_SUBTREE_HOLD,
   EVALUATE_WATCHDOGS_NOW,
+  ARM_TASK_MONITOR,
+  CLEAR_TASK_MONITOR,
 } from "./task-autonomy";
 
 export {
