@@ -26,10 +26,11 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.GOALS).toBe("goals");
     expect(FLAG_KEYS.OBSERVABILITY).toBe("observability");
     expect(FLAG_KEYS.BOARD_CHAT).toBe("board_chat");
+    expect(FLAG_KEYS.PLUGIN_SDK).toBe("plugin_sdk");
   });
 
-  it("has exactly 22 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(22);
+  it("has exactly 23 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(23);
   });
 
   it("all values are unique", () => {
@@ -60,6 +61,10 @@ describe("FLAG_DEFAULTS", () => {
 
   it("BOARD_CHAT defaults to false (experimental; operator opt-in)", () => {
     expect(FLAG_DEFAULTS[FLAG_KEYS.BOARD_CHAT]).toBe(false);
+  });
+
+  it("PLUGIN_SDK defaults to false (advanced extensibility; opt-in)", () => {
+    expect(FLAG_DEFAULTS[FLAG_KEYS.PLUGIN_SDK]).toBe(false);
   });
 
   it("all other flags default to true", () => {

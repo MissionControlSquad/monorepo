@@ -32,3 +32,4 @@ import "./skill";
 import "./portability";
 import "./goal";
 import "./boardroom";
+import "./plugin";

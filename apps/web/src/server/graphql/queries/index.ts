@@ -31,3 +31,4 @@ import "./portability";
 import "./goals";
 import "./observability";
 import "./boardroom";
+import "./plugins";

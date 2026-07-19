@@ -30,6 +30,7 @@ export default defineConfig({
       "tests/unit/goals.test.ts",
       "tests/unit/observability.test.ts",
       "tests/unit/boardroom.test.ts",
+      "tests/unit/plugins.test.ts",
     ],
   },
   resolve: {
