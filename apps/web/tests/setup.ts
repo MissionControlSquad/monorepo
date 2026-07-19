@@ -31,6 +31,7 @@ async function truncateAll() {
   clearCaches();
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      attention_dismissals,
       agent_capability_grants,
       agent_authz_events,
       agent_instructions,

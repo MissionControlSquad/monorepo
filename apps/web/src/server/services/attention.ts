@@ -14,8 +14,34 @@ import { getAgentOrgChainHealth } from "./org-chart";
 
 export type { AttentionItem, AttentionFeed } from "@agentcenter/utils";
 
-export async function getAttentionFeed(workspaceId: string): Promise<AttentionFeed> {
-  const [approvals, incidents, blockedTasks, agents] = await Promise.all([
+/** Epic #20b: hide a feed item (by its stable key) until it naturally leaves the feed. Idempotent. */
+export async function dismissAttentionItem(
+  workspaceId: string,
+  itemKey: string,
+  dismissedByProfileId?: string | null,
+): Promise<boolean> {
+  await prisma.attentionDismissal.upsert({
+    where: { workspaceId_itemKey: { workspaceId, itemKey } },
+    create: { workspaceId, itemKey, dismissedByProfileId: dismissedByProfileId ?? null },
+    update: {},
+  });
+  return true;
+}
+
+/** Undo a dismissal. Idempotent. */
+export async function undismissAttentionItem(
+  workspaceId: string,
+  itemKey: string,
+): Promise<boolean> {
+  await prisma.attentionDismissal.deleteMany({ where: { workspaceId, itemKey } });
+  return true;
+}
+
+export async function getAttentionFeed(
+  workspaceId: string,
+  includeDismissed = false,
+): Promise<AttentionFeed> {
+  const [approvals, incidents, blockedTasks, agents, dismissals] = await Promise.all([
     prisma.approval.findMany({
       where: { workspaceId, status: "pending" },
       select: { id: true, title: true, updatedAt: true },
@@ -38,7 +64,11 @@ export async function getAttentionFeed(workspaceId: string): Promise<AttentionFe
       where: { workspaceId },
       select: { id: true, name: true, reportsToAgentId: true },
     }),
+    includeDismissed
+      ? Promise.resolve([] as { itemKey: string }[])
+      : prisma.attentionDismissal.findMany({ where: { workspaceId }, select: { itemKey: true } }),
   ]);
+  const dismissed = new Set(dismissals.map((d) => d.itemKey));
 
   const items: AttentionItem[] = [];
 
@@ -107,5 +137,5 @@ export async function getAttentionFeed(workspaceId: string): Promise<AttentionFe
     }
   }
 
-  return rankAndCount(items);
+  return rankAndCount(dismissed.size ? items.filter((it) => !dismissed.has(it.id)) : items);
 }

@@ -29,10 +29,11 @@ const AttentionFeed = builder.simpleObject("AttentionFeed", {
 builder.queryField("attentionFeed", (t) =>
   t.field({
     type: AttentionFeed,
-    resolve: async (_root, _args, ctx) => {
+    args: { includeDismissed: t.arg.boolean() },
+    resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ATTENTION);
       const tenancy = requireRole(ctx, "member");
-      return getAttentionFeed(tenancy.workspaceId);
+      return getAttentionFeed(tenancy.workspaceId, args.includeDismissed ?? false);
     },
   }),
 );

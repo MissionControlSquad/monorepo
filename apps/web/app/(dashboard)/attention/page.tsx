@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "urql";
+import { useQuery, useMutation } from "urql";
 import { ATTENTION_FEED_QUERY } from "@/lib/graphql/queries";
+import { DISMISS_ATTENTION_ITEM } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 
 // Epic #20: unified attention feed. ATTENTION-gated. Ranked "what needs you now" over approvals,
@@ -48,7 +50,19 @@ export default function AttentionPage() {
   const [{ data, fetching }, refetch] = useQuery<{ attentionFeed: Feed }>({
     query: ATTENTION_FEED_QUERY,
   });
+  const [, dismiss] = useMutation(DISMISS_ATTENTION_ITEM);
+  const [busy, setBusy] = useState<string | null>(null);
   const feed = data?.attentionFeed;
+
+  async function onDismiss(itemKey: string) {
+    setBusy(itemKey);
+    try {
+      await dismiss({ itemKey });
+      refetch({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
@@ -85,11 +99,21 @@ export default function AttentionPage() {
             </span>
             <span className="text-xs text-muted-foreground">{item.whyNow}</span>
           </span>
-          <Link href={SOURCE_HREF[item.sourceKind] ?? "/"}>
-            <Button size="sm" variant="secondary">
-              Resolve
+          <span className="flex gap-2">
+            <Link href={SOURCE_HREF[item.sourceKind] ?? "/"}>
+              <Button size="sm" variant="secondary">
+                Resolve
+              </Button>
+            </Link>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={busy === item.id}
+              onClick={() => onDismiss(item.id)}
+            >
+              Dismiss
             </Button>
-          </Link>
+          </span>
         </Card>
       ))}
     </div>
