@@ -1,6 +1,6 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, COST_WINDOWS, summarizeCostWindows } from "@agentcenter/utils";
 import type { BudgetWindow, IncidentStatus } from "@agentcenter/database";
 import { requireRole, scoped, requireTenancy } from "@/server/tenancy";
 import { prisma } from "@/server/prisma";
@@ -267,6 +267,34 @@ builder.queryField("agentWindowSpend", (t) =>
         }),
       );
       return out;
+    },
+  }),
+);
+
+// Domain 12 GAP-6 A10: rolling per-provider spend over the standard windows (5h / 24h / 7d). Pure
+// aggregation over CostEvent occurredAt. BUDGETS-gated, member+, workspace-scoped.
+const CostWindowSpend = builder.simpleObject("CostWindowSpend", {
+  fields: (t) => ({
+    provider: t.string(),
+    window: t.string(),
+    amountCents: t.int(),
+    eventCount: t.int(),
+  }),
+});
+
+builder.queryField("costWindowSpend", (t) =>
+  t.field({
+    type: [CostWindowSpend],
+    resolve: async (_root, _args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      requireRole(ctx, "member");
+      const now = new Date();
+      const longest = Math.max(...COST_WINDOWS.map((w) => w.ms));
+      const rows = await prisma.costEvent.findMany({
+        where: scoped(ctx, { occurredAt: { gte: new Date(now.getTime() - longest) } }),
+        select: { provider: true, amountCents: true, occurredAt: true },
+      });
+      return summarizeCostWindows(rows, now);
     },
   }),
 );

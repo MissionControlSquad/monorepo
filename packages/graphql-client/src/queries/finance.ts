@@ -69,6 +69,18 @@ export const COST_BREAKDOWN_QUERY = gql`
   }
 `;
 
+// Domain 12 GAP-6 A10: rolling per-provider spend windows (5h/24h/7d).
+export const COST_WINDOW_SPEND_QUERY = gql`
+  query CostWindowSpend {
+    costWindowSpend {
+      provider
+      window
+      amountCents
+      eventCount
+    }
+  }
+`;
+
 // Domain 12 GAP-1: non-inference finance ledger read surfaces.
 export const FINANCE_EVENT_SUMMARY_QUERY = gql`
   query FinanceEventSummary($since: DateTime, $until: DateTime) {

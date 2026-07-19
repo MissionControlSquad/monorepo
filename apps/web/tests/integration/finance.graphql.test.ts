@@ -260,3 +260,42 @@ describe("non-inference finance ledger (Domain 12 GAP-1)", () => {
     expect(other.data.financeEventSummary).toMatchObject({ debitCents: 0, count: 0 });
   });
 });
+
+describe("rolling window spend (Domain 12 GAP-6 A10)", () => {
+  it("aggregates per-provider spend over 5h/24h/7d from cost events", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    // recent event (within 5h) + an older one (within 7d) for the same provider
+    await runGraphQL(
+      `mutation{ ingestCostEvent(amountCents:100, provider:"anthropic"){ id } }`,
+      undefined,
+      admin,
+    );
+    // backdate a second event 3 days old directly
+    const old = await prisma.costEvent.create({
+      data: {
+        workspaceId: WS_A,
+        provider: "anthropic",
+        amountCents: 25,
+        occurredAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      },
+    });
+    expect(old.id).toBeTruthy();
+
+    const r = await runGraphQL(
+      `query{ costWindowSpend{ provider window amountCents eventCount } }`,
+      undefined,
+      admin,
+    );
+    expect(r.errors).toBeFalsy();
+    const rows = r.data.costWindowSpend as {
+      provider: string;
+      window: string;
+      amountCents: number;
+    }[];
+    const byWindow = Object.fromEntries(
+      rows.filter((x) => x.provider === "anthropic").map((x) => [x.window, x.amountCents]),
+    );
+    expect(byWindow["5h"]).toBe(100); // only the recent one
+    expect(byWindow["7d"]).toBe(125); // both
+  });
+});

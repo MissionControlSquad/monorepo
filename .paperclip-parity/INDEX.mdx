@@ -304,6 +304,13 @@ See 03-sandbox-depth.mdx.
       timeout isolation, empty). Typecheck 12/12, web build ✓. Remaining Domain 12: GAP-3 telemetry, GAP-4 OTel, GAP-5 pino/
       run-log, GAP-6 rollups (A10 window spend / A12 issue-tree / A14 billingType).
 
+- [x] **Cost/observability Domain 12 — GAP-6 A10 rolling window spend** DONE (next commit). Pure cost-windows.ts in
+      @agentcenter/utils: COST_WINDOWS (5h/24h/7d) + summarizeCostWindows (folds CostEvent rows into per-provider×window
+      totals from a passed `now`; null provider→unknown; excludes too-old + future rows). GraphQL costWindowSpend query
+      (BUDGETS, member) fetches rows within the longest window + aggregates. Shared client op. Tests: 4 unit + 1 integration.
+      Typecheck 12/12, web build ✓. Remaining Domain 12: GAP-3 telemetry, GAP-4 OTel, GAP-5 pino/run-log, GAP-6 A12 issue-tree
+      rollup + A13 unpriced + A14 billingType split.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
