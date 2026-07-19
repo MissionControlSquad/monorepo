@@ -5,6 +5,7 @@ import type { BudgetWindow, IncidentStatus } from "@agentcenter/database";
 import { requireRole, scoped, requireTenancy } from "@/server/tenancy";
 import { prisma } from "@/server/prisma";
 import { windowBounds } from "@/server/services/budget-window";
+import { costByTaskTree } from "@/server/services/cost-rollup";
 import { costBreakdownCache, costTrendCache, financeSummaryCache } from "@/server/cache";
 
 // Epic #4: finance/budget read layer — BUDGETS-gated, workspace-scoped, member+.
@@ -295,6 +296,33 @@ builder.queryField("costWindowSpend", (t) =>
         select: { provider: true, amountCents: true, occurredAt: true },
       });
       return summarizeCostWindows(rows, now);
+    },
+  }),
+);
+
+// Domain 12 GAP-6 A12: recursive issue-tree cost + runtime rollup over a task subtree.
+const TaskTreeCost = builder.simpleObject("TaskTreeCost", {
+  fields: (t) => ({
+    rootTaskId: t.string(),
+    taskCount: t.int(),
+    costCents: t.int(),
+    eventCount: t.int(),
+    runCount: t.int(),
+    runtimeSeconds: t.int(),
+  }),
+});
+
+builder.queryField("costByTaskTree", (t) =>
+  t.field({
+    type: TaskTreeCost,
+    args: {
+      rootTaskId: t.arg.string({ required: true }),
+      excludeRoot: t.arg.boolean(),
+    },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      const tenancy = requireRole(ctx, "member");
+      return costByTaskTree(tenancy.workspaceId, args.rootTaskId, args.excludeRoot ?? false);
     },
   }),
 );

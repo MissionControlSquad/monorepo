@@ -299,3 +299,59 @@ describe("rolling window spend (Domain 12 GAP-6 A10)", () => {
     expect(byWindow["7d"]).toBe(125); // both
   });
 });
+
+describe("issue-tree cost rollup (Domain 12 GAP-6 A12)", () => {
+  it("sums cost + runtime across a task and its descendants", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    // root → child → grandchild
+    const root = await prisma.task.create({ data: { title: "root", description: "d" } });
+    const child = await prisma.task.create({
+      data: { title: "child", description: "d", parentTaskId: root.id },
+    });
+    const grandchild = await prisma.task.create({
+      data: { title: "gc", description: "d", parentTaskId: child.id },
+    });
+    // an unrelated sibling tree (must NOT be counted)
+    const other = await prisma.task.create({ data: { title: "other", description: "d" } });
+
+    await prisma.costEvent.createMany({
+      data: [
+        { workspaceId: WS_A, taskId: root.id, amountCents: 100 },
+        { workspaceId: WS_A, taskId: child.id, amountCents: 50 },
+        { workspaceId: WS_A, taskId: grandchild.id, amountCents: 25 },
+        { workspaceId: WS_A, taskId: other.id, amountCents: 999 },
+      ],
+    });
+    // a finished run on the child (10s of wall-clock)
+    const started = new Date("2026-07-19T12:00:00Z");
+    await prisma.agentRun.create({
+      data: {
+        workspaceId: WS_A,
+        taskId: child.id,
+        kind: "sandbox",
+        status: "done",
+        startedAt: started,
+        finishedAt: new Date(started.getTime() + 10_000),
+      },
+    });
+
+    const Q = `query($id:String!,$ex:Boolean){ costByTaskTree(rootTaskId:$id, excludeRoot:$ex){ taskCount costCents eventCount runCount runtimeSeconds } }`;
+    const full = await gqlQ(Q, { id: root.id, ex: false }, admin);
+    expect(full.data.costByTaskTree).toMatchObject({
+      taskCount: 3,
+      costCents: 175, // 100 + 50 + 25 (NOT the unrelated 999)
+      eventCount: 3,
+      runCount: 1,
+      runtimeSeconds: 10,
+    });
+
+    // excludeRoot drops the root's own 100
+    const descendants = await gqlQ(Q, { id: root.id, ex: true }, admin);
+    expect(descendants.data.costByTaskTree).toMatchObject({ taskCount: 2, costCents: 75 });
+  });
+});
+
+// local alias so the appended block reads clearly
+async function gqlQ(query: string, variables: Record<string, unknown>, cookie: string) {
+  return runGraphQL(query, variables, cookie);
+}
