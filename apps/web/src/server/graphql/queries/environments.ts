@@ -10,6 +10,10 @@ import {
 } from "@/server/services/environments";
 import { getWorkspaceExecutionPolicy } from "@/server/services/execution-policy";
 import { listEnvironmentLeases } from "@/server/services/environment-leases";
+import {
+  listTemplates,
+  classifyActiveTemplateDrift,
+} from "@/server/services/environment-custom-images";
 
 // Tier D / Phase 3: Environment reads. ENVIRONMENTS-gated, workspace-scoped, member+.
 // `configPublic` is the MASKED config — secret-refs render as "secret:<name>", never plaintext.
@@ -131,6 +135,43 @@ builder.queryField("environmentDeleteBlastRadius", (t) =>
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
       const tenancy = requireRole(ctx, "member");
       return getEnvironmentDeleteBlastRadius(tenancy.workspaceId, args.id);
+    },
+  }),
+);
+
+const CustomImageTemplateType = builder.simpleObject("EnvironmentCustomImageTemplate", {
+  fields: (t) => ({
+    id: t.string(),
+    environmentId: t.string(),
+    provider: t.string(),
+    templateKind: t.string(),
+    templateRef: t.string(),
+    status: t.string(),
+    capturedAt: t.field({ type: "DateTime" }),
+    lastUsedAt: t.field({ type: "DateTime", nullable: true }),
+  }),
+});
+const CustomImageOverviewType = builder.simpleObject("EnvironmentCustomImageOverview", {
+  fields: (t) => ({
+    hasActive: t.boolean(),
+    /** none | relinkable | breaking — how the env config drifted from the active image's capture config. */
+    drift: t.string(),
+    templates: t.field({ type: [CustomImageTemplateType] }),
+  }),
+});
+
+builder.queryField("environmentCustomImages", (t) =>
+  t.field({
+    type: CustomImageOverviewType,
+    args: { environmentId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.CUSTOM_IMAGES);
+      const tenancy = requireRole(ctx, "member");
+      const [templates, drift] = await Promise.all([
+        listTemplates(tenancy.workspaceId, args.environmentId),
+        classifyActiveTemplateDrift(tenancy.workspaceId, args.environmentId),
+      ]);
+      return { hasActive: drift.hasActive, drift: drift.change, templates };
     },
   }),
 );

@@ -36,6 +36,7 @@ import {
 } from "./execution-workspaces";
 import { beginRunStatus, setRunPhase, appendRunLog } from "./run-runtime-status";
 import { attachRunBridgeToken } from "./run-bridge";
+import { resolveActiveImageRef } from "./environment-custom-images";
 import { env as env_ } from "../env";
 import type { SandboxProvider, SandboxHandle } from "./sandbox/types";
 import type { AgentTrustProfile, EnvironmentLease } from "@agentcenter/database";
@@ -320,6 +321,12 @@ export async function runTaskInSandbox(input: {
     projectDefaultStrategy: projectWorkspace?.defaultStrategy,
   });
 
+  // Custom image overlay (Plan 5, flag-gated): boot from the environment's active captured image, if any.
+  const imageRef =
+    envRes?.environmentId && (await isFeatureEnabled(FLAG_KEYS.CUSTOM_IMAGES))
+      ? await resolveActiveImageRef(envRes.environmentId, providerKey)
+      : null;
+
   const script = composeSandboxScript({
     prompt,
     repoUrl: bundle.project?.repoUrl,
@@ -352,6 +359,7 @@ export async function runTaskInSandbox(input: {
       policy: coerceLeasePolicy(envRes?.leasePolicy),
       taskId: input.taskId,
       runId: run.id,
+      spec: imageRef ? { image: imageRef } : undefined,
     });
     handle = acquired.handle;
     lease = acquired.lease;

@@ -10,7 +10,12 @@
  */
 import { prisma } from "@/server/prisma";
 import type { EnvironmentLease } from "@agentcenter/database";
-import type { SandboxHandle, SandboxProvider, SandboxProvisionContext } from "./sandbox/types";
+import type {
+  SandboxHandle,
+  SandboxProvider,
+  SandboxProvisionContext,
+  SandboxSpec,
+} from "./sandbox/types";
 import { getSandboxProvider } from "./sandbox-providers";
 import { resolveWorkspaceSecret } from "./secrets";
 
@@ -73,10 +78,12 @@ export async function acquireLease(opts: {
   policy: LeasePolicy;
   taskId?: string | null;
   runId?: string | null;
+  /** Provision spec — e.g. a custom-image ref to boot a fresh box from (Plan 5). */
+  spec?: SandboxSpec;
 }): Promise<AcquiredLease> {
-  const { workspaceId, environmentId, provider, ctx, policy, taskId, runId } = opts;
+  const { workspaceId, environmentId, provider, ctx, policy, taskId, runId, spec } = opts;
   if (!environmentId) {
-    return { handle: await provider.provision(ctx), lease: null };
+    return { handle: await provider.provision(ctx, spec), lease: null };
   }
 
   if (policy === "reuse_by_environment" && provider.resume) {
@@ -95,7 +102,7 @@ export async function acquireLease(opts: {
     }
   }
 
-  const handle = await provider.provision(ctx);
+  const handle = await provider.provision(ctx, spec);
   const lease = await prisma.environmentLease.create({
     data: {
       workspaceId,

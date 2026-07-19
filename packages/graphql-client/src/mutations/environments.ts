@@ -95,6 +95,24 @@ export const DESTROY_ENVIRONMENT_LEASE = gql`
   }
 `;
 
+export const CAPTURE_CUSTOM_IMAGE = gql`
+  mutation CaptureCustomImage($environmentId: String!) {
+    captureCustomImage(environmentId: $environmentId)
+  }
+`;
+
+export const ROLLBACK_CUSTOM_IMAGE = gql`
+  mutation RollbackCustomImage($templateId: String!) {
+    rollbackCustomImage(templateId: $templateId)
+  }
+`;
+
+export const DISABLE_CUSTOM_IMAGE = gql`
+  mutation DisableCustomImage($templateId: String!) {
+    disableCustomImage(templateId: $templateId)
+  }
+`;
+
 export const SET_WORKSPACE_EXECUTION_MODE = gql`
   mutation SetWorkspaceExecutionMode($executionMode: String, $enableIsolatedWorkspaces: Boolean) {
     setWorkspaceExecutionMode(

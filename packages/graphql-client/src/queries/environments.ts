@@ -71,6 +71,23 @@ export const ENVIRONMENT_LEASES_QUERY = gql`
   }
 `;
 
+export const ENVIRONMENT_CUSTOM_IMAGES_QUERY = gql`
+  query EnvironmentCustomImages($environmentId: String!) {
+    environmentCustomImages(environmentId: $environmentId) {
+      hasActive
+      drift
+      templates {
+        id
+        provider
+        templateKind
+        templateRef
+        status
+        capturedAt
+      }
+    }
+  }
+`;
+
 export const WORKSPACE_EXECUTION_POLICY_QUERY = gql`
   query WorkspaceExecutionPolicy {
     workspaceExecutionPolicy {

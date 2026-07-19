@@ -15,6 +15,7 @@ export * from "./agent-instructions";
 export * from "./trust";
 export * from "./execution-workspace-policy";
 export * from "./execution-target";
+export * from "./custom-image-policy";
 export * from "./hierarchy";
 export * from "./org-chart";
 export * from "./goals";

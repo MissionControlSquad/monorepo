@@ -19,6 +19,11 @@ import {
 } from "@/server/services/environments";
 import { setWorkspaceExecutionMode, type ExecutionMode } from "@/server/services/execution-policy";
 import { destroyLeaseNow } from "@/server/services/environment-leases";
+import {
+  captureCustomImage,
+  rollbackToTemplate,
+  disableTemplate,
+} from "@/server/services/environment-custom-images";
 
 // Tier D / Phase 3: Environment writes. ENVIRONMENTS-gated, admin (drivers wire up credential use +
 // arbitrary execution targets). Config secrets are persisted as {secretRef} pointers by the service;
@@ -170,6 +175,49 @@ builder.mutationField("destroyEnvironmentLease", (t) =>
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
       const tenancy = requireRole(ctx, "admin");
       return destroyLeaseNow(tenancy.workspaceId, args.leaseId);
+    },
+  }),
+);
+
+// Custom images (Plan 5): capture the env's box into a reusable image; rollback/disable. CUSTOM_IMAGES, admin.
+builder.mutationField("captureCustomImage", (t) =>
+  t.field({
+    type: "String", // the new template id
+    args: { environmentId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.CUSTOM_IMAGES);
+      const tenancy = requireRole(ctx, "admin");
+      const created = await captureCustomImage(
+        tenancy.workspaceId,
+        args.environmentId,
+        tenancy.userId,
+      );
+      return created.id;
+    },
+  }),
+);
+
+builder.mutationField("rollbackCustomImage", (t) =>
+  t.field({
+    type: "String",
+    args: { templateId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.CUSTOM_IMAGES);
+      const tenancy = requireRole(ctx, "admin");
+      const t2 = await rollbackToTemplate(tenancy.workspaceId, args.templateId);
+      return t2.id;
+    },
+  }),
+);
+
+builder.mutationField("disableCustomImage", (t) =>
+  t.field({
+    type: "Boolean",
+    args: { templateId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.CUSTOM_IMAGES);
+      const tenancy = requireRole(ctx, "admin");
+      return disableTemplate(tenancy.workspaceId, args.templateId);
     },
   }),
 );

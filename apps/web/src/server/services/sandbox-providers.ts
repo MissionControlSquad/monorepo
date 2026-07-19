@@ -160,6 +160,14 @@ const localProvider: SandboxProvider = {
   destroyById: async (providerLeaseId) => {
     rmSync(providerLeaseId, { recursive: true, force: true });
   },
+
+  // The local provider has no real image registry — this is a STUB so the custom-image lifecycle is
+  // exercisable end-to-end (the ref is a deterministic pointer at the captured dir, not a portable
+  // image). Real capture is a cloud-provider capability (e2b/daytona/k8s snapshot).
+  snapshot: async (handle) => ({
+    templateRef: `local-image:${handle.id}`,
+    templateKind: "snapshot",
+  }),
 };
 
 // ─── registry ────────────────────────────────────────────────────────────────

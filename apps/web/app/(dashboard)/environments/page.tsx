@@ -8,6 +8,7 @@ import {
   AGENT_ENVIRONMENT_BINDINGS_QUERY,
   ENVIRONMENT_LEASES_QUERY,
   EXECUTION_WORKSPACES_QUERY,
+  ENVIRONMENT_CUSTOM_IMAGES_QUERY,
   WORKSPACE_EXECUTION_POLICY_QUERY,
 } from "@/lib/graphql/queries";
 import {
@@ -18,6 +19,9 @@ import {
   PROBE_ENVIRONMENT,
   SET_AGENT_ENVIRONMENT,
   DESTROY_ENVIRONMENT_LEASE,
+  CAPTURE_CUSTOM_IMAGE,
+  ROLLBACK_CUSTOM_IMAGE,
+  DISABLE_CUSTOM_IMAGE,
   SET_WORKSPACE_EXECUTION_MODE,
 } from "@/lib/graphql/mutations";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
@@ -82,6 +86,7 @@ export default function EnvironmentsPage() {
   const { isEnabled } = useFeatureFlags();
   const policyEnabled = isEnabled(FLAG_KEYS.EXECUTION_POLICY);
   const workspacesEnabled = isEnabled(FLAG_KEYS.EXECUTION_WORKSPACES);
+  const imagesEnabled = isEnabled(FLAG_KEYS.CUSTOM_IMAGES);
 
   const envs = data?.environments ?? [];
   const caps = capData?.environmentCapabilities;
@@ -360,6 +365,9 @@ export default function EnvironmentsPage() {
                 {probe[env.id].details ? ` — ${probe[env.id].details}` : ""}
               </p>
             )}
+            {imagesEnabled && env.driver === "sandbox" && env.status === "active" && (
+              <CustomImageControl environmentId={env.id} />
+            )}
           </Card>
         ))}
       </section>
@@ -371,6 +379,88 @@ export default function EnvironmentsPage() {
       {workspacesEnabled && <RecentWorkspacesSection />}
 
       {policyEnabled && <ExecutionPolicySection />}
+    </div>
+  );
+}
+
+// ── Custom image capture (Plan 5) — snapshot a sandbox env into a reusable image ──
+interface CImgTemplate {
+  id: string;
+  templateRef: string;
+  status: string;
+  capturedAt: string;
+}
+function CustomImageControl({ environmentId }: { environmentId: string }) {
+  const [{ data }, refetch] = useQuery<{
+    environmentCustomImages: { hasActive: boolean; drift: string; templates: CImgTemplate[] };
+  }>({ query: ENVIRONMENT_CUSTOM_IMAGES_QUERY, variables: { environmentId } });
+  const [, capture] = useMutation(CAPTURE_CUSTOM_IMAGE);
+  const [, rollback] = useMutation(ROLLBACK_CUSTOM_IMAGE);
+  const [, disable] = useMutation(DISABLE_CUSTOM_IMAGE);
+  const [busy, setBusy] = useState(false);
+  const ov = data?.environmentCustomImages;
+  const refresh = () => refetch({ requestPolicy: "network-only" });
+
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true);
+    try {
+      await fn();
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1 border-t border-border pt-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          Custom image
+          {ov?.hasActive ? (
+            <>
+              {" · active"}
+              {ov.drift !== "none" && (
+                <Badge variant={ov.drift === "breaking" ? "red" : "yellow"}>{ov.drift}</Badge>
+              )}
+            </>
+          ) : (
+            " · none"
+          )}
+        </span>
+        <button
+          onClick={() => run(() => capture({ environmentId }))}
+          disabled={busy}
+          className="text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+        >
+          {busy ? "Capturing…" : "Capture image"}
+        </button>
+      </div>
+      {(ov?.templates ?? []).slice(0, 4).map((tpl) => (
+        <div key={tpl.id} className="flex items-center justify-between gap-2">
+          <span className="truncate font-mono text-xs text-muted-foreground">
+            <Badge variant={tpl.status === "active" ? "green" : "gray"}>{tpl.status}</Badge>{" "}
+            {tpl.templateRef}
+          </span>
+          <span className="flex items-center gap-2">
+            {tpl.status !== "active" && (
+              <button
+                onClick={() => run(() => rollback({ templateId: tpl.id }))}
+                disabled={busy}
+                className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+              >
+                Rollback
+              </button>
+            )}
+            <button
+              onClick={() => run(() => disable({ templateId: tpl.id }))}
+              disabled={busy}
+              className="text-xs text-destructive hover:underline disabled:opacity-50"
+            >
+              Disable
+            </button>
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

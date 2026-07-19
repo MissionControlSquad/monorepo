@@ -92,6 +92,15 @@ export interface SandboxProvider {
    * destroy path). Optional — a provider without it can only be torn down via handle.destroy().
    */
   destroyById?(providerLeaseId: string, ctx: SandboxProvisionContext): Promise<void>;
+  /**
+   * Capture a live sandbox as a reusable image/snapshot (Plan 5 custom images). Returns a provider
+   * ref future provisions can boot from (via SandboxSpec.image). Optional — a provider without it does
+   * not support capture (the custom-image layer reports "capture unsupported").
+   */
+  snapshot?(
+    handle: SandboxHandle,
+    ctx: SandboxProvisionContext,
+  ): Promise<{ templateRef: string; templateKind: string }>;
 }
 
 /** Default absolute sandbox lifetime (ms) — matches Paperclip's e2b/modal default. */
