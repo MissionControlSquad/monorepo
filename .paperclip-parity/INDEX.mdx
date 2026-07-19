@@ -40,6 +40,12 @@ Those are marked "buildbase-owned", not gaps.
 2. **`Environment` model + CRUD** — unifies where/how a run executes (local|ssh|sandbox|host) + config + probe.
    Ties runTaskInSandbox + RunnerHost + adapters into one selectable thing. UI needs (3).
 3. **`JsonSchemaForm` UI primitive** — gates every rich config screen (environments, adapters, plugins).
+   ✅ DONE — pure model `packages/utils/src/json-schema-form.ts` (parseJsonSchema + validateJsonSchemaForm
+   + applyJsonSchemaDefaults, with numeric/length/pattern constraints + `{secretRef:{name}}` vault-pointer
+   support) + reusable `apps/web/src/components/common/JsonSchemaForm.tsx`; dogfooded into
+   AgentAdapterConfigCard (replaced inline field rendering). Unit tests json-schema-form.test.ts (12/12
+   w/ adapter-config). Typecheck 12/12, web build ✓. NOTE: this is also when the fresh-machine test DB was
+   first stood up (brew postgresql@16 + apps/web/.env.test → agentcenter_test).
 
 ## PHASED BACKLOG (dependency-ordered; value × cost)
 

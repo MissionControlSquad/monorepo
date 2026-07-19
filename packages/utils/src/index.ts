@@ -29,6 +29,7 @@ export * from "./runtime-templates";
 export * from "./adapters";
 export * from "./memory-providers";
 export * from "./adapter-config";
+export * from "./json-schema-form";
 export * from "./profile-analytics";
 export * from "./project-source";
 export * from "./cli-auth";
