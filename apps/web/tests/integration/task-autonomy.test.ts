@@ -298,3 +298,34 @@ describe("typed thread interactions (Domain 8 G6.5)", () => {
     expect(bad.errors).toBeDefined();
   });
 });
+
+describe("cancel task (Domain 8 G6.7)", () => {
+  async function memberGql(query: string, variables?: Record<string, unknown>) {
+    const token = await createJWT({ userId: "u", workspaceId: "ws", userRole: "member" }, SECRET);
+    const req = new Request("http://test/api/graphql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `bb-workspace-token=${token}` },
+      body: JSON.stringify({ query, variables }),
+    });
+    return JSON.parse(await (await GRAPHQL(req)).text()) as { data?: any; errors?: any };
+  }
+
+  it("cancels an active task (status cancelled + cancelledAt set)", async () => {
+    const taskId = await makeTask();
+    const r = await memberGql(
+      `mutation($id:String!){ cancelTask(taskId:$id){ id status cancelledAt } }`,
+      { id: taskId },
+    );
+    expect(r.data.cancelTask).toMatchObject({ status: "cancelled" });
+    expect(r.data.cancelTask.cancelledAt).toBeTruthy();
+  });
+
+  it("refuses to cancel a done or already-cancelled task", async () => {
+    const taskId = await makeTask();
+    await prisma.task.update({ where: { id: taskId }, data: { status: "done" } });
+    const r = await memberGql(`mutation($id:String!){ cancelTask(taskId:$id){ id } }`, {
+      id: taskId,
+    });
+    expect(r.errors).toBeDefined();
+  });
+});

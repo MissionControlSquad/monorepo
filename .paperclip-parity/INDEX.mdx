@@ -376,6 +376,12 @@ See 03-sandbox-depth.mdx.
       Typecheck 12/12, web build ✓. (GAP-D update/reset paths still need GAP-B catalog provenance.) Remaining Domain 5:
       GAP-B catalog package, GAP-C external import, GAP-D update/reset, GAP-E runtime sync, GAP-G studio.
 
+- [x] **Work-items Domain 8 — G6.7 cancelled task status** DONE (next commit). TaskStatus gains `cancelled` (terminal,
+      distinct from done) + Task.cancelledAt (migration 20260719300000 — ALTER TYPE ADD VALUE + column). TaskStatus const
+      +CANCELLED. GraphQL cancelTask(taskId) mutation (member+, refuses a done/already-cancelled task) + cancelledAt on Task
+      type + shared client op. Tests: 2 integration (cancel active, refuse done). Typecheck 12/12, web build ✓. Remaining
+      Domain 8 G6: G6.2 rich comments, G6.3 external-object sync, G6.4 origin/idempotency, G6.6 subtree cancel/restore verbs.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

@@ -18,6 +18,7 @@ export const TaskStatus = {
   REVIEW: "review",
   DONE: "done",
   BLOCKED: "blocked",
+  CANCELLED: "cancelled",
 } as const;
 
 export type TaskStatusValue = (typeof TaskStatus)[keyof typeof TaskStatus];

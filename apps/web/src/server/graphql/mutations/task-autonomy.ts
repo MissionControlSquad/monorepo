@@ -223,3 +223,28 @@ builder.mutationField("resolveThreadInteraction", (t) =>
     },
   }),
 );
+
+// Domain 8 G6.7: cancel a task (terminal, distinct from done). member+; not a terminal→terminal no-op.
+builder.mutationField("cancelTask", (t) =>
+  t.prismaField({
+    type: "Task",
+    args: { taskId: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, "member");
+      const task = await ctx.prisma.task.findFirst({
+        where: { id: args.taskId, deletedAt: null },
+        select: { id: true, status: true },
+      });
+      if (!task) throw new GraphQLError("Task not found", { extensions: { code: "NOT_FOUND" } });
+      if (task.status === "done" || task.status === "cancelled")
+        throw new GraphQLError(`Task is already ${task.status}`, {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      await ctx.prisma.task.update({
+        where: { id: task.id },
+        data: { status: "cancelled", cancelledAt: new Date() },
+      });
+      return ctx.prisma.task.findUniqueOrThrow({ ...query, where: { id: task.id } });
+    },
+  }),
+);

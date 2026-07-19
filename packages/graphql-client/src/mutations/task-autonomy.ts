@@ -69,3 +69,14 @@ export const RESOLVE_THREAD_INTERACTION = gql`
     }
   }
 `;
+
+// Domain 8 G6.7: cancel a task (terminal).
+export const CANCEL_TASK = gql`
+  mutation CancelTask($taskId: String!) {
+    cancelTask(taskId: $taskId) {
+      id
+      status
+      cancelledAt
+    }
+  }
+`;

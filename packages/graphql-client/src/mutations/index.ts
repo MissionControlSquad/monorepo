@@ -156,6 +156,7 @@ export {
   CLEAR_TASK_MONITOR,
   CREATE_THREAD_INTERACTION,
   RESOLVE_THREAD_INTERACTION,
+  CANCEL_TASK,
 } from "./task-autonomy";
 
 export {

@@ -7,6 +7,7 @@ enum TaskStatus {
   review
   done
   blocked
+  cancelled // Domain 8 G6.7 — terminal, distinct from done; work abandoned
 }
 
 enum Priority {
@@ -27,6 +28,7 @@ model Task {
   updatedAt          DateTime   @updatedAt
   dueDate            DateTime?
   deletedAt          DateTime?
+  cancelledAt        DateTime? // Domain 8 G6.7 — when the task was cancelled
   tags               String[]   @default([])
   taskNumber         Int        @default(autoincrement())
   parentTaskId       String?
