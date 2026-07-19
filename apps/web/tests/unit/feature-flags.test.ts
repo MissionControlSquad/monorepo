@@ -28,6 +28,9 @@ const sampleFlags = [
 
 describe("feature-flags server module", () => {
   beforeEach(() => {
+    // This suite asserts the 60s cache behavior, so it must opt out of the test-wide fresh-read flag
+    // (.env.test sets DISABLE_FLAG_CACHE=1 to avoid cross-file flag-cache flakiness elsewhere).
+    delete process.env.DISABLE_FLAG_CACHE;
     vi.useFakeTimers();
     invalidateFlagCache();
     mockListAllFeatureFlags.mockReset();

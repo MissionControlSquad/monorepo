@@ -13,6 +13,15 @@ let flagCache: Map<string, FlagEntry> | null = null;
 let lastRefresh = 0;
 const CACHE_TTL = 60_000; // 1 minute
 
+/**
+ * Effective cache TTL. Integration tests toggle flags constantly and share one process, so a live
+ * cache goes stale relative to the DB and causes order-dependent flakiness. When DISABLE_FLAG_CACHE=1
+ * (set by vitest.config.ts) every read hits the DB fresh. Prod keeps the 60s cache.
+ */
+function cacheTtl(): number {
+  return process.env.DISABLE_FLAG_CACHE === "1" ? -1 : CACHE_TTL;
+}
+
 async function refreshCache(): Promise<Map<string, FlagEntry>> {
   const flags = await listAllFeatureFlags();
   const map = new Map<string, FlagEntry>();
@@ -30,7 +39,7 @@ async function refreshCache(): Promise<Map<string, FlagEntry>> {
 }
 
 export async function getFeatureFlags(): Promise<Map<string, FlagEntry>> {
-  if (!flagCache || Date.now() - lastRefresh > CACHE_TTL) {
+  if (!flagCache || Date.now() - lastRefresh > cacheTtl()) {
     return refreshCache();
   }
   return flagCache;
