@@ -232,6 +232,15 @@ See 03-sandbox-depth.mdx.
       Tests: hire→approve creates agent (governance test 8/8, +2). Typecheck 12/12, web build ✓. Remaining Domain 14:
       #10/#11/#12 Agent-Companies package model (L), #13 delegation presets, #14 quorum, #15 policy engine.
 
+- [x] **Heartbeat Domain 9 — #6 scheduled retries + backoff** DONE (next commit). AgentRun gains retryCount/
+      scheduledRetryAt/retryReason/retryOfRunId (migration 20260719220000). Pure backoff in @agentcenter/utils
+      (run-retry.ts: RETRY_BACKOFF_MS 30s/2m/5m/15m, isTransientRunStatus [timeout only], shouldRetryRun cap, nextRetryAt).
+      Service run-retry.ts: scheduleRunRetryIfTransient (stamps scheduledRetryAt at finalize for a transient timeout under
+      cap; wired into runTaskInSandbox behind RUNNERS) + promoteDueRunRetries (reap cron re-dispatches due runs as a fresh
+      queued AgentRun, owner-preserving, retryOfRunId lineage, retryCount+1, optimistic-claim → no double-promote). A clean
+      failed / exhausted budget → no retry. Tests: 4 unit + 2 integration. Typecheck 12/12, web build ✓. Remaining Domain 9:
+      #1/#2 wake queue+tick, #8 stranded-work reconcile, #10 silent-run watchdog, #11 issue monitors, #9 subtree watchdog.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

@@ -15,6 +15,10 @@ import {
 } from "../../src/server/services/sandbox-run";
 import { getOrCreateAgentProfileId } from "../../src/server/agent-profile";
 import { promoteAgentRunReview } from "../../src/server/services/run-review";
+import {
+  scheduleRunRetryIfTransient,
+  promoteDueRunRetries,
+} from "../../src/server/services/run-retry";
 import { createEnvironment } from "../../src/server/services/environments";
 import { getRunRuntimeStatus } from "../../src/server/services/run-runtime-status";
 import { createSecret, bindSecret } from "../../src/server/services/secrets";
@@ -574,5 +578,71 @@ describe("untrusted-output review gate (Domain 8 G2)", () => {
         reviewedByProfileId: "profile_board",
       }),
     ).rejects.toThrow(/awaiting review/);
+  });
+});
+
+describe("scheduled run retries (Domain 9 #6)", () => {
+  it("schedules a retry for a transient timeout, then promotes it to a fresh queued run", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await makeTask();
+    // A timed-out source run under the retry cap.
+    const source = await prisma.agentRun.create({
+      data: {
+        workspaceId: WS,
+        agentId,
+        taskId,
+        kind: "sandbox",
+        providerKey: "local",
+        status: "timeout",
+        retryCount: 0,
+      },
+    });
+
+    const now = new Date("2026-07-19T12:00:00Z");
+    const at = await scheduleRunRetryIfTransient(
+      { id: source.id, status: "timeout", retryCount: 0 },
+      now,
+    );
+    expect(at).not.toBeNull();
+    const scheduled = await prisma.agentRun.findUniqueOrThrow({ where: { id: source.id } });
+    expect(scheduled.scheduledRetryAt?.toISOString()).toBe(at!.toISOString());
+    expect(scheduled.retryReason).toBe("timeout");
+
+    // Not yet due → nothing promoted.
+    expect(await promoteDueRunRetries(new Date(at!.getTime() - 1000))).toBe(0);
+
+    // Due → one fresh queued run for the same agent/task, retryCount+1, linked to the source.
+    expect(await promoteDueRunRetries(new Date(at!.getTime() + 1000))).toBe(1);
+    const retry = await prisma.agentRun.findFirstOrThrow({
+      where: { retryOfRunId: source.id },
+    });
+    expect(retry).toMatchObject({
+      status: "queued",
+      agentId,
+      taskId,
+      retryCount: 1,
+      providerKey: "local",
+    });
+    // source schedule cleared → a second tick does not double-promote
+    expect(await promoteDueRunRetries(new Date(at!.getTime() + 2000))).toBe(0);
+  });
+
+  it("does not schedule a retry for a clean failure or an exhausted budget", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await makeTask();
+    // clean failure → no retry
+    const failed = await prisma.agentRun.create({
+      data: { workspaceId: WS, agentId, taskId, kind: "sandbox", status: "failed", retryCount: 0 },
+    });
+    expect(
+      await scheduleRunRetryIfTransient({ id: failed.id, status: "failed", retryCount: 0 }),
+    ).toBeNull();
+    // exhausted budget → no retry even for a timeout
+    const exhausted = await prisma.agentRun.create({
+      data: { workspaceId: WS, agentId, taskId, kind: "sandbox", status: "timeout", retryCount: 4 },
+    });
+    expect(
+      await scheduleRunRetryIfTransient({ id: exhausted.id, status: "timeout", retryCount: 4 }),
+    ).toBeNull();
   });
 });

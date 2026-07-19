@@ -11,6 +11,7 @@
  *  - deadLetterExhaustedDeliveries — un-acked live deliveries past the attempt cap → dead-lettered.
  *  - redeliverStalePending — re-push un-acked live deliveries to still-connected agents.
  *  - tickRoutineTriggers — fire cron routine triggers whose nextFireAt has passed (Domain 9 #12).
+ *  - promoteDueRunRetries — re-dispatch transiently-failed runs whose backoff has elapsed (Domain 9 #6).
  *
  * Registered in vercel.json to run every 5 minutes.
  */
@@ -24,6 +25,7 @@ import { evaluateWatchdogs } from "@/server/services/task-watchdog";
 import { deadLetterExhaustedDeliveries } from "@agentcenter/database";
 import { redeliverStalePending } from "@/server/services/live-task-delivery";
 import { tickRoutineTriggers } from "@/server/services/routines";
+import { promoteDueRunRetries } from "@/server/services/run-retry";
 
 export async function GET(request: Request) {
   try {
@@ -44,6 +46,7 @@ export async function GET(request: Request) {
       deliveriesDeadLettered,
       deliveriesRepushed,
       routinesFired,
+      retriesPromoted,
     ] = await Promise.all([
       sweepExpiredCheckouts(now),
       reapStuckRunnerCommands(now),
@@ -52,6 +55,7 @@ export async function GET(request: Request) {
       deadLetterExhaustedDeliveries(5, now),
       redeliverStalePending(now),
       tickRoutineTriggers(now),
+      promoteDueRunRetries(now),
     ]);
     return successResponse({
       ok: true,
@@ -64,6 +68,7 @@ export async function GET(request: Request) {
       deliveriesDeadLettered,
       deliveriesRepushed,
       routinesFired,
+      retriesPromoted,
       at: now.toISOString(),
     });
   } catch (err) {

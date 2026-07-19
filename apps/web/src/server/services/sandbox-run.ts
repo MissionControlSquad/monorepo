@@ -27,6 +27,7 @@ import { getSandboxProvider } from "./sandbox-providers";
 import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
 import { captureRunMemory } from "./agent-memory";
 import { stampRunReview } from "./run-review";
+import { scheduleRunRetryIfTransient } from "./run-retry";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertExecutionAllowed } from "./execution-policy";
 import { resolveEnvironmentExecution, type EnvExecutionResolution } from "./environments";
@@ -484,6 +485,16 @@ export async function runTaskInSandbox(input: {
         },
         { agentId: agent.id },
       );
+    }
+
+    // Scheduled-retry (Domain 9 #6): a transient timeout schedules a bounded-backoff re-dispatch (the
+    // reap cron promotes it). No-op for a clean failure or an exhausted retry budget. Best-effort.
+    if (runStatus === "timeout" && (await isFeatureEnabled(FLAG_KEYS.RUNNERS))) {
+      await scheduleRunRetryIfTransient({
+        id: run.id,
+        status: runStatus,
+        retryCount: run.retryCount,
+      });
     }
 
     return {

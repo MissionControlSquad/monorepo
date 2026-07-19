@@ -23,6 +23,12 @@ model AgentRun {
   sourceTrust Json? // { preset, disposition, sourceAgentId, sourceRunId, promotedByProfileId }
   reviewedByProfileId String?
   reviewedAt  DateTime?
+  // Domain 9 #6 — scheduled retries + backoff. A transient failure (timeout) sets scheduledRetryAt;
+  // the reap cron promotes it to a fresh queued run (retryOfRunId → lineage). retryCount caps retries.
+  retryCount       Int       @default(0)
+  scheduledRetryAt DateTime?
+  retryReason      String?
+  retryOfRunId     String?
   requestedByProfileId String?
   bridgeTokenHash String? // Plan 6: hash of the run-scoped in-sandbox bridge token (null when inactive)
   startedAt   DateTime  @default(now())
@@ -35,5 +41,6 @@ model AgentRun {
   @@index([taskId])
   @@index([bridgeTokenHash])
   @@index([status])
+  @@index([scheduledRetryAt])
   @@map("agent_runs")
 }
