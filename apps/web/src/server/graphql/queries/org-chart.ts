@@ -1,6 +1,6 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, renderOrgChartSvg } from "@agentcenter/utils";
 import { requireRole, scoped } from "@/server/tenancy";
 import { getAgentOrgChainHealth } from "@/server/services/org-chart";
 
@@ -41,6 +41,23 @@ builder.queryField("agentOrgChainHealth", (t) =>
         select: { id: true, name: true, reportsToAgentId: true },
       });
       return getAgentOrgChainHealth(args.agentId, agents);
+    },
+  }),
+);
+
+// Domain 14 #16: a server-rendered, shareable/embeddable SVG of the workspace org chart.
+builder.queryField("orgChartSvg", (t) =>
+  t.field({
+    type: "String",
+    resolve: async (_root, _args, ctx) => {
+      await requireFeature(FLAG_KEYS.ORG_CHART);
+      const tenancy = requireRole(ctx, "member");
+      const agents = await ctx.prisma.agent.findMany({
+        where: { workspaceId: tenancy.workspaceId },
+        select: { id: true, name: true, role: true, reportsToAgentId: true },
+        orderBy: { name: "asc" },
+      });
+      return renderOrgChartSvg(agents);
     },
   }),
 );

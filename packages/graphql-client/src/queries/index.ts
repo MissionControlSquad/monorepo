@@ -181,7 +181,7 @@ export { PLUGINS_QUERY, PLUGIN_QUERY } from "./plugins";
 export { API_KEYS_QUERY } from "./api-keys";
 export { TERMINAL_SESSIONS_QUERY } from "./terminals";
 export { AGENT_INSTRUCTIONS_QUERY } from "./agent-instructions";
-export { ORG_CHART_QUERY } from "./org-chart";
+export { ORG_CHART_QUERY, ORG_CHART_SVG_QUERY } from "./org-chart";
 export { ATTENTION_FEED_QUERY } from "./attention";
 export { AGENT_CAPABILITY_GRANTS_QUERY, AGENT_AUTHZ_EVENTS_QUERY } from "./agent-authz";
 export { PROFILE_ANALYTICS_QUERY } from "./profile-analytics";
