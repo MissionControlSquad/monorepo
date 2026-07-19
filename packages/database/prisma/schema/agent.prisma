@@ -145,10 +145,15 @@ model Agent {
   terminalSessions TerminalSession[] @relation("AgentTerminals") // Epic #9
   instructions   AgentInstruction[] @relation("AgentInstructions") // Epic #18
 
+  reportsToAgentId String? // Epic #19: manager edge (org chart); self-FK, SetNull
+  reportsTo        Agent?  @relation("AgentOrg", fields: [reportsToAgentId], references: [id], onDelete: SetNull)
+  reports          Agent[] @relation("AgentOrg")
+
   @@index([username])
   @@index([cloudVmId])
   @@index([workspaceId])
   @@index([adapterType])
+  @@index([workspaceId, reportsToAgentId])
   @@map("agents")
 }
 
