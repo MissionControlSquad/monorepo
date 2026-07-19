@@ -21,6 +21,7 @@ export const EnvironmentType = builder.simpleObject("Environment", {
     description: t.string({ nullable: true }),
     driver: t.string(),
     status: t.string(),
+    transport: t.string(),
     configPublic: t.field({ type: "JSON" }),
     envVars: t.field({ type: "JSON" }),
     metadata: t.field({ type: "JSON", nullable: true }),

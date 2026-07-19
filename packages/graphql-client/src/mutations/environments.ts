@@ -8,6 +8,7 @@ const ENV_FIELDS = `
   description
   driver
   status
+  transport
   configPublic
   envVars
   metadata

@@ -9,6 +9,7 @@ export const ENVIRONMENTS_QUERY = gql`
       description
       driver
       status
+      transport
       configPublic
       envVars
       metadata

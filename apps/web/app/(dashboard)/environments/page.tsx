@@ -42,6 +42,7 @@ interface Environment {
   description: string | null;
   driver: string;
   status: string;
+  transport: string;
   configPublic: Record<string, unknown>;
   envVars: Record<string, string>;
   metadata: Record<string, unknown> | null;
@@ -309,6 +310,7 @@ export default function EnvironmentsPage() {
               <div className="flex items-center gap-2">
                 <span className="font-medium text-foreground">{env.name}</span>
                 <Badge variant={DRIVER_VARIANT[env.driver] ?? "gray"}>{env.driver}</Badge>
+                <span className="font-mono text-xs text-muted-foreground">{env.transport}</span>
                 {env.status === "archived" && <Badge variant="gray">archived</Badge>}
               </div>
               <span className="flex items-center gap-3">

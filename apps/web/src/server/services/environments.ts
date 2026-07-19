@@ -12,6 +12,7 @@
  */
 import { GraphQLError } from "graphql";
 import { z } from "zod";
+import { resolveExecutionTarget, describeExecutionTarget } from "@agentcenter/utils";
 import { prisma } from "@/server/prisma";
 import type { Environment, Prisma } from "@agentcenter/database";
 import {
@@ -107,12 +108,18 @@ export async function resolveConfigSecrets(
 // ── CRUD ────────────────────────────────────────────────────────────────────
 export type SafeEnvironment = Omit<Environment, "config"> & {
   configPublic: Record<string, unknown>;
+  /** How a run reaches this environment's machine, e.g. "local", "sandbox:e2b", "ssh" (Plan 6). */
+  transport: string;
 };
 
-/** Strip secret values from an environment before it leaves the server. */
+/** Strip secret values from an environment before it leaves the server + describe its transport. */
 export function toSafeEnvironment(env: Environment): SafeEnvironment {
   const { config, ...rest } = env;
-  return { ...rest, configPublic: maskConfig(config) };
+  const providerKey = (config as { provider?: string } | null)?.provider ?? null;
+  const transport = describeExecutionTarget(
+    resolveExecutionTarget({ driver: env.driver, providerKey }),
+  );
+  return { ...rest, configPublic: maskConfig(config), transport };
 }
 
 export async function listEnvironments(workspaceId: string): Promise<SafeEnvironment[]> {
