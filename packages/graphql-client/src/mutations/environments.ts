@@ -79,6 +79,15 @@ export const PROBE_ENVIRONMENT = gql`
   }
 `;
 
+export const SET_AGENT_ENVIRONMENT = gql`
+  mutation SetAgentEnvironment($agentId: String!, $environmentId: String) {
+    setAgentEnvironment(agentId: $agentId, environmentId: $environmentId) {
+      id
+      environmentId
+    }
+  }
+`;
+
 export const SET_WORKSPACE_EXECUTION_MODE = gql`
   mutation SetWorkspaceExecutionMode($executionMode: String, $enableIsolatedWorkspaces: Boolean) {
     setWorkspaceExecutionMode(

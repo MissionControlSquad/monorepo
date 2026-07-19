@@ -400,6 +400,46 @@ export async function probeEnvironment(workspaceId: string, id: string): Promise
   return { ok: false, driver, summary: `Probe is not supported for driver "${driver}".` };
 }
 
+// ── execution resolution (bind an agent's Environment into the run seam) ─────────
+export interface EnvExecutionResolution {
+  environmentId: string;
+  driver: string; // local | ssh | sandbox | plugin
+  /** Sandbox provider key for local/sandbox drivers; null for drivers not yet runnable via the seam. */
+  providerKey: string | null;
+  /** Instance-scoped env vars merged into the run env (non-secret bag). */
+  envVars: Record<string, string>;
+}
+
+/**
+ * Resolve an agent's bound Environment into a concrete execution target for the sandbox seam. Maps
+ * `local`→the local provider and `sandbox`→its configured provider; `ssh`/`plugin` resolve to a null
+ * provider (not yet runnable via this seam — they need Plan 6 transport). Returns null if the agent has
+ * no active environment. Archived environments are ignored (fall back to the agent's ad-hoc provider).
+ */
+export async function resolveEnvironmentExecution(
+  workspaceId: string,
+  environmentId: string,
+): Promise<EnvExecutionResolution | null> {
+  const env = await prisma.environment.findFirst({
+    where: { id: environmentId, workspaceId, status: "active" },
+  });
+  if (!env) return null;
+  const cfg = (env.config ?? {}) as Record<string, unknown>;
+  const envVars = (env.envVars ?? {}) as Record<string, string>;
+  if (env.driver === "sandbox") {
+    return {
+      environmentId: env.id,
+      driver: "sandbox",
+      providerKey: String(cfg.provider ?? ""),
+      envVars,
+    };
+  }
+  if (env.driver === "local") {
+    return { environmentId: env.id, driver: "local", providerKey: "local", envVars };
+  }
+  return { environmentId: env.id, driver: env.driver, providerKey: null, envVars };
+}
+
 // ── capabilities matrix (feature 21) ────────────────────────────────────────────
 export interface EnvironmentCapabilities {
   drivers: EnvironmentDriver[];

@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "urql";
 import {
   ENVIRONMENTS_QUERY,
   ENVIRONMENT_CAPABILITIES_QUERY,
+  AGENT_ENVIRONMENT_BINDINGS_QUERY,
   WORKSPACE_EXECUTION_POLICY_QUERY,
 } from "@/lib/graphql/queries";
 import {
@@ -13,12 +14,13 @@ import {
   ARCHIVE_ENVIRONMENT,
   DELETE_ENVIRONMENT,
   PROBE_ENVIRONMENT,
+  SET_AGENT_ENVIRONMENT,
   SET_WORKSPACE_EXECUTION_MODE,
 } from "@/lib/graphql/mutations";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
-import { Container, ShieldCheck } from "lucide-react";
+import { Container, ShieldCheck, Bot } from "lucide-react";
 
 // Tier D / Phase 3: Environments dashboard — the first-class "where/how a run executes" model.
 // ENVIRONMENTS-gated in nav; every mutation re-checks the flag + admin server-side. Config secrets are
@@ -337,8 +339,74 @@ export default function EnvironmentsPage() {
         ))}
       </section>
 
+      <AgentBindingsSection envs={envs} />
+
       {policyEnabled && <ExecutionPolicySection />}
     </div>
+  );
+}
+
+// ── Agent bindings — pick which environment each agent runs in ──
+interface BindAgent {
+  id: string;
+  name: string;
+  identityEmoji: string | null;
+  environmentId: string | null;
+}
+function AgentBindingsSection({ envs }: { envs: Environment[] }) {
+  const [{ data }, refetch] = useQuery<{ agents: BindAgent[] }>({
+    query: AGENT_ENVIRONMENT_BINDINGS_QUERY,
+  });
+  const [, setAgentEnv] = useMutation(SET_AGENT_ENVIRONMENT);
+  const [busy, setBusy] = useState<string | null>(null);
+  const agents = data?.agents ?? [];
+  const active = envs.filter((e) => e.status === "active");
+
+  async function bind(agentId: string, environmentId: string | null) {
+    setBusy(agentId);
+    try {
+      await setAgentEnv({ agentId, environmentId });
+      refetch({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Bot className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-sm font-semibold text-foreground">Agent bindings</h2>
+      </div>
+      <Card className="space-y-2 p-4">
+        <p className="text-sm text-muted-foreground">
+          Choose which environment each agent runs in. Unbound agents fall back to their ad-hoc
+          sandbox provider.
+        </p>
+        {agents.length === 0 && <p className="text-sm text-muted-foreground">No agents.</p>}
+        {agents.map((a) => (
+          <div key={a.id} className="flex items-center justify-between gap-2">
+            <span className="truncate text-sm text-foreground">
+              {a.identityEmoji ? `${a.identityEmoji} ` : ""}
+              {a.name}
+            </span>
+            <select
+              className="rounded border border-border bg-background px-2 py-1 text-sm disabled:opacity-50"
+              value={a.environmentId ?? ""}
+              disabled={busy === a.id}
+              onChange={(e) => bind(a.id, e.target.value || null)}
+            >
+              <option value="">— none —</option>
+              {active.map((env) => (
+                <option key={env.id} value={env.id}>
+                  {env.name} ({env.driver})
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </Card>
+    </section>
   );
 }
 

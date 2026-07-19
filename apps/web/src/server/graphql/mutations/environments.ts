@@ -126,6 +126,40 @@ builder.mutationField("probeEnvironment", (t) =>
   }),
 );
 
+// Bind an agent to an Environment (or clear it → fall back to its ad-hoc sandboxProvider). Admin.
+builder.mutationField("setAgentEnvironment", (t) =>
+  t.prismaField({
+    type: "Agent",
+    args: {
+      agentId: t.arg.string({ required: true }),
+      environmentId: t.arg.string(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.ENVIRONMENTS);
+      const tenancy = requireRole(ctx, "admin");
+      const agent = await ctx.prisma.agent.findFirst({
+        where: { id: args.agentId, workspaceId: tenancy.workspaceId },
+        select: { id: true },
+      });
+      if (!agent) throw new GraphQLError("Agent not found", { extensions: { code: "NOT_FOUND" } });
+      if (args.environmentId) {
+        const env = await ctx.prisma.environment.findFirst({
+          where: { id: args.environmentId, workspaceId: tenancy.workspaceId },
+          select: { id: true },
+        });
+        if (!env) {
+          throw new GraphQLError("Environment not found", { extensions: { code: "NOT_FOUND" } });
+        }
+      }
+      return ctx.prisma.agent.update({
+        ...query,
+        where: { id: agent.id },
+        data: { environmentId: args.environmentId ?? null },
+      });
+    },
+  }),
+);
+
 // Set the workspace execution policy (force runs onto isolated k8s, or `any`). EXECUTION_POLICY, admin.
 builder.mutationField("setWorkspaceExecutionMode", (t) =>
   t.field({

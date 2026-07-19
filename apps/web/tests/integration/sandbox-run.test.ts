@@ -14,6 +14,7 @@ import {
   autoDispatchSandboxForAssignment,
 } from "../../src/server/services/sandbox-run";
 import { getOrCreateAgentProfileId } from "../../src/server/agent-profile";
+import { createEnvironment } from "../../src/server/services/environments";
 
 // Tier D: the sandbox EXECUTION SEAM. Exercised end-to-end against the REAL `local` provider (temp
 // dir + child_process, no keys) — proving provision → materialise the task → run the runtime → capture
@@ -76,7 +77,7 @@ beforeAll(() => {
 beforeEach(async () => {
   agentCache.clear();
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE agent_runs, messages, tasks, agent_skills, skills, agent_instructions, agents, profiles CASCADE`,
+    `TRUNCATE TABLE agent_runs, messages, tasks, agent_skills, skills, agent_instructions, agents, profiles, environments CASCADE`,
   );
   await prisma.featureFlag.upsert({
     where: { key: "runners" },
@@ -339,5 +340,110 @@ describe("async sandbox runs (enqueue → drain → cancel)", () => {
     const taskId = await makeTask();
     const profileId = await getOrCreateAgentProfileId(agentId);
     expect(await autoDispatchSandboxForAssignment(taskId, [profileId])).toHaveLength(0);
+  });
+});
+
+describe("environment-driven execution (Plan 1 wiring)", () => {
+  /** An agent bound to an environment (no ad-hoc sandboxProvider). */
+  async function agentInEnv(environmentId: string, template = "echo SANDBOX_RAN"): Promise<string> {
+    const agent = await prisma.agent.create({
+      data: {
+        name: "Env Agent",
+        role: "worker",
+        personality: "diligent",
+        workspaceId: WS,
+        setupStatus: "active",
+        apiKeyHash: hashApiKey(`mc_env_${Math.random()}`),
+        runtimeAdapter: "shell",
+        runtimeTemplate: template,
+        environmentId,
+      },
+    });
+    return agent.id;
+  }
+
+  it("runs via the agent's bound sandbox Environment (provider from env config)", async () => {
+    const env = await createEnvironment(WS, {
+      name: "Sbx",
+      driver: "sandbox",
+      config: { provider: "local" },
+    });
+    const agentId = await agentInEnv(env.id);
+    const taskId = await makeTask();
+
+    const result = await runTaskInSandbox({ workspaceId: WS, taskId, agentId });
+    expect(result.providerKey).toBe("local");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("SANDBOX_RAN");
+  });
+
+  it("runs via a local-driver Environment on the local provider", async () => {
+    const env = await createEnvironment(WS, { name: "Loc", driver: "local" });
+    const agentId = await agentInEnv(env.id);
+    const taskId = await makeTask();
+    const result = await runTaskInSandbox({ workspaceId: WS, taskId, agentId });
+    expect(result.providerKey).toBe("local");
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("injects the Environment's instance env vars into the run", async () => {
+    const env = await createEnvironment(WS, {
+      name: "SbxVars",
+      driver: "sandbox",
+      config: { provider: "local" },
+      envVars: { MY_ENV_VAR: "env-value-123" },
+    });
+    const agentId = await agentInEnv(env.id, "echo VAR=$MY_ENV_VAR");
+    const taskId = await makeTask();
+    const result = await runTaskInSandbox({ workspaceId: WS, taskId, agentId });
+    expect(result.stdout).toContain("VAR=env-value-123");
+  });
+
+  it("rejects an ssh/plugin Environment (not yet runnable via the sandbox seam)", async () => {
+    const env = await createEnvironment(WS, {
+      name: "Ssh",
+      driver: "ssh",
+      config: { host: "1.2.3.4" },
+    });
+    const agentId = await agentInEnv(env.id);
+    const taskId = await makeTask();
+    await expect(runTaskInSandbox({ workspaceId: WS, taskId, agentId })).rejects.toThrow(
+      /not yet runnable/i,
+    );
+  });
+
+  it("auto-dispatches an env-bound agent that has no ad-hoc sandbox provider", async () => {
+    const env = await createEnvironment(WS, {
+      name: "SbxAuto",
+      driver: "sandbox",
+      config: { provider: "local" },
+    });
+    const agentId = await agentInEnv(env.id);
+    const taskId = await makeTask();
+    const profileId = await getOrCreateAgentProfileId(agentId);
+    const enqueued = await autoDispatchSandboxForAssignment(taskId, [profileId]);
+    expect(enqueued).toHaveLength(1);
+    expect((await prisma.agentRun.findUnique({ where: { id: enqueued[0] } }))?.status).toBe(
+      "queued",
+    );
+  });
+
+  it("an explicit provider override bypasses the Environment", async () => {
+    const env = await createEnvironment(WS, {
+      name: "SbxOverride",
+      driver: "ssh", // would normally be rejected…
+      config: { host: "1.2.3.4" },
+    });
+    const agentId = await agentInEnv(env.id);
+    const taskId = await makeTask();
+    // …but the explicit override wins and runs locally.
+    const result = await runTaskInSandbox({
+      workspaceId: WS,
+      taskId,
+      agentId,
+      providerKey: "local",
+    });
+    expect(result.providerKey).toBe("local");
+    expect(result.exitCode).toBe(0);
   });
 });

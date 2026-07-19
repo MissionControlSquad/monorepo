@@ -41,6 +41,18 @@ export const ENVIRONMENT_DELETE_BLAST_RADIUS_QUERY = gql`
   }
 `;
 
+// Agents + their current environment binding (for the Environments-page binding table).
+export const AGENT_ENVIRONMENT_BINDINGS_QUERY = gql`
+  query AgentEnvironmentBindings {
+    agents {
+      id
+      name
+      identityEmoji
+      environmentId
+    }
+  }
+`;
+
 export const WORKSPACE_EXECUTION_POLICY_QUERY = gql`
   query WorkspaceExecutionPolicy {
     workspaceExecutionPolicy {

@@ -26,10 +26,85 @@ import { getSandboxProvider } from "./sandbox-providers";
 import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertExecutionAllowed } from "./execution-policy";
+import { resolveEnvironmentExecution, type EnvExecutionResolution } from "./environments";
+import type { SandboxProvider } from "./sandbox/types";
+import type { AgentTrustProfile } from "@agentcenter/database";
 
 const MAX_OUTPUT_CHARS = 45_000;
 const MAX_MESSAGE_CHARS = 8_000;
 const DEFAULT_TIMEOUT_MS = 600_000;
+
+/** The subset of an agent the admission path needs (loaded with its trust profile). */
+type AdmissionAgent = {
+  sandboxProvider: string | null;
+  environmentId: string | null;
+  trustLevel: TrustLevel | null;
+  trustProfile: Pick<AgentTrustProfile, "lowTrustContainment"> | null;
+};
+
+/**
+ * Resolve the concrete execution target for a run and enforce fail-closed admission — shared by the
+ * synchronous (runTaskInSandbox) and background (enqueueSandboxRun) paths so they never diverge.
+ * Precedence: explicit override → the agent's bound Environment → the agent's ad-hoc sandboxProvider.
+ * Enforces low-trust containment (isolating provider required) and the workspace execution allowlist
+ * (using the Environment's real driver) BEFORE anything is provisioned or queued.
+ */
+async function resolveAndAdmitTarget(
+  workspaceId: string,
+  agent: AdmissionAgent,
+  inputProviderKey?: string | null,
+): Promise<{
+  provider: SandboxProvider;
+  providerKey: string;
+  execDriver: string;
+  envRes: EnvExecutionResolution | null;
+}> {
+  const envRes =
+    !inputProviderKey && agent.environmentId
+      ? await resolveEnvironmentExecution(workspaceId, agent.environmentId)
+      : null;
+  if (envRes && envRes.providerKey === null) {
+    throw new GraphQLError(
+      `Environment driver "${envRes.driver}" is not yet runnable via the sandbox seam. Use a local or sandbox environment.`,
+      { extensions: { code: "BAD_USER_INPUT" } },
+    );
+  }
+  const execDriver = envRes?.driver ?? "sandbox";
+
+  const providerKey = (inputProviderKey ?? envRes?.providerKey ?? agent.sandboxProvider) || null;
+  if (!providerKey) {
+    throw new GraphQLError("No sandbox provider is configured for this agent", {
+      extensions: { code: "BAD_USER_INPUT" },
+    });
+  }
+  const provider = getSandboxProvider(providerKey);
+  if (!provider) {
+    throw new GraphQLError(`Unknown sandbox provider: ${providerKey}`, {
+      extensions: { code: "BAD_USER_INPUT" },
+    });
+  }
+
+  // Fail-closed admission: a low-trust/untrusted (or explicitly contained) agent must run in an
+  // ISOLATING sandbox — never on the control-plane host (the `local` provider).
+  const trustLevel = (agent.trustLevel ?? "standard") as TrustLevel;
+  if (
+    requiresSandboxContainment({
+      trustLevel,
+      lowTrustContainment: agent.trustProfile?.lowTrustContainment,
+    }) &&
+    !provider.isolating
+  ) {
+    throw new GraphQLError(
+      `Agent is ${trustLevel}-trust and must run in an isolated sandbox — provider "${providerKey}" runs on the host. Configure an isolating cloud sandbox provider.`,
+      { extensions: { code: "FORBIDDEN" } },
+    );
+  }
+
+  // Workspace execution allowlist (Plan 4): deny an inadmissible target BEFORE provisioning/queuing.
+  await assertExecutionAllowed(workspaceId, { driver: execDriver, provider: providerKey });
+
+  return { provider, providerKey, execDriver, envRes };
+}
 
 /** Post the run outcome to the task timeline as a message from the agent (best-effort). */
 async function postRunToTask(agentId: string, taskId: string, summary: string): Promise<void> {
@@ -128,38 +203,12 @@ export async function runTaskInSandbox(input: {
   });
   if (!agent) throw new GraphQLError("Agent not found", { extensions: { code: "NOT_FOUND" } });
 
-  const providerKey = (input.providerKey ?? agent.sandboxProvider) || null;
-  if (!providerKey) {
-    throw new GraphQLError("No sandbox provider is configured for this agent", {
-      extensions: { code: "BAD_USER_INPUT" },
-    });
-  }
-  const provider = getSandboxProvider(providerKey);
-  if (!provider) {
-    throw new GraphQLError(`Unknown sandbox provider: ${providerKey}`, {
-      extensions: { code: "BAD_USER_INPUT" },
-    });
-  }
-
-  // Fail-closed admission: a low-trust/untrusted (or explicitly contained) agent must run in an
-  // ISOLATING sandbox — never on the control-plane host (the `local` provider).
-  const trustLevel = (agent.trustLevel ?? "standard") as TrustLevel;
-  if (
-    requiresSandboxContainment({
-      trustLevel,
-      lowTrustContainment: agent.trustProfile?.lowTrustContainment,
-    }) &&
-    !provider.isolating
-  ) {
-    throw new GraphQLError(
-      `Agent is ${trustLevel}-trust and must run in an isolated sandbox — provider "${providerKey}" runs on the host. Configure an isolating cloud sandbox provider.`,
-      { extensions: { code: "FORBIDDEN" } },
-    );
-  }
-
-  // Workspace execution allowlist (Plan 4): if the workspace forces `kubernetes`, deny any non-k8s
-  // target BEFORE provisioning. Fail-closed; default policy (`any`) permits everything.
-  await assertExecutionAllowed(input.workspaceId, { driver: "sandbox", provider: providerKey });
+  // Resolve the target (Environment → provider) + enforce trust containment + execution allowlist.
+  const { provider, providerKey, envRes } = await resolveAndAdmitTarget(
+    input.workspaceId,
+    agent,
+    input.providerKey,
+  );
 
   const bundle = await assembleContextBundle(
     {
@@ -206,7 +255,12 @@ export async function runTaskInSandbox(input: {
       ? `command -v ${adapter.binName} >/dev/null 2>&1 || { ${adapter.installCommand}; }`
       : null;
   // Inject the agent's OWN bound secrets (LLM API keys, etc.) so a real runtime can authenticate.
-  const env = await resolveEnvForAgent(input.workspaceId, agent.id);
+  // The Environment's instance-scoped envVars (a non-secret bag) go in first; the agent's resolved
+  // secrets take precedence on any key collision.
+  const env = {
+    ...(envRes?.envVars ?? {}),
+    ...(await resolveEnvForAgent(input.workspaceId, agent.id)),
+  };
   // BYO git token from the workspace vault (GIT_TOKEN, else GITHUB_TOKEN) — only when a repo is cloned.
   const gitToken = bundle.project?.repoUrl
     ? ((await resolveWorkspaceSecret(input.workspaceId, "GIT_TOKEN")) ??
@@ -330,34 +384,8 @@ export async function enqueueSandboxRun(input: {
   });
   if (!agent) throw new GraphQLError("Agent not found", { extensions: { code: "NOT_FOUND" } });
 
-  const providerKey = (input.providerKey ?? agent.sandboxProvider) || null;
-  if (!providerKey) {
-    throw new GraphQLError("No sandbox provider is configured for this agent", {
-      extensions: { code: "BAD_USER_INPUT" },
-    });
-  }
-  const provider = getSandboxProvider(providerKey);
-  if (!provider) {
-    throw new GraphQLError(`Unknown sandbox provider: ${providerKey}`, {
-      extensions: { code: "BAD_USER_INPUT" },
-    });
-  }
-  const trustLevel = (agent.trustLevel ?? "standard") as TrustLevel;
-  if (
-    requiresSandboxContainment({
-      trustLevel,
-      lowTrustContainment: agent.trustProfile?.lowTrustContainment,
-    }) &&
-    !provider.isolating
-  ) {
-    throw new GraphQLError(
-      `Agent is ${trustLevel}-trust and must run in an isolated sandbox — provider "${providerKey}" runs on the host. Configure an isolating cloud sandbox provider.`,
-      { extensions: { code: "FORBIDDEN" } },
-    );
-  }
-
-  // Workspace execution allowlist (Plan 4): reject an inadmissible target at enqueue, so it never queues.
-  await assertExecutionAllowed(input.workspaceId, { driver: "sandbox", provider: providerKey });
+  // Same resolution + fail-closed admission as the sync path — so an inadmissible run never queues.
+  const { providerKey } = await resolveAndAdmitTarget(input.workspaceId, agent, input.providerKey);
 
   const run = await prisma.agentRun.create({
     data: {
@@ -438,9 +466,10 @@ export async function autoDispatchSandboxForAssignment(
     if (!agentId) continue; // human assignee
     const agent = await prisma.agent.findFirst({
       where: { id: agentId },
-      select: { sandboxProvider: true, workspaceId: true },
+      select: { sandboxProvider: true, environmentId: true, workspaceId: true },
     });
-    if (!agent?.sandboxProvider || !agent.workspaceId) continue;
+    // Dispatchable when the agent has EITHER an ad-hoc sandbox provider OR a bound Environment.
+    if (!agent?.workspaceId || (!agent.sandboxProvider && !agent.environmentId)) continue;
     const active = await prisma.agentRun.findFirst({
       where: { taskId, agentId, status: { in: ["queued", "running"] } },
       select: { id: true },
