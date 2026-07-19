@@ -18,6 +18,8 @@ import {
   CreditCard,
   Receipt,
   KeyRound,
+  Workflow,
+  Repeat,
   Zap,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
@@ -43,6 +45,8 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   { href: "/finance", icon: CreditCard, label: "Finance", flag: FLAG_KEYS.BUDGETS },
   { href: "/ledger", icon: Receipt, label: "Ledger", flag: FLAG_KEYS.LEDGER },
   { href: "/secrets", icon: KeyRound, label: "Secrets", flag: FLAG_KEYS.SECRETS_VAULT },
+  { href: "/routines", icon: Repeat, label: "Routines", flag: FLAG_KEYS.PIPELINES_ROUTINES },
+  { href: "/pipelines", icon: Workflow, label: "Pipelines", flag: FLAG_KEYS.PIPELINES_ROUTINES },
 ];
 
 function isActive(pathname: string | null, href: string): boolean {

@@ -18,10 +18,11 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.LEDGER).toBe("ledger");
     expect(FLAG_KEYS.MULTI_PROVIDER_ADAPTERS).toBe("multi_provider_adapters");
     expect(FLAG_KEYS.SECRETS_VAULT).toBe("secrets_vault");
+    expect(FLAG_KEYS.PIPELINES_ROUTINES).toBe("pipelines_routines");
   });
 
-  it("has exactly 14 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(14);
+  it("has exactly 15 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(15);
   });
 
   it("all values are unique", () => {
@@ -63,6 +64,7 @@ describe("FLAG_DEFAULTS", () => {
       FLAG_KEYS.BUDGETS,
       FLAG_KEYS.LEDGER,
       FLAG_KEYS.SECRETS_VAULT,
+      FLAG_KEYS.PIPELINES_ROUTINES,
     ];
     for (const key of expectedTrue) {
       expect(FLAG_DEFAULTS[key]).toBe(true);

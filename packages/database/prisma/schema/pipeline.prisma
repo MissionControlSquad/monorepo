@@ -1,0 +1,203 @@
+// ─── Routines & Pipelines (Epic #7) ───────────────────────────────
+// Routines: reusable scheduled/triggered workflow docs with run history + immutable revisions +
+// (deferred) a public fire URL. Pipelines: multi-stage case workflows with claim/transition/
+// breakdown, a review-cases inbox, and SLA health.
+//
+// Draft-spec rework: workspaceId (buildbase, D5 — no FK, indexed) NOT an Organization FK; gated by
+// the buildbase feature `pipelines_routines` (no retired License). Reuses the existing
+// recurrence-config shape + Task creation path; append-only event logs follow StatusHistory.
+
+// ─── Routines ─────────────────────────────────────────────────────
+enum RoutineTriggerType {
+  cron
+  manual
+  webhook
+}
+
+enum RoutineRunStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+}
+
+model Routine {
+  id                 String   @id @default(cuid())
+  workspaceId        String // buildbase workspace _id; no FK (D5)
+  name               String
+  description        String?
+  definition         Json
+  isActive           Boolean  @default(true)
+  timezone           String   @default("UTC")
+  currentVersion     Int      @default(1)
+  createdByProfileId String?
+  projectId          String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  createdByProfile Profile?          @relation("RoutineCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: SetNull)
+  project          Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  triggers         RoutineTrigger[]
+  revisions        RoutineRevision[]
+  runs             RoutineRun[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, isActive])
+  @@index([projectId])
+  @@map("routines")
+}
+
+model RoutineTrigger {
+  id               String             @id @default(cuid())
+  routineId        String
+  type             RoutineTriggerType
+  recurrenceConfig Json? // reuses RecurringTask.recurrenceConfig shape (cron)
+  nextFireAt       DateTime?
+  publicId         String?            @unique // nanoid; public fire URL (webhook)
+  isEnabled        Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+
+  routine Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+
+  @@index([routineId])
+  @@index([type, isEnabled, nextFireAt]) // cron scan predicate
+  @@index([publicId])
+  @@map("routine_triggers")
+}
+
+model RoutineRevision {
+  id         String   @id @default(cuid())
+  routineId  String
+  version    Int
+  definition Json
+  editedById String?
+  createdAt  DateTime @default(now())
+
+  routine  Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  editedBy Profile? @relation("RoutineRevisionEditedBy", fields: [editedById], references: [id], onDelete: SetNull)
+
+  @@unique([routineId, version])
+  @@index([routineId, createdAt])
+  @@map("routine_revisions")
+}
+
+model RoutineRun {
+  id              String             @id @default(cuid())
+  routineId       String
+  triggeredBy     RoutineTriggerType
+  triggerId       String?
+  status          RoutineRunStatus   @default(queued)
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  error           String?
+  output          Json?
+  generatedTaskId String?
+  createdAt       DateTime           @default(now())
+
+  routine       Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  generatedTask Task?   @relation("TaskFromRoutineRun", fields: [generatedTaskId], references: [id], onDelete: SetNull)
+
+  @@index([routineId, createdAt])
+  @@index([status])
+  @@map("routine_runs")
+}
+
+// ─── Pipelines ────────────────────────────────────────────────────
+enum CaseStatus {
+  open
+  claimed
+  in_review
+  transitioned
+  done
+  rejected
+}
+
+enum PipelineCaseEventType {
+  created
+  claimed
+  transitioned
+  commented
+  breakdown
+  rejected
+  linked_task
+}
+
+model Pipeline {
+  id          String   @id @default(cuid())
+  workspaceId String
+  projectId   String?
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  stages  PipelineStage[]
+  cases   PipelineCase[]
+
+  @@index([workspaceId])
+  @@index([projectId])
+  @@map("pipelines")
+}
+
+model PipelineStage {
+  id            String  @id @default(cuid())
+  pipelineId    String
+  name          String
+  order         Int
+  isReviewStage Boolean @default(false) // surfaces cases in the review-cases inbox
+  slaMinutes    Int? // liveness/health: stage SLA
+
+  pipeline     Pipeline       @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  casesAtStage PipelineCase[] @relation("CaseCurrentStage")
+
+  @@unique([pipelineId, order])
+  @@index([pipelineId])
+  @@map("pipeline_stages")
+}
+
+model PipelineCase {
+  id                 String     @id @default(cuid())
+  pipelineId         String
+  currentStageId     String?
+  title              String
+  payload            Json?
+  status             CaseStatus @default(open)
+  claimedByProfileId String?
+  claimedAt          DateTime?
+  linkedTaskId       String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  enteredStageAt     DateTime   @default(now())
+
+  pipeline     Pipeline            @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  currentStage PipelineStage?      @relation("CaseCurrentStage", fields: [currentStageId], references: [id], onDelete: SetNull)
+  claimedBy    Profile?            @relation("PipelineCaseClaimedBy", fields: [claimedByProfileId], references: [id], onDelete: SetNull)
+  linkedTask   Task?               @relation("TaskFromPipelineCase", fields: [linkedTaskId], references: [id], onDelete: SetNull)
+  events       PipelineCaseEvent[]
+
+  @@index([pipelineId, status])
+  @@index([currentStageId, status])
+  @@index([claimedByProfileId])
+  @@index([enteredStageAt])
+  @@map("pipeline_cases")
+}
+
+model PipelineCaseEvent {
+  id             String                @id @default(cuid())
+  caseId         String
+  type           PipelineCaseEventType
+  fromStageId    String?
+  toStageId      String?
+  actorProfileId String?
+  note           String?
+  metadata       Json?
+  createdAt      DateTime              @default(now())
+
+  case PipelineCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt])
+  @@map("pipeline_case_events")
+}

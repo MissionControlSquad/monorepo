@@ -61,6 +61,10 @@ model Profile {
   approvalsDecided   Approval[]        @relation("ApprovalDecidedBy")
   approvalComments   ApprovalComment[] @relation("ApprovalCommentAuthor")
 
+  createdRoutines   Routine[]         @relation("RoutineCreatedByProfile") // Epic #7
+  routineRevisions  RoutineRevision[] @relation("RoutineRevisionEditedBy")
+  claimedCases      PipelineCase[]    @relation("PipelineCaseClaimedBy")
+
   @@index([kind])
   @@index([username])
   @@map("profiles")
