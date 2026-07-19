@@ -11,6 +11,7 @@ import {
   deleteBudgetPolicy,
   resolveBudgetIncident,
   raiseBudgetAndResume,
+  setAgentSalary,
 } from "@/server/services/budgets";
 
 // Epic #4: budget mutations. Policy/incident writes require admin; manual cost ingest member+.
@@ -227,6 +228,29 @@ builder.mutationField("repriceCostEvent", (t) =>
       const tenancy = requireRole(ctx, "member");
       const ev = await repriceCostEvent(tenancy.workspaceId, args.costEventId, args.amountCents);
       return ctx.prisma.costEvent.findUniqueOrThrow({ ...query, where: { id: ev.id } });
+    },
+  }),
+);
+
+// Domain 14 #18: set an agent's token "salary" (monthly per-agent allowance). 0 removes it. admin.
+builder.mutationField("setAgentSalary", (t) =>
+  t.prismaField({
+    type: "BudgetPolicy",
+    nullable: true,
+    args: {
+      agentId: t.arg.string({ required: true }),
+      monthlyCents: t.arg.int({ required: true }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      const tenancy = requireRole(ctx, "admin");
+      const pol = await setAgentSalary({
+        workspaceId: tenancy.workspaceId,
+        agentId: args.agentId,
+        monthlyCents: args.monthlyCents,
+      });
+      if (!pol) return null;
+      return ctx.prisma.budgetPolicy.findUniqueOrThrow({ ...query, where: { id: pol.id } });
     },
   }),
 );

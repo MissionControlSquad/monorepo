@@ -439,3 +439,53 @@ describe("unpriced cost + reprice (Domain 12 GAP-6 A13)", () => {
     expect(qwAfter._sum.spendCents ?? 0).toBe(400);
   });
 });
+
+describe("token salary budgeting (Domain 14 #18)", () => {
+  it("setAgentSalary upserts one monthly agent budget; agentSalary reads it; 0 removes it", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    const agent = await prisma.agent.create({
+      data: { name: "Wagey", role: "worker", workspaceId: WS_A },
+    });
+    const SET = `mutation($a:String!,$c:Int!){ setAgentSalary(agentId:$a, monthlyCents:$c){ id isSalary scope window limitCents hardStop } }`;
+
+    // set → creates the salary policy
+    const set = await runGraphQL(SET, { a: agent.id, c: 5000 }, admin);
+    expect(set.data.setAgentSalary).toMatchObject({
+      isSalary: true,
+      scope: "agent",
+      window: "monthly",
+      limitCents: 5000,
+      hardStop: true,
+    });
+    // exactly one salary policy for the agent
+    expect(await prisma.budgetPolicy.count({ where: { agentId: agent.id, isSalary: true } })).toBe(
+      1,
+    );
+
+    // update → upserts the same policy (still one)
+    const raise = await runGraphQL(SET, { a: agent.id, c: 8000 }, admin);
+    expect(raise.data.setAgentSalary.limitCents).toBe(8000);
+    expect(await prisma.budgetPolicy.count({ where: { agentId: agent.id, isSalary: true } })).toBe(
+      1,
+    );
+
+    // query
+    const read = await runGraphQL(
+      `query($a:String!){ agentSalary(agentId:$a){ limitCents isSalary } }`,
+      { a: agent.id },
+      admin,
+    );
+    expect(read.data.agentSalary).toMatchObject({ limitCents: 8000, isSalary: true });
+
+    // 0 removes it
+    const removed = await runGraphQL(SET, { a: agent.id, c: 0 }, admin);
+    expect(removed.data.setAgentSalary).toBeNull();
+    expect(await prisma.budgetPolicy.count({ where: { agentId: agent.id, isSalary: true } })).toBe(
+      0,
+    );
+
+    // member cannot set a salary
+    const denied = await runGraphQL(SET, { a: agent.id, c: 1000 }, await cookieFor(WS_A, "member"));
+    expect(denied.errors).toBeDefined();
+  });
+});

@@ -71,6 +71,59 @@ export async function createBudgetPolicy(input: CreateBudgetPolicyInput): Promis
   });
 }
 
+/**
+ * Set an agent's token "salary" (Domain 14 #18) — a periodic per-agent monthly allowance, modelled as
+ * the agent's canonical isSalary=true, scope=agent, window=monthly BudgetPolicy (hard-stop). Upserts
+ * the single salary policy (there is exactly one per agent). A limit of 0 removes the salary.
+ */
+export async function setAgentSalary(input: {
+  workspaceId: string;
+  agentId: string;
+  monthlyCents: number;
+}): Promise<BudgetPolicy | null> {
+  if (!Number.isInteger(input.monthlyCents) || input.monthlyCents < 0)
+    badRequest("monthlyCents must be a non-negative integer");
+  const agent = await prisma.agent.findFirst({
+    where: { id: input.agentId, workspaceId: input.workspaceId },
+    select: { id: true, name: true },
+  });
+  if (!agent) throw new GraphQLError("Agent not found", { extensions: { code: "NOT_FOUND" } });
+
+  const existing = await prisma.budgetPolicy.findFirst({
+    where: { workspaceId: input.workspaceId, agentId: input.agentId, isSalary: true },
+  });
+
+  if (input.monthlyCents === 0) {
+    if (existing) await prisma.budgetPolicy.delete({ where: { id: existing.id } });
+    return null;
+  }
+  if (existing) {
+    return prisma.budgetPolicy.update({
+      where: { id: existing.id },
+      data: { limitCents: input.monthlyCents, isActive: true },
+    });
+  }
+  return prisma.budgetPolicy.create({
+    data: {
+      workspaceId: input.workspaceId,
+      scope: "agent",
+      agentId: input.agentId,
+      name: `${agent.name} — salary`,
+      limitCents: input.monthlyCents,
+      window: "monthly",
+      hardStop: true,
+      isSalary: true,
+    },
+  });
+}
+
+/** The agent's salary policy, or null when none is set. */
+export function getAgentSalary(workspaceId: string, agentId: string): Promise<BudgetPolicy | null> {
+  return prisma.budgetPolicy.findFirst({
+    where: { workspaceId, agentId, isSalary: true },
+  });
+}
+
 export async function updateBudgetPolicy(input: UpdateBudgetPolicyInput): Promise<BudgetPolicy> {
   const existing = await prisma.budgetPolicy.findFirst({
     where: { id: input.id, workspaceId: input.workspaceId },

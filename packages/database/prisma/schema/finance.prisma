@@ -119,6 +119,7 @@ model BudgetPolicy {
   hardStop     Boolean      @default(false) // true = auto-pause on hard breach
   warnPercent  Int          @default(80) // soft-warn threshold as % of limit (Paperclip parity)
   notifyEnabled Boolean     @default(true) // emit notification on incident open
+  isSalary     Boolean      @default(false) // Domain 14 #18 — the agent's periodic token "salary" allowance
   isActive     Boolean      @default(true)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt

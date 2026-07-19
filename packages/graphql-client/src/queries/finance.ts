@@ -162,3 +162,15 @@ export const FINANCE_EVENTS_QUERY = gql`
     }
   }
 `;
+
+// Domain 14 #18: an agent's token salary policy.
+export const AGENT_SALARY_QUERY = gql`
+  query AgentSalary($agentId: String!) {
+    agentSalary(agentId: $agentId) {
+      id
+      limitCents
+      window
+      isSalary
+    }
+  }
+`;

@@ -115,6 +115,7 @@ export {
   RAISE_BUDGET_AND_RESUME,
   INGEST_FINANCE_EVENT,
   REPRICE_COST_EVENT,
+  SET_AGENT_SALARY,
 } from "./finance";
 
 export {

@@ -59,6 +59,7 @@ builder.prismaObject("BudgetPolicy", {
     window: t.exposeString("window"),
     hardStop: t.exposeBoolean("hardStop"),
     warnPercent: t.exposeInt("warnPercent"),
+    isSalary: t.exposeBoolean("isSalary"),
     notifyEnabled: t.exposeBoolean("notifyEnabled"),
     isActive: t.exposeBoolean("isActive"),
     windows: t.relation("windows"),

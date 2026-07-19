@@ -110,3 +110,14 @@ export const REPRICE_COST_EVENT = gql`
     }
   }
 `;
+
+// Domain 14 #18: set an agent's token salary (0 removes it).
+export const SET_AGENT_SALARY = gql`
+  mutation SetAgentSalary($agentId: String!, $monthlyCents: Int!) {
+    setAgentSalary(agentId: $agentId, monthlyCents: $monthlyCents) {
+      id
+      limitCents
+      isSalary
+    }
+  }
+`;

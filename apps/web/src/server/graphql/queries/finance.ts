@@ -368,3 +368,20 @@ builder.queryField("costBillingSplit", (t) =>
     },
   }),
 );
+
+// Domain 14 #18: an agent's token salary policy (null when unset).
+builder.queryField("agentSalary", (t) =>
+  t.prismaField({
+    type: "BudgetPolicy",
+    nullable: true,
+    args: { agentId: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      const tenancy = requireRole(ctx, "member");
+      return ctx.prisma.budgetPolicy.findFirst({
+        ...query,
+        where: { workspaceId: tenancy.workspaceId, agentId: args.agentId, isSalary: true },
+      });
+    },
+  }),
+);
