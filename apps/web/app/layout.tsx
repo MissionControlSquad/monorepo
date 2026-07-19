@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "@buildbase/sdk/css";
 import { RuntimeEnvScript } from "@/components/RuntimeEnvScript";
+import { BuildbaseProvider } from "@/components/providers/BuildbaseProvider";
 
 export const metadata: Metadata = {
   title: "AgentCenter",
@@ -27,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <RuntimeEnvScript />
-        {children}
+        <BuildbaseProvider>{children}</BuildbaseProvider>
       </body>
     </html>
   );

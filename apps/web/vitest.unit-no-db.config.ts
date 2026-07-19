@@ -16,6 +16,7 @@ export default defineConfig({
       "tests/unit/json-response.test.ts",
       "tests/unit/logger.test.ts",
       "tests/unit/license.test.ts",
+      "tests/unit/tenancy.test.ts",
     ],
   },
   resolve: {

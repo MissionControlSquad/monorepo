@@ -1,0 +1,72 @@
+import { NextRequest } from "next/server";
+import { createJWT } from "@/lib/jwt";
+
+// buildbase OAuth code → session exchange (Epic #1). Ported from the MissionControlSquad website.
+// Namespaced under /api/auth/buildbase/* to avoid colliding with the existing admin auth routes.
+const SESSION_COOKIE_NAME = "bb-session-id";
+
+export async function POST(request: NextRequest) {
+  const SAAS_CLIENT_SECRET = process.env.SAAS_CLIENT_SECRET;
+  const SAAS_SERVER_URL = process.env.SAAS_SERVER_URL;
+  const SAAS_ORG_ID = process.env.SAAS_ORG_ID;
+  const SAAS_CLIENT_ID = process.env.SAAS_CLIENT_ID;
+  const SYSTEM_SECRET = process.env.SYSTEM_SECRET;
+
+  let code: string;
+  try {
+    const body = (await request.json()) as { code?: string };
+    code = body.code ?? "";
+  } catch {
+    return Response.json({ success: false, message: "Invalid request body" }, { status: 400 });
+  }
+
+  if (!code || code.length < 10 || code.length > 256) {
+    return Response.json({ success: false, message: "Invalid code" }, { status: 400 });
+  }
+  if (!SAAS_ORG_ID || !SAAS_CLIENT_ID || !SAAS_CLIENT_SECRET || !SYSTEM_SECRET) {
+    return Response.json({ success: false, message: "buildbase not configured" }, { status: 503 });
+  }
+
+  const serverUrl = SAAS_SERVER_URL || "https://api.console.buildbase.app";
+
+  const tokenRes = await fetch(`${serverUrl}/api/v1/auth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      code,
+      clientId: SAAS_CLIENT_ID,
+      clientSecret: SAAS_CLIENT_SECRET,
+      orgId: SAAS_ORG_ID,
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    return Response.json({ success: false, message: "Token exchange failed" }, { status: 401 });
+  }
+
+  const raw = (await tokenRes.json()) as { data?: unknown };
+  const result = (raw.data ?? raw) as {
+    sessionId?: string;
+    user?: { id?: string; _id?: string; email?: string; name?: string; role?: string };
+  };
+  const sessionId = result.sessionId;
+  const user = result.user;
+
+  if (!sessionId) {
+    return Response.json({ success: false, message: "No session returned" }, { status: 401 });
+  }
+
+  const userId = user?.id || user?._id || "";
+  const token = await createJWT(
+    { userId, workspaceId: null, userRole: user?.role || "member", email: user?.email || "" },
+    SYSTEM_SECRET,
+  );
+
+  const isSecure = new URL(request.url).protocol === "https:";
+  const cookieFlags = `HttpOnly; Path=/; SameSite=Lax${isSecure ? "; Secure" : ""}; Max-Age=604800`;
+
+  const headers = new Headers({ "Content-Type": "application/json" });
+  headers.set("Set-Cookie", `${SESSION_COOKIE_NAME}=${sessionId}; ${cookieFlags}`);
+
+  return new Response(JSON.stringify({ success: true, sessionId, token, user }), { headers });
+}

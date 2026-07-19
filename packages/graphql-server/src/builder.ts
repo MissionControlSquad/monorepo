@@ -16,10 +16,31 @@ export interface SessionPayload {
   iat?: number;
 }
 
+/** Workspace-level role of the current human, resolved from buildbase (Epic #1). */
+export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
+
+/**
+ * Per-request human tenancy, bridging the buildbase SaaS plane to the AgentCenter domain plane.
+ * Present for human (session) requests; null for anonymous or agent (apiKeyHash) requests.
+ * See docs/gap-plans/01-buildbase-tenancy.md. `workspaceId` is the buildbase workspace `_id`.
+ */
+export interface TenancyContext {
+  /** buildbase human user id (during pre-buildbase bootstrap: the Profile id). */
+  userId: string;
+  /** buildbase workspace `_id` — the scoping key for every domain root row. */
+  workspaceId: string;
+  /** The human's role in the current workspace. */
+  role: WorkspaceRole;
+  /** True if the workspace role grants the given capability string. */
+  can: (permission: string) => boolean;
+}
+
 export interface GraphQLContext extends YogaInitialContext {
   prisma: typeof prisma;
   /** Set when request has valid mc_session cookie (admin login with Profile). Used for createdByProfileId, fromProfileId, etc. */
   session: (SessionPayload & { profileId: string }) | null;
+  /** Human workspace tenancy (Epic #1). Null for anonymous or agent requests. */
+  tenancy: TenancyContext | null;
 }
 
 export const builder = new SchemaBuilder<{

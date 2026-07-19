@@ -39,8 +39,11 @@ model Project {
   channels       Channel[]
   recurringTasks RecurringTask[]
 
+  workspaceId String? // buildbase workspace _id (Epic #1, D5); no FK; backfilled to default workspace
+
   @@index([status])
   @@index([createdAt])
+  @@index([workspaceId])
   @@map("projects")
 }
 

@@ -105,10 +105,10 @@ model Agent {
   apiKeyCreatedAt DateTime?
   isOnVacation    Boolean         @default(false)
   templateId      String?
-  configVersion   String?         // Reported by agent on sync_identity; used for "upgrade available"
+  configVersion   String? // Reported by agent on sync_identity; used for "upgrade available"
   hostingType     HostingType     @default(selfHosted)
   cloudVmId       String?
-  llmModel        String?         // Per-agent LLM model override; null = use VM default
+  llmModel        String? // Per-agent LLM model override; null = use VM default
   createdBy       String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -126,8 +126,11 @@ model Agent {
   profile             Profile?
   cloudVm             CloudVM?             @relation(fields: [cloudVmId], references: [id], onDelete: SetNull)
 
+  workspaceId String? // buildbase workspace _id (Epic #1, D5); no FK; backfilled to default workspace
+
   @@index([username])
   @@index([cloudVmId])
+  @@index([workspaceId])
   @@map("agents")
 }
 
@@ -156,7 +159,7 @@ model WorkSession {
   projectId String?
   startedAt DateTime             @default(now())
   endedAt   DateTime?
-  duration  Int?                 // milliseconds
+  duration  Int? // milliseconds
   eventType WorkSessionEventType
 
   task    Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)

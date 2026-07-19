@@ -18,6 +18,7 @@ import { execute, subscribe, type ExecutionArgs } from "graphql";
 import { schema } from "./src/server/graphql/schema";
 import { prisma } from "./src/server/prisma";
 import { verifySessionToken, COOKIE_NAME } from "./src/server/admin-auth";
+import { resolveTenancy } from "./src/server/tenancy";
 import { isFeatureEnabled } from "./src/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import {
@@ -63,7 +64,8 @@ setupGraphQLWS(
     subscribe: subscribe as (args: ExecutionArgs) => any,
     context: async (ctx) => {
       const session = await sessionFromRequest(ctx.extra.request);
-      return { prisma, session };
+      const cookieHeader = ctx.extra.request.headers.cookie ?? null;
+      return { prisma, session, tenancy: await resolveTenancy(session, cookieHeader) };
     },
   },
   wss,
