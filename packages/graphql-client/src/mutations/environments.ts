@@ -88,6 +88,12 @@ export const SET_AGENT_ENVIRONMENT = gql`
   }
 `;
 
+export const DESTROY_ENVIRONMENT_LEASE = gql`
+  mutation DestroyEnvironmentLease($leaseId: String!) {
+    destroyEnvironmentLease(leaseId: $leaseId)
+  }
+`;
+
 export const SET_WORKSPACE_EXECUTION_MODE = gql`
   mutation SetWorkspaceExecutionMode($executionMode: String, $enableIsolatedWorkspaces: Boolean) {
     setWorkspaceExecutionMode(

@@ -21,6 +21,7 @@ model Environment {
   createdByProfileId String? // buildbase userId
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  leases             EnvironmentLease[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId, status])

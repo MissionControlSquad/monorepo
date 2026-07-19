@@ -18,6 +18,7 @@ import {
   type EnvironmentDriver,
 } from "@/server/services/environments";
 import { setWorkspaceExecutionMode, type ExecutionMode } from "@/server/services/execution-policy";
+import { destroyLeaseNow } from "@/server/services/environment-leases";
 
 // Tier D / Phase 3: Environment writes. ENVIRONMENTS-gated, admin (drivers wire up credential use +
 // arbitrary execution targets). Config secrets are persisted as {secretRef} pointers by the service;
@@ -156,6 +157,19 @@ builder.mutationField("setAgentEnvironment", (t) =>
         where: { id: agent.id },
         data: { environmentId: args.environmentId ?? null },
       });
+    },
+  }),
+);
+
+// Destroy a lease's machine now (manual teardown of a reused/retained sandbox). ENVIRONMENTS, admin.
+builder.mutationField("destroyEnvironmentLease", (t) =>
+  t.field({
+    type: "Boolean",
+    args: { leaseId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.ENVIRONMENTS);
+      const tenancy = requireRole(ctx, "admin");
+      return destroyLeaseNow(tenancy.workspaceId, args.leaseId);
     },
   }),
 );

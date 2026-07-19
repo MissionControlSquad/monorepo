@@ -408,6 +408,8 @@ export interface EnvExecutionResolution {
   providerKey: string | null;
   /** Instance-scoped env vars merged into the run env (non-secret bag). */
   envVars: Record<string, string>;
+  /** Lease policy from env metadata: ephemeral (default) | reuse_by_environment | retain_on_failure. */
+  leasePolicy: string;
 }
 
 /**
@@ -426,18 +428,17 @@ export async function resolveEnvironmentExecution(
   if (!env) return null;
   const cfg = (env.config ?? {}) as Record<string, unknown>;
   const envVars = (env.envVars ?? {}) as Record<string, string>;
+  const leasePolicy = String(
+    (env.metadata as { leasePolicy?: unknown } | null)?.leasePolicy ?? "ephemeral",
+  );
+  const base = { environmentId: env.id, envVars, leasePolicy };
   if (env.driver === "sandbox") {
-    return {
-      environmentId: env.id,
-      driver: "sandbox",
-      providerKey: String(cfg.provider ?? ""),
-      envVars,
-    };
+    return { ...base, driver: "sandbox", providerKey: String(cfg.provider ?? "") };
   }
   if (env.driver === "local") {
-    return { environmentId: env.id, driver: "local", providerKey: "local", envVars };
+    return { ...base, driver: "local", providerKey: "local" };
   }
-  return { environmentId: env.id, driver: env.driver, providerKey: null, envVars };
+  return { ...base, driver: env.driver, providerKey: null };
 }
 
 // ── capabilities matrix (feature 21) ────────────────────────────────────────────

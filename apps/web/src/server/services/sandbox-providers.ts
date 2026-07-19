@@ -15,7 +15,7 @@
  * provider account. Pure bring-your-own-infra; there is no operator-owned credential tier.
  */
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type {
@@ -119,6 +119,18 @@ function runLocal(command: string, cwd: string, timeoutMs?: number): Promise<San
   });
 }
 
+/** A local handle whose `id` IS its working dir — so a lease can resume/destroy it by that id. */
+function localHandle(dir: string): SandboxHandle {
+  return {
+    id: dir,
+    providerKey: "local",
+    exec: (command, opts) => runLocal(command, opts?.cwd ?? dir, opts?.timeoutMs),
+    destroy: async () => {
+      rmSync(dir, { recursive: true, force: true });
+    },
+  };
+}
+
 const localProvider: SandboxProvider = {
   key: "local",
   displayName: "Local (this host)",
@@ -126,16 +138,18 @@ const localProvider: SandboxProvider = {
   credentialKeys: [],
   isolating: false, // runs on the control-plane host — NOT for untrusted/low-trust agents
 
-  provision: async () => {
-    const dir = mkdtempSync(join(tmpdir(), "agentcenter-sbx-"));
-    return {
-      id: dir,
-      providerKey: "local",
-      exec: (command, opts) => runLocal(command, opts?.cwd ?? dir, opts?.timeoutMs),
-      destroy: async () => {
-        rmSync(dir, { recursive: true, force: true });
-      },
-    };
+  provision: async () => localHandle(mkdtempSync(join(tmpdir(), "agentcenter-sbx-"))),
+
+  // Lease reuse: the provider lease id is the dir. Re-attach if it still exists (else the lease is stale).
+  resume: async (providerLeaseId) => {
+    if (!existsSync(providerLeaseId)) {
+      throw new Error(`Local sandbox ${providerLeaseId} no longer exists (cannot resume).`);
+    }
+    return localHandle(providerLeaseId);
+  },
+
+  destroyById: async (providerLeaseId) => {
+    rmSync(providerLeaseId, { recursive: true, force: true });
   },
 };
 

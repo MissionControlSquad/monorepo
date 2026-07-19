@@ -9,6 +9,7 @@ import {
   getEnvironmentDeleteBlastRadius,
 } from "@/server/services/environments";
 import { getWorkspaceExecutionPolicy } from "@/server/services/execution-policy";
+import { listEnvironmentLeases } from "@/server/services/environment-leases";
 
 // Tier D / Phase 3: Environment reads. ENVIRONMENTS-gated, workspace-scoped, member+.
 // `configPublic` is the MASKED config — secret-refs render as "secret:<name>", never plaintext.
@@ -69,6 +70,24 @@ export const WorkspaceExecutionPolicyType = builder.simpleObject("WorkspaceExecu
   }),
 });
 
+const EnvironmentLeaseType = builder.simpleObject("EnvironmentLease", {
+  fields: (t) => ({
+    id: t.string(),
+    environmentId: t.string(),
+    taskId: t.string({ nullable: true }),
+    runId: t.string({ nullable: true }),
+    status: t.string(),
+    leasePolicy: t.string(),
+    provider: t.string({ nullable: true }),
+    providerLeaseId: t.string({ nullable: true }),
+    cleanupStatus: t.string({ nullable: true }),
+    acquiredAt: t.field({ type: "DateTime" }),
+    lastUsedAt: t.field({ type: "DateTime" }),
+    expiresAt: t.field({ type: "DateTime", nullable: true }),
+    releasedAt: t.field({ type: "DateTime", nullable: true }),
+  }),
+});
+
 builder.queryField("environments", (t) =>
   t.field({
     type: [EnvironmentType],
@@ -111,6 +130,18 @@ builder.queryField("environmentDeleteBlastRadius", (t) =>
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
       const tenancy = requireRole(ctx, "member");
       return getEnvironmentDeleteBlastRadius(tenancy.workspaceId, args.id);
+    },
+  }),
+);
+
+builder.queryField("environmentLeases", (t) =>
+  t.field({
+    type: [EnvironmentLeaseType],
+    args: { environmentId: t.arg.string() },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.ENVIRONMENTS);
+      const tenancy = requireRole(ctx, "member");
+      return listEnvironmentLeases(tenancy.workspaceId, args.environmentId);
     },
   }),
 );

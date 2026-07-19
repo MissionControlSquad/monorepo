@@ -68,6 +68,17 @@ export interface SandboxProvider {
    */
   isolating: boolean;
   provision(ctx: SandboxProvisionContext, spec?: SandboxSpec): Promise<SandboxHandle>;
+  /**
+   * Reconstruct a live handle for an ALREADY-provisioned sandbox by its provider lease id — the basis
+   * for lease REUSE (a `reuse_*` policy keeps the machine and re-attaches on the next run). Optional:
+   * a provider without it does not support reuse (the lease layer falls back to ephemeral).
+   */
+  resume?(providerLeaseId: string, ctx: SandboxProvisionContext): Promise<SandboxHandle>;
+  /**
+   * Destroy a sandbox by its provider lease id when we hold no live handle (the reaper / manual
+   * destroy path). Optional — a provider without it can only be torn down via handle.destroy().
+   */
+  destroyById?(providerLeaseId: string, ctx: SandboxProvisionContext): Promise<void>;
 }
 
 /** Default absolute sandbox lifetime (ms) — matches Paperclip's e2b/modal default. */

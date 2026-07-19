@@ -6,6 +6,7 @@ import {
   ENVIRONMENTS_QUERY,
   ENVIRONMENT_CAPABILITIES_QUERY,
   AGENT_ENVIRONMENT_BINDINGS_QUERY,
+  ENVIRONMENT_LEASES_QUERY,
   WORKSPACE_EXECUTION_POLICY_QUERY,
 } from "@/lib/graphql/queries";
 import {
@@ -15,12 +16,13 @@ import {
   DELETE_ENVIRONMENT,
   PROBE_ENVIRONMENT,
   SET_AGENT_ENVIRONMENT,
+  DESTROY_ENVIRONMENT_LEASE,
   SET_WORKSPACE_EXECUTION_MODE,
 } from "@/lib/graphql/mutations";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
-import { Container, ShieldCheck, Bot } from "lucide-react";
+import { Container, ShieldCheck, Bot, Boxes } from "lucide-react";
 
 // Tier D / Phase 3: Environments dashboard — the first-class "where/how a run executes" model.
 // ENVIRONMENTS-gated in nav; every mutation re-checks the flag + admin server-side. Config secrets are
@@ -92,6 +94,7 @@ export default function EnvironmentsPage() {
     name: "",
     driver: "local",
     description: "",
+    leasePolicy: "ephemeral",
     // sandbox
     provider: "",
     // ssh
@@ -125,6 +128,7 @@ export default function EnvironmentsPage() {
         driver: form.driver,
         description: form.description.trim() || null,
         config: buildConfig(),
+        metadata: form.leasePolicy !== "ephemeral" ? { leasePolicy: form.leasePolicy } : undefined,
       });
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Create failed");
       setForm((f) => ({ ...f, name: "", description: "", host: "", keySecret: "", provider: "" }));
@@ -218,6 +222,23 @@ export default function EnvironmentsPage() {
             </select>
           </div>
           <p className="text-xs text-muted-foreground">{DRIVER_HELP[form.driver]}</p>
+
+          {(form.driver === "sandbox" || form.driver === "local") && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              Machine reuse
+              <select
+                className="rounded border border-border bg-background px-2 py-1 text-sm"
+                value={form.leasePolicy}
+                onChange={(e) => setForm((f) => ({ ...f, leasePolicy: e.target.value }))}
+              >
+                <option value="ephemeral">ephemeral (fresh box each run)</option>
+                <option value="reuse_by_environment">reuse (keep the box between runs)</option>
+                <option value="retain_on_failure">
+                  retain on failure (keep only failed boxes)
+                </option>
+              </select>
+            </label>
+          )}
 
           {form.driver === "sandbox" && (
             <select
@@ -341,8 +362,88 @@ export default function EnvironmentsPage() {
 
       <AgentBindingsSection envs={envs} />
 
+      <LeasesSection />
+
       {policyEnabled && <ExecutionPolicySection />}
     </div>
+  );
+}
+
+// ── Leases — live provider machines held by reuse/retain environments ──
+const LEASE_STATUS_VARIANT: Record<string, "green" | "yellow" | "gray" | "red"> = {
+  active: "yellow",
+  released: "green",
+  retained: "yellow",
+  expired: "gray",
+  pending_cleanup: "gray",
+  failed: "red",
+};
+interface Lease {
+  id: string;
+  environmentId: string;
+  status: string;
+  leasePolicy: string;
+  provider: string | null;
+  providerLeaseId: string | null;
+  acquiredAt: string;
+  expiresAt: string | null;
+}
+function LeasesSection() {
+  const [{ data }, refetch] = useQuery<{ environmentLeases: Lease[] }>({
+    query: ENVIRONMENT_LEASES_QUERY,
+  });
+  const [, destroyLease] = useMutation(DESTROY_ENVIRONMENT_LEASE);
+  const [busy, setBusy] = useState<string | null>(null);
+  // Only surface leases that still hold (or held) a machine — hide fully-expired noise.
+  const leases = (data?.environmentLeases ?? []).filter((l) => l.status !== "expired");
+
+  async function destroy(leaseId: string) {
+    setBusy(leaseId);
+    try {
+      await destroyLease({ leaseId });
+      refetch({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Boxes className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold text-foreground">Leases</h2>
+        </div>
+        <button
+          onClick={() => refetch({ requestPolicy: "network-only" })}
+          className="text-xs text-muted-foreground transition hover:text-foreground"
+        >
+          Refresh
+        </button>
+      </div>
+      <Card className="space-y-2 p-4">
+        <p className="text-sm text-muted-foreground">
+          Machines held by reuse/retain environments. Ephemeral runs never appear here. Idle
+          machines are reaped automatically; destroy one now to free it immediately.
+        </p>
+        {leases.length === 0 && <p className="text-sm text-muted-foreground">No held machines.</p>}
+        {leases.map((l) => (
+          <div key={l.id} className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-2 truncate font-mono text-xs text-muted-foreground">
+              <Badge variant={LEASE_STATUS_VARIANT[l.status] ?? "gray"}>{l.status}</Badge>
+              {l.provider}·{l.leasePolicy}
+            </span>
+            <button
+              onClick={() => destroy(l.id)}
+              disabled={busy === l.id}
+              className="text-xs text-destructive transition hover:underline disabled:opacity-50"
+            >
+              Destroy
+            </button>
+          </div>
+        ))}
+      </Card>
+    </section>
   );
 }
 

@@ -53,6 +53,23 @@ export const AGENT_ENVIRONMENT_BINDINGS_QUERY = gql`
   }
 `;
 
+export const ENVIRONMENT_LEASES_QUERY = gql`
+  query EnvironmentLeases($environmentId: String) {
+    environmentLeases(environmentId: $environmentId) {
+      id
+      environmentId
+      status
+      leasePolicy
+      provider
+      providerLeaseId
+      cleanupStatus
+      acquiredAt
+      lastUsedAt
+      expiresAt
+    }
+  }
+`;
+
 export const WORKSPACE_EXECUTION_POLICY_QUERY = gql`
   query WorkspaceExecutionPolicy {
     workspaceExecutionPolicy {

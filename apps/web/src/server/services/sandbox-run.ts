@@ -27,8 +27,9 @@ import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertExecutionAllowed } from "./execution-policy";
 import { resolveEnvironmentExecution, type EnvExecutionResolution } from "./environments";
-import type { SandboxProvider } from "./sandbox/types";
-import type { AgentTrustProfile } from "@agentcenter/database";
+import { acquireLease, releaseLease, coerceLeasePolicy } from "./environment-leases";
+import type { SandboxProvider, SandboxHandle } from "./sandbox/types";
+import type { AgentTrustProfile, EnvironmentLease } from "@agentcenter/database";
 
 const MAX_OUTPUT_CHARS = 45_000;
 const MAX_MESSAGE_CHARS = 8_000;
@@ -298,9 +299,23 @@ export async function runTaskInSandbox(input: {
         },
       });
 
-  let handle: Awaited<ReturnType<typeof provider.provision>> | undefined;
+  let handle: SandboxHandle | undefined;
+  let lease: EnvironmentLease | null = null;
   try {
-    handle = await provider.provision(ctx);
+    // Acquire an execution machine via the lease layer: a `reuse_by_environment` env re-attaches to a
+    // kept machine; ephemeral (and ad-hoc, no-env) runs provision a fresh one. Release honors the policy.
+    const acquired = await acquireLease({
+      workspaceId: input.workspaceId,
+      environmentId: envRes?.environmentId ?? null,
+      provider,
+      ctx,
+      policy: coerceLeasePolicy(envRes?.leasePolicy),
+      taskId: input.taskId,
+      runId: run.id,
+    });
+    handle = acquired.handle;
+    lease = acquired.lease;
+
     let exitCode: number | null;
     let stdout: string;
     let stderr: string;
@@ -313,10 +328,18 @@ export async function runTaskInSandbox(input: {
       stdout = result.stdout.slice(-MAX_OUTPUT_CHARS);
       stderr = result.stderr.slice(-MAX_OUTPUT_CHARS);
       timedOut = result.timedOut ?? false;
-    } finally {
-      // Always tear the sandbox down, even on failure — never leak a running sandbox.
-      await handle.destroy().catch(() => {});
+    } catch (execErr) {
+      // exec itself blew up — release as a failure (retain_on_failure keeps the box), then re-throw.
+      await releaseLease({ lease, handle, outcome: "failure" });
+      throw execErr;
     }
+
+    // Release the machine per the lease policy (ephemeral destroys; reuse keeps; retain keeps on fail).
+    await releaseLease({
+      lease,
+      handle,
+      outcome: exitCode === 0 && !timedOut ? "success" : "failure",
+    });
 
     const runStatus = timedOut ? "timeout" : exitCode === 0 ? "done" : "failed";
     await prisma.agentRun.update({
