@@ -32,6 +32,7 @@ export default defineConfig({
       "tests/unit/boardroom.test.ts",
       "tests/unit/plugins.test.ts",
       "tests/unit/api-keys.test.ts",
+      "tests/unit/terminals.test.ts",
     ],
   },
   resolve: {

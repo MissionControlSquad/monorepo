@@ -28,10 +28,11 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.BOARD_CHAT).toBe("board_chat");
     expect(FLAG_KEYS.PLUGIN_SDK).toBe("plugin_sdk");
     expect(FLAG_KEYS.API_KEYS).toBe("api_keys");
+    expect(FLAG_KEYS.TERMINALS).toBe("terminals");
   });
 
-  it("has exactly 24 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(24);
+  it("has exactly 25 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(25);
   });
 
   it("all values are unique", () => {
@@ -68,6 +69,10 @@ describe("FLAG_DEFAULTS", () => {
     expect(FLAG_DEFAULTS[FLAG_KEYS.PLUGIN_SDK]).toBe(false);
   });
 
+  it("TERMINALS defaults to false (runtime/operator surface; opt-in)", () => {
+    expect(FLAG_DEFAULTS[FLAG_KEYS.TERMINALS]).toBe(false);
+  });
+
   it("all other flags default to true", () => {
     const expectedTrue: FlagKey[] = [
       FLAG_KEYS.CHANNELS,
@@ -89,7 +94,7 @@ describe("FLAG_DEFAULTS", () => {
       FLAG_KEYS.GOALS,
       FLAG_KEYS.OBSERVABILITY,
       FLAG_KEYS.API_KEYS,
-    ];
+    ]; // TERMINALS + PLUGIN_SDK + BOARD_CHAT default false (asserted above)
     for (const key of expectedTrue) {
       expect(FLAG_DEFAULTS[key]).toBe(true);
     }

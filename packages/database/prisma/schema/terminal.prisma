@@ -1,0 +1,40 @@
+// ─── Terminals — session lifecycle + audit (Epic #9) ──────────────
+// Authorizes + records a terminal session into an agent's environment over SSH. v1 parses/validates
+// the SSH command, mints a short-lived hashed connect token, and tracks lifecycle — it does NOT open a
+// PTY/SSH byte stream (deferred runtime slice, spec D2). workspaceId-scoped (Epic #1, D5; no FK).
+
+enum TerminalConnectionType {
+  ssh
+}
+
+enum TerminalSessionStatus {
+  pending
+  active
+  closed
+  expired
+}
+
+model TerminalSession {
+  id                 String                 @id @default(cuid())
+  workspaceId        String
+  agentId            String?
+  agent              Agent?                 @relation("AgentTerminals", fields: [agentId], references: [id], onDelete: SetNull)
+  label              String?
+  connectionType     TerminalConnectionType @default(ssh)
+  status             TerminalSessionStatus  @default(pending)
+  username           String?
+  host               String?
+  port               Int?
+  cwd                String?
+  connectTokenHash   String
+  connectExpiresAt   DateTime
+  sessionExpiresAt   DateTime
+  lastActivityAt     DateTime?
+  closedAt           DateTime?
+  createdByProfileId String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([workspaceId, status])
+  @@map("terminal_sessions")
+}

@@ -20,10 +20,12 @@ makes a CLI possible**: workspace **API keys (personal access tokens)** — mint
 - **D3 (secret handling)** — the plaintext key is returned **exactly once** at mint time and never
   again; only `keyHash` (sha256) + `keyPrefix` (first 12 chars, for display) are stored. list/GraphQL
   never expose `keyHash` or the plaintext (mirrors the secrets-vault reveal discipline from #5).
-- **D4 (verify is tested, wiring deferred)** — `verifyApiKey(plainKey)` resolves an active key to its
-  `{ workspaceId, apiKeyId }` and stamps `lastUsedAt`. It is fully unit/integration-tested, but wiring
-  it into the request auth middleware (so a `Authorization: Bearer mc_…` header establishes tenancy) is
-  a deferred runtime slice — the same seam pattern used elsewhere.
+- **D4 (verify → WIRED into auth middleware)** — `verifyApiKey(plainKey)` resolves an active key to its
+  `{ workspaceId, apiKeyId, createdByProfileId }` and stamps `lastUsedAt`. **Now wired**: `resolveTenancy`
+  checks an `Authorization: Bearer mc_…` header first (before the buildbase cookie). A key authenticates
+  as least-privilege **`member`** (a leaked key must not wield `admin`), scoped to the key's workspace,
+  attributed to the minting profile. Gated by the `API_KEYS` flag as an admin **kill-switch** — turning
+  the feature off immediately stops key auth. (Originally a deferred seam; wired in a follow-up pass.)
 
 ## 1. Requirements
 - **R1.** `ApiKey { workspaceId, name, keyHash (unique), keyPrefix, createdByProfileId?, lastUsedAt?,

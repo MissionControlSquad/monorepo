@@ -158,3 +158,4 @@ export { WORKSPACE_SUMMARY_QUERY } from "./observability";
 export { BOARD_THREAD_QUERY } from "./boardroom";
 export { PLUGINS_QUERY } from "./plugins";
 export { API_KEYS_QUERY } from "./api-keys";
+export { TERMINAL_SESSIONS_QUERY } from "./terminals";
