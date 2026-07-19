@@ -48,7 +48,6 @@ interface Agent {
   isOnVacation: boolean; personality: string | null;
   workspacePath: string | null; hostingType: string | null;
   createdAt: string; upgradeAvailable: boolean; apiKeyPrefix: string | null;
-  cloudVm: { id: string; name: string; status: string; ipv4: string | null } | null;
   currentTaskRef: { id: string; title: string; taskNumber: number; status: string } | null;
 }
 
@@ -518,22 +517,6 @@ function OverviewTab({ agent, router, onRefresh }: { agent: Agent; router: Retur
         )}
       </View>
 
-      {agent.cloudVm && (
-        <TouchableOpacity
-          className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-blue-200 dark:border-blue-800 gap-2.5"
-          onPress={() => router.push(`/cloud/${agent.cloudVm!.id}`)}
-          activeOpacity={0.75}
-        >
-          <View className="flex-row items-center justify-between">
-            <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.5px]">Cloud VM</Text>
-            <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
-          </View>
-          <InfoRow label="Name" value={agent.cloudVm.name} />
-          <InfoRow label="Status" value={humanizeLabel(agent.cloudVm.status)} />
-          {agent.cloudVm.ipv4 && <InfoRow label="IP" value={agent.cloudVm.ipv4} mono />}
-        </TouchableOpacity>
-      )}
-
       {agent.personality && (
         <View className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 gap-2.5">
           <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.5px]">Personality</Text>
@@ -986,14 +969,12 @@ interface AgentSetupData {
     setupStatus: string;
     apiKeyPrefix: string | null;
     hostingType: string;
-    cloudVmId: string | null;
   };
   configFiles: { filename: string; content: string }[];
   bootstrapMessage: string;
   cronSchedule: string;
   cronCommand: string;
   workspacePath: string;
-  cloudVms: { id: string; name?: string | null; serverName?: string | null; ipv4: string | null; region: string; serverType: string }[];
 }
 
 type SetupMode = "auto" | "manual";
@@ -1318,20 +1299,6 @@ function SetupTab({ agentId }: { agentId: string }) {
         </>
       )}
 
-      {/* Cloud VMs shortcut */}
-      {setup.cloudVms.length > 0 && (
-        <TouchableOpacity
-          className="flex-row items-center gap-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3.5 border border-blue-200 dark:border-blue-800"
-          onPress={() => router.push("/cloud")}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="server-outline" size={16} color="#2563eb" />
-          <Text className="flex-1 text-sm text-blue-600 dark:text-blue-400 font-medium">
-            {setup.cloudVms.length} Cloud VM{setup.cloudVms.length !== 1 ? "s" : ""} available — Deploy to VM
-          </Text>
-          <Ionicons name="arrow-forward" size={14} color="#2563eb" />
-        </TouchableOpacity>
-      )}
     </ScrollView>
   );
 }

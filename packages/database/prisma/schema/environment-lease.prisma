@@ -1,0 +1,40 @@
+// ─── Environment leases (Tier D / Phase 3 — Plan 2) ───────────────
+// A lease binds a run to a live provider machine, with a reuse/retain policy. It turns the ephemeral
+// provision→exec→destroy seam into a leased, reusable, recoverable one (ported from Paperclip's
+// environment_leases). Status/policy are TEXT (D5 convention — no fragile Prisma enums).
+//
+//   leasePolicy:
+//     ephemeral               → destroy the machine after the run (today's default behavior)
+//     reuse_by_environment    → keep the machine; the next run for the same env re-attaches to it
+//     retain_on_failure       → on a failed run, keep the machine (for debugging) instead of destroying
+//   status: active | released | retained | expired | failed | pending_cleanup
+//   cleanupStatus: pending | success | failed
+//
+// providerLeaseId is the provider's own handle id (e.g. the local dir, an e2b sandbox id, a k8s pod).
+// Security: workspace-scoped; reuse only ever within the SAME workspace + environment.
+
+model EnvironmentLease {
+  id              String       @id @default(cuid())
+  workspaceId     String // buildbase workspace _id; no FK (D5)
+  environmentId   String
+  environment     Environment  @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  taskId          String?
+  runId           String? // AgentRun id
+  status          String       @default("active")
+  leasePolicy     String       @default("ephemeral")
+  provider        String? // sandbox provider key
+  providerLeaseId String? // provider handle id (dir / sandbox id / pod name)
+  acquiredAt      DateTime     @default(now())
+  lastUsedAt      DateTime     @default(now())
+  expiresAt       DateTime?
+  releasedAt      DateTime?
+  failureReason   String?
+  cleanupStatus   String?
+  metadata        Json?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([workspaceId, environmentId, status])
+  @@index([status, expiresAt])
+  @@map("environment_leases")
+}

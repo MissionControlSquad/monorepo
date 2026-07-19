@@ -122,23 +122,6 @@ export const ProjectStatus = {
 
 export type ProjectStatusValue = (typeof ProjectStatus)[keyof typeof ProjectStatus];
 
-// ─── Cloud VM Statuses ───────────────────────────────────
-export const CloudVmStatus = {
-  PROVISIONING: "provisioning",
-  WAITING_FOR_SSH: "waiting_for_ssh",
-  INSTALLING_DEPS: "installing_deps",
-  INSTALLING_OPENCLAW: "installing_openclaw",
-  CONFIGURING: "configuring",
-  STARTING_SERVICE: "starting_service",
-  RUNNING: "running",
-  STOPPED: "stopped",
-  ERROR: "error",
-  DESTROYING: "destroying",
-  DESTROYED: "destroyed",
-} as const;
-
-export type CloudVmStatusValue = (typeof CloudVmStatus)[keyof typeof CloudVmStatus];
-
 // ─── Notification Kinds ──────────────────────────────────
 // Mirror of the Prisma UserNotificationType enum — values must stay in sync.
 export const NotificationKind = {

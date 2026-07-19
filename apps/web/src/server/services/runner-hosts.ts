@@ -23,9 +23,18 @@ export function stripHostKey(h: RunnerHost): SafeRunnerHost {
 }
 
 function encryptKey(privateKey: string): string {
-  return env.SSH_KEY_ENCRYPTION_SECRET
-    ? encryptPrivateKey(privateKey, env.SSH_KEY_ENCRYPTION_SECRET)
-    : privateKey;
+  if (env.SSH_KEY_ENCRYPTION_SECRET) {
+    return encryptPrivateKey(privateKey, env.SSH_KEY_ENCRYPTION_SECRET);
+  }
+  // Never persist an SSH private key in plaintext in production — fail closed. (Provisioned Hetzner
+  // hosts generate a root-access key through this path, so a missing secret would store it in the
+  // clear.) Dev/test fall back to raw, mirroring the secrets-vault dev behavior.
+  if (env.NODE_ENV === "production") {
+    throw new Error(
+      "SSH_KEY_ENCRYPTION_SECRET must be set to store SSH private keys (refusing to persist plaintext at rest).",
+    );
+  }
+  return privateKey;
 }
 
 /** Build an SSHConfig for a host, decrypting its key. Server-internal only — never exposed. */

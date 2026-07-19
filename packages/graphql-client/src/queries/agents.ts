@@ -24,7 +24,6 @@ export const AGENTS_QUERY = gql`
       currentConfigVersion
       upgradeAvailable
       hostingType
-      cloudVmId
       createdBy
       createdAt
       updatedAt
@@ -63,13 +62,6 @@ export const AGENT_QUERY = gql`
       adapterType
       adapterConfig
       llmModel
-      cloudVmId
-      cloudVm {
-        id
-        name
-        status
-        ipv4
-      }
       createdBy
       createdAt
       updatedAt

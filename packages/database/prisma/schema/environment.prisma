@@ -1,0 +1,29 @@
+// ─── Environments (Tier D / Phase 3) ──────────────────────────────
+// A first-class, durable model of "where and how an agent run executes" — ported from Paperclip's
+// Environment subsystem. `driver` selects the execution substrate (local | ssh | sandbox | plugin);
+// `config` is driver-specific (secrets stored ONLY as {secretRef:{name}} pointers into the vault, never
+// plaintext); `envVars` is a bag merged into the run env. Downstream (leases, workspaces, policy)
+// reference an Environment. Status/driver are TEXT (D5 convention — no fragile Prisma enums).
+//
+// Security: workspace-scoped (buildbase workspace _id, no FK). Resolved secret plaintext never leaves
+// the server; reads expose a masked `configPublic`. ENVIRONMENTS-flag-gated, admin-only mutations.
+
+model Environment {
+  id                 String   @id @default(cuid())
+  workspaceId        String // buildbase workspace _id; no FK (D5)
+  name               String
+  description        String?
+  driver             String   @default("local") // local | ssh | sandbox | plugin
+  status             String   @default("active") // active | archived
+  config             Json     @default("{}") // driver-specific; secrets as {secretRef:{name}}
+  envVars            Json     @default("{}") // merged into the run env
+  metadata           Json?
+  createdByProfileId String? // buildbase userId
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  leases             EnvironmentLease[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, status])
+  @@map("environments")
+}

@@ -142,7 +142,6 @@ export interface Agent {
   currentConfigVersion?: number | null;
   upgradeAvailable?: boolean;
   hostingType?: string | null;
-  cloudVmId?: string | null;
   personality?: string | null;
   workspacePath?: string | null;
   /** Search result alias — some GraphQL queries return `_id` instead of `id`. */

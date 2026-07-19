@@ -25,6 +25,10 @@ export type ExecPlanFn = (
 const isWin = process.platform === "win32";
 
 /** Core spawn+capture. Enforces a timeout; nothing leaves the machine except the returned result. */
+// Bound in-memory capture so a runaway command (e.g. `yes`) can't OOM the daemon. The control plane
+// caps stored output further (64 KB); this is the memory-safety bound at the source.
+const MAX_CAPTURE_BYTES = 1_000_000;
+
 function runChild(
   file: string,
   args: string[],
@@ -34,6 +38,8 @@ function runChild(
     const child = spawn(file, args, { cwd: opts.cwd });
     let stdout = "";
     let stderr = "";
+    let outDropped = 0;
+    let errDropped = 0;
     let timedOut = false;
     const timer = opts.timeoutMs
       ? setTimeout(() => {
@@ -42,15 +48,28 @@ function runChild(
         }, opts.timeoutMs)
       : undefined;
 
-    child.stdout?.on("data", (d: Buffer) => (stdout += d.toString()));
-    child.stderr?.on("data", (d: Buffer) => (stderr += d.toString()));
+    child.stdout?.on("data", (d: Buffer) => {
+      if (stdout.length < MAX_CAPTURE_BYTES) stdout += d.toString();
+      else outDropped += d.length;
+    });
+    child.stderr?.on("data", (d: Buffer) => {
+      if (stderr.length < MAX_CAPTURE_BYTES) stderr += d.toString();
+      else errDropped += d.length;
+    });
+    const cap = (s: string, dropped: number) =>
+      dropped > 0 ? `${s}\n…[truncated ${dropped} bytes]` : s;
     child.on("error", (err) => {
       if (timer) clearTimeout(timer);
-      resolve({ exitCode: null, stdout, stderr: stderr + String(err), timedOut });
+      resolve({
+        exitCode: null,
+        stdout: cap(stdout, outDropped),
+        stderr: cap(stderr, errDropped) + String(err),
+        timedOut,
+      });
     });
     child.on("close", (code) => {
       if (timer) clearTimeout(timer);
-      resolve({ exitCode: code, stdout, stderr, timedOut });
+      resolve({ exitCode: code, stdout: cap(stdout, outDropped), stderr: cap(stderr, errDropped), timedOut });
     });
   });
 }

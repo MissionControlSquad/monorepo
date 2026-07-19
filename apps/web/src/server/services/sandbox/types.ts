@@ -32,12 +32,29 @@ export interface SandboxExecResult {
   exitCode: number | null;
   stdout: string;
   stderr: string;
+  /** True when the command was killed because it exceeded its timeout budget. */
+  timedOut?: boolean;
+  /** The signal that terminated the process, if any (e.g. "SIGKILL"). */
+  signal?: string | null;
+}
+
+/** A chunk of live output as a sandbox command runs (for streaming to the run's live status). */
+export interface SandboxLogChunk {
+  stream: "stdout" | "stderr";
+  data: string;
+}
+
+export interface SandboxExecOpts {
+  cwd?: string;
+  timeoutMs?: number;
+  /** Called with each output chunk as it arrives — enables mid-run streaming (Plan 6). */
+  onLog?: (chunk: SandboxLogChunk) => void;
 }
 
 export interface SandboxHandle {
   id: string;
   providerKey: string;
-  exec(command: string, opts?: { cwd?: string; timeoutMs?: number }): Promise<SandboxExecResult>;
+  exec(command: string, opts?: SandboxExecOpts): Promise<SandboxExecResult>;
   destroy(): Promise<void>;
 }
 
@@ -57,7 +74,33 @@ export interface SandboxProvider {
   requiresApiKey: boolean;
   /** Vault secret NAMES the WORKSPACE must provide (BYO). Empty for `local`. */
   credentialKeys: string[];
+  /**
+   * true = runs untrusted code in an ISOLATED ephemeral box (the customer's own account); false =
+   * runs on the control-plane host (`local`). Low-trust/untrusted agents may only use isolating
+   * providers (fail-closed admission).
+   */
+  isolating: boolean;
   provision(ctx: SandboxProvisionContext, spec?: SandboxSpec): Promise<SandboxHandle>;
+  /**
+   * Reconstruct a live handle for an ALREADY-provisioned sandbox by its provider lease id — the basis
+   * for lease REUSE (a `reuse_*` policy keeps the machine and re-attaches on the next run). Optional:
+   * a provider without it does not support reuse (the lease layer falls back to ephemeral).
+   */
+  resume?(providerLeaseId: string, ctx: SandboxProvisionContext): Promise<SandboxHandle>;
+  /**
+   * Destroy a sandbox by its provider lease id when we hold no live handle (the reaper / manual
+   * destroy path). Optional — a provider without it can only be torn down via handle.destroy().
+   */
+  destroyById?(providerLeaseId: string, ctx: SandboxProvisionContext): Promise<void>;
+  /**
+   * Capture a live sandbox as a reusable image/snapshot (Plan 5 custom images). Returns a provider
+   * ref future provisions can boot from (via SandboxSpec.image). Optional — a provider without it does
+   * not support capture (the custom-image layer reports "capture unsupported").
+   */
+  snapshot?(
+    handle: SandboxHandle,
+    ctx: SandboxProvisionContext,
+  ): Promise<{ templateRef: string; templateKind: string }>;
 }
 
 /** Default absolute sandbox lifetime (ms) — matches Paperclip's e2b/modal default. */
@@ -122,6 +165,7 @@ export function defineCloudProvider(opts: {
     displayName: opts.displayName,
     requiresApiKey: true,
     credentialKeys: opts.credentialKeys,
+    isolating: true, // ephemeral box on the customer's own account — contains untrusted code
     provision: async (ctx, spec) => {
       const creds: Record<string, string> = {};
       const missing: string[] = [];

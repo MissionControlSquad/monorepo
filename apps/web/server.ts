@@ -26,6 +26,7 @@ import {
   startEvictionLoop,
 } from "./src/server/services/live-gateway-handler";
 import { handleTerminalConnection } from "./src/server/services/terminal-pty-handler";
+import { startSandboxDrainLoop } from "./src/server/services/sandbox-drain-loop";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
@@ -150,6 +151,11 @@ app.prepare().then(async () => {
     terminalPtyWss.on("connection", handleTerminalConnection);
   }
 
+  // RUNNERS flag gates the in-process sandbox queue drain — on this persistent server a run can
+  // execute for as long as the process lives (unlike the Vercel cron, capped at the function limit).
+  const runnersEnabled = await isFeatureEnabled(FLAG_KEYS.RUNNERS);
+  if (runnersEnabled) startSandboxDrainLoop();
+
   server.on("request", async (req, res) => {
     const parsedUrl = parse(req.url!, true);
     await handle(req, res, parsedUrl);
@@ -163,6 +169,9 @@ app.prepare().then(async () => {
     ]
       .filter(Boolean)
       .join(", ");
-    console.log(`> Ready on http://${hostname}:${port} (ws: ${ws})`);
+    const loops = [runnersEnabled ? "sandbox-drain" : null].filter(Boolean).join(", ");
+    console.log(
+      `> Ready on http://${hostname}:${port} (ws: ${ws}${loops ? `; loops: ${loops}` : ""})`,
+    );
   });
 });

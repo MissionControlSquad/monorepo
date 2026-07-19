@@ -15,6 +15,11 @@ const SandboxProviderType = builder.simpleObject("SandboxProvider", {
     key: t.string(),
     displayName: t.string(),
     requiresApiKey: t.boolean(),
+    /** The vault secret NAMES the workspace must add for this provider (so the UI can guide setup). */
+    credentialKeys: t.stringList(),
+    /** isolating = runs untrusted code in an isolated box; false = on the host (`local`). Low-trust
+     * agents may only use isolating providers (fail-closed admission). */
+    isolating: t.boolean(),
     /** configured = this WORKSPACE has stored the provider's credentials (by secret name) in the vault. */
     configured: t.boolean(),
     /** available = runnable now (local, or a workspace-configured cloud provider — its SDK still needed). */
@@ -36,6 +41,8 @@ builder.queryField("sandboxProviders", (t) =>
             key: p.key,
             displayName: p.displayName,
             requiresApiKey: p.requiresApiKey,
+            credentialKeys: p.credentialKeys,
+            isolating: p.isolating,
             configured,
             // Runnable now = local, or a cloud provider whose BYO creds are present (the vendor SDK
             // must also be installed on the deployment to actually provision — reflected honestly).

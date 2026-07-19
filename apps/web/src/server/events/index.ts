@@ -11,6 +11,7 @@ import "./handlers/queue";
 import "./handlers/project";
 import "./handlers/user-notification";
 import "./handlers/budget";
+import "./handlers/auto-dispatch-sandbox";
 
 // Re-export emit for use in mutations
 export { emit } from "./bus";

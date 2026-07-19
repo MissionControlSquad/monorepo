@@ -35,4 +35,3 @@ export { taskModel } from "./task";
 export { taskTemplateModel } from "./task-template";
 export { recurringTaskModel } from "./recurring-task";
 export { workSessionModel } from "./work-session";
-export { cloudVMModel } from "./cloud-vm";

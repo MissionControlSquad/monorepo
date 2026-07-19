@@ -6,7 +6,6 @@ export { logAgentAction } from "./log-action";
 export type { LogAgentActionInput } from "./log-action";
 export { getAgentsWithProfiles } from "./get-agents-with-profiles";
 export type { AgentWithProfile } from "./get-agents-with-profiles";
-export { listAgentsByVM } from "./list-by-vm";
 export { findAgentBySlug } from "./find-by-slug";
 export { findStaleAgents, isAgentStill } from "./find-stale";
 export { getAgentPreflightStats } from "./get-preflight-stats";

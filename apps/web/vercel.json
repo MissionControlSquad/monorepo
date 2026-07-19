@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/reap-stale-work",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/auto-sleep",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/run-sandbox-queue",
+      "schedule": "* * * * *"
     }
   ]
 }

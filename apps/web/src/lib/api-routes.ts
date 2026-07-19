@@ -15,9 +15,6 @@ export const API_ROUTES = {
   channels: {
     attachments: "/api/channels/attachments",
   },
-  cloudVms: {
-    list: "/api/cloud-vms",
-  },
   license: {
     get: "/api/license",
   },

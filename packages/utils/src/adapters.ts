@@ -65,6 +65,14 @@ export interface Adapter {
    * Runs on the machine that has the CLI (the runner). Falls back to `models` when absent/failing.
    */
   detectModels?(): Promise<string[]>;
+  /**
+   * Shell command that installs the runtime binary inside a fresh sandbox. The sandbox seam runs it
+   * idempotently: `command -v <binName> || <installCommand>`. Omit for adapters with no binary
+   * (process/shell/http). Install commands are ported from Paperclip's SANDBOX_INSTALL_COMMANDs.
+   */
+  installCommand?: string;
+  /** The binary probed with `command -v` before installing (guards the installCommand). */
+  binName?: string;
   build(ctx: AdapterContext): AdapterInvocation;
 }
 
@@ -114,6 +122,8 @@ const openclawAdapter: Adapter = {
   requiresTemplate: false,
   supportsModel: true,
   models: [],
+  installCommand: "npm install -g openclaw",
+  binName: "openclaw",
   build: (ctx) => ({
     argv: ["openclaw", "run", "--task", ctx.taskId, ...(ctx.model ? ["--model", ctx.model] : [])],
     mode: "spawn",
@@ -129,6 +139,8 @@ const codexAdapter: Adapter = {
   requiresTemplate: false,
   supportsModel: true,
   models: [],
+  installCommand: "npm install -g @openai/codex",
+  binName: "codex",
   build: (ctx) => ({
     argv: ["codex", "exec", ...(ctx.model ? ["-m", ctx.model] : []), brief(ctx)],
     mode: "spawn",
@@ -145,6 +157,8 @@ const claudeAdapter: Adapter = {
   supportsModel: true,
   // Curated Claude model ids; a runner with the CLI can add more via detectModels (not wired here).
   models: ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5", "claude-fable-5"],
+  installCommand: "npm install -g @anthropic-ai/claude-code",
+  binName: "claude",
   build: (ctx) => ({
     argv: ["claude", "--print", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
     mode: "spawn",
@@ -160,6 +174,8 @@ const geminiAdapter: Adapter = {
   requiresTemplate: false,
   supportsModel: true,
   models: [],
+  installCommand: "npm install -g @google/gemini-cli",
+  binName: "gemini",
   build: (ctx) => ({
     argv: ["gemini", ...(ctx.model ? ["-m", ctx.model] : []), "-p", brief(ctx)],
     mode: "spawn",

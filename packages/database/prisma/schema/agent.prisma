@@ -107,13 +107,14 @@ model Agent {
   templateId      String?
   configVersion   String? // Reported by agent on sync_identity; used for "upgrade available"
   hostingType     HostingType     @default(selfHosted)
-  cloudVmId       String?
   llmModel        String? // Per-agent LLM model override; null = use VM default
   // Tier D: per-agent runtime adapter selection (the control plane dictates how the runner launches
   // this agent). null = use the runner's own configured default.
   runtimeAdapter  String? // adapter key: openclaw|codex|claude|gemini|process|shell|http|<plugin>
   runtimeModel    String? // model override passed to the adapter
   runtimeTemplate String? // command/argv/URL template for process/shell/http adapters
+  sandboxProvider String? // Tier D: run this agent's tasks inside a provisioned sandbox (provider key). null = local/runner
+  environmentId   String? // Tier D / Phase 3: the Environment (where/how) this agent runs in. null = ad-hoc sandboxProvider
   memoryProvider  String  @default("none") // Tier D memory binding: none | markdown | db
   createdBy       String?
   createdAt       DateTime        @default(now())
@@ -130,7 +131,6 @@ model Agent {
   projectDocsAdded    ProjectDoc[]         @relation("ProjectDocAddedBy")
   projectDocRevisions ProjectDocRevision[] @relation("ProjectDocRevisionEditedBy")
   profile             Profile?
-  cloudVm             CloudVM?             @relation(fields: [cloudVmId], references: [id], onDelete: SetNull)
 
   workspaceId String? // buildbase workspace _id (Epic #1, D5); no FK; backfilled to default workspace
 
@@ -158,7 +158,6 @@ model Agent {
   capabilityGrants AgentCapabilityGrant[] @relation("AgentGrants") // Epic #21
 
   @@index([username])
-  @@index([cloudVmId])
   @@index([workspaceId])
   @@index([adapterType])
   @@index([workspaceId, reportsToAgentId])

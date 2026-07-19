@@ -5,11 +5,7 @@ import { Roles, SetupStatus, AgentStatus } from "../../constants";
 import { applyAgentStatusUpdate } from "../../agent-status";
 import { ensureAgentProfile } from "../../agent-profile";
 import { pubsub, PubSubEvent } from "../../pubsub";
-import { findCloudVMForSSH, findProfileForAgentId } from "@agentcenter/database";
-import { getAgentSlug } from "@agentcenter/utils";
-import { getVMSSHConfig, computeAgentCronIndex } from "../../services/cloud-vm-utils";
-import { removeAgentCrons, ensureHeartbeatCron } from "../../services/cloud-vm-cron";
-import { computeCronSchedule } from "../../agent-config-generator";
+import { findProfileForAgentId } from "@agentcenter/database";
 
 /**
  * Resolve an agent by apiKey argument.
@@ -265,7 +261,7 @@ builder.mutationField("setAgentVacation", (t) =>
     resolve: async (query, _root, args, ctx) => {
       const agent = await agentModel.delegate.findUnique({
         where: { id: args.id },
-        select: { name: true, username: true, cloudVmId: true },
+        select: { name: true, username: true },
       });
       if (!agent) throw new Error(`Agent not found: ${args.id}`);
 
@@ -279,42 +275,10 @@ builder.mutationField("setAgentVacation", (t) =>
           detailedStatus: null,
           statusMessage: null,
         });
-
-        // Remove heartbeat cron on cloud VMs (non-fatal)
-        if (agent.cloudVmId) {
-          try {
-            const vm = await findCloudVMForSSH(agent.cloudVmId);
-            if (vm) {
-              const sshConfig = getVMSSHConfig(vm);
-              const agentSlug = getAgentSlug(agent);
-              const removed = await removeAgentCrons(sshConfig, agentSlug);
-              console.log(`[vacation] Removed ${removed} cron(s) for ${agentSlug}`);
-            }
-          } catch (err) {
-            console.error(`[vacation] Failed to remove crons for agent ${args.id}:`, err);
-          }
-        }
       } else {
         await applyAgentStatusUpdate(args.id, {
           isOnVacation: false,
         });
-
-        // Re-add heartbeat cron on cloud VMs (non-fatal)
-        if (agent.cloudVmId) {
-          try {
-            const vm = await findCloudVMForSSH(agent.cloudVmId);
-            if (vm) {
-              const sshConfig = getVMSSHConfig(vm);
-              const agentSlug = getAgentSlug(agent);
-              const cronIndex = await computeAgentCronIndex(agent.cloudVmId, agentSlug);
-              const cronSchedule = computeCronSchedule(cronIndex);
-              const result = await ensureHeartbeatCron(sshConfig, agentSlug, cronSchedule);
-              console.log(`[vacation] Cron restore for ${agentSlug}: ${result.message}`);
-            }
-          } catch (err) {
-            console.error(`[vacation] Failed to restore crons for agent ${args.id}:`, err);
-          }
-        }
       }
 
       pubsub.publish(PubSubEvent.AGENT.STATUS_CHANGED, { agentId: args.id });
@@ -325,15 +289,10 @@ builder.mutationField("setAgentVacation", (t) =>
         ? ((await findProfileForAgentId(profileId))?.displayName ?? "Someone")
         : "Someone";
       const action = args.onVacation ? "put on vacation" : "returned from vacation";
-      const cronNote = agent.cloudVmId
-        ? args.onVacation
-          ? " (cron removed)"
-          : " (cron restored)"
-        : "";
       const activity = await activityModel.create({
         data: {
           type: "agent_status_changed",
-          message: `${agent.name} ${action} by ${who}${cronNote}`,
+          message: `${agent.name} ${action} by ${who}`,
           profileId: profileId ?? undefined,
           metadata: { vacation: args.onVacation },
         },

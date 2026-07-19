@@ -79,20 +79,6 @@ export const createTaskSchema = z.object({
   blockedByTaskId: idStr().optional(),
 });
 
-export const createCloudVMSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .max(100)
-    .regex(
-      /^[a-zA-Z0-9._-]+$/,
-      "Name must contain only letters, numbers, dots, hyphens, and underscores",
-    )
-    .optional(),
-  region: z.string().min(1).max(20).optional(),
-  serverType: z.string().min(1).max(30).optional(),
-});
-
 export const createRecurringTaskSchema = z.object({
   title: str(500),
   description: str(10000),

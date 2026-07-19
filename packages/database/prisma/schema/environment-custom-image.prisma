@@ -1,0 +1,32 @@
+// ─── Environment custom images (Tier D / Phase 3 — Plan 5) ────────
+// A captured snapshot/image for an environment+provider that future provisions boot from (via
+// SandboxSpec.image). At most one ACTIVE template per (environmentId, provider) — superseding a prior
+// one links it via supersededByTemplateId (the supersede chain). sourceConfigFingerprint records the
+// provider config the image was built from, so a config drift can be classified none/relinkable/
+// breaking. Status/kind TEXT (D5). CUSTOM_IMAGES-flag-gated, workspace-scoped.
+//
+// NOTE: the interactive setup-terminal capture flow (Paperclip's setup sessions) is deferred — it
+// needs a live SSH PTY into a setup box (infra-dependent). Capture here snapshots a freshly-provisioned
+// box directly.
+
+model EnvironmentCustomImageTemplate {
+  id                      String   @id @default(cuid())
+  workspaceId             String // buildbase workspace _id; no FK (D5)
+  environmentId           String
+  provider                String // sandbox provider key
+  templateKind            String   @default("snapshot") // snapshot | image | provider_template
+  templateRef             String // provider ref future provisions boot from
+  sourceTemplateRef       String? // the base image this was captured from
+  sourceConfigFingerprint String? // fingerprint of the provider config at capture time
+  status                  String   @default("active") // active | superseded | disabled
+  supersededByTemplateId  String?
+  createdByProfileId      String?
+  capturedAt              DateTime @default(now())
+  lastUsedAt              DateTime?
+  metadata                Json?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([workspaceId, environmentId, status])
+  @@map("environment_custom_image_templates")
+}

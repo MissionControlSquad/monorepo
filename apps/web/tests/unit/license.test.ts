@@ -234,7 +234,7 @@ describe("license module", () => {
         maxAgents: -1,
         maxProjects: -1,
         maxSeats: -1,
-        features: ["channels", "analytics", "cloud_vms"],
+        features: ["channels", "analytics", "terminals"],
       });
       const payload = verifyAccessToken(token);
       expect(payload).not.toBeNull();
@@ -242,7 +242,7 @@ describe("license module", () => {
       expect(payload!.maxAgents).toBe(-1);
       expect(payload!.maxProjects).toBe(-1);
       expect(payload!.maxSeats).toBe(-1);
-      expect(payload!.features).toEqual(["channels", "analytics", "cloud_vms"]);
+      expect(payload!.features).toEqual(["channels", "analytics", "terminals"]);
     });
 
     it("returns payload for token expiring in the future", () => {
@@ -357,7 +357,7 @@ describe("license module", () => {
     it("returns false for an unlicensed feature", async () => {
       mockFindUnique.mockResolvedValue(makeStoredLicense());
       invalidateLicenseCache();
-      const licensed = await isFeatureLicensed("cloud_vms");
+      const licensed = await isFeatureLicensed("terminals");
       expect(licensed).toBe(false);
     });
 

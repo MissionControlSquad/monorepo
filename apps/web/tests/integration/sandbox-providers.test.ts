@@ -70,6 +70,9 @@ describe("sandbox providers (Tier D — BYO)", () => {
       "exe-dev",
     ]);
     expect(listSandboxProviders().find((p) => p.key === "local")!.requiresApiKey).toBe(false);
+    // local runs on the host (not isolating); cloud providers isolate untrusted code.
+    expect(getSandboxProvider("local")!.isolating).toBe(false);
+    expect(getSandboxProvider("e2b")!.isolating).toBe(true);
   });
 
   it("the local provider really provisions, execs a command, and tears down", async () => {
@@ -117,10 +120,17 @@ describe("sandbox providers (Tier D — BYO)", () => {
     invalidateFlagCache();
 
     // No secrets yet → cloud providers are not configured; local is always available.
-    let res = await gql(`query{ sandboxProviders{ key requiresApiKey configured available } }`);
+    let res = await gql(
+      `query{ sandboxProviders{ key requiresApiKey isolating configured available } }`,
+    );
     expect(res.errors).toBeFalsy();
     const local = res.data.sandboxProviders.find((p: { key: string }) => p.key === "local");
-    expect(local).toMatchObject({ available: true, configured: true, requiresApiKey: false });
+    expect(local).toMatchObject({
+      available: true,
+      configured: true,
+      requiresApiKey: false,
+      isolating: false,
+    });
     let e2b = res.data.sandboxProviders.find((p: { key: string }) => p.key === "e2b");
     expect(e2b).toMatchObject({ available: false, configured: false, requiresApiKey: true });
 

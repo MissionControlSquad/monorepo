@@ -27,12 +27,6 @@ const DEFAULT_FLAGS: {
     description: "Recurring tasks",
   },
   {
-    key: FLAG_KEYS.CLOUD_VMS,
-    enabled: true,
-    managedBy: "system",
-    description: "Cloud VM provisioning",
-  },
-  {
     key: FLAG_KEYS.REVIEWS,
     enabled: true,
     managedBy: "system",

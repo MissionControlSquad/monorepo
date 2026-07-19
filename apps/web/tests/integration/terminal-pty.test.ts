@@ -12,15 +12,15 @@ import {
 // here — token auth, lifecycle, and credential lookup — is exercised without a live connection.
 const WS = "ws_pty";
 
-async function makeVM(ipv4: string): Promise<string> {
-  const vm = await prisma.cloudVM.create({
-    data: { workspaceId: WS, status: "running", ipv4, sshPrivateKey: "PRIVATE_KEY" },
+async function makeHost(host: string, workspaceId = WS): Promise<string> {
+  const h = await prisma.runnerHost.create({
+    data: { workspaceId, name: "box", host, username: "root", sshPrivateKey: "PRIVATE_KEY" },
   });
-  return vm.id;
+  return h.id;
 }
 
 beforeEach(async () => {
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE terminal_sessions, cloud_vms CASCADE`);
+  await prisma.$executeRawUnsafe(`TRUNCATE TABLE terminal_sessions, runner_hosts CASCADE`);
 });
 
 describe("terminal PTY activation (Tier D Slice 6)", () => {
@@ -63,8 +63,8 @@ describe("terminal PTY activation (Tier D Slice 6)", () => {
     );
   });
 
-  it("resolves SSH credentials for a managed VM target (matched by IP)", async () => {
-    await makeVM("10.0.0.5");
+  it("resolves SSH credentials for a registered RunnerHost (matched by host)", async () => {
+    await makeHost("10.0.0.5");
     const { session } = await openTerminalSession({
       workspaceId: WS,
       command: "ssh deploy@10.0.0.5",
@@ -75,7 +75,7 @@ describe("terminal PTY activation (Tier D Slice 6)", () => {
     expect(config?.username).toBe("deploy");
   });
 
-  it("returns null credentials for a host that is not a managed VM", async () => {
+  it("returns null credentials for a host that is not a registered RunnerHost", async () => {
     const { session } = await openTerminalSession({
       workspaceId: WS,
       command: "ssh deploy@1.2.3.4",
@@ -83,10 +83,8 @@ describe("terminal PTY activation (Tier D Slice 6)", () => {
     expect(await resolveTerminalSshConfig(session)).toBeNull();
   });
 
-  it("does not resolve a VM from another workspace", async () => {
-    await prisma.cloudVM.create({
-      data: { workspaceId: "ws_other", status: "running", ipv4: "10.0.0.9", sshPrivateKey: "K" },
-    });
+  it("does not resolve a RunnerHost from another workspace", async () => {
+    await makeHost("10.0.0.9", "ws_other");
     const { session } = await openTerminalSession({
       workspaceId: WS,
       command: "ssh deploy@10.0.0.9",

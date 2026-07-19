@@ -33,8 +33,6 @@ import {
   isAgentAssignedToTask,
   updateTaskStatus,
   findTaskByIdSelect,
-  findCloudVMIdByServerName,
-  logCloudVMEvent,
 } from "@agentcenter/database";
 import { connectionRegistry } from "./live-connection-registry";
 import { pubsub, PubSubEvent } from "@agentcenter/graphql-server";
@@ -71,21 +69,15 @@ function stripHtml(str: string): string {
 // ─── VM event logging ─────────────────────────────────────────────────────────
 
 /**
- * Silently log an event to the CloudVM logs if the machineName maps to a
- * managed CloudVM. No-ops for self-hosted / user VPS machines.
+ * Activity-log hook for gateway events. The managed CloudVM log sink has been
+ * retired, so this is now a no-op retained to keep the call sites intact.
  */
 async function logVMActivity(
-  machineName: string | null | undefined,
-  message: string,
-  level: "info" | "warn" | "error" = "info",
+  _machineName: string | null | undefined,
+  _message: string,
+  _level: "info" | "warn" | "error" = "info",
 ): Promise<void> {
-  if (!machineName) return;
-  try {
-    const vmId = await findCloudVMIdByServerName(machineName);
-    if (vmId) await logCloudVMEvent(vmId, message, level);
-  } catch {
-    // Never throw — logging is best-effort
-  }
+  // No-op: CloudVM event logging removed (BYO RunnerHost only).
 }
 
 // ─── Install token lookup ─────────────────────────────────────────────────────

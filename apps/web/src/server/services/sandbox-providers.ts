@@ -15,7 +15,7 @@
  * provider account. Pure bring-your-own-infra; there is no operator-owned credential tier.
  */
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type {
@@ -61,23 +61,83 @@ export async function isSandboxProviderConfigured(
 
 // ─── local reference provider (real, no keys) ────────────────────────────────
 
-function runLocal(command: string, cwd: string, timeoutMs?: number): Promise<SandboxExecResult> {
+// Bound in-memory capture so a runaway command can't OOM the host running the local sandbox.
+const MAX_CAPTURE_BYTES = 1_000_000;
+
+function runLocal(
+  command: string,
+  cwd: string,
+  timeoutMs?: number,
+  onLog?: (chunk: { stream: "stdout" | "stderr"; data: string }) => void,
+): Promise<SandboxExecResult> {
   return new Promise((resolve) => {
-    const child = spawn("sh", ["-c", command], { cwd });
+    // `detached` puts the command in its own process group so a timeout can kill the WHOLE tree
+    // (the shell AND its children). Otherwise a grandchild (e.g. a spawned runtime) keeps the stdio
+    // pipes open and `close` never fires — the timeout would hang and orphans would survive.
+    const child = spawn("sh", ["-c", command], { cwd, detached: true });
     let stdout = "";
     let stderr = "";
-    const timer = timeoutMs ? setTimeout(() => child.kill("SIGKILL"), timeoutMs) : undefined;
-    child.stdout?.on("data", (d: Buffer) => (stdout += d.toString()));
-    child.stderr?.on("data", (d: Buffer) => (stderr += d.toString()));
+    let outDropped = 0;
+    let errDropped = 0;
+    let timedOut = false;
+    const killTree = (sig: NodeJS.Signals) => {
+      try {
+        if (child.pid) process.kill(-child.pid, sig); // negative pid → the process group
+      } catch {
+        child.kill(sig); // group already gone / not a leader — fall back to the child
+      }
+    };
+    const timer = timeoutMs
+      ? setTimeout(() => {
+          timedOut = true;
+          killTree("SIGKILL");
+        }, timeoutMs)
+      : undefined;
+    child.stdout?.on("data", (d: Buffer) => {
+      const s = d.toString();
+      if (stdout.length < MAX_CAPTURE_BYTES) stdout += s;
+      else outDropped += d.length;
+      onLog?.({ stream: "stdout", data: s });
+    });
+    child.stderr?.on("data", (d: Buffer) => {
+      const s = d.toString();
+      if (stderr.length < MAX_CAPTURE_BYTES) stderr += s;
+      else errDropped += d.length;
+      onLog?.({ stream: "stderr", data: s });
+    });
+    const cap = (s: string, dropped: number) =>
+      dropped > 0 ? `${s}\n…[truncated ${dropped} bytes]` : s;
     child.on("error", (err) => {
       if (timer) clearTimeout(timer);
-      resolve({ exitCode: null, stdout, stderr: stderr + String(err) });
+      resolve({
+        exitCode: null,
+        stdout: cap(stdout, outDropped),
+        stderr: cap(stderr, errDropped) + String(err),
+      });
     });
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       if (timer) clearTimeout(timer);
-      resolve({ exitCode: code, stdout, stderr });
+      resolve({
+        exitCode: code,
+        stdout: cap(stdout, outDropped),
+        stderr: cap(stderr, errDropped) + (timedOut ? "\n…[killed: exceeded timeout]" : ""),
+        timedOut,
+        signal: signal ?? null,
+      });
     });
   });
+}
+
+/** A local handle whose `id` IS its working dir — so a lease can resume/destroy it by that id. */
+function localHandle(dir: string): SandboxHandle {
+  return {
+    id: dir,
+    providerKey: "local",
+    exec: (command, opts) => runLocal(command, opts?.cwd ?? dir, opts?.timeoutMs, opts?.onLog),
+    destroy: async () => {
+      rmSync(dir, { recursive: true, force: true });
+    },
+  };
 }
 
 const localProvider: SandboxProvider = {
@@ -85,17 +145,29 @@ const localProvider: SandboxProvider = {
   displayName: "Local (this host)",
   requiresApiKey: false,
   credentialKeys: [],
-  provision: async () => {
-    const dir = mkdtempSync(join(tmpdir(), "agentcenter-sbx-"));
-    return {
-      id: dir,
-      providerKey: "local",
-      exec: (command, opts) => runLocal(command, opts?.cwd ?? dir, opts?.timeoutMs),
-      destroy: async () => {
-        rmSync(dir, { recursive: true, force: true });
-      },
-    };
+  isolating: false, // runs on the control-plane host — NOT for untrusted/low-trust agents
+
+  provision: async () => localHandle(mkdtempSync(join(tmpdir(), "agentcenter-sbx-"))),
+
+  // Lease reuse: the provider lease id is the dir. Re-attach if it still exists (else the lease is stale).
+  resume: async (providerLeaseId) => {
+    if (!existsSync(providerLeaseId)) {
+      throw new Error(`Local sandbox ${providerLeaseId} no longer exists (cannot resume).`);
+    }
+    return localHandle(providerLeaseId);
   },
+
+  destroyById: async (providerLeaseId) => {
+    rmSync(providerLeaseId, { recursive: true, force: true });
+  },
+
+  // The local provider has no real image registry — this is a STUB so the custom-image lifecycle is
+  // exercisable end-to-end (the ref is a deterministic pointer at the captured dir, not a portable
+  // image). Real capture is a cloud-provider capability (e2b/daytona/k8s snapshot).
+  snapshot: async (handle) => ({
+    templateRef: `local-image:${handle.id}`,
+    templateKind: "snapshot",
+  }),
 };
 
 // ─── registry ────────────────────────────────────────────────────────────────

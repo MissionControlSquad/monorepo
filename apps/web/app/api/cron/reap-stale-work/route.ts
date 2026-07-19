@@ -6,6 +6,7 @@
  *  - evaluateWatchdogs — auto-fire task watchdogs (lease_expired / no_heartbeat → release/pause).
  *  - sweepExpiredCheckouts — release every task checkout whose lease expired.
  *  - reapStuckRunnerCommands — `running` past their deadline → `timeout`.
+ *  - reapStaleLeases — reuse/retain env-lease machines past their TTL → destroyed + `expired`.
  *  - reapStaleTerminalSessions — orphaned `active` / never-connected `pending` → closed / expired.
  *  - deadLetterExhaustedDeliveries — un-acked live deliveries past the attempt cap → dead-lettered.
  *  - redeliverStalePending — re-push un-acked live deliveries to still-connected agents.
@@ -15,6 +16,7 @@
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { env } from "@/server/env";
 import { reapStuckRunnerCommands } from "@/server/services/runner-commands";
+import { reapStaleLeases } from "@/server/services/environment-leases";
 import { reapStaleTerminalSessions } from "@/server/services/terminals";
 import { sweepExpiredCheckouts } from "@/server/services/task-checkout";
 import { evaluateWatchdogs } from "@/server/services/task-watchdog";
@@ -35,12 +37,14 @@ export async function GET(request: Request) {
     const [
       checkoutsReleased,
       commandsReaped,
+      leasesReaped,
       terminals,
       deliveriesDeadLettered,
       deliveriesRepushed,
     ] = await Promise.all([
       sweepExpiredCheckouts(now),
       reapStuckRunnerCommands(now),
+      reapStaleLeases(),
       reapStaleTerminalSessions(now),
       deadLetterExhaustedDeliveries(5, now),
       redeliverStalePending(now),
@@ -50,6 +54,7 @@ export async function GET(request: Request) {
       watchdogsFired: watchdogDecisions.length,
       checkoutsReleased,
       commandsReaped,
+      leasesReaped,
       terminalsClosed: terminals.closed,
       terminalsExpired: terminals.expired,
       deliveriesDeadLettered,

@@ -3,9 +3,6 @@ export const FLAG_KEYS = {
   CHANNELS: "channels",
   ANALYTICS: "analytics",
   RECURRING_TASKS: "recurring_tasks",
-  /** @deprecated Operator-managed Hetzner VMs are deprecated — all infra is BYO. Default-off; gates
-   * the retained (reversible) managed-provisioning routes + UI. Do not build new features on it. */
-  CLOUD_VMS: "cloud_vms",
   REVIEWS: "reviews",
   DOCUMENTS: "documents",
   AGENT_QUEUE: "agent_queue",
@@ -38,6 +35,10 @@ export const FLAG_KEYS = {
   MONITORS: "monitors",
   RUNNERS: "runners",
   MEMORY: "memory",
+  ENVIRONMENTS: "environments",
+  EXECUTION_POLICY: "execution_policy",
+  EXECUTION_WORKSPACES: "execution_workspaces",
+  CUSTOM_IMAGES: "custom_images",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -47,7 +48,6 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.CHANNELS]: true,
   [FLAG_KEYS.ANALYTICS]: true,
   [FLAG_KEYS.RECURRING_TASKS]: true,
-  [FLAG_KEYS.CLOUD_VMS]: false,
   [FLAG_KEYS.REVIEWS]: true,
   [FLAG_KEYS.DOCUMENTS]: true,
   [FLAG_KEYS.AGENT_QUEUE]: true,
@@ -83,4 +83,12 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.RUNNERS]: false,
   // Tier D: two-layer agent memory (opt-in over the stateless default).
   [FLAG_KEYS.MEMORY]: false,
+  // Tier D / Phase 3: first-class Environment model (where/how a run executes). Opt-in operator surface.
+  [FLAG_KEYS.ENVIRONMENTS]: false,
+  // Tier D / Phase 3: workspace execution policy/allowlist (force runs onto isolated k8s). Opt-in.
+  [FLAG_KEYS.EXECUTION_POLICY]: false,
+  // Tier D / Phase 3: named project workspaces + per-run execution-workspace recording. Opt-in.
+  [FLAG_KEYS.EXECUTION_WORKSPACES]: false,
+  // Tier D / Phase 3: custom sandbox image capture (snapshot a configured box into a reusable image).
+  [FLAG_KEYS.CUSTOM_IMAGES]: false,
 };

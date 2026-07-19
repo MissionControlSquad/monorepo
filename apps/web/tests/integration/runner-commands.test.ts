@@ -6,22 +6,31 @@ import { invalidateFlagCache } from "../../src/server/feature-flags";
 
 // Isolate the RunnerCommand lifecycle from real SSH + key decryption:
 //   • sshExec is mocked so no network happens; we control its result per test.
-//   • getVMSSHConfig is mocked so we don't depend on SSH_KEY_ENCRYPTION_SECRET.
+//   • resolveHostSSHConfig is mocked so we don't depend on SSH_KEY_ENCRYPTION_SECRET.
 vi.mock("../../src/server/services/ssh", () => ({
   sshExec: vi.fn(),
   sshExecStream: vi.fn(),
   sshUploadFile: vi.fn(),
   sshTestConnection: vi.fn(),
 }));
-vi.mock("../../src/server/services/cloud-vm-utils", () => ({
-  getVMSSHConfig: vi.fn(() => ({ host: "1.2.3.4", privateKey: "KEY" })),
-}));
+vi.mock("../../src/server/services/runner-hosts", async (importActual) => {
+  const actual = await importActual<typeof import("../../src/server/services/runner-hosts")>();
+  return {
+    ...actual,
+    resolveHostSSHConfig: vi.fn(async () => ({
+      host: "10.0.0.5",
+      port: 22,
+      username: "root",
+      privateKey: "K",
+    })),
+  };
+});
 
 import { sshExec } from "../../src/server/services/ssh";
 import {
   createRunnerCommand,
   runQueuedCommand,
-  runCommandOnVM,
+  runCommandOnHost,
   cancelRunnerCommand,
   capOutput,
   reapStuckRunnerCommands,
@@ -50,11 +59,11 @@ async function gql(
   };
 }
 
-async function makeVM(): Promise<string> {
-  const vm = await prisma.cloudVM.create({
-    data: { workspaceId: WS, status: "running", ipv4: "1.2.3.4", sshPrivateKey: "KEY" },
+async function makeHost(): Promise<string> {
+  const host = await prisma.runnerHost.create({
+    data: { workspaceId: WS, name: "box", host: "10.0.0.5", username: "root", sshPrivateKey: "K" },
   });
-  return vm.id;
+  return host.id;
 }
 
 async function enableRunners() {
@@ -71,20 +80,20 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   mockedSshExec.mockReset();
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE runner_commands, cloud_vms CASCADE`);
+  await prisma.$executeRawUnsafe(`TRUNCATE TABLE runner_commands, runner_hosts CASCADE`);
   await prisma.featureFlag.deleteMany({ where: { key: "runners" } });
   invalidateFlagCache();
 });
 
 describe("runner-commands service (Tier D)", () => {
-  it("runs a queued command on a VM and persists exit/stdout/stderr", async () => {
-    const vmId = await makeVM();
+  it("runs a queued command on a host and persists exit/stdout/stderr", async () => {
+    const hostId = await makeHost();
     mockedSshExec.mockResolvedValue({ stdout: "hello\n", stderr: "", code: 0 });
 
     const cmd = await createRunnerCommand({
       workspaceId: WS,
-      targetKind: "cloud_vm",
-      targetId: vmId,
+      targetKind: "host",
+      targetId: hostId,
       command: "echo hello",
     });
     expect(cmd.status).toBe("queued");
@@ -98,12 +107,12 @@ describe("runner-commands service (Tier D)", () => {
   });
 
   it("prefixes cwd when provided", async () => {
-    const vmId = await makeVM();
+    const hostId = await makeHost();
     mockedSshExec.mockResolvedValue({ stdout: "", stderr: "", code: 0 });
     const cmd = await createRunnerCommand({
       workspaceId: WS,
-      targetKind: "cloud_vm",
-      targetId: vmId,
+      targetKind: "host",
+      targetId: hostId,
       command: "ls",
       cwd: "/srv/app",
     });
@@ -112,36 +121,36 @@ describe("runner-commands service (Tier D)", () => {
   });
 
   it("marks failed on transport error", async () => {
-    const vmId = await makeVM();
+    const hostId = await makeHost();
     mockedSshExec.mockRejectedValue(new Error("connection refused"));
-    const cmd = await runCommandOnVM({ workspaceId: WS, vmId, command: "boom" });
+    const cmd = await runCommandOnHost({ workspaceId: WS, hostId, command: "boom" });
     expect(cmd.status).toBe("failed");
     expect(cmd.errorMessage).toContain("connection refused");
   });
 
   it("marks timeout when the exec times out", async () => {
-    const vmId = await makeVM();
+    const hostId = await makeHost();
     mockedSshExec.mockRejectedValue(new Error("SSH command timed out after 120000ms: sleep"));
-    const cmd = await runCommandOnVM({ workspaceId: WS, vmId, command: "sleep 999" });
+    const cmd = await runCommandOnHost({ workspaceId: WS, hostId, command: "sleep 999" });
     expect(cmd.status).toBe("timeout");
   });
 
-  it("rejects a non-cloud_vm target for server-side execution", async () => {
+  it("rejects an agent target for server-side execution", async () => {
     const cmd = await createRunnerCommand({
       workspaceId: WS,
       targetKind: "agent",
       targetId: "agent_1",
       command: "echo hi",
     });
-    await expect(runQueuedCommand(WS, cmd.id)).rejects.toThrow(/cloud_vm/);
+    await expect(runQueuedCommand(WS, cmd.id)).rejects.toThrow(/agent/);
   });
 
   it("does not run a command from another workspace", async () => {
-    const vmId = await makeVM();
+    const hostId = await makeHost();
     const cmd = await createRunnerCommand({
       workspaceId: WS,
-      targetKind: "cloud_vm",
-      targetId: vmId,
+      targetKind: "host",
+      targetId: hostId,
       command: "echo hi",
     });
     await expect(runQueuedCommand("ws_other", cmd.id)).rejects.toThrow(/not found/i);
@@ -157,16 +166,16 @@ describe("runner-commands service (Tier D)", () => {
   });
 
   it("caps runaway stdout when persisting a result", async () => {
-    const vmId = await makeVM();
+    const hostId = await makeHost();
     mockedSshExec.mockResolvedValue({ stdout: "y".repeat(200_000), stderr: "", code: 0 });
-    const cmd = await runCommandOnVM({ workspaceId: WS, vmId, command: "spew" });
+    const cmd = await runCommandOnHost({ workspaceId: WS, hostId, command: "spew" });
     expect(cmd.status).toBe("done");
     expect(cmd.stdout!.length).toBeLessThan(70_000);
     expect(cmd.stdout).toContain("truncated");
   });
 
   it("reaps a command stuck in running past its deadline; leaves fresh/finished ones alone", async () => {
-    const vmId = await makeVM();
+    const hostId = await makeHost();
     const mk = async (claimedMinsAgo: number, status = "running") => {
       const c = await createRunnerCommand({
         workspaceId: WS,
@@ -186,7 +195,7 @@ describe("runner-commands service (Tier D)", () => {
     const stuck = await mk(10); // running, claimed 10 min ago → past 120s+60s deadline
     const fresh = await mk(0); // running, just claimed → not stuck
     const doneId = await mk(10, "done"); // finished → must not be touched
-    void vmId;
+    void hostId;
 
     const n = await reapStuckRunnerCommands(new Date());
     expect(n).toBe(1);
@@ -202,11 +211,11 @@ describe("runner-commands service (Tier D)", () => {
   });
 
   it("cancels a queued command", async () => {
-    const vmId = await makeVM();
+    const hostId = await makeHost();
     const cmd = await createRunnerCommand({
       workspaceId: WS,
-      targetKind: "cloud_vm",
-      targetId: vmId,
+      targetKind: "host",
+      targetId: hostId,
       command: "echo hi",
     });
     expect(await cancelRunnerCommand(WS, cmd.id)).toBe(true);
@@ -219,27 +228,27 @@ describe("runner-commands service (Tier D)", () => {
 
 describe("runner-commands GraphQL (Tier D)", () => {
   it("admin runs a command; result persisted; member denied; feature-gated", async () => {
-    const vmId = await makeVM();
+    const hostId = await makeHost();
     mockedSshExec.mockResolvedValue({ stdout: "ok", stderr: "", code: 0 });
     await enableRunners();
 
     const run = await gql(
-      `mutation($vmId:String!){ runCommandOnVm(vmId:$vmId, command:"echo ok"){ id status exitCode stdout } }`,
-      { vmId },
+      `mutation($hostId:String!){ runCommandOnHost(hostId:$hostId, command:"echo ok"){ id status exitCode stdout } }`,
+      { hostId },
     );
     expect(run.errors).toBeFalsy();
-    expect(run.data.runCommandOnVm).toMatchObject({ status: "done", exitCode: 0, stdout: "ok" });
+    expect(run.data.runCommandOnHost).toMatchObject({ status: "done", exitCode: 0, stdout: "ok" });
 
     const list = await gql(
-      `query($vmId:String!){ runnerCommands(targetKind:"cloud_vm", targetId:$vmId){ id command status } }`,
-      { vmId },
+      `query($hostId:String!){ runnerCommands(targetKind:"host", targetId:$hostId){ id command status } }`,
+      { hostId },
     );
     expect(list.data.runnerCommands).toHaveLength(1);
 
     // member cannot run
     const denied = await gql(
-      `mutation($vmId:String!){ runCommandOnVm(vmId:$vmId, command:"echo x"){ id } }`,
-      { vmId },
+      `mutation($hostId:String!){ runCommandOnHost(hostId:$hostId, command:"echo x"){ id } }`,
+      { hostId },
       "member",
     );
     expect(denied.errors).toBeDefined();
@@ -251,8 +260,8 @@ describe("runner-commands GraphQL (Tier D)", () => {
       update: { enabled: false },
     });
     invalidateFlagCache();
-    const gated = await gql(`query($vmId:String!){ runnerCommands(targetId:$vmId){ id } }`, {
-      vmId,
+    const gated = await gql(`query($hostId:String!){ runnerCommands(targetId:$hostId){ id } }`, {
+      hostId,
     });
     expect(gated.errors).toBeDefined();
   });
