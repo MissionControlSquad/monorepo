@@ -68,3 +68,57 @@ export const COST_BREAKDOWN_QUERY = gql`
     }
   }
 `;
+
+// Domain 12 GAP-1: non-inference finance ledger read surfaces.
+export const FINANCE_EVENT_SUMMARY_QUERY = gql`
+  query FinanceEventSummary($since: DateTime, $until: DateTime) {
+    financeEventSummary(since: $since, until: $until) {
+      debitCents
+      creditCents
+      netCents
+      estimatedCents
+      count
+    }
+  }
+`;
+
+export const FINANCE_EVENTS_BY_BILLER_QUERY = gql`
+  query FinanceEventsByBiller($since: DateTime, $until: DateTime) {
+    financeEventsByBiller(since: $since, until: $until) {
+      key
+      debitCents
+      creditCents
+      netCents
+      count
+    }
+  }
+`;
+
+export const FINANCE_EVENTS_BY_KIND_QUERY = gql`
+  query FinanceEventsByKind($since: DateTime, $until: DateTime) {
+    financeEventsByKind(since: $since, until: $until) {
+      key
+      debitCents
+      creditCents
+      netCents
+      count
+    }
+  }
+`;
+
+export const FINANCE_EVENTS_QUERY = gql`
+  query FinanceEvents($limit: Int) {
+    financeEvents(limit: $limit) {
+      id
+      eventKind
+      direction
+      biller
+      provider
+      description
+      amountCents
+      currency
+      estimated
+      occurredAt
+    }
+  }
+`;

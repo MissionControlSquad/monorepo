@@ -37,7 +37,7 @@ beforeAll(() => {
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE budget_incidents, quota_windows, budget_policies, cost_events, agents CASCADE`,
+    `TRUNCATE TABLE budget_incidents, quota_windows, budget_policies, cost_events, finance_events, agents CASCADE`,
   );
 });
 
@@ -166,5 +166,97 @@ describe("BUDGETS feature gate (Epic #4)", () => {
       await prisma.featureFlag.deleteMany({ where: { key: "budgets" } });
       invalidateFlagCache();
     }
+  });
+});
+
+describe("non-inference finance ledger (Domain 12 GAP-1)", () => {
+  const INGEST = `mutation($k:String!,$a:Int!,$d:String,$b:String,$idem:String){
+    ingestFinanceEvent(eventKind:$k, amountCents:$a, direction:$d, biller:$b, idempotencyKey:$idem){
+      id eventKind direction amountCents biller
+    }
+  }`;
+
+  it("admin ingests debit/credit events; member cannot ingest", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    const member = await cookieFor(WS_A, "member");
+
+    const denied = await runGraphQL(INGEST, { k: "platform_fee", a: 500 }, member);
+    expect(denied.errors).toBeDefined();
+
+    const fee = await runGraphQL(
+      INGEST,
+      { k: "platform_fee", a: 500, d: "debit", b: "acme" },
+      admin,
+    );
+    expect(fee.data.ingestFinanceEvent).toMatchObject({
+      eventKind: "platform_fee",
+      direction: "debit",
+      amountCents: 500,
+      biller: "acme",
+    });
+
+    const credit = await runGraphQL(INGEST, { k: "credit_purchase", a: 2000, d: "credit" }, admin);
+    expect(credit.data.ingestFinanceEvent.direction).toBe("credit");
+
+    // an unknown kind is rejected
+    const bad = await runGraphQL(INGEST, { k: "not_a_kind", a: 100 }, admin);
+    expect(bad.errors).toBeDefined();
+  });
+
+  it("summary nets debit − credit; by-biller / by-kind group; idempotency dedupes", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    await runGraphQL(INGEST, { k: "platform_fee", a: 1000, d: "debit", b: "acme" }, admin);
+    await runGraphQL(INGEST, { k: "storage_charge", a: 250, d: "debit", b: "acme" }, admin);
+    await runGraphQL(INGEST, { k: "credit_purchase", a: 400, d: "credit", b: "stripe" }, admin);
+    // idempotent replay — must not double-count
+    await runGraphQL(
+      INGEST,
+      { k: "platform_fee", a: 1000, d: "debit", b: "acme", idem: "dup1" },
+      admin,
+    );
+    await runGraphQL(
+      INGEST,
+      { k: "platform_fee", a: 1000, d: "debit", b: "acme", idem: "dup1" },
+      admin,
+    );
+
+    const summary = await runGraphQL(
+      `query{ financeEventSummary{ debitCents creditCents netCents count } }`,
+      undefined,
+      admin,
+    );
+    // debits: 1000 + 250 + 1000(dedup once) = 2250 ; credits: 400 ; net: 1850 ; count 4
+    expect(summary.data.financeEventSummary).toMatchObject({
+      debitCents: 2250,
+      creditCents: 400,
+      netCents: 1850,
+      count: 4,
+    });
+
+    const byBiller = await runGraphQL(
+      `query{ financeEventsByBiller{ key netCents count } }`,
+      undefined,
+      admin,
+    );
+    const acme = byBiller.data.financeEventsByBiller.find((g: any) => g.key === "acme");
+    expect(acme).toMatchObject({ netCents: 2250, count: 3 });
+
+    const byKind = await runGraphQL(`query{ financeEventsByKind{ key count } }`, undefined, admin);
+    const fee = byKind.data.financeEventsByKind.find((g: any) => g.key === "platform_fee");
+    expect(fee.count).toBe(2);
+  });
+
+  it("is workspace-scoped — one workspace never sees another's finance events", async () => {
+    await runGraphQL(
+      INGEST,
+      { k: "platform_fee", a: 999, d: "debit" },
+      await cookieFor(WS_A, "admin"),
+    );
+    const other = await runGraphQL(
+      `query{ financeEventSummary{ debitCents count } }`,
+      undefined,
+      await cookieFor(WS_B, "admin"),
+    );
+    expect(other.data.financeEventSummary).toMatchObject({ debitCents: 0, count: 0 });
   });
 });

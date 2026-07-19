@@ -21,6 +21,32 @@ builder.prismaObject("CostEvent", {
   }),
 });
 
+// Domain 12 GAP-1: non-inference finance ledger event.
+builder.prismaObject("FinanceEvent", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    workspaceId: t.exposeString("workspaceId"),
+    agentId: t.exposeString("agentId", { nullable: true }),
+    taskId: t.exposeString("taskId", { nullable: true }),
+    projectId: t.exposeString("projectId", { nullable: true }),
+    issueId: t.exposeString("issueId", { nullable: true }),
+    costEventId: t.exposeString("costEventId", { nullable: true }),
+    eventKind: t.exposeString("eventKind"),
+    direction: t.exposeString("direction"),
+    biller: t.exposeString("biller", { nullable: true }),
+    provider: t.exposeString("provider", { nullable: true }),
+    billingCode: t.exposeString("billingCode", { nullable: true }),
+    description: t.exposeString("description", { nullable: true }),
+    quantity: t.exposeFloat("quantity", { nullable: true }),
+    unit: t.exposeString("unit"),
+    amountCents: t.exposeInt("amountCents"),
+    currency: t.exposeString("currency"),
+    estimated: t.exposeBoolean("estimated"),
+    externalInvoiceId: t.exposeString("externalInvoiceId", { nullable: true }),
+    occurredAt: t.expose("occurredAt", { type: "DateTime" }),
+  }),
+});
+
 builder.prismaObject("BudgetPolicy", {
   fields: (t) => ({
     id: t.exposeID("id"),

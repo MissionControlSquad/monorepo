@@ -71,3 +71,31 @@ export const RAISE_BUDGET_AND_RESUME = gql`
     }
   }
 `;
+
+// Domain 12 GAP-1: ingest a non-inference finance event (admin).
+export const INGEST_FINANCE_EVENT = gql`
+  mutation IngestFinanceEvent(
+    $eventKind: String!
+    $amountCents: Int!
+    $direction: String
+    $biller: String
+    $description: String
+    $estimated: Boolean
+    $idempotencyKey: String
+  ) {
+    ingestFinanceEvent(
+      eventKind: $eventKind
+      amountCents: $amountCents
+      direction: $direction
+      biller: $biller
+      description: $description
+      estimated: $estimated
+      idempotencyKey: $idempotencyKey
+    ) {
+      id
+      eventKind
+      direction
+      amountCents
+    }
+  }
+`;

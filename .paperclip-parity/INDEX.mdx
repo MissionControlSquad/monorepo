@@ -212,6 +212,17 @@ See 03-sandbox-depth.mdx.
       Typecheck 12/12, web build ✓. NOTE: reviewState currently lives on AgentRun (the run entity we already have) rather
       than a full WorkProduct taxonomy — G1 work-product types + G3 richer TaskRun + G2 read-path redaction remain.
 
+- [x] **Cost/observability Domain 12 — GAP-1 non-inference finance ledger** DONE (next commit). New FinanceEvent model
+      (migration 20260719200000) — account-level provider money (credit purchase/refund/expiry, platform/BYOK fee, gateway
+      overhead, training/storage/bandwidth charge, subscription fee, tax/discount, manual adjustment), distinct from CostEvent
+      (inference) and LedgerEvent (human P&L). Pure constants + summarizer in @agentcenter/utils (finance-events.ts:
+      FINANCE_EVENT_KINDS/DIRECTIONS/UNITS + signedFinanceAmount + summarizeFinanceEvents). Service finance-events.ts:
+      recordFinanceEvent (validated, idempotent, workspace-scoped, cost-event FK check), financeSummary (debit/credit/net/
+      estimated), financeByBiller/byKind, listFinanceEvents. GraphQL: FinanceEvent type + financeEventSummary/ByBiller/ByKind/
+      financeEvents queries (member) + ingestFinanceEvent mutation (admin) + shared client ops. Tests: 4 unit + 4 integration
+      (ingest RBAC, net debit−credit, group-by, idempotency dedup, workspace isolation). Typecheck 12/12, web build ✓.
+      Remaining Domain 12: GAP-2 provider quota polling, GAP-3 telemetry, GAP-4 OTel, GAP-5 pino/run-log, GAP-6 rollups.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   hire_agent approval, auto-sleep cron, ~~secret audit-on-resolve~~ (FIXED — P1), ~~adapter Tier-A↔Tier-D disconnect~~

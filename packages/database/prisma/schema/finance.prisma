@@ -68,6 +68,45 @@ model CostEvent {
   @@map("cost_events")
 }
 
+// ─── Non-inference finance ledger (Domain 12 GAP-1) ──────────────────────────────────────────────
+// Account-level provider money that is NOT per-inference cost (CostEvent) and NOT human P&L
+// (LedgerEvent): credit purchases/refunds/expiry, platform + BYOK fees, gateway overhead, training/
+// storage/bandwidth charges, subscription fees, tax/discount, manual adjustments. eventKind/direction/
+// unit are TEXT with app-level validation (D5, no PG enums). Integer cents only. BUDGETS-gated, admin.
+model FinanceEvent {
+  id                String   @id @default(cuid())
+  workspaceId       String // buildbase workspace _id; no FK (D5)
+  agentId           String?
+  taskId            String?
+  projectId         String?
+  issueId           String?
+  costEventId       String? // optional link to the inference CostEvent this charge relates to
+  eventKind         String // credit_purchase | platform_fee | byok_fee | … (see FINANCE_EVENT_KINDS)
+  direction         String   @default("debit") // debit (money out) | credit (money in)
+  biller            String? // who is charging (provider/vendor/platform)
+  provider          String?
+  billingCode       String?
+  description        String?
+  quantity          Float?
+  unit              String   @default("flat") // flat | credits | gb_month | gpu_hour | …
+  amountCents       Int      @default(0)
+  currency          String   @default("USD")
+  estimated         Boolean  @default(false)
+  externalInvoiceId String?
+  idempotencyKey    String?
+  metadataJson      Json?
+  occurredAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, occurredAt])
+  @@index([workspaceId, biller, occurredAt])
+  @@index([workspaceId, eventKind, occurredAt])
+  @@index([workspaceId, direction, occurredAt])
+  @@index([costEventId])
+  @@map("finance_events")
+}
+
 model BudgetPolicy {
   id          String       @id @default(cuid())
   workspaceId String

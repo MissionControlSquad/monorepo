@@ -4,6 +4,7 @@ import { FLAG_KEYS } from "@agentcenter/utils";
 import type { BudgetScope, BudgetWindow } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
 import { recordCostEvent } from "@/server/services/cost";
+import { recordFinanceEvent } from "@/server/services/finance-events";
 import {
   createBudgetPolicy,
   updateBudgetPolicy,
@@ -160,6 +161,53 @@ builder.mutationField("raiseBudgetAndResume", (t) =>
         resolvedById: tenancy.userId,
       });
       return ctx.prisma.budgetIncident.findUniqueOrThrow({ ...query, where: { id: incident.id } });
+    },
+  }),
+);
+
+// Domain 12 GAP-1: ingest a non-inference finance event (credit purchase, platform/BYOK fee, storage/
+// training charge, manual adjustment, …). Admin only — these are human-entered account charges, never
+// an agent API key. BUDGETS-gated, workspace-scoped.
+builder.mutationField("ingestFinanceEvent", (t) =>
+  t.prismaField({
+    type: "FinanceEvent",
+    args: {
+      eventKind: t.arg.string({ required: true }),
+      amountCents: t.arg.int({ required: true }),
+      direction: t.arg.string(),
+      unit: t.arg.string(),
+      currency: t.arg.string(),
+      biller: t.arg.string(),
+      provider: t.arg.string(),
+      description: t.arg.string(),
+      quantity: t.arg.float(),
+      estimated: t.arg.boolean(),
+      externalInvoiceId: t.arg.string(),
+      costEventId: t.arg.string(),
+      idempotencyKey: t.arg.string(),
+      occurredAt: t.arg({ type: "DateTime" }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      const tenancy = requireRole(ctx, "admin");
+      const ev = await recordFinanceEvent({
+        workspaceId: tenancy.workspaceId,
+        eventKind: args.eventKind,
+        amountCents: args.amountCents,
+        direction: args.direction ?? undefined,
+        unit: args.unit ?? undefined,
+        currency: args.currency ?? undefined,
+        biller: args.biller ?? null,
+        provider: args.provider ?? null,
+        description: args.description ?? null,
+        quantity: args.quantity ?? null,
+        estimated: args.estimated ?? false,
+        externalInvoiceId: args.externalInvoiceId ?? null,
+        costEventId: args.costEventId ?? null,
+        idempotencyKey: args.idempotencyKey ?? null,
+        occurredAt: args.occurredAt ?? undefined,
+      });
+      return ctx.prisma.financeEvent.findUniqueOrThrow({ ...query, where: { id: ev.id } });
     },
   }),
 );
