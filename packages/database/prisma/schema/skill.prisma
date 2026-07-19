@@ -213,3 +213,20 @@ model TeamInstall {
   @@index([workspaceId])
   @@map("team_installs")
 }
+
+// ─── Skill governance policy (Domain 5 GAP-F) ────────────────────────────────
+// One allow/deny policy document per workspace over skill actions × subjects × resources. defaultEffect
+// + rules Json (validated app-side by @agentcenter/utils skill-policy). revision gives optimistic
+// concurrency on replace. SKILLS_TEAMS-gated; replace is admin.
+model SkillPolicy {
+  id                 String   @id @default(cuid())
+  workspaceId        String   @unique // buildbase workspace _id; no FK (D5)
+  defaultEffect      String   @default("allow") // allow | deny
+  rules              Json     @default("[]")
+  revision           Int      @default(1)
+  updatedByProfileId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("skill_policies")
+}

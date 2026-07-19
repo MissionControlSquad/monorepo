@@ -35,6 +35,7 @@ export * from "./source-trust";
 export * from "./finance-events";
 export * from "./run-retry";
 export * from "./skill-frontmatter";
+export * from "./skill-policy";
 export * from "./profile-analytics";
 export * from "./project-source";
 export * from "./cli-auth";

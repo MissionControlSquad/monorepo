@@ -251,6 +251,17 @@ See 03-sandbox-depth.mdx.
       skill-frontmatter 11 unit + 1 integration (35 in skills-teams). Typecheck 12/12, web build ✓. Remaining Domain 5:
       GAP-B catalog package, GAP-C import, GAP-D update/audit/reset, GAP-E runtime sync, GAP-F policy engine, GAP-G studio.
 
+- [x] **Skills Domain 5 — GAP-F skill governance policy engine** DONE (next commit). Pure evaluator skill-policy.ts in
+      @agentcenter/utils: SKILL_ACTIONS (create/import/install/edit/update/test/reset/remove) × subjects (all_agents/
+      agents/roles) × resource selectors (skillIds/skillKeys/sourceTypes) → priority-ordered rule eval → {allowed,effect,
+      matchedRuleId,reason,remediation}; default allow; + credential-scrub helpers (normalizeSkillPolicySourceLocator/
+      isSafeSourceLocator). SkillPolicy model per workspace (migration 20260719240000, revision = optimistic concurrency).
+      Service skill-policy.ts: getSkillPolicy/replaceSkillPolicy (admin, expectedRevision conflict)/evaluateSkillAction/
+      assertSkillAction guard wired into createSkill/updateSkill/deleteSkill/forkSkill/installCatalogSkill. GraphQL:
+      skillPolicy + evaluateSkillPolicy queries + replaceSkillPolicy mutation. Tests: 8 unit + 3 integration (deny-rule
+      enforcement, admin-only+optimistic-concurrency, evaluate-explains). Typecheck 12/12, web build ✓. Remaining Domain 5:
+      GAP-B catalog package, GAP-C import, GAP-D update/audit/reset, GAP-E runtime sync, GAP-G studio.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

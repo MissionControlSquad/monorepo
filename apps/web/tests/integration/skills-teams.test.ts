@@ -49,7 +49,7 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE skills, teams, agents, profiles, agent_governance_policies CASCADE`,
+    `TRUNCATE TABLE skills, skill_policies, teams, agents, profiles, agent_governance_policies CASCADE`,
   );
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Skills Human" } });
   humanId = p.id;
@@ -538,5 +538,86 @@ describe("team catalog metadata (Epic #10)", () => {
       (t) => t.id === r.data.createTeam.id,
     );
     expect(found?.tags).toContain("growth");
+  });
+});
+
+describe("skill governance policy (Domain 5 GAP-F)", () => {
+  const REPLACE = `mutation($d:String!,$r:JSON!,$rev:Int){ replaceSkillPolicy(defaultEffect:$d, rules:$r, expectedRevision:$rev) }`;
+
+  it("default policy allows; a deny rule blocks the matching action for the matching role", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    // baseline: no policy → create allowed
+    expect((await makeSkill(WS_A, "Before Policy")).errors).toBeFalsy();
+
+    // admin writes a policy denying create for role member
+    const set = await gql(
+      REPLACE,
+      {
+        d: "allow",
+        r: [
+          {
+            id: "no-member-create",
+            effect: "deny",
+            actions: ["create"],
+            subjects: [{ type: "roles", roles: ["member"] }],
+            remediation: "ask an admin",
+          },
+        ],
+      },
+      admin,
+    );
+    expect(set.errors).toBeFalsy();
+    expect(set.data.replaceSkillPolicy).toMatchObject({ revision: 1, defaultEffect: "allow" });
+
+    // a member create is now denied
+    const denied = await gql(
+      `mutation{ createSkill(name:"Blocked", markdown:"# x"){ id } }`,
+      undefined,
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
+    expect(denied.data?.createSkill).toBeFalsy();
+
+    // an admin create is still allowed (role not in the subject)
+    const adminCreate = await gql(
+      `mutation{ createSkill(name:"Admin Skill", markdown:"# ok"){ id } }`,
+      undefined,
+      admin,
+    );
+    expect(adminCreate.errors).toBeFalsy();
+  });
+
+  it("replaceSkillPolicy is admin-only and enforces optimistic concurrency", async () => {
+    const member = await cookieFor(WS_A, "member");
+    const denied = await gql(REPLACE, { d: "deny", r: [] }, member);
+    expect(denied.errors).toBeDefined();
+
+    const admin = await cookieFor(WS_A, "admin");
+    await gql(REPLACE, { d: "allow", r: [] }, admin); // revision → 1
+    // a stale expectedRevision (0) conflicts
+    const conflict = await gql(REPLACE, { d: "deny", r: [], rev: 0 }, admin);
+    expect(conflict.errors).toBeDefined();
+    // the correct revision succeeds
+    const ok = await gql(REPLACE, { d: "deny", r: [], rev: 1 }, admin);
+    expect(ok.data.replaceSkillPolicy.revision).toBe(2);
+  });
+
+  it("evaluateSkillPolicy explains a decision without enforcing", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    await gql(
+      REPLACE,
+      { d: "allow", r: [{ id: "deny-remove", effect: "deny", actions: ["remove"] }] },
+      admin,
+    );
+    const decision = await gql(
+      `query{ evaluateSkillPolicy(action:"remove"){ allowed effect matchedRuleId } }`,
+      undefined,
+      admin,
+    );
+    expect(decision.data.evaluateSkillPolicy).toMatchObject({
+      allowed: false,
+      effect: "deny",
+      matchedRuleId: "deny-remove",
+    });
   });
 });
