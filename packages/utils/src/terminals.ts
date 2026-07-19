@@ -91,7 +91,14 @@ export function isUnsafeSessionWorkspaceCwd(cwd: string | null | undefined): boo
   return SESSION_CWD_SYSTEM_ROOTS.has(normalizePosix(value.replace(/\/+$/, "") || "/"));
 }
 
-export type TerminalState = "pending" | "active" | "closed" | "expired";
+export const TERMINAL_STATE = {
+  PENDING: "pending",
+  ACTIVE: "active",
+  CLOSED: "closed",
+  EXPIRED: "expired",
+} as const;
+export const TERMINAL_STATES = Object.values(TERMINAL_STATE);
+export type TerminalState = (typeof TERMINAL_STATES)[number];
 
 /** Pure: derive the effective state from timestamps + stored status. */
 export function terminalSessionState(

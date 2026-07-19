@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "urql";
+import { TERMINAL_STATE } from "@agentcenter/utils";
 import { TERMINAL_SESSIONS_QUERY } from "@/lib/graphql/queries";
 import { OPEN_TERMINAL_SESSION, CLOSE_TERMINAL_SESSION } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
@@ -25,15 +26,15 @@ interface Session {
 }
 
 function effectiveState(s: Session): string {
-  if (s.closedAt || s.status === "closed") return "closed";
-  if (new Date(s.sessionExpiresAt).getTime() <= Date.now()) return "expired";
+  if (s.closedAt || s.status === TERMINAL_STATE.CLOSED) return TERMINAL_STATE.CLOSED;
+  if (new Date(s.sessionExpiresAt).getTime() <= Date.now()) return TERMINAL_STATE.EXPIRED;
   return s.status;
 }
 const STATE_VARIANT: Record<string, "gray" | "blue" | "green" | "yellow" | "red"> = {
-  pending: "yellow",
-  active: "green",
-  closed: "gray",
-  expired: "red",
+  [TERMINAL_STATE.PENDING]: "yellow",
+  [TERMINAL_STATE.ACTIVE]: "green",
+  [TERMINAL_STATE.CLOSED]: "gray",
+  [TERMINAL_STATE.EXPIRED]: "red",
 };
 
 export default function TerminalsPage() {

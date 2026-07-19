@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { BOARD_THREAD_QUERY } from "@/lib/graphql/queries";
 import { SEND_BOARD_MESSAGE } from "@/lib/graphql/mutations";
+import { BOARD_ROLE } from "@agentcenter/utils";
 import { Button, Card } from "@/components/ui";
 
 // Epic #15: boardroom concierge chat. BOARD_CHAT-gated (experimental, admin). A standing per-workspace
@@ -59,16 +60,19 @@ export default function BoardroomPage() {
           </p>
         )}
         {messages.map((m) => (
-          <div key={m.id} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+          <div
+            key={m.id}
+            className={m.role === BOARD_ROLE.USER ? "flex justify-end" : "flex justify-start"}
+          >
             <div
               className={
-                m.role === "user"
+                m.role === BOARD_ROLE.USER
                   ? "max-w-[80%] rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900"
                   : "max-w-[80%] rounded-lg bg-muted px-3 py-2 text-sm text-foreground"
               }
             >
               <span className="mb-0.5 block text-xs font-medium text-muted-foreground">
-                {m.role === "user" ? "You" : "Concierge"}
+                {m.role === BOARD_ROLE.USER ? "You" : "Concierge"}
               </span>
               <span className="whitespace-pre-wrap">{m.body}</span>
             </div>

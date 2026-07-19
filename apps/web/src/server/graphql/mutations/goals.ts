@@ -1,24 +1,22 @@
 import { GraphQLError } from "graphql";
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, isGoalLevel, isGoalStatus } from "@agentcenter/utils";
 import type { GoalLevel, GoalStatus } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
 import { createGoal, updateGoal, deleteGoal, setProjectDefaultGoal } from "@/server/services/goals";
 
 // Epic #11: goals mutations. Member CRUD (goals are low blast-radius; matches Paperclip company access).
-const LEVELS = ["company", "team", "task"];
-const STATUSES = ["planned", "active", "completed", "archived"];
-
+// Level/status vocabulary is shared in @agentcenter/utils (no hardcoded lists).
 function asLevel(v: string | null | undefined): GoalLevel | null {
   if (v == null) return null;
-  if (!LEVELS.includes(v))
+  if (!isGoalLevel(v))
     throw new GraphQLError(`invalid level`, { extensions: { code: "BAD_USER_INPUT" } });
   return v as GoalLevel;
 }
 function asStatus(v: string | null | undefined): GoalStatus | null {
   if (v == null) return null;
-  if (!STATUSES.includes(v))
+  if (!isGoalStatus(v))
     throw new GraphQLError(`invalid status`, { extensions: { code: "BAD_USER_INPUT" } });
   return v as GoalStatus;
 }

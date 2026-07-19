@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { EXPORT_WORKSPACE_BUNDLE, WORKSPACE_IMPORTS } from "@/lib/graphql/queries";
 import { IMPORT_WORKSPACE_BUNDLE } from "@/lib/graphql/mutations";
+import { COLLISION_STRATEGIES } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
 
 // Epic #14: workspace portability. WORKSPACE_PORTABILITY-gated. Export renders a credential-free JSON
@@ -29,7 +30,7 @@ interface ImportRow {
   createdAt: string;
 }
 
-const STRATEGIES = ["rename", "skip", "replace"] as const;
+const STRATEGIES = COLLISION_STRATEGIES;
 
 export default function PortabilityPage() {
   const [{ data: exp }, refetchExport] = useQuery<{ exportWorkspaceBundle: unknown }>({

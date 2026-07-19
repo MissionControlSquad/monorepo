@@ -1,6 +1,6 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, isCollisionStrategy } from "@agentcenter/utils";
 import type {
   SkillTrustLevel,
   SkillSharingScope,
@@ -217,7 +217,7 @@ builder.mutationField("installTeam", (t) =>
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
       const tenancy = requireRole(ctx, "admin");
-      const strategy = ["rename", "skip", "replace"].includes(args.collisionStrategy ?? "")
+      const strategy = isCollisionStrategy(args.collisionStrategy ?? "")
         ? (args.collisionStrategy as CollisionStrategy)
         : "rename";
       const res = await installTeam({
