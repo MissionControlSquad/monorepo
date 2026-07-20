@@ -153,6 +153,7 @@ model Agent {
 
   reportsToAgentId String? // Epic #19: manager edge (org chart); self-FK, SetNull
   reportsTo        Agent?  @relation("AgentOrg", fields: [reportsToAgentId], references: [id], onDelete: SetNull)
+  companyId        String? // Domain 14 #10: the AgentCompany this agent belongs to (no FK — soft link)
   reports          Agent[] @relation("AgentOrg")
 
   capabilityGrants AgentCapabilityGrant[] @relation("AgentGrants") // Epic #21

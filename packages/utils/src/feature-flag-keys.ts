@@ -43,6 +43,7 @@ export const FLAG_KEYS = {
   WORK_PRODUCTS: "work_products",
   PROVIDER_QUOTA: "provider_quota",
   THREAD_INTERACTIONS: "thread_interactions",
+  AGENT_COMPANIES: "agent_companies",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -99,4 +100,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.WORK_PRODUCTS]: false,
   [FLAG_KEYS.PROVIDER_QUOTA]: false,
   [FLAG_KEYS.THREAD_INTERACTIONS]: false,
+  [FLAG_KEYS.AGENT_COMPANIES]: false,
 };

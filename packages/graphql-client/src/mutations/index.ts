@@ -243,6 +243,12 @@ export {
   PROMOTE_AGENT_RUN_REVIEW,
 } from "./sandbox-run";
 export { SET_AGENT_RUNTIME } from "./agent-runtime";
+export {
+  CREATE_AGENT_COMPANY,
+  UPDATE_AGENT_COMPANY,
+  DELETE_AGENT_COMPANY,
+  SET_AGENT_COMPANY,
+} from "./agent-companies";
 export { SET_AGENT_MEMORY_PROVIDER, SET_COMPANY_MEMORY_PROVIDER, FORGET_AGENT_MEMORY } from "./memory";
 export {
   CREATE_ENVIRONMENT,

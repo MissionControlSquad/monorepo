@@ -41,4 +41,5 @@ import "./monitor";
 import "./runner-command";
 import "./runner-host";
 import "./agent-run";
+import "./agent-company";
 import "./memory-operation";

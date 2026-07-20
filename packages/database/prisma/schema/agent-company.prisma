@@ -1,0 +1,23 @@
+// ─── Agent-Companies (Domain 14 #10) ─────────────────────────────────────────
+// An AgentCompany is the first-order org object of the Paperclip "agentcompanies/v1" model: a named,
+// portable company of agents with goals + provenance. Workspace-scoped, no FK (D5). Agents/Teams/etc.
+// soft-link via companyId. This is the entity the markdown COMPANY.md package model (#10-12) builds on.
+model AgentCompany {
+  id                 String   @id @default(cuid())
+  workspaceId        String // buildbase workspace _id; no FK (D5)
+  slug               String
+  name               String
+  description        String?
+  goals              String[] @default([])
+  schemaVersion      String   @default("agentcompanies/v1")
+  license            String?
+  authors            Json? // [{name, url?}] attribution, preserved on export/import
+  sourceRef          String? // pinned origin (github owner/repo@commit) when imported
+  createdByProfileId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@map("agent_companies")
+}

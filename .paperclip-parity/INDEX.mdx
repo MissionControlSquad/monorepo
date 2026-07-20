@@ -419,6 +419,16 @@ See 03-sandbox-depth.mdx.
       (create→one policy, update→still one, query, 0-removes, member denied). Typecheck 12/12, web build ✓. Remaining Domain 14:
       #10-12 Agent-Companies package model (L), #13 delegation, #14 quorum, #15 policy engine.
 
+- [x] **Teams Domain 14 — #10 Agent-Companies foundation** DONE (next commit). The defining structural gap's keystone entity.
+      New AgentCompany model (migration 20260720000000) — the first-order org object of Paperclip's agentcompanies/v1 (slug,
+      name, description, goals[], schemaVersion default agentcompanies/v1, license, authors, sourceRef provenance) + Agent.companyId
+      soft link. Service agent-companies.ts: createCompany (slug + collision guard) / list / get / updateCompany / deleteCompany
+      (clears member agents' companyId, doesn't delete them) / setAgentCompany (bind/unbind, both in workspace). New AGENT_COMPANIES
+      flag. GraphQL: AgentCompany type + agentCompanies/agentCompany queries + create/update/delete/setAgentCompany mutations
+      (admin) + companyId on Agent + shared client ops. Tests: 4 integration (create+slug+collision+RBAC, list, bind→delete-clears,
+      update goals). Typecheck 12/12, web build ✓. **Remaining #11/#12: the markdown COMPANY.md/TEAM.md/AGENTS.md package
+      parser/emitter + import-graph + README/Mermaid export build on this entity (multi-session L×2).**
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

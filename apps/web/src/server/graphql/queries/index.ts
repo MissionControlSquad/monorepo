@@ -49,6 +49,7 @@ import "./deliverable-votes";
 import "./monitors";
 import "./runner-commands";
 import "./agent-runs";
+import "./agent-companies";
 import "./memory";
 import "./finance-events";
 import "./work-products";
