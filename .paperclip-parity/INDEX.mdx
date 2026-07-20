@@ -448,6 +448,14 @@ See 03-sandbox-depth.mdx.
       **Domain 14 Agent-Companies (#10/#11/#12) now has entity + markdown emit/parse + export + import round-trip.** Remaining:
       GitHub-pinned remote import (+sha256 verify — infra), #13 delegation presets, #14 quorum, #15 policy engine.
 
+- [x] **Teams Domain 14 — #14 board quorum (multi-approver)** DONE (next commit). Approval.requiredApprovals (default 1,
+      migration 20260720010000) + ApprovalVote model (one vote per voter, unique). Service castApprovalVote: a reject
+      finalizes immediately (decideApproval reject); distinct approve votes reaching requiredApprovals finalize via
+      decideApproval approve (same side effects — hire fulfilment, task transition). Single-decider flow unchanged when
+      requiredApprovals=1. GraphQL createApproval gains requiredApprovals arg + castApprovalVote mutation (admin=board) +
+      requiredApprovals on Approval type + shared client op. Tests: 2 unit (2-of-N finalizes on 2nd distinct approve; single
+      reject finalizes). Typecheck 12/12, web build ✓. Remaining Domain 14: #13 delegation presets, #15 per-agent approval-policy engine.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

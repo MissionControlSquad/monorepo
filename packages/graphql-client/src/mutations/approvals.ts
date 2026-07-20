@@ -89,3 +89,14 @@ export const REQUEST_AGENT_HIRE = gql`
     }
   }
 `;
+
+// Domain 14 #14: cast a board-quorum vote on an approval.
+export const CAST_APPROVAL_VOTE = gql`
+  mutation CastApprovalVote($id: String!, $vote: String!) {
+    castApprovalVote(id: $id, vote: $vote) {
+      status
+      approveVotes
+      requiredApprovals
+    }
+  }
+`;

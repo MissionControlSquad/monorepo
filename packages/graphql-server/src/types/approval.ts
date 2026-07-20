@@ -10,6 +10,7 @@ builder.prismaObject("Approval", {
     payload: t.expose("payload", { type: "JSON", nullable: true }),
     taskId: t.exposeString("taskId", { nullable: true }),
     status: t.exposeString("status"),
+    requiredApprovals: t.exposeInt("requiredApprovals"),
     title: t.exposeString("title"),
     reason: t.exposeString("reason", { nullable: true }),
     decisionNote: t.exposeString("decisionNote", { nullable: true }),

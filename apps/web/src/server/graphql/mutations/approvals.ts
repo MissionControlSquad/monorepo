@@ -11,6 +11,7 @@ import {
   cancelApproval,
   addComment,
   requestAgentHire,
+  castApprovalVote,
 } from "@/server/services/approvals";
 import { setTrustProfile } from "@/server/services/trust";
 
@@ -27,6 +28,7 @@ builder.mutationField("createApproval", (t) =>
       taskId: t.arg.string(),
       title: t.arg.string({ required: true }),
       reason: t.arg.string(),
+      requiredApprovals: t.arg.int(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
@@ -39,6 +41,7 @@ builder.mutationField("createApproval", (t) =>
         title: args.title,
         reason: args.reason ?? null,
         requestedById: tenancy.userId,
+        requiredApprovals: args.requiredApprovals ?? undefined,
       });
       return ctx.prisma.approval.findUniqueOrThrow({ ...query, where: { id: created.id } });
     },
@@ -208,6 +211,32 @@ builder.mutationField("setAgentTrustProfile", (t) =>
       return ctx.prisma.agentTrustProfile.findUniqueOrThrow({
         ...query,
         where: { agentId: args.agentId },
+      });
+    },
+  }),
+);
+
+// Domain 14 #14: cast a board-quorum vote. A reject finalizes; approvals finalize at requiredApprovals.
+const ApprovalVoteResult = builder.simpleObject("ApprovalVoteResult", {
+  fields: (t) => ({
+    status: t.string(),
+    approveVotes: t.int(),
+    requiredApprovals: t.int(),
+  }),
+});
+
+builder.mutationField("castApprovalVote", (t) =>
+  t.field({
+    type: ApprovalVoteResult,
+    args: { id: t.arg.string({ required: true }), vote: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.GOVERNANCE);
+      const tenancy = requireRole(ctx, "admin"); // board members are admins/owners
+      return castApprovalVote({
+        approvalId: args.id,
+        workspaceId: tenancy.workspaceId,
+        voterProfileId: tenancy.userId,
+        vote: args.vote === "reject" ? "reject" : "approve",
       });
     },
   }),

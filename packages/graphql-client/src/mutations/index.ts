@@ -105,6 +105,7 @@ export {
   CANCEL_APPROVAL,
   ADD_APPROVAL_COMMENT,
   REQUEST_AGENT_HIRE,
+  CAST_APPROVAL_VOTE,
 } from "./approvals";
 
 export {

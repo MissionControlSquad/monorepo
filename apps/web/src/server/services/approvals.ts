@@ -22,10 +22,77 @@ export interface CreateApprovalInput {
   reason?: string | null;
   requestedById: string; // Profile id
   payload?: Prisma.InputJsonValue;
+  requiredApprovals?: number; // Domain 14 #14 — N-of-M board quorum (default 1)
 }
 
 export function createApproval(input: CreateApprovalInput) {
-  return prisma.approval.create({ data: { ...input } });
+  const { requiredApprovals, ...rest } = input;
+  return prisma.approval.create({
+    data: { ...rest, requiredApprovals: Math.max(1, requiredApprovals ?? 1) },
+  });
+}
+
+/**
+ * Cast one board member's vote on an approval (Domain 14 #14). A single `reject` finalizes the approval
+ * as rejected immediately. Once distinct `approve` votes reach requiredApprovals, the approval is
+ * finalized via decideApproval (running the same side effects — hire fulfilment, task transition). A
+ * voter may vote once; re-voting updates their vote. Returns the current tally + final status.
+ */
+export async function castApprovalVote(input: {
+  approvalId: string;
+  workspaceId: string;
+  voterProfileId: string;
+  vote: "approve" | "reject";
+}): Promise<{ status: string; approveVotes: number; requiredApprovals: number }> {
+  const approval = await findScoped(input.approvalId, input.workspaceId);
+  if (approval.status !== "pending" && approval.status !== "needs_changes") {
+    throw Object.assign(new Error(`Approval is not votable (status: ${approval.status})`), {
+      status: 400,
+    });
+  }
+
+  await prisma.approvalVote.upsert({
+    where: {
+      approvalId_voterProfileId: {
+        approvalId: input.approvalId,
+        voterProfileId: input.voterProfileId,
+      },
+    },
+    create: {
+      approvalId: input.approvalId,
+      voterProfileId: input.voterProfileId,
+      vote: input.vote,
+    },
+    update: { vote: input.vote },
+  });
+
+  if (input.vote === "reject") {
+    await decideApproval({
+      approvalId: input.approvalId,
+      workspaceId: input.workspaceId,
+      decision: "reject",
+      decidedById: input.voterProfileId,
+    });
+    return { status: "rejected", approveVotes: 0, requiredApprovals: approval.requiredApprovals };
+  }
+
+  const approveVotes = await prisma.approvalVote.count({
+    where: { approvalId: input.approvalId, vote: "approve" },
+  });
+  if (approveVotes >= approval.requiredApprovals) {
+    await decideApproval({
+      approvalId: input.approvalId,
+      workspaceId: input.workspaceId,
+      decision: "approve",
+      decidedById: input.voterProfileId,
+    });
+    return {
+      status: "approved",
+      approveVotes,
+      requiredApprovals: approval.requiredApprovals,
+    };
+  }
+  return { status: "pending", approveVotes, requiredApprovals: approval.requiredApprovals };
 }
 
 /** The spec carried by a hire_agent approval's payload (Domain 14 #3). */

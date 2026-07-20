@@ -207,3 +207,49 @@ describe("GraphQL governance / approvals (Epic #3)", () => {
     expect(await prisma.agent.count({ where: { workspaceId: WS_A, name: "Ghost Hire" } })).toBe(0);
   });
 });
+
+describe("board quorum (Domain 14 #14)", () => {
+  it("a 2-of-N approval finalizes only after two distinct approve votes", async () => {
+    const boardA = await prisma.profile.create({ data: { kind: "human", displayName: "Board A" } });
+    const boardB = await prisma.profile.create({ data: { kind: "human", displayName: "Board B" } });
+
+    const created = await runGraphQL(
+      `mutation{ createApproval(subjectType:"task", subjectId:"t-quorum", title:"needs 2", requiredApprovals:2){ id requiredApprovals } }`,
+      undefined,
+      await cookieFor(boardA.id, WS_A, "admin"),
+    );
+    expect(created.data.createApproval.requiredApprovals).toBe(2);
+    const id = created.data.createApproval.id;
+
+    const v1 = await runGraphQL(
+      `mutation{ castApprovalVote(id:"${id}", vote:"approve"){ status approveVotes } }`,
+      undefined,
+      await cookieFor(boardA.id, WS_A, "admin"),
+    );
+    expect(v1.data.castApprovalVote).toMatchObject({ status: "pending", approveVotes: 1 });
+
+    const v2 = await runGraphQL(
+      `mutation{ castApprovalVote(id:"${id}", vote:"approve"){ status approveVotes } }`,
+      undefined,
+      await cookieFor(boardB.id, WS_A, "admin"),
+    );
+    expect(v2.data.castApprovalVote).toMatchObject({ status: "approved", approveVotes: 2 });
+    expect((await prisma.approval.findUniqueOrThrow({ where: { id } })).status).toBe("approved");
+  });
+
+  it("a single reject vote finalizes a quorum approval as rejected", async () => {
+    const p = await prisma.profile.create({ data: { kind: "human", displayName: "Rejector" } });
+    const created = await runGraphQL(
+      `mutation{ createApproval(subjectType:"task", subjectId:"t-rej", title:"rej", requiredApprovals:3){ id } }`,
+      undefined,
+      await cookieFor(p.id, WS_A, "admin"),
+    );
+    const id = created.data.createApproval.id;
+    const rej = await runGraphQL(
+      `mutation{ castApprovalVote(id:"${id}", vote:"reject"){ status } }`,
+      undefined,
+      await cookieFor(p.id, WS_A, "admin"),
+    );
+    expect(rej.data.castApprovalVote.status).toBe("rejected");
+  });
+});
