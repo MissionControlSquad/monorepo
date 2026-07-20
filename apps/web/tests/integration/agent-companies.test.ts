@@ -90,3 +90,39 @@ describe("agent companies (Domain 14 #10)", () => {
     expect(upd.data.updateAgentCompany).toMatchObject({ goals: ["new goal"], description: "desc" });
   });
 });
+
+describe("company package export (Domain 14 #12)", () => {
+  it("exports COMPANY.md + per-agent AGENTS.md + README with a Mermaid org chart", async () => {
+    const company = (
+      await gql(`mutation{ createAgentCompany(name:"Exportable", goals:["ship"]){ id } }`)
+    ).data.createAgentCompany;
+
+    const ceo = await prisma.agent.create({
+      data: { name: "Ada", role: "ceo", workspaceId: WS, companyId: company.id },
+    });
+    await prisma.agent.create({
+      data: {
+        name: "Grace",
+        role: "cto",
+        workspaceId: WS,
+        companyId: company.id,
+        reportsToAgentId: ceo.id,
+      },
+    });
+
+    const res = await gql(
+      `query($id:String!){ exportCompanyPackage(companyId:$id){ path content } }`,
+      { id: company.id },
+      "member",
+    );
+    const byPath = Object.fromEntries(
+      res.data.exportCompanyPackage.map((f: any) => [f.path, f.content]),
+    );
+    expect(byPath["COMPANY.md"]).toContain("schema: agentcompanies/v1");
+    expect(byPath["COMPANY.md"]).toContain('name: "Exportable"');
+    expect(byPath["agents/ada/AGENTS.md"]).toContain("# Ada");
+    expect(byPath["agents/grace/AGENTS.md"]).toContain('reportsTo: "ada"');
+    expect(byPath["README.md"]).toContain("```mermaid");
+    expect(byPath["README.md"]).toContain("n_ada --> n_grace");
+  });
+});

@@ -5,7 +5,12 @@
  */
 import { prisma } from "@/server/prisma";
 import { GraphQLError } from "graphql";
-import { slugify as coreSlugify } from "@agentcenter/utils";
+import {
+  slugify as coreSlugify,
+  emitCompanyMarkdown,
+  emitAgentMarkdown,
+  renderOrgChartMermaid,
+} from "@agentcenter/utils";
 import type { AgentCompany } from "@agentcenter/database";
 
 function badRequest(message: string): never {
@@ -113,4 +118,67 @@ export async function setAgentCompany(
       throw new GraphQLError("Company not found", { extensions: { code: "NOT_FOUND" } });
   }
   await prisma.agent.update({ where: { id: agentId }, data: { companyId } });
+}
+
+/**
+ * Export a company as a portable markdown package (Domain 14 #12): COMPANY.md + agents/<slug>/AGENTS.md
+ * per member agent + a README.md with a Mermaid org chart. Returns a path→content file map. Pure
+ * emitters live in @agentcenter/utils. Secrets/keys are never emitted (only org structure + persona).
+ */
+export async function exportCompanyPackage(
+  workspaceId: string,
+  companyId: string,
+): Promise<{ path: string; content: string }[]> {
+  const company = await prisma.agentCompany.findFirst({ where: { id: companyId, workspaceId } });
+  if (!company) throw new GraphQLError("Company not found", { extensions: { code: "NOT_FOUND" } });
+
+  const agents = await prisma.agent.findMany({
+    where: { companyId, workspaceId },
+    select: { id: true, name: true, role: true, personality: true, reportsToAgentId: true },
+    orderBy: { name: "asc" },
+  });
+  const slugFor = (name: string) => coreSlugify(name, 40, "agent");
+  const idToSlug = new Map(agents.map((a) => [a.id, slugFor(a.name)]));
+
+  const files: { path: string; content: string }[] = [
+    {
+      path: "COMPANY.md",
+      content: emitCompanyMarkdown({
+        name: company.name,
+        slug: company.slug,
+        description: company.description,
+        goals: company.goals,
+        license: company.license,
+        schemaVersion: company.schemaVersion,
+      }),
+    },
+  ];
+
+  for (const a of agents) {
+    const slug = idToSlug.get(a.id)!;
+    files.push({
+      path: `agents/${slug}/AGENTS.md`,
+      content: emitAgentMarkdown({
+        name: a.name,
+        role: a.role,
+        slug,
+        reportsTo: a.reportsToAgentId ? (idToSlug.get(a.reportsToAgentId) ?? null) : null,
+        personality: a.personality,
+      }),
+    });
+  }
+
+  const mermaid = renderOrgChartMermaid(
+    agents.map((a) => ({
+      slug: idToSlug.get(a.id)!,
+      name: a.name,
+      reportsTo: a.reportsToAgentId ? (idToSlug.get(a.reportsToAgentId) ?? null) : null,
+    })),
+  );
+  files.push({
+    path: "README.md",
+    content: `# ${company.name}\n\n${company.description ?? ""}\n\n## Org chart\n\n${mermaid}\n`,
+  });
+
+  return files;
 }

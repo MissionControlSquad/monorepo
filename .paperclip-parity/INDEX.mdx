@@ -429,6 +429,15 @@ See 03-sandbox-depth.mdx.
       update goals). Typecheck 12/12, web build ✓. **Remaining #11/#12: the markdown COMPANY.md/TEAM.md/AGENTS.md package
       parser/emitter + import-graph + README/Mermaid export build on this entity (multi-session L×2).**
 
+- [x] **Teams Domain 14 — #11/#12 company markdown package + export** DONE (next commit). Pure company-package.ts in
+      @agentcenter/utils: emitCompanyMarkdown / parseCompanyMarkdown (agentcompanies/v1 COMPANY.md — frontmatter + goals,
+      round-trips via the GAP-A frontmatter parser), emitAgentMarkdown (AGENTS.md w/ role + reportsTo slug), renderOrgChartMermaid
+      (graph TD of the reporting hierarchy). Service exportCompanyPackage(ws, id) → path→content file map: COMPANY.md +
+      agents/<slug>/AGENTS.md per member + README.md with the Mermaid org chart (secrets/keys never emitted). GraphQL
+      exportCompanyPackage query (member) + shared client op. Tests: 4 unit (emit/parse round-trip, no-frontmatter null, agent
+      md, Mermaid edges) + 1 integration (full package export). Typecheck 12/12, web build ✓. Remaining #11/#12: import-graph
+      resolver (pinned GitHub refs + sha256 verify + collision) — the read/verify half of round-trip portability.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

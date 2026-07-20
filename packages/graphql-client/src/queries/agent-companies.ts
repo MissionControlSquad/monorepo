@@ -31,3 +31,13 @@ export const AGENT_COMPANY_QUERY = gql`
     }
   }
 `;
+
+// Domain 14 #12: export a company as a portable markdown package.
+export const EXPORT_COMPANY_PACKAGE_QUERY = gql`
+  query ExportCompanyPackage($companyId: String!) {
+    exportCompanyPackage(companyId: $companyId) {
+      path
+      content
+    }
+  }
+`;
