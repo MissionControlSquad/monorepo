@@ -87,6 +87,55 @@ export function emitAgentMarkdown(agent: AgentPackageFields): string {
   return `${fm}\n${body}`;
 }
 
+export interface ParsedCompanyPackage {
+  company: CompanyPackageFields | null;
+  agents: AgentPackageFields[];
+  warnings: string[];
+}
+
+/** Pure: parse an AGENTS.md file back into fields (frontmatter-driven). Missing name → null. */
+export function parseAgentMarkdown(markdown: string): AgentPackageFields | null {
+  const fm = parseSkillFrontmatter(markdown);
+  if (!fm || typeof fm.name !== "string") return null;
+  return {
+    name: fm.name,
+    slug: typeof fm.slug === "string" ? fm.slug : "",
+    role: typeof fm.role === "string" ? fm.role : "worker",
+    reportsTo: typeof fm.reportsTo === "string" ? fm.reportsTo : null,
+  };
+}
+
+/**
+ * Pure: parse a whole company package file map (path→content) into a structured import plan. Reads
+ * COMPANY.md for the company and every agents/<slug>/AGENTS.md for members. Collects warnings for a
+ * missing/invalid COMPANY.md or an unparseable AGENTS.md. Path-unsafe entries are skipped with a warning.
+ */
+export function parseCompanyPackageFiles(
+  files: { path: string; content: string }[],
+): ParsedCompanyPackage {
+  const warnings: string[] = [];
+  let company: CompanyPackageFields | null = null;
+  const agents: AgentPackageFields[] = [];
+
+  for (const f of files) {
+    const path = f.path.trim();
+    if (/(^\/|\.\.(?:\/|\\|$)|^[a-zA-Z]:)/.test(path)) {
+      warnings.push(`skipped unsafe path: ${path}`);
+      continue;
+    }
+    if (path === "COMPANY.md") {
+      company = parseCompanyMarkdown(f.content);
+      if (!company) warnings.push("COMPANY.md is missing or has no frontmatter");
+    } else if (/(^|\/)AGENTS\.md$/i.test(path)) {
+      const a = parseAgentMarkdown(f.content);
+      if (a) agents.push(a);
+      else warnings.push(`could not parse ${path}`);
+    }
+  }
+  if (!company) warnings.push("package has no valid COMPANY.md");
+  return { company, agents, warnings };
+}
+
 /** Pure: render a Mermaid `graph TD` of the reporting hierarchy, for the export README. */
 export function renderOrgChartMermaid(
   agents: { slug: string; name: string; reportsTo?: string | null }[],

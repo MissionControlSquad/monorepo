@@ -7,6 +7,7 @@ import {
   updateCompany,
   deleteCompany,
   setAgentCompany,
+  importCompanyPackage,
 } from "@/server/services/agent-companies";
 
 // Domain 14 #10: Agent-Company writes. AGENT_COMPANIES-gated, admin (org-shaping).
@@ -82,6 +83,39 @@ builder.mutationField("setAgentCompany", (t) =>
       const tenancy = requireRole(ctx, "admin");
       await setAgentCompany(tenancy.workspaceId, args.agentId, args.companyId ?? null);
       return ctx.prisma.agent.findUniqueOrThrow({ ...query, where: { id: args.agentId } });
+    },
+  }),
+);
+
+// Domain 14 #12: import a company markdown package (path→content). admin.
+const ImportCompanyResultType = builder.simpleObject("ImportCompanyResult", {
+  fields: (t) => ({
+    companyId: t.string(),
+    slug: t.string(),
+    createdAgentIds: t.stringList(),
+    warnings: t.stringList(),
+  }),
+});
+
+builder.mutationField("importCompanyPackage", (t) =>
+  t.field({
+    type: ImportCompanyResultType,
+    args: {
+      files: t.arg({ type: "JSON", required: true }), // [{ path, content }]
+      sourceRef: t.arg.string(),
+    },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.AGENT_COMPANIES);
+      const tenancy = requireRole(ctx, "admin");
+      const files = Array.isArray(args.files)
+        ? (args.files as { path: string; content: string }[])
+        : [];
+      return importCompanyPackage({
+        workspaceId: tenancy.workspaceId,
+        files,
+        sourceRef: args.sourceRef ?? null,
+        createdByProfileId: tenancy.userId,
+      });
     },
   }),
 );

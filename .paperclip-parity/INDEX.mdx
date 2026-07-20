@@ -438,6 +438,16 @@ See 03-sandbox-depth.mdx.
       md, Mermaid edges) + 1 integration (full package export). Typecheck 12/12, web build ✓. Remaining #11/#12: import-graph
       resolver (pinned GitHub refs + sha256 verify + collision) — the read/verify half of round-trip portability.
 
+- [x] **Teams Domain 14 — #12 company package import (round-trip)** DONE (next commit). Completes portable companies. Pure
+      parseCompanyPackageFiles(files) in @agentcenter/utils → {company, agents[], warnings}: reads COMPANY.md + every
+      agents/<slug>/AGENTS.md, skips path-unsafe entries + warns, parseAgentMarkdown for members. Service importCompanyPackage
+      creates the AgentCompany (renaming slug on collision), one Agent per AGENTS.md, wires reportsTo by package slug, records
+      sourceRef provenance, never imports secrets. GraphQL importCompanyPackage mutation (admin, JSON files) + shared client op.
+      Tests: 2 unit (parse plan, missing-COMPANY/unsafe-path warnings) + 1 integration (export→import ROUND-TRIP: slug renamed
+      on collision, 2 agents recreated, reporting edge re-wired by slug, provenance recorded). Typecheck 12/12, web build ✓.
+      **Domain 14 Agent-Companies (#10/#11/#12) now has entity + markdown emit/parse + export + import round-trip.** Remaining:
+      GitHub-pinned remote import (+sha256 verify — infra), #13 delegation presets, #14 quorum, #15 policy engine.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

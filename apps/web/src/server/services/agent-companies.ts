@@ -10,6 +10,7 @@ import {
   emitCompanyMarkdown,
   emitAgentMarkdown,
   renderOrgChartMermaid,
+  parseCompanyPackageFiles,
 } from "@agentcenter/utils";
 import type { AgentCompany } from "@agentcenter/database";
 
@@ -181,4 +182,86 @@ export async function exportCompanyPackage(
   });
 
   return files;
+}
+
+export interface ImportCompanyResult {
+  companyId: string;
+  slug: string;
+  createdAgentIds: string[];
+  warnings: string[];
+}
+
+/**
+ * Import a company markdown package (Domain 14 #12) into the workspace: creates the AgentCompany
+ * (renaming the slug on collision), then one Agent per AGENTS.md, wiring reportsTo by slug within the
+ * package. sourceRef records provenance. Never imports secrets. Returns the created ids + warnings.
+ */
+export async function importCompanyPackage(input: {
+  workspaceId: string;
+  files: { path: string; content: string }[];
+  sourceRef?: string | null;
+  createdByProfileId?: string | null;
+}): Promise<ImportCompanyResult> {
+  const parsed = parseCompanyPackageFiles(input.files);
+  if (!parsed.company) badRequest("package has no valid COMPANY.md");
+  const spec = parsed.company;
+
+  // Resolve a non-colliding slug.
+  const base = (spec.slug || coreSlugify(spec.name, 64, "company")).toLowerCase();
+  let slug = base;
+  for (
+    let i = 2;
+    await prisma.agentCompany.findFirst({
+      where: { workspaceId: input.workspaceId, slug },
+      select: { id: true },
+    });
+    i++
+  )
+    slug = `${base}-${i}`;
+
+  const company = await prisma.agentCompany.create({
+    data: {
+      workspaceId: input.workspaceId,
+      slug,
+      name: spec.name,
+      description: spec.description ?? null,
+      goals: spec.goals ?? [],
+      license: spec.license ?? null,
+      schemaVersion: spec.schemaVersion ?? "agentcompanies/v1",
+      sourceRef: input.sourceRef ?? null,
+      createdByProfileId: input.createdByProfileId ?? null,
+    },
+  });
+
+  // Create agents first (no manager), then wire reportsTo by package slug.
+  const slugToId = new Map<string, string>();
+  const createdAgentIds: string[] = [];
+  for (const a of parsed.agents) {
+    const agent = await prisma.agent.create({
+      data: {
+        name: a.name,
+        role: a.role,
+        workspaceId: input.workspaceId,
+        companyId: company.id,
+        username: `${coreSlugify(a.name, 40, "agent")}-${company.id.slice(0, 6)}`,
+        setupStatus: "active",
+      },
+    });
+    slugToId.set(a.slug || coreSlugify(a.name, 40, "agent"), agent.id);
+    createdAgentIds.push(agent.id);
+  }
+  for (const a of parsed.agents) {
+    if (!a.reportsTo) continue;
+    const childId = slugToId.get(a.slug || coreSlugify(a.name, 40, "agent"));
+    const managerId = slugToId.get(a.reportsTo);
+    if (childId && managerId) {
+      await prisma.agent.update({ where: { id: childId }, data: { reportsToAgentId: managerId } });
+    } else {
+      parsed.warnings.push(
+        `could not wire ${a.slug} → reportsTo ${a.reportsTo} (manager not in package)`,
+      );
+    }
+  }
+
+  return { companyId: company.id, slug, createdAgentIds, warnings: parsed.warnings };
 }

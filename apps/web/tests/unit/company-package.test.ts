@@ -52,3 +52,41 @@ describe("company package emit/parse (Domain 14 #11/#12)", () => {
     expect(mermaid).toContain("n_ada --> n_grace");
   });
 });
+
+describe("parseCompanyPackageFiles (Domain 14 #12 import)", () => {
+  it("parses a COMPANY.md + AGENTS.md file map into an import plan", async () => {
+    const { parseCompanyPackageFiles, emitCompanyMarkdown, emitAgentMarkdown } =
+      await import("@agentcenter/utils");
+    const files = [
+      {
+        path: "COMPANY.md",
+        content: emitCompanyMarkdown({ name: "Acme", slug: "acme", goals: ["g"] }),
+      },
+      {
+        path: "agents/ada/AGENTS.md",
+        content: emitAgentMarkdown({ name: "Ada", slug: "ada", role: "ceo" }),
+      },
+      {
+        path: "agents/grace/AGENTS.md",
+        content: emitAgentMarkdown({ name: "Grace", slug: "grace", role: "cto", reportsTo: "ada" }),
+      },
+      { path: "README.md", content: "ignored" },
+    ];
+    const plan = parseCompanyPackageFiles(files);
+    expect(plan.company).toMatchObject({ name: "Acme", slug: "acme", goals: ["g"] });
+    expect(plan.agents).toHaveLength(2);
+    expect(plan.agents.find((a) => a.slug === "grace")?.reportsTo).toBe("ada");
+    expect(plan.warnings).toEqual([]);
+  });
+
+  it("warns on a missing COMPANY.md and skips unsafe paths", async () => {
+    const { parseCompanyPackageFiles } = await import("@agentcenter/utils");
+    const plan = parseCompanyPackageFiles([
+      { path: "../escape/AGENTS.md", content: "x" },
+      { path: "notes.txt", content: "y" },
+    ]);
+    expect(plan.company).toBeNull();
+    expect(plan.warnings.some((w) => /no valid COMPANY.md/.test(w))).toBe(true);
+    expect(plan.warnings.some((w) => /unsafe path/.test(w))).toBe(true);
+  });
+});

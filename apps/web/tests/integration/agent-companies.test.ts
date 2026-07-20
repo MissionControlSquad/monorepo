@@ -126,3 +126,52 @@ describe("company package export (Domain 14 #12)", () => {
     expect(byPath["README.md"]).toContain("n_ada --> n_grace");
   });
 });
+
+describe("company package import round-trip (Domain 14 #12)", () => {
+  it("exports a company then imports the package, recreating agents + reporting edges", async () => {
+    // build a source company with a 2-level org
+    const company = (
+      await gql(`mutation{ createAgentCompany(name:"Source Co", goals:["ship"]){ id } }`)
+    ).data.createAgentCompany;
+    const ceo = await prisma.agent.create({
+      data: { name: "Ada", role: "ceo", workspaceId: WS, companyId: company.id },
+    });
+    await prisma.agent.create({
+      data: {
+        name: "Grace",
+        role: "cto",
+        workspaceId: WS,
+        companyId: company.id,
+        reportsToAgentId: ceo.id,
+      },
+    });
+
+    const files = (
+      await gql(`query($id:String!){ exportCompanyPackage(companyId:$id){ path content } }`, {
+        id: company.id,
+      })
+    ).data.exportCompanyPackage;
+
+    // import the package (slug collides with the source → renamed)
+    const imp = await gql(
+      `mutation($f:JSON!){ importCompanyPackage(files:$f, sourceRef:"github:acme/co@abc"){ companyId slug createdAgentIds warnings } }`,
+      { f: files },
+    );
+    expect(imp.data.importCompanyPackage.slug).toBe("source-co-2"); // renamed on collision
+    expect(imp.data.importCompanyPackage.createdAgentIds).toHaveLength(2);
+    expect(imp.data.importCompanyPackage.warnings).toEqual([]);
+
+    // the imported agents exist with the reporting edge wired by slug
+    const importedId = imp.data.importCompanyPackage.companyId;
+    const imported = await prisma.agent.findMany({ where: { companyId: importedId } });
+    expect(imported).toHaveLength(2);
+    const grace = imported.find((a) => a.name === "Grace")!;
+    const ada = imported.find((a) => a.name === "Ada")!;
+    expect(grace.reportsToAgentId).toBe(ada.id);
+    // provenance recorded
+    const importedCompany = await prisma.agentCompany.findUniqueOrThrow({
+      where: { id: importedId },
+    });
+    expect(importedCompany.sourceRef).toBe("github:acme/co@abc");
+  });
+});

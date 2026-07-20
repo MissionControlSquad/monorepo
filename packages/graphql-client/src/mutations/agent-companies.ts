@@ -32,3 +32,15 @@ export const SET_AGENT_COMPANY = gql`
     }
   }
 `;
+
+// Domain 14 #12: import a company markdown package.
+export const IMPORT_COMPANY_PACKAGE = gql`
+  mutation ImportCompanyPackage($files: JSON!, $sourceRef: String) {
+    importCompanyPackage(files: $files, sourceRef: $sourceRef) {
+      companyId
+      slug
+      createdAgentIds
+      warnings
+    }
+  }
+`;
