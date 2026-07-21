@@ -60,16 +60,16 @@ export async function deliverViaBuildbase(
   record: UserNotification,
 ): Promise<BuildbaseDeliveryOutcome> {
   if (!bb) return "skip";
-  if (record.channel !== "push" && record.channel !== "email") return "skip";
 
   const workspaceId = resolveWorkspaceId(record);
   if (!workspaceId) return "skip";
 
+  // No channels override — buildbase applies the event's channel config AND the member's per-type
+  // push/email preference (its 4-layer gate). We record in-app ourselves; buildbase does push/email.
   const result = await bb.notification.send(workspaceId, record.type, record.userId, {
     title: record.title,
     message: record.body,
     url: record.url ?? undefined,
-    channels: { [record.channel]: true },
   });
 
   if (!result.sent) {

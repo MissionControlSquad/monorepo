@@ -13,22 +13,20 @@ export async function register() {
     const { initLicense, stopTokenRefresh } = await import("./src/server/license");
     await initLicense();
 
-    const { startRetryProcessor, stopRetryProcessor } =
-      await import("./src/server/services/notification-retry");
-    startRetryProcessor();
+    // Note: notification retry processor removed — buildbase owns push/email delivery + its own
+    // retry; the in-app feed is written synchronously and never needs redelivery.
 
-    // Graceful shutdown: stop heartbeat + retry processor before exiting
+    // Graceful shutdown: stop the license heartbeat before exiting
     const shutdown = () => {
       console.info(
         JSON.stringify({
           timestamp: new Date().toISOString(),
           level: "info",
           tag: "instrumentation",
-          message: "Shutting down — stopping license refresh and retry processor",
+          message: "Shutting down — stopping license refresh",
         }),
       );
       stopTokenRefresh();
-      stopRetryProcessor();
       process.exit(0);
     };
     process.once("SIGTERM", shutdown);
