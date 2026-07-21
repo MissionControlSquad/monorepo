@@ -1,0 +1,12 @@
+---
+service: workspace-realization
+kind: service
+status: Missing
+priority: P1
+gate: buildable-now
+---
+# workspace-realization · ❌ Missing
+**What it is:** actually materialize a workspace on disk (clone repo, checkout, set cwd) — the write side behind all the recording.
+**Monorepo:** operations are *recorded* but never *realized* (serverless model records intent only).
+**Required:** a git-worktree realizer bound to a host. **The central P1 execution-workspace gap.**
+**Covers:** features/P1-execution-workspaces.mdx · SERVICE-AUDIT #175.

@@ -1,0 +1,12 @@
+---
+service: recovery-observability
+kind: service
+status: Partial
+priority: P2
+gate: buildable-now
+---
+# recovery-observability · 🟡 Partial
+**What it is:** surface recovery actions (what was reaped/retried, why).
+**Monorepo:** recovery runs; observability of it is thin.
+**Required:** recovery event log + a view. Buildable-now.
+**Covers:** features/P2-observability-portability.mdx · SERVICE-AUDIT #137.

@@ -1,0 +1,12 @@
+---
+service: remote-http-endpoint-guard
+kind: service
+status: Missing
+priority: P1
+gate: buildable-now
+---
+# remote-http-endpoint-guard · ❌ Missing
+**What it is:** SSRF guard — block private/loopback/link-local targets on all agent-driven outbound HTTP.
+**Monorepo:** `private-hostname-guard` middleware exists for some routes; not applied as a central fetch guard.
+**Required:** a shared guarded-fetch wrapper enforced at every outbound call site. **Top P1 buildable-now item.**
+**Covers:** features/P1-security-ssrf-guard.mdx · SERVICE-AUDIT #138.
