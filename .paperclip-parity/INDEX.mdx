@@ -622,6 +622,15 @@ See 03-sandbox-depth.mdx.
       history). Deferred (need backend): the runSkillTest interactive test harness and the folder-tree editor.
       Typecheck 4/4, build ✓.
 
+- [x] **UI depth — Adapter Manager install/remove (11-ui §9, full slice)** DONE (next commit). Added the
+      record-level install path (the §9 gap): backend mutations installAdapter (register an external adapter as a
+      registry row — admin, MULTI_PROVIDER_ADAPTERS-gated, kebab-type validated, transport/authKind enum-checked,
+      starts disabled) + removeAdapter (deletes a non-builtIn row; refuses the builtIn openclaw). Wired an "Install
+      adapter" form + per-row "Remove" into /adapters (inline gql, matching the page's style). Tests: 3 integration
+      (install→row then remove→gone; duplicate + non-admin rejected; builtIn un-removable). Deferred (need runtime
+      hot-load, doc 02): reloadAdapter/reinstallAdapter (live npm/local module swap). Typecheck ✓, build ✓.
+      **All four 11-ui depth screens now have their backend-ready parts shipped.**
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
