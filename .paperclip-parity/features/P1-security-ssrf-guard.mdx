@@ -5,7 +5,13 @@ status: Missing
 gate: buildable-now
 ---
 
-# Remote HTTP endpoint guard (SSRF) · P1 · ❌ Missing (security)
+# Remote HTTP endpoint guard (SSRF) · P1 · ✅ Present (security)
+
+> **Built** (`remote-http-endpoint-guard.ts` + `guardedFetch`, 19 tests). On-by-default; env escape
+> hatch `SSRF_ALLOW_PRIVATE_NETWORK`. Applied to exe-dev + cloudflare provider bridges. Remaining
+> vectors: webhook `http` adapter (runner package — needs the guard shared there) + secret-provider
+> endpoints (when implemented).
+
 
 **What it is:** Paperclip's `remote-http-endpoint-guard.ts` (161 ln) validates every **outbound** HTTP
 endpoint an agent/plugin/webhook/external-object call would hit — parses the URL, resolves DNS, and
