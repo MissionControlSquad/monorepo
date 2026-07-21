@@ -534,6 +534,18 @@ See 03-sandbox-depth.mdx.
       trusted). AGENT_RUNS_QUERY already selected reviewState; added it to the interface + controls. No new route.
       Typecheck ✓, build ✓. This closes the last of the six §12 human-facing zero-UI surfaces the explorer mapped.
 
+- [x] **UI — unified "Needs my review" inbox (front-end)** DONE (next commit). New `/review` page (nav entry
+      ClipboardCheck, GOVERNANCE-gated) — the first surface that aggregates the workspace-wide agent-work review
+      queues with the primary decision wired INLINE, reusing existing shared mutations (no duplication of the
+      specialized pages): Approvals & hires (approve/reject, or vote for quorum), Plan decompositions (Approve &
+      apply = reviewDecomposition→applyDecomposition, or reject), Budget incidents (resolve + raise&resume
+      deep-link). Each section self-hides when empty or its flag is off, shows a count, and deep-links to its full
+      page (/approvals, /reliability, /finance). A footer routes to the remaining per-task/per-run review surfaces
+      (attention, runners, task work-products/questions). Backed the artifact inventory of all 58 agent-work
+      concepts (41 has-UI / 10 partial / 7 gap). Typecheck ✓, build ✓ (/review emitted). Verified every field
+      resolves server-side. Documented gaps (no UI): human task-review inbox (dead code), agent queue items,
+      agent-memory inspection, agent-authored documents, cost reprice / provider-quota drill-in.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
