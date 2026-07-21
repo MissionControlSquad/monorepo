@@ -45,6 +45,7 @@ import {
   APPROVE_TASK,
   REJECT_TASK,
   REQUEST_CLARIFICATION,
+  REVIEW_TASK,
 } from "../../lib/graphql/mutations";
 import { useAppContext } from "../context/AppContext";
 import { TaskComments } from "./TaskComments";
@@ -122,6 +123,25 @@ export function TaskDetailModal({
   const [, executeApproveTask] = useMutation(APPROVE_TASK);
   const [, executeRejectTask] = useMutation(REJECT_TASK);
   const [, executeRequestClarification] = useMutation(REQUEST_CLARIFICATION);
+  const [, executeReviewTask] = useMutation(REVIEW_TASK);
+
+  // Domain 8: the human review action (admin). Distinct from the Squad-Lead agent path — enforced
+  // admin-only server-side. Approve → done, request changes → assigned, then close so the board reflects it.
+  async function handleHumanReview(decision: "approve" | "request_changes") {
+    if (!taskId) return;
+    setApprovalLoading(decision === "approve" ? "approve" : "reject");
+    try {
+      const res = await executeReviewTask({ taskId, decision });
+      if (res.error) {
+        toast.error(res.error.message.replace("[GraphQL] ", "") ?? "Review failed");
+        return;
+      }
+      toast.success(decision === "approve" ? "Task approved" : "Sent back for changes");
+      onClose();
+    } finally {
+      setApprovalLoading(null);
+    }
+  }
 
   // Approval UI state
   const [_approvalLoading, setApprovalLoading] = useState<"approve" | "reject" | "clarify" | null>(
@@ -1340,11 +1360,26 @@ export function TaskDetailModal({
         </div>
 
         {/* ===== REVIEW APPROVAL BAR ===== */}
-        {/* Disabled: approval is handled by Squad Leader agent via comments */}
+        {/* A Squad-Lead agent may review via comments; an admin can also sign off directly here
+            (reviewTask — enforced admin-only server-side). */}
         {task.status === TaskStatusValues.REVIEW && (
           <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-t border-amber-200 bg-amber-50">
-            <span className="text-xs font-semibold text-amber-700 mr-auto">Awaiting Review</span>
-            <span className="text-xs text-amber-600">Squad Leader will review via comments</span>
+            <span className="text-xs font-semibold text-amber-700 mr-auto">Awaiting review</span>
+            <Button
+              size="sm"
+              disabled={_approvalLoading !== null}
+              onClick={() => handleHumanReview("approve")}
+            >
+              Approve
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={_approvalLoading !== null}
+              onClick={() => handleHumanReview("request_changes")}
+            >
+              Request changes
+            </Button>
           </div>
         )}
 

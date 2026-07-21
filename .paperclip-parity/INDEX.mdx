@@ -631,6 +631,12 @@ See 03-sandbox-depth.mdx.
       hot-load, doc 02): reloadAdapter/reinstallAdapter (live npm/local module swap). Typecheck ✓, build ✓.
       **All four 11-ui depth screens now have their backend-ready parts shipped.**
 
+- [x] **Hardening — task-detail review bar wired to reviewTask (Domain 8, front-end)** DONE (next commit). The
+      TaskDetailModal review bar showed a dead "Squad Leader will review via comments" message for review-status
+      tasks. Replaced it with live Approve / Request-changes buttons calling the human reviewTask mutation (admin
+      enforced server-side; approve→done, request_changes→assigned, then close so the board reflects it). Human task
+      review is now reachable both from the /review inbox and in-context on the task. Typecheck ✓, build ✓.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
