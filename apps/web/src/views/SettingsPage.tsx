@@ -3,14 +3,14 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
-import { ShieldOff, Lock, KeyRound } from "lucide-react";
+import { ShieldOff, Lock, KeyRound, FlaskConical } from "lucide-react";
 import {
   SET_SYSTEM_SHUTDOWN,
   SYSTEM_SETTINGS_QUERY,
   CHANGE_PASSWORD,
 } from "../lib/graphql/mutations/system";
-import { AGENT_GOVERNANCE_QUERY } from "@/lib/graphql/queries";
-import { SET_AGENT_GOVERNANCE } from "@/lib/graphql/mutations";
+import { AGENT_GOVERNANCE_QUERY, FEATURE_FLAGS_QUERY } from "@/lib/graphql/queries";
+import { SET_AGENT_GOVERNANCE, UPDATE_FEATURE_FLAG } from "@/lib/graphql/mutations";
 import { Breadcrumbs, Card, Button, ConfirmDialog, PageLayout } from "../components/ui";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -183,6 +183,9 @@ export function SettingsPage() {
 
       {/* Agent Governance */}
       <AgentGovernanceCard />
+
+      {/* Experimental feature flags */}
+      <FeatureFlagsCard />
 
       {/* License */}
       {licenseInfo && licenseInfo.status !== LicenseStatusCode.NONE && (
@@ -370,6 +373,96 @@ function AgentGovernanceCard() {
         />
         Require approval before new agents can work
       </label>
+    </Card>
+  );
+}
+
+interface FeatureFlag {
+  key: string;
+  enabled: boolean;
+  managedBy: string;
+  description?: string | null;
+}
+
+/**
+ * Experimental feature flags — a per-flag toggle grid so an admin can turn optional features on/off
+ * without a DB round-trip. Only user-managed flags are toggleable; system-managed ones are shown but
+ * locked (the server rejects toggling them). Mirrors Paperclip's InstanceExperimentalSettings.
+ */
+function FeatureFlagsCard() {
+  const [{ data, fetching }, refetch] = useQuery<{ featureFlags: FeatureFlag[] }>({
+    query: FEATURE_FLAGS_QUERY,
+  });
+  const [, updateFlag] = useMutation(UPDATE_FEATURE_FLAG);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const flags = [...(data?.featureFlags ?? [])].sort((a, b) => a.key.localeCompare(b.key));
+
+  async function toggle(key: string, next: boolean) {
+    setBusy(key);
+    try {
+      const res = await updateFlag({ key, enabled: next });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors[0]?.message ?? "Failed to update flag");
+      } else {
+        toast.success(`${key} ${next ? "enabled" : "disabled"}`);
+        refetch({ requestPolicy: "network-only" });
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card padding="lg" className="space-y-4">
+      <div className="flex items-start gap-4">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
+          <FlaskConical className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-semibold text-foreground">Experimental Features</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Turn optional features on or off for this workspace. System-managed flags are shown but
+            can only be changed by your administrator.
+          </p>
+        </div>
+      </div>
+
+      {fetching && flags.length === 0 && (
+        <p className="text-sm text-muted-foreground">Loading flags…</p>
+      )}
+
+      <ul className="divide-y divide-border">
+        {flags.map((f) => {
+          const locked = f.managedBy !== "user";
+          return (
+            <li key={f.key} className="flex items-center justify-between gap-4 py-2.5">
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 font-mono text-sm text-foreground">
+                  {f.key}
+                  {locked && (
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                      system
+                    </span>
+                  )}
+                </p>
+                {f.description && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">{f.description}</p>
+                )}
+              </div>
+              <label className="inline-flex shrink-0 cursor-pointer items-center">
+                <input
+                  type="checkbox"
+                  checked={f.enabled}
+                  disabled={locked || busy === f.key}
+                  onChange={(e) => toggle(f.key, e.target.checked)}
+                  className="h-4 w-4"
+                />
+              </label>
+            </li>
+          );
+        })}
+      </ul>
     </Card>
   );
 }

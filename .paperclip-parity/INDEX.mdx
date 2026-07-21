@@ -476,6 +476,19 @@ See 03-sandbox-depth.mdx.
       all present). Typecheck ✓, build ✓ (/companies route emitted). Backend covered by existing agent-companies
       integration tests. Still UI-less: work products, thread interactions, agent-hire proposal form.
 
+- [x] **UI + config — experimental-flags panel & flag backfill (11-ui §12, front-end + startup)** DONE (next
+      commit). Two coupled fixes. (1) Added a FeatureFlagsCard to SettingsPage: a per-flag toggle grid over
+      FEATURE_FLAGS_QUERY / UPDATE_FEATURE_FLAG; user-managed flags toggle, system-managed shown but locked
+      (server already rejects toggling them). (2) Found+fixed a reachability gap: newer flags (AGENT_COMPANIES,
+      WORK_PRODUCTS, PROVIDER_QUOTA, THREAD_INTERACTIONS, LOW_TRUST_REVIEW, and every other non-curated FLAG_KEYS)
+      had NO DB row, so getAllFlags() (DB-only) couldn't list them AND their client FeatureGate fell back to
+      FLAG_DEFAULTS=false — the feature was both hidden and impossible to enable. ensureFeatureFlags() now
+      backfills every remaining FLAG_KEYS as managedBy:"user" at its FLAG_DEFAULTS value (non-destructive upsert —
+      never touches a curated system flag or an admin's toggle). This makes the /companies page (and all
+      default-off features) reachable: flip the flag in the panel → the gate opens. Tests: 3 new integration
+      (every FLAG_KEYS seeded; AGENT_COMPANIES user-managed at default; idempotent, preserves toggles). Full
+      integration 64 files/465 green, flag-keys unit 12/12, web build ✓.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
