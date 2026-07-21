@@ -50,6 +50,10 @@ import { useAppContext } from "../context/AppContext";
 import { TaskComments } from "./TaskComments";
 import { TaskRelationsCard } from "./TaskRelationsCard";
 import { TaskExternalLinksCard } from "./TaskExternalLinksCard";
+import { TaskBlockerDiagnosticsCard } from "./TaskBlockerDiagnosticsCard";
+import { TaskThreadInteractionsCard } from "./TaskThreadInteractionsCard";
+import { TaskWorkProductsCard } from "./TaskWorkProductsCard";
+import { TaskCostRollupCard } from "./TaskCostRollupCard";
 import { TaskDeliverables } from "./TaskDeliverables";
 import { ChildTaskDeliverables } from "./ChildTaskDeliverables";
 import { ErrorBoundary, PanelErrorFallback } from "../common/ErrorBoundary";
@@ -1154,6 +1158,10 @@ export function TaskDetailModal({
               {resolvedTaskId && (
                 <>
                   <div className="border-t border-border" />
+                  <TaskBlockerDiagnosticsCard taskId={resolvedTaskId} />
+                  <TaskThreadInteractionsCard taskId={resolvedTaskId} />
+                  <TaskWorkProductsCard taskId={resolvedTaskId} />
+                  <TaskCostRollupCard taskId={resolvedTaskId} />
                   <TaskRelationsCard taskId={resolvedTaskId} />
                   <div className="border-t border-border" />
                   <TaskExternalLinksCard taskId={resolvedTaskId} />

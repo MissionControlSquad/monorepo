@@ -515,6 +515,18 @@ See 03-sandbox-depth.mdx.
       (needs a cost-event drill-down list that doesn't exist — no dangling control). Typecheck ✓, build ✓, finance
       tests 9/9.
 
+- [x] **UI wiring — task-detail cards: work products, thread interactions, cost rollup, blocker diagnostics
+      (Domains 8/12, front-end)** DONE (next commit). Four self-contained cards (following the TaskRelationsCard
+      pattern) slotted into TaskDetailModal COL 2 — NOT new routes, NOT duplicating the Deliverables list:
+      • TaskWorkProductsCard — workProductsByTask (the code-output subset of deliverables) with review governance:
+        reviewState/outputStatus badges + Approve/Request-changes (setWorkProductReviewState) + a server-guarded
+        status select (setWorkProductStatus). Reuses WORK_PRODUCT_STATUSES from utils.
+      • TaskThreadInteractionsCard — pending agent→human interactions (threadInteractions) with Resolve/Dismiss
+        (resolveThreadInteraction). Renders only when pending ones exist.
+      • TaskCostRollupCard — costByTaskTree subtree cost + runtime rollup (read-only; reuses formatCents).
+      • TaskBlockerDiagnosticsCard — blockerDiagnostics "why blocked" readiness (read-only; hidden when ready).
+      Each renders nothing when empty (no clutter on clean tasks). Typecheck ✓, build ✓.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
