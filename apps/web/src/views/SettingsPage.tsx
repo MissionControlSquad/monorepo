@@ -3,14 +3,24 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
-import { ShieldOff, Lock, KeyRound, FlaskConical } from "lucide-react";
+import { ShieldOff, Lock, KeyRound, FlaskConical, Brain } from "lucide-react";
 import {
   SET_SYSTEM_SHUTDOWN,
   SYSTEM_SETTINGS_QUERY,
   CHANGE_PASSWORD,
 } from "../lib/graphql/mutations/system";
-import { AGENT_GOVERNANCE_QUERY, FEATURE_FLAGS_QUERY } from "@/lib/graphql/queries";
-import { SET_AGENT_GOVERNANCE, UPDATE_FEATURE_FLAG } from "@/lib/graphql/mutations";
+import {
+  AGENT_GOVERNANCE_QUERY,
+  FEATURE_FLAGS_QUERY,
+  COMPANY_MEMORY_DEFAULT_QUERY,
+} from "@/lib/graphql/queries";
+import {
+  SET_AGENT_GOVERNANCE,
+  UPDATE_FEATURE_FLAG,
+  SET_COMPANY_MEMORY_PROVIDER,
+} from "@/lib/graphql/mutations";
+import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
+import { MEMORY_PROVIDERS, FLAG_KEYS } from "@agentcenter/utils";
 import { Breadcrumbs, Card, Button, ConfirmDialog, PageLayout } from "../components/ui";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -183,6 +193,9 @@ export function SettingsPage() {
 
       {/* Agent Governance */}
       <AgentGovernanceCard />
+
+      {/* Agent memory backend */}
+      <MemoryDefaultCard />
 
       {/* Experimental feature flags */}
       <FeatureFlagsCard />
@@ -372,6 +385,68 @@ function AgentGovernanceCard() {
           onChange={(e) => toggle(e.target.checked)}
         />
         Require approval before new agents can work
+      </label>
+    </Card>
+  );
+}
+
+/**
+ * Domain 4: the workspace-default memory backend for agents (none / markdown / db). Individual agents
+ * can override it; this sets the default they inherit. MEMORY-gated — self-hides when the flag is off.
+ */
+function MemoryDefaultCard() {
+  const enabled = useFeatureFlag(FLAG_KEYS.MEMORY);
+  const [{ data }, refetch] = useQuery<{ companyMemoryDefault: string | null }>({
+    query: COMPANY_MEMORY_DEFAULT_QUERY,
+    pause: !enabled,
+  });
+  const [, setProvider] = useMutation(SET_COMPANY_MEMORY_PROVIDER);
+  const [saving, setSaving] = useState(false);
+
+  if (!enabled) return null;
+  const current = data?.companyMemoryDefault ?? "none";
+
+  async function onChange(provider: string) {
+    setSaving(true);
+    try {
+      const res = await setProvider({ provider });
+      if (res.error) toast.error(res.error.graphQLErrors[0]?.message ?? "Failed to update");
+      else {
+        toast.success(`Memory backend set to ${provider}`);
+        refetch({ requestPolicy: "network-only" });
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card padding="lg" className="space-y-4">
+      <div className="flex items-start gap-4">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
+          <Brain className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-semibold text-foreground">Agent memory</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The default memory backend new agents use. Individual agents can override it.
+          </p>
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-sm text-foreground">
+        Default backend
+        <select
+          className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+          value={current}
+          disabled={saving}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {MEMORY_PROVIDERS.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
       </label>
     </Card>
   );

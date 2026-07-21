@@ -587,6 +587,12 @@ See 03-sandbox-depth.mdx.
       default (query paused until opened). Typecheck ✓, build ✓. Inventory gaps 2 → 1 (only memory-provider
       settings left).
 
+- [x] **UI — agent memory backend setting (Domain 4, front-end)** DONE (next commit). Closes the last inventory
+      gap. Added a MemoryDefaultCard to Settings (companyMemoryDefault + setCompanyMemoryProvider, MEMORY_PROVIDERS
+      none/markdown/db from utils) — the workspace-default memory backend agents inherit; MEMORY-gated, self-hides
+      when off. Typecheck ✓, build ✓. **All 7 original agent-work inventory gaps now closed** (per-agent provider
+      override remains a minor future enhancement — the primary company-default knob is wired).
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
