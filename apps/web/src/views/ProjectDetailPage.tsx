@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 import { ProjectMemberEditor } from "../components/project/ProjectMemberEditor";
 import { ProjectSourceCard } from "../components/project/ProjectSourceCard";
+import { ProjectWorkspacesCard } from "../components/project/ProjectWorkspacesCard";
 import {
   Breadcrumbs,
   Button,
@@ -986,6 +987,9 @@ function ProjectDetailPanel({
         readOnly={isArchived}
         onSaved={() => reexecuteProject({ requestPolicy: "network-only" })}
       />
+
+      {/* Execution workspaces */}
+      <ProjectWorkspacesCard projectId={project.id} />
 
       {/* Docs */}
       <WhenFeatureEnabled flag={FLAG_KEYS.DOCUMENTS}>

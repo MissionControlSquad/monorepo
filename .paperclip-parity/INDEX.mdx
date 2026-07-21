@@ -637,6 +637,13 @@ See 03-sandbox-depth.mdx.
       enforced server-side; approve→done, request_changes→assigned, then close so the board reflects it). Human task
       review is now reachable both from the /review inbox and in-context on the task. Typecheck ✓, build ✓.
 
+- [x] **UI depth — Execution Workspaces on the project (11-ui §7, front-end)** DONE (next commit). §7 was ❌ (no
+      UI) but the backend CRUD already existed (projectWorkspaces + create/update/delete). New ProjectWorkspacesCard
+      on the project detail page: lists a project's execution workspaces (repo/ref/setup/strategy/primary), creates
+      them (name + strategy from WORKSPACE_STRATEGIES + repo/setup + isPrimary), makes-primary (update), and
+      deletes. EXECUTION_WORKSPACES-gated, self-hides when off. Deferred (need backend): provision/teardown
+      lifecycle (provisionWorkspace) + the services/ports runtime-config editor. Typecheck ✓, build ✓.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
