@@ -193,3 +193,19 @@ export const PROVIDER_QUOTA_WINDOWS_QUERY = gql`
     }
   }
 `;
+
+// Domain 12 A13: cost events awaiting a price correction (drill-down for repriceCostEvent).
+export const UNPRICED_COST_EVENTS_QUERY = gql`
+  query UnpricedCostEvents($limit: Int) {
+    unpricedCostEvents(limit: $limit) {
+      id
+      model
+      provider
+      tokensIn
+      tokensOut
+      amountCents
+      billingType
+      occurredAt
+    }
+  }
+`;

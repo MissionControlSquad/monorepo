@@ -9,8 +9,9 @@ import {
   COST_WINDOW_SPEND_QUERY,
   COST_BILLING_SPLIT_QUERY,
   PROVIDER_QUOTA_WINDOWS_QUERY,
+  UNPRICED_COST_EVENTS_QUERY,
 } from "@/lib/graphql/queries";
-import { INGEST_FINANCE_EVENT } from "@/lib/graphql/mutations";
+import { INGEST_FINANCE_EVENT, REPRICE_COST_EVENT } from "@/lib/graphql/mutations";
 import { formatCents as money, FINANCE_EVENT_KINDS, COST_WINDOWS } from "@agentcenter/utils";
 import { Card, Badge, Button } from "@/components/ui";
 import { Input } from "@/components/ui/shadcn/input";
@@ -117,6 +118,107 @@ function ProviderQuotaSection() {
               {w.detail && <p className="text-[11px] text-muted-foreground">{w.detail}</p>}
             </div>
           ))}
+        </Card>
+      ))}
+    </section>
+  );
+}
+
+interface UnpricedEvent {
+  id: string;
+  model: string | null;
+  provider: string | null;
+  tokensIn: number;
+  tokensOut: number;
+  amountCents: number;
+  billingType: string;
+  occurredAt: string;
+}
+
+// Domain 12 A13: cost events an agent reported without a real price. An admin enters the actual amount
+// and repriceCostEvent corrects it + re-accrues budget windows. Self-hides when nothing is unpriced.
+function UnpricedCostsSection() {
+  const [{ data }, refetch] = useQuery<{ unpricedCostEvents: UnpricedEvent[] }>({
+    query: UNPRICED_COST_EVENTS_QUERY,
+    variables: { limit: 50 },
+  });
+  const [, reprice] = useMutation(REPRICE_COST_EVENT);
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const events = data?.unpricedCostEvents ?? [];
+  if (events.length === 0) return null;
+
+  async function onReprice(id: string) {
+    const cents = Math.round(Number(amounts[id]) * 100);
+    if (!Number.isFinite(cents) || cents < 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    setBusy(id);
+    try {
+      const res = await reprice({ costEventId: id, amountCents: cents });
+      if (res.error) toast.error(res.error.graphQLErrors[0]?.message ?? "Failed to reprice");
+      else {
+        toast.success("Cost repriced");
+        setAmounts((m) => {
+          const next = { ...m };
+          delete next[id];
+          return next;
+        });
+        refetch({ requestPolicy: "network-only" });
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        Unpriced costs
+        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
+          {events.length}
+        </span>
+      </h2>
+      <p className="-mt-1 text-xs text-muted-foreground">
+        Runs an agent reported without a final price. Enter the actual amount to correct spend and
+        re-accrue budgets.
+      </p>
+      {events.map((e) => (
+        <Card key={e.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-foreground">
+                {e.model ?? e.provider ?? "cost event"}
+              </span>
+              <Badge variant="yellow" size="sm">
+                unpriced
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {e.tokensIn.toLocaleString()} in · {e.tokensOut.toLocaleString()} out
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              current estimate {money(e.amountCents)}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Input
+              value={amounts[e.id] ?? ""}
+              onChange={(ev) => setAmounts((m) => ({ ...m, [e.id]: ev.target.value }))}
+              placeholder="Actual ($)"
+              inputMode="decimal"
+              className="w-28"
+            />
+            <Button
+              size="sm"
+              disabled={busy === e.id || !amounts[e.id]}
+              onClick={() => onReprice(e.id)}
+            >
+              Reprice
+            </Button>
+          </div>
         </Card>
       ))}
     </section>
@@ -324,6 +426,7 @@ export function FinanceEventsSection() {
         )}
       </Card>
 
+      <UnpricedCostsSection />
       <ProviderQuotaSection />
     </section>
   );

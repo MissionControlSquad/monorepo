@@ -105,6 +105,25 @@ builder.queryField("budgetIncidents", (t) =>
   }),
 );
 
+// Domain 12 A13: cost events an agent reported without a real price (costStatus "unpriced"), awaiting
+// an admin reprice. This is the drill-down that makes repriceCostEvent reachable. Workspace-scoped.
+builder.queryField("unpricedCostEvents", (t) =>
+  t.prismaField({
+    type: ["CostEvent"],
+    args: { limit: t.arg.int({ defaultValue: 50 }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      requireRole(ctx, "member");
+      return ctx.prisma.costEvent.findMany({
+        ...query,
+        where: scoped(ctx, { costStatus: "unpriced" }),
+        orderBy: { occurredAt: "desc" },
+        take: Math.min(args.limit ?? 50, 200),
+      });
+    },
+  }),
+);
+
 builder.queryField("costBreakdown", (t) =>
   t.field({
     type: [CostBucket],

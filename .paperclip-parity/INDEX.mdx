@@ -572,6 +572,15 @@ See 03-sandbox-depth.mdx.
       Typecheck 4/4, build ✓. Remaining true gaps (need backend): cost-event reprice (no cost-event list query
       exists) and the memory-operations audit / memory-provider settings surfaces.
 
+- [x] **Cost-event reprice — the must-have financial-correctness gap (Domain 12 A13, full slice)** DONE (next
+      commit). repriceCostEvent existed but had no drill-down to reach it. Added: server query unpricedCostEvents
+      (BUDGETS-gated, member+, workspace-scoped, costStatus="unpriced") + client op UNPRICED_COST_EVENTS_QUERY +
+      an "Unpriced costs" section on the finance page listing agent-reported runs with no final price, each with an
+      inline amount field → REPRICE_COST_EVENT (corrects spend + re-accrues budget windows; flips status→reported
+      so it leaves the list). Tests: 2 integration (unpriced listed then repriced out; cross-workspace reprice
+      refused). Typecheck 4/4, web build ✓. Inventory gaps 3 → 2 (remaining: memory-operations audit,
+      memory-provider settings).
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
