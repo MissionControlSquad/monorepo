@@ -607,6 +607,14 @@ See 03-sandbox-depth.mdx.
       closed. Deferred (need new backend): secretReferences usage drill-down + discoverVaultCandidates AWS
       discovery. Typecheck ✓, build ✓.
 
+- [x] **UI depth — plugin settings via JsonSchemaForm (11-ui §10, front-end)** DONE (next commit). The
+      PluginDetailPage was already fleshed out in earlier work (manifest, capabilities, tools/jobs, config form,
+      error surface, enable/disable/clear/uninstall) — the §10 "6-line stub" gap was closed. Remaining backend-ready
+      item: its config form hand-rolled field rendering with the old adapterConfigFields; refactored it to the
+      shared JsonSchemaForm primitive (keystone #3) — the dogfooding §10's impl plan called for (dedup + validation
+      + secret masking), removing ~55 lines of duplicated field rendering. Deferred (need plugin runtime backend):
+      the Status runtime dashboard (pluginRuntimeStatus/job-runs/logs). Typecheck ✓, build ✓.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
