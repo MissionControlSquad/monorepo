@@ -14,6 +14,7 @@ import {
   type CreateUserNotificationInput,
 } from "@agentcenter/database";
 import { sendPushToUser } from "./push";
+import { deliverViaBuildbase } from "./notification-buildbase";
 import { sendEmail } from "./email";
 import { renderEmailTemplate } from "./email-templates";
 import { logError, logWarn, log } from "../logger";
@@ -161,7 +162,12 @@ export async function dispatchNotification(record: UserNotification): Promise<vo
       await markUserNotificationSent(record.id);
       break;
 
-    case "push":
+    case "push": {
+      // Prefer buildbase delivery when provisioned + opted-in (metadata.workspaceId); else fall back.
+      if ((await deliverViaBuildbase(record)) === "delivered") {
+        await markUserNotificationSent(record.id);
+        break;
+      }
       // sendPushToUser throws if VAPID is not configured (error propagates to handleDispatchFailure)
       // returns false (no-op) if user has no subscriptions — still mark sent
       await sendPushToUser(record.userId, {
@@ -171,8 +177,13 @@ export async function dispatchNotification(record: UserNotification): Promise<vo
       });
       await markUserNotificationSent(record.id);
       break;
+    }
 
     case "email": {
+      if ((await deliverViaBuildbase(record)) === "delivered") {
+        await markUserNotificationSent(record.id);
+        break;
+      }
       const email = await getUserEmail(record.userId);
       const user = email ? { email } : null;
       if (!user?.email) {
