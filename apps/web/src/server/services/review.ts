@@ -255,3 +255,44 @@ export async function performRequestClarification(params: {
 
   return { newStatus: TaskStatus.REVIEW };
 }
+
+// ── Human review (Domain 8) ──────────────────────────────────────────────────────
+// The agent review path (performApproveTask/performRejectTask) is Squad-Lead-agent only. This is the
+// missing HUMAN path: an admin signs off (or sends back) a task an agent has moved to `review`. Same
+// transitions as the agent flow — approve → done, changes → assigned — with a comment authored by the
+// human's profile. Purely additive; only acts on a task currently awaiting review.
+export async function reviewTaskByHuman(params: {
+  taskId: string;
+  reviewerProfileId: string; // the human's Profile id (ctx.tenancy.userId)
+  reviewerName: string;
+  decision: "approve" | "request_changes";
+  note?: string | null;
+}): Promise<{ newStatus: string }> {
+  const { taskId, reviewerProfileId, reviewerName, decision, note } = params;
+
+  const task = await taskModel.findById(taskId);
+  if (!task) throw Object.assign(new Error("Task not found"), { status: 404 });
+  if (task.status !== TaskStatus.REVIEW)
+    throw Object.assign(
+      new Error(`Only a task awaiting review can be reviewed (status: ${task.status})`),
+      { status: 400 },
+    );
+
+  const newStatus = decision === "approve" ? TaskStatus.DONE : TaskStatus.ASSIGNED;
+  const content =
+    decision === "approve"
+      ? `**Approved** by ${reviewerName}${note ? ` — ${note}` : "."}`
+      : `**Changes requested** by ${reviewerName}\n\n${note ?? "Please revise and resubmit."}`;
+
+  const fromStatus = task.status;
+  await Promise.all([
+    taskModel.update(taskId, { data: { status: newStatus } }),
+    messageModel.create({ data: { taskId, fromProfileId: reviewerProfileId, content } }),
+  ]);
+
+  await taskModel
+    .emitStatusChanged(task, { fromStatus, toStatus: newStatus, profileId: reviewerProfileId })
+    .catch((err) => console.error("[review] emitStatusChanged (human review) failed", err));
+
+  return { newStatus };
+}

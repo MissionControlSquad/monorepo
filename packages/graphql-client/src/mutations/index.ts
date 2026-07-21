@@ -80,7 +80,7 @@ export {
   DELETE_RECURRING_TASK,
 } from "./recurring-tasks";
 
-export { APPROVE_TASK, REJECT_TASK, REQUEST_CLARIFICATION } from "./reviews";
+export { APPROVE_TASK, REJECT_TASK, REQUEST_CLARIFICATION, REVIEW_TASK } from "./reviews";
 
 export { INGEST_EVENT } from "./events";
 

@@ -42,6 +42,17 @@ export const REJECT_TASK = gql`
   }
 `;
 
+// Domain 8: human task review (admin signs off / sends back a task an agent moved to review).
+export const REVIEW_TASK = gql`
+  mutation ReviewTask($taskId: String!, $decision: String!, $note: String) {
+    reviewTask(taskId: $taskId, decision: $decision, note: $note) {
+      success
+      message
+      newStatus
+    }
+  }
+`;
+
 export const REQUEST_CLARIFICATION = gql`
   mutation RequestClarification($reviewerId: String!, $taskId: String!, $questions: [String!]!) {
     requestClarification(reviewerId: $reviewerId, taskId: $taskId, questions: $questions) {

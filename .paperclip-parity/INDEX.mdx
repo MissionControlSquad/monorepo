@@ -546,6 +546,17 @@ See 03-sandbox-depth.mdx.
       resolves server-side. Documented gaps (no UI): human task-review inbox (dead code), agent queue items,
       agent-memory inspection, agent-authored documents, cost reprice / provider-quota drill-in.
 
+- [x] **Human task-review path — the #1 inventory gap (Domain 8, full slice)** DONE (next commit). The existing
+      approveTask/rejectTask require a Squad-Lead AGENT reviewer (agentModel + role check) — there was NO human
+      path; the task-detail Approve/Reject dialogs were dead code. Added: service reviewTaskByHuman (in review.ts,
+      reusing taskModel/messageModel/emitStatusChanged — approve→done, request_changes→assigned, comment authored
+      by the human's Profile, only acts on a task in `review`); GraphQL mutation reviewTask (admin, REVIEWS-gated,
+      reviewerProfileId=tenancy.userId); client op REVIEW_TASK (barrel-registered); wired a "Tasks awaiting review"
+      section (first) into the /review inbox using the workspace-wide tasksByStatus(status:"review") + REVIEW_TASK
+      with Approve / Request-changes. Tasks aren't workspace-scoped in this codebase (no workspaceId column) so no
+      isolation needed. Tests: 3 integration (approve→done+comment; request_changes→assigned; non-review guard).
+      Typecheck 4/4, web build ✓. Flips the inventory's biggest Gap → Has-UI.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

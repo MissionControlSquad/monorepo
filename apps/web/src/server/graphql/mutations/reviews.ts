@@ -3,11 +3,14 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { agentModel } from "../../models";
 import { Roles } from "../../constants";
+import { requireRole } from "@/server/tenancy";
+import { prisma } from "@/server/prisma";
 import { isSystemShutdown } from "../../system-settings";
 import {
   performApproveTask,
   performRejectTask,
   performRequestClarification,
+  reviewTaskByHuman,
 } from "../../services/review";
 
 const ReviewResultType = builder.simpleObject("ReviewResult", {
@@ -122,6 +125,44 @@ builder.mutationField("requestClarification", (t) =>
       return {
         success: true,
         message: "Clarification requested",
+        newStatus: result.newStatus,
+        childTaskIds: null,
+      };
+    },
+  }),
+);
+
+// Domain 8: the HUMAN task-review path. The approveTask/rejectTask mutations above require a
+// Squad-Lead AGENT reviewer; this lets a workspace admin sign off (or send back) a task an agent
+// has moved to `review`. REVIEWS-gated, admin-only, reuses the shared reviewTaskByHuman service.
+builder.mutationField("reviewTask", (t) =>
+  t.field({
+    type: ReviewResultType,
+    args: {
+      taskId: t.arg.string({ required: true }),
+      decision: t.arg.string({ required: true }), // "approve" | "request_changes"
+      note: t.arg.string(),
+    },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.REVIEWS);
+      if (await isSystemShutdown())
+        throw new Error("System is in shutdown mode. No task reviews allowed.");
+      const tenancy = requireRole(ctx, "admin");
+      const decision = args.decision === "approve" ? "approve" : "request_changes";
+      const profile = await prisma.profile.findUnique({
+        where: { id: tenancy.userId },
+        select: { displayName: true },
+      });
+      const result = await reviewTaskByHuman({
+        taskId: args.taskId,
+        reviewerProfileId: tenancy.userId,
+        reviewerName: profile?.displayName ?? "Reviewer",
+        decision,
+        note: args.note ?? null,
+      });
+      return {
+        success: true,
+        message: decision === "approve" ? "Task approved and moved to done" : "Task sent back",
         newStatus: result.newStatus,
         childTaskIds: null,
       };

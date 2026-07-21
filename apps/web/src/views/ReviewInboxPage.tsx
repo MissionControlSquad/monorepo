@@ -9,6 +9,7 @@ import {
   APPROVALS_QUERY,
   PENDING_DECOMPOSITIONS_QUERY,
   BUDGET_INCIDENTS_QUERY,
+  TASKS_BY_STATUS_QUERY,
 } from "@/lib/graphql/queries";
 import {
   APPROVE_APPROVAL,
@@ -17,6 +18,7 @@ import {
   REVIEW_DECOMPOSITION,
   APPLY_DECOMPOSITION,
   RESOLVE_BUDGET_INCIDENT,
+  REVIEW_TASK,
 } from "@/lib/graphql/mutations";
 import { formatCents as money, IncidentThreshold } from "@agentcenter/utils";
 import { Card, Badge, Button } from "@/components/ui";
@@ -52,6 +54,12 @@ interface Incident {
   autoPaused: boolean;
   detail: string | null;
 }
+interface ReviewTask {
+  id: string;
+  title: string;
+  description: string | null;
+  taskNumber: number | null;
+}
 
 function SectionHeader({
   title,
@@ -79,6 +87,70 @@ function SectionHeader({
         {linkLabel} <ArrowRight className="h-3 w-3" />
       </Link>
     </div>
+  );
+}
+
+function TasksInReviewSection() {
+  const [{ data }, refetch] = useQuery<{ tasksByStatus: ReviewTask[] }>({
+    query: TASKS_BY_STATUS_QUERY,
+    variables: { status: "review" },
+  });
+  const [, reviewTask] = useMutation(REVIEW_TASK);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const tasks = data?.tasksByStatus ?? [];
+  if (tasks.length === 0) return null;
+  const refresh = () => refetch({ requestPolicy: "network-only" });
+
+  async function act(id: string, decision: "approve" | "request_changes") {
+    setBusy(id);
+    try {
+      const res = await reviewTask({ taskId: id, decision });
+      if (res.error) toast.error(String(res.error.message).replace("[GraphQL] ", ""));
+      else {
+        toast.success(decision === "approve" ? "Task approved" : "Sent back for changes");
+        refresh();
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <SectionHeader
+        title="Tasks awaiting review"
+        count={tasks.length}
+        href="/"
+        linkLabel="Board"
+      />
+      {tasks.map((t) => (
+        <Card key={t.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
+          <Link href={`/task/${t.id}`} className="min-w-0 flex-1">
+            <span className="text-sm font-medium text-foreground hover:underline">
+              {t.taskNumber != null ? `#${t.taskNumber} ` : ""}
+              {t.title}
+            </span>
+            {t.description && (
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{t.description}</p>
+            )}
+          </Link>
+          <div className="flex shrink-0 gap-2">
+            <Button size="sm" disabled={busy === t.id} onClick={() => act(t.id, "approve")}>
+              Approve
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={busy === t.id}
+              onClick={() => act(t.id, "request_changes")}
+            >
+              Request changes
+            </Button>
+          </div>
+        </Card>
+      ))}
+    </section>
   );
 }
 
@@ -351,6 +423,7 @@ export function ReviewInboxPage() {
         </div>
       </div>
 
+      <TasksInReviewSection />
       <ApprovalsSection />
       <DecompositionsSection />
       <IncidentsSection />
