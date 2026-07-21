@@ -268,6 +268,7 @@ describe("adapter registry unification (Tier-A DB ↔ Tier-D code)", () => {
     "grok-local",
     "opencode-local",
     "pi-local",
+    "hermes", // seeded bare (no -local suffix) — matches the code key directly
   ];
 
   it.each(SEEDED_DB_ADAPTER_TYPES)("resolves seeded DB adapter %s to a code module", (type) => {

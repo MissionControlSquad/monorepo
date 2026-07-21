@@ -5,7 +5,12 @@ status: Partial
 gate: buildable-now
 ---
 
-# Adapters & runtime registry · P1 · 🟡 Present, two registries not unified
+# Adapters & runtime registry · P1 · 🟡 Present, registries now consistent (ACP deferred)
+
+> **Update:** the two registries are now **key-consistent** — every seeded DB adapter resolves to its
+> Tier-D runtime module (hyphen-alias bug fixed + drift-guard test). Only net-new provider **ACP**
+> remains (needs a confirmed launch spec) + an optional startup-sync nicety.
+
 
 **What it is:** the catalog of agent runtimes (claude/codex/cursor/grok/…), their launch config, model
 profiles, install/enable/remove, and JSON-Schema config UI.
@@ -20,9 +25,14 @@ profiles, install/enable/remove, and JSON-Schema config UI.
   table only had underscore forms → `canonicalAdapterKey("claude-local")` returned identity and those
   rows failed to resolve their runtime module at launch. Added hyphen aliases for all seeded rows +
   a co-validation test (every seeded DB type resolves to a code module). (commit on parity branch.)
-- **Two registries still only alias-bridged, not fully unified:** `installAdapter` creates a DB row with
-  no Tier-D module; `hermes` code module has no seeded DB row; ACP absent. Remaining: seed the code
-  registry as DB rows (drive DB from code) + add hermes-local + ACP rows.
+- ✅ **Every seeded DB adapter now resolves** to a Tier-D module (verified by test). Correction: `hermes`
+  IS seeded (as a **bare** `hermes` row, matching the code key directly — the earlier "no DB row" note
+  was wrong). All 9 seeded types (openclaw-gateway + 7×`*-local` + hermes) resolve.
+- **Remaining (lower value):** (a) **ACP adapter** — absent; needs a confirmed launch spec/CLI before
+  seeding (deferred, not buildable without the real runtime). (b) *Optional* — relocate the migration
+  seed into an idempotent `ensureBuiltinAdapters()` startup sync so future code adapters auto-seed
+  (maintainability nicety; the correctness gap is already closed). `installAdapter` still allows a DB
+  row with no code module — acceptable (custom/plugin adapters register their module separately).
 - cursor/grok/opencode/pi/hermes launch specs are "best-effort mirrors, unconfirmed against a live CLI."
 - `detectModels()`/`getQuotaWindows()` are optional hooks no built-in implements.
 - **ACP** adapter absent.
