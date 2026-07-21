@@ -9,9 +9,9 @@ import {
   SEARCH_AGENT_MEMORY_QUERY,
   MEMORY_OPERATIONS_QUERY,
 } from "@/lib/graphql/queries";
-import { FORGET_AGENT_MEMORY } from "@/lib/graphql/mutations";
+import { FORGET_AGENT_MEMORY, SET_AGENT_MEMORY_PROVIDER } from "@/lib/graphql/mutations";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
-import { FLAG_KEYS, formatCents } from "@agentcenter/utils";
+import { FLAG_KEYS, formatCents, MEMORY_PROVIDERS } from "@agentcenter/utils";
 import { Card, Button, Badge } from "@/components/ui";
 import { Input } from "@/components/ui/shadcn/input";
 import { TimeAgo } from "@/components/common/TimeAgo";
@@ -86,10 +86,33 @@ function MemoryActivityLog({ agentId }: { agentId: string }) {
   );
 }
 
-export function AgentMemoryCard({ agentId }: { agentId: string }) {
+export function AgentMemoryCard({
+  agentId,
+  currentProvider,
+}: {
+  agentId: string;
+  currentProvider?: string | null;
+}) {
   const enabled = useFeatureFlag(FLAG_KEYS.MEMORY);
   const [term, setTerm] = useState("");
   const [active, setActive] = useState(""); // committed search term
+  const [, setAgentProvider] = useMutation(SET_AGENT_MEMORY_PROVIDER);
+  const [provider, setProviderState] = useState(currentProvider ?? "none");
+  const [savingProvider, setSavingProvider] = useState(false);
+
+  async function onProviderChange(next: string) {
+    setSavingProvider(true);
+    try {
+      const res = await setAgentProvider({ agentId, provider: next });
+      if (res.error) toast.error(res.error.graphQLErrors[0]?.message ?? "Failed to set backend");
+      else {
+        setProviderState(next);
+        toast.success(`Memory backend set to ${next}`);
+      }
+    } finally {
+      setSavingProvider(false);
+    }
+  }
 
   const [{ data: listData, fetching }, refetch] = useQuery<{ agentMemoryEntries: MemoryEntry[] }>({
     query: AGENT_MEMORY_ENTRIES_QUERY,
@@ -129,7 +152,20 @@ export function AgentMemoryCard({ agentId }: { agentId: string }) {
       <div className="flex items-center gap-2">
         <Brain className="h-4 w-4 text-muted-foreground" />
         <h2 className="text-sm font-semibold text-foreground">Memory</h2>
-        <span className="ml-auto text-xs text-muted-foreground">{entries.length}</span>
+        <select
+          className="ml-auto rounded border border-border bg-background px-2 py-0.5 text-xs"
+          value={provider}
+          disabled={savingProvider}
+          onChange={(e) => onProviderChange(e.target.value)}
+          title="Memory backend for this agent"
+        >
+          {MEMORY_PROVIDERS.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-muted-foreground">{entries.length}</span>
       </div>
 
       <form

@@ -19,6 +19,7 @@ export const AGENTS_QUERY = gql`
       lastHeartbeat
       setupStatus
       isOnVacation
+      memoryProvider
       apiKeyPrefix
       configVersion
       currentConfigVersion
@@ -54,6 +55,7 @@ export const AGENT_QUERY = gql`
       lastHeartbeat
       setupStatus
       isOnVacation
+      memoryProvider
       apiKeyPrefix
       configVersion
       currentConfigVersion
