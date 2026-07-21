@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "urql";
+import { toast } from "sonner";
 import {
   RUNNER_HOSTS_QUERY,
   RUNNER_COMMANDS_QUERY,
@@ -22,6 +23,7 @@ import {
   RUN_TASK_IN_SANDBOX,
   ENQUEUE_TASK_IN_SANDBOX,
   CANCEL_AGENT_RUN,
+  PROMOTE_AGENT_RUN_REVIEW,
 } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 import { Server, Bot, Box } from "lucide-react";
@@ -81,6 +83,7 @@ interface AgentRun {
   stdout: string | null;
   stderr: string | null;
   errorMessage: string | null;
+  reviewState: string | null;
   startedAt: string;
   finishedAt: string | null;
 }
@@ -124,10 +127,28 @@ function RunHistory() {
     variables: { limit: 20 },
   });
   const [, cancelRun] = useMutation(CANCEL_AGENT_RUN);
+  const [, promoteRun] = useMutation(PROMOTE_AGENT_RUN_REVIEW);
   const [open, setOpen] = useState<string | null>(null);
   const [busyCancel, setBusyCancel] = useState<string | null>(null);
+  const [busyReview, setBusyReview] = useState<string | null>(null);
   const runs = data?.agentRuns ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
+
+  // Domain 7 (low-trust review): a run quarantined in needs_review is promoted (or sent back) by an
+  // admin — the only path out. Approving flips its source-trust disposition to trusted.
+  async function onReview(runId: string, decision: "approved" | "changes_requested") {
+    setBusyReview(runId);
+    try {
+      const res = await promoteRun({ runId, decision });
+      if (res.error) toast.error(res.error.graphQLErrors[0]?.message ?? "Failed to review run");
+      else {
+        toast.success(decision === "approved" ? "Run approved" : "Changes requested");
+        refresh();
+      }
+    } finally {
+      setBusyReview(null);
+    }
+  }
 
   // Poll while anything is in flight so queued → running → terminal transitions surface live
   // (the in-process drain loop / cron advance the rows server-side).
@@ -177,6 +198,11 @@ function RunHistory() {
                 <span className="text-xs text-muted-foreground">exit {r.exitCode}</span>
               )}
               <Badge variant={RUN_STATUS_VARIANT[r.status] ?? "gray"}>{r.status}</Badge>
+              {r.reviewState === "needs_review" && <Badge variant="yellow">needs review</Badge>}
+              {r.reviewState === "approved" && <Badge variant="green">approved</Badge>}
+              {r.reviewState === "changes_requested" && (
+                <Badge variant="orange">changes requested</Badge>
+              )}
               {r.status === "queued" && (
                 <button
                   onClick={() => onCancel(r.id)}
@@ -185,6 +211,24 @@ function RunHistory() {
                 >
                   Cancel
                 </button>
+              )}
+              {r.reviewState === "needs_review" && (
+                <>
+                  <button
+                    onClick={() => onReview(r.id, "approved")}
+                    disabled={busyReview === r.id}
+                    className="text-xs text-green-600 transition hover:underline disabled:opacity-50"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => onReview(r.id, "changes_requested")}
+                    disabled={busyReview === r.id}
+                    className="text-xs text-muted-foreground transition hover:underline disabled:opacity-50"
+                  >
+                    Request changes
+                  </button>
+                </>
               )}
             </span>
           </div>
