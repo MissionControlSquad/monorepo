@@ -466,6 +466,16 @@ See 03-sandbox-depth.mdx.
       Attention. Typecheck (web+client) ✓, web build ✓. NOTE: remaining new client ops (agent-companies, work
       products, thread interactions, agent-hire) are still backend/GraphQL/client-op only — no UI yet.
 
+- [x] **UI wiring — Agent Companies screen (Domain 14 #10/#12, front-end)** DONE (next commit). Net-new page
+      `/companies` (route wraps FeatureGate on AGENT_COMPANIES; view `AgentCompaniesPage.tsx`) wiring the
+      previously backend-only agent-companies ops: list (AGENT_COMPANIES_QUERY), create (name/description/goals),
+      delete, **export** (imperative EXPORT_COMPANY_PACKAGE_QUERY → downloads the package as a path→content JSON
+      bundle — the exact shape import expects), and **import** (file-picker → IMPORT_COMPANY_PACKAGE, toasts
+      created-agent count + warnings). Clean export→import round-trip. Added to sidebar NAV_ITEMS (Building2 icon).
+      Verified every field resolves server-side (agentCompanies/exportCompanyPackage/create/delete/importCompanyPackage
+      all present). Typecheck ✓, build ✓ (/companies route emitted). Backend covered by existing agent-companies
+      integration tests. Still UI-less: work products, thread interactions, agent-hire proposal form.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

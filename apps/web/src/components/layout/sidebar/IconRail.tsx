@@ -43,6 +43,7 @@ import {
   Cpu,
   Container,
   Gavel,
+  Building2,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -75,6 +76,7 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
     flag: FLAG_KEYS.AGENT_INSTRUCTIONS,
   },
   { href: "/org-chart", icon: Network, label: "Org chart", flag: FLAG_KEYS.ORG_CHART },
+  { href: "/companies", icon: Building2, label: "Companies", flag: FLAG_KEYS.AGENT_COMPANIES },
   { href: "/agent-authz", icon: Lock, label: "Agent access", flag: FLAG_KEYS.AGENT_AUTHZ },
   { href: "/channels", icon: MessageSquare, label: "Channels", flag: FLAG_KEYS.CHANNELS },
   { href: "/projects", icon: FolderKanban, label: "Projects" },
