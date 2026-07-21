@@ -64,6 +64,38 @@ infra gate.
 monorepo has route parity but each page is shallower (Paperclip's IssueDetail/Secrets/CompanySkills are
 100–200KB single pages). Not missing *features* — missing *depth*. Covered qualitatively in `features/P3-ui-polish.mdx`.
 
+## Final sweep — components, hooks, apps (the last uncompared areas)
+
+### Component-group diff (`ui/src/components`)
+Paperclip organizes by feature-widget; the monorepo by domain (agent/task/finance/…). Genuinely-missing
+Paperclip widget groups (beyond the "thin pages" depth gap):
+
+| Paperclip component group | Monorepo | Priority | Note |
+|---|---|---|---|
+| `environment-variables-editor` | ❌ Missing | P2 | dotenv-paste + per-row secret binding + convert-to-secret (11-ui §4). JsonSchemaForm is only a partial substitute. |
+| `skill-studio` | ❌ Missing | P2 | Skill Studio authoring UI (deferred; needs the test-run runtime for the full thing). |
+| `transcript` | ❌ Missing | P2 | Run **transcript viewer** — read a run's full log/transcript. Pairs with `run-log-store`. |
+| `interrupt-handoff` | ❌ Missing | P2 | Interrupt + continuation-handoff UI (pairs with continuation-summary). |
+| `folders` | ❌ Missing | P3 | Folder-organization UI (matches the missing `folders` service). |
+| `issue-output` / `issue-properties` / `routine-sections` | 🟡 thinner | P2/P3 | Richer issue-detail + routine editors — **UI depth**, monorepo `task/` + `routines` are shallower. |
+| `access` | 🚫 | — | buildbase. |
+
+### Hook diff (`ui/src/hooks`)
+Paperclip hooks the monorepo lacks: `useKeyboardShortcuts` (global shortcut registry — noted P2 gap),
+`useIssueExternalObjects` (external-objects — P2), `usePrefersReducedMotion` (a11y — P3), `useSharedPolling`
+(polling coordination — P3). Ordering/badge hooks (`useAgentOrder`/`useCompanyOrder`/`useInboxBadge`) are
+covered by the monorepo's sidebar-preferences + sidebar-badges.
+
+### Remaining backend (`lib`/`http`) + tools
+`lib/join-request-dedupe` (buildbase invites), `lib/objects` (external-objects), `http/body-limits` (minor),
+`tools/agent-shim` (agent shim), `scripts/` (90 ops scripts). Nothing new material.
+
+### Where the MONOREPO is AHEAD (net-adds Paperclip lacks)
+- **Native mobile app** — `apps/mobile` (`@agentcenter/mobile`, React Native/Expo + nativewind). Paperclip has **no mobile**.
+- **Desktop app** — `apps/desktop` (`@agentcenter/desktop`). Paperclip ships electron separately, not in-tree.
+- **API-route superset** — 93 vs 55.
+- **Net-new domain surfaces** vs Paperclip: `adapters`, `agent-authz`, `analytics`, `api-keys`, `environments`, `live-gateway`, `monitors`, `observability`, `portability`, `reliability`, `runners`, `instructions`.
+
 ## Net: does this change the conclusion?
 - **Core loop / standalone-works:** unchanged — still ✅ (routes superset confirms the API surface).
 - **New P1:** the **SSRF guard** is now doubly-confirmed (middleware), and **worktree realization** is
