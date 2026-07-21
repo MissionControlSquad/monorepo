@@ -1,0 +1,206 @@
+---
+title: "Exhaustive per-service audit — all 177 Paperclip services"
+generated: 2026-07-21
+method: name diff + hand-classification against the 5 deep code inventories
+---
+
+# Exhaustive per-service audit
+
+Every non-test service in `paperclip/server/src/services` (177), classified against the monorepo.
+Status: ✅ Present · 🟡 Partial · ❌ Missing · 🚫 buildbase-owned (out of scope).
+Priority = the tier of the covering feature (Present) **or** the priority of the gap (Partial/Missing).
+"Covers" points at the `features/` file (or the monorepo equivalent).
+
+| # | Paperclip service | Status | Covers / monorepo equivalent | Priority | Gate |
+|---|---|---|---|---|---|
+| 1 | access | 🚫 | buildbase RBAC | — | buildbase-owned |
+| 2 | activity | ✅ | P2-observability (`activity/*`, ActivityFeed) | P2 | done |
+| 3 | activity-log | ✅ | `AgentAction` + activity feed | P2 | done |
+| 4 | adapter-models-env | 🟡 | adapter model profiles (`AdapterModelProfile`); env-driven model list not dynamic | P1 | needs-provider-key |
+| 5 | adapter-plugin-store | ❌ | declarative adapter-plugin loader exists (`adapters.ts`), no JSON-file store | P3 | infra-gated |
+| 6 | adapter-registry-bootstrap | 🟡 | P1-adapters (registries not unified/seeded) | P1 | buildable-now |
+| 7 | agent-assignability | ✅ | `assignment-guard.ts` (assertAssignableAgents) | P0 | done |
+| 8 | agent-instructions | ✅ | `agent-instructions` GraphQL + route `/instructions` | P2 | done (delivery deferred) |
+| 9 | agent-invokability | 🟡 | agent-authz capability checks (partial) | P1 | buildable-now |
+| 10 | agent-permissions | 🟡 | `agent-authz.ts` capability grants | P1 | buildable-now |
+| 11 | agent-secret-bindings | ✅ | `secrets.ts` bind/resolveEnvForAgent | P1 | done |
+| 12 | agent-start-lock | ❌ | no start-concurrency lock | P3 | buildable-now |
+| 13 | agents | ✅ | P0-agents-lifecycle | P0 | done |
+| 14 | approvals | ✅ | P0-review-approvals | P0 | done |
+| 15 | assets | ❌ | P3-additional (asset store beyond deliverables) | P3 | infra-gated (storage) |
+| 16 | attention | ✅ | P0-attention (feed + snooze) | P0 | done |
+| 17 | authorization | 🚫 | buildbase | — | buildbase-owned |
+| 18 | board-auth | 🚫 | buildbase (board claim/auth) | — | buildbase-owned |
+| 19 | budgets | ✅ | P1-cost-budgets-finance | P1 | done |
+| 20 | built-in-agent-metadata | ✅ | `agent-templates.ts` + built-in configs | P2 | done |
+| 21 | built-in-agents | ✅ | `agent-templates` (wizard templates) | P2 | done |
+| 22 | catalog-provenance | ❌ | P2-skills (no skill/catalog provenance) | P2 | buildable-now |
+| 23 | change-consent-gate | 🟡 | approvals + agent-authz (simplified) | P2 | buildable-now |
+| 24 | cloud-upstreams | ❌ | P3-additional (cloud fork/sync) | P3 | infra-gated |
+| 25 | codex-auth-reconciliation | ❌ | P3-additional | P3 | needs-provider-key |
+| 26 | companies | ✅ | P2-skills-teams-companies (agent-companies) | P2 | done |
+| 27 | company-artifacts | ❌ | P3-additional (assets) | P3 | infra-gated |
+| 28 | company-export-readme | 🟡 | company export (markdown package) — no README gen | P3 | buildable-now |
+| 29 | company-member-roles | 🚫 | buildbase membership | — | buildbase-owned |
+| 30 | company-portability | ✅ | P2-observability-portability (workspace bundle) | P2 | done |
+| 31 | company-search | ❌ | P2-additional (rich search) | P2 | buildable-now |
+| 32 | company-search-extract | ❌ | P2-additional | P2 | buildable-now |
+| 33 | company-search-rate-limit | ❌ | P2-additional | P2 | buildable-now |
+| 34 | company-skill-policy | ✅ | `skill-policy.ts` | P2 | done |
+| 35 | company-skills | 🟡 | P2-skills (library present; catalog/import/studio deferred) | P2 | mixed |
+| 36 | costs | ✅ | P1-cost-budgets-finance (`cost.ts`) | P1 | done |
+| 37 | cron | ✅ | P1-heartbeat (cron routes) | P1 | infra-gated |
+| 38 | dashboard | ✅ | `(home)` DashboardLive | P0 | done |
+| 39 | database-backup-health | ❌ | P3-additional (→ operator CLI) | P3 | buildable-now |
+| 40 | decision-training | ❌ | P3-additional | P3 | buildable-now (capture) |
+| 41 | default-agent-instructions | ✅ | `seedAgentInstructions` | P2 | done |
+| 42 | document-annotations | ✅ | DeliverableAnnotation + ProjectDocComment (ported) | P2 | done (reanchoring omitted) |
+| 43 | documents | ✅ | `documents` + ProjectDoc | P2 | done |
+| 44 | effective-run-config-fingerprints | ✅ | in `environment-custom-images.ts` | P1 | done |
+| 45 | environment-config | ✅ | `environments.ts` config + secret-masking | P1 | done |
+| 46 | environment-custom-image-runtime | 🟡 | custom-image capture; per-provider snapshot | P1 | needs-provider-key |
+| 47 | environment-custom-image-setup-session-utils | ❌ | interactive setup-terminal capture deferred | P1 | infra-gated |
+| 48 | environment-custom-image-terminal-sessions | ❌ | setup-terminal PTY capture deferred | P1 | infra-gated |
+| 49 | environment-custom-images | ✅ | `environment-custom-images.ts` | P1 | done (snapshot per-provider gated) |
+| 50 | environment-execution-target | ✅ | `execution-target.ts` resolver | P1 | done |
+| 51 | environment-probe | ✅ | `probeEnvironment` (cloud/ssh gated) | P1 | done |
+| 52 | environment-run-orchestrator | 🟡 | `sandbox-run.ts` orchestrates; env-run split thinner | P1 | needs-provider-key |
+| 53 | environment-runtime | 🟡 | `resolveEnvironmentExecution` (ssh/plugin → null) | P1 | needs-provider-key |
+| 54 | environments | ✅ | P1-environments-leases | P1 | done (mgmt UI thin) |
+| 55 | execution-allowlist | ✅ | `execution-policy.ts` | P1 | done |
+| 56 | execution-policy-bootstrap | 🟡 | execution-policy present; bootstrap seeding thin | P1 | buildable-now |
+| 57 | execution-workspace-policy | ✅ | `execution-workspace-policy.ts` | P1 | done |
+| 58 | execution-workspaces | 🟡 | P1-execution-workspaces (recorded, not realized) | P1 | buildable-now |
+| 59 | external-objects | ❌ | P2-external-objects-github | P2 | needs-github-token |
+| 60 | feedback | ❌ | P2-additional (feedback/evals) | P2 | buildable-now |
+| 61 | feedback-redaction | ❌ | P2-additional | P2 | buildable-now |
+| 62 | feedback-share-client | ❌ | P2-additional | P2 | buildable-now |
+| 63 | finance | ✅ | P1-cost-budgets-finance (FinanceEvent) | P1 | done |
+| 64 | folders | ❌ | P3-additional | P3 | buildable-now |
+| 65 | github-external-object-provider | ❌ | P2-external-objects-github | P2 | needs-github-token |
+| 66 | github-fetch | ❌ | P2-external-objects-github (+ SSRF guard) | P2 | needs-github-token |
+| 67 | goals | ✅ | P2-pipelines-routines-cases-goals | P2 | done |
+| 68 | heartbeat | ✅ | P1-heartbeat (auto-sleep/reap) | P1 | infra-gated |
+| 69 | heartbeat-run-runtime-status | ✅ | `run-runtime-status.ts` | P1 | done |
+| 70 | heartbeat-run-summary | 🟡 | run status present; per-run summary thin | P2 | buildable-now |
+| 71 | heartbeat-stop-metadata | 🟡 | run finalize present; stop-metadata thin | P3 | buildable-now |
+| 72 | hire-hook | ✅ | `requestAgentHire` → decideApproval creates agent | P0 | done |
+| 73 | hot-restart | ❌ | P3-additional | P3 | infra-gated |
+| 74 | inbox-agent-policy | ❌ | P3-additional | P3 | buildable-now |
+| 75 | inbox-dismissals | ✅ | attention snooze (ported) | P0 | done |
+| 76 | instance-settings | 🟡 | `system-settings` (shutdown) + settings page | P2 | mixed (some buildbase) |
+| 77 | invite-grants | 🚫 | buildbase invites | — | buildbase-owned |
+| 78 | invite-rate-limit | 🚫 | buildbase | — | buildbase-owned |
+| 79 | issue-approvals | ✅ | approvals (task subjectType) | P0 | done |
+| 80 | issue-assignment-wakeup | ❌ | P2-additional (dependency-wakeups) | P2 | buildable-now |
+| 81 | issue-continuation-summary | ❌ | P2-additional | P2 | buildable-now/needs-LLM |
+| 82 | issue-dependency-wakeups | ❌ | P2-additional | P2 | buildable-now |
+| 83 | issue-execution-policy | ✅ | `execution-policy.ts` (per-task) | P1 | done |
+| 84 | issue-goal-fallback | ✅ | `goal-task` default-goal | P2 | done |
+| 85 | issue-liveness | 🟡 | `run-runtime-status` (ephemeral) | P1 | done |
+| 86 | issue-recovery-actions | ✅ | `TaskRecoveryAction` + stranded-work | P1 | done |
+| 87 | issue-references | ✅ | `TaskRelation` + `ExternalLink` | P0 | done |
+| 88 | issue-rewake-throttle | ❌ | P2-additional (dependency-wakeups) | P2 | buildable-now |
+| 89 | issue-thread-interactions | ✅ | `TaskThreadInteraction` | P0 | done |
+| 90 | issue-tree-control | ✅ | `subtree-control.ts` (hold/cancel/restore) | P0 | done |
+| 91 | issue-visibility | 🟡 | task scoping present; per-issue visibility ACL thin | P3 | buildbase-adjacent |
+| 92 | issues | ✅ | P0-tasks-issues | P0 | done |
+| 93 | json-schema-secret-refs | 🟡 | secretRef in JsonSchemaForm; full ref-resolver thin | P2 | buildable-now |
+| 94 | live-events | 🟡 | GraphQL subscriptions + event bus | P1 | done (different shape) |
+| 95 | local-service-supervisor | ❌ | P3-additional | P3 | infra-gated |
+| 96 | low-trust-runtime-containment | ✅ | `trust.ts` lowTrustContainment + source-trust | P1 | done |
+| 97 | mcp-http | 🚫 | P3-tools-mcp (buildbase-owned) | — | buildbase-owned |
+| 98 | pipeline-case-outputs | 🟡 | pipeline cases present; case-outputs thin | P2 | buildable-now |
+| 99 | pipeline-conversation-context | 🟡 | pipelines present; conversation-context thin | P2 | buildable-now |
+| 100 | pipelines | ✅ | P2-pipelines-routines-cases-goals | P2 | done |
+| 101 | pipelines-aggregation | 🟡 | `pipelineHealth` present; full aggregation thin | P2 | buildable-now |
+| 102 | plan-review-context | ❌ | P2-additional (continuation summary) | P2 | buildable-now |
+| 103 | plugin-capability-validator | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 104 | plugin-config-validator | ✅ | `plugins.ts` setPluginConfig (JSON-schema) | P2 | done |
+| 105 | plugin-database | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 106 | plugin-dev-watcher | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 107 | plugin-environment-driver | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 108 | plugin-event-bus | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 109 | plugin-host-service-cleanup | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 110 | plugin-host-services | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 111 | plugin-job-coordinator | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 112 | plugin-job-scheduler | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 113 | plugin-job-store | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 114 | plugin-lifecycle | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 115 | plugin-loader | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 116 | plugin-local-folders | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 117 | plugin-log-retention | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 118 | plugin-managed-agents | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 119 | plugin-managed-routines | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 120 | plugin-managed-skills | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 121 | plugin-manifest-validator | ✅ | `plugins.ts` validateManifest (core subset) | P2 | done |
+| 122 | plugin-registry | ✅ | `plugins.ts` | P2 | done |
+| 123 | plugin-runtime-sandbox | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 124 | plugin-secrets-handler | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 125 | plugin-state-store | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 126 | plugin-stream-bus | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 127 | plugin-tool-dispatcher | ❌ | P3-tools-mcp / plugin-runtime | P3 | infra-gated |
+| 128 | plugin-tool-registry | ❌ | P3-tools-mcp / plugin-runtime | P3 | infra-gated |
+| 129 | plugin-worker-manager | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 130 | portable-path | 🟡 | path helpers exist; portable-path util thin | P3 | buildable-now |
+| 131 | principal-access-compatibility | 🚫 | buildbase | — | buildbase-owned |
+| 132 | productivity-review | ❌ | (heartbeat-driven productivity watchdog) | P3 | infra-gated |
+| 133 | project-workspace-runtime-config | ❌ | P1-execution-workspaces (realization) | P1 | buildable-now |
+| 134 | projects | ✅ | projects CRUD + detail | P0 | done |
+| 135 | quota-windows | ✅ | `QuotaWindow` (finance) | P1 | done |
+| 136 | recovery | ✅ | P1-heartbeat (stranded-work/recovery) | P1 | done |
+| 137 | recovery-observability | 🟡 | recovery present; obs of it thin | P2 | buildable-now |
+| 138 | remote-http-endpoint-guard | ❌ | **P1-security-ssrf-guard** | **P1** | buildable-now |
+| 139 | resource-memberships | 🚫 | buildbase | — | buildbase-owned |
+| 140 | responsible-user-denial-run-outcomes | 🚫 | buildbase (human denial attribution) | — | buildbase-owned |
+| 141 | routines | ✅ | P2-pipelines-routines (routines + triggers) | P2 | done |
+| 142 | run-continuations | ❌ | P2-additional (continuation summary) | P2 | buildable-now |
+| 143 | run-liveness | ✅ | `run-runtime-status.ts` | P1 | done |
+| 144 | run-log-store | 🟡 | ephemeral run status; no durable log store | P2 | buildable-now |
+| 145 | run-scratch | ❌ | P3-additional | P3 | infra-gated |
+| 146 | runtime-skill-selections | ❌ | P2-skills (runtime skill sync deferred) | P3 | infra-gated |
+| 147 | sandbox-provider-runtime | ✅ | P1-sandbox-execution (`sandbox-providers.ts`) | P1 | done (cloud gated) |
+| 148 | secrets | ✅ | P1-secrets-vault | P1 | done (aws/vault stubs) |
+| 149 | session-workspace-cwd | ❌ | P1-execution-workspaces (realization) | P1 | buildable-now |
+| 150 | sidebar-badges | ✅ | ported | P2 | done |
+| 151 | sidebar-preferences | ✅ | ported | P2 | done |
+| 152 | skills-catalog | ❌ | P2-skills (file catalog) | P2 | buildbase-owned |
+| 153 | smoke-lab | ❌ | (dev smoke-test lab) | P3 | infra-gated |
+| 154 | source-trust | ✅ | `source-trust.ts` | P1 | done |
+| 155 | successful-run-handoff-state | ❌ | P3-additional | P3 | infra-gated |
+| 156 | summary-slot-finalization | ❌ | P2-additional (continuation summary) | P2 | buildable-now |
+| 157 | summary-slots | ❌ | P2-additional | P2 | buildable-now |
+| 158 | task-watchdog-scope | ✅ | `task-watchdog.ts` | P1 | done |
+| 159 | task-watchdogs | ✅ | P1-heartbeat (2 of 4 conditions live) | P1 | done (some conditions inert) |
+| 160 | teams-catalog | ❌ | P2-skills (file team catalog) | P2 | buildbase-owned |
+| 161 | tool-access | ❌ | P3-tools-mcp | P3 | infra-gated |
+| 162 | tool-access-policy | ❌ | P3-tools-mcp (buildable-now half) | P2 | buildable-now |
+| 163 | tool-content-guards | ❌ | P3-tools-mcp | P2 | buildable-now |
+| 164 | tool-gateway | ❌ | P3-tools-mcp | P3 | infra-gated |
+| 165 | tool-oauth-legacy-backfill | ❌ | P3-tools-mcp | P3 | buildable-now |
+| 166 | tool-profile-binding-precedence | ❌ | P3-tools-mcp | P3 | buildable-now |
+| 167 | tool-runtime-metrics | ❌ | P3-tools-mcp | P3 | buildable-now |
+| 168 | tool-runtime-supervisor | ❌ | P3-tools-mcp | P3 | infra-gated |
+| 169 | trust-preset-resolver | 🟡 | trust levels present; preset resolver thin | P2 | buildable-now |
+| 170 | work-products | ✅ | P0-deliverables-work-products | P0 | done |
+| 171 | work-timeline | ✅ | `WorkTimelinePage` / workTimeline | P2 | done |
+| 172 | workspace-file-resources | ❌ | P3-additional | P3 | buildable-now |
+| 173 | workspace-operation-log-store | ✅ | `recordWorkspaceOperation` (execution-workspaces) | P1 | done |
+| 174 | workspace-operations | ✅ | `recordWorkspaceOperation` | P1 | done |
+| 175 | workspace-realization | ❌ | P1-execution-workspaces (realization gap) | P1 | buildable-now |
+| 176 | workspace-runtime | 🟡 | recording present; realization missing | P1 | buildable-now |
+| 177 | workspace-runtime-read-model | 🟡 | execution-workspace read queries present | P1 | done |
+
+## Tally
+
+- ✅ **Present:** ~74 (core loop, most execution recording, budgets/secrets/memory/skills library, UX ports).
+- 🟡 **Partial:** ~30 (execution-workspace realization, environments cloud paths, trust/consent, pipelines depth, run summaries, agent permissions).
+- ❌ **Missing:** ~61 — of which **~25 are the plugin runtime**, **~8 the tool subsystem**, and the rest the second-pass finds (external-objects, feedback, company-search, continuation-summary, dependency-wakeups, cloud-upstreams, decision-training, folders, assets, etc.).
+- 🚫 **buildbase-owned (out of scope):** ~12 (access/authorization/invites/member-roles/MCP/resource-memberships/responsible-user-denial).
+
+## Required, by priority (net)
+
+- **P1:** SSRF guard (#138, security, buildable-now); execution-workspace realization (#58/133/149/175, buildable-now); adapter-registry unification (#6); agent-permissions/invokability (#9/10).
+- **P2:** dependency-wakeups (#80/82/88), external-objects/GitHub (#59/65/66), continuation-summaries (#81/102/142/156/157), feedback (#60–62), company-search (#31–33), tool access-policy + content-guards (#162/163, the buildable half).
+- **P3:** plugin runtime (#103–129), tool gateway/runtime (#161/164/168), cloud-upstreams, decision-training, folders, assets, run-scratch/handoff, operator-CLI-adjacent (db-backup-health), UI polish.
+- **🚫 excluded:** MCP + all human RBAC/membership/invites (buildbase).
