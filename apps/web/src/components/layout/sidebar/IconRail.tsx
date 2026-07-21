@@ -42,6 +42,7 @@ import {
   Gauge,
   Cpu,
   Container,
+  Gavel,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
@@ -59,6 +60,7 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   { href: "/", icon: LayoutDashboard, label: "Home" },
   { href: "/search", icon: Search, label: "Search" },
   { href: "/attention", icon: Inbox, label: "Attention", flag: FLAG_KEYS.ATTENTION },
+  { href: "/approvals", icon: Gavel, label: "Approvals", flag: FLAG_KEYS.GOVERNANCE },
   { href: "/agents", icon: Bot, label: "Agents" },
   {
     href: "/adapters",

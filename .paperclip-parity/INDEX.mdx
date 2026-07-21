@@ -456,6 +456,16 @@ See 03-sandbox-depth.mdx.
       requiredApprovals on Approval type + shared client op. Tests: 2 unit (2-of-N finalizes on 2nd distinct approve; single
       reject finalizes). Typecheck 12/12, web build ✓. Remaining Domain 14: #13 delegation presets, #15 per-agent approval-policy engine.
 
+- [x] **UI wiring — board-quorum voting (Domain 14 #14, front-end)** DONE (next commit). First UI slice of the
+      backlog: wires the previously backend-only `castApprovalVote` + `requiredApprovals` into the existing
+      Approvals surface. APPROVALS_QUERY / APPROVAL_QUERY now select `requiredApprovals`; the list page and
+      ApprovalDetailPage render a "board · needs N" badge and, for quorum approvals (requiredApprovals>1), swap
+      the direct Approve/Reject (which would finalize immediately, bypassing the board) for Vote approve / Vote
+      reject buttons that call castApprovalVote and toast the running tally. Also added the orphaned /approvals
+      page to the sidebar NAV_ITEMS (Gavel icon, GOVERNANCE-gated) — it was previously only reachable via
+      Attention. Typecheck (web+client) ✓, web build ✓. NOTE: remaining new client ops (agent-companies, work
+      products, thread interactions, agent-hire) are still backend/GraphQL/client-op only — no UI yet.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

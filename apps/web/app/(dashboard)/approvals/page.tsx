@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import { APPROVALS_QUERY } from "@/lib/graphql/queries";
-import { APPROVE_APPROVAL, REJECT_APPROVAL } from "@/lib/graphql/mutations";
+import { APPROVE_APPROVAL, REJECT_APPROVAL, CAST_APPROVAL_VOTE } from "@/lib/graphql/mutations";
 import { Button, Card } from "@/components/ui";
 
 // Epic #3: governance approvals inbox. Gated at the API by the GOVERNANCE feature + buildbase role
@@ -14,6 +15,7 @@ interface Approval {
   title: string;
   subjectType: string;
   status: string;
+  requiredApprovals: number;
   reason?: string | null;
   createdAt: string;
   requestedBy?: { id: string; displayName: string } | null;
@@ -38,6 +40,7 @@ export default function ApprovalsPage() {
   });
   const [, approve] = useMutation(APPROVE_APPROVAL);
   const [, reject] = useMutation(REJECT_APPROVAL);
+  const [, castVote] = useMutation(CAST_APPROVAL_VOTE);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const approvals = data?.approvals ?? [];
@@ -47,6 +50,24 @@ export default function ApprovalsPage() {
     try {
       if (kind === "approve") await approve({ id });
       else await reject({ id, decisionNote: "Changes needed" });
+      refetch({ requestPolicy: "network-only" });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // Domain 14 #14: quorum approvals finalize only when approve votes reach requiredApprovals, so
+  // vote via castApprovalVote (a direct approve would finalize immediately, bypassing the board).
+  async function vote(id: string, kind: "approve" | "reject") {
+    setBusyId(id);
+    try {
+      const res = await castVote({ id, vote: kind });
+      const r = res.data?.castApprovalVote as
+        { status: string; approveVotes: number; requiredApprovals: number } | undefined;
+      if (res.error) toast.error(String((res.error as Error).message).replace("[GraphQL] ", ""));
+      else if (r?.status === "approved") toast.success("Quorum reached — approved");
+      else if (r?.status === "rejected") toast.success("Rejected");
+      else toast.success(`Vote recorded — ${r?.approveVotes ?? 0}/${r?.requiredApprovals ?? 0}`);
       refetch({ requestPolicy: "network-only" });
     } finally {
       setBusyId(null);
@@ -81,6 +102,11 @@ export default function ApprovalsPage() {
                 <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                   {a.subjectType}
                 </span>
+                {a.requiredApprovals > 1 && (
+                  <span className="rounded bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600">
+                    board · needs {a.requiredApprovals}
+                  </span>
+                )}
               </div>
               {a.reason && <p className="mt-1 text-sm text-muted-foreground">{a.reason}</p>}
               <p className="mt-1 text-xs text-muted-foreground">
@@ -96,25 +122,48 @@ export default function ApprovalsPage() {
                 </Button>
               </Link>
             )}
-            {a.status === "pending" && a.subjectType !== "budget_override" && (
-              <div className="flex shrink-0 gap-2">
-                <Button
-                  size="sm"
-                  disabled={busyId === a.id}
-                  onClick={() => decide(a.id, "approve")}
-                >
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busyId === a.id}
-                  onClick={() => decide(a.id, "reject")}
-                >
-                  Reject
-                </Button>
-              </div>
-            )}
+            {a.status === "pending" &&
+              a.subjectType !== "budget_override" &&
+              a.requiredApprovals > 1 && (
+                <div className="flex shrink-0 gap-2">
+                  <Button
+                    size="sm"
+                    disabled={busyId === a.id}
+                    onClick={() => vote(a.id, "approve")}
+                  >
+                    Vote approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busyId === a.id}
+                    onClick={() => vote(a.id, "reject")}
+                  >
+                    Vote reject
+                  </Button>
+                </div>
+              )}
+            {a.status === "pending" &&
+              a.subjectType !== "budget_override" &&
+              a.requiredApprovals <= 1 && (
+                <div className="flex shrink-0 gap-2">
+                  <Button
+                    size="sm"
+                    disabled={busyId === a.id}
+                    onClick={() => decide(a.id, "approve")}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busyId === a.id}
+                    onClick={() => decide(a.id, "reject")}
+                  >
+                    Reject
+                  </Button>
+                </div>
+              )}
           </Card>
         ))}
       </div>
