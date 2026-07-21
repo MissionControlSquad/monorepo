@@ -56,6 +56,7 @@ import {
 import { ProjectMemberEditor } from "../components/project/ProjectMemberEditor";
 import { ProjectSourceCard } from "../components/project/ProjectSourceCard";
 import { ProjectWorkspacesCard } from "../components/project/ProjectWorkspacesCard";
+import { ProjectDocCommentsThread } from "../components/project/ProjectDocCommentsThread";
 import {
   Breadcrumbs,
   Button,
@@ -532,6 +533,12 @@ function DocViewDialog({
                 {showHistory && docId && (
                   <div className="mt-5 pt-4 border-t border-border">
                     <RevisionHistory docId={docId} />
+                  </div>
+                )}
+
+                {docId && (
+                  <div className="mt-5 pt-4 border-t border-border">
+                    <ProjectDocCommentsThread docId={docId} />
                   </div>
                 )}
               </div>

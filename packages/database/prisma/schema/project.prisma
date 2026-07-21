@@ -93,9 +93,28 @@ model ProjectDoc {
   project   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   addedBy   Agent?               @relation("ProjectDocAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
   revisions ProjectDocRevision[]
+  comments  ProjectDocComment[]
 
   @@index([projectId])
   @@map("project_docs")
+}
+
+// Human review comments/annotations on an agent-authored project doc (Paperclip parity:
+// document-annotations, simplified to the monorepo's DeliverableAnnotation shape). quote optionally
+// anchors the comment to a snippet; resolved tracks whether the note has been addressed.
+model ProjectDocComment {
+  id              String   @id @default(cuid())
+  docId           String
+  body            String
+  quote           String?
+  resolved        Boolean  @default(false)
+  authorProfileId String?
+  createdAt       DateTime @default(now())
+
+  doc ProjectDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId])
+  @@map("project_doc_comments")
 }
 
 model ProjectDocRevision {

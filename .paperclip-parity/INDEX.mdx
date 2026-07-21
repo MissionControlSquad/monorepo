@@ -690,6 +690,15 @@ See 03-sandbox-depth.mdx.
       assigned/needs-review/clarification/approved/rejected/done, deliverable submitted, document added, mentions,
       new comment, team updates), reading/saving via the existing REST route (no new backend). Typecheck ✓, build ✓.
 
+- [x] **Project-doc review comments (port of paperclip document-annotations, simplified)** DONE (next commit).
+      Paperclip's document-annotations is a heavy anchored-thread system; ported the spirit at the monorepo's
+      DeliverableAnnotation shape. Full-stack: new ProjectDocComment model (docId FK, body, optional quote,
+      resolved; migration 20260721020000) + ProjectDocComment GraphQL type + service (add/list/resolve/delete with
+      trim/validation) + projectDocComments query + add/resolve/delete mutations (DOCUMENTS-gated, member+) + client
+      ops + a ProjectDocCommentsThread slotted into the project-doc viewer (comment, resolve/reopen, delete, quote
+      anchor). Tests: 2 integration (add→list→resolve→delete; empty-body + unknown-doc rejected). Typecheck ✓,
+      build ✓. (Paperclip's anchor-snapshot reanchoring intentionally not ported.)
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
