@@ -16,6 +16,7 @@ import {
   type SandboxExecResult,
   type SandboxHandle,
 } from "./types";
+import { guardedFetch } from "../remote-http-endpoint-guard";
 
 const DEFAULT_API_URL = "https://exe.dev/exec";
 // Install Node 20 so an agent runtime bridge can run (mirrors Paperclip's DEFAULT_SETUP_SCRIPT).
@@ -37,7 +38,9 @@ async function runLifecycleCommand(
   apiKey: string,
   command: string,
 ): Promise<string> {
-  const res = await fetch(apiUrl, {
+  // SSRF guard: apiUrl is workspace-configured (EXE_DEV_API_URL). Blocks private/reserved targets
+  // unless SSRF_ALLOW_PRIVATE_NETWORK=1 (self-hosted internal bridge).
+  const res = await guardedFetch(apiUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
