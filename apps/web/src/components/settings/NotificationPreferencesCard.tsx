@@ -110,6 +110,30 @@ export function NotificationPreferencesCard() {
               {TYPE_FIELDS.map((f) => row(f.key, f.label))}
             </div>
           </div>
+          <div>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Quiet hours
+            </p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>From</span>
+              <input
+                type="time"
+                className="rounded border border-border bg-background px-2 py-1 text-sm text-foreground"
+                value={(prefs.quietStart as string) ?? ""}
+                onChange={(e) => setPrefs((p) => (p ? { ...p, quietStart: e.target.value } : p))}
+              />
+              <span>to</span>
+              <input
+                type="time"
+                className="rounded border border-border bg-background px-2 py-1 text-sm text-foreground"
+                value={(prefs.quietEnd as string) ?? ""}
+                onChange={(e) => setPrefs((p) => (p ? { ...p, quietEnd: e.target.value } : p))}
+              />
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Push notifications are held during this window.
+            </p>
+          </div>
           <div className="flex justify-end border-t border-border pt-3">
             <Button size="sm" disabled={saving} onClick={onSave}>
               Save preferences
