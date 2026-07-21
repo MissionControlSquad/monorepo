@@ -615,6 +615,13 @@ See 03-sandbox-depth.mdx.
       + secret masking), removing ~55 lines of duplicated field rendering. Deferred (need plugin runtime backend):
       the Status runtime dashboard (pluginRuntimeStatus/job-runs/logs). Typecheck ✓, build ✓.
 
+- [x] **UI depth — Skill Studio Audit + Versions panels (11-ui §12, front-end)** DONE (next commit). Added two
+      per-skill expandable panels to /skills, mirroring the existing Files/Test panels: **Audit** (wires the
+      previously-unwired AUDIT_SKILL_QUERY — static security audit with verdict + severity-coded findings) and
+      **Versions** (new SKILL_VERSIONS_QUERY client op over the existing server skillVersions field — revision
+      history). Deferred (need backend): the runSkillTest interactive test harness and the folder-tree editor.
+      Typecheck 4/4, build ✓.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

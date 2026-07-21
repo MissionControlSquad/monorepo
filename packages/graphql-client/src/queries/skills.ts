@@ -123,3 +123,15 @@ export const AUDIT_SKILL_QUERY = gql`
     }
   }
 `;
+
+// Domain 5: version history of a skill bundle (Skill Studio Versions tab).
+export const SKILL_VERSIONS_QUERY = gql`
+  query SkillVersions($skillId: String!) {
+    skillVersions(skillId: $skillId) {
+      id
+      revisionNumber
+      label
+      createdAt
+    }
+  }
+`;

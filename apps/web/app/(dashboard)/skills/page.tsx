@@ -7,6 +7,8 @@ import {
   SKILL_FILES_QUERY,
   SKILL_CATALOG_QUERY,
   LINT_SKILL_QUERY,
+  AUDIT_SKILL_QUERY,
+  SKILL_VERSIONS_QUERY,
 } from "@/lib/graphql/queries";
 import {
   CREATE_SKILL,
@@ -68,6 +70,8 @@ export default function SkillsPage() {
   const [showCatalog, setShowCatalog] = useState(false);
   const [openFiles, setOpenFiles] = useState<string | null>(null);
   const [openLint, setOpenLint] = useState<string | null>(null);
+  const [openAudit, setOpenAudit] = useState<string | null>(null);
+  const [openVersions, setOpenVersions] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     icon: "",
@@ -229,6 +233,20 @@ export default function SkillsPage() {
               </Button>
               <Button
                 size="sm"
+                variant="secondary"
+                onClick={() => setOpenAudit((o) => (o === s.id ? null : s.id))}
+              >
+                Audit
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setOpenVersions((o) => (o === s.id ? null : s.id))}
+              >
+                Versions
+              </Button>
+              <Button
+                size="sm"
                 variant={s.sharingScope === "public" ? "primary" : "secondary"}
                 disabled={busy === s.id}
                 title="Publish to the cross-workspace catalog"
@@ -283,6 +301,8 @@ export default function SkillsPage() {
           </div>
           {openFiles === s.id && <SkillFilesPanel skillId={s.id} />}
           {openLint === s.id && <SkillLintPanel skillId={s.id} />}
+          {openAudit === s.id && <SkillAuditPanel skillId={s.id} />}
+          {openVersions === s.id && <SkillVersionsPanel skillId={s.id} />}
         </Card>
       ))}
     </div>
@@ -417,6 +437,85 @@ function SkillLintPanel({ skillId }: { skillId: string }) {
           <span>
             {f.path && <span className="font-mono text-muted-foreground">{f.path}: </span>}
             <span className="text-foreground">{f.message}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface AuditFinding {
+  code: string;
+  severity: string;
+  message: string;
+  path: string | null;
+}
+
+// Domain 5 GAP-D: static security audit of a skill bundle. Reuses the existing (previously unwired)
+// auditSkill query.
+function SkillAuditPanel({ skillId }: { skillId: string }) {
+  const [{ data, fetching }] = useQuery<{
+    auditSkill: { verdict: string; findings: AuditFinding[] };
+  }>({
+    query: AUDIT_SKILL_QUERY,
+    variables: { skillId },
+    requestPolicy: "network-only",
+  });
+  const audit = data?.auditSkill;
+  const findings = audit?.findings ?? [];
+  return (
+    <div className="mt-2 space-y-1 rounded border border-dashed border-border p-3">
+      <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        Security audit {fetching ? "…" : ""}
+        {audit && (
+          <Badge variant={audit.verdict === "pass" ? "green" : "red"}>{audit.verdict}</Badge>
+        )}
+      </p>
+      {!fetching && findings.length === 0 && (
+        <p className="text-xs text-muted-foreground">No findings.</p>
+      )}
+      {findings.map((f, i) => (
+        <div key={i} className="flex items-start gap-2 text-xs">
+          <Badge variant={f.severity === "high" || f.severity === "critical" ? "red" : "yellow"}>
+            {f.severity}
+          </Badge>
+          <span>
+            <span className="font-mono text-muted-foreground">{f.code}</span>
+            {f.path && <span className="font-mono text-muted-foreground"> · {f.path}</span>}:{" "}
+            <span className="text-foreground">{f.message}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface SkillVersionRow {
+  id: string;
+  revisionNumber: number;
+  label: string | null;
+  createdAt: string;
+}
+
+// Domain 5: skill bundle version history. New client op over the existing server skillVersions field.
+function SkillVersionsPanel({ skillId }: { skillId: string }) {
+  const [{ data, fetching }] = useQuery<{ skillVersions: SkillVersionRow[] }>({
+    query: SKILL_VERSIONS_QUERY,
+    variables: { skillId },
+    requestPolicy: "network-only",
+  });
+  const versions = data?.skillVersions ?? [];
+  return (
+    <div className="mt-2 space-y-1 rounded border border-dashed border-border p-3">
+      <p className="text-xs font-medium text-muted-foreground">
+        Versions {fetching ? "…" : versions.length === 0 ? "— none yet" : `(${versions.length})`}
+      </p>
+      {versions.map((v) => (
+        <div key={v.id} className="flex items-center gap-2 text-xs">
+          <Badge variant="gray">r{v.revisionNumber}</Badge>
+          <span className="text-foreground">{v.label ?? "—"}</span>
+          <span className="ml-auto text-muted-foreground">
+            {new Date(v.createdAt).toLocaleString()}
           </span>
         </div>
       ))}
