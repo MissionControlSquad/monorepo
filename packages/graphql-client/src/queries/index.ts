@@ -234,3 +234,4 @@ export {
   EXECUTION_WORKSPACES_QUERY,
 } from "./execution-workspaces";
 export { SIDEBAR_BADGES_QUERY } from "./sidebar-badges";
+export { SIDEBAR_PREFERENCE_QUERY } from "./sidebar-preferences";

@@ -661,6 +661,14 @@ See 03-sandbox-depth.mdx.
       Tests: 2 integration (ws-scoped pending-approval count exact + review superset; unauth denied). Typecheck 4/4,
       web build ✓.
 
+- [x] **Sidebar preferences — reorder + hide nav (port of paperclip sidebar-preferences service)** DONE (next
+      commit). Full-stack: new UserSidebarPreference model (workspaceId+userId unique, orderedIds/hiddenIds JSON;
+      migration 20260721000000) + service (get/upsert + normalizeIds dedup/trim, mirroring Paperclip) + GraphQL
+      sidebarPreference query + setSidebarPreference mutation (own-user) + client ops + UI: IconRail applies the
+      order/hide (pure orderNavItems helper) and a SidebarCustomizeCard on Settings reorders (up/down) + hides
+      (eye toggle) nav items, with Reset. Tests: 3 integration (normalizeIds; empty default; upsert round-trip).
+      Typecheck ✓, build ✓.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

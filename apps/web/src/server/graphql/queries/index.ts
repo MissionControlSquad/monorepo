@@ -41,6 +41,7 @@ import "./agent-instructions";
 import "./org-chart";
 import "./attention";
 import "./sidebar-badges";
+import "./sidebar-preferences";
 import "./agent-authz";
 import "./agent-governance";
 import "./task-relations";

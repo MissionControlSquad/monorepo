@@ -47,7 +47,10 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 import { useQuery } from "urql";
-import { SIDEBAR_BADGES_QUERY } from "@agentcenter/graphql-client/queries";
+import {
+  SIDEBAR_BADGES_QUERY,
+  SIDEBAR_PREFERENCE_QUERY,
+} from "@agentcenter/graphql-client/queries";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
@@ -60,7 +63,14 @@ interface IconRailProps {
   onCreateTask: () => void;
 }
 
-const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; flag?: string }[] = [
+export interface NavItem {
+  href: string;
+  icon: typeof LayoutDashboard;
+  label: string;
+  flag?: string;
+}
+
+export const NAV_ITEMS: NavItem[] = [
   { href: "/", icon: LayoutDashboard, label: "Home" },
   { href: "/search", icon: Search, label: "Search" },
   { href: "/attention", icon: Inbox, label: "Attention", flag: FLAG_KEYS.ATTENTION },
@@ -119,6 +129,28 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   },
 ];
 
+/**
+ * Apply a user's sidebar preference: items in `orderedIds` come first (in that order), the rest keep
+ * their default order; items in `hiddenIds` are dropped. Pure — shared with the customize panel.
+ */
+export function orderNavItems(
+  items: NavItem[],
+  orderedIds: string[],
+  hiddenIds: string[],
+): NavItem[] {
+  const hidden = new Set(hiddenIds);
+  const rank = new Map(orderedIds.map((href, i) => [href, i]));
+  return items
+    .filter((it) => !hidden.has(it.href))
+    .slice()
+    .sort((a, b) => {
+      const ra = rank.has(a.href) ? rank.get(a.href)! : Infinity;
+      const rb = rank.has(b.href) ? rank.get(b.href)! : Infinity;
+      if (ra !== rb) return ra - rb;
+      return items.indexOf(a) - items.indexOf(b); // stable: default order for unranked
+    });
+}
+
 function isActive(pathname: string | null, href: string): boolean {
   if (!pathname) return false;
   if (href === "/") return pathname === "/" || pathname === "/recurring-tasks";
@@ -134,6 +166,9 @@ export function IconRail({ onCreateTask }: IconRailProps) {
   const [{ data: badges }] = useQuery<{
     sidebarBadges: { approvals: number; review: number; attention: number };
   }>({ query: SIDEBAR_BADGES_QUERY });
+  const [{ data: pref }] = useQuery<{
+    sidebarPreference: { orderedIds: string[]; hiddenIds: string[] };
+  }>({ query: SIDEBAR_PREFERENCE_QUERY });
   const badgeFor = (href: string): number => {
     const b = badges?.sidebarBadges;
     if (!b) return 0;
@@ -171,8 +206,13 @@ export function IconRail({ onCreateTask }: IconRailProps) {
 
       {/* Navigation */}
       <nav className="flex flex-col items-center gap-0.5">
-        {NAV_ITEMS.filter(({ flag }) => !flag || isEnabled(flag)).map(
-          ({ href, icon: Icon, label }) => {
+        {orderNavItems(
+          NAV_ITEMS,
+          pref?.sidebarPreference?.orderedIds ?? [],
+          pref?.sidebarPreference?.hiddenIds ?? [],
+        )
+          .filter(({ flag }) => !flag || isEnabled(flag))
+          .map(({ href, icon: Icon, label }) => {
             const count = badgeFor(href);
             return (
               <Link
@@ -193,8 +233,7 @@ export function IconRail({ onCreateTask }: IconRailProps) {
                 )}
               </Link>
             );
-          },
-        )}
+          })}
       </nav>
 
       <div className="flex-1" />

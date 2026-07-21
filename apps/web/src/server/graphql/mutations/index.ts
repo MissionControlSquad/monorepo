@@ -17,6 +17,7 @@ import "./recurring-tasks";
 import "./reviews";
 import "./events";
 import "./system";
+import "./sidebar-preferences";
 import "./profile";
 import "./feature-flags";
 import "./approvals";

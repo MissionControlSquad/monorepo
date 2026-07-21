@@ -36,6 +36,7 @@ import {
 import { Input } from "@/components/ui/shadcn/input";
 import { LicenseStatusCode } from "@/server/constants";
 import { API_ROUTES } from "@/lib/api-routes";
+import { SidebarCustomizeCard } from "@/components/layout/sidebar/SidebarCustomizeCard";
 
 const changePasswordSchema = z
   .object({
@@ -196,6 +197,9 @@ export function SettingsPage() {
 
       {/* Agent memory backend */}
       <MemoryDefaultCard />
+
+      {/* Sidebar customization */}
+      <SidebarCustomizeCard />
 
       {/* Experimental feature flags */}
       <FeatureFlagsCard />

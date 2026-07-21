@@ -270,3 +270,4 @@ export {
   UPDATE_PROJECT_WORKSPACE,
   DELETE_PROJECT_WORKSPACE,
 } from "./execution-workspaces";
+export { SET_SIDEBAR_PREFERENCE } from "./sidebar-preferences";
