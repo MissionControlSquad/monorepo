@@ -8,11 +8,16 @@ import { dismissAttentionItem, undismissAttentionItem } from "@/server/services/
 builder.mutationField("dismissAttentionItem", (t) =>
   t.field({
     type: "Boolean",
-    args: { itemKey: t.arg.string({ required: true }) },
+    // snoozeHours > 0 hides the item until then (it re-surfaces after); omit/0 dismisses permanently.
+    args: { itemKey: t.arg.string({ required: true }), snoozeHours: t.arg.int() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ATTENTION);
       const tenancy = requireRole(ctx, "member");
-      return dismissAttentionItem(tenancy.workspaceId, args.itemKey, tenancy.userId);
+      const snoozedUntil =
+        args.snoozeHours && args.snoozeHours > 0
+          ? new Date(Date.now() + args.snoozeHours * 3600_000)
+          : null;
+      return dismissAttentionItem(tenancy.workspaceId, args.itemKey, tenancy.userId, snoozedUntil);
     },
   }),
 );

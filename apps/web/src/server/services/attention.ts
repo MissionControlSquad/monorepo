@@ -20,11 +20,17 @@ export async function dismissAttentionItem(
   workspaceId: string,
   itemKey: string,
   dismissedByProfileId?: string | null,
+  snoozedUntil?: Date | null,
 ): Promise<boolean> {
   await prisma.attentionDismissal.upsert({
     where: { workspaceId_itemKey: { workspaceId, itemKey } },
-    create: { workspaceId, itemKey, dismissedByProfileId: dismissedByProfileId ?? null },
-    update: {},
+    create: {
+      workspaceId,
+      itemKey,
+      dismissedByProfileId: dismissedByProfileId ?? null,
+      snoozedUntil: snoozedUntil ?? null,
+    },
+    update: { snoozedUntil: snoozedUntil ?? null },
   });
   return true;
 }
@@ -66,10 +72,20 @@ export async function getAttentionFeed(
       select: { id: true, name: true, reportsToAgentId: true },
     }),
     includeDismissed
-      ? Promise.resolve([] as { itemKey: string }[])
-      : prisma.attentionDismissal.findMany({ where: { workspaceId }, select: { itemKey: true } }),
+      ? Promise.resolve([] as { itemKey: string; snoozedUntil: Date | null }[])
+      : prisma.attentionDismissal.findMany({
+          where: { workspaceId },
+          select: { itemKey: true, snoozedUntil: true },
+        }),
   ]);
-  const dismissed = new Set(dismissals.map((d) => d.itemKey));
+  // A dismissal hides an item if it is permanent (snoozedUntil null) or still snoozed (in the future).
+  // An expired snooze is ignored, so the item re-surfaces.
+  const now = Date.now();
+  const dismissed = new Set(
+    dismissals
+      .filter((d) => d.snoozedUntil == null || d.snoozedUntil.getTime() > now)
+      .map((d) => d.itemKey),
+  );
 
   const items: AttentionItem[] = [];
 

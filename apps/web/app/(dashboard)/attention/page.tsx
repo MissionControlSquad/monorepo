@@ -55,10 +55,10 @@ export default function AttentionPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const feed = data?.attentionFeed;
 
-  async function onDismiss(itemKey: string) {
+  async function onDismiss(itemKey: string, snoozeHours?: number) {
     setBusy(itemKey);
     try {
-      await dismiss({ itemKey });
+      await dismiss({ itemKey, snoozeHours: snoozeHours ?? null });
       refetch({ requestPolicy: "network-only" });
     } finally {
       setBusy(null);
@@ -106,6 +106,15 @@ export default function AttentionPage() {
                 Resolve
               </Button>
             </Link>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={busy === item.id}
+              onClick={() => onDismiss(item.id, 24)}
+              title="Hide for a day; it'll come back if still relevant"
+            >
+              Snooze 1d
+            </Button>
             <Button
               size="sm"
               variant="secondary"
