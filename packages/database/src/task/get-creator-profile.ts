@@ -25,3 +25,12 @@ export async function getTaskProjectId(taskId: string): Promise<string | null> {
   });
   return task?.projectId ?? null;
 }
+
+/** Resolve the buildbase workspace id for a task (via its project). Null if unassigned. */
+export async function getTaskWorkspaceId(taskId: string): Promise<string | null> {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { project: { select: { workspaceId: true } } },
+  });
+  return task?.project?.workspaceId ?? null;
+}
