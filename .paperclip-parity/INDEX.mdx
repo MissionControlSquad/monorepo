@@ -557,6 +557,13 @@ See 03-sandbox-depth.mdx.
       isolation needed. Tests: 3 integration (approve→done+comment; request_changes→assigned; non-review guard).
       Typecheck 4/4, web build ✓. Flips the inventory's biggest Gap → Has-UI.
 
+- [x] **UI — agent memory inspection + work-queue on the profile (Domains 4/5, front-end)** DONE (next commit).
+      Two inventory gaps closed, both agent-profile cards reusing existing ops (no backend). AgentMemoryCard:
+      agentMemoryEntries + searchAgentMemory (recall search) + forgetAgentMemory (per-entry Forget) — MEMORY-gated,
+      self-hides when off. AgentQueueCard: agentQueueActive (the agent's self-generated follow-up/breakdown queue)
+      with Done/Skip (updateQueueItemStatus) + Remove (deleteQueueItem), auto-generated badge, related-task link —
+      AGENT_QUEUE-gated, self-hides when empty. Typecheck ✓, build ✓. Inventory gaps 6 → 4.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

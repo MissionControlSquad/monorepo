@@ -7,6 +7,8 @@ import { AgentProfileHeader } from "../components/profile/AgentProfileHeader";
 import { AgentProfileStats } from "../components/profile/AgentProfileStats";
 import { CurrentWorkSection } from "../components/profile/CurrentWorkSection";
 import { AgentSalaryCard } from "../components/profile/AgentSalaryCard";
+import { AgentMemoryCard } from "../components/profile/AgentMemoryCard";
+import { AgentQueueCard } from "../components/profile/AgentQueueCard";
 import { AssignedTasksList } from "../components/profile/AssignedTasksList";
 import { RecentDeliverablesList } from "../components/profile/RecentDeliverablesList";
 import { AgentActivityTimeline } from "../components/profile/AgentActivityTimeline";
@@ -332,6 +334,8 @@ export function AgentProfilePage({ agentId }: AgentProfilePageProps) {
         <AgentProfileHeader agent={agent} />
         <AgentProfileStats agentId={agent.id} projectId={projectId ?? undefined} />
         <AgentSalaryCard agentId={agent.id} />
+        <AgentQueueCard agentId={agent.id} />
+        <AgentMemoryCard agentId={agent.id} />
         <CurrentWorkSection agent={agent} />
       </div>
 
