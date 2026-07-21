@@ -1,0 +1,29 @@
+---
+feature: Additional P2 differences (feedback, company-search, continuation-summary, dependency-wakeups)
+priority: P2
+status: Missing
+gate: buildable-now (some need LLM/scale)
+---
+
+# Additional P2 differences · P2 · ❌ Missing (found in second-pass diff)
+
+Distinct Paperclip capabilities my first-pass domain buckets missed. All confirmed **absent** in the
+monorepo.
+
+| Feature | Paperclip | What it is | Gate | Notes |
+|---|---|---|---|---|
+| **Feedback / evals system** | `feedback.ts` (2117 ln), `feedback-redaction.ts`, `feedback-share-client.ts` | Capture structured feedback/eval votes on agent output, redact PII, export + share bundles | buildable-now (DB) | Large but pure DB/app; a real product surface the monorepo lacks entirely. |
+| **Company search (rich)** | `company-search.ts` (1340 ln) + `-extract` + `-rate-limit` | Full-text/paginated search across company entities with branch-fetch pagination, extraction, and rate limiting | buildable-now | The monorepo has a simpler `globalSearch` (tasks/messages/deliverables). This is broader + paginated + rate-limited. |
+| **Issue continuation summary** | `issue-continuation-summary.ts` (284 ln), `summary-slots.ts`, `plan-review-context.ts` | When a task/run is interrupted or waits for review, auto-generate a "Continuation Summary" doc + extract the next action, so the next run resumes cleanly | buildable-now (heuristic) / needs-LLM (rich) | Valuable for long/multi-run tasks; the monorepo has no run-handoff summary. |
+| **Dependency wakeups** | `issue-dependency-wakeups.ts`, `issue-assignment-wakeup.ts`, `issue-rewake-throttle.ts` | Wake a **blocked** task when its blockers resolve (idempotent, throttled) — closes the loop so blocked work auto-resumes | buildable-now | The monorepo blocks tasks + surfaces them in attention, but does **not** auto-wake them when the blocker clears. A real recovery gap. |
+
+**What's required:**
+- Feedback + company-search: pure DB/app slices (buildable-now), each a sizeable vertical.
+- Continuation summary: buildable-now with a heuristic; richer summary needs the LLM relay.
+- Dependency wakeups: buildable-now — hook task→done to re-evaluate + wake dependents (fits the existing reap/recovery cron).
+
+**Priority rationale:** Each adds real capability/robustness (feedback loops, discoverability, resumable
+long tasks, auto-unblocking). None blocks the core loop, hence P2. **Dependency wakeups** is the highest-
+value/lowest-effort (closes an autonomy gap) and should arguably be P1-adjacent.
+
+**Depends on:** LLM relay for rich continuation summaries; otherwise nothing external.

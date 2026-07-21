@@ -1,0 +1,27 @@
+---
+feature: External objects & GitHub sync
+priority: P2
+status: Missing
+gate: needs-github-token (real sync) / buildable-now (model)
+---
+
+# External objects & GitHub sync · P2 · ❌ Missing
+
+**What it is:** Paperclip's `external-objects.ts` (945 ln) + `github-external-object-provider.ts` +
+`github-fetch.ts` — a **pluggable external-object system**: detectors recognize references (GitHub
+PR/issue/commit URLs, etc.), resolvers fetch + snapshot their live state, and the objects become
+first-class, refreshable entities linked to tasks/work-products (status, checks, merge state).
+
+**Status in our monorepo (verified):** **Missing.** The monorepo has `ExternalLink` (a stored URL with a
+type label — `task.prisma`) and work-product `provider`/`externalId` fields, but **no detector/resolver
+framework and no live GitHub fetch/sync.** A linked PR is a dead URL, not a synced object.
+
+**What's required:**
+- **Model + detector/resolver framework** (ExternalObject + snapshot) — buildable-now.
+- **GitHub provider** (fetch PR/issue/commit/checks state) — **needs a GitHub token** + the SSRF guard (P1).
+
+**Priority rationale:** For a coding-agent platform this is high-value — it turns "the agent opened PR #42"
+into a live, status-tracked object (merged? checks passing? review requested?). Not required for the core
+loop, but a major capability gap vs Paperclip. Gated on a GitHub token for real sync.
+
+**Depends on:** GitHub API token; the SSRF guard (P1) for safe outbound fetch.
