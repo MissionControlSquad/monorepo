@@ -11,7 +11,7 @@
  * Destroy: DELETE {base}/api/paperclip-sandbox/v1/leases/{providerLeaseId}.
  */
 import { defineCloudProvider, type SandboxHandle } from "./types";
-import { guardedFetch } from "../remote-http-endpoint-guard";
+import { guardedFetch } from "@agentcenter/utils/remote-http-endpoint-guard";
 
 const API_PREFIX = "/api/paperclip-sandbox/v1";
 const DEFAULT_CWD = "/workspace/paperclip";

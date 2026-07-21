@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import type { AdapterInvocation } from "@agentcenter/utils";
+import { guardedFetch } from "@agentcenter/utils/remote-http-endpoint-guard";
 
 export interface ExecResult {
   exitCode: number | null;
@@ -86,7 +87,9 @@ async function execHttp(
   const controller = new AbortController();
   const timer = opts.timeoutMs ? setTimeout(() => controller.abort(), opts.timeoutMs) : undefined;
   try {
-    const res = await fetch(plan.url, {
+    // SSRF guard: plan.url is the agent-configured webhook target — block private/reserved hosts
+    // (metadata, internal services) unless SSRF_ALLOW_PRIVATE_NETWORK=1.
+    const res = await guardedFetch(plan.url, {
       method: plan.method,
       headers: plan.headers,
       body: plan.body,

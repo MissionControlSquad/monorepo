@@ -16,7 +16,7 @@ import {
   type SandboxExecResult,
   type SandboxHandle,
 } from "./types";
-import { guardedFetch } from "../remote-http-endpoint-guard";
+import { guardedFetch } from "@agentcenter/utils/remote-http-endpoint-guard";
 
 const DEFAULT_API_URL = "https://exe.dev/exec";
 // Install Node 20 so an agent runtime bridge can run (mirrors Paperclip's DEFAULT_SETUP_SCRIPT).

@@ -4,7 +4,7 @@ import {
   parseRemoteHttpEndpoint,
   guardError,
   type RemoteHttpEndpointLookup,
-} from "@/server/services/remote-http-endpoint-guard";
+} from "@agentcenter/utils/remote-http-endpoint-guard";
 
 const lookupTo =
   (address: string, family = 4): RemoteHttpEndpointLookup =>
