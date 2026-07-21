@@ -10,6 +10,7 @@ import {
   LEDGER_EVENTS_QUERY,
 } from "@/lib/graphql/queries";
 import { CREATE_LEDGER_EVENT, DELETE_LEDGER_EVENT } from "@/lib/graphql/mutations";
+import { formatCents as money } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
 
 // Epic #16: business finance ledger (human P&L). API-gated by the LEDGER feature + buildbase role
@@ -52,14 +53,6 @@ interface Event {
   currency: string;
   description: string | null;
   occurredAt: string;
-}
-
-function money(cents: number): string {
-  const sign = cents < 0 ? "-" : "";
-  return `${sign}$${(Math.abs(cents) / 100).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 }
 
 function todayISO(): string {

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Wallet } from "lucide-react";
 import { AGENT_SALARY_QUERY } from "@/lib/graphql/queries";
 import { SET_AGENT_SALARY } from "@/lib/graphql/mutations";
+import { formatCents as money } from "@agentcenter/utils";
 import { Card, Button } from "@/components/ui";
 import { Input } from "@/components/ui/shadcn/input";
 
@@ -14,13 +15,6 @@ interface Salary {
   limitCents: number;
   window: string;
   isSalary: boolean;
-}
-
-function money(cents: number): string {
-  return `$${(cents / 100).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 }
 
 /**

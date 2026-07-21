@@ -503,6 +503,18 @@ See 03-sandbox-depth.mdx.
       (a budget policy flagged isSalary; admin server-side). No new route — reuses Card/Button/Input. Typecheck ✓,
       build ✓.
 
+- [x] **UI wiring — finance events + cost windows + billing split (Domain 12 GAP-1/6, front-end)** DONE (next
+      commit). New FinanceEventsSection component appended to the existing finance page (per explorer map — NOT a
+      new route, NOT the ledger page which is a different domain). Wires the previously backend-only ops:
+      financeEventSummary (net/debits/credits/estimated tiles), costBillingSplit (metered/subscription/other),
+      costWindowSpend (rolling 5h/24h/7d per-provider grid — reuses COST_WINDOWS from utils), financeEvents feed,
+      and ingestFinanceEvent (admin record form — reuses FINANCE_EVENT_KINDS from utils). These are account-level
+      provider money, distinct from the per-inference cost breakdown already on the page. De-dup: extracted the
+      thrice-copied money(cents) formatter into a single @agentcenter/utils formatCents (superset — handles
+      negatives) and refactored finance/ledger pages + the salary card to import it. Deferred: repriceCostEvent
+      (needs a cost-event drill-down list that doesn't exist — no dangling control). Typecheck ✓, build ✓, finance
+      tests 9/9.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

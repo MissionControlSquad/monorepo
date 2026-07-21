@@ -65,6 +65,7 @@ export * from "./agent-creation";
 export * from "./defaults";
 export * from "./format";
 export * from "./browser";
+export * from "./currency";
 export * from "./network";
 export * from "./notification-api";
 export * from "./agent-status";
