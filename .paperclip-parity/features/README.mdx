@@ -1,0 +1,48 @@
+---
+title: Paperclip → monorepo parity — per-item feature tree
+scope: one MDX per feature, per service, per UI surface
+---
+# Parity feature tree
+
+One file per **everything** — every Paperclip service, every UI surface, and every
+cross-cutting feature — so each item is independently linkable and reviewable.
+Source of truth for classification is [`../SERVICE-AUDIT.mdx`](../SERVICE-AUDIT.mdx)
+(the 177-row line-item table) and [`../CODEBASE-COVERAGE.mdx`](../CODEBASE-COVERAGE.mdx)
+(routes/CLI/middleware/components/hooks/apps). Priorities defined in
+[`../PRIORITIES.mdx`](../PRIORITIES.mdx).
+
+## Layout
+
+| Folder | Count | What |
+|---|---:|---|
+| `./` (root) | 29 | **Feature-level** files, grouped P0–P3 (the domains: agents, tasks, deliverables, review, attention, messages, adapters, sandbox, environments, secrets, cost, memory, workspaces, security, skills/teams, plugins, pipelines, observability, tools/MCP, plugin-runtime, operator-CLI, UI-polish, …). |
+| `./services/` | 177 | **One file per Paperclip service**, keyed to SERVICE-AUDIT `#`. Frontmatter: `status` / `priority` / `gate`. |
+| `./ui/` | 73 | **One file per UI surface** — 63 present dashboard routes + 10 missing Paperclip pages/widgets. |
+
+## Tally
+
+**Services (177):** 63 Present · 28 Partial · 76 Missing · 10 buildbase-owned.
+Of the 76 Missing: ~25 = the plugin runtime, ~8 = the tool subsystem, the rest are the
+second-pass cross-cutting gaps (external-objects, feedback, company-search,
+continuation-summaries, dependency-wakeups, folders, assets, …).
+
+**UI (73):** 59 Present · 10 Missing · 4 buildbase-owned (human auth).
+
+## Reading order
+
+1. `../PRIORITIES.mdx` — the P0–P3 framework + "does it work standalone" (YES).
+2. Root `P0-*.mdx` — confirm the core agent loop is fully present.
+3. Root `P1-*.mdx` — the production-critical, buildable-now gaps. **Top items:**
+   `remote-http-endpoint-guard` (SSRF, #138) and `workspace-realization` (#175).
+4. `./services/` + `./ui/` — the exhaustive per-item leaves.
+
+## Buildable-now shortlist (net, from the leaves)
+
+- **P1** — SSRF guard (`services/remote-http-endpoint-guard.mdx`); execution-workspace
+  realization (`services/workspace-realization.mdx` + `-runtime` + `session-workspace-cwd`
+  + `project-workspace-runtime-config`); adapter-registry unification (`services/*adapter*`).
+- **P2** — continuation-summaries (`summary-slots` / `-finalization` / `run-continuations`);
+  external-objects/GitHub; feedback; company-search; tool access-policy + content-guards
+  (the data-model half); env-var-editor widget (`ui/x-env-var-editor.mdx`);
+  run-log-store + transcript viewer (`ui/x-transcript.mdx`).
+- **P3** — plugin runtime & tool gateway (infra-gated; need a long-lived host).
