@@ -37,7 +37,6 @@ import { Input } from "@/components/ui/shadcn/input";
 import { LicenseStatusCode } from "@/server/constants";
 import { API_ROUTES } from "@/lib/api-routes";
 import { SidebarCustomizeCard } from "@/components/layout/sidebar/SidebarCustomizeCard";
-import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
 import { BuildbaseAccountCard } from "@/components/settings/BuildbaseAccountCard";
 
 const changePasswordSchema = z
@@ -203,8 +202,8 @@ export function SettingsPage() {
       {/* Agent memory backend */}
       <MemoryDefaultCard />
 
-      {/* Notification preferences */}
-      <NotificationPreferencesCard />
+      {/* Notification preferences now live in buildbase — see BuildbaseAccountCard →
+          openWorkspaceSettings('notifications'). */}
 
       {/* Sidebar customization */}
       <SidebarCustomizeCard />

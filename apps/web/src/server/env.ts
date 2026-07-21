@@ -48,14 +48,7 @@ const serverSchema = z.object({
   // dev/test fall back to an insecure default in secrets-crypto.ts.
   SECRET_ENCRYPTION_KEY: z.string().optional(),
 
-  // ── Web Push (optional — only needed for push notifications) ──
-  VAPID_PUBLIC_KEY: z
-    .string()
-    .default(
-      "BEAGuNNkK6E6ijU7Q8PrUwQB5E6yxVGGiPZtYd7jrLJlt19ge_9pYT76yrWgLr7WH4zrN33oWk-T_UEBoerEBus",
-    ),
-  VAPID_PRIVATE_KEY: z.string().optional(),
-  VAPID_SUBJECT: z.string().default("mailto:dharmendra@agentcenter.cloud"),
+  // Web Push removed — buildbase owns push delivery (its own service worker + subscription).
 
   // ── Email via Resend (optional — only needed for email notifications) ──
   RESEND_API_KEY: z.string().optional(),

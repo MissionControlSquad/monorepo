@@ -94,6 +94,23 @@ is dropped** (buildbase has no equivalent; per-send `scheduledAt`/`ttl` exist bu
    `PushSubscription` + `UserNotificationPreference` this pass (push/email dormant until you
    provision; in-app + history keep working throughout).
 
+## Execution status (executed on this branch)
+
+- [x] **Step 1** — `notify()` records one in-app row + delegates to buildbase; deleted push.ts,
+      email-templates.ts, notification-retry.ts; unwired retry from instrumentation.
+- [x] **Step 2** — dropped `PushSubscription` + `UserNotificationPreference` models + migration +
+      DB helpers + `/api/user-notifications/{subscribe,preferences}` routes.
+- [x] **Step 3** — deleted usePushNotifications, NotificationPreferences(Card), PushPermissionBanner,
+      old `sw.js`; added buildbase `public/push-sw.js`; removed VAPID env; unwired SW registration.
+- [ ] **Decision B — feed filter (wire on provisioning).** The in-app bell should hide event types
+      the member turned fully off. This reads **live** per-user prefs
+      (`workspace.getNotificationPreferences(workspaceId)` — current-session scoped, no `userId`
+      param), so it can only be built+verified against a provisioned buildbase org. **Approach when
+      ready:** add `/api/user-notifications/muted-types` that reads the caller's buildbase session
+      (from the bb session cookie) → `getNotificationPreferences` → returns slugs where
+      `email===false && push===false`; the feed filters `notifications` by that set (empty = show all).
+      Until then the feed is complete history (correct: nothing is muted pre-provisioning).
+
 ## Not touched by any of this
 `Notification` (agent mentions) and `Subscription` (agent task subs) are AI-domain and stay exactly
 as-is. This cutover is only the **user-facing** push/email delivery layer.

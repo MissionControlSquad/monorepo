@@ -64,12 +64,8 @@ export function AppShell({ children, modal }: AppShellProps) {
 
   useEffect(() => setMounted(true), []);
 
-  // Register service worker for push notifications
-  useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    }
-  }, []);
+  // Push service worker is now owned by buildbase (registers public/push-sw.js via its own
+  // usePushNotifications hook inside the notifications settings screen). Our VAPID SW is removed.
 
   // Lock body scroll when activity sheet is open
   useEffect(() => {
