@@ -10,22 +10,22 @@
 // box directly.
 
 model EnvironmentCustomImageTemplate {
-  id                      String   @id @default(cuid())
+  id                      String    @id @default(cuid())
   workspaceId             String // buildbase workspace _id; no FK (D5)
   environmentId           String
   provider                String // sandbox provider key
-  templateKind            String   @default("snapshot") // snapshot | image | provider_template
+  templateKind            String    @default("snapshot") // snapshot | image | provider_template
   templateRef             String // provider ref future provisions boot from
   sourceTemplateRef       String? // the base image this was captured from
   sourceConfigFingerprint String? // fingerprint of the provider config at capture time
-  status                  String   @default("active") // active | superseded | disabled
+  status                  String    @default("active") // active | superseded | disabled
   supersededByTemplateId  String?
   createdByProfileId      String?
-  capturedAt              DateTime @default(now())
+  capturedAt              DateTime  @default(now())
   lastUsedAt              DateTime?
   metadata                Json?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   @@index([workspaceId, environmentId, status])
   @@map("environment_custom_image_templates")

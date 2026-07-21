@@ -118,18 +118,8 @@ describe("Notifications API", () => {
     expect(res.status).toBe(200);
   });
 
-  it("GET /api/user-notifications/preferences — returns preferences object", async () => {
-    const { GET } = await import("../../app/api/user-notifications/preferences/route");
-    const res = await GET(
-      buildRequest("GET", "http://localhost:3000/api/user-notifications/preferences", {
-        headers: { cookie: `mc_session=${cookie}` },
-      }),
-    );
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toBeDefined();
-    expect(typeof body).toBe("object");
-  });
+  // Notification preferences route removed in the buildbase cutover — buildbase owns per-type
+  // user preferences (openWorkspaceSettings('notifications')). See BUILDBASE-NOTIFICATION-CUTOVER.mdx.
 
   it("GET /api/user-notifications — unauthenticated returns 401", async () => {
     const { GET } = await import("../../app/api/user-notifications/route");

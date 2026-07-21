@@ -82,16 +82,16 @@ model WatchdogDecision {
 }
 
 model TaskRecoveryAction {
-  id          String         @id @default(cuid())
-  taskId      String
-  detectedBy  String // "cron" | watchdogId
-  reason      String
-  status      RecoveryStatus @default(detected)
-  resolution  String?
-  attemptCount Int           @default(1) // Domain 9 #8: which recovery attempt this is (ladder bound)
-  attemptedAt DateTime?
-  resolvedAt  DateTime?
-  createdAt   DateTime       @default(now())
+  id           String         @id @default(cuid())
+  taskId       String
+  detectedBy   String // "cron" | watchdogId
+  reason       String
+  status       RecoveryStatus @default(detected)
+  resolution   String?
+  attemptCount Int            @default(1) // Domain 9 #8: which recovery attempt this is (ladder bound)
+  attemptedAt  DateTime?
+  resolvedAt   DateTime?
+  createdAt    DateTime       @default(now())
 
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
@@ -137,18 +137,18 @@ model TaskTreeHold {
 // A structured ask an agent posts into a task thread that a human resolves. kind/status are TEXT with
 // app-level validation (D5). THREAD_INTERACTIONS-gated. payload/result carry the interaction data.
 model TaskThreadInteraction {
-  id                 String   @id @default(cuid())
-  taskId             String
-  kind               String // suggest_tasks | ask_user_questions | request_confirmation
-  status             String   @default("pending") // pending | resolved | dismissed
-  sourceMessageId    String?
-  sourceRunId        String?
-  payload            Json
-  result             Json?
-  createdByProfileId String?
+  id                  String    @id @default(cuid())
+  taskId              String
+  kind                String // suggest_tasks | ask_user_questions | request_confirmation
+  status              String    @default("pending") // pending | resolved | dismissed
+  sourceMessageId     String?
+  sourceRunId         String?
+  payload             Json
+  result              Json?
+  createdByProfileId  String?
   resolvedByProfileId String?
-  createdAt          DateTime @default(now())
-  resolvedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  resolvedAt          DateTime?
 
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 

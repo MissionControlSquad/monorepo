@@ -24,10 +24,10 @@ model Document {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  createdBy                 Agent?                    @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  createdByProfile          Profile?                  @relation(fields: [createdByProfileId], references: [id], onDelete: SetNull)
-  task                      Task?                     @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  project                   Project?                  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdBy                 Agent?                     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdByProfile          Profile?                   @relation(fields: [createdByProfileId], references: [id], onDelete: SetNull)
+  task                      Task?                      @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project                   Project?                   @relation(fields: [projectId], references: [id], onDelete: SetNull)
   messageAttachments        MessageAttachment[]
   channelMessageAttachments ChannelMessageAttachment[]
   caseDocument              CaseDocument?              @relation("CaseDocument") // Epic #17

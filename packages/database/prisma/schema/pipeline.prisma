@@ -23,7 +23,7 @@ enum RoutineRunStatus {
 }
 
 model Routine {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   workspaceId        String // buildbase workspace _id; no FK (D5)
   name               String
   description        String?
@@ -38,8 +38,8 @@ model Routine {
   assigneeAgentId    String? // the agent whose profile the generated task is assigned to
   priority           Priority?
   goalId             String? // the goal generated tasks advance
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   createdByProfile Profile?          @relation("RoutineCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: SetNull)
   project          Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -132,15 +132,15 @@ enum PipelineCaseEventType {
 }
 
 model Pipeline {
-  id          String   @id @default(cuid())
-  workspaceId String
-  projectId   String?
-  name        String
-  description String?
-  isActive    Boolean  @default(true)
-  sequentialOnly Boolean @default(false) // cases must advance one stage at a time (no skipping)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  workspaceId    String
+  projectId      String?
+  name           String
+  description    String?
+  isActive       Boolean  @default(true)
+  sequentialOnly Boolean  @default(false) // cases must advance one stage at a time (no skipping)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   project Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   stages  PipelineStage[]
@@ -152,8 +152,8 @@ model Pipeline {
 }
 
 model PipelineStage {
-  id            String  @id @default(cuid())
-  pipelineId    String
+  id              String  @id @default(cuid())
+  pipelineId      String
   name            String
   order           Int
   isReviewStage   Boolean @default(false) // surfaces cases in the review-cases inbox

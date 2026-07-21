@@ -24,25 +24,25 @@ enum RunnerTargetKind {
 }
 
 model RunnerCommand {
-  id          String              @id @default(cuid())
-  workspaceId String // buildbase workspace _id; no FK (D5)
-  targetKind  RunnerTargetKind
-  targetId    String // vmId | agentId | hostId depending on targetKind
-  command     String // the shell command to run
-  cwd         String? // optional working directory
-  timeoutMs   Int                 @default(120000)
-  status      RunnerCommandStatus @default(queued)
-  exitCode    Int?
-  stdout      String?
-  stderr      String?
+  id           String              @id @default(cuid())
+  workspaceId  String // buildbase workspace _id; no FK (D5)
+  targetKind   RunnerTargetKind
+  targetId     String // vmId | agentId | hostId depending on targetKind
+  command      String // the shell command to run
+  cwd          String? // optional working directory
+  timeoutMs    Int                 @default(120000)
+  status       RunnerCommandStatus @default(queued)
+  exitCode     Int?
+  stdout       String?
+  stderr       String?
   errorMessage String?
 
   requestedByProfileId String? // buildbase userId that requested it
   claimedAt            DateTime? // when a poller/server claimed it (atomic lease)
   startedAt            DateTime?
   finishedAt           DateTime?
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@index([workspaceId, status])
   @@index([targetKind, targetId, status])

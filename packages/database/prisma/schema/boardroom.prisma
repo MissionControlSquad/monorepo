@@ -21,16 +21,16 @@ model BoardThread {
 }
 
 model BoardMessage {
-  id        String      @id @default(cuid())
-  threadId  String
-  thread    BoardThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  role      BoardRole
-  body      String
-  authorId  String? // profile id for a user turn; null for an assistant turn
+  id             String      @id @default(cuid())
+  threadId       String
+  thread         BoardThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role           BoardRole
+  body           String
+  authorId       String? // profile id for a user turn; null for an assistant turn
   // Operator feedback on an assistant turn: +1 up, -1 down, null none (Paperclip feedback votes).
   feedbackScore  Int?
   feedbackReason String?
-  createdAt DateTime    @default(now())
+  createdAt      DateTime    @default(now())
 
   @@index([threadId, createdAt])
   @@map("board_messages")
