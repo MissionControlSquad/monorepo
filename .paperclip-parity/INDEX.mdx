@@ -644,6 +644,13 @@ See 03-sandbox-depth.mdx.
       deletes. EXECUTION_WORKSPACES-gated, self-hides when off. Deferred (need backend): provision/teardown
       lifecycle (provisionWorkspace) + the services/ports runtime-config editor. Typecheck ✓, build ✓.
 
+- [x] **Hardening — unit tests for the untested pure utils I introduced** DONE (next commit). Audited util test
+      coverage: most (json-schema-form, company-package, cost-windows, finance-events, work-products, billing-types,
+      source-trust, execution-workspace-policy) already have tests; the two I added/used without coverage did not.
+      Added currency.test.ts (formatCents — whole/fractional/negative/grouping) and memory-providers.test.ts
+      (isMemoryProvider + resolveMemoryProvider agent→company→none resolution). 8 tests, all green. Fits the repo's
+      pure-util unit-test convention.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
