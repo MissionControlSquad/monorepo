@@ -1,0 +1,12 @@
+---
+service: database-backup-health
+kind: service
+status: Missing
+priority: P3
+gate: buildable-now
+---
+# database-backup-health · ❌ Missing
+**What it is:** monitor DB backup freshness/health.
+**Monorepo:** none (Prisma migrations exist; no backup health check).
+**Required:** a backup-freshness check — fits the operator CLI (`db:backup`/`doctor`). Buildable-now.
+**Covers:** features/P3-operator-cli.mdx · SERVICE-AUDIT #39.

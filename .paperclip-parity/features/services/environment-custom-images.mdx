@@ -1,0 +1,12 @@
+---
+service: environment-custom-images
+kind: service
+status: Present
+priority: P1
+gate: done (snapshot per-provider gated)
+---
+# environment-custom-images · ✅ Present
+**What it is:** capture/rollback/disable custom images + drift classification.
+**Monorepo:** `environment-custom-images.ts` + GraphQL + per-card UI.
+**Required:** real `snapshot()` for cloud providers — needs a key.
+**Covers:** features/P1-environments-leases.mdx · SERVICE-AUDIT #49.

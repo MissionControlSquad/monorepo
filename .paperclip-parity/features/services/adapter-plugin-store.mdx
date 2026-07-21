@@ -1,0 +1,12 @@
+---
+service: adapter-plugin-store
+kind: service
+status: Missing
+priority: P3
+gate: infra-gated
+---
+# adapter-plugin-store · ❌ Missing
+**What it is:** JSON-file store of externally-registered adapter plugins.
+**Monorepo:** declarative loader exists (`adapters.ts:loadAdapterPlugins`), but no persistent file store/caller.
+**Required:** wire a manifest store + loader caller (small).
+**Covers:** features/P1-adapters-runtime-registry.mdx · SERVICE-AUDIT #5.

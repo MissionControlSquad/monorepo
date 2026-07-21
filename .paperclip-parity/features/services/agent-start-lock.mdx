@@ -1,0 +1,12 @@
+---
+service: agent-start-lock
+kind: service
+status: Missing
+priority: P3
+gate: buildable-now
+---
+# agent-start-lock · ❌ Missing
+**What it is:** concurrency lock so an agent isn't started twice simultaneously.
+**Monorepo:** run admission + optimistic claims exist, but no explicit agent-start mutex.
+**Required:** a per-agent start lock (advisory lock / row CAS). Small.
+**Covers:** SERVICE-AUDIT #12.

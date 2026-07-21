@@ -1,0 +1,12 @@
+---
+service: agent-invokability
+kind: service
+status: Partial
+priority: P1
+gate: buildable-now
+---
+# agent-invokability · 🟡 Partial
+**What it is:** may this agent be invoked (permission/capability resolution) for an action.
+**Monorepo:** partial via `agent-authz.ts` capability grants + deny events; no full invokability resolver.
+**Required:** a resolver combining capability grants + trust + status into an invokability decision.
+**Covers:** features/P3-tools-mcp.mdx (adjacent) · SERVICE-AUDIT #9.

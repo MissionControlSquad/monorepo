@@ -1,0 +1,12 @@
+---
+service: environment-runtime
+kind: service
+status: Partial
+priority: P1
+gate: needs-provider-key
+---
+# environment-runtime · 🟡 Partial
+**What it is:** resolve + drive an environment's runtime for a run.
+**Monorepo:** `resolveEnvironmentExecution` (ssh/plugin drivers → null "not yet runnable").
+**Required:** ssh/plugin runtime drivers — needs a real host/runtime.
+**Covers:** features/P1-environments-leases.mdx · SERVICE-AUDIT #53.
