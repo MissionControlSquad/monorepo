@@ -9,7 +9,7 @@ import { prisma } from "../client";
 export async function getChannelVisibility(channelId: string) {
   return prisma.channel.findUnique({
     where: { id: channelId },
-    select: { visibility: true, slug: true },
+    select: { visibility: true, slug: true, workspaceId: true },
   });
 }
 

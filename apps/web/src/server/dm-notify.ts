@@ -115,6 +115,7 @@ export async function notifyAgentChannelMembers(
         title: isDm ? `Message from ${senderName}` : `${senderName} mentioned you`,
         body: message.content.slice(0, 200),
         url: channelUrl,
+        workspaceId: channel.workspaceId ?? undefined,
       }),
     ),
   );

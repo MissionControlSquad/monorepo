@@ -1,0 +1,60 @@
+---
+title: Buildbase custom notification events to create
+purpose: dashboard checklist — one row per event the delivery adapter sends
+---
+# Buildbase notification events — create these in the dashboard
+
+The delivery adapter (`notification-buildbase.ts`) calls
+`bb.notification.send(workspaceId, <slug>, userId, { title, message, url, channels })`. The
+**slug MUST match exactly** — it is our `UserNotificationType` enum value, passed straight through
+as the event. Create each event below (Notifications → Custom → Create Notification Event), then
+edit its auto-created email template.
+
+**Set "User can toggle this in workspace settings" = ON for all** — these are all user-facing, and
+buildbase's per-user preference then governs delivery (our own prefs remain the fallback path's gate).
+
+| Slug (exact) | Name | Description | Category | Status |
+|---|---|---|---|---|
+| `new_comment` | New Comment | Someone commented or sent you a message | Messages | **wired today** (dm-notify) |
+| `mention` | Mention | Someone mentioned you | Messages | reserved |
+| `task_assigned` | Task Assigned | A task was assigned to you | Tasks | reserved |
+| `task_needs_review` | Task Needs Review | A task is ready for your review | Tasks | reserved |
+| `task_clarification_requested` | Clarification Requested | An agent asked for clarification on a task | Tasks | reserved |
+| `task_approved` | Task Approved | Your task was approved | Tasks | reserved |
+| `task_rejected` | Task Rejected | Your task was rejected | Tasks | reserved |
+| `task_done` | Task Done | A task you're involved in was completed | Tasks | reserved |
+| `deliverable_submitted` | Deliverable Submitted | A deliverable was submitted for review | Deliverables | reserved |
+| `document_added` | Document Added | A document was added | Documents | reserved |
+| `team_update` | Team Update | An update from your team | Team | reserved |
+
+"reserved" = the event/slug exists in our enum but isn't emitted via `notify()` yet; creating it now
+means it works the moment a trigger is wired. `new_comment` is the one live path today.
+
+## Email template merge tags
+
+Each event's auto-created email template can use buildbase merge tags. The adapter populates:
+
+- `{{message}}` — the notification body
+- `{{url}}` — click-through URL (also the push click target)
+- `{{name}}`, `{{email}}`, `{{workspaceName}}` — recipient/workspace (buildbase-provided)
+
+The push `title` = our notification title; push `body` = `{{message}}`.
+
+## Runtime env to activate delivery (server-private)
+
+```
+NEXT_PUBLIC_SAAS_ORG_ID=…         # already used by the client provider
+NEXT_PUBLIC_SAAS_SERVER_URL=…     # already used by the client provider
+BUILDBASE_SERVICE_SESSION_ID=…    # server-to-server session for org-level notification.send
+```
+
+With those set **and** the events above created, push/email route through buildbase; otherwise the
+adapter returns "skip" and the home-grown `sendPushToUser`/`sendEmail` path runs. Both fail-safe.
+
+## Code wiring status
+
+- [x] Adapter sends `record.type` as the event slug (`notification-buildbase.ts`).
+- [x] `workspaceId` threaded into notifications: `NotifyParams.workspaceId` → metadata → adapter.
+- [x] `dm-notify` (the live `new_comment` path) passes `channel.workspaceId`.
+- [ ] Wire `workspaceId` on future `notify()` callers as new notification types go live (pass the
+      task/project/channel workspaceId; without it that event falls back to home-grown delivery).

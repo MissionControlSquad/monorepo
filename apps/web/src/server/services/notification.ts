@@ -260,6 +260,12 @@ export interface NotifyParams {
   url?: string;
   metadata?: Record<string, unknown>;
   channels?: NotificationChannel[];
+  /**
+   * Buildbase workspace id. Stamped into metadata so the buildbase delivery adapter can route
+   * push/email through notification.send (which is workspace-scoped). Omit and delivery falls
+   * back to the home-grown push/email path. See notification-buildbase.ts.
+   */
+  workspaceId?: string;
 }
 
 /**
@@ -267,7 +273,11 @@ export interface NotifyParams {
  * Creates DB records and dispatches to push/email/in_app channels independently.
  */
 export async function notify(params: NotifyParams): Promise<void> {
-  const { userId, type, title, body, taskId, messageId, url, metadata } = params;
+  const { userId, type, title, body, taskId, messageId, url } = params;
+  // Fold workspaceId into metadata so the buildbase adapter can resolve it at dispatch time.
+  const metadata: Record<string, unknown> | undefined = params.workspaceId
+    ? { ...params.metadata, workspaceId: params.workspaceId }
+    : params.metadata;
 
   // Rate limit check
   if (isRateLimited(userId)) {
