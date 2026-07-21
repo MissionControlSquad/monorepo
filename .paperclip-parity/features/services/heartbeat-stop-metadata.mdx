@@ -1,0 +1,12 @@
+---
+service: heartbeat-stop-metadata
+kind: service
+status: Partial
+priority: P3
+gate: buildable-now
+---
+# heartbeat-stop-metadata · 🟡 Partial
+**What it is:** metadata about why/how a run stopped.
+**Monorepo:** run finalize records status/exit; richer stop-metadata thin.
+**Required:** structured stop-reason metadata. Small.
+**Covers:** SERVICE-AUDIT #71.

@@ -1,0 +1,12 @@
+---
+service: pipelines-aggregation
+kind: service
+status: Partial
+priority: P2
+gate: buildable-now
+---
+# pipelines-aggregation · 🟡 Partial
+**What it is:** aggregate pipeline metrics/health.
+**Monorepo:** `pipelineHealth` query present; full aggregation (throughput/SLA rollups) thin.
+**Required:** richer aggregation queries. Buildable-now.
+**Covers:** features/P2-pipelines-routines-cases-goals.mdx · SERVICE-AUDIT #101.

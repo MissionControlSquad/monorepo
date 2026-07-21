@@ -1,0 +1,12 @@
+---
+service: instance-settings
+kind: service
+status: Partial
+priority: P2
+gate: mixed
+---
+# instance-settings · 🟡 Partial
+**What it is:** instance-level settings (shutdown, experimental flags, access).
+**Monorepo:** `system-settings` (shutdown) + settings page (governance/notifications/memory/flags panel). Instance-access is buildbase.
+**Required:** experimental-flags panel is present; instance-access is buildbase.
+**Covers:** SERVICE-AUDIT #76.
