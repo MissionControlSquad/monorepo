@@ -24,9 +24,12 @@ monorepo**. Apply this split to every feature, not just billing.
 
 Nothing in `finance/`, `budgets`, `cost`, `quota`, or `agent-authz` is touched. Only:
 
-1. **App pricing (ADD, user-facing)** — mount buildbase `PricingPage` + `useSubscription*` for the
-   human's app subscription. Net-new; removes nothing. *Functions only once buildbase org + Stripe +
-   plans are provisioned.*
+1. **User-layer screens (WIRE, don't build)** — billing, quota/usage, credits, notifications,
+   members, permissions, devices, connected-agents are all **inbuilt SDK screens**. We implement
+   NONE of them — we open them via `openWorkspaceSettings(section)` from `useSaaSAuth()`. A single
+   entry-point card (`BuildbaseAccountCard`) on `/settings` surfaces them; renders only when
+   BuildbaseReady. (`PricingPage` is public/no-login marketing only — not used for the logged-in app.)
+   *Functions once buildbase org + Stripe + plans + notification events are provisioned.*
 2. **Human RBAC gates (ADD)** — replace ad-hoc `userRole` checks on user-facing UI with SDK
    `WhenPermission`/`hasPermission`. `userRole` already arrives via the workspace token.
 3. **User notification delivery (SWAP, adapter)** — behind a flag, route `UserNotification`
@@ -57,6 +60,7 @@ lands now.
 - [x] Bump `@buildbase/sdk` 0.0.44 → 0.0.57 (typecheck clean)
 - [x] Re-plan (this doc)
 - [x] MCP scaffold (`/api/mcp`, dormant-until-provisioned)
-- [ ] App-pricing surface (needs Stripe/plans provisioned) — deferred, dormant-ready
-- [ ] Human RBAC gates (SDK `Permission`) — deferred, additive
-- [ ] Notification-delivery adapter (needs events provisioned) — deferred, flag+fallback
+- [x] Notification-delivery adapter (`notification-buildbase.ts`, fail-safe fallback)
+- [x] User-layer inbuilt-screen entry points (`BuildbaseAccountCard` on `/settings`) — no custom pages
+- [x] Human RBAC gate (`WhenAdmin`, dormant-safe, buildbase workspace roles)
+- [ ] Provision buildbase org + Stripe + plans + notification events (owner) — activates all of the above

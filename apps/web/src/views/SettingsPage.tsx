@@ -38,6 +38,7 @@ import { LicenseStatusCode } from "@/server/constants";
 import { API_ROUTES } from "@/lib/api-routes";
 import { SidebarCustomizeCard } from "@/components/layout/sidebar/SidebarCustomizeCard";
 import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
+import { BuildbaseAccountCard } from "@/components/settings/BuildbaseAccountCard";
 
 const changePasswordSchema = z
   .object({
@@ -130,6 +131,9 @@ export function SettingsPage() {
         <h1 className="text-xl font-semibold text-foreground">Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">System-wide configuration</p>
       </div>
+
+      {/* Buildbase user-layer account/billing — opens inbuilt SDK screens (renders only when configured) */}
+      <BuildbaseAccountCard />
 
       {/* Change Password */}
       <Card padding="lg" className="space-y-4">
