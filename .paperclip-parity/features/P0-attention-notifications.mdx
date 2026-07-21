@@ -1,0 +1,29 @@
+---
+feature: Attention & notifications
+priority: P0
+status: Present
+gate: buildable-now
+---
+
+# Attention & notifications · P0 · ✅ Present
+
+**What it is:** the "what needs me" layer — a computed attention feed (approvals + budget incidents +
+blocked tasks + org-chain breaks) with dismiss/snooze, plus per-user notifications, preferences, push
+and email channels, and realtime mention alerts.
+
+**Present in our monorepo (verified):**
+- Attention feed: `services/attention.ts:getAttentionFeed` (ranked, computed — no table), `attentionFeed` query, route `/attention`.
+- Dismiss/snooze: `AttentionDismissal` (+ `snoozedUntil`, Paperclip inbox-dismissals parity), `dismissAttentionItem`/`undismissAttentionItem` with `snoozeHours`, "Snooze 1d" button.
+- User notifications: `UserNotification`, `services/notification.ts` (+ retry, metrics), REST `/api/user-notifications/*`, `NotificationBell`/`NotificationDropdown`.
+- Preferences: `UserNotificationPreference` (per-type + channel + quiet hours), REST route, `NotificationPreferencesCard` (11 type toggles + channels + quiet hours).
+- Realtime mentions: `Notification`, `subscriptions/notificationCreated.ts`, `markNotificationDelivered`.
+- Sidebar badges: `sidebarBadges` query → live counts on Attention/Review/Approvals nav.
+
+**Gaps / pending:**
+- Push delivery needs VAPID/web-push keys (infra); email needs SMTP/provider (infra). Both code paths present.
+
+**What's required:** Nothing for in-app; push/email need external delivery creds.
+
+**Priority rationale:** Keeps humans in the loop on agent work; the aggregation layer over governance.
+
+**Depends on:** VAPID (push), SMTP (email) — optional channels.

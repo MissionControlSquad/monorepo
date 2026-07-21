@@ -1,0 +1,35 @@
+---
+feature: Tool subsystem & MCP
+priority: P3
+status: Missing
+gate: infra-gated / buildbase-owned
+---
+
+# Tool subsystem & MCP · P3 · ❌ Missing
+
+**What it is:** how agents call external tools — a tool registry + per-agent access grants + access
+policy + a gateway that routes/executes tool calls + a runtime supervisor + content guards; and MCP
+(Model Context Protocol) to expose tools/resources to agents.
+
+**Status in our monorepo (verified):** **entirely absent.** `grep` over `apps/` + `packages/` (excluding
+node_modules) found **zero** `tool-*` or `mcp-*` service files — only agent-template markdown docs. This
+is the "AgentToolsTab (§6)" gap.
+
+**Paperclip has (all Missing here):**
+- `tool-gateway.ts` (~244KB) — central tool-call gateway/routing. → infra-gated.
+- `tool-access.ts` (~276KB) — access resolution (connections, secret bindings, issuances). → infra-gated.
+- `tool-access-policy.ts` (~78KB) — policy eval + audit events + principal grants. → **buildable-now** (pure policy + DB).
+- `tool-content-guards.ts` — validate tool I/O. → **buildable-now**.
+- `tool-runtime-supervisor.ts` / `tool-runtime-metrics.ts` — runtime slots + metrics. → infra-gated.
+- `tool-oauth-legacy-backfill.ts`, `tool-profile-binding-precedence.ts` — → buildable-now.
+- `plugin-tool-registry.ts` / `plugin-tool-dispatcher.ts` — → infra-gated (part of plugin runtime).
+- `mcp-http.ts` — Streamable-HTTP MCP client. → **buildbase-owned** (MCP is the buildbase platform's responsibility per the parity docs; do NOT build here).
+
+**What's required:**
+- The **tool access-policy model** (registry + per-agent grants + policy + content-guards) is the **buildable-now** slice — a pure data/policy layer, no runtime. This is the cleanest first step and gives the `/agent-authz`-adjacent "which agent may use which tool" surface.
+- The **gateway/dispatcher/supervisor** (actually executing tool calls) is infra-gated (needs the plugin runtime + a tool execution host).
+- **MCP** is a hard boundary — buildbase-owned.
+
+**Priority rationale:** Tools are a major capability, but the executing half needs runtime infra and MCP is out-of-scope; only the policy model is cleanly buildable now.
+
+**Depends on:** plugin runtime (P3) + a tool host for execution; buildbase for MCP.

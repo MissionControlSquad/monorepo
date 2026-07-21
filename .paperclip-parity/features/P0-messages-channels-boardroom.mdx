@@ -1,0 +1,27 @@
+---
+feature: Messages, channels & boardroom
+priority: P0
+status: Present
+gate: buildable-now
+---
+
+# Messages, channels & boardroom · P0 · ✅ Present (LLM relay deferred)
+
+**What it is:** communication — task comment threads (with mentions/reactions/auto-assign), Slack-like
+channels + DMs, and the durable boardroom conference chat.
+
+**Present in our monorepo (verified):**
+- Task comments: `Message` (+ attachments/mentions/reactions), `createMessage`, `subscriptions/messageCreated.ts`, `messagesByTask(Connection)`, `TaskComments`.
+- Reactions + mentions: `MessageReaction`/`toggleMessageReaction`, `MessageMention` + `services/mention-auto-assign.ts`.
+- Channels + DMs: `Channel`/`ChannelMember`/`ChannelMessage`, full `mutations/channels.ts` (create/join/DM/read/pin/reactions/CRUD), `queries: channels/channelMessages/pinned/search`, `subscriptions/channelMessageCreated.ts`, routes `/channels/[channelId]`, REST + SSE stream.
+- Boardroom: `BoardThread`/`BoardMessage`, `sendBoardMessage`/`setBoardMessageFeedback`, `boardThread`, route `/boardroom`.
+
+**Gaps / pending:**
+- **Boardroom LLM relay:** assistant turns persist + feedback voting work, but the generation engine is a **deferred runtime seam** (`boardroom.prisma:2` — replies come from the default relay). Needs the Tier-D/LLM relay.
+- `channels/page.tsx` index is a placeholder empty-state (detail route works).
+
+**What's required:** The LLM relay (infra) to make boardroom assistant replies real; a channels index list (small, buildable-now).
+
+**Priority rationale:** Human↔agent and human↔human communication is core to coordination.
+
+**Depends on:** LLM relay runtime for boardroom assistant.

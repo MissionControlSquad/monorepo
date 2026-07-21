@@ -1,0 +1,33 @@
+---
+feature: Live gateway & runners
+priority: P1
+status: Present
+gate: infra-gated
+---
+
+# Live gateway & runners · P1 · ✅ Present (needs the WS server)
+
+**What it is:** the second execution path — external/NAT'd agents connect outbound over WebSocket,
+receive tasks reliably (dead-letter/redeliver), and BYO SSH runner hosts execute commands.
+
+**Present in our monorepo (verified):**
+- Live registry: `live-connection-registry.ts` (globalThis WS singleton).
+- Schema: `live-gateway.prisma` (tokens/connections/routes/pending-deliveries/nonces).
+- Delivery + ack: `live-task-delivery.ts:tryDeliverTaskToLiveAgents`, handler `live-gateway-handler.ts` (`vm.task_ack`/`vm.task_done`), LIVE_GATEWAY-gated.
+- Reliability: `deadLetterExhaustedDeliveries`, `redeliverStalePending` (60s, cap 5) — wired in cron `reap-stale-work`.
+- Runner hosts: `runner-hosts.ts` (SSH key encrypted at rest, never returned), `runner-host.prisma`.
+- Runner commands: `runner-commands.ts` (host exec via SSH + agent-pull `claimCommandsForAgent`/`recordCommandResult`, reaper, cancel), poll routes `/api/runner/commands`.
+- Runner daemon: `packages/runner/src/runner.ts` (poll loop; git-clone + spawn are injected infra deps).
+- In-sandbox API bridge: `run-bridge.ts` (run-scoped `rbt_` token, least-privilege POST), route `/api/runner/bridge/message`.
+- UI: `views/LiveGatewayPage.tsx`; client `packages/mc-bridge-plugin/`.
+
+**Gaps / pending:**
+- Requires the **custom WS server** (`apps/web/server.ts`) — not Vercel serverless. The registry + bridge are infra-gated on a long-lived host + a public `NEXT_PUBLIC_MC_URL`.
+- **In-flight live-task cancel MISSING** — protocol handles only done/ack, no cancel frame (buildable-now protocol addition).
+- Runner host exec needs a reachable SSH host; daemon needs the real machine-specific clone/exec.
+
+**What's required:** deploy the long-lived WS server + public MC URL; add a cancel frame. Real hosts to exercise SSH exec.
+
+**Priority rationale:** The connected-runner path is how self-hosted/NAT'd agents run — a production deployment mode.
+
+**Depends on:** long-lived server, SSH hosts, `SSH_KEY_ENCRYPTION_SECRET`.

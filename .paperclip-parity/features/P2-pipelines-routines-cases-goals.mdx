@@ -1,0 +1,27 @@
+---
+feature: Pipelines, routines, cases & goals
+priority: P2
+status: Present
+gate: buildable-now
+---
+
+# Pipelines, routines, cases & goals · P2 · ✅ Present
+
+**What it is:** structured work beyond ad-hoc tasks — multi-stage pipelines (review-gated cases),
+scheduled/webhook routines, the support-case/work-item domain, and hierarchical goals/OKRs.
+
+**Present in our monorepo (verified):**
+- Pipelines: `pipeline.prisma` (PipelineCase/PipelineStage, isReviewStage/requireApproval), `mutations/pipelines.ts` (claim/release/comment/breakdown/transition/reject, stage CRUD), `reviewCases`/`casesInPipeline`/`pipelineHealth`, route `/pipelines`.
+- Routines: `RecurringTask` + triggers, `createRoutine`/`triggerRoutineNow`/`addRoutineTrigger` + `tickRoutineTriggers` (5-field cron), route `/routines`.
+- Cases: `case.prisma` (Case/CaseEvent actor user/agent/system, in_review state), CRUD + status + labels + task-link, routes `/cases` + `/cases/[caseId]`.
+- Goals: `goal.prisma` (ownerAgentId, GoalStatus), CRUD + project-default-goal, routes `/goals` + `/goals/[goalId]`.
+
+**Gaps / pending:**
+- Routine auto-generation is cron-gated (manual trigger works now).
+- Pipeline advancement by agents depends on execution for real work; the human review/gate half is fully live.
+
+**What's required:** cron for auto-routines; otherwise complete.
+
+**Priority rationale:** These are the higher-order work structures — valuable, and fully wired.
+
+**Depends on:** cron scheduler for routine auto-fire.

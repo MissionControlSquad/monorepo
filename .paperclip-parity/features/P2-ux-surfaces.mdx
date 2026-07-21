@@ -1,0 +1,31 @@
+---
+feature: UX surfaces (palette, sidebar, notifications, doc-comments, org-chart)
+priority: P2
+status: Present
+gate: buildable-now
+---
+
+# UX surfaces · P2 · ✅ Present (ported from Paperclip UI)
+
+**What it is:** the cross-cutting UX layer — command palette, sidebar badges + reorder/hide, notification
+preferences, project-doc comments, agent-profile cards, org chart.
+
+**Present in our monorepo (verified):**
+- Command palette (Cmd/Ctrl-K): `components/layout/CommandPalette.tsx` (no cmdk dep) — Actions / Go-to (nav) / Tasks (globalSearch) / Agents / Projects; mounted in `AppShell`.
+- Sidebar badges: `sidebarBadges` query → approvals/review/attention counts on nav (port of Paperclip sidebar-badges).
+- Sidebar reorder/hide: `UserSidebarPreference` model + `orderNavItems` + Settings customize panel (port of sidebar-preferences).
+- Notification preferences: `NotificationPreferencesCard` (channels + 11 types + quiet hours).
+- Project-doc comments: `ProjectDocComment` + `ProjectDocCommentsThread` (port of document-annotations, simplified).
+- Agent-profile cards: salary, memory (+ provider + activity log), work-queue, recent runs, agent-companies.
+- Org chart: `/org-chart` (SVG, reassign manager, chain-health).
+- Feature-flag panel + attention snooze + review inbox + agent-runs card (all shipped this session).
+
+**Gaps / pending:**
+- **Global keyboard-shortcut registry / help sheet** missing (only Cmd-K).
+- Unified tabbed **Inbox** (Paperclip merges mine/recent/unread/blocked) is split across attention/review/activity — could consolidate.
+
+**What's required:** nothing critical; optional shortcut registry + a consolidated inbox shell (buildable-now).
+
+**Priority rationale:** These are the polish/productivity features that make the platform pleasant — high value, low risk, mostly done.
+
+**Depends on:** nothing.

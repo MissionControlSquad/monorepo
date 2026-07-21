@@ -1,0 +1,32 @@
+---
+feature: Environments & leases
+priority: P1
+status: Partial
+gate: needs-provider-key
+---
+
+# Environments & leases · P1 · 🟡 Present; per-provider probe/reuse/snapshot
+
+**What it is:** where an agent runs — environment definitions (local/ssh/sandbox/plugin drivers),
+connectivity probe, capability matrix, lease acquire/reuse/reap, custom-image capture/snapshot/rollback,
+execution allowlist policy, and agent↔env binding.
+
+**Present in our monorepo (verified):**
+- Model + CRUD: `environment.prisma`, `services/environments.ts` (create/update/archive/delete-with-blast-radius, secret-masking, singleton guards), GraphQL + client fully wired.
+- Probe: `probeEnvironment` (local trivial; sandbox real provision+echo+destroy; ssh `sshTestConnection`; plugin unsupported).
+- Capabilities: `getEnvironmentCapabilities`.
+- Leases: `environment-leases.ts` (acquire/release/reuse via atomic CAS, reaper, destroy-now), wired into `sandbox-run.ts`.
+- Custom images: `environment-custom-images.ts` (capture/rollback/disable + drift), `snapshot()` implemented by **local (stub) + daytona** only.
+- Execution policy: `execution-policy.ts` (allowlist, kubernetes-forces-isolating, fail-closed), `setWorkspaceExecutionMode`.
+- Agent↔env: `agent.environmentId`, `setAgentEnvironment`, `resolveEnvironmentExecution`.
+
+**Gaps / pending:**
+- **Environment management UI MISSING** — server + graphql-client fully wired, but there is no `EnvironmentsPage` view (only `LiveGatewayPage`). (Note: an `/environments` route exists but the rich management view is thin.) → **buildable-now**.
+- Sandbox/ssh probe, lease reuse (`provider.resume`), and snapshot for e2b/modal/novita/cloudflare/k8s/exe-dev → **needs-provider-key**.
+- Interactive setup-terminal image capture deferred.
+
+**What's required:** an environments management UI (buildable-now); real keys to exercise probe/reuse/snapshot per provider.
+
+**Priority rationale:** Environments + leases are the substrate agents execute on; production needs env config + image reuse.
+
+**Depends on:** provider keys for cloud probe/snapshot.

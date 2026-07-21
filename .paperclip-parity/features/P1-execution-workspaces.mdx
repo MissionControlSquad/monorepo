@@ -1,0 +1,27 @@
+---
+feature: Execution workspaces
+priority: P1
+status: Partial (recorded, not realized)
+gate: buildable-now
+---
+
+# Execution workspaces · P1 · 🟡 Recorded, not realized
+
+**What it is:** a project's named source (repo/ref + setup/cleanup) reused across runs, and the
+per-run realized workspace (strategy: project_primary / git_worktree / adapter_managed / cloud_sandbox)
+with an operation log.
+
+**Present in our monorepo (verified):**
+- ProjectWorkspace CRUD: `execution-workspaces.ts` (create/update/delete/list), `execution-workspace.prisma`, GraphQL + the `ProjectWorkspacesCard` UI (list/create/make-primary/delete) on the project detail.
+- Recording: `recordExecutionWorkspace`/`recordWorkspaceOperation`/`closeExecutionWorkspace` wired into `sandbox-run.ts` (EXECUTION_WORKSPACES-gated, additive bookkeeping).
+- Strategy resolution: `resolveEffectiveWorkspaceStrategyType` (labels the recorded row).
+
+**Gaps / pending:**
+- **REALIZATION is partial/absent:** the actual clone happens **inside the sandbox script** as a flat `git clone --depth 1` (`composeSandboxScript`) + a git credential helper + `setupCommand`. The recording functions only **write rows** — they do NOT clone/provision.
+- **`strategyType` is recorded but NOT realized** — worktree/branch/adapter-managed all collapse to the flat clone. `cleanupCommand` is stored but **never executed** in the seam.
+
+**What's required (buildable-now):** branch on `strategyType` in the sandbox script — realize `git_worktree`/branch-isolated checkouts and run `cleanupCommand`. No infra needed (it's script-composition logic); a real provider key only to run it end-to-end.
+
+**Priority rationale:** Multi-agent parallel work on one repo needs real worktree/branch isolation, not a shared flat clone.
+
+**Depends on:** nothing to implement the strategy branching; a provider key to exercise it.

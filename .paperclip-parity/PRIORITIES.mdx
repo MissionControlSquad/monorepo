@@ -1,0 +1,92 @@
+---
+title: "Feature Priorities — required vs present (P0–P3)"
+generated: 2026-07-21
+method: end-to-end code inventory of the monorepo (5 parallel domain sweeps) cross-referenced against the real Paperclip source
+---
+
+# Feature Priorities — what's required vs what's present
+
+This is the prioritized catalog. Each significant feature has its own file in `features/`
+(`P{n}-<slug>.mdx`) with: what it is, **verified** monorepo status (file evidence), gaps, and what's
+required. This index is the map.
+
+## Does the system work today? — YES (standalone)
+
+The platform **boots and runs the full agent loop without any pending item.** Verified end-to-end:
+an agent authenticates + fetches work (`/api/agents/me/context`), receives a task
+(live-gateway **or** `/api/tasks/checkout`), executes (`sandbox-run.ts` → `local` provider or a
+connected runner), submits deliverables (`/api/tasks/[id]/deliverables`), and a human reviews
+(`reviewTaskByHuman` / approvals / `/review`). Startup has **no hard dependency** on plugin-runtime,
+tools, or MCP. The one external requirement to run an agent *for real* is a credential — a
+sandbox-provider key **or** a connected runner via the live gateway (both code paths are built).
+
+## Priority definitions
+
+- **P0 — Foundational.** The platform cannot function without it. → **all Present.**
+- **P1 — Production-critical.** Needed to run agents in production (execution, secrets, cost control,
+  recovery, memory, governance). Mostly Present; live execution gated on a real provider key.
+- **P2 — High-value depth, buildable now.** Real capability/UX with existing backends. Present/partial.
+- **P3 — Deferred / optional.** Infra-gated runtime (plugin worker, tools, MCP, workspace realization),
+  buildbase-owned, or polish (dark mode). Missing/partial **by design**.
+
+Gate legend: `buildable-now` · `needs-provider-key` (real sandbox/LLM key) · `needs-cloud-key`
+(AWS/GCP/Vault) · `infra-gated` (cron/long-lived server/worker) · `buildbase-owned`.
+
+## The matrix
+
+### P0 — Foundational (all ✅ Present)
+| # | Feature | Status | File |
+|---|---|---|---|
+| 1 | Agents — lifecycle & identity | ✅ Present | `features/P0-agents-lifecycle.mdx` |
+| 2 | Tasks & issues | ✅ Present | `features/P0-tasks-issues.mdx` |
+| 3 | Deliverables & work products | ✅ Present (1 dead mutation) | `features/P0-deliverables-work-products.mdx` |
+| 4 | Review, approvals & governance | ✅ Present (trust-edit unwired) | `features/P0-review-approvals-governance.mdx` |
+| 5 | Attention & notifications | ✅ Present | `features/P0-attention-notifications.mdx` |
+| 6 | Messages, channels & boardroom | ✅ Present (LLM relay deferred) | `features/P0-messages-channels-boardroom.mdx` |
+
+### P1 — Production-critical
+| # | Feature | Status | Gate | File |
+|---|---|---|---|---|
+| 7 | Adapters & runtime registry | 🟡 Present, two registries not unified | buildable-now | `features/P1-adapters-runtime-registry.mdx` |
+| 8 | Sandbox execution (+7 providers) | 🟡 Plumbing present, only `local` run for real | needs-provider-key | `features/P1-sandbox-execution.mdx` |
+| 9 | Environments & leases | 🟡 Present; probe/reuse/snapshot per-provider | needs-provider-key | `features/P1-environments-leases.mdx` |
+| 10 | Live gateway & runners | ✅ Present | infra-gated (WS server) | `features/P1-live-gateway-runners.mdx` |
+| 11 | Heartbeat, scheduling & recovery | ✅ Present | infra-gated (cron) | `features/P1-heartbeat-scheduling-recovery.mdx` |
+| 12 | Secrets vault | 🟡 Local envelope full; aws/vault stubs | needs-cloud-key | `features/P1-secrets-vault.mdx` |
+| 13 | Cost, budgets & finance | ✅ Present | buildable-now | `features/P1-cost-budgets-finance.mdx` |
+| 14 | Agent memory | 🟡 Present; cost-linkage + eval gaps | buildable-now | `features/P1-agent-memory.mdx` |
+| 15 | Execution workspaces | 🟡 Recorded, not realized | buildable-now | `features/P1-execution-workspaces.mdx` |
+
+### P2 — High-value depth (buildable now)
+| # | Feature | Status | File |
+|---|---|---|---|
+| 16 | Skills, teams & agent-companies | 🟡 Library present; file-catalog/import/studio deferred | `features/P2-skills-teams-companies.mdx` |
+| 17 | Plugins (registry) | ✅ Registry present; runtime is P3 | `features/P2-plugins.mdx` |
+| 18 | Pipelines, routines, cases, goals | ✅ Present | `features/P2-pipelines-routines-cases-goals.mdx` |
+| 19 | Observability & portability | ✅ Present (observability read-only) | `features/P2-observability-portability.mdx` |
+| 20 | UX surfaces (palette, sidebar, notif, doc-comments, org-chart, monitors) | ✅ Present | `features/P2-ux-surfaces.mdx` |
+
+### P3 — Deferred / optional (missing or partial by design)
+| # | Feature | Status | Gate | File |
+|---|---|---|---|---|
+| 21 | Tool subsystem & MCP | ❌ Missing | infra-gated / buildbase-owned | `features/P3-tools-mcp.mdx` |
+| 22 | Plugin runtime (worker/loader/jobs) | ❌ Missing | infra-gated | `features/P3-plugin-runtime.mdx` |
+| 23 | Deferred execution infra | 🟡 Partial | needs-key / infra-gated | `features/P3-deferred-execution-infra.mdx` |
+| 24 | Operator CLI | ❌ Missing | buildable-now | `features/P3-operator-cli.mdx` |
+| 25 | UI polish (dark mode, DesignGuide, AgentToolsTab, per-company tabs) | ❌/🟡 | buildable-now / infra-gated | `features/P3-ui-polish.mdx` |
+
+## Buildable-now shortlist (no infra, no buildbase, real value)
+1. **Adapter-registry unification** + seed Tier-D providers as DB rows (P1 #7).
+2. **Execution-workspace realization** — branch/worktree checkout + run `cleanupCommand` (P1 #15).
+3. **Memory cost-linkage (GAP-G)** — populate `costCents`/`costEventId` on memory ops (P1 #14).
+4. **Trust-profile editor** + wire `setAgentTrustProfile` client op (P0 #4 gap).
+5. **Retire/wire `reviseDeliverable`** dead GraphQL mutation (P0 #3 gap).
+6. **Operator CLI** (`doctor`/`db:backup`) (P3 #24).
+7. **Tool access-policy model** (the pure-DB half of the tool subsystem) (P3 #21).
+8. **Dark mode** (needs a full dark token set + toggle) (P3 #25).
+
+## Deferred by hard constraint (not buildable without X)
+- **Real agent execution / snapshots / quota polling** → a real provider key (e2b/daytona/modal…).
+- **AWS/GCP/Vault secret providers + discovery** → real cloud credentials.
+- **Cloudflare bridge Worker** → a CF account + wrangler deploy (worker source is external).
+- **MCP, human auth/billing/orgs/RBAC** → buildbase-owned boundary; do NOT build here.

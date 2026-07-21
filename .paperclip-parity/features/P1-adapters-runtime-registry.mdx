@@ -1,0 +1,28 @@
+---
+feature: Adapters & runtime registry
+priority: P1
+status: Partial
+gate: buildable-now
+---
+
+# Adapters & runtime registry · P1 · 🟡 Present, two registries not unified
+
+**What it is:** the catalog of agent runtimes (claude/codex/cursor/grok/…), their launch config, model
+profiles, install/enable/remove, and JSON-Schema config UI.
+
+**Present in our monorepo (verified):**
+- Tier-A DB registry: `agent_adapters` table (`adapter.prisma`), `installAdapter`/`setAdapterEnabled`/`removeAdapter`/`setAgentAdapter`, Ajv config validation (`adapters/registry.ts`), `JsonSchemaForm` + `AgentAdapterConfigCard`, route `/adapters`.
+- Tier-D code registry: `packages/utils/src/adapters.ts` — built-in runtime adapters (openclaw, codex, claude, gemini, cursor, grok, opencode, pi, hermes, process, shell, http), `buildAdapterInvocation` (launch argv + installCommand).
+- Declarative adapter-plugin loader (data-only): `adapterFromPluginSpec`/`loadAdapterPlugins`.
+
+**Gaps / pending:**
+- **Two registries only alias-bridged, NOT unified:** Tier-A `getAdapter` (DB) and Tier-D `getAdapter` (code) are separate, joined only by `ADAPTER_KEY_ALIASES` (openclaw-gateway→openclaw). `installAdapter` creates a DB row with **no** Tier-D module; Tier-D modules (cursor/grok/opencode/pi/hermes) have **no** seeded DB row. Only `openclaw-gateway` is DB-seeded.
+- cursor/grok/opencode/pi/hermes launch specs are "best-effort mirrors, unconfirmed against a live CLI."
+- `detectModels()`/`getQuotaWindows()` are optional hooks no built-in implements.
+- **ACP** adapter absent.
+
+**What's required (buildable-now):** seed Tier-D `BUILTIN_ADAPTERS` as DB rows (or drive Tier-D from DB), co-validate a DB row against a runtime module, add the ACP row. Live model/quota detection + confirming launch specs → **needs a real provider key**.
+
+**Priority rationale:** Adapters decide *what runtime* an agent runs on — production needs the right providers selectable and the two registries consistent.
+
+**Depends on:** a real provider key to confirm launch/detect; nothing else for unification.
