@@ -600,6 +600,13 @@ See 03-sandbox-depth.mdx.
       company default (Settings) + per-agent override. Typecheck 4/4, build ✓. Agent-work inventory: 0 gaps, and
       no deferred UI items remain.
 
+- [x] **UI depth — Secrets vaults health-check (11-ui §11, front-end)** DONE (next commit). Wired the
+      previously-unused CHECK_SECRET_PROVIDER_HEALTH into the /secrets providers list — a per-provider "Check"
+      button that pings the vault and updates the health badge (healthy/unhealthy/unchecked + lastError). The page
+      already covered My-Secrets (personal toggle + badge) and bulk import, so §11's backend-ready gap is now
+      closed. Deferred (need new backend): secretReferences usage drill-down + discoverVaultCandidates AWS
+      discovery. Typecheck ✓, build ✓.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

@@ -18,6 +18,7 @@ import {
   CREATE_SECRET_PROVIDER,
   DELETE_SECRET_PROVIDER,
   IMPORT_SECRETS,
+  CHECK_SECRET_PROVIDER_HEALTH,
 } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 
@@ -78,6 +79,7 @@ export default function SecretsPage() {
   const [, updateSecret] = useMutation(UPDATE_SECRET);
   const [, createProvider] = useMutation(CREATE_SECRET_PROVIDER);
   const [, deleteProvider] = useMutation(DELETE_SECRET_PROVIDER);
+  const [, checkProviderHealth] = useMutation(CHECK_SECRET_PROVIDER_HEALTH);
   const [, importSecrets] = useMutation(IMPORT_SECRETS);
 
   const [busy, setBusy] = useState<string | null>(null);
@@ -120,6 +122,21 @@ export default function SecretsPage() {
         return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create provider");
       setProviderForm({ name: "", kind: "env" });
       refreshProviders();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onCheckProvider(id: string) {
+    setBusy(id);
+    try {
+      const res = await checkProviderHealth({ id });
+      if (res.error) {
+        setError(res.error.graphQLErrors[0]?.message ?? "Health check failed");
+      } else {
+        setError(null);
+        refreshProviders();
+      }
     } finally {
       setBusy(null);
     }
@@ -255,19 +272,29 @@ export default function SecretsPage() {
               <span className="flex items-center gap-2">
                 <Badge variant="blue">{p.kind}</Badge>
                 <span className="text-foreground">{p.name}</span>
-                <Badge variant={p.healthy ? "green" : "gray"}>
-                  {p.healthy ? "healthy" : "unchecked"}
+                <Badge variant={p.healthy ? "green" : p.lastError ? "red" : "gray"}>
+                  {p.healthy ? "healthy" : p.lastError ? "unhealthy" : "unchecked"}
                 </Badge>
                 {p.lastError && <span className="text-xs text-destructive">{p.lastError}</span>}
               </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={busy === p.id}
-                onClick={() => onDeleteProvider(p.id)}
-              >
-                Delete
-              </Button>
+              <span className="flex shrink-0 gap-1">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy === p.id}
+                  onClick={() => onCheckProvider(p.id)}
+                >
+                  Check
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy === p.id}
+                  onClick={() => onDeleteProvider(p.id)}
+                >
+                  Delete
+                </Button>
+              </span>
             </div>
           ))}
         </div>
