@@ -40,6 +40,7 @@ import "./terminals";
 import "./agent-instructions";
 import "./org-chart";
 import "./attention";
+import "./sidebar-badges";
 import "./agent-authz";
 import "./agent-governance";
 import "./task-relations";

@@ -46,6 +46,8 @@ import {
   Building2,
   ClipboardCheck,
 } from "lucide-react";
+import { useQuery } from "urql";
+import { SIDEBAR_BADGES_QUERY } from "@agentcenter/graphql-client/queries";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
@@ -128,6 +130,18 @@ export function IconRail({ onCreateTask }: IconRailProps) {
   const { isEnabled } = useFeatureFlags();
   const router = useRouter();
   const pathname = usePathname();
+  // Paperclip parity: live actionable counts badged onto the nav.
+  const [{ data: badges }] = useQuery<{
+    sidebarBadges: { approvals: number; review: number; attention: number };
+  }>({ query: SIDEBAR_BADGES_QUERY });
+  const badgeFor = (href: string): number => {
+    const b = badges?.sidebarBadges;
+    if (!b) return 0;
+    if (href === "/attention") return b.attention;
+    if (href === "/review") return b.review;
+    if (href === "/approvals") return b.approvals;
+    return 0;
+  };
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -158,20 +172,28 @@ export function IconRail({ onCreateTask }: IconRailProps) {
       {/* Navigation */}
       <nav className="flex flex-col items-center gap-0.5">
         {NAV_ITEMS.filter(({ flag }) => !flag || isEnabled(flag)).map(
-          ({ href, icon: Icon, label }) => (
-            <Link
-              key={href}
-              href={href}
-              title={label}
-              className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
-                isActive(pathname, href)
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              <Icon className="w-[20px] h-[20px]" />
-            </Link>
-          ),
+          ({ href, icon: Icon, label }) => {
+            const count = badgeFor(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                title={count > 0 ? `${label} (${count})` : label}
+                className={`relative w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
+                  isActive(pathname, href)
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                <Icon className="w-[20px] h-[20px]" />
+                {count > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+                    {count > 9 ? "9+" : count}
+                  </span>
+                )}
+              </Link>
+            );
+          },
         )}
       </nav>
 

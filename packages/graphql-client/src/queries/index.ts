@@ -233,3 +233,4 @@ export {
   PROJECT_WORKSPACES_QUERY,
   EXECUTION_WORKSPACES_QUERY,
 } from "./execution-workspaces";
+export { SIDEBAR_BADGES_QUERY } from "./sidebar-badges";

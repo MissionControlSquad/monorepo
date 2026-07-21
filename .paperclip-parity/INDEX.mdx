@@ -651,6 +651,16 @@ See 03-sandbox-depth.mdx.
       (isMemoryProvider + resolveMemoryProvider agent→company→none resolution). 8 tests, all green. Fits the repo's
       pure-util unit-test convention.
 
+## Deep parity from the real Paperclip source (/Users/dharmendra/Projects/Agent-Center-Cloud/paperclip)
+
+- [x] **Sidebar nav badges (port of paperclip server/src/services/sidebar-badges.ts)** DONE (next commit). Paperclip
+      badges the sidebar with actionable counts (SidebarBadges {inbox,approvals,failedRuns,joinRequests}). Ported a
+      monorepo-shaped equivalent: new sidebarBadges query (member+, plain counts — approvals pending [ws-scoped],
+      tasks-in-review + decompositions + open-incidents for the /review total, blocked-tasks for attention) + client
+      op SIDEBAR_BADGES_QUERY + count badges rendered on the IconRail nav (Attention / Needs-my-review / Approvals).
+      Tests: 2 integration (ws-scoped pending-approval count exact + review superset; unauth denied). Typecheck 4/4,
+      web build ✓.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
