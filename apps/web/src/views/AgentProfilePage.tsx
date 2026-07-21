@@ -6,6 +6,7 @@ import { AGENT_QUERY } from "../lib/graphql/queries";
 import { AgentProfileHeader } from "../components/profile/AgentProfileHeader";
 import { AgentProfileStats } from "../components/profile/AgentProfileStats";
 import { CurrentWorkSection } from "../components/profile/CurrentWorkSection";
+import { AgentSalaryCard } from "../components/profile/AgentSalaryCard";
 import { AssignedTasksList } from "../components/profile/AssignedTasksList";
 import { RecentDeliverablesList } from "../components/profile/RecentDeliverablesList";
 import { AgentActivityTimeline } from "../components/profile/AgentActivityTimeline";
@@ -330,6 +331,7 @@ export function AgentProfilePage({ agentId }: AgentProfilePageProps) {
         )}
         <AgentProfileHeader agent={agent} />
         <AgentProfileStats agentId={agent.id} projectId={projectId ?? undefined} />
+        <AgentSalaryCard agentId={agent.id} />
         <CurrentWorkSection agent={agent} />
       </div>
 

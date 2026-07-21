@@ -497,6 +497,12 @@ See 03-sandbox-depth.mdx.
       cost-windows, agent-salary, blocker-diagnostics, memory-inspect) — these are the 11-ui.mdx §12 "lower-priority
       UI depth" backlog and several are intentionally agent/API-only (memory has no human UI even in Paperclip).
 
+- [x] **UI wiring — agent salary control (Domain 14/finance, front-end)** DONE (next commit). New
+      AgentSalaryCard component (follows the profile's per-section component decomposition) rendered in the agent
+      profile top section: AGENT_SALARY_QUERY shows the current monthly salary; SET_AGENT_SALARY sets/updates it
+      (a budget policy flagged isSalary; admin server-side). No new route — reuses Card/Button/Input. Typecheck ✓,
+      build ✓.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
