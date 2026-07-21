@@ -489,6 +489,14 @@ See 03-sandbox-depth.mdx.
       (every FLAG_KEYS seeded; AGENT_COMPANIES user-managed at default; idempotent, preserves toggles). Full
       integration 64 files/465 green, flag-keys unit 12/12, web build ✓.
 
+- [x] **UI wiring — propose-a-hire form (Domain 14 #3, front-end)** DONE (next commit). Closes the governance
+      loop end-to-end on one screen: a "Propose a hire" disclosure on the Approvals page (name/role/level) calls
+      the previously backend-only REQUEST_AGENT_HIRE → creates a pending hire_agent approval that appears in the
+      list below → approving it (or reaching board quorum via the quorum UI) actually creates the agent. Typecheck
+      ✓, web build ✓. NOTE: broader zero-UI ops remain (work-products, thread-interactions, finance-events,
+      cost-windows, agent-salary, blocker-diagnostics, memory-inspect) — these are the 11-ui.mdx §12 "lower-priority
+      UI depth" backlog and several are intentionally agent/API-only (memory has no human UI even in Paperclip).
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

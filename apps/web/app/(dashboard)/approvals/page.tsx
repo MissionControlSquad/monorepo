@@ -5,8 +5,14 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import { APPROVALS_QUERY } from "@/lib/graphql/queries";
-import { APPROVE_APPROVAL, REJECT_APPROVAL, CAST_APPROVAL_VOTE } from "@/lib/graphql/mutations";
+import {
+  APPROVE_APPROVAL,
+  REJECT_APPROVAL,
+  CAST_APPROVAL_VOTE,
+  REQUEST_AGENT_HIRE,
+} from "@/lib/graphql/mutations";
 import { Button, Card } from "@/components/ui";
+import { Input } from "@/components/ui/shadcn/input";
 
 // Epic #3: governance approvals inbox. Gated at the API by the GOVERNANCE feature + buildbase role
 // (admin decides, member views). Reads/writes are workspace-scoped server-side.
@@ -41,9 +47,36 @@ export default function ApprovalsPage() {
   const [, approve] = useMutation(APPROVE_APPROVAL);
   const [, reject] = useMutation(REJECT_APPROVAL);
   const [, castVote] = useMutation(CAST_APPROVAL_VOTE);
+  const [, requestHire] = useMutation(REQUEST_AGENT_HIRE);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [hireOpen, setHireOpen] = useState(false);
+  const [hire, setHire] = useState({ name: "", role: "", level: "" });
 
   const approvals = data?.approvals ?? [];
+
+  // Domain 14 #3: propose hiring an agent — creates a pending hire_agent approval that appears in the
+  // list below; approving it (or reaching board quorum) actually creates the agent.
+  async function proposeHire() {
+    if (!hire.name.trim() || !hire.role.trim()) return;
+    setBusyId("hire");
+    try {
+      const res = await requestHire({
+        name: hire.name.trim(),
+        role: hire.role.trim(),
+        level: hire.level.trim() || null,
+      });
+      if (res.error) {
+        toast.error(String(res.error.message).replace("[GraphQL] ", ""));
+        return;
+      }
+      toast.success("Hire proposed — pending approval");
+      setHire({ name: "", role: "", level: "" });
+      setHireOpen(false);
+      refetch({ requestPolicy: "network-only" });
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   async function decide(id: string, kind: "approve" | "reject") {
     setBusyId(id);
@@ -76,7 +109,44 @@ export default function ApprovalsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
-      <h1 className="text-lg font-semibold text-foreground">Approvals</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-lg font-semibold text-foreground">Approvals</h1>
+        <Button size="sm" variant="secondary" onClick={() => setHireOpen((v) => !v)}>
+          {hireOpen ? "Cancel" : "Propose a hire"}
+        </Button>
+      </div>
+
+      {hireOpen && (
+        <Card className="space-y-3 p-4">
+          <h2 className="text-sm font-semibold text-foreground">Propose an agent hire</h2>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Input
+              value={hire.name}
+              onChange={(e) => setHire((h) => ({ ...h, name: e.target.value }))}
+              placeholder="Agent name"
+            />
+            <Input
+              value={hire.role}
+              onChange={(e) => setHire((h) => ({ ...h, role: e.target.value }))}
+              placeholder="Role (e.g. qa)"
+            />
+            <Input
+              value={hire.level}
+              onChange={(e) => setHire((h) => ({ ...h, level: e.target.value }))}
+              placeholder="Level (optional)"
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              disabled={busyId === "hire" || !hire.name.trim() || !hire.role.trim()}
+              onClick={proposeHire}
+            >
+              Propose hire
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {fetching && <p className="text-sm text-muted-foreground">Loading approvals…</p>}
       {error && <p className="text-sm text-destructive">Failed to load approvals.</p>}
