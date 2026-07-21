@@ -1,0 +1,75 @@
+---
+title: "Codebase-comparison coverage — what I compared, what I didn't, and the extra gaps"
+generated: 2026-07-21
+---
+
+# Codebase-comparison coverage (honest scope)
+
+The prior audits (`PRIORITIES.mdx`, `SERVICE-AUDIT.mdx`, `features/`) were built from **two** areas of
+Paperclip: `server/src/services` (all 177) and `ui/src/pages`. That is the highest-signal ~70% of the
+product logic, but it is **not the whole codebase.** This file records the full comparison scope and the
+additional gaps found when broadening to the areas I had skipped.
+
+## Areas compared
+
+| Paperclip area | Compared? | Result |
+|---|---|---|
+| `server/src/services` (177) | ✅ fully | SERVICE-AUDIT.mdx (line-item) |
+| `ui/src/pages` (76) | ✅ fully | UI inventory in the first pass |
+| `server/src/routes` (55) | ✅ now | monorepo has **93** `app/api` routes — API surface is well-covered (superset). |
+| `cli/src` | ⚠️ **skipped first, checked now** | **major gap — see below** |
+| `server/src/middleware` | ⚠️ checked now | SSRF + log-redaction confirmed missing (see below) |
+| `server/src/realtime` | ⚠️ checked now | terminal-ws + live-events-ws (infra-gated, matches terminals/live) |
+| `server/src/{http,auth,adapters,built-ins,lib,secrets,storage,types}` | 🟡 spot-checked | `built-ins/agents`→agent-templates (present); auth/secrets/storage present; nothing new material |
+| `packages/` | ⚠️ checked now | skills-catalog + teams-catalog (file catalogs, missing); mcp-server + 2 demo MCP servers (buildbase); adapter-utils/plugins/shared present-equivalent |
+| `evals/` (11 files) | ⚠️ checked now | **monorepo has NO evals dir — missing** |
+| `skills/` (22 packaged skill files) | 🟡 counted | monorepo ships agent-template skills (markdown) — different packaging |
+| `ui/src/components` (411) + `hooks` (24) | 🟡 counted | monorepo has **174** components + 11 hooks (~40%) — UI **depth** gap, not whole features |
+| `apps/desktop`, `apps/mobile` | ❌ not compared | monorepo HAS both; Paperclip ships electron separately — not audited |
+| `tools/`, `scripts/`, `docker/`, `docs/` | ❌ not compared | tooling/ops — low product-signal |
+
+## Additional gaps found by broadening (not in the first audit)
+
+### 1. CLI — `paperclipai` (a full user/operator CLI) — mostly MISSING · P2/P3
+Paperclip's `cli/` is the primary human entrypoint ("orchestrate AI agent teams to run a business").
+Commands: `run` · `doctor` · `db-backup` · `configure` · `env` / `env-lab` · `onboard` ·
+`auth-bootstrap-ceo` · `allowed-hostname` · `pipelines` · `routines` · **`worktree` / `worktree-merge-history`**.
+Checks (`doctor`): agent-jwt-secret, config, database, deployment-auth, llm, log, port, secrets.
+
+**Monorepo:** only `@agentcenter/runner` (the agent-run daemon) — the equivalent of `run`. **Missing:**
+`doctor`+checks, `db-backup`, `configure`/`env`/`onboard`, and — notably — **`worktree` management**, which
+is exactly the **execution-workspace realization** logic (P1 #58/175). So the worktree gap shows up twice:
+the sandbox seam doesn't realize worktree strategies (P1-execution-workspaces) **and** there's no CLI
+worktree tool. → expands the P3 operator-CLI item; the worktree part is P1.
+
+### 2. Middleware — SSRF guard + log redaction — MISSING · P1
+Paperclip `server/src/middleware/` has **`private-hostname-guard.ts`** (SSRF — blocks private hostnames on
+outbound) and **`http-log-redaction.ts`** (structured log redaction) as first-class middleware. This
+**confirms** the second-pass P1 `remote-http-endpoint-guard` finding (it's wired as middleware) and the
+`log-redaction` partial. Also present in Paperclip: `board-mutation-guard`, `http-log-policy`,
+`api-compression` (minor).
+
+### 3. Evals — MISSING · P2/P3
+Paperclip ships `evals/` (11 files) — an agent/skill/memory eval harness. The monorepo has **no evals dir**
+(confirms memory GAP-H + no general eval suite). Buildable-now (harness), but real evals need agent execution.
+
+### 4. Realtime WebSockets — Partial · P1 (infra-gated)
+Paperclip `realtime/`: `environment-custom-image-terminal-ws.ts` (terminal PTY WS — matches the monorepo's
+deferred `terminals/`) and `live-events-ws.ts` (a general live-events socket — monorepo uses the
+live-gateway WS + GraphQL subscriptions instead). No new feature, just confirms the terminals/live-gateway
+infra gate.
+
+### 5. UI component depth — Partial · P2
+411 Paperclip components vs 174 monorepo (~40%). This is the "thin pages" observation quantified: the
+monorepo has route parity but each page is shallower (Paperclip's IssueDetail/Secrets/CompanySkills are
+100–200KB single pages). Not missing *features* — missing *depth*. Covered qualitatively in `features/P3-ui-polish.mdx`.
+
+## Net: does this change the conclusion?
+- **Core loop / standalone-works:** unchanged — still ✅ (routes superset confirms the API surface).
+- **New P1:** the **SSRF guard** is now doubly-confirmed (middleware), and **worktree realization** is
+  reinforced (missing in both the sandbox seam and the CLI).
+- **New P2/P3:** a real **CLI** (doctor/db-backup/configure/onboard/worktree), an **evals harness**, and
+  **UI depth**.
+- **Still honest caveats:** `apps/desktop` + `apps/mobile`, `tools/`, `scripts/`, and a line-by-line read
+  of `ui/components` were **not** exhaustively diffed — but these are depth/packaging, not new product
+  capabilities. The service + route + CLI + middleware + package + eval comparison is now complete.
