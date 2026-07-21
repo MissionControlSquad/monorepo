@@ -54,6 +54,7 @@ import { TaskBlockerDiagnosticsCard } from "./TaskBlockerDiagnosticsCard";
 import { TaskThreadInteractionsCard } from "./TaskThreadInteractionsCard";
 import { TaskWorkProductsCard } from "./TaskWorkProductsCard";
 import { TaskCostRollupCard } from "./TaskCostRollupCard";
+import { TaskDocumentsCard } from "./TaskDocumentsCard";
 import { TaskDeliverables } from "./TaskDeliverables";
 import { ChildTaskDeliverables } from "./ChildTaskDeliverables";
 import { ErrorBoundary, PanelErrorFallback } from "../common/ErrorBoundary";
@@ -1161,6 +1162,7 @@ export function TaskDetailModal({
                   <TaskBlockerDiagnosticsCard taskId={resolvedTaskId} />
                   <TaskThreadInteractionsCard taskId={resolvedTaskId} />
                   <TaskWorkProductsCard taskId={resolvedTaskId} />
+                  <TaskDocumentsCard taskId={resolvedTaskId} />
                   <TaskCostRollupCard taskId={resolvedTaskId} />
                   <TaskRelationsCard taskId={resolvedTaskId} />
                   <div className="border-t border-border" />

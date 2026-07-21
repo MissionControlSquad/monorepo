@@ -8,6 +8,7 @@ import {
   FINANCE_EVENTS_QUERY,
   COST_WINDOW_SPEND_QUERY,
   COST_BILLING_SPLIT_QUERY,
+  PROVIDER_QUOTA_WINDOWS_QUERY,
 } from "@/lib/graphql/queries";
 import { INGEST_FINANCE_EVENT } from "@/lib/graphql/mutations";
 import { formatCents as money, FINANCE_EVENT_KINDS, COST_WINDOWS } from "@agentcenter/utils";
@@ -58,6 +59,67 @@ function Stat({ label, value }: { label: string; value: string }) {
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-1 text-lg font-semibold text-foreground">{value}</div>
     </Card>
+  );
+}
+
+interface QuotaWindow {
+  label: string;
+  usedPercent: number | null;
+  resetsAt: string | null;
+  valueLabel: string | null;
+  detail: string | null;
+}
+interface QuotaResult {
+  provider: string;
+  ok: boolean;
+  errorFamily: string | null;
+  error: string | null;
+  windows: QuotaWindow[];
+}
+
+// Domain 12 GAP-2: live provider rate-limit / quota windows (admin, PROVIDER_QUOTA-gated). Self-hides
+// when the flag is off or no provider reports quota. Providers that error (bad/absent creds) are shown
+// with their error rather than silently dropped.
+function ProviderQuotaSection() {
+  const [{ data, error }] = useQuery<{ providerQuotaWindows: QuotaResult[] }>({
+    query: PROVIDER_QUOTA_WINDOWS_QUERY,
+  });
+  if (error) return null; // flag off / not admin — nothing to show
+  const results = (data?.providerQuotaWindows ?? []).filter((r) => r.windows.length > 0 || !r.ok);
+  if (results.length === 0) return null;
+
+  return (
+    <section className="space-y-2">
+      <h2 className="text-sm font-semibold text-foreground">Provider quota</h2>
+      {results.map((r) => (
+        <Card key={r.provider} className="space-y-2 p-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-foreground">{r.provider}</span>
+            {!r.ok && <Badge variant="red">{r.errorFamily ?? "error"}</Badge>}
+          </div>
+          {!r.ok && r.error && <p className="text-xs text-muted-foreground">{r.error}</p>}
+          {r.windows.map((w, i) => (
+            <div key={i} className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">{w.label}</span>
+                <span className="text-muted-foreground">
+                  {w.valueLabel ?? (w.usedPercent != null ? `${Math.round(w.usedPercent)}%` : "")}
+                </span>
+              </div>
+              {w.usedPercent != null && (
+                <div className="h-1.5 w-full overflow-hidden rounded bg-muted">
+                  <div
+                    className={`h-full rounded ${w.usedPercent >= 90 ? "bg-red-500" : w.usedPercent >= 70 ? "bg-amber-500" : "bg-emerald-500"}`}
+                    style={{ width: `${Math.min(Math.max(w.usedPercent, 0), 100)}%` }}
+                  />
+                </div>
+              )}
+              {w.detail && <p className="text-[11px] text-muted-foreground">{w.detail}</p>}
+            </div>
+          ))}
+        </Card>
+      ))}
+    </section>
   );
 }
 
@@ -261,6 +323,8 @@ export function FinanceEventsSection() {
           ))
         )}
       </Card>
+
+      <ProviderQuotaSection />
     </section>
   );
 }

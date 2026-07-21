@@ -564,6 +564,14 @@ See 03-sandbox-depth.mdx.
       with Done/Skip (updateQueueItemStatus) + Remove (deleteQueueItem), auto-generated badge, related-task link —
       AGENT_QUEUE-gated, self-hides when empty. Typecheck ✓, build ✓. Inventory gaps 6 → 4.
 
+- [x] **UI — agent documents viewer + provider-quota drill-in (Domains 11/12, front-end)** DONE (next commit).
+      TaskDocumentsCard: agent-authored docs on a task (documentsByTask) — read-only, expandable content,
+      author+time; slotted into task-detail COL 2; self-hides when none. Provider quota: new client op
+      PROVIDER_QUOTA_WINDOWS_QUERY (server field already existed) + a ProviderQuotaSection on the finance page —
+      live per-provider rate-limit windows with a used-% bar; errors (bad/absent creds) shown, self-hides when off.
+      Typecheck 4/4, build ✓. Remaining true gaps (need backend): cost-event reprice (no cost-event list query
+      exists) and the memory-operations audit / memory-provider settings surfaces.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~

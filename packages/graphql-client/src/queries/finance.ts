@@ -174,3 +174,22 @@ export const AGENT_SALARY_QUERY = gql`
     }
   }
 `;
+
+// Domain 12 GAP-2: live provider quota / rate-limit windows (admin, PROVIDER_QUOTA-gated).
+export const PROVIDER_QUOTA_WINDOWS_QUERY = gql`
+  query ProviderQuotaWindows {
+    providerQuotaWindows {
+      provider
+      ok
+      errorFamily
+      error
+      windows {
+        label
+        usedPercent
+        resetsAt
+        valueLabel
+        detail
+      }
+    }
+  }
+`;
