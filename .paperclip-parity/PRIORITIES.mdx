@@ -99,14 +99,14 @@ Everything else in the 178-service list maps to a P0–P2 feature above (e.g. `i
 ## Buildable-now shortlist (no infra, no buildbase, real value)
 0. ~~**SSRF endpoint guard**~~ ✅ DONE (remote-http-endpoint-guard + guardedFetch, applied to webhook adapter + bridges).
 1. ~~**Dependency wakeups** — auto-wake blocked tasks when blockers resolve~~ ✅ DONE (dependency-wakeups.ts + handler, TASK_AUTONOMY-gated, 5 tests).
-2. **Adapter-registry unification** + seed Tier-D providers as DB rows (P1 #7).
-2. **Execution-workspace realization** — branch/worktree checkout + run `cleanupCommand` (P1 #15).
-3. **Memory cost-linkage (GAP-G)** — populate `costCents`/`costEventId` on memory ops (P1 #14).
-4. **Trust-profile editor** + wire `setAgentTrustProfile` client op (P0 #4 gap).
-5. **Retire/wire `reviseDeliverable`** dead GraphQL mutation (P0 #3 gap).
-6. **Operator CLI** (`doctor`/`db:backup`) (P3 #24).
-7. **Tool access-policy model** (the pure-DB half of the tool subsystem) (P3 #21).
-8. **Dark mode** (needs a full dark token set + toggle) (P3 #25).
+2. ~~**Adapter-registry unification**~~ ✅ DONE (hyphen-alias resolution bug fixed + drift-guard test, 26 tests). ACP + startup-sync noted as follow-ups.
+3. ~~**Memory cost-linkage (GAP-G)**~~ ✅ DONE (recordMemoryOperation persists tokens/cost + auto-creates & links a CostEvent, 3 tests).
+4. ~~**Trust-profile editor** + wire `setAgentTrustProfile`~~ ✅ DONE (client ops + AgentTrustCard on the agent profile, GOVERNANCE-gated).
+5. ~~**Retire `reviseDeliverable`**~~ ✅ DONE (removed — redundant with the REST PATCH revision path).
+6. ~~**Operator CLI `doctor`**~~ ✅ DONE (`npm run doctor` — env + DB connectivity + migration status; `db:backup` still open).
+7. **Tool access-policy model** (P3 #21) — ⏸ DEFERRED: enforces nothing without the tool runtime (absent). Build the model *with* the tool subsystem, not as speculative standalone plumbing.
+8. **Dark mode** (P3 #25) — ⏸ DEFERRED: needs a full dark token set + toggle + fixing ~28 components that hardcode light colors. A real design pass; a half-broken dark mode is worse than none.
+—. **Execution-workspace realization** (#15/#175) — ⏸ DEFERRED (infra): materializing worktrees on disk needs a persistent host/filesystem (the runner daemon), not the serverless web app.
 
 ## Deferred by hard constraint (not buildable without X)
 - **Real agent execution / snapshots / quota polling** → a real provider key (e2b/daytona/modal…).
