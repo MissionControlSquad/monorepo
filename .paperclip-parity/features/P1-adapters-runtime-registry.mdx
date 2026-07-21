@@ -16,7 +16,13 @@ profiles, install/enable/remove, and JSON-Schema config UI.
 - Declarative adapter-plugin loader (data-only): `adapterFromPluginSpec`/`loadAdapterPlugins`.
 
 **Gaps / pending:**
-- **Two registries only alias-bridged, NOT unified:** Tier-A `getAdapter` (DB) and Tier-D `getAdapter` (code) are separate, joined only by `ADAPTER_KEY_ALIASES` (openclaw-gateway→openclaw). `installAdapter` creates a DB row with **no** Tier-D module; Tier-D modules (cursor/grok/opencode/pi/hermes) have **no** seeded DB row. Only `openclaw-gateway` is DB-seeded.
+- ✅ **FIXED — alias hyphen/underscore bug:** the DB seeds `*-local` rows with **hyphens**, but the alias
+  table only had underscore forms → `canonicalAdapterKey("claude-local")` returned identity and those
+  rows failed to resolve their runtime module at launch. Added hyphen aliases for all seeded rows +
+  a co-validation test (every seeded DB type resolves to a code module). (commit on parity branch.)
+- **Two registries still only alias-bridged, not fully unified:** `installAdapter` creates a DB row with
+  no Tier-D module; `hermes` code module has no seeded DB row; ACP absent. Remaining: seed the code
+  registry as DB rows (drive DB from code) + add hermes-local + ACP rows.
 - cursor/grok/opencode/pi/hermes launch specs are "best-effort mirrors, unconfirmed against a live CLI."
 - `detectModels()`/`getQuotaWindows()` are optional hooks no built-in implements.
 - **ACP** adapter absent.
