@@ -1,0 +1,78 @@
+---
+title: Notification cutover — ours (history) vs buildbase (delivery)
+status: ANALYSIS — awaiting confirmation before any deletion
+principle: keep tracking/history in our DB; delegate send/create logic to buildbase
+---
+# Notification cutover analysis
+
+Owner's rule: **we keep the notification *history* (buildbase stores none), we drop our own
+*send/create logic*.** So every notification is still recorded in our DB (powers the in-app feed +
+history), and delivery (push/email) is delegated to buildbase.
+
+## Anatomy — every piece and its disposition
+
+### Models (`notification.prisma`)
+
+| Model | What it is | Disposition |
+|---|---|---|
+| `Notification` | agent↔agent @-mentions, delivered via GraphQL subscription | **KEEP** — AI-domain, unrelated to buildbase |
+| `Subscription` | agent↔task real-time subscriptions | **KEEP** — AI-domain |
+| `UserNotification` | user-facing record: history + in-app feed **and** delivery-tracking fields | **KEEP as history/feed.** Delivery fields (`retryCount`/`nextRetryAt`/`errorMsg`/`sentAt`) go vestigial for push/email; still meaningful for `in_app`/record state |
+| `PushSubscription` | our VAPID web-push endpoints | **REMOVE** — buildbase owns push (its own subscription + `push-sw.js`) |
+| `UserNotificationPreference` | per-type + per-channel toggles + quiet hours | **TRIM** — push/email prefs move to buildbase's notifications screen; keep only what `in_app` needs (decision below) |
+
+### Services
+
+| File | Lines | What | Disposition |
+|---|---|---|---|
+| `notification.ts` | 370 | `notify()` + dispatch(`in_app`/`push`/`email`) + rate-limit + quiet-hours + dedup + retry orchestration | **SLIM** — keep record-create + `in_app` + call buildbase; drop push/email dispatch + their quiet-hours/retry |
+| `push.ts` | 92 | our VAPID `web-push` sender | **REMOVE** |
+| `email.ts` | 71 | our Resend email sender | **REMOVE** |
+| `email-templates.ts` | 60 | our email templates | **REMOVE** — buildbase owns templates |
+| `notification-retry.ts` | 66 | cron retry for failed push/email | **REMOVE** — buildbase retries its own; `in_app` never fails to "deliver" |
+| `notification-metrics.ts` | 29 | counters | **KEEP/trim** — repoint at record-create + buildbase outcome |
+| `notification-buildbase.ts` | 85 | the adapter (added this branch) | **KEEP → promote to the delivery path** |
+
+### UI / hooks
+
+| File | What | Disposition |
+|---|---|---|
+| `NotificationBell.tsx` + `useNotificationsContext` | in-app feed (reads `UserNotification`) | **KEEP** — this is the history/feed |
+| `usePushNotifications.ts` | our VAPID subscribe flow | **REMOVE** — buildbase's push + its `public/push-sw.js` replace it |
+| `NotificationPreferencesCard.tsx` + `NotificationPreferences.tsx` | our push/email/type/quiet-hours prefs UI | **REMOVE** — buildbase notifications screen (`openWorkspaceSettings('notifications')`) replaces it |
+
+### Env / infra to drop
+`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `RESEND_API_KEY`, `NOTIFICATION_FROM_EMAIL`
+become unused once push/email is buildbase's. (Leave in `.env.example` commented until cutover verified.)
+
+## Target send flow (after cutover)
+
+```
+notify(params) →
+  1. create ONE UserNotification row  (our history + in-app feed) — ALWAYS, regardless of buildbase
+  2. deliverViaBuildbase(record)      → bb.notification.send(workspaceId, type, userId,
+                                          { title, message, url })  — buildbase gates (per-user
+                                          prefs) + delivers push/email + owns templates/retry
+```
+
+- **in-app feed** = read from our `UserNotification` rows (unchanged).
+- **push/email** = buildbase only. No `push.ts` / `email.ts` / VAPID / Resend in our tree.
+- Before buildbase is provisioned: step 1 still runs (feed + history work); step 2 is a no-op
+  (dormant) → **push/email simply don't send until provisioned** (the accepted "cut over now" cost).
+
+## Decisions to confirm before I execute
+
+1. **History granularity** — record **one** `UserNotification` per notification (type=the event,
+   powers feed+history; buildbase fans out to push/email itself) — *recommended* — vs keep the
+   current one-row-per-channel model.
+2. **Preferences** — push/email prefs fully in buildbase; for `in_app` either (a) keep a single
+   `inAppEnabled` + per-type toggles in `UserNotificationPreference` for the feed, or (b) drop our
+   preference model entirely and always record in-app. *Recommend (a)* — the feed still needs a mute.
+3. **Push service worker** — add buildbase's `public/push-sw.js`, delete our VAPID SW + hook. Confirm.
+4. **Execute now vs staged** — you chose "cut over now." Confirm I delete push.ts/email.ts/
+   email-templates.ts/notification-retry.ts/usePushNotifications/prefs UI + PushSubscription model in
+   this pass (push/email dormant until you provision; in-app keeps working).
+
+## Not touched by any of this
+`Notification` (agent mentions) and `Subscription` (agent task subs) are AI-domain and stay exactly
+as-is. This cutover is only the **user-facing** push/email delivery layer.
