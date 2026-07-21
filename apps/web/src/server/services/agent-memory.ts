@@ -13,6 +13,7 @@ import {
   type MemorySourceKind,
   type MemoryProvider,
 } from "@agentcenter/utils";
+import { recordCostEvent } from "./cost";
 
 const MAX_INJECT_CHARS = 8_000;
 const MAX_CAPTURE_CHARS = 8_000;
@@ -36,8 +37,43 @@ export async function recordMemoryOperation(input: {
   error?: string | null;
   latencyMs?: number | null;
   resultCount?: number | null;
+  // Usage + cost (Domain 4 GAP-G): tokens an op consumed and its money cost. When a directly-billed
+  // op carries costCents with no pre-existing costEventId, a CostEvent is created + linked so memory
+  // spend surfaces in the finance ledger. `included_in_run` records the cost for visibility without a
+  // new ledger entry (the run already billed it); pass the run's costEventId to link it.
+  inputTokens?: number | null;
+  embeddingTokens?: number | null;
+  outputTokens?: number | null;
+  costCents?: number | null;
+  costEventId?: string | null;
   attributionMode?: string | null;
 }): Promise<MemoryOperation> {
+  const costCents = input.costCents ?? null;
+  const attributionMode = input.attributionMode ?? (costCents != null ? "billed_directly" : null);
+  let costEventId = input.costEventId ?? null;
+
+  // Auto-attribute a directly-billed memory op to the ledger (unless the caller already linked one).
+  if (costCents != null && costCents > 0 && !costEventId && attributionMode === "billed_directly") {
+    try {
+      const event = await recordCostEvent({
+        workspaceId: input.workspaceId,
+        agentId: input.agentId ?? null,
+        model: `memory:${input.opType}`,
+        provider: input.provider,
+        taskId: input.taskId ?? null,
+        projectId: input.projectId ?? null,
+        tokensIn: (input.inputTokens ?? 0) + (input.embeddingTokens ?? 0),
+        tokensOut: input.outputTokens ?? 0,
+        amountCents: costCents,
+        billingType: "metered_api",
+        source: "agent",
+      });
+      costEventId = event.id;
+    } catch {
+      // Ledger write is best-effort — never break the memory audit path over a cost link.
+    }
+  }
+
   return prisma.memoryOperation.create({
     data: {
       workspaceId: input.workspaceId,
@@ -54,7 +90,12 @@ export async function recordMemoryOperation(input: {
       error: input.error ?? null,
       latencyMs: input.latencyMs ?? null,
       resultCount: input.resultCount ?? null,
-      attributionMode: input.attributionMode ?? null,
+      inputTokens: input.inputTokens ?? null,
+      embeddingTokens: input.embeddingTokens ?? null,
+      outputTokens: input.outputTokens ?? null,
+      costCents,
+      costEventId,
+      attributionMode,
     },
   });
 }

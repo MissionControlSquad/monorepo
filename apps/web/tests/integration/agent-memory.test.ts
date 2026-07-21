@@ -332,3 +332,63 @@ describe("memory search + forget (Domain 4 GAP-F)", () => {
     expect(ok.data.forgetAgentMemory).toBe(true);
   });
 });
+
+describe("memory cost-linkage (GAP-G)", () => {
+  it("directly-billed op creates + links a CostEvent in the ledger", async () => {
+    const op = await recordMemoryOperation({
+      workspaceId: WS,
+      agentId,
+      provider: "db",
+      opType: "query",
+      inputTokens: 100,
+      embeddingTokens: 40,
+      outputTokens: 10,
+      costCents: 7,
+    });
+
+    expect(op.costCents).toBe(7);
+    expect(op.attributionMode).toBe("billed_directly");
+    expect(op.costEventId).toBeTruthy();
+
+    const event = await prisma.costEvent.findUniqueOrThrow({ where: { id: op.costEventId! } });
+    expect(event).toMatchObject({
+      workspaceId: WS,
+      agentId,
+      amountCents: 7,
+      model: "memory:query",
+      provider: "db",
+      tokensIn: 140, // input + embedding
+      tokensOut: 10,
+      source: "agent",
+    });
+  });
+
+  it("included_in_run records cost for visibility WITHOUT a new ledger entry, linking the run's event", async () => {
+    const op = await recordMemoryOperation({
+      workspaceId: WS,
+      agentId,
+      provider: "db",
+      opType: "capture",
+      costCents: 3,
+      attributionMode: "included_in_run",
+      costEventId: "run_evt_123",
+    });
+    expect(op.attributionMode).toBe("included_in_run");
+    expect(op.costCents).toBe(3);
+    expect(op.costEventId).toBe("run_evt_123");
+    // No auto-created CostEvent (the id points at the run's pre-existing event, not a new row).
+    expect(await prisma.costEvent.findUnique({ where: { id: "run_evt_123" } })).toBeNull();
+  });
+
+  it("free op records no cost + no ledger entry", async () => {
+    const op = await recordMemoryOperation({
+      workspaceId: WS,
+      agentId,
+      provider: "markdown",
+      opType: "list",
+    });
+    expect(op.costCents).toBeNull();
+    expect(op.costEventId).toBeNull();
+    expect(op.attributionMode).toBeNull();
+  });
+});
