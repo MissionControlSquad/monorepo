@@ -4,10 +4,14 @@ import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { toast } from "sonner";
 import { Brain, Search, X } from "lucide-react";
-import { AGENT_MEMORY_ENTRIES_QUERY, SEARCH_AGENT_MEMORY_QUERY } from "@/lib/graphql/queries";
+import {
+  AGENT_MEMORY_ENTRIES_QUERY,
+  SEARCH_AGENT_MEMORY_QUERY,
+  MEMORY_OPERATIONS_QUERY,
+} from "@/lib/graphql/queries";
 import { FORGET_AGENT_MEMORY } from "@/lib/graphql/mutations";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, formatCents } from "@agentcenter/utils";
 import { Card, Button, Badge } from "@/components/ui";
 import { Input } from "@/components/ui/shadcn/input";
 import { TimeAgo } from "@/components/common/TimeAgo";
@@ -20,6 +24,66 @@ interface MemoryEntry {
   sourceTaskId?: string | null;
   sourceKind?: string | null;
   createdAt: string;
+}
+interface MemoryOp {
+  id: string;
+  opType: string;
+  provider?: string | null;
+  success: boolean;
+  error?: string | null;
+  latencyMs?: number | null;
+  resultCount?: number | null;
+  costCents?: number | null;
+  createdAt: string;
+}
+
+// The provenance/cost audit for an agent's memory — every capture/query/forget with timing + cost.
+// Collapsed by default (audit data); reuses MEMORY_OPERATIONS_QUERY. Read-only.
+function MemoryActivityLog({ agentId }: { agentId: string }) {
+  const [open, setOpen] = useState(false);
+  const [{ data }] = useQuery<{ memoryOperations: MemoryOp[] }>({
+    query: MEMORY_OPERATIONS_QUERY,
+    variables: { agentId, limit: 30 },
+    pause: !open,
+  });
+  const ops = data?.memoryOperations ?? [];
+
+  return (
+    <div className="border-t border-border pt-2">
+      <button
+        className="text-xs text-muted-foreground transition hover:text-foreground"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {open ? "Hide" : "Show"} memory activity
+      </button>
+      {open && (
+        <ul className="mt-2 space-y-1">
+          {ops.length === 0 && <li className="text-xs text-muted-foreground">No activity.</li>}
+          {ops.map((o) => (
+            <li key={o.id} className="flex items-center gap-2 text-xs">
+              <Badge variant={o.success ? "gray" : "red"} size="sm">
+                {o.opType}
+              </Badge>
+              {o.provider && <span className="text-muted-foreground">{o.provider}</span>}
+              {o.resultCount != null && (
+                <span className="text-muted-foreground">{o.resultCount} hit(s)</span>
+              )}
+              {o.latencyMs != null && (
+                <span className="text-muted-foreground">{o.latencyMs}ms</span>
+              )}
+              {o.costCents ? (
+                <span className="text-muted-foreground">{formatCents(o.costCents)}</span>
+              ) : null}
+              {!o.success && o.error && (
+                <span className="truncate text-destructive">{o.error}</span>
+              )}
+              <TimeAgo date={o.createdAt} className="ml-auto text-muted-foreground" />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 export function AgentMemoryCard({ agentId }: { agentId: string }) {
@@ -130,6 +194,8 @@ export function AgentMemoryCard({ agentId }: { agentId: string }) {
           </li>
         ))}
       </ul>
+
+      <MemoryActivityLog agentId={agentId} />
     </Card>
   );
 }
