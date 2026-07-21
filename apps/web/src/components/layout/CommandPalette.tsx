@@ -4,7 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "urql";
 import { Search, Plus, CornerDownLeft } from "lucide-react";
-import { AGENTS_QUERY, PROJECTS_QUERY } from "@agentcenter/graphql-client/queries";
+import {
+  AGENTS_QUERY,
+  PROJECTS_QUERY,
+  GLOBAL_SEARCH_QUERY,
+} from "@agentcenter/graphql-client/queries";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/shadcn/dialog";
 import { useFeatureFlags } from "../context/FeatureFlagContext";
 import { NAV_ITEMS } from "./sidebar/IconRail";
@@ -34,6 +38,14 @@ export function CommandPalette({ onCreateTask }: { onCreateTask: () => void }) {
   const [{ data: projectData }] = useQuery<{ projects: { id: string; name: string }[] }>({
     query: PROJECTS_QUERY,
     pause: !open,
+  });
+  const searchText = query.trim();
+  const [{ data: searchData }] = useQuery<{
+    globalSearch: { tasks: { _id: string; taskNumber?: number; title: string }[] };
+  }>({
+    query: GLOBAL_SEARCH_QUERY,
+    variables: { searchText, limit: 6 },
+    pause: !open || searchText.length < 2,
   });
 
   // Cmd/Ctrl-K toggles the palette from anywhere.
@@ -89,9 +101,15 @@ export function CommandPalette({ onCreateTask }: { onCreateTask: () => void }) {
         group: "Projects",
         run: go(`/projects/${p.id}`),
       })),
+      ...(searchData?.globalSearch?.tasks ?? []).map((tk) => ({
+        id: `task:${tk._id}`,
+        label: `#${tk.taskNumber ?? "?"} ${tk.title}`,
+        group: "Tasks",
+        run: go(`/task/${tk.taskNumber ?? tk._id}`),
+      })),
     ];
     return list;
-  }, [agentData, projectData, isEnabled, router, onCreateTask]);
+  }, [agentData, projectData, searchData, isEnabled, router, onCreateTask]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -101,7 +119,7 @@ export function CommandPalette({ onCreateTask }: { onCreateTask: () => void }) {
 
   // Preserve group order but flatten for keyboard navigation.
   const groups = useMemo(() => {
-    const order = ["Actions", "Go to", "Agents", "Projects"];
+    const order = ["Actions", "Go to", "Tasks", "Agents", "Projects"];
     const byGroup = new Map<string, Cmd[]>();
     for (const c of filtered) {
       if (!byGroup.has(c.group)) byGroup.set(c.group, []);
