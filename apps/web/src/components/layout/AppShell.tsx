@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";
 import { Header } from "./Header";
 import { IconRail } from "./sidebar/IconRail";
+import { CommandPalette } from "./CommandPalette";
 import { ActivityDrawer } from "./ActivityDrawer";
 import { ProfileSidebar } from "./ProfileSidebar";
 import { useProfileSidebar } from "../context/ProfileSidebarContext";
@@ -146,6 +147,8 @@ export function AppShell({ children, modal }: AppShellProps) {
 
   return (
     <SupportContextProvider>
+      {/* Global Cmd/Ctrl-K quick switcher */}
+      {!isOnboarding && <CommandPalette onCreateTask={handleOpenCreateTask} />}
       <div
         className="flex bg-muted"
         style={{

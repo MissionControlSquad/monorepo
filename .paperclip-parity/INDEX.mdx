@@ -677,6 +677,13 @@ See 03-sandbox-depth.mdx.
       "Snooze 1d" button beside Dismiss. Tests: 1 integration (surfaces → snoozed-hidden → expired-resurfaces →
       permanent-hidden). Typecheck ✓, build ✓.
 
+- [x] **Command palette / Cmd-K quick switcher (port of paperclip ui CommandPalette.tsx)** DONE (next commit).
+      Paperclip has a cmdk-based Cmd/Ctrl-K palette; the monorepo had none (only a search box). Built a lightweight
+      version (no cmdk dep): a global Cmd/Ctrl-K listener opens a Dialog with a filtered, keyboard-navigable list
+      (↑/↓/Enter/Esc) grouped into Actions (New task), Go-to (all enabled nav pages, reusing NAV_ITEMS), Agents
+      (AGENTS_QUERY → /agents/[id]) and Projects (PROJECTS_QUERY → /projects/[id]). Mounted once in AppShell
+      (skipped during onboarding); agent/project queries paused until opened. Typecheck ✓, build ✓.
+
 ## Cross-domain recurring themes (the "loopholes")
 - **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
   ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
