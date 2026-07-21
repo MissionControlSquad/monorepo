@@ -60,18 +60,39 @@ notify(params) →
 - Before buildbase is provisioned: step 1 still runs (feed + history work); step 2 is a no-op
   (dormant) → **push/email simply don't send until provisioned** (the accepted "cut over now" cost).
 
-## Decisions to confirm before I execute
+## RE-PLAN — preferences (confirmed: end users toggle per type)
 
-1. **History granularity** — record **one** `UserNotification` per notification (type=the event,
-   powers feed+history; buildbase fans out to push/email itself) — *recommended* — vs keep the
-   current one-row-per-channel model.
-2. **Preferences** — push/email prefs fully in buildbase; for `in_app` either (a) keep a single
-   `inAppEnabled` + per-type toggles in `UserNotificationPreference` for the feed, or (b) drop our
-   preference model entirely and always record in-app. *Recommend (a)* — the feed still needs a mute.
+Buildbase provides exactly the per-type, end-user-controlled toggles the owner wants:
+- **`userManaged: true` events** appear in buildbase's notifications settings screen; each workspace
+  member enables/disables per type.
+- **`getNotificationPreferences(workspaceId)` → `Record<eventSlug, { email?, push? }>`** reads them;
+  `updateNotificationPreferences(...)` writes them. Delivery is auto-gated (4-layer gate, layer 3 =
+  these end-user overrides) — we just call `send()`.
+- **Key constraint:** buildbase preferences cover **email + push only — there is NO in-app channel
+  in buildbase**, and **no quiet-hours** concept.
+
+**Decision → per-type user preferences live entirely in buildbase.** We **delete**
+`UserNotificationPreference` (our push/email/type toggles + quiet hours). Consequence: **quiet-hours
+is dropped** (buildbase has no equivalent; per-send `scheduledAt`/`ttl` exist but not user quiet-hours).
+
+**In-app feed** (ours, buildbase can't gate it) — two coherent options:
+- **(A) Feed = complete history**, always recorded; the per-type toggle governs push/email only.
+  Zero preference logic on our side. *Simplest, matches "we keep history, buildbase owns delivery."*
+- **(B) Feed honors the toggle too** — the bell filters client-side using buildbase
+  `getNotificationPreferences` (user session, **read-only, no storage**): an event the user turned
+  fully off (email=false, push=false) is also hidden from the feed. One toggle location (buildbase),
+  consistent across all three surfaces, still no preference model on our side. *Recommended.*
+
+## Remaining decisions to confirm before I execute
+
+1. **History granularity** — ✅ confirmed: **one `UserNotification` row per notification**.
+2. **In-app feed vs the toggle** — **(A)** full history, or **(B)** client-filter by buildbase pref
+   (recommended). And confirm **quiet-hours is acceptable to drop**.
 3. **Push service worker** — add buildbase's `public/push-sw.js`, delete our VAPID SW + hook. Confirm.
-4. **Execute now vs staged** — you chose "cut over now." Confirm I delete push.ts/email.ts/
-   email-templates.ts/notification-retry.ts/usePushNotifications/prefs UI + PushSubscription model in
-   this pass (push/email dormant until you provision; in-app keeps working).
+4. **Execute now vs staged** — you leaned "cut over now"; confirm after this re-plan. Delete
+   push.ts/email.ts/email-templates.ts/notification-retry.ts/usePushNotifications/prefs UI +
+   `PushSubscription` + `UserNotificationPreference` this pass (push/email dormant until you
+   provision; in-app + history keep working throughout).
 
 ## Not touched by any of this
 `Notification` (agent mentions) and `Subscription` (agent task subs) are AI-domain and stay exactly
