@@ -1,0 +1,62 @@
+---
+title: Buildbase integration — re-plan (AI-agent vs user-facing split)
+branch: feat/buildbase-platform-integration
+supersedes: the "rip out monorepo billing/quota/RBAC/notifications" framing
+---
+# Buildbase re-plan — split by layer, not by feature
+
+**The rule (from the product owner):** buildbase is the **human/user layer** — app auth,
+workspaces, **app subscription pricing**, human RBAC, user-facing notification delivery.
+It is *not* the AI-agent layer. buildbase bills the human for using the app; it does **not**
+model per-AI-agent budgets, costs, or execution quotas. Those are our domain and **stay in the
+monorepo**. Apply this split to every feature, not just billing.
+
+## Grounded audit of the four features
+
+| Feature | Monorepo has (evidence) | Layer | Decision |
+|---|---|---|---|
+| **Billing** | `finance/` = `LedgerEvent`, `CostEvent`, `FinanceEvent`, `BudgetPolicy`, `BudgetIncident`, `cost-rollup`, agent **salary** — all **per-AI-agent** cost tracking. `Subscription` model = *an agent subscribing to a task* (agentId+taskId), **not** human billing. **No app-pricing exists.** | AI (monorepo) + **missing** user layer | **Keep** all finance as-is. **Add** app-subscription pricing from buildbase (net-new user-facing; `PricingPage`, `useSubscription*`). Nothing removed. |
+| **Quota** | `QuotaWindow`, `provider-quota`, `budget-window` = **per-agent execution/spend quotas**. | AI (monorepo) | **Keep.** buildbase quota = app-usage metering the *human* is billed for — only wire if we ever meter user app-usage. **N/A today.** |
+| **RBAC** | Only `agent-authz` (`AgentAuthzEvent`) = **which agent may be invoked** (AI). Human admin-gating already reads `ctx.tenancy.userRole` — **which comes from the buildbase workspace token.** | AI stays; human already buildbase-fed | **Keep** agent-authz. **Formalize** human-UI gates with SDK `Permission`/`WhenPermission`/`hasPermission` (userRole already flows in). Small, additive. |
+| **Notifications** | `UserNotification` — *"User-facing notifications (push, email, in-app)"* — with its **own** `sendPushToUser` + `sendEmail` + templates + preferences + retry + metrics. Separately, `Notification` = agent @-mention (agent↔agent). | **Overlap** (user delivery) + AI (@-mention) | **The one real swap.** Route user-facing **delivery** through buildbase `notification.send()` (email+push, 4-layer gating, templates, prefs UI — all built-in). Keep the **triggers** (what to notify about) in the monorepo; keep agent @-mention `Notification` as AI. |
+
+## Net migration surface (much smaller than first framed)
+
+Nothing in `finance/`, `budgets`, `cost`, `quota`, or `agent-authz` is touched. Only:
+
+1. **App pricing (ADD, user-facing)** — mount buildbase `PricingPage` + `useSubscription*` for the
+   human's app subscription. Net-new; removes nothing. *Functions only once buildbase org + Stripe +
+   plans are provisioned.*
+2. **Human RBAC gates (ADD)** — replace ad-hoc `userRole` checks on user-facing UI with SDK
+   `WhenPermission`/`hasPermission`. `userRole` already arrives via the workspace token.
+3. **User notification delivery (SWAP, adapter)** — behind a flag, route `UserNotification`
+   delivery to buildbase `notification.send()`; keep the home-grown path as fallback. Reversible.
+   *Functions only once notification events are created in the buildbase admin dashboard.*
+4. **MCP scaffold (ADD, this session)** — `/api/mcp` via `@buildbase/sdk/mcp`, read-only built-ins,
+   dormant until `BUILDBASE_ORG_ID` + `BUILDBASE_MCP_SECRET` are set. See below.
+
+## Provisioning gate (why most of this is code-ready-but-dormant)
+
+`BUILDBASE_ORG_ID` is currently **empty** → `BuildbaseProvider` falls back to admin auth and none of
+the buildbase user-layer features run. Every item above is wired **behind that same gate**: code
+lands now, activates when you provision the buildbase org (Stripe + plans + notification events).
+This matches the existing integration pattern (dormant on empty ORG_ID) and keeps the app working
+in the interim — the reason the swap is an **adapter with fallback**, never a rip-and-replace.
+
+## Sequencing (per instruction #5)
+
+The user-layer buildbase work does **not** displace the standalone P1 gaps
+(`remote-http-endpoint-guard` #138, `workspace-realization` #175) — those are AI-layer, work today,
+and remain higher priority. Buildbase items 1–3 are dormant until provisioning regardless, so they
+can land opportunistically without blocking the P1 gap work. Item 4 (MCP scaffold) is additive and
+lands now.
+
+## Status
+
+- [x] Branch `feat/buildbase-platform-integration`
+- [x] Bump `@buildbase/sdk` 0.0.44 → 0.0.57 (typecheck clean)
+- [x] Re-plan (this doc)
+- [x] MCP scaffold (`/api/mcp`, dormant-until-provisioned)
+- [ ] App-pricing surface (needs Stripe/plans provisioned) — deferred, dormant-ready
+- [ ] Human RBAC gates (SDK `Permission`) — deferred, additive
+- [ ] Notification-delivery adapter (needs events provisioned) — deferred, flag+fallback
