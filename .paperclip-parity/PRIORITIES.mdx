@@ -97,8 +97,8 @@ Everything else in the 178-service list maps to a P0–P2 feature above (e.g. `i
 `default-agent-instructions`, `agent-assignability`→assignment-guard, `execution-allowlist`→execution-policy).
 
 ## Buildable-now shortlist (no infra, no buildbase, real value)
-0. **SSRF endpoint guard** — a pure `assertPublicHttpEndpoint` util gating all outbound HTTP (P1 security — do first).
-1. **Dependency wakeups** — auto-wake blocked tasks when blockers resolve (closes an autonomy gap).
+0. ~~**SSRF endpoint guard**~~ ✅ DONE (remote-http-endpoint-guard + guardedFetch, applied to webhook adapter + bridges).
+1. ~~**Dependency wakeups** — auto-wake blocked tasks when blockers resolve~~ ✅ DONE (dependency-wakeups.ts + handler, TASK_AUTONOMY-gated, 5 tests).
 2. **Adapter-registry unification** + seed Tier-D providers as DB rows (P1 #7).
 2. **Execution-workspace realization** — branch/worktree checkout + run `cleanupCommand` (P1 #15).
 3. **Memory cost-linkage (GAP-G)** — populate `costCents`/`costEventId` on memory ops (P1 #14).
