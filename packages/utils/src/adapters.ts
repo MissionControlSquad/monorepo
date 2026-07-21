@@ -396,16 +396,27 @@ const BUILTIN_ADAPTERS: Adapter[] = [
 // Adapter key aliases (Domain 2, gap 4.0): the Tier-A `AgentAdapter` DB rows and some external configs
 // use different spellings than the Tier-D code keys. Resolve them to the one canonical module so an
 // agent bound to e.g. "openclaw-gateway" (the seeded DB row) still runs the `openclaw` runtime.
+// Both spellings are aliased: the seeded `AgentAdapter` DB rows use hyphens (`claude-local`,
+// `openclaw-gateway`); some external/legacy configs use underscores. Missing hyphen forms were a bug
+// — a `claude-local` agent failed to resolve its runtime module (canonicalized to identity).
 const ADAPTER_KEY_ALIASES: Record<string, string> = {
   "openclaw-gateway": "openclaw",
   openclaw_gateway: "openclaw",
+  "claude-local": "claude",
   claude_local: "claude",
+  "codex-local": "codex",
   codex_local: "codex",
+  "gemini-local": "gemini",
   gemini_local: "gemini",
+  "cursor-local": "cursor",
   cursor_local: "cursor",
+  "grok-local": "grok",
   grok_local: "grok",
+  "opencode-local": "opencode",
   opencode_local: "opencode",
+  "pi-local": "pi",
   pi_local: "pi",
+  "hermes-local": "hermes",
   hermes_local: "hermes",
 };
 

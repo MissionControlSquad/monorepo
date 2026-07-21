@@ -6,6 +6,7 @@ import {
   registerAdapter,
   buildAdapterInvocation,
   BUILTIN_ADAPTER_KEYS,
+  canonicalAdapterKey,
   substituteAdapterToken,
   resolveAdapterModels,
   loadAdapterPlugins,
@@ -250,5 +251,40 @@ describe("adapter registry", () => {
     expect(substituteAdapterToken("{taskId}-{model}-{workspaceDir}", { ...base, model: "m" })).toBe(
       "t_1-m-/work",
     );
+  });
+});
+
+// Registry unification (parity #6): every seeded AgentAdapter DB row `type` must canonicalize to a
+// registered Tier-D runtime module. The DB seeds hyphen spellings (`claude-local`, `openclaw-gateway`);
+// a missing hyphen alias previously left those rows unresolvable at launch.
+describe("adapter registry unification (Tier-A DB ↔ Tier-D code)", () => {
+  // The exact `type` values seeded in migration 20260711140000_add_agent_adapters.
+  const SEEDED_DB_ADAPTER_TYPES = [
+    "openclaw-gateway",
+    "claude-local",
+    "codex-local",
+    "cursor-local",
+    "gemini-local",
+    "grok-local",
+    "opencode-local",
+    "pi-local",
+  ];
+
+  it.each(SEEDED_DB_ADAPTER_TYPES)("resolves seeded DB adapter %s to a code module", (type) => {
+    const adapter = getAdapter(type);
+    expect(adapter, `DB adapter '${type}' must resolve to a Tier-D module`).toBeDefined();
+    expect(BUILTIN_ADAPTER_KEYS).toContain(adapter!.key);
+  });
+
+  it("canonicalizes both hyphen and underscore DB spellings", () => {
+    expect(canonicalAdapterKey("claude-local")).toBe("claude");
+    expect(canonicalAdapterKey("claude_local")).toBe("claude");
+    expect(canonicalAdapterKey("openclaw-gateway")).toBe("openclaw");
+    expect(canonicalAdapterKey("cursor-local")).toBe("cursor");
+  });
+
+  it("leaves unknown / already-canonical keys unchanged (identity)", () => {
+    expect(canonicalAdapterKey("claude")).toBe("claude");
+    expect(canonicalAdapterKey("totally-unknown")).toBe("totally-unknown");
   });
 });
