@@ -526,3 +526,53 @@ export async function listCaseOutputs(
   if (!c) notFound("Case");
   return prisma.pipelineCaseOutput.findMany({ where: { caseId }, orderBy: { createdAt: "asc" } });
 }
+
+// ── Cross-stage conversation context (parity #99) ──
+export interface PipelineCaseContext {
+  caseId: string;
+  title: string;
+  currentStageId: string | null;
+  /** Chronological trail of stage transitions + notes — the "conversation" carried across stages. */
+  timeline: {
+    at: Date;
+    type: string;
+    fromStageId: string | null;
+    toStageId: string | null;
+    note: string | null;
+  }[];
+  /** Structured outputs accumulated so far. */
+  outputs: { stageId: string | null; key: string; value: unknown }[];
+}
+
+/**
+ * Assemble the context a case carries across stages (#99): its transition/note timeline plus the
+ * structured outputs accumulated so far. A downstream stage (or the case-detail UI) reads this to see
+ * what happened upstream without re-deriving it.
+ */
+export async function assembleCaseContext(
+  workspaceId: string,
+  caseId: string,
+): Promise<PipelineCaseContext> {
+  const c = await prisma.pipelineCase.findFirst({
+    where: { id: caseId, pipeline: { workspaceId } },
+    select: { id: true, title: true, currentStageId: true },
+  });
+  if (!c) notFound("Case");
+  const [events, outputs] = await Promise.all([
+    prisma.pipelineCaseEvent.findMany({ where: { caseId }, orderBy: { createdAt: "asc" } }),
+    prisma.pipelineCaseOutput.findMany({ where: { caseId }, orderBy: { createdAt: "asc" } }),
+  ]);
+  return {
+    caseId: c.id,
+    title: c.title,
+    currentStageId: c.currentStageId,
+    timeline: events.map((e) => ({
+      at: e.createdAt,
+      type: e.type,
+      fromStageId: e.fromStageId,
+      toStageId: e.toStageId,
+      note: e.note,
+    })),
+    outputs: outputs.map((o) => ({ stageId: o.stageId, key: o.key, value: o.value })),
+  };
+}
