@@ -56,6 +56,7 @@ export const FLAG_KEYS = {
   EXTERNAL_OBJECTS: "external_objects",
   CLOUD_UPSTREAMS: "cloud_upstreams",
   PROVIDER_AUTH: "provider_auth",
+  LOCAL_SERVICES: "local_services",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -125,4 +126,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.EXTERNAL_OBJECTS]: false,
   [FLAG_KEYS.CLOUD_UPSTREAMS]: false,
   [FLAG_KEYS.PROVIDER_AUTH]: false,
+  [FLAG_KEYS.LOCAL_SERVICES]: false,
 };

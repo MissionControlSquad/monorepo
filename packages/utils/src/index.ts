@@ -14,6 +14,7 @@ export * from "./rewake-throttle";
 export * from "./upstream-sync";
 export * from "./setup-session";
 export * from "./provider-auth";
+export * from "./service-supervision";
 export * from "./agent-capabilities";
 export * from "./attention";
 export * from "./observability";
