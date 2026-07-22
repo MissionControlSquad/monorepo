@@ -33,27 +33,27 @@ model ProjectWorkspace {
 }
 
 model ExecutionWorkspace {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   workspaceId        String
   projectId          String?
   projectWorkspaceId String?
   taskId             String?
   runId              String? // AgentRun id
-  mode               String   @default("run") // run | setup
+  mode               String    @default("run") // run | setup
   strategyType       String // project_primary | git_worktree | adapter_managed | cloud_sandbox
   name               String
-  status             String   @default("active") // active | closed
+  status             String    @default("active") // active | closed
   cwd                String?
   repoUrl            String?
   baseRef            String?
   branchName         String?
-  providerType       String   @default("local_fs") // local_fs | <sandbox provider key>
+  providerType       String    @default("local_fs") // local_fs | <sandbox provider key>
   providerRef        String? // sandbox id / lease id
-  lastUsedAt         DateTime @default(now())
+  lastUsedAt         DateTime  @default(now())
   closedAt           DateTime?
   metadata           Json?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   operations WorkspaceOperation[]
 
@@ -63,15 +63,15 @@ model ExecutionWorkspace {
 }
 
 model WorkspaceOperation {
-  id                   String   @id @default(cuid())
+  id                   String             @id @default(cuid())
   executionWorkspaceId String
   executionWorkspace   ExecutionWorkspace @relation(fields: [executionWorkspaceId], references: [id], onDelete: Cascade)
   phase                String // provision | clone | setup | cleanup | run
   command              String?
   exitCode             Int?
-  status               String   @default("done") // done | failed | skipped
+  status               String             @default("done") // done | failed | skipped
   detail               String?
-  startedAt            DateTime @default(now())
+  startedAt            DateTime           @default(now())
   finishedAt           DateTime?
 
   @@index([executionWorkspaceId])

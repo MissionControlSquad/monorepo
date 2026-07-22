@@ -87,7 +87,7 @@ model FinanceEvent {
   biller            String? // who is charging (provider/vendor/platform)
   provider          String?
   billingCode       String?
-  description        String?
+  description       String?
   quantity          Float?
   unit              String   @default("flat") // flat | credits | gb_month | gpu_hour | …
   amountCents       Int      @default(0)
@@ -109,20 +109,20 @@ model FinanceEvent {
 }
 
 model BudgetPolicy {
-  id          String       @id @default(cuid())
-  workspaceId String
-  scope       BudgetScope
-  agentId     String? // required when scope=agent
-  name        String
-  limitCents  Int
-  window       BudgetWindow @default(monthly)
-  hardStop     Boolean      @default(false) // true = auto-pause on hard breach
-  warnPercent  Int          @default(80) // soft-warn threshold as % of limit (Paperclip parity)
-  notifyEnabled Boolean     @default(true) // emit notification on incident open
-  isSalary     Boolean      @default(false) // Domain 14 #18 — the agent's periodic token "salary" allowance
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id            String       @id @default(cuid())
+  workspaceId   String
+  scope         BudgetScope
+  agentId       String? // required when scope=agent
+  name          String
+  limitCents    Int
+  window        BudgetWindow @default(monthly)
+  hardStop      Boolean      @default(false) // true = auto-pause on hard breach
+  warnPercent   Int          @default(80) // soft-warn threshold as % of limit (Paperclip parity)
+  notifyEnabled Boolean      @default(true) // emit notification on incident open
+  isSalary      Boolean      @default(false) // Domain 14 #18 — the agent's periodic token "salary" allowance
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   agent     Agent?           @relation(fields: [agentId], references: [id], onDelete: Cascade)
   windows   QuotaWindow[]
@@ -156,7 +156,7 @@ model QuotaWindow {
 }
 
 model BudgetIncident {
-  id            String         @id @default(cuid())
+  id            String            @id @default(cuid())
   workspaceId   String
   policyId      String
   quotaWindowId String?
@@ -170,7 +170,7 @@ model BudgetIncident {
   detail        String?
   resolvedById  String?
   resolvedAt    DateTime?
-  createdAt     DateTime       @default(now())
+  createdAt     DateTime          @default(now())
 
   policy BudgetPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
   agent  Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)

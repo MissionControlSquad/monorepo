@@ -4,7 +4,7 @@
 // opType/sourceKind/attributionMode are TEXT with app-level validation (no PG enums, per D5). MEMORY-gated.
 
 model MemoryOperation {
-  id          String @id @default(cuid())
+  id          String  @id @default(cuid())
   workspaceId String // buildbase workspace _id; no FK (D5)
   agentId     String?
   provider    String // resolved binding value (none|markdown|db) at op time

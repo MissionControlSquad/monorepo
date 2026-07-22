@@ -115,7 +115,7 @@ model Agent {
   runtimeTemplate String? // command/argv/URL template for process/shell/http adapters
   sandboxProvider String? // Tier D: run this agent's tasks inside a provisioned sandbox (provider key). null = local/runner
   environmentId   String? // Tier D / Phase 3: the Environment (where/how) this agent runs in. null = ad-hoc sandboxProvider
-  memoryProvider  String  @default("none") // Tier D memory binding: none | markdown | db
+  memoryProvider  String          @default("none") // Tier D memory binding: none | markdown | db
   createdBy       String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -145,11 +145,11 @@ model Agent {
   adapterConfig Json? // per-agent config, validated vs AgentAdapter.configSchema
   adapter       AgentAdapter? @relation("AgentAdapterType", fields: [adapterType], references: [type], onDelete: Restrict)
 
-  secretBindings SecretBinding[] // Epic #5
-  agentSkills    AgentSkill[] // Epic #10
-  goals          Goal[]         @relation("AgentGoals") // Epic #11
-  terminalSessions TerminalSession[] @relation("AgentTerminals") // Epic #9
-  instructions   AgentInstruction[] @relation("AgentInstructions") // Epic #18
+  secretBindings   SecretBinding[] // Epic #5
+  agentSkills      AgentSkill[] // Epic #10
+  goals            Goal[]             @relation("AgentGoals") // Epic #11
+  terminalSessions TerminalSession[]  @relation("AgentTerminals") // Epic #9
+  instructions     AgentInstruction[] @relation("AgentInstructions") // Epic #18
 
   reportsToAgentId String? // Epic #19: manager edge (org chart); self-FK, SetNull
   reportsTo        Agent?  @relation("AgentOrg", fields: [reportsToAgentId], references: [id], onDelete: SetNull)

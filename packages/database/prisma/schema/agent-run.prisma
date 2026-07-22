@@ -2,39 +2,39 @@
 // runner tasks, and (later) adapter runs all write to. Closes the "results returned but never stored"
 // gap and is the anchor for run history, retries, per-run cost, and provenance (memory/artifacts).
 model AgentRun {
-  id          String    @id @default(cuid())
-  workspaceId String // buildbase workspace id; no FK (D5)
-  agentId     String?
-  taskId      String?
+  id                   String    @id @default(cuid())
+  workspaceId          String // buildbase workspace id; no FK (D5)
+  agentId              String?
+  taskId               String?
   // Where/how it ran: "sandbox" | "runner" | "host" | "local". providerKey = sandbox provider (e2b/…) when kind=sandbox.
-  kind        String
-  providerKey String?
-  sandboxId   String? // the ephemeral sandbox/host id this run used
-  status      String    @default("running") // running | done | failed | timeout | canceled
-  exitCode    Int?
-  stdout      String?   @db.Text
-  stderr      String?   @db.Text
-  errorMessage String?
-  costCents   Int?
+  kind                 String
+  providerKey          String?
+  sandboxId            String? // the ephemeral sandbox/host id this run used
+  status               String    @default("running") // running | done | failed | timeout | canceled
+  exitCode             Int?
+  stdout               String?   @db.Text
+  stderr               String?   @db.Text
+  errorMessage         String?
+  costCents            Int?
   // Domain 8 G2 — untrusted-output review gate. A run by a low-trust/untrusted agent (or one whose
   // trust profile requires it) finalizes `needs_review` with a quarantined sourceTrust marker; a board
   // reviewer promotes it. Standard/trusted output is auto-`approved`. LOW_TRUST_REVIEW-gated.
-  reviewState String? // approved | needs_review | changes_requested (null = not evaluated / feature off)
-  sourceTrust Json? // { preset, disposition, sourceAgentId, sourceRunId, promotedByProfileId }
-  reviewedByProfileId String?
-  reviewedAt  DateTime?
+  reviewState          String? // approved | needs_review | changes_requested (null = not evaluated / feature off)
+  sourceTrust          Json? // { preset, disposition, sourceAgentId, sourceRunId, promotedByProfileId }
+  reviewedByProfileId  String?
+  reviewedAt           DateTime?
   // Domain 9 #6 — scheduled retries + backoff. A transient failure (timeout) sets scheduledRetryAt;
   // the reap cron promotes it to a fresh queued run (retryOfRunId → lineage). retryCount caps retries.
-  retryCount       Int       @default(0)
-  scheduledRetryAt DateTime?
-  retryReason      String?
-  retryOfRunId     String?
+  retryCount           Int       @default(0)
+  scheduledRetryAt     DateTime?
+  retryReason          String?
+  retryOfRunId         String?
   requestedByProfileId String?
-  bridgeTokenHash String? // Plan 6: hash of the run-scoped in-sandbox bridge token (null when inactive)
-  startedAt   DateTime  @default(now())
-  finishedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  bridgeTokenHash      String? // Plan 6: hash of the run-scoped in-sandbox bridge token (null when inactive)
+  startedAt            DateTime  @default(now())
+  finishedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@index([workspaceId, createdAt])
   @@index([agentId])

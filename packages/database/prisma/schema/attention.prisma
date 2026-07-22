@@ -3,12 +3,12 @@
 // item key, e.g. "approval:<id>") until it naturally leaves the feed. workspaceId-scoped (no FK).
 
 model AttentionDismissal {
-  id                  String   @id @default(cuid())
-  workspaceId         String
-  itemKey             String // the feed item's stable id, e.g. "approval:<id>"
+  id                   String    @id @default(cuid())
+  workspaceId          String
+  itemKey              String // the feed item's stable id, e.g. "approval:<id>"
   dismissedByProfileId String?
-  snoozedUntil        DateTime? // null = dismissed permanently; else the item reappears after this time
-  createdAt           DateTime @default(now())
+  snoozedUntil         DateTime? // null = dismissed permanently; else the item reappears after this time
+  createdAt            DateTime  @default(now())
 
   @@unique([workspaceId, itemKey])
   @@index([workspaceId])

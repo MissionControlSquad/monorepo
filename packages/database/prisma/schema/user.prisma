@@ -7,11 +7,11 @@ enum ProfileKind {
 
 /// Human account — public identity is on Profile
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id           String   @id @default(cuid())
+  email        String   @unique
   passwordHash String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   profile                Profile?
   adminUser              AdminUser?
@@ -39,21 +39,21 @@ model Profile {
   agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   channelMemberships       ChannelMember[]
-  channelMessagesFrom      ChannelMessage[]        @relation("ChannelMessageFrom")
-  channelMessagesPinned    ChannelMessage[]        @relation("ChannelMessagePinnedBy")
+  channelMessagesFrom      ChannelMessage[]         @relation("ChannelMessageFrom")
+  channelMessagesPinned    ChannelMessage[]         @relation("ChannelMessagePinnedBy")
   channelMessageMentions   ChannelMessageMention[]
   channelMessageReactions  ChannelMessageReaction[]
-  channelsCreated          Channel[]               @relation("ChannelCreatedByProfile")
+  channelsCreated          Channel[]                @relation("ChannelCreatedByProfile")
   messages                 Message[]
   messageMentions          MessageMention[]
   messageReactions         MessageReaction[]
   taskAssignments          TaskAssignee[]
-  createdTasks             Task[]                  @relation("TaskCreatedByProfile")
+  createdTasks             Task[]                   @relation("TaskCreatedByProfile")
   deliverables             Deliverable[]
-  deliverableVersions      DeliverableVersion[]    @relation("DeliverableVersionEditedByProfile")
+  deliverableVersions      DeliverableVersion[]     @relation("DeliverableVersionEditedByProfile")
   projectMemberships       ProjectMember[]
   activities               Activity[]
-  createdRecurringTasks    RecurringTask[]         @relation("RecurringTaskCreatedByProfile")
+  createdRecurringTasks    RecurringTask[]          @relation("RecurringTaskCreatedByProfile")
   recurringTaskAssignments RecurringTaskAssignee[]
   documents                Document[]
 
@@ -61,9 +61,9 @@ model Profile {
   approvalsDecided   Approval[]        @relation("ApprovalDecidedBy")
   approvalComments   ApprovalComment[] @relation("ApprovalCommentAuthor")
 
-  createdRoutines   Routine[]         @relation("RoutineCreatedByProfile") // Epic #7
-  routineRevisions  RoutineRevision[] @relation("RoutineRevisionEditedBy")
-  claimedCases      PipelineCase[]    @relation("PipelineCaseClaimedBy")
+  createdRoutines  Routine[]         @relation("RoutineCreatedByProfile") // Epic #7
+  routineRevisions RoutineRevision[] @relation("RoutineRevisionEditedBy")
+  claimedCases     PipelineCase[]    @relation("PipelineCaseClaimedBy")
 
   checkedOutTasks Task[] @relation("TaskCheckedOutBy") // Epic #8
 

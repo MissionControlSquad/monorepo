@@ -14,7 +14,7 @@ model UsedNonce {
 // After first connect the plugin receives a per-machine connectionToken.
 model LiveGatewayToken {
   id          String    @id @default(cuid())
-  tokenHash   String    @unique        // bcrypt hash — never stored plain
+  tokenHash   String    @unique // bcrypt hash — never stored plain
   tokenPrefix String    @db.VarChar(8) // first 8 chars shown in UI
   name        String?
   isActive    Boolean   @default(true)
@@ -30,14 +30,14 @@ model LiveGatewayToken {
 // Not tied to CloudVM — works for self-hosted, user VPS, or MC-provisioned VMs.
 model LiveGatewayConnection {
   id                 String    @id @default(cuid())
-  machineFingerprint String    @unique         // sha256(hostname:primaryMac)
-  connectionToken    String?                   // bcrypt hash of per-machine token (raw shown once)
+  machineFingerprint String    @unique // sha256(hostname:primaryMac)
+  connectionToken    String? // bcrypt hash of per-machine token (raw shown once)
   machineName        String?   @db.VarChar(255)
   connectionStatus   String    @default("disconnected") // connected | disconnected
   connectedAt        DateTime?
   lastDisconnectedAt DateTime?
   pluginVersion      String?
-  hostMeta           Json?                     // { hostname, platform, arch, openclawVersion? }
+  hostMeta           Json? // { hostname, platform, arch, openclawVersion? }
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -51,37 +51,37 @@ model LiveGatewayConnection {
 // Maps agent username (slug) → connection. Plugin reports its agent list on hello.
 // Hot path: task assignment looks up agent username → finds connection → delivers via WS.
 model LiveAgentRoute {
-  id           String               @id @default(cuid())
+  id           String   @id @default(cuid())
   connectionId String
-  agentSlug    String               // Agent.username
-  createdAt    DateTime             @default(now())
+  agentSlug    String // Agent.username
+  createdAt    DateTime @default(now())
 
-  connection   LiveGatewayConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connection LiveGatewayConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
   @@unique([connectionId, agentSlug])
-  @@index([agentSlug])              // hot path lookup
+  @@index([agentSlug]) // hot path lookup
   @@map("live_agent_routes")
 }
 
 // Offline delivery queue. Drained on next vm.hello. Has 24h TTL.
 // idempotencyKey prevents double-delivery on reconnect.
 model LivePendingDelivery {
-  id             String               @id @default(cuid())
+  id             String    @id @default(cuid())
   connectionId   String
   agentSlug      String
   taskId         String
-  message        String               @db.Text
-  priority       String               @default("normal")
-  idempotencyKey String               @unique        // task:{taskId}:agent:{agentSlug}
-  createdAt      DateTime             @default(now())
-  expiresAt      DateTime                            // 24h TTL
-  delivered      Boolean              @default(false)
+  message        String    @db.Text
+  priority       String    @default("normal")
+  idempotencyKey String    @unique // task:{taskId}:agent:{agentSlug}
+  createdAt      DateTime  @default(now())
+  expiresAt      DateTime // 24h TTL
+  delivered      Boolean   @default(false)
   deliveredAt    DateTime?
-  attempts       Int                  @default(0)    // # times pushed to the agent (re-drain on reconnect)
+  attempts       Int       @default(0) // # times pushed to the agent (re-drain on reconnect)
   lastAttemptAt  DateTime?
-  deadLetteredAt DateTime?                           // given up after too many un-acked attempts
+  deadLetteredAt DateTime? // given up after too many un-acked attempts
 
-  connection     LiveGatewayConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connection LiveGatewayConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
   @@index([connectionId, delivered])
   @@index([expiresAt])
