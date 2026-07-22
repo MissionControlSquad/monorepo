@@ -6,6 +6,8 @@ export * from "./formatDuration";
 export * from "./chart-colors";
 export * from "./feature-flag-keys";
 export * from "./plugin-constants";
+export * from "./plugin-lifecycle";
+export * from "./plugin-bus";
 export * from "./agent-capabilities";
 export * from "./attention";
 export * from "./observability";
