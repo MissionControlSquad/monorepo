@@ -55,3 +55,4 @@ import "./agent-memory";
 import "./agent-companies";
 import "./attention";
 import "./project-doc-comments";
+import "./feedback";

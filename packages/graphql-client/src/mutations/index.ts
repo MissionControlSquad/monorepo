@@ -273,3 +273,4 @@ export {
 } from "./execution-workspaces";
 export { SET_SIDEBAR_PREFERENCE } from "./sidebar-preferences";
 export { ADD_PROJECT_DOC_COMMENT, RESOLVE_PROJECT_DOC_COMMENT, DELETE_PROJECT_DOC_COMMENT } from "./project-doc-comments";
+export { SUBMIT_FEEDBACK } from "./feedback";
