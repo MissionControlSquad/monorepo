@@ -49,6 +49,7 @@ export const FLAG_KEYS = {
   CONTINUATION_SUMMARIES: "continuation_summaries",
   DECISION_TRAINING: "decision_training",
   INBOX_POLICY: "inbox_policy",
+  TOOL_RUNTIME_METRICS: "tool_runtime_metrics",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -111,4 +112,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.CONTINUATION_SUMMARIES]: false,
   [FLAG_KEYS.DECISION_TRAINING]: false,
   [FLAG_KEYS.INBOX_POLICY]: false,
+  [FLAG_KEYS.TOOL_RUNTIME_METRICS]: false,
 };
