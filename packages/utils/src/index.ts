@@ -33,6 +33,7 @@ export * from "./trust-presets";
 export * from "./redact";
 export * from "./tool-content-guards";
 export * from "./portable-path";
+export * from "./workspace-file-ref";
 export * from "./memory-providers";
 export * from "./adapter-config";
 export * from "./json-schema-form";
