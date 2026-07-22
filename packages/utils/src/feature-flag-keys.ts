@@ -48,6 +48,7 @@ export const FLAG_KEYS = {
   FOLDERS: "folders",
   CONTINUATION_SUMMARIES: "continuation_summaries",
   DECISION_TRAINING: "decision_training",
+  INBOX_POLICY: "inbox_policy",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -109,4 +110,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.FOLDERS]: false,
   [FLAG_KEYS.CONTINUATION_SUMMARIES]: false,
   [FLAG_KEYS.DECISION_TRAINING]: false,
+  [FLAG_KEYS.INBOX_POLICY]: false,
 };
