@@ -46,6 +46,7 @@ export const FLAG_KEYS = {
   AGENT_COMPANIES: "agent_companies",
   FEEDBACK: "feedback",
   FOLDERS: "folders",
+  CONTINUATION_SUMMARIES: "continuation_summaries",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -105,4 +106,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.AGENT_COMPANIES]: false,
   [FLAG_KEYS.FEEDBACK]: false,
   [FLAG_KEYS.FOLDERS]: false,
+  [FLAG_KEYS.CONTINUATION_SUMMARIES]: false,
 };
