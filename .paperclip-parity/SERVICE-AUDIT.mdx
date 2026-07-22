@@ -18,7 +18,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 3 | activity-log | ✅ | `AgentAction` + activity feed | P2 | done |
 | 4 | adapter-models-env | 🟡 | adapter model profiles (`AdapterModelProfile`); env-driven model list not dynamic | P1 | needs-provider-key |
 | 5 | adapter-plugin-store | ❌ | declarative adapter-plugin loader exists (`adapters.ts`), no JSON-file store | P3 | infra-gated |
-| 6 | adapter-registry-bootstrap | 🟡 | P1-adapters (registries not unified/seeded) | P1 | buildable-now |
+| 6 | adapter-registry-bootstrap | ✅ | aliases fixed + ensureBuiltinAdapters (done) | P1 | buildable-now |
 | 7 | agent-assignability | ✅ | `assignment-guard.ts` (assertAssignableAgents) | P0 | done |
 | 8 | agent-instructions | ✅ | `agent-instructions` GraphQL + route `/instructions` | P2 | done (delivery deferred) |
 | 9 | agent-invokability | 🟡 | agent-authz capability checks (partial) | P1 | buildable-now |
@@ -68,7 +68,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 53 | environment-runtime | 🟡 | `resolveEnvironmentExecution` (ssh/plugin → null) | P1 | needs-provider-key |
 | 54 | environments | ✅ | P1-environments-leases | P1 | done (mgmt UI thin) |
 | 55 | execution-allowlist | ✅ | `execution-policy.ts` | P1 | done |
-| 56 | execution-policy-bootstrap | 🟡 | execution-policy present; bootstrap seeding thin | P1 | buildable-now |
+| 56 | execution-policy-bootstrap | ✅ | N/A — getWorkspaceExecutionPolicy returns a graceful default (no seed needed) | P1 | buildable-now |
 | 57 | execution-workspace-policy | ✅ | `execution-workspace-policy.ts` | P1 | done |
 | 58 | execution-workspaces | 🟡 | recorded (web) + realized (runner workspace.ts, done) | P1 | buildable-now |
 | 59 | external-objects | ❌ | P2-external-objects-github | P2 | needs-github-token |

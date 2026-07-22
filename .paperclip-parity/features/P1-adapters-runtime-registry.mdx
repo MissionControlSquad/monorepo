@@ -1,15 +1,16 @@
 ---
 feature: Adapters & runtime registry
 priority: P1
-status: Partial
-gate: buildable-now
+status: Present
+gate: done
 ---
 
-# Adapters & runtime registry · P1 · 🟡 Present, registries now consistent (ACP deferred)
+# Adapters & runtime registry · P1 · ✅ Unified (ACP deferred — needs a real launch spec)
 
-> **Update:** the two registries are now **key-consistent** — every seeded DB adapter resolves to its
-> Tier-D runtime module (hyphen-alias bug fixed + drift-guard test). Only net-new provider **ACP**
-> remains (needs a confirmed launch spec) + an optional startup-sync nicety.
+> **Done:** registries are key-consistent (hyphen-alias bug fixed + drift-guard test) AND
+> `ensureBuiltinAdapters` now drives the DB rows from the Tier-D code registry at startup
+> (idempotent, create-if-absent, 3 tests). A new code provider auto-seeds — no manual migration.
+> Only net-new provider **ACP** remains (needs a confirmed launch spec/CLI).
 
 
 **What it is:** the catalog of agent runtimes (claude/codex/cursor/grok/…), their launch config, model
