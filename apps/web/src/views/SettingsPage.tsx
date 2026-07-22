@@ -38,6 +38,7 @@ import { LicenseStatusCode } from "@/server/constants";
 import { API_ROUTES } from "@/lib/api-routes";
 import { SidebarCustomizeCard } from "@/components/layout/sidebar/SidebarCustomizeCard";
 import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
+import { AppearanceCard } from "@/components/settings/AppearanceCard";
 
 const changePasswordSchema = z
   .object({
@@ -201,6 +202,9 @@ export function SettingsPage() {
 
       {/* Notification preferences */}
       <NotificationPreferencesCard />
+
+      {/* Appearance / theme */}
+      <AppearanceCard />
 
       {/* Sidebar customization */}
       <SidebarCustomizeCard />
