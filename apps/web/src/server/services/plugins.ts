@@ -149,6 +149,7 @@ export async function uninstallPlugin(workspaceId: string, pluginId: string): Pr
     prisma.pluginTool.deleteMany({ where: { workspaceId, pluginId } }),
     prisma.pluginKv.deleteMany({ where: { workspaceId, pluginId } }),
     prisma.pluginJob.deleteMany({ where: { workspaceId, pluginId } }),
+    prisma.pluginHostService.deleteMany({ where: { workspaceId, pluginId } }),
   ]);
   await prisma.plugin.delete({ where: { id: existing.id } });
   return true;
