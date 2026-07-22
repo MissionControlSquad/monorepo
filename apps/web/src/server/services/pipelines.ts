@@ -496,3 +496,33 @@ export async function computePipelineStats(
 
   return { activeCount, doneCount, rejectedCount, staleCount, completedLast24h, byStage };
 }
+
+// ── Structured case outputs (parity #98) ──
+export async function recordCaseOutput(
+  workspaceId: string,
+  caseId: string,
+  input: { stageId?: string | null; key: string; value: unknown },
+): Promise<import("@agentcenter/database").PipelineCaseOutput> {
+  const c = await prisma.pipelineCase.findFirst({
+    where: { id: caseId, pipeline: { workspaceId } },
+    select: { id: true },
+  });
+  if (!c) notFound("Case");
+  const key = input.key.trim();
+  if (!key) badRequest("output key is required");
+  return prisma.pipelineCaseOutput.create({
+    data: { caseId, stageId: input.stageId ?? null, key, value: (input.value ?? null) as never },
+  });
+}
+
+export async function listCaseOutputs(
+  workspaceId: string,
+  caseId: string,
+): Promise<import("@agentcenter/database").PipelineCaseOutput[]> {
+  const c = await prisma.pipelineCase.findFirst({
+    where: { id: caseId, pipeline: { workspaceId } },
+    select: { id: true },
+  });
+  if (!c) notFound("Case");
+  return prisma.pipelineCaseOutput.findMany({ where: { caseId }, orderBy: { createdAt: "asc" } });
+}

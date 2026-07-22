@@ -169,18 +169,19 @@ model PipelineStage {
 }
 
 model PipelineCase {
-  id                 String     @id @default(cuid())
+  caseOutputs        PipelineCaseOutput[]
+  id                 String               @id @default(cuid())
   pipelineId         String
   currentStageId     String?
   title              String
   payload            Json?
-  status             CaseStatus @default(open)
+  status             CaseStatus           @default(open)
   claimedByProfileId String?
   claimedAt          DateTime?
   linkedTaskId       String?
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
-  enteredStageAt     DateTime   @default(now())
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  enteredStageAt     DateTime             @default(now())
 
   pipeline     Pipeline            @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   currentStage PipelineStage?      @relation("CaseCurrentStage", fields: [currentStageId], references: [id], onDelete: SetNull)
@@ -210,4 +211,20 @@ model PipelineCaseEvent {
 
   @@index([caseId, createdAt])
   @@map("pipeline_case_events")
+}
+
+// Structured per-stage outputs a case produced (parity #98). Keyed data emitted while the case sat on
+// a stage — distinct from the case's freeform payload. D5: no cross-workspace FK beyond the case.
+model PipelineCaseOutput {
+  id        String   @id @default(cuid())
+  caseId    String
+  stageId   String?
+  key       String
+  value     Json
+  createdAt DateTime @default(now())
+
+  case PipelineCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, stageId])
+  @@map("pipeline_case_outputs")
 }
