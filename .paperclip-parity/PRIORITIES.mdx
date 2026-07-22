@@ -105,7 +105,7 @@ Everything else in the 178-service list maps to a P0–P2 feature above (e.g. `i
 5. ~~**Retire `reviseDeliverable`**~~ ✅ DONE (removed — redundant with the REST PATCH revision path).
 6. ~~**Operator CLI `doctor`**~~ ✅ DONE (`npm run doctor` — env + DB connectivity + migration status; `db:backup` still open).
 7. **Tool access-policy model** (P3 #21) — ⏸ DEFERRED: enforces nothing without the tool runtime (absent). Build the model *with* the tool subsystem, not as speculative standalone plumbing.
-8. **Dark mode** (P3 #25) — ⏸ DEFERRED: needs a full dark token set + toggle + fixing ~28 components that hardcode light colors. A real design pass; a half-broken dark mode is worse than none.
+8. ~~**Dark mode**~~ ✅ DONE (P3 #25): full dark token set + `@custom-variant dark` + light/dark/system toggle (AppearanceCard) with a no-flash pre-hydration apply; remapped light-surface hardcoded colors to tokens across 10 components (overlays + intentionally-dark terminals preserved).
 —. **Execution-workspace realization** (#15/#175) — ⏸ DEFERRED (infra): materializing worktrees on disk needs a persistent host/filesystem (the runner daemon), not the serverless web app.
 
 ## Deferred by hard constraint (not buildable without X)
