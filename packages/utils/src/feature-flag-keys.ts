@@ -52,6 +52,7 @@ export const FLAG_KEYS = {
   TOOL_RUNTIME_METRICS: "tool_runtime_metrics",
   PLUGIN_RUNTIME: "plugin_runtime",
   ASSETS: "assets",
+  PRODUCTIVITY_REVIEW: "productivity_review",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -117,4 +118,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.TOOL_RUNTIME_METRICS]: false,
   [FLAG_KEYS.PLUGIN_RUNTIME]: false,
   [FLAG_KEYS.ASSETS]: false,
+  [FLAG_KEYS.PRODUCTIVITY_REVIEW]: false,
 };
