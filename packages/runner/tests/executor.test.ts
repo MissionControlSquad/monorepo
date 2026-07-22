@@ -1,6 +1,16 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from "vitest";
 import { execPlan } from "../src/executor.js";
 import type { AdapterInvocation } from "@agentcenter/utils";
+
+// These tests exercise the HTTP adapter's result mapping with a mocked fetch and a non-resolving
+// (`.example`) host. execHttp is SSRF-guarded (resolves DNS + blocks private/unresolvable hosts),
+// so bypass the guard here — SSRF behavior itself is covered by remote-http-endpoint-guard tests.
+beforeAll(() => {
+  process.env.SSRF_ALLOW_PRIVATE_NETWORK = "1";
+});
+afterAll(() => {
+  delete process.env.SSRF_ALLOW_PRIVATE_NETWORK;
+});
 
 const httpPlan = (over: Partial<Extract<AdapterInvocation, { mode: "http" }>> = {}): AdapterInvocation => ({
   mode: "http",
@@ -21,8 +31,9 @@ describe("execPlan http mode", () => {
 
     const r = await execPlan(httpPlan());
     expect(fetchMock).toHaveBeenCalledOnce();
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://hooks.example/run");
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string | URL, RequestInit];
+    // guardedFetch normalizes the target to a URL before fetching (SSRF parse step).
+    expect(String(url)).toBe("https://hooks.example/run");
     expect(init.method).toBe("POST");
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toBe("ok-body");

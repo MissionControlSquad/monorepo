@@ -10,6 +10,7 @@ import {
   type RunnerConfig,
 } from "./config.js";
 import { HttpRunnerApi } from "./api-client.js";
+import { realizeWorkspace } from "./workspace.js";
 import { execShell, execPlan } from "./executor.js";
 import { listAdapters, loadAdapterPlugins } from "@agentcenter/utils";
 import type { AgentContextProject } from "@agentcenter/types";
@@ -54,15 +55,13 @@ function realWriteFile(path: string, content: string): void {
   writeFileSync(path, content);
 }
 
-/** Shallow-clone the project repo into the run dir (or pull if it already exists). */
+/** Realize the project repo into the run dir (parity #175 — shell-safe, worktree-capable). */
 async function realCloneRepo(project: AgentContextProject, dir: string): Promise<void> {
   if (!project.repoUrl) return;
-  const ref = project.repoRef ? `--branch '${project.repoRef}'` : "";
-  const res = await execShell(
-    `git clone --depth 1 ${ref} '${project.repoUrl}' '${dir}' 2>/dev/null || (cd '${dir}' && git pull)`,
-    { timeoutMs: 180_000 },
+  await realizeWorkspace(
+    { strategy: "project_primary", repoUrl: project.repoUrl, baseRef: project.repoRef ?? null, dir },
+    execShell,
   );
-  if (res.exitCode !== 0) throw new Error(`git clone/pull failed: ${res.stderr.slice(0, 300)}`);
 }
 
 /** Assemble the task-run dependencies (real fs, git, and process spawn) from config. */
