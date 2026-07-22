@@ -245,6 +245,7 @@ export const StoragePrefix = {
   DELIVERABLES: "deliverables",
   ATTACHMENTS: "attachments",
   AVATARS: "avatars",
+  ASSETS: "assets",
 } as const;
 
 export type StoragePrefixValue = (typeof StoragePrefix)[keyof typeof StoragePrefix];

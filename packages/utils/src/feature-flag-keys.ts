@@ -51,6 +51,7 @@ export const FLAG_KEYS = {
   INBOX_POLICY: "inbox_policy",
   TOOL_RUNTIME_METRICS: "tool_runtime_metrics",
   PLUGIN_RUNTIME: "plugin_runtime",
+  ASSETS: "assets",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -115,4 +116,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.INBOX_POLICY]: false,
   [FLAG_KEYS.TOOL_RUNTIME_METRICS]: false,
   [FLAG_KEYS.PLUGIN_RUNTIME]: false,
+  [FLAG_KEYS.ASSETS]: false,
 };

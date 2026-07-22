@@ -1,0 +1,23 @@
+// Asset store (parity #15 assets / #27 company-artifacts). A general workspace asset — an uploaded file
+// (image, doc, binary) stored in R2 and referenced by storageKey, optionally OWNED by another entity
+// (a company, agent, project) so #27 company-artifacts is just an asset with ownerType=company. Content
+// lives in object storage; this row is the metadata + pointer. D5: workspaceId no FK; kind/ownerType
+// are TEXT. ASSETS-flag-gated.
+model Asset {
+  id                  String   @id @default(cuid())
+  workspaceId         String // no FK (D5)
+  name                String
+  kind                String // image | document | archive | binary | other
+  mimeType            String
+  sizeBytes           Int      @default(0)
+  storageKey          String // R2 object key (assets/ prefix)
+  ownerType           String? // company | agent | project | task | null (workspace-level)
+  ownerId             String?
+  metadata            Json?
+  uploadedByProfileId String?
+  createdAt           DateTime @default(now())
+
+  @@index([workspaceId, ownerType, ownerId])
+  @@index([workspaceId, kind, createdAt])
+  @@map("assets")
+}
