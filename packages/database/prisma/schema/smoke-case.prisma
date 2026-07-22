@@ -1,0 +1,22 @@
+// Tool smoke-lab (parity #153). Saved smoke cases that assert how a tool call SHOULD be admitted
+// (allowed / denied) so an operator can validate their tool-access + content-guard config before agents
+// rely on it. Running a case drives the real tool gateway and records pass/fail. D5: workspaceId no FK;
+// expectDecision/lastResult are TEXT. SMOKE_LAB-flag-gated.
+model SmokeCase {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  name               String
+  toolName           String
+  agentId            String? // simulate a specific agent's scope
+  inputText          String?
+  expectDecision     String // allow | deny
+  lastResult         String? // pass | fail | error
+  lastActual         String? // the decision the gateway actually returned
+  lastRunAt          DateTime?
+  createdByProfileId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([workspaceId, createdAt])
+  @@map("smoke_cases")
+}
