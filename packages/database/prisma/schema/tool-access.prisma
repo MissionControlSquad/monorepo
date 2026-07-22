@@ -1,0 +1,18 @@
+// Tool access-policy (parity #21 — the buildable-now data half). Declarative allow/deny rules over
+// tool names, workspace-wide or per-agent. Persisted here + resolved by the pure evaluator in
+// @agentcenter/utils; ENFORCEMENT is the tool runtime's job (absent today). D5: workspaceId has no
+// FK; `effect` is TEXT (app-validated), not an enum.
+model ToolAccessPolicy {
+  id          String   @id @default(cuid())
+  workspaceId String // no FK (D5)
+  agentId     String? // null = workspace-wide
+  toolPattern String // exact tool name or a glob with `*`
+  effect      String   @default("allow") // allow | deny
+  priority    Int      @default(0) // higher wins ties after scope
+  reason      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId, agentId])
+  @@map("tool_access_policies")
+}
