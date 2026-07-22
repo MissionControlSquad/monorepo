@@ -22,8 +22,9 @@ async function makeAgent() {
 }
 
 beforeEach(async () => {
-  const agents = await prisma.agent.findMany({ where: { workspaceId: WS }, select: { id: true } });
-  await prisma.agentRun.deleteMany({ where: { agentId: { in: agents.map((a) => a.id) } } });
+  // AgentRun carries its own workspaceId — clean by that so an orphaned run from a prior suite run
+  // (whose agent was already deleted) doesn't survive and get reaped here.
+  await prisma.agentRun.deleteMany({ where: { workspaceId: WS } });
   await prisma.agent.deleteMany({ where: { workspaceId: WS } });
 });
 
