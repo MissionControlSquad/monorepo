@@ -24,7 +24,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 9 | agent-invokability | 🟡 | agent-authz capability checks (partial) | P1 | buildable-now |
 | 10 | agent-permissions | 🟡 | `agent-authz.ts` capability grants | P1 | buildable-now |
 | 11 | agent-secret-bindings | ✅ | `secrets.ts` bind/resolveEnvForAgent | P1 | done |
-| 12 | agent-start-lock | ❌ | no start-concurrency lock | P3 | buildable-now |
+| 12 | agent-start-lock | 🟡 | task-level start race already guarded by task-checkout fencing token; per-agent lock uncertain need | P3 | buildable-now |
 | 13 | agents | ✅ | P0-agents-lifecycle | P0 | done |
 | 14 | approvals | ✅ | P0-review-approvals | P0 | done |
 | 15 | assets | ❌ | P3-additional (asset store beyond deliverables) | P3 | infra-gated (storage) |
@@ -51,7 +51,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 36 | costs | ✅ | P1-cost-budgets-finance (`cost.ts`) | P1 | done |
 | 37 | cron | ✅ | P1-heartbeat (cron routes) | P1 | infra-gated |
 | 38 | dashboard | ✅ | `(home)` DashboardLive | P0 | done |
-| 39 | database-backup-health | ❌ | P3-additional (→ operator CLI) | P3 | buildable-now |
+| 39 | database-backup-health | ✅ | db:backup script (done) | P3 | buildable-now |
 | 40 | decision-training | ❌ | P3-additional | P3 | buildable-now (capture) |
 | 41 | default-agent-instructions | ✅ | `seedAgentInstructions` | P2 | done |
 | 42 | document-annotations | ✅ | DeliverableAnnotation + ProjectDocComment (ported) | P2 | done (reanchoring omitted) |
