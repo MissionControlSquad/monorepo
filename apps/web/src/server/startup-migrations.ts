@@ -9,6 +9,7 @@ import {
   ensureFeatureFlagExists,
 } from "@agentcenter/database";
 import { FLAG_KEYS, FLAG_DEFAULTS, type FlagKey } from "@agentcenter/utils";
+import { ensureBuiltinAdapters } from "@/server/adapters/registry";
 
 /**
  * Convert raw presigned R2 URLs in Profile.avatarUrl to proxy paths.
@@ -189,6 +190,7 @@ export async function runStartupMigrations() {
   try {
     await normalizeAvatarUrls();
     await ensureFeatureFlags();
+    await ensureBuiltinAdapters();
   } catch (err) {
     // Log but don't crash the server — these are best-effort fixes
     console.error("[startup] Migration error (non-fatal):", err);

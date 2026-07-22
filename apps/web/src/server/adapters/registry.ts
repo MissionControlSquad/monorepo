@@ -9,6 +9,7 @@
 import Ajv, { type ValidateFunction } from "ajv";
 import { prisma } from "@/server/prisma";
 import type { AgentAdapter } from "@agentcenter/database";
+import { getAdapter as getCodeAdapter } from "@agentcenter/utils";
 
 export const BUILTIN_ADAPTER_TYPE = "openclaw-gateway";
 
@@ -75,4 +76,67 @@ export async function isAdapterSelectable(type: string, featureEnabled: boolean)
   const adapter = await getAdapter(type);
   if (!adapter || !adapter.enabled) return false;
   return adapter.builtIn || featureEnabled;
+}
+
+// ── Built-in adapter seeding (parity #6 — drive DB rows from the Tier-D code registry) ──
+
+type AdapterTransport = "local" | "gateway" | "cloud";
+type AdapterAuthKind = "none" | "apiKey" | "subscription" | "secretBinding";
+
+// Code key → DB row shape. openclaw is the protected gateway builtIn; the rest are the `*-local`
+// providers (hermes seeds bare, matching the original migration). process/shell/http are internal
+// mechanisms, not user-selectable providers, so they are intentionally not seeded.
+const BUILTIN_ADAPTER_DB: Record<
+  string,
+  { type: string; transport: AdapterTransport; authKind: AdapterAuthKind; builtIn: boolean }
+> = {
+  openclaw: { type: "openclaw-gateway", transport: "gateway", authKind: "apiKey", builtIn: true },
+  claude: { type: "claude-local", transport: "local", authKind: "subscription", builtIn: false },
+  codex: { type: "codex-local", transport: "local", authKind: "subscription", builtIn: false },
+  gemini: { type: "gemini-local", transport: "local", authKind: "subscription", builtIn: false },
+  cursor: { type: "cursor-local", transport: "local", authKind: "apiKey", builtIn: false },
+  grok: { type: "grok-local", transport: "local", authKind: "apiKey", builtIn: false },
+  opencode: { type: "opencode-local", transport: "local", authKind: "apiKey", builtIn: false },
+  pi: { type: "pi-local", transport: "local", authKind: "apiKey", builtIn: false },
+  hermes: { type: "hermes", transport: "local", authKind: "apiKey", builtIn: false },
+};
+
+// Derive a draft-07 config schema from what the code adapter accepts.
+function configSchemaFor(adapter: { supportsModel: boolean; requiresTemplate: boolean }): unknown {
+  const properties: Record<string, unknown> = {};
+  if (adapter.supportsModel) properties.model = { type: "string" };
+  if (adapter.requiresTemplate) properties.template = { type: "string" };
+  return { $schema: "http://json-schema.org/draft-07/schema#", type: "object", properties };
+}
+
+/**
+ * Idempotently ensure every built-in code adapter has a corresponding AgentAdapter DB row, so a new
+ * provider added to the Tier-D registry auto-seeds (no manual migration) and the two registries stay
+ * consistent. Create-if-absent: an existing row (incl. admin edits to enabled/displayName) is never
+ * overwritten. Returns the types it created. (Parity #6.)
+ */
+export async function ensureBuiltinAdapters(): Promise<string[]> {
+  const created: string[] = [];
+  for (const [key, meta] of Object.entries(BUILTIN_ADAPTER_DB)) {
+    const code = getCodeAdapter(key);
+    if (!code) continue;
+    const existing = await prisma.agentAdapter.findUnique({
+      where: { type: meta.type },
+      select: { type: true },
+    });
+    if (existing) continue;
+    await prisma.agentAdapter.create({
+      data: {
+        type: meta.type,
+        displayName: code.displayName,
+        transport: meta.transport,
+        authKind: meta.authKind,
+        configSchema: configSchemaFor(code) as never,
+        builtIn: meta.builtIn,
+        enabled: true,
+      },
+    });
+    created.push(meta.type);
+  }
+  return created;
 }
