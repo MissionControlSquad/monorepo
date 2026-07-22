@@ -1,0 +1,22 @@
+// Provider auth state (parity #25). Tracks the auth status of an AI provider credential (Codex/OpenAI,
+// etc.) per workspace so the runtime can reconcile before a run: refresh when expiring, prompt re-auth
+// when expired/revoked. The refresh/validate call itself is the infra seam; classifyProviderAuth decides
+// the action. D5: workspaceId no FK; provider/state are TEXT. PROVIDER_AUTH-flag-gated.
+model ProviderAuthState {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  provider      String // codex | openai | anthropic | ...
+  accountRef    String // account/key identifier (not the secret itself)
+  state         String    @default("unknown") // valid | expiring | expired | revoked | unknown
+  scopes        String[]  @default([])
+  expiresAt     DateTime?
+  revoked       Boolean   @default(false)
+  lastCheckedAt DateTime?
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([workspaceId, provider, accountRef])
+  @@index([workspaceId, state])
+  @@map("provider_auth_states")
+}
