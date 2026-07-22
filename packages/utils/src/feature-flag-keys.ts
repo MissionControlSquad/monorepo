@@ -54,6 +54,7 @@ export const FLAG_KEYS = {
   ASSETS: "assets",
   PRODUCTIVITY_REVIEW: "productivity_review",
   EXTERNAL_OBJECTS: "external_objects",
+  CLOUD_UPSTREAMS: "cloud_upstreams",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -121,4 +122,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.ASSETS]: false,
   [FLAG_KEYS.PRODUCTIVITY_REVIEW]: false,
   [FLAG_KEYS.EXTERNAL_OBJECTS]: false,
+  [FLAG_KEYS.CLOUD_UPSTREAMS]: false,
 };
