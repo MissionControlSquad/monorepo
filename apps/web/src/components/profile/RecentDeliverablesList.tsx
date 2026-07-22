@@ -37,7 +37,7 @@ const KIND_COLORS: Record<string, string> = {
   [DeliverableKind.MARKDOWN]: "text-blue-600 bg-blue-50",
   [DeliverableKind.CODE]: "text-purple-600 bg-purple-50",
   [DeliverableKind.LINK]: "text-green-600 bg-green-50",
-  [DeliverableKind.FILE]: "text-gray-600 bg-gray-100",
+  [DeliverableKind.FILE]: "text-muted-foreground bg-muted",
 };
 
 const KIND_LABELS: Record<string, string> = {
@@ -76,9 +76,9 @@ export function RecentDeliverablesList({ agentId, projectId }: RecentDeliverable
 
   return (
     <Card className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-3 py-2.5 @xl:px-5 @xl:py-3 border-b border-gray-100 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700">Deliverables</h3>
-        {sorted && <span className="text-xs text-gray-400 font-medium">{sorted.length} items</span>}
+      <div className="flex-shrink-0 px-3 py-2.5 @xl:px-5 @xl:py-3 border-b border-border flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-foreground">Deliverables</h3>
+        {sorted && <span className="text-xs text-muted-foreground font-medium">{sorted.length} items</span>}
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-gray-100">
         {!sorted ? (
@@ -87,22 +87,22 @@ export function RecentDeliverablesList({ agentId, projectId }: RecentDeliverable
           </div>
         ) : sorted.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-2">
+            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
               <Package className="w-5 h-5 text-gray-300" />
             </div>
-            <p className="text-sm text-gray-400">No deliverables yet</p>
+            <p className="text-sm text-muted-foreground">No deliverables yet</p>
             <p className="text-xs text-gray-300 mt-0.5">Work output will show up here</p>
           </div>
         ) : (
           <>
             {visible!.map((d) => {
               const Icon = KIND_ICONS[d.kind] || File;
-              const colorClass = KIND_COLORS[d.kind] || "text-gray-600 bg-gray-100";
+              const colorClass = KIND_COLORS[d.kind] || "text-muted-foreground bg-muted";
 
               return (
                 <div
                   key={d.id}
-                  className="flex items-center gap-2.5 px-3 py-2.5 @xl:gap-3 @xl:px-4 @xl:py-3 hover:bg-gray-50 cursor-pointer transition group"
+                  className="flex items-center gap-2.5 px-3 py-2.5 @xl:gap-3 @xl:px-4 @xl:py-3 hover:bg-muted cursor-pointer transition group"
                   onClick={() => openDeliverable(d.id)}
                 >
                   {/* Kind icon */}
@@ -114,15 +114,15 @@ export function RecentDeliverablesList({ agentId, projectId }: RecentDeliverable
 
                   {/* Title + task info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                    <p className="text-sm text-foreground truncate group-hover:text-blue-600 transition-colors">
                       {d.title}
                     </p>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[11px] text-gray-400">
+                      <span className="text-[11px] text-muted-foreground">
                         {KIND_LABELS[d.kind] ?? d.kind}
                       </span>
                       {d.language && (
-                        <span className="text-[11px] text-gray-400 font-mono">({d.language})</span>
+                        <span className="text-[11px] text-muted-foreground font-mono">({d.language})</span>
                       )}
                       {d.task?.title && (
                         <>
@@ -151,7 +151,7 @@ export function RecentDeliverablesList({ agentId, projectId }: RecentDeliverable
                   {/* Time */}
                   <TimeAgo
                     date={d.createdAt!}
-                    className="text-[11px] text-gray-400 flex-shrink-0 hidden @xl:block"
+                    className="text-[11px] text-muted-foreground flex-shrink-0 hidden @xl:block"
                   />
                 </div>
               );

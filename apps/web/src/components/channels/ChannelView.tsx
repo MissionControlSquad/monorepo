@@ -1288,7 +1288,7 @@ export function ChannelView({ channelId, suggestionCategories }: ChannelViewProp
               aria-label="Channel info"
             >
               <div className="shrink-0 flex items-center justify-between px-3 py-3 border-b border-border">
-                <span className="text-sm font-semibold text-gray-800">Channel info</span>
+                <span className="text-sm font-semibold text-foreground">Channel info</span>
                 <Button
                   type="button"
                   variant="ghost"

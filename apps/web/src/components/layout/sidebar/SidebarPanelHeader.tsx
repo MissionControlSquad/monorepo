@@ -9,7 +9,7 @@ export function SidebarPanelHeader({ title, count, countLabel, action }: Sidebar
   return (
     <div className="flex-shrink-0 px-4 pt-4 pb-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         {action}
       </div>
       {count != null && countLabel && (

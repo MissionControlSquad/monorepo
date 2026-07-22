@@ -156,7 +156,7 @@ function MentionSuggestionListInner<T>(
               className={`w-full text-left px-3 py-2 flex items-center gap-2 text-sm transition-colors ${
                 i === selectedIndex
                   ? "bg-indigo-50 text-indigo-900"
-                  : "hover:bg-muted text-gray-800"
+                  : "hover:bg-muted text-foreground"
               }`}
             >
               {renderItem(item, i, i === selectedIndex)}

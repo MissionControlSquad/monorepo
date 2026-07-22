@@ -87,26 +87,26 @@ export function AssignedTasksList({ agentId, projectId }: AssignedTasksListProps
 
   return (
     <Card className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-3 py-2.5 @xl:px-5 @xl:py-3 border-b border-gray-100 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700">Assigned Tasks</h3>
-        {tasks && <span className="text-xs text-gray-400 font-medium">{tasks.length} total</span>}
+      <div className="flex-shrink-0 px-3 py-2.5 @xl:px-5 @xl:py-3 border-b border-border flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-foreground">Assigned Tasks</h3>
+        {tasks && <span className="text-xs text-muted-foreground font-medium">{tasks.length} total</span>}
       </div>
 
       {/* Status filter tabs */}
       {availableTabs.length > 1 && (
-        <div className="flex-shrink-0 px-2 pt-2 pb-1 @xl:px-3 border-b border-gray-100">
+        <div className="flex-shrink-0 px-2 pt-2 pb-1 @xl:px-3 border-b border-border">
           <div className="flex gap-1 overflow-x-auto scrollbar-none">
             <button
               onClick={() => setActiveFilter("all")}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition ${
                 activeFilter === "all"
                   ? "bg-gray-900 text-white"
-                  : "text-gray-500 hover:bg-gray-100"
+                  : "text-muted-foreground hover:bg-muted"
               }`}
             >
               All
               <span
-                className={`text-[10px] ${activeFilter === "all" ? "text-gray-300" : "text-gray-400"}`}
+                className={`text-[10px] ${activeFilter === "all" ? "text-gray-300" : "text-muted-foreground"}`}
               >
                 {tasks?.length}
               </span>
@@ -119,11 +119,11 @@ export function AssignedTasksList({ agentId, projectId }: AssignedTasksListProps
                   key={status}
                   onClick={() => setActiveFilter(status)}
                   className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition ${
-                    isActive ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
+                    isActive ? "bg-gray-900 text-white" : "text-muted-foreground hover:bg-muted"
                   }`}
                 >
                   {config?.label ?? status}
-                  <span className={`text-[10px] ${isActive ? "text-gray-300" : "text-gray-400"}`}>
+                  <span className={`text-[10px] ${isActive ? "text-gray-300" : "text-muted-foreground"}`}>
                     {statusCounts[status]}
                   </span>
                 </button>
@@ -140,10 +140,10 @@ export function AssignedTasksList({ agentId, projectId }: AssignedTasksListProps
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-2">
+            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
               <ClipboardList className="w-5 h-5 text-gray-300" />
             </div>
-            <p className="text-sm text-gray-400">No tasks assigned</p>
+            <p className="text-sm text-muted-foreground">No tasks assigned</p>
             <p className="text-xs text-gray-300 mt-0.5">Tasks will appear here when assigned</p>
           </div>
         ) : (
@@ -152,7 +152,7 @@ export function AssignedTasksList({ agentId, projectId }: AssignedTasksListProps
             return (
               <div
                 key={task.id}
-                className="flex items-center gap-2.5 px-3 py-2 @xl:gap-3 @xl:px-5 @xl:py-2.5 hover:bg-gray-50 cursor-pointer transition group"
+                className="flex items-center gap-2.5 px-3 py-2 @xl:gap-3 @xl:px-5 @xl:py-2.5 hover:bg-muted cursor-pointer transition group"
                 onClick={() => openTask(task.taskNumber ?? task.id)}
               >
                 {/* Priority dot */}
@@ -172,7 +172,7 @@ export function AssignedTasksList({ agentId, projectId }: AssignedTasksListProps
                 )}
 
                 {/* Title */}
-                <span className="text-sm text-gray-900 truncate flex-1 group-hover:text-blue-600 transition-colors">
+                <span className="text-sm text-foreground truncate flex-1 group-hover:text-blue-600 transition-colors">
                   {task.title}
                 </span>
 
@@ -188,10 +188,10 @@ export function AssignedTasksList({ agentId, projectId }: AssignedTasksListProps
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <TimeAgo
                     date={task.updatedAt!}
-                    className="text-[11px] text-gray-400 hidden @xl:block"
+                    className="text-[11px] text-muted-foreground hidden @xl:block"
                   />
                   {task.taskNumber != null && (
-                    <span className="text-xs text-gray-400 font-mono">#{task.taskNumber}</span>
+                    <span className="text-xs text-muted-foreground font-mono">#{task.taskNumber}</span>
                   )}
                 </div>
               </div>
