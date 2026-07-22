@@ -58,6 +58,77 @@ export function listCompanies(workspaceId: string): Promise<AgentCompany[]> {
   return prisma.agentCompany.findMany({ where: { workspaceId }, orderBy: { name: "asc" } });
 }
 
+// ── Company search (parity #31–33) ──────────────────────────────────────────
+
+export interface CompanySearchHit {
+  company: AgentCompany;
+  score: number;
+  /** Which fields matched (extraction, #32) — for highlighting on the companies page. */
+  matchedFields: string[];
+}
+
+// Pure scorer (#31/#32): name matches weigh most, then goals, then description. A hit needs every
+// search term to appear somewhere. Returns the score + the distinct fields that matched.
+export function scoreCompany(
+  company: { name: string; description?: string | null; goals?: string[] },
+  terms: string[],
+): { score: number; matchedFields: string[] } {
+  const name = company.name.toLowerCase();
+  const description = (company.description ?? "").toLowerCase();
+  const goals = (company.goals ?? []).join(" ").toLowerCase();
+  const fields: [string, string, number][] = [
+    ["name", name, 3],
+    ["goals", goals, 2],
+    ["description", description, 1],
+  ];
+
+  const matched = new Set<string>();
+  let score = 0;
+  for (const term of terms) {
+    let termHit = false;
+    for (const [field, text, weight] of fields) {
+      if (text.includes(term)) {
+        score += weight;
+        matched.add(field);
+        termHit = true;
+      }
+    }
+    if (!termHit) return { score: 0, matchedFields: [] }; // every term must match somewhere
+  }
+  return { score, matchedFields: [...matched] };
+}
+
+// ── Search rate limit (#33) — in-memory, per-workspace ──
+const SEARCH_RATE_MAX = 30;
+const SEARCH_RATE_WINDOW_MS = 60_000;
+const searchBuckets = new Map<string, { count: number; resetAt: number }>();
+
+export function isCompanySearchRateLimited(workspaceId: string, now: number = Date.now()): boolean {
+  const bucket = searchBuckets.get(workspaceId);
+  if (!bucket || now >= bucket.resetAt) {
+    searchBuckets.set(workspaceId, { count: 1, resetAt: now + SEARCH_RATE_WINDOW_MS });
+    return false;
+  }
+  bucket.count++;
+  return bucket.count > SEARCH_RATE_MAX;
+}
+
+/** Rank the workspace's companies against a free-text query (name/goals/description). */
+export async function searchCompanies(
+  workspaceId: string,
+  query: string,
+  limit = 20,
+): Promise<CompanySearchHit[]> {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return [];
+  const companies = await listCompanies(workspaceId);
+  return companies
+    .map((company) => ({ company, ...scoreCompany(company, terms) }))
+    .filter((hit) => hit.score > 0)
+    .sort((a, b) => b.score - a.score || a.company.name.localeCompare(b.company.name))
+    .slice(0, Math.min(Math.max(limit, 1), 100));
+}
+
 export function getCompany(workspaceId: string, id: string): Promise<AgentCompany | null> {
   return prisma.agentCompany.findFirst({ where: { id, workspaceId } });
 }

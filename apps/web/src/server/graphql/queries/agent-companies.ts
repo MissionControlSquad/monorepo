@@ -1,8 +1,13 @@
+import { GraphQLError } from "graphql";
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
-import { exportCompanyPackage } from "@/server/services/agent-companies";
+import {
+  exportCompanyPackage,
+  searchCompanies,
+  isCompanySearchRateLimited,
+} from "@/server/services/agent-companies";
 
 // Domain 14 #10: Agent-Company reads. AGENT_COMPANIES-gated, member+, workspace-scoped.
 builder.queryField("agentCompanies", (t) =>
@@ -32,6 +37,39 @@ builder.queryField("agentCompany", (t) =>
         ...query,
         where: { id: args.id, workspaceId: tenancy.workspaceId },
       });
+    },
+  }),
+);
+
+// Parity #31–33: search the workspace's companies (name/goals/description), rate-limited.
+const CompanySearchHitType = builder.simpleObject("CompanySearchHit", {
+  fields: (t) => ({
+    companyId: t.string(),
+    name: t.string(),
+    score: t.int(),
+    matchedFields: t.stringList(),
+  }),
+});
+
+builder.queryField("searchCompanies", (t) =>
+  t.field({
+    type: [CompanySearchHitType],
+    args: { query: t.arg.string({ required: true }), limit: t.arg.int() },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.AGENT_COMPANIES);
+      const tenancy = requireRole(ctx, "member");
+      if (isCompanySearchRateLimited(tenancy.workspaceId)) {
+        throw new GraphQLError("Search rate limit exceeded — try again shortly.", {
+          extensions: { code: "RATE_LIMITED" },
+        });
+      }
+      const hits = await searchCompanies(tenancy.workspaceId, args.query, args.limit ?? 20);
+      return hits.map((h) => ({
+        companyId: h.company.id,
+        name: h.company.name,
+        score: h.score,
+        matchedFields: h.matchedFields,
+      }));
     },
   }),
 );
