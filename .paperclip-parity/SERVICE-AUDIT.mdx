@@ -70,7 +70,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 55 | execution-allowlist | ✅ | `execution-policy.ts` | P1 | done |
 | 56 | execution-policy-bootstrap | 🟡 | execution-policy present; bootstrap seeding thin | P1 | buildable-now |
 | 57 | execution-workspace-policy | ✅ | `execution-workspace-policy.ts` | P1 | done |
-| 58 | execution-workspaces | 🟡 | P1-execution-workspaces (recorded, not realized) | P1 | buildable-now |
+| 58 | execution-workspaces | 🟡 | recorded (web) + realized (runner workspace.ts, done) | P1 | buildable-now |
 | 59 | external-objects | ❌ | P2-external-objects-github | P2 | needs-github-token |
 | 60 | feedback | ❌ | P2-additional (feedback/evals) | P2 | buildable-now |
 | 61 | feedback-redaction | ❌ | P2-additional | P2 | buildable-now |
@@ -92,9 +92,9 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 77 | invite-grants | 🚫 | buildbase invites | — | buildbase-owned |
 | 78 | invite-rate-limit | 🚫 | buildbase | — | buildbase-owned |
 | 79 | issue-approvals | ✅ | approvals (task subjectType) | P0 | done |
-| 80 | issue-assignment-wakeup | ❌ | P2-additional (dependency-wakeups) | P2 | buildable-now |
+| 80 | issue-assignment-wakeup | ✅ | dependency-wakeups (done) | P2 | buildable-now |
 | 81 | issue-continuation-summary | ❌ | P2-additional | P2 | buildable-now/needs-LLM |
-| 82 | issue-dependency-wakeups | ❌ | P2-additional | P2 | buildable-now |
+| 82 | issue-dependency-wakeups | ✅ | dependency-wakeups (done) | P2 | buildable-now |
 | 83 | issue-execution-policy | ✅ | `execution-policy.ts` (per-task) | P1 | done |
 | 84 | issue-goal-fallback | ✅ | `goal-task` default-goal | P2 | done |
 | 85 | issue-liveness | 🟡 | `run-runtime-status` (ephemeral) | P1 | done |
@@ -105,7 +105,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 90 | issue-tree-control | ✅ | `subtree-control.ts` (hold/cancel/restore) | P0 | done |
 | 91 | issue-visibility | 🟡 | task scoping present; per-issue visibility ACL thin | P3 | buildbase-adjacent |
 | 92 | issues | ✅ | P0-tasks-issues | P0 | done |
-| 93 | json-schema-secret-refs | 🟡 | secretRef in JsonSchemaForm; full ref-resolver thin | P2 | buildable-now |
+| 93 | json-schema-secret-refs | ✅ | recursive resolveSecretRefs util (done) | P2 | buildable-now |
 | 94 | live-events | 🟡 | GraphQL subscriptions + event bus | P1 | done (different shape) |
 | 95 | local-service-supervisor | ❌ | P3-additional | P3 | infra-gated |
 | 96 | low-trust-runtime-containment | ✅ | `trust.ts` lowTrustContainment + source-trust | P1 | done |
@@ -113,7 +113,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 98 | pipeline-case-outputs | 🟡 | pipeline cases present; case-outputs thin | P2 | buildable-now |
 | 99 | pipeline-conversation-context | 🟡 | pipelines present; conversation-context thin | P2 | buildable-now |
 | 100 | pipelines | ✅ | P2-pipelines-routines-cases-goals | P2 | done |
-| 101 | pipelines-aggregation | 🟡 | `pipelineHealth` present; full aggregation thin | P2 | buildable-now |
+| 101 | pipelines-aggregation | ✅ | computePipelineStats + query (done) | P2 | buildable-now |
 | 102 | plan-review-context | ❌ | P2-additional (continuation summary) | P2 | buildable-now |
 | 103 | plugin-capability-validator | ❌ | P3-plugin-runtime | P3 | infra-gated |
 | 104 | plugin-config-validator | ✅ | `plugins.ts` setPluginConfig (JSON-schema) | P2 | done |
@@ -149,7 +149,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 134 | projects | ✅ | projects CRUD + detail | P0 | done |
 | 135 | quota-windows | ✅ | `QuotaWindow` (finance) | P1 | done |
 | 136 | recovery | ✅ | P1-heartbeat (stranded-work/recovery) | P1 | done |
-| 137 | recovery-observability | 🟡 | recovery present; obs of it thin | P2 | buildable-now |
+| 137 | recovery-observability | ✅ | getRecoveryStats + query (done) | P2 | buildable-now |
 | 138 | remote-http-endpoint-guard | ✅ | **P1-security-ssrf-guard** (built + guardedFetch) | **P1** | done |
 | 139 | resource-memberships | 🚫 | buildbase | — | buildbase-owned |
 | 140 | responsible-user-denial-run-outcomes | 🚫 | buildbase (human denial attribution) | — | buildbase-owned |
@@ -174,14 +174,14 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 159 | task-watchdogs | ✅ | P1-heartbeat (2 of 4 conditions live) | P1 | done (some conditions inert) |
 | 160 | teams-catalog | ❌ | P2-skills (file team catalog) | P2 | buildbase-owned |
 | 161 | tool-access | ❌ | P3-tools-mcp | P3 | infra-gated |
-| 162 | tool-access-policy | ❌ | P3-tools-mcp (buildable-now half) | P2 | buildable-now |
+| 162 | tool-access-policy | ✅ | model + evaluator + service (data half, done) | P2 | buildable-now |
 | 163 | tool-content-guards | ❌ | P3-tools-mcp | P2 | buildable-now |
 | 164 | tool-gateway | ❌ | P3-tools-mcp | P3 | infra-gated |
 | 165 | tool-oauth-legacy-backfill | ❌ | P3-tools-mcp | P3 | buildable-now |
 | 166 | tool-profile-binding-precedence | ❌ | P3-tools-mcp | P3 | buildable-now |
 | 167 | tool-runtime-metrics | ❌ | P3-tools-mcp | P3 | buildable-now |
 | 168 | tool-runtime-supervisor | ❌ | P3-tools-mcp | P3 | infra-gated |
-| 169 | trust-preset-resolver | 🟡 | trust levels present; preset resolver thin | P2 | buildable-now |
+| 169 | trust-preset-resolver | ✅ | trustPresetForLevel + wired to editor (done) | P2 | buildable-now |
 | 170 | work-products | ✅ | P0-deliverables-work-products | P0 | done |
 | 171 | work-timeline | ✅ | `WorkTimelinePage` / workTimeline | P2 | done |
 | 172 | workspace-file-resources | ❌ | P3-additional | P3 | buildable-now |
