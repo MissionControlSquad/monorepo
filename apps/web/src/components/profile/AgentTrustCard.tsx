@@ -7,7 +7,7 @@ import { ShieldCheck } from "lucide-react";
 import { AGENT_TRUST_PROFILE_QUERY } from "@/lib/graphql/queries";
 import { SET_AGENT_TRUST_PROFILE } from "@/lib/graphql/mutations";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, trustPresetForLevel } from "@agentcenter/utils";
 import { Card, Button, Badge } from "@/components/ui";
 import { Input } from "@/components/ui/shadcn/input";
 import { Switch } from "@/components/ui/shadcn/switch";
@@ -138,7 +138,11 @@ export function AgentTrustCard({ agentId }: { agentId: string }) {
           <select
             className="rounded-md border border-border bg-background px-2 py-1 text-sm"
             value={draft.trustLevel}
-            onChange={(e) => setDraft((d) => ({ ...d, trustLevel: e.target.value as TrustLevel }))}
+            onChange={(e) => {
+              // Selecting a level pre-fills the recommended containment toggles (still overridable).
+              const level = e.target.value as TrustLevel;
+              setDraft((d) => ({ ...d, trustLevel: level, ...trustPresetForLevel(level) }));
+            }}
             disabled={fetching}
           >
             {TRUST_LEVELS.map((lvl) => (

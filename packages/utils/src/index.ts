@@ -29,6 +29,7 @@ export * from "./runtime-templates";
 export * from "./adapters";
 export * from "./tool-access-policy";
 export * from "./secret-refs";
+export * from "./trust-presets";
 export * from "./memory-providers";
 export * from "./adapter-config";
 export * from "./json-schema-form";
