@@ -45,6 +45,7 @@ export const FLAG_KEYS = {
   THREAD_INTERACTIONS: "thread_interactions",
   AGENT_COMPANIES: "agent_companies",
   FEEDBACK: "feedback",
+  FOLDERS: "folders",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -103,4 +104,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.THREAD_INTERACTIONS]: false,
   [FLAG_KEYS.AGENT_COMPANIES]: false,
   [FLAG_KEYS.FEEDBACK]: false,
+  [FLAG_KEYS.FOLDERS]: false,
 };

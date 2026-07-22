@@ -56,3 +56,4 @@ import "./agent-companies";
 import "./attention";
 import "./project-doc-comments";
 import "./feedback";
+import "./folders";

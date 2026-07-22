@@ -237,3 +237,4 @@ export {
 export { SIDEBAR_BADGES_QUERY } from "./sidebar-badges";
 export { SIDEBAR_PREFERENCE_QUERY } from "./sidebar-preferences";
 export { PROJECT_DOC_COMMENTS_QUERY } from "./project-doc-comments";
+export { FOLDERS_QUERY, FOLDER_ITEMS_QUERY } from "./folders";
