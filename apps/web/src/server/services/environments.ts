@@ -12,7 +12,13 @@
  */
 import { GraphQLError } from "graphql";
 import { z } from "zod";
-import { resolveExecutionTarget, describeExecutionTarget } from "@agentcenter/utils";
+import {
+  resolveExecutionTarget,
+  describeExecutionTarget,
+  maskSecretRefs,
+  resolveSecretRefs,
+  isSecretRef,
+} from "@agentcenter/utils";
 import { prisma } from "@/server/prisma";
 import type { Environment, Prisma } from "@agentcenter/database";
 import {
@@ -73,36 +79,20 @@ function validateDriverConfig(driver: EnvironmentDriver, config: unknown): Recor
 }
 
 // ── config secret masking (read path) ──────────────────────────────────────────
-function isSecretRef(v: unknown): v is { secretRef: { name: string } } {
-  return typeof v === "object" && v !== null && "secretRef" in v;
-}
-
 /** Mask a persisted config for return to the client: secret-refs become "secret:<name>", never values. */
 export function maskConfig(config: unknown): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries((config ?? {}) as Record<string, unknown>)) {
-    out[k] = isSecretRef(v) ? `secret:${v.secretRef.name}` : v;
-  }
-  return out;
+  return maskSecretRefs(config ?? {}) as Record<string, unknown>;
 }
 
-/** Resolve a persisted config's secret-refs into plaintext (server-side only — for run/probe). */
+/** Resolve a persisted config's secret-refs into plaintext (server-side only — for run/probe).
+ *  Recursive (nested objects/arrays) via the shared @agentcenter/utils resolver. */
 export async function resolveConfigSecrets(
   config: unknown,
   resolveSecret: (name: string) => Promise<string | null>,
 ): Promise<Record<string, unknown>> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries((config ?? {}) as Record<string, unknown>)) {
-    if (isSecretRef(v)) {
-      const value = await resolveSecret(v.secretRef.name);
-      if (value == null)
-        badRequest(`Environment config references a missing secret: ${v.secretRef.name}`);
-      out[k] = value;
-    } else {
-      out[k] = v;
-    }
-  }
-  return out;
+  return (await resolveSecretRefs(config ?? {}, resolveSecret, {
+    onMissing: (name) => badRequest(`Environment config references a missing secret: ${name}`),
+  })) as Record<string, unknown>;
 }
 
 // ── CRUD ────────────────────────────────────────────────────────────────────
