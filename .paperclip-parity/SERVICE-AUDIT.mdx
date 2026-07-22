@@ -118,7 +118,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 103 | plugin-capability-validator | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 104 | plugin-config-validator | ✅ | `plugins.ts` setPluginConfig (JSON-schema) | P2 | done |
 | 105 | plugin-database | ✅ | P3-plugin-runtime | P3 | infra-gated |
-| 106 | plugin-dev-watcher | ❌ | P3-plugin-runtime | P3 | blocked: filesystem watcher — host-only (registry done in #116) |
+| 106 | plugin-dev-watcher | 🟡 | P3-plugin-runtime | P3 | scaffold: dev-watcher interface (pure watcher contract) |
 | 107 | plugin-environment-driver | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 108 | plugin-event-bus | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 109 | plugin-host-service-cleanup | ✅ | P3-plugin-runtime | P3 | infra-gated |
@@ -135,13 +135,13 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 120 | plugin-managed-skills | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 121 | plugin-manifest-validator | ✅ | `plugins.ts` validateManifest (core subset) | P2 | done |
 | 122 | plugin-registry | ✅ | `plugins.ts` | P2 | done |
-| 123 | plugin-runtime-sandbox | ❌ | P3-plugin-runtime | P3 | blocked: sandboxed worker process — host-only |
+| 123 | plugin-runtime-sandbox | 🟡 | P3-plugin-runtime | P3 | scaffold: vm-sandbox interface + pure protocol/env |
 | 124 | plugin-secrets-handler | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 125 | plugin-state-store | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 126 | plugin-stream-bus | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 127 | plugin-tool-dispatcher | ✅ | P3-tools-mcp / plugin-runtime | P3 | infra-gated |
 | 128 | plugin-tool-registry | ✅ | P3-tools-mcp / plugin-runtime | P3 | infra-gated |
-| 129 | plugin-worker-manager | ❌ | P3-plugin-runtime | P3 | blocked: worker process spawn/manage — host-only |
+| 129 | plugin-worker-manager | 🟡 | P3-plugin-runtime | P3 | scaffold: worker contracts + minimal-env/NDJSON-RPC/crash-policy (pure); fork impl is the seam |
 | 130 | portable-path | 🟡 | path helpers exist; portable-path util thin | P3 | buildable-now |
 | 131 | principal-access-compatibility | 🚫 | buildbase | — | buildbase-owned |
 | 132 | productivity-review | ✅ | (heartbeat-driven productivity watchdog) | P3 | infra-gated |
