@@ -37,7 +37,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 22 | catalog-provenance | ✅ | P2-skills (no skill/catalog provenance) | P2 | buildable-now |
 | 23 | change-consent-gate | 🟡 | approvals + agent-authz (simplified) | P2 | buildable-now |
 | 24 | cloud-upstreams | ✅ | P3-additional (cloud fork/sync) | P3 | infra-gated |
-| 25 | codex-auth-reconciliation | ❌ | P3-additional | P3 | needs-provider-key |
+| 25 | codex-auth-reconciliation | ❌ | P3-additional | P3 | blocked: needs OpenAI/Codex OAuth credential |
 | 26 | companies | ✅ | P2-skills-teams-companies (agent-companies) | P2 | done |
 | 27 | company-artifacts | ✅ | P3-additional (assets) | P3 | infra-gated |
 | 28 | company-export-readme | 🟡 | company export (markdown package) — no README gen | P3 | buildable-now |
@@ -59,8 +59,8 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 44 | effective-run-config-fingerprints | ✅ | in `environment-custom-images.ts` | P1 | done |
 | 45 | environment-config | ✅ | `environments.ts` config + secret-masking | P1 | done |
 | 46 | environment-custom-image-runtime | 🟡 | custom-image capture; per-provider snapshot | P1 | needs-provider-key |
-| 47 | environment-custom-image-setup-session-utils | ❌ | interactive setup-terminal capture deferred | P1 | infra-gated |
-| 48 | environment-custom-image-terminal-sessions | ❌ | setup-terminal PTY capture deferred | P1 | infra-gated |
+| 47 | environment-custom-image-setup-session-utils | ❌ | interactive setup-terminal capture deferred | P1 | blocked: needs a real host + interactive PTY |
+| 48 | environment-custom-image-terminal-sessions | ❌ | setup-terminal PTY capture deferred | P1 | blocked: needs a real host + interactive PTY |
 | 49 | environment-custom-images | ✅ | `environment-custom-images.ts` | P1 | done (snapshot per-provider gated) |
 | 50 | environment-execution-target | ✅ | `execution-target.ts` resolver | P1 | done |
 | 51 | environment-probe | ✅ | `probeEnvironment` (cloud/ssh gated) | P1 | done |
@@ -85,7 +85,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 70 | heartbeat-run-summary | 🟡 | run status present; per-run summary thin | P2 | buildable-now |
 | 71 | heartbeat-stop-metadata | 🟡 | run finalize present; stop-metadata thin | P3 | buildable-now |
 | 72 | hire-hook | ✅ | `requestAgentHire` → decideApproval creates agent | P0 | done |
-| 73 | hot-restart | ❌ | P3-additional | P3 | infra-gated |
+| 73 | hot-restart | ❌ | P3-additional | P3 | blocked: runtime process lifecycle — no data/logic half |
 | 74 | inbox-agent-policy | ✅ | P3-additional | P3 | buildable-now |
 | 75 | inbox-dismissals | ✅ | attention snooze (ported) | P0 | done |
 | 76 | instance-settings | 🟡 | `system-settings` (shutdown) + settings page | P2 | mixed (some buildbase) |
@@ -107,7 +107,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 92 | issues | ✅ | P0-tasks-issues | P0 | done |
 | 93 | json-schema-secret-refs | ✅ | recursive resolveSecretRefs util (done) | P2 | buildable-now |
 | 94 | live-events | 🟡 | GraphQL subscriptions + event bus | P1 | done (different shape) |
-| 95 | local-service-supervisor | ❌ | P3-additional | P3 | infra-gated |
+| 95 | local-service-supervisor | ❌ | P3-additional | P3 | blocked: local process supervision — host-only (pattern covered by plugin-host-services) |
 | 96 | low-trust-runtime-containment | ✅ | `trust.ts` lowTrustContainment + source-trust | P1 | done |
 | 97 | mcp-http | 🚫 | P3-tools-mcp (buildbase-owned) | — | buildbase-owned |
 | 98 | pipeline-case-outputs | 🟡 | pipeline cases present; case-outputs thin | P2 | buildable-now |
@@ -118,7 +118,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 103 | plugin-capability-validator | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 104 | plugin-config-validator | ✅ | `plugins.ts` setPluginConfig (JSON-schema) | P2 | done |
 | 105 | plugin-database | ✅ | P3-plugin-runtime | P3 | infra-gated |
-| 106 | plugin-dev-watcher | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 106 | plugin-dev-watcher | ❌ | P3-plugin-runtime | P3 | blocked: filesystem watcher — host-only (registry done in #116) |
 | 107 | plugin-environment-driver | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 108 | plugin-event-bus | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 109 | plugin-host-service-cleanup | ✅ | P3-plugin-runtime | P3 | infra-gated |
@@ -135,13 +135,13 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 120 | plugin-managed-skills | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 121 | plugin-manifest-validator | ✅ | `plugins.ts` validateManifest (core subset) | P2 | done |
 | 122 | plugin-registry | ✅ | `plugins.ts` | P2 | done |
-| 123 | plugin-runtime-sandbox | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 123 | plugin-runtime-sandbox | ❌ | P3-plugin-runtime | P3 | blocked: sandboxed worker process — host-only |
 | 124 | plugin-secrets-handler | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 125 | plugin-state-store | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 126 | plugin-stream-bus | ✅ | P3-plugin-runtime | P3 | infra-gated |
 | 127 | plugin-tool-dispatcher | ✅ | P3-tools-mcp / plugin-runtime | P3 | infra-gated |
 | 128 | plugin-tool-registry | ✅ | P3-tools-mcp / plugin-runtime | P3 | infra-gated |
-| 129 | plugin-worker-manager | ❌ | P3-plugin-runtime | P3 | infra-gated |
+| 129 | plugin-worker-manager | ❌ | P3-plugin-runtime | P3 | blocked: worker process spawn/manage — host-only |
 | 130 | portable-path | 🟡 | path helpers exist; portable-path util thin | P3 | buildable-now |
 | 131 | principal-access-compatibility | 🚫 | buildbase | — | buildbase-owned |
 | 132 | productivity-review | ✅ | (heartbeat-driven productivity watchdog) | P3 | infra-gated |
@@ -164,20 +164,20 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 149 | session-workspace-cwd | ✅ | P1-execution-workspaces (realization) | P1 | buildable-now |
 | 150 | sidebar-badges | ✅ | ported | P2 | done |
 | 151 | sidebar-preferences | ✅ | ported | P2 | done |
-| 152 | skills-catalog | ❌ | P2-skills (file catalog) | P2 | buildbase-owned |
-| 153 | smoke-lab | ❌ | (dev smoke-test lab) | P3 | infra-gated |
+| 152 | skills-catalog | ❌ | P2-skills (file catalog) | P2 | blocked: buildbase-owned (platform file catalog) |
+| 153 | smoke-lab | ❌ | (dev smoke-test lab) | P3 | blocked: dev smoke-test harness — host/dev-only |
 | 154 | source-trust | ✅ | `source-trust.ts` | P1 | done |
 | 155 | successful-run-handoff-state | ✅ | P3-additional | P3 | infra-gated |
 | 156 | summary-slot-finalization | ✅ | P2-additional (continuation summary) | P2 | buildable-now |
 | 157 | summary-slots | ✅ | P2-additional | P2 | buildable-now |
 | 158 | task-watchdog-scope | ✅ | `task-watchdog.ts` | P1 | done |
 | 159 | task-watchdogs | ✅ | P1-heartbeat (2 of 4 conditions live) | P1 | done (some conditions inert) |
-| 160 | teams-catalog | ❌ | P2-skills (file team catalog) | P2 | buildbase-owned |
+| 160 | teams-catalog | ❌ | P2-skills (file team catalog) | P2 | blocked: buildbase-owned (platform file catalog) |
 | 161 | tool-access | 🟡 | P3-tools-mcp (covered by tool-access-policies + tool-gateway) | P3 | covered |
 | 162 | tool-access-policy | ✅ | model + evaluator + service (data half, done) | P2 | buildable-now |
 | 163 | tool-content-guards | ✅ | P3-tools-mcp | P2 | buildable-now |
 | 164 | tool-gateway | ✅ | P3-tools-mcp | P3 | infra-gated |
-| 165 | tool-oauth-legacy-backfill | ❌ | P3-tools-mcp | P3 | blocked: needs live OAuth tool data |
+| 165 | tool-oauth-legacy-backfill | ❌ | P3-tools-mcp | P3 | blocked: needs live legacy OAuth token data to backfill |
 | 166 | tool-profile-binding-precedence | 🟡 | P3-tools-mcp (agent>workspace precedence exists via evaluateToolAccess) | P3 | partial: richer 5-target model deferred |
 | 167 | tool-runtime-metrics | ✅ | P3-tools-mcp | P3 | buildable-now |
 | 168 | tool-runtime-supervisor | ✅ | P3-tools-mcp | P3 | infra-gated |
