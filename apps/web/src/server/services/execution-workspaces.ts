@@ -11,7 +11,12 @@
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Prisma, ProjectWorkspace, ExecutionWorkspace } from "@agentcenter/database";
-import { isWorkspaceStrategy } from "@agentcenter/utils";
+import {
+  isWorkspaceStrategy,
+  resolveEffectiveWorkspaceStrategyType,
+  resolveWorkspaceRuntimeConfig,
+  type WorkspaceRuntimeConfig,
+} from "@agentcenter/utils";
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
@@ -157,6 +162,63 @@ export async function recordExecutionWorkspace(input: {
       providerRef: input.providerRef ?? null,
     },
   });
+}
+
+/**
+ * Realize the workspace for one run (#133/#149/#175): resolve the effective strategy and concrete
+ * placement (cwd/branch) from the project-workspace template, then record the ExecutionWorkspace. The
+ * returned runtime config is what the runtime consumes to know WHERE to run (creating the dir/worktree
+ * on a host is the infra-blocked half and happens in the runtime, not here). Deterministic: a retry of
+ * the same task resolves to the same cwd/branch.
+ */
+export async function realizeWorkspaceForRun(input: {
+  workspaceId: string;
+  projectId?: string | null;
+  projectWorkspaceId?: string | null;
+  taskId?: string | null;
+  runId: string;
+  driver?: string | null; // environment driver (sandbox forces cloud_sandbox)
+  pinnedStrategy?: string | null; // an issue/task pin overriding the project default
+  providerType: string;
+  providerRef?: string | null;
+  branchPrefix?: string | null;
+}): Promise<{ executionWorkspace: ExecutionWorkspace; runtime: WorkspaceRuntimeConfig }> {
+  const pw = input.projectWorkspaceId
+    ? await prisma.projectWorkspace.findFirst({
+        where: { id: input.projectWorkspaceId, workspaceId: input.workspaceId },
+      })
+    : null;
+
+  const strategy = resolveEffectiveWorkspaceStrategyType({
+    driver: input.driver,
+    projectDefaultStrategy: pw?.defaultStrategy,
+    issuePinnedStrategy: input.pinnedStrategy,
+  });
+
+  const runtime = resolveWorkspaceRuntimeConfig({
+    strategy,
+    runId: input.runId,
+    taskId: input.taskId,
+    basePath: pw?.cwd,
+    branchPrefix: input.branchPrefix,
+  });
+
+  const executionWorkspace = await recordExecutionWorkspace({
+    workspaceId: input.workspaceId,
+    projectId: input.projectId ?? pw?.projectId ?? null,
+    projectWorkspaceId: input.projectWorkspaceId ?? null,
+    taskId: input.taskId ?? null,
+    runId: input.runId,
+    strategyType: strategy,
+    name: pw?.name ?? runtime.branchName ?? input.runId,
+    repoUrl: pw?.repoUrl ?? null,
+    baseRef: pw?.defaultRef ?? pw?.repoRef ?? null,
+    branchName: runtime.branchName,
+    providerType: input.providerType,
+    providerRef: input.providerRef ?? null,
+  });
+
+  return { executionWorkspace, runtime };
 }
 
 export async function recordWorkspaceOperation(

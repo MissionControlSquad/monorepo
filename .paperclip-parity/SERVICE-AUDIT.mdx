@@ -34,7 +34,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 19 | budgets | ✅ | P1-cost-budgets-finance | P1 | done |
 | 20 | built-in-agent-metadata | ✅ | `agent-templates.ts` + built-in configs | P2 | done |
 | 21 | built-in-agents | ✅ | `agent-templates` (wizard templates) | P2 | done |
-| 22 | catalog-provenance | ❌ | P2-skills (no skill/catalog provenance) | P2 | buildable-now |
+| 22 | catalog-provenance | ✅ | P2-skills (no skill/catalog provenance) | P2 | buildable-now |
 | 23 | change-consent-gate | 🟡 | approvals + agent-authz (simplified) | P2 | buildable-now |
 | 24 | cloud-upstreams | ❌ | P3-additional (cloud fork/sync) | P3 | infra-gated |
 | 25 | codex-auth-reconciliation | ❌ | P3-additional | P3 | needs-provider-key |
@@ -43,16 +43,16 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 28 | company-export-readme | 🟡 | company export (markdown package) — no README gen | P3 | buildable-now |
 | 29 | company-member-roles | 🚫 | buildbase membership | — | buildbase-owned |
 | 30 | company-portability | ✅ | P2-observability-portability (workspace bundle) | P2 | done |
-| 31 | company-search | ❌ | P2-additional (rich search) | P2 | buildable-now |
-| 32 | company-search-extract | ❌ | P2-additional | P2 | buildable-now |
-| 33 | company-search-rate-limit | ❌ | P2-additional | P2 | buildable-now |
+| 31 | company-search | ✅ | P2-additional (rich search) | P2 | buildable-now |
+| 32 | company-search-extract | ✅ | P2-additional | P2 | buildable-now |
+| 33 | company-search-rate-limit | ✅ | P2-additional | P2 | buildable-now |
 | 34 | company-skill-policy | ✅ | `skill-policy.ts` | P2 | done |
 | 35 | company-skills | 🟡 | P2-skills (library present; catalog/import/studio deferred) | P2 | mixed |
 | 36 | costs | ✅ | P1-cost-budgets-finance (`cost.ts`) | P1 | done |
 | 37 | cron | ✅ | P1-heartbeat (cron routes) | P1 | infra-gated |
 | 38 | dashboard | ✅ | `(home)` DashboardLive | P0 | done |
 | 39 | database-backup-health | ✅ | db:backup script (done) | P3 | buildable-now |
-| 40 | decision-training | ❌ | P3-additional | P3 | buildable-now (capture) |
+| 40 | decision-training | ✅ | P3-additional | P3 | buildable-now (capture) |
 | 41 | default-agent-instructions | ✅ | `seedAgentInstructions` | P2 | done |
 | 42 | document-annotations | ✅ | DeliverableAnnotation + ProjectDocComment (ported) | P2 | done (reanchoring omitted) |
 | 43 | documents | ✅ | `documents` + ProjectDoc | P2 | done |
@@ -76,7 +76,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 61 | feedback-redaction | ✅ | redactSensitive util (done) | P2 | buildable-now |
 | 62 | feedback-share-client | ✅ | SUBMIT_FEEDBACK client op (done) | P2 | buildable-now |
 | 63 | finance | ✅ | P1-cost-budgets-finance (FinanceEvent) | P1 | done |
-| 64 | folders | ❌ | P3-additional | P3 | buildable-now |
+| 64 | folders | ✅ | P3-additional | P3 | buildable-now |
 | 65 | github-external-object-provider | ❌ | P2-external-objects-github | P2 | needs-github-token |
 | 66 | github-fetch | ❌ | P2-external-objects-github (+ SSRF guard) | P2 | needs-github-token |
 | 67 | goals | ✅ | P2-pipelines-routines-cases-goals | P2 | done |
@@ -86,7 +86,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 71 | heartbeat-stop-metadata | 🟡 | run finalize present; stop-metadata thin | P3 | buildable-now |
 | 72 | hire-hook | ✅ | `requestAgentHire` → decideApproval creates agent | P0 | done |
 | 73 | hot-restart | ❌ | P3-additional | P3 | infra-gated |
-| 74 | inbox-agent-policy | ❌ | P3-additional | P3 | buildable-now |
+| 74 | inbox-agent-policy | ✅ | P3-additional | P3 | buildable-now |
 | 75 | inbox-dismissals | ✅ | attention snooze (ported) | P0 | done |
 | 76 | instance-settings | 🟡 | `system-settings` (shutdown) + settings page | P2 | mixed (some buildbase) |
 | 77 | invite-grants | 🚫 | buildbase invites | — | buildbase-owned |
@@ -145,7 +145,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 130 | portable-path | 🟡 | path helpers exist; portable-path util thin | P3 | buildable-now |
 | 131 | principal-access-compatibility | 🚫 | buildbase | — | buildbase-owned |
 | 132 | productivity-review | ❌ | (heartbeat-driven productivity watchdog) | P3 | infra-gated |
-| 133 | project-workspace-runtime-config | ❌ | P1-execution-workspaces (realization) | P1 | buildable-now |
+| 133 | project-workspace-runtime-config | ✅ | P1-execution-workspaces (realization) | P1 | buildable-now |
 | 134 | projects | ✅ | projects CRUD + detail | P0 | done |
 | 135 | quota-windows | ✅ | `QuotaWindow` (finance) | P1 | done |
 | 136 | recovery | ✅ | P1-heartbeat (stranded-work/recovery) | P1 | done |
@@ -154,28 +154,28 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 139 | resource-memberships | 🚫 | buildbase | — | buildbase-owned |
 | 140 | responsible-user-denial-run-outcomes | 🚫 | buildbase (human denial attribution) | — | buildbase-owned |
 | 141 | routines | ✅ | P2-pipelines-routines (routines + triggers) | P2 | done |
-| 142 | run-continuations | ❌ | P2-additional (continuation summary) | P2 | buildable-now |
+| 142 | run-continuations | ✅ | P2-additional (continuation summary) | P2 | buildable-now |
 | 143 | run-liveness | ✅ | `run-runtime-status.ts` | P1 | done |
 | 144 | run-log-store | 🟡 | ephemeral run status; no durable log store | P2 | buildable-now |
 | 145 | run-scratch | ❌ | P3-additional | P3 | infra-gated |
 | 146 | runtime-skill-selections | ❌ | P2-skills (runtime skill sync deferred) | P3 | infra-gated |
 | 147 | sandbox-provider-runtime | ✅ | P1-sandbox-execution (`sandbox-providers.ts`) | P1 | done (cloud gated) |
 | 148 | secrets | ✅ | P1-secrets-vault | P1 | done (aws/vault stubs) |
-| 149 | session-workspace-cwd | ❌ | P1-execution-workspaces (realization) | P1 | buildable-now |
+| 149 | session-workspace-cwd | ✅ | P1-execution-workspaces (realization) | P1 | buildable-now |
 | 150 | sidebar-badges | ✅ | ported | P2 | done |
 | 151 | sidebar-preferences | ✅ | ported | P2 | done |
 | 152 | skills-catalog | ❌ | P2-skills (file catalog) | P2 | buildbase-owned |
 | 153 | smoke-lab | ❌ | (dev smoke-test lab) | P3 | infra-gated |
 | 154 | source-trust | ✅ | `source-trust.ts` | P1 | done |
 | 155 | successful-run-handoff-state | ❌ | P3-additional | P3 | infra-gated |
-| 156 | summary-slot-finalization | ❌ | P2-additional (continuation summary) | P2 | buildable-now |
-| 157 | summary-slots | ❌ | P2-additional | P2 | buildable-now |
+| 156 | summary-slot-finalization | ✅ | P2-additional (continuation summary) | P2 | buildable-now |
+| 157 | summary-slots | ✅ | P2-additional | P2 | buildable-now |
 | 158 | task-watchdog-scope | ✅ | `task-watchdog.ts` | P1 | done |
 | 159 | task-watchdogs | ✅ | P1-heartbeat (2 of 4 conditions live) | P1 | done (some conditions inert) |
 | 160 | teams-catalog | ❌ | P2-skills (file team catalog) | P2 | buildbase-owned |
 | 161 | tool-access | ❌ | P3-tools-mcp | P3 | infra-gated |
 | 162 | tool-access-policy | ✅ | model + evaluator + service (data half, done) | P2 | buildable-now |
-| 163 | tool-content-guards | ❌ | P3-tools-mcp | P2 | buildable-now |
+| 163 | tool-content-guards | ✅ | P3-tools-mcp | P2 | buildable-now |
 | 164 | tool-gateway | ❌ | P3-tools-mcp | P3 | infra-gated |
 | 165 | tool-oauth-legacy-backfill | ❌ | P3-tools-mcp | P3 | buildable-now |
 | 166 | tool-profile-binding-precedence | ❌ | P3-tools-mcp | P3 | buildable-now |
@@ -187,7 +187,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 172 | workspace-file-resources | ❌ | P3-additional | P3 | buildable-now |
 | 173 | workspace-operation-log-store | ✅ | `recordWorkspaceOperation` (execution-workspaces) | P1 | done |
 | 174 | workspace-operations | ✅ | `recordWorkspaceOperation` | P1 | done |
-| 175 | workspace-realization | ❌ | P1-execution-workspaces (realization gap) | P1 | buildable-now |
+| 175 | workspace-realization | ✅ | P1-execution-workspaces (realization gap) | P1 | buildable-now |
 | 176 | workspace-runtime | 🟡 | recording present; realization missing | P1 | buildable-now |
 | 177 | workspace-runtime-read-model | 🟡 | execution-workspace read queries present | P1 | done |
 

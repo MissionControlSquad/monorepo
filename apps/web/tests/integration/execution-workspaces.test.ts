@@ -5,6 +5,7 @@ import { invalidateFlagCache } from "../../src/server/feature-flags";
 import {
   createProjectWorkspace,
   listProjectWorkspaces,
+  realizeWorkspaceForRun,
 } from "../../src/server/services/execution-workspaces";
 import { runTaskInSandbox, composeSandboxScript } from "../../src/server/services/sandbox-run";
 import { getOrCreateAgentProfileId } from "../../src/server/agent-profile";
@@ -152,5 +153,46 @@ describe("per-run execution-workspace recording", () => {
     });
     const result = await runTaskInSandbox({ workspaceId: WS, taskId: task.id, agentId: agent.id });
     expect(await prisma.executionWorkspace.count({ where: { runId: result.runId } })).toBe(0);
+  });
+
+  it("realizeWorkspaceForRun resolves cwd/branch from the template and records it (#133/#149/#175)", async () => {
+    const pw = await createProjectWorkspace(WS, {
+      projectId: "proj_rz",
+      name: "primary",
+      cwd: "/srv/app",
+      repoUrl: "https://example.com/app.git",
+      defaultRef: "main",
+      defaultStrategy: "git_worktree",
+    });
+
+    const { executionWorkspace, runtime } = await realizeWorkspaceForRun({
+      workspaceId: WS,
+      projectWorkspaceId: pw.id,
+      taskId: "task-42",
+      runId: "run-xyz",
+      providerType: "local",
+    });
+
+    // resolved placement
+    expect(runtime.strategy).toBe("git_worktree");
+    expect(runtime.cwd).toBe("/srv/app/.worktrees/task-42");
+    expect(runtime.branchName).toBe("agent/task-42");
+    // recorded row carries the resolved strategy/branch + template baseRef
+    expect(executionWorkspace.strategyType).toBe("git_worktree");
+    expect(executionWorkspace.branchName).toBe("agent/task-42");
+    expect(executionWorkspace.baseRef).toBe("main");
+    expect(executionWorkspace.projectId).toBe("proj_rz");
+
+    // a sandbox driver forces cloud_sandbox regardless of the template default
+    const sandboxed = await realizeWorkspaceForRun({
+      workspaceId: WS,
+      projectWorkspaceId: pw.id,
+      taskId: "task-42",
+      runId: "run-abc",
+      driver: "sandbox",
+      providerType: "sandbox",
+    });
+    expect(sandboxed.runtime.strategy).toBe("cloud_sandbox");
+    expect(sandboxed.runtime.cwd).toBe("/workspace");
   });
 });
