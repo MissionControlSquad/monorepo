@@ -234,6 +234,9 @@ export function ChannelView({ channelId, suggestionCategories }: ChannelViewProp
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const topSentinelRef = useRef<HTMLDivElement>(null);
 
+  /* eslint-disable react-hooks/immutability -- isInitialLoadRef/prevCountRef are run-once + prev-value
+     flags updated inside this scroll effect; that's the intended imperative behavior, not reactive-
+     value mutation. */
   useEffect(() => {
     if (!scrollRef.current || messages.length === 0) return;
 
@@ -254,6 +257,7 @@ export function ChannelView({ channelId, suggestionCategories }: ChannelViewProp
     }
     prevCountRef.current = count;
   }, [messages.length]);
+  /* eslint-enable react-hooks/immutability */
 
   useEffect(() => {
     const sentinel = topSentinelRef.current;
@@ -692,179 +696,183 @@ export function ChannelView({ channelId, suggestionCategories }: ChannelViewProp
             </div>
           ) : (
             <div>
-              {(() => {
-                let unreadShown = false;
-                return messages.map((msg: ChannelMessage, idx: number) => {
-                  const profile = msg.fromProfile;
-                  const displayName = profile?.displayName ?? "Unknown";
-                  const isOptimistic = msg.id.startsWith("optimistic-");
-                  const isCurrentlyEditing = editingMessageId === msg.id;
-                  const isEdited =
-                    msg.updatedAt &&
-                    new Date(msg.updatedAt).getTime() !== new Date(msg.createdAt).getTime();
+              {/* IIFE accesses no ref (verified) — react-hooks/refs false positive on the mutable-closure pattern */}
+              {
+                // eslint-disable-next-line react-hooks/refs
+                (() => {
+                  let unreadShown = false;
+                  return messages.map((msg: ChannelMessage, idx: number) => {
+                    const profile = msg.fromProfile;
+                    const displayName = profile?.displayName ?? "Unknown";
+                    const isOptimistic = msg.id.startsWith("optimistic-");
+                    const isCurrentlyEditing = editingMessageId === msg.id;
+                    const isEdited =
+                      msg.updatedAt &&
+                      new Date(msg.updatedAt).getTime() !== new Date(msg.createdAt).getTime();
 
-                  // Date separator: show when day changes between messages
-                  const msgDate = new Date(msg.createdAt);
-                  const prevMsg = idx > 0 ? messages[idx - 1] : null;
-                  const prevDate = prevMsg ? new Date(prevMsg.createdAt) : null;
-                  const showDateSep =
-                    !prevDate || msgDate.toDateString() !== prevDate.toDateString();
+                    // Date separator: show when day changes between messages
+                    const msgDate = new Date(msg.createdAt);
+                    const prevMsg = idx > 0 ? messages[idx - 1] : null;
+                    const prevDate = prevMsg ? new Date(prevMsg.createdAt) : null;
+                    const showDateSep =
+                      !prevDate || msgDate.toDateString() !== prevDate.toDateString();
 
-                  // Message grouping: collapse avatar/name if same sender as previous and within 5 min (and same day)
-                  const isGrouped =
-                    prevMsg &&
-                    !showDateSep &&
-                    prevMsg.fromProfileId === msg.fromProfileId &&
-                    !msg.id.startsWith("optimistic-") &&
-                    Math.abs(msgDate.getTime() - new Date(prevMsg.createdAt).getTime()) <
-                      5 * 60 * 1000;
+                    // Message grouping: collapse avatar/name if same sender as previous and within 5 min (and same day)
+                    const isGrouped =
+                      prevMsg &&
+                      !showDateSep &&
+                      prevMsg.fromProfileId === msg.fromProfileId &&
+                      !msg.id.startsWith("optimistic-") &&
+                      Math.abs(msgDate.getTime() - new Date(prevMsg.createdAt).getTime()) <
+                        5 * 60 * 1000;
 
-                  // Format date label
-                  const formatDateLabel = (d: Date) => {
-                    const today = new Date();
-                    const yesterday = new Date();
-                    yesterday.setDate(yesterday.getDate() - 1);
-                    if (d.toDateString() === today.toDateString()) return "Today";
-                    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-                    return d.toLocaleDateString(undefined, {
-                      weekday: "long",
-                      month: "long",
-                      day: "numeric",
-                    });
-                  };
+                    // Format date label
+                    const formatDateLabel = (d: Date) => {
+                      const today = new Date();
+                      const yesterday = new Date();
+                      yesterday.setDate(yesterday.getDate() - 1);
+                      if (d.toDateString() === today.toDateString()) return "Today";
+                      if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+                      return d.toLocaleDateString(undefined, {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                      });
+                    };
 
-                  return (
-                    <Fragment key={msg.id}>
-                      {showDateSep && (
-                        <div className="flex items-center gap-3 px-4 py-3">
-                          <div className="flex-1 h-px bg-border" />
-                          <span className="text-xs font-medium text-muted-foreground shrink-0">
-                            {formatDateLabel(msgDate)}
-                          </span>
-                          <div className="flex-1 h-px bg-border" />
-                        </div>
-                      )}
-                      {/* Unread marker */}
-                      {!unreadShown &&
-                        lastReadAt &&
-                        !isOptimistic &&
-                        msgDate.getTime() > lastReadAt &&
-                        (prevMsg ? new Date(prevMsg.createdAt).getTime() <= lastReadAt : true) &&
-                        (() => {
-                          unreadShown = true;
-                          return (
-                            <div className="flex items-center gap-3 px-4 py-1">
-                              <div className="flex-1 h-px bg-destructive" />
-                              <span className="text-xs font-semibold text-destructive shrink-0">
-                                New
-                              </span>
-                              <div className="flex-1 h-px bg-destructive" />
-                            </div>
-                          );
-                        })()}
-                      <div
-                        key={msg.id}
-                        data-message-id={msg.id}
-                        onMouseEnter={() =>
-                          !isOptimistic && editingMessageId !== msg.id && showToolbar(msg.id)
-                        }
-                        onMouseLeave={hideToolbar}
-                        className={`group relative flex gap-3 w-full px-4 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:auto_2rem] ${
-                          isGrouped ? "py-px" : "pt-1.5 pb-1"
-                        } ${
-                          highlightedMessageId === msg.id
-                            ? "bg-warning-muted ring-2 ring-warning/30 transition-all duration-500"
-                            : isCurrentlyEditing
-                              ? "bg-indigo-50 ring-2 ring-indigo-200"
-                              : "hover:bg-muted"
-                        }`}
-                      >
-                        {isGrouped ? (
-                          <div className="shrink-0 w-9" />
-                        ) : (
-                          <ProfileAvatar
-                            {...(profile?.id ? { profileId: profile.id } : { name: displayName })}
-                            size="md+"
-                            className="mt-0.5"
-                          />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          {!isGrouped && (
-                            <div className="flex items-baseline gap-2 flex-wrap">
-                              <span className="font-medium text-foreground text-sm">
-                                {displayName}
-                              </span>
-                              <TimeAgo
-                                date={msg.createdAt}
-                                className="text-xs text-muted-foreground"
-                              />
-                              {isEdited && (
-                                <span className="text-xs text-muted-foreground">(edited)</span>
-                              )}
-                              {isOptimistic && (
-                                <span className="text-xs text-muted-foreground italic flex items-center gap-1">
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                  Sending…
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {isGrouped && isEdited && (
-                            <span className="text-xs text-muted-foreground">(edited)</span>
-                          )}
-                          <div className={`${isGrouped ? "" : "mt-0.5"} text-sm text-foreground`}>
-                            {!isOptimistic ? (
-                              <ChannelMessageContent content={msg.content} />
-                            ) : (
-                              <MarkdownWithMentions content={msg.content} />
-                            )}
+                    return (
+                      <Fragment key={msg.id}>
+                        {showDateSep && (
+                          <div className="flex items-center gap-3 px-4 py-3">
+                            <div className="flex-1 h-px bg-border" />
+                            <span className="text-xs font-medium text-muted-foreground shrink-0">
+                              {formatDateLabel(msgDate)}
+                            </span>
+                            <div className="flex-1 h-px bg-border" />
                           </div>
-                          {!isOptimistic &&
-                            (() => {
-                              const linkUrl = extractFirstUrl(msg.content ?? "");
-                              return linkUrl ? <ChannelLinkPreview url={linkUrl} /> : null;
-                            })()}
-                          {(msg.attachments ?? []).filter(
-                            (a: MessageAttachment) =>
-                              a.document?.storageKey || a.document?.fileName,
-                          ).length > 0 && (
-                            <div className="mt-1.5 flex flex-wrap gap-2">
-                              {(msg.attachments ?? [])
-                                .filter(
-                                  (a: MessageAttachment) =>
-                                    a.document?.storageKey || a.document?.fileName,
-                                )
-                                .map((att: MessageAttachment) => (
-                                  <ChannelAttachment key={att.id} attachment={att as any} />
-                                ))}
-                            </div>
-                          )}
-                          {!isOptimistic && (
-                            <ChannelMessageReactions
-                              messageId={msg.id}
-                              reactions={(msg.reactions ?? []) as any}
-                              currentProfileId={postingProfile?.id}
-                              currentProfileName={postingProfile?.displayName}
+                        )}
+                        {/* Unread marker */}
+                        {!unreadShown &&
+                          lastReadAt &&
+                          !isOptimistic &&
+                          msgDate.getTime() > lastReadAt &&
+                          (prevMsg ? new Date(prevMsg.createdAt).getTime() <= lastReadAt : true) &&
+                          (() => {
+                            unreadShown = true;
+                            return (
+                              <div className="flex items-center gap-3 px-4 py-1">
+                                <div className="flex-1 h-px bg-destructive" />
+                                <span className="text-xs font-semibold text-destructive shrink-0">
+                                  New
+                                </span>
+                                <div className="flex-1 h-px bg-destructive" />
+                              </div>
+                            );
+                          })()}
+                        <div
+                          key={msg.id}
+                          data-message-id={msg.id}
+                          onMouseEnter={() =>
+                            !isOptimistic && editingMessageId !== msg.id && showToolbar(msg.id)
+                          }
+                          onMouseLeave={hideToolbar}
+                          className={`group relative flex gap-3 w-full px-4 transition-colors duration-150 [content-visibility:auto] [contain-intrinsic-size:auto_2rem] ${
+                            isGrouped ? "py-px" : "pt-1.5 pb-1"
+                          } ${
+                            highlightedMessageId === msg.id
+                              ? "bg-warning-muted ring-2 ring-warning/30 transition-all duration-500"
+                              : isCurrentlyEditing
+                                ? "bg-indigo-50 ring-2 ring-indigo-200"
+                                : "hover:bg-muted"
+                          }`}
+                        >
+                          {isGrouped ? (
+                            <div className="shrink-0 w-9" />
+                          ) : (
+                            <ProfileAvatar
+                              {...(profile?.id ? { profileId: profile.id } : { name: displayName })}
+                              size="md+"
+                              className="mt-0.5"
                             />
                           )}
+                          <div className="min-w-0 flex-1">
+                            {!isGrouped && (
+                              <div className="flex items-baseline gap-2 flex-wrap">
+                                <span className="font-medium text-foreground text-sm">
+                                  {displayName}
+                                </span>
+                                <TimeAgo
+                                  date={msg.createdAt}
+                                  className="text-xs text-muted-foreground"
+                                />
+                                {isEdited && (
+                                  <span className="text-xs text-muted-foreground">(edited)</span>
+                                )}
+                                {isOptimistic && (
+                                  <span className="text-xs text-muted-foreground italic flex items-center gap-1">
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    Sending…
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {isGrouped && isEdited && (
+                              <span className="text-xs text-muted-foreground">(edited)</span>
+                            )}
+                            <div className={`${isGrouped ? "" : "mt-0.5"} text-sm text-foreground`}>
+                              {!isOptimistic ? (
+                                <ChannelMessageContent content={msg.content} />
+                              ) : (
+                                <MarkdownWithMentions content={msg.content} />
+                              )}
+                            </div>
+                            {!isOptimistic &&
+                              (() => {
+                                const linkUrl = extractFirstUrl(msg.content ?? "");
+                                return linkUrl ? <ChannelLinkPreview url={linkUrl} /> : null;
+                              })()}
+                            {(msg.attachments ?? []).filter(
+                              (a: MessageAttachment) =>
+                                a.document?.storageKey || a.document?.fileName,
+                            ).length > 0 && (
+                              <div className="mt-1.5 flex flex-wrap gap-2">
+                                {(msg.attachments ?? [])
+                                  .filter(
+                                    (a: MessageAttachment) =>
+                                      a.document?.storageKey || a.document?.fileName,
+                                  )
+                                  .map((att: MessageAttachment) => (
+                                    <ChannelAttachment key={att.id} attachment={att as any} />
+                                  ))}
+                              </div>
+                            )}
+                            {!isOptimistic && (
+                              <ChannelMessageReactions
+                                messageId={msg.id}
+                                reactions={(msg.reactions ?? []) as any}
+                                currentProfileId={postingProfile?.id}
+                                currentProfileName={postingProfile?.displayName}
+                              />
+                            )}
+                          </div>
+                          {/* Hover timestamp for grouped messages */}
+                          {isGrouped && (
+                            <span
+                              className="shrink-0 self-center text-[11px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity select-none"
+                              title={new Date(msg.createdAt).toLocaleString()}
+                            >
+                              {new Date(msg.createdAt).toLocaleTimeString([], {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          )}
                         </div>
-                        {/* Hover timestamp for grouped messages */}
-                        {isGrouped && (
-                          <span
-                            className="shrink-0 self-center text-[11px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity select-none"
-                            title={new Date(msg.createdAt).toLocaleString()}
-                          >
-                            {new Date(msg.createdAt).toLocaleTimeString([], {
-                              hour: "numeric",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        )}
-                      </div>
-                    </Fragment>
-                  );
-                });
-              })()}
+                      </Fragment>
+                    );
+                  });
+                })()
+              }
             </div>
           )}
         </div>

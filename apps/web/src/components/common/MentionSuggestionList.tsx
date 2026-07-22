@@ -59,9 +59,14 @@ function MentionSuggestionListInner<T>(
 ) {
   const internalRef = useInternalRef<HTMLUListElement | null>(null);
 
+  // "Latest ref" mirrors: the props are copied into stable containers so the empty-dep setRef
+  // callback below always reads the current listRef/ref. Read-only inside setRef (never during
+  // render), so the write-during-render the rule flags is safe here.
   const listRefCopy = useInternalRef(listRef);
+  // eslint-disable-next-line react-hooks/refs -- intentional latest-ref mirror (see above)
   listRefCopy.current = listRef;
   const fwdRefCopy = useInternalRef(ref);
+  // eslint-disable-next-line react-hooks/refs -- intentional latest-ref mirror (see above)
   fwdRefCopy.current = ref;
 
   const setRef = useCallback(
