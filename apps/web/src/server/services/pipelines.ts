@@ -439,3 +439,60 @@ export async function computePipelineHealth(
   }
   return stale;
 }
+
+export interface PipelineStats {
+  activeCount: number;
+  doneCount: number;
+  rejectedCount: number;
+  staleCount: number;
+  /** Cases that reached `done` in the last 24h (throughput). */
+  completedLast24h: number;
+  /** Active-case distribution across stages, most-loaded first. */
+  byStage: { stageId: string; stageName: string; count: number }[];
+}
+
+/**
+ * Aggregate health metrics for a pipeline (parity #101) — the summary that complements the
+ * per-case stale list: active/done/rejected counts, SLA-breach (stale) count, recent throughput,
+ * and the active-case distribution per stage.
+ */
+export async function computePipelineStats(
+  workspaceId: string,
+  pipelineId: string,
+  now: Date = new Date(),
+): Promise<PipelineStats> {
+  const pipeline = await prisma.pipeline.findFirst({ where: { id: pipelineId, workspaceId } });
+  if (!pipeline) notFound("Pipeline");
+
+  const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const [byStatus, activeCases, completedLast24h, stages] = await Promise.all([
+    prisma.pipelineCase.groupBy({ by: ["status"], where: { pipelineId }, _count: { _all: true } }),
+    prisma.pipelineCase.findMany({
+      where: { pipelineId, status: { notIn: ["done", "rejected"] } },
+      include: { currentStage: true },
+    }),
+    prisma.pipelineCase.count({ where: { pipelineId, status: "done", updatedAt: { gte: since } } }),
+    prisma.pipelineStage.findMany({ where: { pipelineId }, select: { id: true, name: true } }),
+  ]);
+
+  const statusCount = (s: string) => byStatus.find((r) => r.status === s)?._count._all ?? 0;
+  const doneCount = statusCount("done");
+  const rejectedCount = statusCount("rejected");
+  const activeCount = activeCases.length;
+
+  let staleCount = 0;
+  const perStage = new Map<string, number>();
+  for (const c of activeCases) {
+    const stageId = c.currentStageId;
+    if (stageId) perStage.set(stageId, (perStage.get(stageId) ?? 0) + 1);
+    const sla = c.currentStage?.slaMinutes;
+    if (sla != null && (now.getTime() - c.enteredStageAt.getTime()) / 60000 > sla) staleCount++;
+  }
+
+  const stageName = new Map(stages.map((s) => [s.id, s.name]));
+  const byStage = [...perStage.entries()]
+    .map(([stageId, count]) => ({ stageId, stageName: stageName.get(stageId) ?? stageId, count }))
+    .sort((a, b) => b.count - a.count);
+
+  return { activeCount, doneCount, rejectedCount, staleCount, completedLast24h, byStage };
+}
