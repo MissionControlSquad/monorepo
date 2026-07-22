@@ -104,9 +104,12 @@ Everything else in the 178-service list maps to a P0–P2 feature above (e.g. `i
 4. ~~**Trust-profile editor** + wire `setAgentTrustProfile`~~ ✅ DONE (client ops + AgentTrustCard on the agent profile, GOVERNANCE-gated).
 5. ~~**Retire `reviseDeliverable`**~~ ✅ DONE (removed — redundant with the REST PATCH revision path).
 6. ~~**Operator CLI `doctor`**~~ ✅ DONE (`npm run doctor` — env + DB connectivity + migration status; `db:backup` still open).
-7. **Tool access-policy model** (P3 #21) — ⏸ DEFERRED: enforces nothing without the tool runtime (absent). Build the model *with* the tool subsystem, not as speculative standalone plumbing.
+7. ~~**Tool access-policy model**~~ ✅ DONE (P3 #21): pure evaluator (glob + scope/priority/specificity precedence, 8 tests) + `ToolAccessPolicy` model/migration + service (list/set/delete/resolve, 4 tests). *Enforcement* still awaits the tool runtime — this is the data + logic half.
 8. ~~**Dark mode**~~ ✅ DONE (P3 #25): full dark token set + `@custom-variant dark` + light/dark/system toggle (AppearanceCard) with a no-flash pre-hydration apply; remapped light-surface hardcoded colors to tokens across 10 components (overlays + intentionally-dark terminals preserved).
-—. **Execution-workspace realization** (#15/#175) — ⏸ DEFERRED (infra): materializing worktrees on disk needs a persistent host/filesystem (the runner daemon), not the serverless web app.
+—. ~~**Execution-workspace realization**~~ ✅ DONE (#15/#175, P1): built in the runner (the host with a
+   filesystem) — `src/workspace.ts` realizes project_primary (shallow clone @ baseRef) OR git_worktree
+   (bare primary + isolated per-run worktree) + cleanup (cleanupCommand + worktree removal), shell-safe.
+   12 tests; realCloneRepo rewired to it. End-to-end enforcement still needs a live run host to exercise.
 
 ## Deferred by hard constraint (not buildable without X)
 - **Real agent execution / snapshots / quota polling** → a real provider key (e2b/daytona/modal…).
