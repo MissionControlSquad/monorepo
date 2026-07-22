@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { DecompositionStatus } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
+import { getRecoveryStats } from "@/server/services/recovery-observability";
 
 // Epic #8: task-autonomy reads — TASK_AUTONOMY-gated, member+. Tasks are not workspace-scoped
 // (they scope via project), so these mirror the existing non-scoped task lifecycle queries.
@@ -51,6 +52,31 @@ builder.queryField("taskRecoveryActions", (t) =>
         orderBy: { createdAt: "desc" },
         take: Math.min(Math.max(args.limit ?? 50, 1), 200),
       });
+    },
+  }),
+);
+
+// Parity #137: recovery observability summary (status/detection breakdown + resolved-rate).
+const RecoveryStatsType = builder.simpleObject("RecoveryStats", {
+  fields: (t) => ({
+    total: t.int(),
+    detected: t.int(),
+    attempting: t.int(),
+    resolved: t.int(),
+    failed: t.int(),
+    resolvedRate: t.float(),
+    last24h: t.int(),
+  }),
+});
+
+builder.queryField("recoveryStats", (t) =>
+  t.field({
+    type: RecoveryStatsType,
+    resolve: async (_root, _args, ctx) => {
+      await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
+      requireRole(ctx, "member");
+      const { byDetectedBy: _omit, ...stats } = await getRecoveryStats();
+      return stats;
     },
   }),
 );
