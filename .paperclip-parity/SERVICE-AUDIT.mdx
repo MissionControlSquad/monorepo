@@ -93,14 +93,14 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 78 | invite-rate-limit | 🚫 | buildbase | — | buildbase-owned |
 | 79 | issue-approvals | ✅ | approvals (task subjectType) | P0 | done |
 | 80 | issue-assignment-wakeup | ✅ | dependency-wakeups (done) | P2 | buildable-now |
-| 81 | issue-continuation-summary | ❌ | P2-additional | P2 | buildable-now/needs-LLM |
+| 81 | issue-continuation-summary | 🟡 | P2-additional (storage via summary-slots; synthesis needs-LLM) | P2 | blocked: needs-LLM |
 | 82 | issue-dependency-wakeups | ✅ | dependency-wakeups (done) | P2 | buildable-now |
 | 83 | issue-execution-policy | ✅ | `execution-policy.ts` (per-task) | P1 | done |
 | 84 | issue-goal-fallback | ✅ | `goal-task` default-goal | P2 | done |
 | 85 | issue-liveness | 🟡 | `run-runtime-status` (ephemeral) | P1 | done |
 | 86 | issue-recovery-actions | ✅ | `TaskRecoveryAction` + stranded-work | P1 | done |
 | 87 | issue-references | ✅ | `TaskRelation` + `ExternalLink` | P0 | done |
-| 88 | issue-rewake-throttle | ❌ | P2-additional (dependency-wakeups) | P2 | buildable-now |
+| 88 | issue-rewake-throttle | ❌ | P2-additional (dependency-wakeups) | P2 | blocked: no self-rewake loop consumer yet |
 | 89 | issue-thread-interactions | ✅ | `TaskThreadInteraction` | P0 | done |
 | 90 | issue-tree-control | ✅ | `subtree-control.ts` (hold/cancel/restore) | P0 | done |
 | 91 | issue-visibility | 🟡 | task scoping present; per-issue visibility ACL thin | P3 | buildbase-adjacent |
@@ -114,7 +114,7 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 99 | pipeline-conversation-context | 🟡 | pipelines present; conversation-context thin | P2 | buildable-now |
 | 100 | pipelines | ✅ | P2-pipelines-routines-cases-goals | P2 | done |
 | 101 | pipelines-aggregation | ✅ | computePipelineStats + query (done) | P2 | buildable-now |
-| 102 | plan-review-context | ❌ | P2-additional (continuation summary) | P2 | buildable-now |
+| 102 | plan-review-context | 🟡 | P2-additional (continuation summary) (continuation storage via summary-slots) | P2 | blocked: needs plan-review runtime |
 | 103 | plugin-capability-validator | ❌ | P3-plugin-runtime | P3 | infra-gated |
 | 104 | plugin-config-validator | ✅ | `plugins.ts` setPluginConfig (JSON-schema) | P2 | done |
 | 105 | plugin-database | ❌ | P3-plugin-runtime | P3 | infra-gated |
@@ -177,8 +177,8 @@ Priority = the tier of the covering feature (Present) **or** the priority of the
 | 162 | tool-access-policy | ✅ | model + evaluator + service (data half, done) | P2 | buildable-now |
 | 163 | tool-content-guards | ✅ | P3-tools-mcp | P2 | buildable-now |
 | 164 | tool-gateway | ❌ | P3-tools-mcp | P3 | infra-gated |
-| 165 | tool-oauth-legacy-backfill | ❌ | P3-tools-mcp | P3 | buildable-now |
-| 166 | tool-profile-binding-precedence | ❌ | P3-tools-mcp | P3 | buildable-now |
+| 165 | tool-oauth-legacy-backfill | ❌ | P3-tools-mcp | P3 | blocked: needs live OAuth tool data |
+| 166 | tool-profile-binding-precedence | 🟡 | P3-tools-mcp (agent>workspace precedence exists via evaluateToolAccess) | P3 | partial: richer 5-target model deferred |
 | 167 | tool-runtime-metrics | ✅ | P3-tools-mcp | P3 | buildable-now |
 | 168 | tool-runtime-supervisor | ❌ | P3-tools-mcp | P3 | infra-gated |
 | 169 | trust-preset-resolver | ✅ | trustPresetForLevel + wired to editor (done) | P2 | buildable-now |
