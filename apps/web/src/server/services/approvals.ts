@@ -12,6 +12,7 @@ import {
 } from "@agentcenter/utils";
 import type { ApprovalSubjectType, Prisma, AgentLevel } from "@agentcenter/database";
 import { TaskStatus } from "../constants";
+import { provisionSetupStatus } from "./agent-governance";
 
 export interface CreateApprovalInput {
   workspaceId: string;
@@ -219,13 +220,16 @@ export async function decideApproval(input: {
     ) {
       const spec = (approval.payload ?? null) as AgentHireSpec | null;
       if (spec?.name && spec.role) {
+        // Governance gate (Domain 14): a hired agent honors requireAgentApproval like team-installed
+        // agents do — it must NOT auto-activate if the workspace requires admin provisioning.
+        const setupStatus = await provisionSetupStatus(input.workspaceId);
         const hired = await tx.agent.create({
           data: {
             name: spec.name,
             role: spec.role,
             workspaceId: input.workspaceId,
             username: `${slugify(spec.name)}-${randomUUID().slice(0, 6)}`,
-            setupStatus: "active",
+            setupStatus,
             ...(spec.level && VALID_AGENT_LEVELS.has(spec.level)
               ? { level: spec.level as AgentLevel }
               : {}),

@@ -13,6 +13,7 @@ import {
   parseCompanyPackageFiles,
 } from "@agentcenter/utils";
 import type { AgentCompany } from "@agentcenter/database";
+import { provisionSetupStatus } from "./agent-governance";
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
@@ -305,6 +306,9 @@ export async function importCompanyPackage(input: {
   });
 
   // Create agents first (no manager), then wire reportsTo by package slug.
+  // Governance gate (Domain 14): imported agents honor requireAgentApproval like team-installed and
+  // hired agents — they must not auto-activate when the workspace requires admin provisioning.
+  const setupStatus = await provisionSetupStatus(input.workspaceId);
   const slugToId = new Map<string, string>();
   const createdAgentIds: string[] = [];
   for (const a of parsed.agents) {
@@ -315,7 +319,7 @@ export async function importCompanyPackage(input: {
         workspaceId: input.workspaceId,
         companyId: company.id,
         username: `${coreSlugify(a.name, 40, "agent")}-${company.id.slice(0, 6)}`,
-        setupStatus: "active",
+        setupStatus,
       },
     });
     slugToId.set(a.slug || coreSlugify(a.name, 40, "agent"), agent.id);
