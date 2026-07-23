@@ -88,6 +88,15 @@ model Task {
   monitorAttemptCount Int       @default(0)
   monitorMaxAttempts  Int? // null = unbounded
 
+  // Domain 8 §2.1 / G6.4 — task origin & provenance + per-origin idempotency. An autonomy creator
+  // (routine / watchdog / plan-decomposition) stamps how a task came to exist; originFingerprint is a
+  // stable hash of the origin identity so a duplicate create is a no-op (partial-unique index in the
+  // migration). requestDepth bounds recursive autonomy (a task that spawns tasks).
+  originKind        String? // routine | watchdog | decomposition | recovery | manual | ...
+  originRunId       String? // the run/cycle that produced this task
+  originFingerprint String? // stable idempotency key; unique when set
+  requestDepth      Int     @default(0)
+
   @@unique([taskNumber])
   @@index([status])
   @@index([createdAt])
