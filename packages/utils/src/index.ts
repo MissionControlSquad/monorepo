@@ -18,6 +18,7 @@ export * from "./service-supervision";
 export * from "./plugin-worker-protocol";
 export * from "./adapter-transcript";
 export * from "./adapter-session";
+export * from "./adapter-skills";
 export * from "./telemetry";
 export * from "./run-watchdog";
 export * from "./memory-ranking";
