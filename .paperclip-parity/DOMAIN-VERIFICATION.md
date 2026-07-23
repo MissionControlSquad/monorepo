@@ -38,11 +38,14 @@ governance stack (greenfield), UI surfaces (separate React build), and file cata
 | 3 | 5 | **Skill trust not re-derived** — adding a `scripts/` file didn't raise `Skill.trustLevel` though `deriveSkillTrustLevel` existed | `upsertSkillFile`/`deleteSkillFile` recompute trust from the file set |
 | 4 | 9/12 | **Dormant tested logic** — silent-run + subtree watchdogs + telemetry-prune had zero callers | Wired all three into the every-5-min reap cron |
 | 5 | — | Flag-count guard stale after +15 flags | Updated 44→59 + strengthened to assert FLAG_KEYS/FLAG_DEFAULTS parity |
+| 6 | 7 | **Secret resolve unaudited** — `resolveWorkspaceSecret` (BYO creds/git token/plugin+env config) resolved plaintext with no `SecretAccessEvent` | Every resolve now records a `read` event (best-effort) + optional consumer provenance |
 
-## Documented follow-ups (not fixed — need design/decision, not a quick patch)
+## Documented follow-ups (not fixed — need design/decision or coordinated rollout, not a quick patch)
 
-- **D7 A3** — audit-on-resolve is live for agent env-injection but **not universal**: `resolveWorkspaceSecret`/`getDecrypted` (git token, BYO creds, plugin/env secrets) resolve unaudited with no binding-enforcement rejection. Making it universal requires threading a consumer-context through many callers + a deny path — a deliberate change, not a hotfix.
-- **D10 A5** — Ed25519 device pairing is fully built+tested but **not wired into the WS handshake** (wiring it would reject every currently-connecting device until registered — needs a rollout/migration path).
+- **D7 A3 (enforcement half)** — the audit gap is now closed (every resolve is recorded); the remaining piece is binding-**enforcement** (deny an unauthorized resolve), which needs a deny path threaded through callers + a policy model — a deliberate change, not a hotfix.
+- **D10 A5** — Ed25519 device pairing is fully built+tested but **not wired into the WS handshake**: enforcing it requires the runner client to sign the nonce AND the server to reject unsigned/unknown devices — a coordinated client+server rollout (wiring a server-only path no client exercises adds risk without benefit).
+- **D2 F6** — `parseLine` transcript parser is built+tested but the runner doesn't stream yet (streaming transport is the infra seam).
+- **Larger MISSING features** (not defects): MCP-upstream governance (connections→catalog→profiles→OAuth→gateway), skill import/update/reset lifecycle, several React UI surfaces.
 - **D2 F6** — `parseLine` transcript parser is built+tested but the runner doesn't stream yet (streaming transport is the infra seam).
 - **Larger MISSING features** (not defects): MCP-upstream governance (connections→catalog→profiles→OAuth→gateway), skill import/update/reset lifecycle, several React UI surfaces.
 
