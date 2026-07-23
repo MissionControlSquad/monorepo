@@ -43,8 +43,14 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.MEMORY).toBe("memory");
   });
 
-  it("has exactly 44 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(44);
+  it("has 59 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(59);
+  });
+
+  it("every flag key has a matching default (FLAG_KEYS ⊇ FLAG_DEFAULTS in sync)", () => {
+    const keyValues = new Set(Object.values(FLAG_KEYS));
+    const defaultKeys = new Set(Object.keys(FLAG_DEFAULTS));
+    expect(defaultKeys).toEqual(keyValues);
   });
 
   it("all values are unique", () => {

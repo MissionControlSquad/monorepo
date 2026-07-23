@@ -9,6 +9,7 @@ import {
   slugify as coreSlugify,
   parseSkillFrontmatter,
   classifySkillFile,
+  deriveSkillTrustLevel,
 } from "@agentcenter/utils";
 import type { Prisma } from "@agentcenter/database";
 import type {
@@ -390,11 +391,20 @@ export async function upsertSkillFile(
   await loadSkill(workspaceId, skillId); // 404s cross-workspace / missing
   const path = normalizeSkillFilePath(input.path);
   const kind = classifySkillFile(path);
-  return prisma.skillFile.upsert({
+  const file = await prisma.skillFile.upsert({
     where: { skillId_path: { skillId, path } },
     create: { skillId, path, content: input.content, kind },
     update: { content: input.content, kind },
   });
+  await recomputeSkillTrust(skillId); // F3: adding a script/asset raises the stored trust rung
+  return file;
+}
+
+/** Recompute a skill's trust level from its current file set (F3). A script → scripts_executables. */
+async function recomputeSkillTrust(skillId: string): Promise<void> {
+  const files = await prisma.skillFile.findMany({ where: { skillId }, select: { path: true } });
+  const derived = deriveSkillTrustLevel(files.map((f) => f.path));
+  await prisma.skill.update({ where: { id: skillId }, data: { trustLevel: derived } });
 }
 
 export async function deleteSkillFile(
@@ -404,6 +414,7 @@ export async function deleteSkillFile(
 ): Promise<boolean> {
   await loadSkill(workspaceId, skillId);
   const res = await prisma.skillFile.deleteMany({ where: { skillId, path } });
+  if (res.count > 0) await recomputeSkillTrust(skillId); // removing a script may lower the rung
   return res.count > 0;
 }
 
