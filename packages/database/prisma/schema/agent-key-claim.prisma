@@ -1,0 +1,20 @@
+// One-time agent-key claim ceremony (parity Domain-10 A13 / GAP-5). A durable claim token is minted for
+// provisioning an agent; only its hash is stored. On first claim the secret is burned (compare-and-delete)
+// and a scoped agent key is issued — separating the shareable install token from the live agent key so a
+// leaked install token can't be replayed. D5: workspaceId no FK; status TEXT. API_KEYS-gated.
+model AgentKeyClaim {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  agentId            String? // the agent this claim provisions (bound on claim if not preset)
+  label              String?
+  claimSecretHash    String? // sha256 of the one-time secret; nulled once burned
+  status             String    @default("pending") // pending | claimed | expired
+  expiresAt          DateTime
+  claimedAt          DateTime?
+  createdByProfileId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([workspaceId, status])
+  @@map("agent_key_claims")
+}
