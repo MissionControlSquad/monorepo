@@ -87,3 +87,22 @@ export function buildPromotedSourceTrust(prev: SourceTrust | null, promotedByPro
 export function isQuarantined(sourceTrust: SourceTrust | null | undefined): boolean {
   return sourceTrust?.disposition === "quarantined";
 }
+
+/** The placeholder shown in place of quarantined output on a higher-trust read. */
+export const QUARANTINE_REDACTION = "[output quarantined — pending review]";
+
+/**
+ * Pure: the containment guarantee (Domain 8 G2). Output from a quarantined run must NOT flow verbatim
+ * into a higher-trust read until a board reviewer promotes it. Returns the redaction placeholder while
+ * the run is quarantined AND not yet approved; otherwise the original text. A promotion sets reviewState
+ * to `approved` (or clears the quarantine disposition), after which the real text flows.
+ */
+export function redactQuarantinedText(
+  sourceTrust: SourceTrust | null | undefined,
+  reviewState: string | null | undefined,
+  text: string | null | undefined,
+): string | null | undefined {
+  if (text == null) return text;
+  if (isQuarantined(sourceTrust) && reviewState !== "approved") return QUARANTINE_REDACTION;
+  return text;
+}
