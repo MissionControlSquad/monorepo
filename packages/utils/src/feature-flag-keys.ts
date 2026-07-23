@@ -58,6 +58,7 @@ export const FLAG_KEYS = {
   PROVIDER_AUTH: "provider_auth",
   LOCAL_SERVICES: "local_services",
   SMOKE_LAB: "smoke_lab",
+  TELEMETRY: "telemetry",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -129,4 +130,5 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.PROVIDER_AUTH]: false,
   [FLAG_KEYS.LOCAL_SERVICES]: false,
   [FLAG_KEYS.SMOKE_LAB]: false,
+  [FLAG_KEYS.TELEMETRY]: false,
 };

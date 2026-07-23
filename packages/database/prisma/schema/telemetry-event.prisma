@@ -1,0 +1,16 @@
+// First-party telemetry event (parity #E1-E4). The DB sink for product/ops/audit analytics events
+// (distinct from OTel tracing). Written via the pure makeTelemetryEvent contract; pruned by
+// retention class. D5: workspaceId no FK; name/retentionClass are TEXT. TELEMETRY-flag-gated.
+model TelemetryEvent {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  name           String
+  props          Json?
+  actorId        String?
+  retentionClass String   @default("operational") // operational | product | audit
+  createdAt      DateTime @default(now())
+
+  @@index([workspaceId, name, createdAt])
+  @@index([retentionClass, createdAt])
+  @@map("telemetry_events")
+}
