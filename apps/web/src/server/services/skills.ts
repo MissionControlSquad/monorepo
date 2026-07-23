@@ -269,6 +269,9 @@ export async function installCatalogSkill(
         trustLevel: source.trustLevel,
         sharingScope: "workspace", // the copy is private to the installer by default
         forkedFromSkillId: source.id,
+        // F13: stamp catalog-install provenance so update-drift (F18) + reset (F20) work.
+        originSkillId: source.id,
+        originVersion: source.currentVersion,
         createdByProfileId: createdByProfileId ?? null,
         currentVersion: 1,
       },
@@ -289,6 +292,93 @@ export async function installCatalogSkill(
     }
     await tx.skill.update({ where: { id: source.id }, data: { forkCount: { increment: 1 } } });
     return skill;
+  });
+}
+
+export type SkillUpdateState = "not_installed" | "up_to_date" | "update_available" | "origin_gone";
+
+export interface SkillUpdateStatus {
+  state: SkillUpdateState;
+  originVersion: number | null; // the source version this install is pinned to
+  latestVersion: number | null; // the source's current version now
+}
+
+/**
+ * Compute a catalog-installed skill's update status (F18): compare the pinned origin version to the
+ * source's current version. A skill with no origin is `not_installed`; a deleted/unpublished source is
+ * `origin_gone`.
+ */
+export async function computeSkillUpdateStatus(
+  workspaceId: string,
+  skillId: string,
+): Promise<SkillUpdateStatus> {
+  const skill = await loadSkill(workspaceId, skillId);
+  if (!skill.originSkillId)
+    return { state: "not_installed", originVersion: null, latestVersion: null };
+  const source = await prisma.skill.findFirst({
+    where: { id: skill.originSkillId, sharingScope: "public" },
+    select: { currentVersion: true },
+  });
+  if (!source)
+    return { state: "origin_gone", originVersion: skill.originVersion, latestVersion: null };
+  return {
+    state: source.currentVersion > (skill.originVersion ?? 0) ? "update_available" : "up_to_date",
+    originVersion: skill.originVersion,
+    latestVersion: source.currentVersion,
+  };
+}
+
+/**
+ * Reset a catalog-installed skill to its origin's current content (F20): re-copy the source markdown +
+ * files, snapshot a new local revision, and re-pin originVersion. Discards local edits. Rejects a skill
+ * with no origin or whose source is gone.
+ */
+export async function resetSkillToOrigin(
+  workspaceId: string,
+  skillId: string,
+  actorProfileId?: string | null,
+): Promise<Skill> {
+  const skill = await loadSkill(workspaceId, skillId);
+  if (!skill.originSkillId) badRequest("this skill was not installed from a catalog");
+  const source = await prisma.skill.findFirst({
+    where: { id: skill.originSkillId, sharingScope: "public" },
+    include: { files: true },
+  });
+  if (!source) badRequest("the origin skill is no longer available");
+
+  return prisma.$transaction(async (tx) => {
+    const nextRev = skill.currentVersion + 1;
+    const updated = await tx.skill.update({
+      where: { id: skill.id },
+      data: {
+        markdown: source.markdown,
+        trustLevel: source.trustLevel,
+        currentVersion: nextRev,
+        originVersion: source.currentVersion,
+      },
+    });
+    await tx.skillVersion.create({
+      data: {
+        workspaceId,
+        skillId: skill.id,
+        revisionNumber: nextRev,
+        content: source.markdown,
+        createdByProfileId: actorProfileId ?? null,
+      },
+    });
+    // Replace files with the source's current set.
+    await tx.skillFile.deleteMany({ where: { skillId: skill.id } });
+    if (source.files.length) {
+      await tx.skillFile.createMany({
+        data: source.files.map((f) => ({
+          skillId: skill.id,
+          path: f.path,
+          content: f.content,
+          kind: classifySkillFile(f.path),
+        })),
+      });
+    }
+    return updated;
   });
 }
 

@@ -65,6 +65,11 @@ model Skill {
   categories         String[]          @default([])
   sharingScope       SkillSharingScope @default(workspace)
   forkedFromSkillId  String?
+  // Catalog-install provenance + update lifecycle (Domain 5 F13/F18/F20). Set when a skill is installed
+  // from a public catalog skill: originSkillId points at the source, originVersion pins the source's
+  // version at install time so drift (update_available) can be detected and resetToOrigin can re-sync.
+  originSkillId      String?
+  originVersion      Int?
   starCount          Int               @default(0)
   installCount       Int               @default(0)
   forkCount          Int               @default(0)
