@@ -295,6 +295,48 @@ export async function installCatalogSkill(
   });
 }
 
+/**
+ * Import a skill from a package of files (parity Domain 5 F16): the SKILL.md (frontmatter → name/key/
+ * description/tags) becomes the skill, the rest become skill files (path-safety checked, trust auto-
+ * derived). Ports the shape of importCompanyPackage for skills. Rejects a package with no SKILL.md.
+ */
+export async function importSkillPackage(input: {
+  workspaceId: string;
+  files: { path: string; content: string }[];
+  sourceRef?: string | null;
+  createdByProfileId?: string | null;
+}): Promise<Skill> {
+  const manifest = input.files.find((f) => /(^|\/)SKILL\.md$/i.test(f.path));
+  if (!manifest) badRequest("package has no SKILL.md");
+  const fm = parseSkillFrontmatter(manifest.content) ?? {};
+  const name = (typeof fm.name === "string" && fm.name.trim()) || "Imported Skill";
+
+  const skill = await createSkill({
+    workspaceId: input.workspaceId,
+    name,
+    markdown: manifest.content,
+    key: typeof fm.key === "string" ? fm.key : null,
+    description: typeof fm.description === "string" ? fm.description : null,
+    categories: Array.isArray(fm.tags) ? fm.tags : null,
+    sourceType: input.sourceRef ? "url" : "local_path",
+    createdByProfileId: input.createdByProfileId ?? null,
+  });
+  if (input.sourceRef)
+    await prisma.skill.update({ where: { id: skill.id }, data: { sourceRef: input.sourceRef } });
+
+  // Attach the remaining files (SKILL.md is already the markdown). upsertSkillFile normalizes the path
+  // (rejecting traversal) and re-derives trust, so a scripts/ file correctly raises the rung.
+  for (const f of input.files) {
+    if (f === manifest) continue;
+    try {
+      await upsertSkillFile(input.workspaceId, skill.id, { path: f.path, content: f.content });
+    } catch {
+      // skip an unsafe/invalid path rather than abort the whole import
+    }
+  }
+  return prisma.skill.findUniqueOrThrow({ where: { id: skill.id } });
+}
+
 export type SkillUpdateState = "not_installed" | "up_to_date" | "update_available" | "origin_gone";
 
 export interface SkillUpdateStatus {
