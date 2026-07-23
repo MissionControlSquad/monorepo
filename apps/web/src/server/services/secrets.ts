@@ -339,6 +339,7 @@ export async function getDecrypted(
 export async function resolveWorkspaceSecret(
   workspaceId: string,
   name: string,
+  consumer?: SecretConsumerContext,
 ): Promise<string | null> {
   const secret = await prisma.secret.findFirst({
     where: { workspaceId, name, status: "active" },
@@ -346,7 +347,22 @@ export async function resolveWorkspaceSecret(
   });
   if (!secret) return null;
   const decrypted = await getDecrypted(workspaceId, secret.id);
-  return decrypted?.value ?? null;
+  const value = decrypted?.value ?? null;
+  // Audit-on-resolve (Domain 7 A3): EVERY resolve of a stored secret is recorded, not just agent
+  // env-injection — so BYO creds / git tokens / plugin+environment config resolves leave a trail too.
+  // Best-effort: audit must never break the resolve. Pass a `consumer` at real use sites for provenance.
+  await recordSecretAccess({
+    secretId: secret.id,
+    action: "read",
+    actorType: consumer?.actorType ?? "system",
+    actorId: consumer?.actorId ?? null,
+    consumerType: consumer?.consumerType ?? "system",
+    consumerId: consumer?.consumerId ?? "server",
+    configPath: name,
+    outcome: value != null ? "resolved" : "decrypt_failed",
+    runId: consumer?.runId ?? null,
+  }).catch(() => {});
+  return value;
 }
 
 export async function bindSecret(args: {
