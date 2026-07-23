@@ -1,0 +1,23 @@
+// Adapter session (parity #F9). Persists a sessioned runtime's opaque resume params + rotation counters
+// per agent+adapter, so a continuation run resumes the same session until the compaction policy rotates
+// it. The resume-exec itself is the infra seam; shouldCompactSession decides rotation. D5: workspaceId/
+// agentId no FK. MULTI_PROVIDER_ADAPTERS-gated (sessions only matter for sessioned adapters).
+model AdapterSession {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  agentId       String
+  adapterKey    String
+  displayId     String
+  sessionParams Json
+  runCount      Int       @default(0)
+  tokens        Int       @default(0)
+  startedAt     DateTime  @default(now())
+  lastUsedAt    DateTime  @default(now())
+  compactedAt   DateTime? // set when rotated; a new session row supersedes it
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([workspaceId, agentId, adapterKey, active])
+  @@map("adapter_sessions")
+}
