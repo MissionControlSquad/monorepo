@@ -82,6 +82,29 @@ fork/spawn/vm/FS-watch is left as the seam.
   tests). Each feature verified with `vitest run <file>` before commit
 - **New this effort:** 45 service files, 22 migrations, 58 feature-flag keys total
 
+## Deep-analysis round (post-SERVICE-AUDIT sweep)
+
+A 4-agent cross-reference of the domain docs (01–14) against the built inventory surfaced **13 buildable
+items the 177-row SERVICE-AUDIT had collapsed or missed**. 12 were built (1 pair verified already-present):
+
+- **F6** per-runtime transcript parser (Claude/Codex/Gemini JSON stdout → structured entries, redacted)
+- **F9** adapter session codec + compaction policy (resume + rotate on runs/tokens/age)
+- **E1–E4** first-party telemetry pipeline (contract + retention classes + DB sink + prune)
+- **F12** threaded skill comments
+- **Domain-8 G6.4** task origin/provenance + per-origin idempotency (partial-unique — no duplicate autonomy tasks)
+- **Domain-9 #10** silent active-run watchdog (output-silence classifier + decisions)
+- **Domain-9 #9** subtree stop-fingerprint watchdog (wake only on change)
+- **Domain-4 F17/F18** db-memory relevance ranking (recency-decay + term overlap) for injection
+- **Domain-10 GAP-1** Ed25519 Live-Gateway device pairing (pure crypto verify + pin + approve)
+- **Domain-10 GAP-5** one-time agent-key claim ceremony (mint→burn→issue scoped key)
+- **Domain-8 G5** document anchored annotations + cross-revision re-anchoring + cooperative locks
+- **#106/#123/#129** plugin-worker host protocol (minimal-env leak guard + NDJSON-RPC codec + crash policy + contracts)
+
+Verified **already built** (no redundant code): Domain-4 A1 company-default memory resolution
+(`resolveEffectiveMemoryProvider`) + A2 post-run capture (`captureRunMemory`, wired in `sandbox-run.ts`).
+
+This round: +12 verticals, 58 new tests, typecheck 12/12 throughout.
+
 ## Pending / next steps (for a human)
 
 1. **Nothing is buildable-pending.** The backlog is at its floor.
