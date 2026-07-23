@@ -9,6 +9,7 @@ import { prisma } from "@/server/prisma";
 import type { AgentMemory, MemoryOperation } from "@agentcenter/database";
 import {
   resolveMemoryProvider,
+  selectMemoriesForInjection,
   type MemoryOpType,
   type MemorySourceKind,
   type MemoryProvider,
@@ -145,7 +146,20 @@ export async function assembleInjectedMemory(
   opContext?: { taskId?: string | null; runId?: string | null },
 ): Promise<string | null> {
   const start = Date.now();
-  const rows = await readAgentMemory(workspaceId, agentId, 20);
+  // Pull a larger candidate set and RANK it (Domain-4 F17/F18): when a task context is present, its
+  // title/description terms bias selection toward relevant memories, not merely the most recent ones.
+  const candidates = await readAgentMemory(workspaceId, agentId, 100);
+  let queryTerms: string[] | undefined;
+  if (opContext?.taskId) {
+    const task = await prisma.task.findUnique({
+      where: { id: opContext.taskId },
+      select: { title: true, description: true },
+    });
+    if (task)
+      queryTerms =
+        `${task.title} ${task.description}`.toLowerCase().match(/[a-z0-9]{3,}/g) ?? undefined;
+  }
+  const rows = selectMemoriesForInjection(candidates, 20, { now: Date.now(), queryTerms });
   await recordMemoryOperation({
     workspaceId,
     agentId,
@@ -158,8 +172,10 @@ export async function assembleInjectedMemory(
     attributionMode: "included_in_run",
   }).catch(() => {});
   if (rows.length === 0) return null;
+  // Emit oldest-first for readability (selection was by relevance; presentation is chronological).
   const text = rows
-    .reverse()
+    .slice()
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
     .map((r) => r.content)
     .join("\n\n---\n\n");
   return text.length > MAX_INJECT_CHARS ? text.slice(-MAX_INJECT_CHARS) : text;
