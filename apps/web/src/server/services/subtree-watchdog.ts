@@ -107,6 +107,31 @@ export async function reconcileSubtreeWatchdog(
   return { shouldWake, fingerprint, stopped };
 }
 
+/**
+ * Reconcile every active subtree watchdog (the heartbeat cron use). Returns how many were checked and
+ * how many should wake their verification agent (a fully-stopped subtree whose fingerprint changed).
+ * Waking the agent is the runtime seam; this drives the detection + suppression bookkeeping.
+ */
+export async function reconcileActiveSubtreeWatchdogs(): Promise<{
+  checked: number;
+  toWake: number;
+}> {
+  const active = await prisma.subtreeWatchdog.findMany({
+    where: { active: true },
+    select: { id: true, workspaceId: true },
+  });
+  let toWake = 0;
+  for (const wd of active) {
+    try {
+      const res = await reconcileSubtreeWatchdog(wd.workspaceId, wd.id);
+      if (res.shouldWake) toWake++;
+    } catch {
+      // best-effort per watchdog — one bad row must not abort the sweep
+    }
+  }
+  return { checked: active.length, toWake };
+}
+
 export async function disarmSubtreeWatchdog(workspaceId: string, taskId: string): Promise<boolean> {
   const { count } = await prisma.subtreeWatchdog.updateMany({
     where: { workspaceId, taskId, active: true },

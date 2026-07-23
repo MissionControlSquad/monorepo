@@ -16,13 +16,21 @@ export interface SilenceFlag {
  * flagged (suspicious/critical) runs so the heartbeat can act. `now` is injectable for tests.
  */
 export async function scanSilentRuns(
-  workspaceId: string,
+  workspaceId: string | undefined,
   opts: { thresholds?: OutputSilenceThresholds; now?: number } = {},
 ): Promise<SilenceFlag[]> {
   const now = opts.now ?? Date.now();
+  // workspaceId undefined → sweep every workspace (the heartbeat cron use); each decision carries the
+  // run's own workspaceId so global + scoped scans record correctly.
   const runs = await prisma.agentRun.findMany({
-    where: { workspaceId, status: "running" },
-    select: { id: true, startedAt: true, lastOutputAt: true, watchdogSnoozedUntil: true },
+    where: { status: "running", ...(workspaceId ? { workspaceId } : {}) },
+    select: {
+      id: true,
+      workspaceId: true,
+      startedAt: true,
+      lastOutputAt: true,
+      watchdogSnoozedUntil: true,
+    },
   });
 
   const flags: SilenceFlag[] = [];
@@ -44,7 +52,7 @@ export async function scanSilentRuns(
     });
     if (result.state === "ok" || result.state === "snoozed") continue;
     decisions.push({
-      workspaceId,
+      workspaceId: run.workspaceId,
       runId: run.id,
       state: result.state,
       silenceMs: result.silenceMs,

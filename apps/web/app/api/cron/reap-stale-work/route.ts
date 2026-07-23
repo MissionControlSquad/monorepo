@@ -14,6 +14,9 @@
  *  - promoteDueRunRetries — re-dispatch transiently-failed runs whose backoff has elapsed (Domain 9 #6).
  *  - reconcileStrandedWork — re-dispatch (once) then escalate-to-blocked tasks whose run died (Domain 9 #8).
  *  - tickDueTaskMonitors — fire agent-armed one-shot "check back later" monitors that are due (Domain 9 #11).
+ *  - scanSilentRuns — record output-silence verdicts for running runs gone quiet (Domain 9 #10).
+ *  - reconcileActiveSubtreeWatchdogs — wake a verify agent when a stopped subtree's fingerprint changes (Domain 9 #9).
+ *  - pruneTelemetry — retention-prune first-party telemetry events by class (Domain 12 E).
  *
  * Registered in vercel.json to run every 5 minutes.
  */
@@ -30,6 +33,9 @@ import { tickRoutineTriggers } from "@/server/services/routines";
 import { promoteDueRunRetries } from "@/server/services/run-retry";
 import { reconcileStrandedWork } from "@/server/services/stranded-work";
 import { tickDueTaskMonitors } from "@/server/services/task-monitors";
+import { scanSilentRuns } from "@/server/services/run-silence-watchdog";
+import { reconcileActiveSubtreeWatchdogs } from "@/server/services/subtree-watchdog";
+import { pruneTelemetry } from "@/server/services/telemetry-sink";
 
 export async function GET(request: Request) {
   try {
@@ -52,6 +58,9 @@ export async function GET(request: Request) {
       routinesFired,
       retriesPromoted,
       monitorsFired,
+      silentRuns,
+      subtreeWake,
+      telemetryPruned,
     ] = await Promise.all([
       sweepExpiredCheckouts(now),
       reapStuckRunnerCommands(now),
@@ -62,6 +71,11 @@ export async function GET(request: Request) {
       tickRoutineTriggers(now),
       promoteDueRunRetries(now),
       tickDueTaskMonitors(now),
+      // Domain 9 #10/#9: product watchdogs — record output-silence + subtree-stop verdicts (waking the
+      // agent is the runtime seam). Domain 12 E: retention-prune telemetry. All best-effort.
+      scanSilentRuns(undefined, { now: now.getTime() }).catch(() => []),
+      reconcileActiveSubtreeWatchdogs().catch(() => ({ checked: 0, toWake: 0 })),
+      pruneTelemetry().catch(() => 0),
     ]);
     // Stranded-work reconciliation runs AFTER retry promotion so a run that just earned a retry (now
     // queued) is not mistaken for stranded. Owner-preserving re-dispatch → escalate-to-blocked ladder.
@@ -81,6 +95,9 @@ export async function GET(request: Request) {
       monitorsFired,
       strandedRedispatched: stranded.redispatched,
       strandedEscalated: stranded.escalated,
+      silentRunsFlagged: silentRuns.length,
+      subtreeWatchdogsWoken: subtreeWake.toWake,
+      telemetryPruned,
       at: now.toISOString(),
     });
   } catch (err) {
