@@ -1,0 +1,31 @@
+// Product watchdog decisions (parity Domain-9 #9/#10). SubtreeWatchdog: a verification agent assigned to
+// a stopped task subtree, re-woken only when the subtree's stop-fingerprint changes (avoids re-review
+// churn). RunWatchdogDecision: a recorded output-silence classification for an active run. D5:
+// workspaceId no FK; state/verdict TEXT. TASK_AUTONOMY-gated.
+model SubtreeWatchdog {
+  id                      String    @id @default(cuid())
+  workspaceId             String
+  taskId                  String
+  watchdogAgentProfileId  String?
+  lastReviewedFingerprint String?
+  active                  Boolean   @default(true)
+  lastReviewedAt          DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([workspaceId, active])
+  @@map("subtree_watchdogs")
+}
+
+model RunWatchdogDecision {
+  id          String   @id @default(cuid())
+  workspaceId String
+  runId       String
+  state       String // ok | suspicious | critical | snoozed
+  silenceMs   Int      @default(0)
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, runId, createdAt])
+  @@map("run_watchdog_decisions")
+}

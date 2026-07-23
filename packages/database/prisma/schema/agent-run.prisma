@@ -11,6 +11,10 @@ model AgentRun {
   providerKey          String?
   sandboxId            String? // the ephemeral sandbox/host id this run used
   status               String    @default("running") // running | done | failed | timeout | canceled
+  // Domain 9 #10 — product silence-watchdog signals. The runner stamps lastOutputAt when output arrives;
+  // the watchdog classifies a running run silent past thresholds. watchdogSnoozedUntil suppresses it.
+  lastOutputAt         DateTime?
+  watchdogSnoozedUntil DateTime?
   exitCode             Int?
   stdout               String?   @db.Text
   stderr               String?   @db.Text
