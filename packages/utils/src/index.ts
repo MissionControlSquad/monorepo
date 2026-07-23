@@ -21,6 +21,7 @@ export * from "./adapter-session";
 export * from "./telemetry";
 export * from "./run-watchdog";
 export * from "./memory-ranking";
+export * from "./document-anchor";
 export * from "./agent-capabilities";
 export * from "./attention";
 export * from "./observability";
