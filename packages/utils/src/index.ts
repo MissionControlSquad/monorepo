@@ -16,6 +16,7 @@ export * from "./setup-session";
 export * from "./provider-auth";
 export * from "./service-supervision";
 export * from "./plugin-worker-protocol";
+export * from "./adapter-transcript";
 export * from "./agent-capabilities";
 export * from "./attention";
 export * from "./observability";
