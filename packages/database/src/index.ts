@@ -18,7 +18,6 @@ export * from "./password-reset";
 export * from "./feature-flag";
 export * from "./license";
 export * from "./delegates";
-export * from "./push-subscription";
 export * from "./activity";
 export * from "./message";
 export * from "./deliverable";

@@ -37,8 +37,8 @@ import { Input } from "@/components/ui/shadcn/input";
 import { LicenseStatusCode } from "@/server/constants";
 import { API_ROUTES } from "@/lib/api-routes";
 import { SidebarCustomizeCard } from "@/components/layout/sidebar/SidebarCustomizeCard";
-import { NotificationPreferencesCard } from "@/components/settings/NotificationPreferencesCard";
 import { AppearanceCard } from "@/components/settings/AppearanceCard";
+import { BuildbaseAccountCard } from "@/components/settings/BuildbaseAccountCard";
 
 const changePasswordSchema = z
   .object({
@@ -132,6 +132,9 @@ export function SettingsPage() {
         <p className="text-sm text-muted-foreground mt-1">System-wide configuration</p>
       </div>
 
+      {/* Buildbase user-layer account/billing — opens inbuilt SDK screens (renders only when configured) */}
+      <BuildbaseAccountCard />
+
       {/* Change Password */}
       <Card padding="lg" className="space-y-4">
         <div className="flex items-start gap-4">
@@ -200,8 +203,8 @@ export function SettingsPage() {
       {/* Agent memory backend */}
       <MemoryDefaultCard />
 
-      {/* Notification preferences */}
-      <NotificationPreferencesCard />
+      {/* Notification preferences now live in buildbase — see BuildbaseAccountCard →
+          openWorkspaceSettings('notifications'). */}
 
       {/* Appearance / theme */}
       <AppearanceCard />

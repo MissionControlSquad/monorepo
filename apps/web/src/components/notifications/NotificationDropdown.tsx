@@ -14,7 +14,6 @@ import {
   Clock,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { PushPermissionBanner } from "./PushPermissionBanner";
 import type { NotificationItem } from "@agentcenter/types";
 
 const TYPE_ICONS: Record<string, typeof CheckCircle> = {
@@ -80,8 +79,6 @@ export function NotificationDropdown({
           Mark all read
         </button>
       </div>
-
-      <PushPermissionBanner />
 
       <div className="max-h-96 overflow-y-auto">
         {notifications.length === 0 && (
