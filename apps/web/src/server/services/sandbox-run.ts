@@ -548,18 +548,40 @@ export async function enqueueSandboxRun(input: {
   // Same resolution + fail-closed admission as the sync path — so an inadmissible run never queues.
   const { providerKey } = await resolveAndAdmitTarget(input.workspaceId, agent, input.providerKey);
 
-  const run = await prisma.agentRun.create({
-    data: {
-      workspaceId: input.workspaceId,
-      agentId: agent.id,
-      taskId: input.taskId,
-      kind: "sandbox",
-      providerKey,
-      status: "queued",
-      requestedByProfileId: input.requestedByProfileId ?? null,
-    },
+  // Coalesce (prevents double-dispatch): a task may have at most one QUEUED run. Two overlapping reap
+  // ticks (or a manual enqueue racing the cron) would otherwise create two queued rows → drain claims
+  // both → the task runs twice (duplicate commits/PRs/cost). A partial-unique index on
+  // (taskId) WHERE status='queued' is the race backstop; the pre-check is the fast path.
+  const existing = await prisma.agentRun.findFirst({
+    where: { taskId: input.taskId, status: "queued", kind: "sandbox" },
+    select: { id: true, providerKey: true },
   });
-  return { runId: run.id, providerKey };
+  if (existing) return { runId: existing.id, providerKey: existing.providerKey ?? providerKey };
+
+  try {
+    const run = await prisma.agentRun.create({
+      data: {
+        workspaceId: input.workspaceId,
+        agentId: agent.id,
+        taskId: input.taskId,
+        kind: "sandbox",
+        providerKey,
+        status: "queued",
+        requestedByProfileId: input.requestedByProfileId ?? null,
+      },
+    });
+    return { runId: run.id, providerKey };
+  } catch (err) {
+    // Lost the race to a concurrent enqueue → return the winner's queued run instead of a duplicate.
+    if ((err as { code?: string }).code === "P2002") {
+      const winner = await prisma.agentRun.findFirst({
+        where: { taskId: input.taskId, status: "queued", kind: "sandbox" },
+        select: { id: true, providerKey: true },
+      });
+      if (winner) return { runId: winner.id, providerKey: winner.providerKey ?? providerKey };
+    }
+    throw err;
+  }
 }
 
 /**

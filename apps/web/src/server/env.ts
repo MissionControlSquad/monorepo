@@ -123,7 +123,14 @@ function validateEnv(): ServerEnv {
 
   // In production runtime, use strict schema and fail hard
   if (process.env.NODE_ENV === "production") {
-    return serverSchema.parse(process.env);
+    const prod = serverSchema.parse(process.env);
+    // Fail fast at BOOT (not at first secret op) if the vault master key is missing/weak — otherwise the
+    // secrets vault would run on the dev insecure default. secrets-crypto also throws at use time; this
+    // surfaces it during startup. (Kept out of the zod schema so lenientSchema.extend() still works.)
+    if ((prod.SECRET_ENCRYPTION_KEY ?? "").length < 32) {
+      throw new Error("SECRET_ENCRYPTION_KEY must be set (>=32 chars) in production");
+    }
+    return prod;
   }
 
   // In development/test, try strict first and warn, then fall back to lenient
