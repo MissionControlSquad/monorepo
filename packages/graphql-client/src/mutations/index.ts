@@ -279,4 +279,9 @@ export { UPSERT_EXTERNAL_OBJECT, REFRESH_EXTERNAL_OBJECT, DELETE_EXTERNAL_OBJECT
 export { UPSERT_CLOUD_UPSTREAM, DELETE_CLOUD_UPSTREAM } from "./cloud-upstreams";
 export { SET_INBOX_POLICY, DELETE_INBOX_POLICY } from "./inbox-policies";
 export { ADD_SKILL_COMMENT, DELETE_SKILL_COMMENT } from "./skill-comments";
+export { UPSERT_ADAPTER_PLUGIN, DELETE_ADAPTER_PLUGIN } from "./adapter-plugins";
+export { CREATE_SMOKE_CASE, DELETE_SMOKE_CASE, RUN_SMOKE_CASE, RUN_SMOKE_SUITE } from "./smoke-lab";
+export { REGISTER_LOCAL_SERVICE } from "./local-services";
+export { SYNC_AGENT_SKILLS } from "./agent-skills-sync";
+export { RESET_SKILL_TO_ORIGIN, IMPORT_SKILL_PACKAGE } from "./skill-lifecycle";
 export { CREATE_FOLDER, RENAME_FOLDER, MOVE_FOLDER, DELETE_FOLDER, ADD_FOLDER_ITEM, REMOVE_FOLDER_ITEM } from "./folders";
