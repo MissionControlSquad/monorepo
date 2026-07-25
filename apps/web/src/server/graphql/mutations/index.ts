@@ -57,4 +57,8 @@ import "./attention";
 import "./project-doc-comments";
 import "./feedback";
 import "./assets";
+import "./skill-comments";
+import "./inbox-policies";
+import "./cloud-upstreams";
+import "./external-objects";
 import "./folders";

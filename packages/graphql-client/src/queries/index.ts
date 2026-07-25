@@ -239,3 +239,8 @@ export { SIDEBAR_PREFERENCE_QUERY } from "./sidebar-preferences";
 export { PROJECT_DOC_COMMENTS_QUERY } from "./project-doc-comments";
 export { FOLDERS_QUERY, FOLDER_ITEMS_QUERY } from "./folders";
 export { ASSETS_QUERY, ASSET_DOWNLOAD_URL_QUERY } from "./assets";
+export { EXTERNAL_OBJECTS_QUERY } from "./external-objects";
+export { CLOUD_UPSTREAMS_QUERY, CLOUD_UPSTREAM_PLAN_QUERY } from "./cloud-upstreams";
+export { INBOX_POLICIES_QUERY } from "./inbox-policies";
+export { SKILL_COMMENTS_QUERY } from "./skill-comments";
+export { PROVIDER_AUTH_STATES_QUERY } from "./provider-auth";
