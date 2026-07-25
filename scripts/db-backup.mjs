@@ -3,7 +3,7 @@
 // SQL file under ./backups via pg_dump. Reads the direct (non-pooled) connection string. Exits
 // non-zero on any failure so it can gate a deploy. Run: `npm run db:backup [-- --gzip] [-- --out DIR]`.
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, statSync } from "node:fs";
+import { mkdirSync, statSync, readdirSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 
 const RED = "\x1b[31m";
@@ -20,6 +20,9 @@ const args = process.argv.slice(2);
 const gzip = args.includes("--gzip");
 const outIdx = args.indexOf("--out");
 const outDir = resolve(outIdx >= 0 && args[outIdx + 1] ? args[outIdx + 1] : "backups");
+// Retention: keep the newest N backups in outDir, prune older ones. --keep 0 disables pruning.
+const keepIdx = args.indexOf("--keep");
+const keep = keepIdx >= 0 && args[keepIdx + 1] ? Math.max(0, parseInt(args[keepIdx + 1], 10) || 0) : 14;
 
 // ── Connection string (prefer the direct, non-pooled URL for pg_dump) ──
 const url =
@@ -60,3 +63,19 @@ try {
 const bytes = statSync(target).size;
 const kb = (bytes / 1024).toFixed(1);
 console.log(`${GREEN}✓ db:backup: wrote ${kb} KB → ${target}${RESET}`);
+
+// ── Retention: prune old backups beyond --keep ──
+if (keep > 0) {
+  try {
+    const backups = readdirSync(outDir)
+      .filter((f) => /^agentcenter-.*\.sql(\.gz)?$/.test(f))
+      .map((f) => ({ f, t: statSync(resolve(outDir, f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t); // newest first
+    const stale = backups.slice(keep);
+    for (const { f } of stale) unlinkSync(resolve(outDir, f));
+    if (stale.length) console.log(`${DIM}Pruned ${stale.length} old backup(s), keeping newest ${keep}.${RESET}`);
+  } catch (err) {
+    // Pruning failure must not fail the backup itself (the dump already succeeded).
+    console.error(`${DIM}retention prune skipped: ${err.message}${RESET}`);
+  }
+}

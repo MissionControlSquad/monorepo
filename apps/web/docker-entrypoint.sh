@@ -84,12 +84,16 @@ run_migrations() {
     return 1
   fi
 
-  # Always run db push as a final safety net — fills any schema gaps that exist
-  # because migrations were marked applied without running (P3005 baseline, manual
-  # provisioning, or any other path that left tables/columns missing). On a healthy
-  # fully-migrated DB this is a fast no-op. Never drops existing data.
-  echo "Syncing schema (db push)..."
-  $PRISMA db push --skip-generate --accept-data-loss 2>&1 || true
+  # Optional schema-gap safety net (OPT-IN). `db push --accept-data-loss` can DROP drifted
+  # columns/tables, so it is NOT run by default — a healthy fully-migrated DB needs only `migrate
+  # deploy` above. Set ALLOW_DB_PUSH_FALLBACK=true only to recover a DB whose migrations were marked
+  # applied without running (P3005 baseline / manual provisioning left tables missing).
+  if [ "${ALLOW_DB_PUSH_FALLBACK:-false}" = "true" ]; then
+    echo "ALLOW_DB_PUSH_FALLBACK=true — syncing schema (db push, may drop drifted columns)..."
+    $PRISMA db push --skip-generate --accept-data-loss 2>&1 || true
+  else
+    echo "Skipping db push fallback (set ALLOW_DB_PUSH_FALLBACK=true to enable schema-gap recovery)."
+  fi
 }
 
 echo "Running database migrations..."
