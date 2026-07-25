@@ -63,4 +63,5 @@ import "./environments";
 import "./execution-workspaces";
 import "./project-doc-comments";
 import "./feedback";
+import "./assets";
 import "./folders";

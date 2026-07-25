@@ -44,4 +44,5 @@ import "./agent-run";
 import "./agent-company";
 import "./memory-operation";
 import "./feedback";
+import "./asset";
 import "./folder";

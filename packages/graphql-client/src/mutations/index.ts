@@ -274,4 +274,5 @@ export {
 export { SET_SIDEBAR_PREFERENCE } from "./sidebar-preferences";
 export { ADD_PROJECT_DOC_COMMENT, RESOLVE_PROJECT_DOC_COMMENT, DELETE_PROJECT_DOC_COMMENT } from "./project-doc-comments";
 export { SUBMIT_FEEDBACK } from "./feedback";
+export { CREATE_ASSET_UPLOAD_URL, RECORD_ASSET, DELETE_ASSET } from "./assets";
 export { CREATE_FOLDER, RENAME_FOLDER, MOVE_FOLDER, DELETE_FOLDER, ADD_FOLDER_ITEM, REMOVE_FOLDER_ITEM } from "./folders";
