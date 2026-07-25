@@ -1,3 +1,4 @@
+import { logError } from "@/server/logger";
 /**
  * Scheduled run retries (Domain 9 #6). A transient run failure (timeout) is not left dead: the run is
  * stamped with a `scheduledRetryAt` (bounded backoff), and the reap cron later PROMOTES it into a fresh
@@ -25,7 +26,13 @@ export async function scheduleRunRetryIfTransient(
       where: { id: run.id },
       data: { scheduledRetryAt: at, retryReason: run.status },
     })
-    .catch(() => {});
+    .catch((err) => {
+      // Don't silently swallow: a failed stamp means this timed-out run is never retried. Log so it's
+      // visible; the stranded-work reconciler is the backstop that will re-dispatch it next tick.
+      logError("run-retry", `failed to stamp scheduledRetryAt for run ${run.id}`, {
+        error: String(err),
+      });
+    });
   return at;
 }
 

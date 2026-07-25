@@ -13,7 +13,24 @@ export function getRedisClient(): import("ioredis").default | null {
   _initialized = true;
 
   const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) return null;
+  if (!redisUrl) {
+    // Pub/sub, SSE fan-out, distributed rate limiting and cache silently fall back to per-process
+    // in-memory. That is fine for a single instance, but in a MULTI-REPLICA production deployment events
+    // published on one replica never reach subscribers on another (agents miss task deliveries). Warn
+    // loudly so a misconfigured prod is visible; not a hard fail because single-instance self-host is valid.
+    if (process.env.NODE_ENV === "production") {
+      console.warn(
+        JSON.stringify({
+          level: "warn",
+          tag: "redis",
+          message:
+            "REDIS_URL is not set in production — pub/sub, SSE, rate limiting and cache are per-process " +
+            "in-memory. Set REDIS_URL for any multi-replica deployment or cross-instance delivery will drop.",
+        }),
+      );
+    }
+    return null;
+  }
 
   try {
     // Dynamic require to avoid bundling ioredis in edge runtime
