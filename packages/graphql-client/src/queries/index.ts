@@ -243,6 +243,7 @@ export { EXTERNAL_OBJECTS_QUERY } from "./external-objects";
 export { CLOUD_UPSTREAMS_QUERY, CLOUD_UPSTREAM_PLAN_QUERY } from "./cloud-upstreams";
 export { INBOX_POLICIES_QUERY } from "./inbox-policies";
 export { SKILL_COMMENTS_QUERY } from "./skill-comments";
+export { ANNOTATION_THREADS_QUERY } from "./document-annotations";
 export { PROVIDER_AUTH_STATES_QUERY } from "./provider-auth";
 export { ADAPTER_PLUGINS_QUERY } from "./adapter-plugins";
 export { SMOKE_CASES_QUERY } from "./smoke-lab";

@@ -57,6 +57,7 @@ import "./attention";
 import "./project-doc-comments";
 import "./feedback";
 import "./assets";
+import "./document-annotations";
 import "./skill-lifecycle";
 import "./agent-skills-sync";
 import "./local-services";

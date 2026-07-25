@@ -45,6 +45,7 @@ import "./agent-company";
 import "./memory-operation";
 import "./feedback";
 import "./asset";
+import "./document-annotation";
 import "./local-service";
 import "./smoke-case";
 import "./adapter-plugin";
