@@ -22,6 +22,7 @@ import {
   DELETE_SKILL_FILE,
 } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
+import { SkillComments } from "@/components/skills/SkillComments";
 
 // Epic #10: skills library. SKILLS_TEAMS-gated. Reusable markdown capability modules with versions,
 // stars, forks; assign to agents from the agent view.
@@ -72,6 +73,7 @@ export default function SkillsPage() {
   const [openLint, setOpenLint] = useState<string | null>(null);
   const [openAudit, setOpenAudit] = useState<string | null>(null);
   const [openVersions, setOpenVersions] = useState<string | null>(null);
+  const [openComments, setOpenComments] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     icon: "",
@@ -247,6 +249,13 @@ export default function SkillsPage() {
               </Button>
               <Button
                 size="sm"
+                variant="secondary"
+                onClick={() => setOpenComments((o) => (o === s.id ? null : s.id))}
+              >
+                Comments
+              </Button>
+              <Button
+                size="sm"
                 variant={s.sharingScope === "public" ? "primary" : "secondary"}
                 disabled={busy === s.id}
                 title="Publish to the cross-workspace catalog"
@@ -303,6 +312,7 @@ export default function SkillsPage() {
           {openLint === s.id && <SkillLintPanel skillId={s.id} />}
           {openAudit === s.id && <SkillAuditPanel skillId={s.id} />}
           {openVersions === s.id && <SkillVersionsPanel skillId={s.id} />}
+          {openComments === s.id && <SkillComments skillId={s.id} />}
         </Card>
       ))}
     </div>
