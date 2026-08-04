@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { Boxes } from "lucide-react";
-import { Card, Badge, Button, Spinner, EmptyState } from "@/components/ui";
+import { Card, Badge, Button, Spinner, EmptyState, Input, FormField, FormDialog } from "@/components/ui";
 
 // Epic #2 (Adapter Manager): instance-admin view of installed provider adapters. MULTI_PROVIDER_ADAPTERS
 // gated. Lists each adapter with its transport/auth kind + model-profile count and lets an admin
@@ -136,61 +136,61 @@ export default function AdaptersPage() {
             to an agent from its settings. The built-in gateway is always available.
           </p>
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setShowInstall((v) => !v)}>
-          {showInstall ? "Cancel" : "Install adapter"}
+        <Button size="sm" variant="secondary" onClick={() => setShowInstall(true)}>
+          Install adapter
         </Button>
       </div>
 
-      {showInstall && (
-        <Card className="space-y-3 p-4">
-          <h2 className="text-sm font-semibold text-foreground">Register an external adapter</h2>
-          <p className="-mt-1 text-xs text-muted-foreground">
-            Adds the adapter to the registry so it can be enabled and assigned. It starts disabled.
-          </p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <input
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-              placeholder="type (e.g. cursor-cloud)"
-              value={form.type}
-              onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-            />
-            <input
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-              placeholder="Display name"
-              value={form.displayName}
-              onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
-            />
+      <FormDialog
+        open={showInstall}
+        onOpenChange={setShowInstall}
+        title="Register an external adapter"
+        description="Adds the adapter to the registry so it can be enabled and assigned. It starts disabled."
+        onSubmit={onInstall}
+        submitLabel="Install"
+        busy={busy === "install"}
+        error={installError}
+        submitDisabled={!form.type.trim() || !form.displayName.trim()}
+      >
+        <FormField label="Type">
+          <Input
+            placeholder="e.g. cursor-cloud"
+            value={form.type}
+            onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+          />
+        </FormField>
+        <FormField label="Display name">
+          <Input
+            placeholder="e.g. Cursor (Cloud)"
+            value={form.displayName}
+            onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
+          />
+        </FormField>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label="Transport">
             <select
-              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={form.transport}
               onChange={(e) => setForm((f) => ({ ...f, transport: e.target.value }))}
             >
               {TRANSPORTS.map((tr) => (
-                <option key={tr} value={tr}>
-                  transport: {tr}
-                </option>
+                <option key={tr} value={tr}>{tr}</option>
               ))}
             </select>
+          </FormField>
+          <FormField label="Auth">
             <select
-              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={form.authKind}
               onChange={(e) => setForm((f) => ({ ...f, authKind: e.target.value }))}
             >
               {AUTH_KINDS.map((ak) => (
-                <option key={ak} value={ak}>
-                  auth: {ak}
-                </option>
+                <option key={ak} value={ak}>{ak}</option>
               ))}
             </select>
-          </div>
-          {installError && <p className="text-sm text-destructive">{installError}</p>}
-          <div className="flex justify-end">
-            <Button size="sm" disabled={busy === "install"} onClick={onInstall}>
-              Install
-            </Button>
-          </div>
-        </Card>
-      )}
+          </FormField>
+        </div>
+      </FormDialog>
 
       {fetching && adapters.length === 0 ? (
         <div className="flex justify-center p-8">
