@@ -48,10 +48,17 @@ async function makeTask(): Promise<string> {
 
 beforeAll(() => {
   process.env.SYSTEM_SECRET = "cf-secret";
+  // The provider fetches through guardedFetch (SSRF), which DNS-resolves the host BEFORE calling fetch.
+  // This test mocks fetch and uses a non-resolvable host, so without this the guard throws
+  // "hostname could not be resolved" before the mock runs. The SSRF guard isn't what's under test here
+  // (the bridge REST client is), so disable it for this file — the escape hatch makes guardedFetch skip
+  // DNS and go straight to the mocked fetch, keeping the test hermetic (no network/DNS).
+  process.env.SSRF_ALLOW_PRIVATE_NETWORK = "1";
   globalThis.fetch = fetchMock as unknown as typeof fetch;
 });
 afterAll(() => {
   globalThis.fetch = realFetch;
+  delete process.env.SSRF_ALLOW_PRIVATE_NETWORK;
 });
 beforeEach(async () => {
   agentCache.clear();

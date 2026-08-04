@@ -1,12 +1,24 @@
-name: Test
+name: CI
 
+# Full verification on every push to a mainline branch and every PR. If any of these jobs fail,
+# something is broken — do not merge. Mirrors the local gate: typecheck (12/12) + lint + the full
+# Vitest suite (unit + integration + e2e, backed by Postgres + Redis, real Prisma migrations) +
+# a production build of the web app.
+
+# The gate for `main`: runs on every PR into main (must be green before merge) and on anything that
+# lands directly on main (direct push / merge), so main itself never sits broken.
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  # Fast-feedback unit tests that need no database (kept from the original workflow).
   unit-no-db:
     name: Unit (no DB)
     runs-on: ubuntu-latest
@@ -15,24 +27,38 @@ jobs:
       POSTGRES_URL_NON_POOLING: "postgresql://unused:unused@localhost:5432/unused"
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "22.22.1"
           cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
+      - run: npm ci
       - name: Generate Prisma Client
         run: cd packages/database && npx prisma generate
-
       - name: Run unit tests (no DB)
         run: cd apps/web && npm run test:unit:no-db
 
+  verify:
+    name: Typecheck + Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.1"
+          cache: "npm"
+      - run: npm ci
+      - name: Generate Prisma Client
+        run: cd packages/database && npx prisma generate
+      - name: Typecheck (all packages)
+        run: npx turbo run typecheck
+      # Lint is advisory — the web app has pre-existing eslint warnings (any-types, hook deps). It runs
+      # for visibility but must not block a merge; the substantive gate is typecheck + tests + build.
+      - name: Lint (non-blocking)
+        run: npx turbo run lint
+        continue-on-error: true
+
   test:
-    name: Test (with DB)
+    name: Tests (unit + integration + e2e)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -40,7 +66,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
+          POSTGRES_DB: clawd_test
         ports:
           - 5432:5432
         options: >-
@@ -48,26 +74,57 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
-    env:
-      POSTGRES_PRISMA_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
-      POSTGRES_URL_NON_POOLING: "postgresql://postgres:postgres@localhost:5432/postgres"
-      AUTH_SECRET: "ci-test-secret"
-
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "22.22.1"
           cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
+      - run: npm ci
       - name: Generate Prisma Client
         run: cd packages/database && npx prisma generate
 
-      - name: Run tests
+      # The test bootstrap (apps/web/tests/setup.ts) runs `prisma migrate deploy` and reads the DB URL
+      # from apps/web/.env.test — which is gitignored. Write a CI copy pointing at the service containers.
+      # `.env.test` is loaded by vitest.config.ts + the package test scripts, so all paths agree.
+      - name: Write CI .env.test
+        run: |
+          cat > apps/web/.env.test <<'EOF'
+          POSTGRES_PRISMA_URL="postgresql://postgres:postgres@localhost:5432/clawd_test"
+          POSTGRES_URL_NON_POOLING="postgresql://postgres:postgres@localhost:5432/clawd_test"
+          AUTH_SECRET="ci-test-secret-not-for-production"
+          CRON_SECRET="ci-cron-secret"
+          REDIS_URL="redis://localhost:6379"
+          NEXT_PUBLIC_MC_URL="http://localhost:3000"
+          EOF
+
+      # Runs every package's `test` (Vitest). apps/web/tests/setup.ts applies all Prisma migrations to
+      # the fresh `clawd_test` DB per file, so the suite runs against the real migrated schema + seeds.
+      - name: Run full test suite
         run: npx turbo run test
+
+  build:
+    name: Build (web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.1"
+          cache: "npm"
+      - run: npm ci
+      - name: Generate Prisma Client
+        run: cd packages/database && npx prisma generate
+      # `next build` runs with the lenient env schema (NEXT_PHASE=phase-production-build), so real
+      # secrets/DB aren't required — this only proves the app compiles.
+      - name: Build web app
+        run: npx turbo run build --filter=@agentcenter/web
