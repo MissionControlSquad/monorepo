@@ -21,7 +21,7 @@ import {
   TRANSITION_CASE,
   REJECT_CASE,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Spinner } from "@/components/ui";
+import { Button, Card, Badge, Spinner, Checkbox } from "@/components/ui";
 import { PipelineDialog } from "@/components/dialogs/PipelineDialog";
 
 // Epic #7: pipelines (multi-stage case workflows). PIPELINES_ROUTINES-gated. Admin builds
@@ -120,8 +120,7 @@ function PipelineCard({
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium text-foreground">{pipeline.name}</span>
         <label className="flex items-center gap-1 text-xs text-muted-foreground">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={pipeline.sequentialOnly}
             onChange={async (e) => {
               await setSequential({

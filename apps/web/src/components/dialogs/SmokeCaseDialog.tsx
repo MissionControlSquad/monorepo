@@ -2,7 +2,7 @@
 
 import { useMutation } from "urql";
 import { CREATE_SMOKE_CASE } from "@/lib/graphql/mutations";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 interface SmokeCaseDialogProps {
@@ -53,14 +53,13 @@ export function SmokeCaseDialog({ open, onOpenChange, onSaved }: SmokeCaseDialog
         />
       </FormField>
       <FormField label="Expected decision">
-        <select
+        <Select
           value={f.values.expectDecision}
           onChange={(e) => f.set("expectDecision", e.target.value)}
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
         >
           <option value="allow">Expect allow</option>
           <option value="deny">Expect deny</option>
-        </select>
+        </Select>
       </FormField>
     </FormDialog>
   );

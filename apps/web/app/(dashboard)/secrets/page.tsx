@@ -16,7 +16,7 @@ import {
   DELETE_SECRET_PROVIDER,
   CHECK_SECRET_PROVIDER_HEALTH,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Select } from "@/components/ui";
 import { SecretDialog } from "@/components/dialogs/SecretDialog";
 import { SecretProviderDialog } from "@/components/dialogs/SecretProviderDialog";
 import { SecretImportDialog } from "@/components/dialogs/SecretImportDialog";
@@ -292,9 +292,7 @@ export default function SecretsPage() {
               >
                 Audit
               </Button>
-              <select
-                className="rounded border border-border bg-background px-2 py-1 text-xs"
-                value={s.status}
+              <Select size="sm" className="text-xs" value={s.status}
                 onChange={async (e) => {
                   await setStatus({ id: s.id, status: e.target.value });
                   refresh();
@@ -303,7 +301,7 @@ export default function SecretsPage() {
                 <option value="active">active</option>
                 <option value="disabled">disabled</option>
                 <option value="archived">archived</option>
-              </select>
+              </Select>
             </span>
           </div>
 

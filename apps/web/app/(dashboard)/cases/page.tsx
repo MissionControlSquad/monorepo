@@ -12,7 +12,7 @@ import {
   REMOVE_CASE_LABEL,
 } from "@/lib/graphql/mutations";
 import { CASE_STATES, CaseState } from "@agentcenter/utils";
-import { Button, Card, Badge, EmptyState, Spinner } from "@/components/ui";
+import { Button, Card, Badge, EmptyState, Spinner, Select } from "@/components/ui";
 import { CaseDialog } from "@/components/dialogs/CaseDialog";
 import { LabelDialog } from "@/components/dialogs/LabelDialog";
 
@@ -129,16 +129,14 @@ export default function CasesPage() {
                   </Link>
                   <Badge variant="gray">{c.caseType}</Badge>
                 </span>
-                <select
-                  className="rounded border border-border bg-background px-2 py-1 text-sm"
-                  value={c.status}
+                <Select size="sm" value={c.status}
                   disabled={busy === c.id}
                   onChange={(e) => act(() => setStatus({ id: c.id, status: e.target.value }), c.id)}
                 >
                   {STATES.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {c.labels.map((cl) => (

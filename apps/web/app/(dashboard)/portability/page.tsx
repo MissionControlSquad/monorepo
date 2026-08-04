@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "urql";
 import { EXPORT_WORKSPACE_BUNDLE, WORKSPACE_IMPORTS } from "@/lib/graphql/queries";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Textarea } from "@/components/ui";
 import { PortabilityImportDialog } from "@/components/dialogs/PortabilityImportDialog";
 
 // Epic #14: workspace portability. WORKSPACE_PORTABILITY-gated. Export renders a credential-free JSON
@@ -101,9 +101,9 @@ export default function PortabilityPage() {
             </Button>
           </span>
         </div>
-        <textarea
+        <Textarea
           readOnly
-          className="h-48 w-full rounded border border-border bg-background px-3 py-1.5 font-mono text-xs"
+          className="h-48 font-mono text-xs"
           value={bundleJson}
         />
       </Card>

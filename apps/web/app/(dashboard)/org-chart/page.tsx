@@ -6,7 +6,7 @@ import { ZoomIn, ZoomOut, Maximize } from "lucide-react";
 import { ORG_CHART_QUERY } from "@/lib/graphql/queries";
 import { SET_AGENT_REPORTS_TO } from "@/lib/graphql/mutations";
 import { AgentStatus, computeOrgLayout } from "@agentcenter/utils";
-import { Card, Badge } from "@/components/ui";
+import { Card, Badge, Select } from "@/components/ui";
 
 // Epic #19: graphical org chart — an SVG canvas of the agent reporting hierarchy (tidy top-down
 // layout via the shared computeOrgLayout helper). Click a node to reassign its manager; zoom to fit.
@@ -165,9 +165,7 @@ export default function OrgChartPage() {
           <Badge variant="gray">{selected.name}</Badge>
           <label className="flex items-center gap-1 text-xs text-muted-foreground">
             reports to
-            <select
-              className="rounded border border-border bg-background px-2 py-1 text-xs"
-              value={selected.reportsToAgentId ?? ""}
+            <Select size="sm" className="text-xs" value={selected.reportsToAgentId ?? ""}
               disabled={busy === selected.id}
               onChange={(e) => assign(selected.id, e.target.value)}
             >
@@ -179,7 +177,7 @@ export default function OrgChartPage() {
                     {a.name}
                   </option>
                 ))}
-            </select>
+            </Select>
           </label>
           <button
             className="ml-auto text-xs text-muted-foreground hover:text-foreground"

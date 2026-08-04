@@ -24,7 +24,7 @@ import {
 } from "@/lib/graphql/mutations";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
-import { Button, Card, Badge, Spinner } from "@/components/ui";
+import { Button, Card, Badge, Spinner, Select } from "@/components/ui";
 import { EnvironmentDialog } from "@/components/dialogs/EnvironmentDialog";
 import { ShieldCheck, Bot, Boxes, GitBranch } from "lucide-react";
 
@@ -491,8 +491,8 @@ function AgentBindingsSection({ envs }: { envs: Environment[] }) {
               {a.identityEmoji ? `${a.identityEmoji} ` : ""}
               {a.name}
             </span>
-            <select
-              className="rounded border border-border bg-background px-2 py-1 text-sm disabled:opacity-50"
+            <Select
+              size="sm"
               value={a.environmentId ?? ""}
               disabled={busy === a.id}
               onChange={(e) => bind(a.id, e.target.value || null)}
@@ -503,7 +503,7 @@ function AgentBindingsSection({ envs }: { envs: Environment[] }) {
                   {env.name} ({env.driver})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         ))}
       </Card>

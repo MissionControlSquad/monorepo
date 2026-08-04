@@ -2,7 +2,7 @@
 
 import { useMutation } from "urql";
 import { CREATE_SKILL } from "@/lib/graphql/mutations";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, FormField, FormDialog, Textarea } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 const EMPTY_MARKDOWN = "# Skill\n\nDescribe what the agent should do.";
@@ -56,8 +56,7 @@ export function SkillDialog({ open, onOpenChange, onSaved }: SkillDialogProps) {
         <Input value={f.values.tagline} onChange={(e) => f.set("tagline", e.target.value)} />
       </FormField>
       <FormField label="Markdown">
-        <textarea
-          className="h-40 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
+        <Textarea className="h-40 font-mono text-xs"
           value={f.values.markdown}
           onChange={(e) => f.set("markdown", e.target.value)}
         />

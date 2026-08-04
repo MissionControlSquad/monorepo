@@ -16,7 +16,7 @@ import {
   RAISE_BUDGET_AND_RESUME,
 } from "@/lib/graphql/mutations";
 import { IncidentThreshold, formatCents as money } from "@agentcenter/utils";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Select } from "@/components/ui";
 import { BudgetPolicyDialog } from "@/components/dialogs/BudgetPolicyDialog";
 import { FinanceEventsSection } from "@/components/finance/FinanceEventsSection";
 
@@ -269,9 +269,7 @@ export default function FinancePage() {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Spend by {breakdownBy}</h2>
-          <select
-            className="rounded border border-border bg-background px-2 py-1 text-xs"
-            value={breakdownBy}
+          <Select size="sm" className="text-xs" value={breakdownBy}
             onChange={(e) => setBreakdownBy(e.target.value)}
           >
             <option value="model">model</option>
@@ -281,7 +279,7 @@ export default function FinancePage() {
             <option value="biller">biller</option>
             <option value="issue">issue</option>
             <option value="billingType">billing type</option>
-          </select>
+          </Select>
         </div>
         <Card className="space-y-3 p-4">
           {buckets.length === 0 && (

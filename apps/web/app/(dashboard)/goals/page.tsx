@@ -7,7 +7,7 @@ import { Target } from "lucide-react";
 import { GOAL_STATUSES, GOAL_STATUS } from "@agentcenter/utils";
 import { GOALS_QUERY, AGENTS_QUERY } from "@/lib/graphql/queries";
 import { UPDATE_GOAL, DELETE_GOAL } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, ConfirmDialog, EmptyState } from "@/components/ui";
+import { Button, Card, Badge, ConfirmDialog, EmptyState, Select } from "@/components/ui";
 import { GoalDialog } from "@/components/dialogs/GoalDialog";
 import { useConfirmDelete } from "@/hooks/useCrud";
 
@@ -134,19 +134,15 @@ export default function GoalsPage() {
               </span>
               <span className="flex items-center gap-2">
                 <Badge variant={STATUS_VARIANT[goal.status] ?? "gray"}>{goal.status}</Badge>
-                <select
-                  className="rounded border border-border bg-background px-2 py-1 text-xs"
-                  value={goal.status}
+                <Select size="sm" className="text-xs" value={goal.status}
                   disabled={busy === goal.id}
                   onChange={(e) => act(() => updateGoal({ id: goal.id, status: e.target.value }), goal.id)}
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
-                </select>
-                <select
-                  className="rounded border border-border bg-background px-2 py-1 text-xs"
-                  value={goal.ownerAgentId ?? ""}
+                </Select>
+                <Select size="sm" className="text-xs" value={goal.ownerAgentId ?? ""}
                   disabled={busy === goal.id}
                   onChange={(e) =>
                     act(
@@ -162,7 +158,7 @@ export default function GoalsPage() {
                   {agents.map((a) => (
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
-                </select>
+                </Select>
                 <Button size="sm" variant="secondary" onClick={() => del.ask(goal)}>
                   Delete
                 </Button>

@@ -21,7 +21,7 @@ import {
   UPSERT_SKILL_FILE,
   DELETE_SKILL_FILE,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Textarea } from "@/components/ui";
 import { SkillDialog } from "@/components/dialogs/SkillDialog";
 import { SkillComments } from "@/components/skills/SkillComments";
 import { SkillUpdatePanel } from "@/components/skills/SkillUpdatePanel";
@@ -370,8 +370,7 @@ function SkillFilesPanel({ skillId }: { skillId: string }) {
           value={draft.path}
           onChange={(e) => setDraft((d) => ({ ...d, path: e.target.value }))}
         />
-        <textarea
-          className="h-20 w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
+        <Textarea className="h-20 font-mono text-xs"
           placeholder="file content"
           value={draft.content}
           onChange={(e) => setDraft((d) => ({ ...d, content: e.target.value }))}

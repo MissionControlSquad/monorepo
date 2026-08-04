@@ -23,7 +23,7 @@ import {
   CANCEL_AGENT_RUN,
   PROMOTE_AGENT_RUN_REVIEW,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Spinner } from "@/components/ui";
+import { Button, Card, Badge, Spinner, Select } from "@/components/ui";
 import { RunnerHostDialog } from "@/components/dialogs/RunnerHostDialog";
 import { RunnerQueueCommandDialog } from "@/components/dialogs/RunnerQueueCommandDialog";
 import { Server, Bot, Box } from "lucide-react";
@@ -571,9 +571,7 @@ export default function RunnersPage() {
             Runtime for the selected agent (overrides the runner default)
           </p>
           <div className="flex flex-wrap items-end gap-2">
-            <select
-              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-              value={rt.adapter}
+            <Select size="sm" value={rt.adapter}
               onChange={(e) => setRt((r) => ({ ...r, adapter: e.target.value }))}
             >
               <option value="">runner default</option>
@@ -582,12 +580,10 @@ export default function RunnersPage() {
                   {a.displayName}
                 </option>
               ))}
-            </select>
+            </Select>
             {selectedAdapter?.supportsModel &&
               (selectedAdapter.models.length > 0 ? (
-                <select
-                  className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-                  value={rt.model}
+                <Select size="sm" value={rt.model}
                   onChange={(e) => setRt((r) => ({ ...r, model: e.target.value }))}
                 >
                   <option value="">default model</option>
@@ -596,7 +592,7 @@ export default function RunnersPage() {
                       {m}
                     </option>
                   ))}
-                </select>
+                </Select>
               ) : (
                 <input
                   className="rounded border border-border bg-background px-3 py-1.5 text-sm"
@@ -669,9 +665,7 @@ export default function RunnersPage() {
         <Card className="space-y-2 p-4">
           <p className="text-xs font-medium text-muted-foreground">Sandbox for a selected agent</p>
           <div className="flex flex-wrap items-end gap-2">
-            <select
-              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-              value={agentId}
+            <Select size="sm" value={agentId}
               onChange={(e) => setAgentId(e.target.value)}
             >
               <option value="">Select agent…</option>
@@ -681,10 +675,8 @@ export default function RunnersPage() {
                   {a.name}
                 </option>
               ))}
-            </select>
-            <select
-              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-              value={sbx.provider}
+            </Select>
+            <Select size="sm" value={sbx.provider}
               onChange={(e) => setSbx((s) => ({ ...s, provider: e.target.value }))}
             >
               <option value="">none (run on runner)</option>
@@ -693,7 +685,7 @@ export default function RunnersPage() {
                   {p.displayName}
                 </option>
               ))}
-            </select>
+            </Select>
             <Button
               size="sm"
               variant="secondary"

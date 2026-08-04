@@ -8,7 +8,7 @@ import {
   DELETE_AGENT_INSTRUCTION,
   SEED_AGENT_INSTRUCTIONS,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Select, Textarea } from "@/components/ui";
 import { InstructionFileDialog } from "@/components/dialogs/InstructionFileDialog";
 
 // Epic #18: per-agent instruction bundles (AGENTS.md). AGENT_INSTRUCTIONS-gated. Pick an agent, edit
@@ -103,9 +103,7 @@ export default function InstructionsPage() {
             Markdown instruction files (AGENTS.md) that configure how an agent behaves.
           </p>
         </div>
-        <select
-          className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-          value={agentId}
+        <Select size="sm" value={agentId}
           onChange={(e) => setAgentId(e.target.value)}
         >
           {agents.length === 0 && <option value="">No agents</option>}
@@ -114,7 +112,7 @@ export default function InstructionsPage() {
               {a.name} · {a.role}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <InstructionFileDialog
@@ -178,8 +176,7 @@ export default function InstructionsPage() {
                     </Button>
                   </span>
                 </div>
-                <textarea
-                  className="h-96 w-full rounded border border-border bg-background px-3 py-2 font-mono text-xs"
+                <Textarea className="h-96 font-mono text-xs"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                 />

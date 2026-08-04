@@ -6,7 +6,7 @@ import { Users } from "lucide-react";
 import { TEAMS_QUERY, PREVIEW_TEAM_INSTALL_QUERY } from "@/lib/graphql/queries";
 import { INSTALL_TEAM } from "@/lib/graphql/mutations";
 import { COLLISION_STRATEGIES } from "@agentcenter/utils";
-import { Button, Card, Badge, EmptyState } from "@/components/ui";
+import { Button, Card, Badge, EmptyState, Select } from "@/components/ui";
 import { TeamDialog } from "@/components/dialogs/TeamDialog";
 import { TeamMemberDialog } from "@/components/dialogs/TeamMemberDialog";
 
@@ -126,15 +126,13 @@ export default function TeamsPage() {
                 ))}
               </span>
               <span className="flex items-center gap-2">
-                <select
-                  className="rounded border border-border bg-background px-2 py-1 text-sm"
-                  value={strategy[tm.id] ?? "rename"}
+                <Select size="sm" value={strategy[tm.id] ?? "rename"}
                   onChange={(e) => setStrategy((s) => ({ ...s, [tm.id]: e.target.value }))}
                 >
                   {STRATEGIES.map((s) => (
                     <option key={s} value={s}>on collision: {s}</option>
                   ))}
-                </select>
+                </Select>
                 <Button
                   size="sm"
                   variant="secondary"
