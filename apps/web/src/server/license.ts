@@ -45,6 +45,11 @@ export interface LicenseInfo {
 
 // Only bypass license in vitest — VITEST env is set by the test runner, not exploitable via .env
 const IS_TEST = !!process.env.VITEST;
+// Local-dev escape hatch for manual testing without a signed license. A dedicated flag (NOT VITEST) so
+// it can't affect the test suite — the license tests run under VITEST and must still see real statuses.
+// Hard-guarded on NODE_ENV so it can never take effect in production; set LICENSE_DEV_BYPASS=1 in a dev .env.
+const DEV_LICENSE_BYPASS =
+  process.env.LICENSE_DEV_BYPASS === "1" && process.env.NODE_ENV !== "production";
 const LICENSE_SERVER_URL = process.env.LICENSE_SERVER_URL || "https://admin.app.agentcenter.cloud";
 const IS_SELF_HOSTED = !process.env.LICENSE_REFRESH_TOKEN; // hosted clients have this env injected
 const REFRESH_INTERVAL_MS = IS_SELF_HOSTED
@@ -512,6 +517,28 @@ export async function forceTokenRefresh(): Promise<{
 // ── Get License Status ──────────────────────────────────────────
 
 export async function getLicenseStatus(): Promise<LicenseInfo> {
+  // Report an active enterprise license so the client activation screen (which reads
+  // GET /api/license → getLicenseStatus) doesn't gate local dev. Keyed on the dedicated dev flag, NOT
+  // IS_TEST — the license unit tests run under VITEST and must still see NONE/EXPIRED/REVOKED here.
+  if (DEV_LICENSE_BYPASS) {
+    const now = Math.floor(Date.now() / 1000);
+    const devPayload: AccessTokenPayload = {
+      typ: "access",
+      lid: "dev",
+      sub: "dev",
+      org: "Local Dev",
+      plan: "enterprise",
+      maxAgents: -1,
+      maxProjects: -1,
+      maxSeats: -1,
+      features: [],
+      iat: now,
+      exp: now + 365 * 24 * 60 * 60,
+      iss: "dev",
+    };
+    return buildStatus(LicenseStatusCode.ACTIVE, devPayload, "License active (dev)");
+  }
+
   const stored = await getStoredLicense();
 
   if (!stored) {
@@ -580,13 +607,13 @@ export function invalidateLicenseCache() {
 }
 
 export async function isLicenseActive(): Promise<boolean> {
-  if (IS_TEST) return true;
+  if (IS_TEST || DEV_LICENSE_BYPASS) return true;
   const status = await getCachedLicenseStatus();
   return status.status === LicenseStatusCode.ACTIVE;
 }
 
 export async function isFeatureLicensed(featureKey: string): Promise<boolean> {
-  if (IS_TEST) return true;
+  if (IS_TEST || DEV_LICENSE_BYPASS) return true;
   const status = await getCachedLicenseStatus();
   if (status.status === LicenseStatusCode.ACTIVE) {
     return status.features.includes(featureKey);
@@ -598,7 +625,7 @@ export async function checkLicenseLimit(
   resource: "agents" | "projects" | "seats",
   currentCount: number,
 ): Promise<{ allowed: boolean; limit: number }> {
-  if (IS_TEST) return { allowed: true, limit: -1 };
+  if (IS_TEST || DEV_LICENSE_BYPASS) return { allowed: true, limit: -1 };
   const status = await getCachedLicenseStatus();
 
   const limitMap = {
