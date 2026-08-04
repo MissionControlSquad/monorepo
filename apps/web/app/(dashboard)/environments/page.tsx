@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import {
   ENVIRONMENTS_QUERY,
-  ENVIRONMENT_CAPABILITIES_QUERY,
   AGENT_ENVIRONMENT_BINDINGS_QUERY,
   ENVIRONMENT_LEASES_QUERY,
   EXECUTION_WORKSPACES_QUERY,
@@ -12,7 +11,6 @@ import {
   WORKSPACE_EXECUTION_POLICY_QUERY,
 } from "@/lib/graphql/queries";
 import {
-  CREATE_ENVIRONMENT,
   UPDATE_ENVIRONMENT,
   ARCHIVE_ENVIRONMENT,
   DELETE_ENVIRONMENT,
@@ -26,7 +24,8 @@ import {
 } from "@/lib/graphql/mutations";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
-import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
+import { Button, Card, Badge } from "@/components/ui";
+import { EnvironmentDialog } from "@/components/dialogs/EnvironmentDialog";
 import { ShieldCheck, Bot, Boxes, GitBranch } from "lucide-react";
 
 // Tier D / Phase 3: Environments dashboard — the first-class "where/how a run executes" model.
@@ -52,32 +51,10 @@ interface Environment {
   metadata: Record<string, unknown> | null;
   createdAt: string;
 }
-interface ProviderCap {
-  key: string;
-  displayName: string;
-  isolating: boolean;
-  credentialKeys: string[];
-}
-interface Capabilities {
-  drivers: string[];
-  sandboxProviders: ProviderCap[];
-}
-
-const DRIVER_HELP: Record<string, string> = {
-  local: "Runs on the control-plane host. Not for untrusted/low-trust agents.",
-  ssh: "Runs on a reachable server over SSH (host + key from the vault).",
-  sandbox: "Provisions an isolated sandbox per run (pick a provider below).",
-  plugin: "Delegates to a registered environment plugin.",
-};
-
 export default function EnvironmentsPage() {
   const [{ data }, refetch] = useQuery<{ environments: Environment[] }>({
     query: ENVIRONMENTS_QUERY,
   });
-  const [{ data: capData }] = useQuery<{ environmentCapabilities: Capabilities }>({
-    query: ENVIRONMENT_CAPABILITIES_QUERY,
-  });
-  const [, createEnv] = useMutation(CREATE_ENVIRONMENT);
   const [, archiveEnv] = useMutation(ARCHIVE_ENVIRONMENT);
   const [, deleteEnv] = useMutation(DELETE_ENVIRONMENT);
   const [, updateEnv] = useMutation(UPDATE_ENVIRONMENT);
@@ -89,9 +66,6 @@ export default function EnvironmentsPage() {
   const imagesEnabled = isEnabled(FLAG_KEYS.CUSTOM_IMAGES);
 
   const envs = data?.environments ?? [];
-  const caps = capData?.environmentCapabilities;
-  const drivers = caps?.drivers ?? ["local", "ssh", "sandbox", "plugin"];
-  const providers = caps?.sandboxProviders ?? [];
 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -99,54 +73,8 @@ export default function EnvironmentsPage() {
     Record<string, { ok: boolean; summary: string; details?: string | null }>
   >({});
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    driver: "local",
-    description: "",
-    leasePolicy: "ephemeral",
-    // sandbox
-    provider: "",
-    // ssh
-    host: "",
-    username: "root",
-    keySecret: "",
-  });
 
   const refresh = () => refetch({ requestPolicy: "network-only" });
-
-  function buildConfig(): Record<string, unknown> {
-    if (form.driver === "sandbox") return { provider: form.provider };
-    if (form.driver === "ssh") {
-      const cfg: Record<string, unknown> = { host: form.host.trim() };
-      if (form.username.trim()) cfg.username = form.username.trim();
-      if (form.keySecret.trim()) cfg.privateKey = { secretRef: { name: form.keySecret.trim() } };
-      return cfg;
-    }
-    return {};
-  }
-
-  async function onCreate() {
-    setError(null);
-    if (!form.name.trim()) return setError("Name is required");
-    if (form.driver === "sandbox" && !form.provider) return setError("Pick a sandbox provider");
-    if (form.driver === "ssh" && !form.host.trim()) return setError("SSH host is required");
-    setBusy("create");
-    try {
-      const res = await createEnv({
-        name: form.name.trim(),
-        driver: form.driver,
-        description: form.description.trim() || null,
-        config: buildConfig(),
-        metadata: form.leasePolicy !== "ephemeral" ? { leasePolicy: form.leasePolicy } : undefined,
-      });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Create failed");
-      setForm((f) => ({ ...f, name: "", description: "", host: "", keySecret: "", provider: "" }));
-      setOpen(false);
-      refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function onArchive(id: string) {
     setBusy(id);
@@ -208,85 +136,7 @@ export default function EnvironmentsPage() {
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <FormDialog
-        open={open}
-        onOpenChange={setOpen}
-        title="New environment"
-        onSubmit={onCreate}
-        submitLabel="Create environment"
-        busy={busy === "create"}
-        error={error}
-        submitDisabled={!form.name.trim()}
-      >
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Name">
-            <Input placeholder="e.g. staging-box" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-          </FormField>
-          <FormField label="Driver">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={form.driver}
-              onChange={(e) => setForm((f) => ({ ...f, driver: e.target.value }))}
-            >
-              {drivers.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </FormField>
-        </div>
-        <p className="text-xs text-muted-foreground">{DRIVER_HELP[form.driver]}</p>
-
-        {(form.driver === "sandbox" || form.driver === "local") && (
-          <FormField label="Machine reuse">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={form.leasePolicy}
-              onChange={(e) => setForm((f) => ({ ...f, leasePolicy: e.target.value }))}
-            >
-              <option value="ephemeral">ephemeral (fresh box each run)</option>
-              <option value="reuse_by_environment">reuse (keep the box between runs)</option>
-              <option value="retain_on_failure">retain on failure (keep only failed boxes)</option>
-            </select>
-          </FormField>
-        )}
-
-        {form.driver === "sandbox" && (
-          <FormField label="Provider">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={form.provider}
-              onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))}
-            >
-              <option value="">— pick a provider —</option>
-              {providers.map((p) => (
-                <option key={p.key} value={p.key}>
-                  {p.displayName} {p.isolating ? "(isolated)" : "(on host)"}
-                </option>
-              ))}
-            </select>
-          </FormField>
-        )}
-
-        {form.driver === "ssh" && (
-          <div className="grid grid-cols-[1fr_6rem] gap-4">
-            <FormField label="Host or IP">
-              <Input className="font-mono" value={form.host} onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))} />
-            </FormField>
-            <FormField label="User">
-              <Input className="font-mono" value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
-            </FormField>
-            <div className="col-span-2">
-              <FormField label="Private-key vault secret name">
-                <Input className="font-mono" value={form.keySecret} onChange={(e) => setForm((f) => ({ ...f, keySecret: e.target.value }))} />
-              </FormField>
-            </div>
-          </div>
-        )}
-
-        <FormField label="Description (optional)">
-          <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
-        </FormField>
-      </FormDialog>
+      <EnvironmentDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
       {/* ── List ───────────────────────────────────────────────── */}
       <section className="space-y-3">

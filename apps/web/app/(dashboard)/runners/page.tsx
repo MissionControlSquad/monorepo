@@ -13,10 +13,8 @@ import {
   AGENT_RUN_LIVE_STATUS_QUERY,
 } from "@/lib/graphql/queries";
 import {
-  CREATE_RUNNER_HOST,
   DELETE_RUNNER_HOST,
   RUN_COMMAND_ON_HOST,
-  QUEUE_AGENT_COMMAND,
   CANCEL_RUNNER_COMMAND,
   SET_AGENT_RUNTIME,
   SET_AGENT_SANDBOX_PROVIDER,
@@ -25,7 +23,9 @@ import {
   CANCEL_AGENT_RUN,
   PROMOTE_AGENT_RUN_REVIEW,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
+import { Button, Card, Badge } from "@/components/ui";
+import { RunnerHostDialog } from "@/components/dialogs/RunnerHostDialog";
+import { RunnerQueueCommandDialog } from "@/components/dialogs/RunnerQueueCommandDialog";
 import { Server, Bot, Box } from "lucide-react";
 
 // Tier D: Runners dashboard. BYO hosts (register a server + run raw commands over direct SSH — the
@@ -349,10 +349,8 @@ export default function RunnersPage() {
   const [{ data: sbxData }] = useQuery<{ sandboxProviders: SandboxProvider[] }>({
     query: SANDBOX_PROVIDERS_QUERY,
   });
-  const [, createHost] = useMutation(CREATE_RUNNER_HOST);
   const [, deleteHost] = useMutation(DELETE_RUNNER_HOST);
   const [, runOnHost] = useMutation(RUN_COMMAND_ON_HOST);
-  const [, queueAgent] = useMutation(QUEUE_AGENT_COMMAND);
   const [, setAgentRuntime] = useMutation(SET_AGENT_RUNTIME);
   const [, setAgentSandbox] = useMutation(SET_AGENT_SANDBOX_PROVIDER);
   const [, runInSandbox] = useMutation(RUN_TASK_IN_SANDBOX);
@@ -363,11 +361,9 @@ export default function RunnersPage() {
   const adapters = adapterData?.runtimeAdapters ?? [];
   const sandboxProviders = sbxData?.sandboxProviders ?? [];
 
-  const [form, setForm] = useState({ name: "", host: "", port: "22", username: "root", key: "" });
   const [hostOpen, setHostOpen] = useState(false);
   const [hostCmd, setHostCmd] = useState<Record<string, string>>({});
   const [agentId, setAgentId] = useState("");
-  const [agentCmd, setAgentCmd] = useState("");
   const [queueOpen, setQueueOpen] = useState(false);
   const [rt, setRt] = useState({ adapter: "", model: "", template: "" });
   const [busy, setBusy] = useState<string | null>(null);
@@ -452,28 +448,6 @@ export default function RunnersPage() {
     }
   }
 
-  async function onCreateHost() {
-    setError(null);
-    if (!form.name.trim() || !form.host.trim() || !form.key.trim())
-      return setError("name, host and private key are required");
-    setBusy("host");
-    try {
-      const res = await createHost({
-        name: form.name.trim(),
-        host: form.host.trim(),
-        port: Number(form.port) || 22,
-        username: form.username.trim() || "root",
-        privateKey: form.key,
-      });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to add host");
-      setForm({ name: "", host: "", port: "22", username: "root", key: "" });
-      setHostOpen(false);
-      refetchHosts({ requestPolicy: "network-only" });
-    } finally {
-      setBusy(null);
-    }
-  }
-
   async function onRunHost(id: string) {
     const command = (hostCmd[id] ?? "").trim();
     if (!command) return;
@@ -482,22 +456,6 @@ export default function RunnersPage() {
       const res = await runOnHost({ hostId: id, command });
       if (res.error) setError(res.error.graphQLErrors[0]?.message ?? "Run failed");
       setHostCmd((m) => ({ ...m, [id]: "" }));
-      setHistoryKey((k) => k + 1);
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onQueueAgent() {
-    setError(null);
-    if (!agentId) return setError("Pick an agent");
-    if (!agentCmd.trim()) return setError("Command is required");
-    setBusy("agent");
-    try {
-      const res = await queueAgent({ agentId, command: agentCmd.trim() });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Queue failed");
-      setAgentCmd("");
-      setQueueOpen(false);
       setHistoryKey((k) => k + 1);
     } finally {
       setBusy(null);
@@ -525,40 +483,11 @@ export default function RunnersPage() {
           <Button size="sm" onClick={() => setHostOpen(true)}>Add host</Button>
         </div>
 
-        <FormDialog
+        <RunnerHostDialog
           open={hostOpen}
           onOpenChange={setHostOpen}
-          title="Add BYO server"
-          description="Run commands on your own server over SSH. The private key is stored encrypted, never shown again."
-          onSubmit={onCreateHost}
-          submitLabel="Add host"
-          busy={busy === "host"}
-          error={error}
-          submitDisabled={!form.name.trim() || !form.host.trim() || !form.key.trim()}
-        >
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Name">
-              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-            </FormField>
-            <FormField label="Host or IP">
-              <Input className="font-mono" value={form.host} onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))} />
-            </FormField>
-            <FormField label="Port">
-              <Input value={form.port} onChange={(e) => setForm((f) => ({ ...f, port: e.target.value }))} />
-            </FormField>
-            <FormField label="Username">
-              <Input value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
-            </FormField>
-          </div>
-          <FormField label="SSH private key (PEM)">
-            <textarea
-              className="h-28 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
-              placeholder="Stored encrypted, never shown again"
-              value={form.key}
-              onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))}
-            />
-          </FormField>
-        </FormDialog>
+          onSaved={() => refetchHosts({ requestPolicy: "network-only" })}
+        />
 
         {hosts.map((h) => (
           <Card key={h.id} className="space-y-2 p-4">
@@ -622,41 +551,14 @@ export default function RunnersPage() {
           poll. Works behind NAT — the machine only makes outbound connections.
         </p>
 
-        <FormDialog
+        <RunnerQueueCommandDialog
           open={queueOpen}
           onOpenChange={setQueueOpen}
-          title="Queue a runner command"
-          description="The agent's runner daemon pulls this on its next poll."
-          onSubmit={onQueueAgent}
-          submitLabel="Queue"
-          busy={busy === "agent"}
-          error={error}
-          submitDisabled={!agentId || !agentCmd.trim()}
-        >
-          <FormField label="Agent">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={agentId}
-              onChange={(e) => setAgentId(e.target.value)}
-            >
-              <option value="">Select agent…</option>
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.identityEmoji ? `${a.identityEmoji} ` : ""}
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Command">
-            <Input
-              className="font-mono"
-              placeholder="e.g. git pull && npm test"
-              value={agentCmd}
-              onChange={(e) => setAgentCmd(e.target.value)}
-            />
-          </FormField>
-        </FormDialog>
+          agents={agents}
+          agentId={agentId}
+          onAgentChange={setAgentId}
+          onSaved={() => setHistoryKey((k) => k + 1)}
+        />
 
         {/* Per-agent runtime: which adapter + model the runner uses for the selected agent. */}
         <Card className="space-y-2 p-4">
