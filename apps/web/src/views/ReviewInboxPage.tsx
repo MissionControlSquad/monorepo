@@ -412,7 +412,7 @@ function IncidentsSection() {
 
 export function ReviewInboxPage() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <div className="flex items-center gap-2">
         <ClipboardCheck className="h-5 w-5 text-muted-foreground" />
         <div>

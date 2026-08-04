@@ -21,10 +21,10 @@ export default function AdapterPluginsPage() {
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
   return (
-    <div className="mx-auto space-y-6 p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Adapter plugins</h1>
+          <h1 className="text-lg font-semibold text-foreground">Adapter plugins</h1>
           <p className="text-sm text-muted-foreground">Declarative runtime adapters (base + template). Zero code execution.</p>
         </div>
         <Button onClick={() => setOpen(true)}>Add adapter</Button>

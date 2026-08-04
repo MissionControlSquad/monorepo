@@ -24,10 +24,10 @@ export default function LocalServicesPage() {
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
   return (
-    <div className="mx-auto space-y-6 p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Local services</h1>
+          <h1 className="text-lg font-semibold text-foreground">Local services</h1>
           <p className="text-sm text-muted-foreground">Supervised local_stdio services (e.g. MCP slots).</p>
         </div>
         <Button onClick={() => setOpen(true)}>Register service</Button>

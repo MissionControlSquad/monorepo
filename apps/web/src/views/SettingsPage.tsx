@@ -125,7 +125,7 @@ export function SettingsPage() {
   };
 
   return (
-    <PageLayout maxWidth="narrow">
+    <PageLayout maxWidth="wide">
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Settings" }]} />
       <div>
         <h1 className="text-xl font-semibold text-foreground">Settings</h1>

@@ -25,10 +25,10 @@ export default function ProviderAuthPage() {
   const rows = data?.providerAuthStates ?? [];
 
   return (
-    <div className="mx-auto space-y-6 p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Provider auth</h1>
+          <h1 className="text-lg font-semibold text-foreground">Provider auth</h1>
           <p className="text-sm text-muted-foreground">Health of AI provider credentials.</p>
         </div>
         <Button variant={needsAttention ? "primary" : "ghost"} size="sm" onClick={() => setNeedsAttention((v) => !v)}>

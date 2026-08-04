@@ -1479,7 +1479,7 @@ export function LiveGatewayPage() {
   const existingIds = new Set(connections.map((c) => c.id));
 
   return (
-    <PageLayout>
+    <PageLayout maxWidth="wide">
       {showWizard && (
         <SetupWizard
           onClose={() => setShowWizard(false)}
@@ -1522,7 +1522,7 @@ export function LiveGatewayPage() {
 
         {/* How it works — shown only when no machines are connected yet */}
         {!loading && connections.length === 0 && (
-          <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             {[
               {
                 icon: <Monitor className="w-4 h-4 text-primary" />,
@@ -1553,7 +1553,7 @@ export function LiveGatewayPage() {
 
         {/* Stats — only when machines exist */}
         {connections.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             {[
               { label: "Live now", value: liveCount, highlight: liveCount > 0 },
               { label: "Total machines", value: connections.length, highlight: false },

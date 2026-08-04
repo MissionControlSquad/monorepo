@@ -50,10 +50,10 @@ export default function SmokeLabPage() {
   }
 
   return (
-    <div className="mx-auto space-y-6 p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Tool smoke-lab</h1>
+          <h1 className="text-lg font-semibold text-foreground">Tool smoke-lab</h1>
           <p className="text-sm text-muted-foreground">
             Assert how a tool call should be admitted, then run it through the real gateway.
           </p>

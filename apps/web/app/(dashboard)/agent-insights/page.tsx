@@ -18,9 +18,9 @@ export default function AgentInsightsPage() {
   const decisions = (dData?.decisions ?? []).slice(0, 30);
 
   return (
-    <div className="mx-auto space-y-8 p-6">
+    <div className="mx-auto space-y-8 p-4 sm:p-6">
       <div>
-        <h1 className="text-xl font-semibold text-foreground">Agent insights</h1>
+        <h1 className="text-lg font-semibold text-foreground">Agent insights</h1>
         <p className="text-sm text-muted-foreground">Productivity flags and the agent decision log.</p>
       </div>
 
