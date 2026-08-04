@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { prisma } from "../../src/server/prisma";
 import { ensureBuiltinAdapters } from "../../src/server/adapters/registry";
 import { canonicalAdapterKey, getAdapter as getCodeAdapter } from "@agentcenter/utils";
@@ -16,8 +16,28 @@ const EXPECTED_TYPES = [
   "hermes",
 ];
 
+// agent_adapters is global seed data shared across all test files (the migration seeds 11 rows; it is
+// never truncated by tests/setup.ts). This file wipes the table to exercise the code seeder in isolation,
+// so it must SNAPSHOT the migration seed up front and RESTORE it afterwards — otherwise the table is left
+// holding only the ~9 code-seeded rows and later files (e.g. adapters.test.ts, which expects the full 11)
+// fail order-dependently.
+let seedSnapshot: Awaited<ReturnType<typeof prisma.agentAdapter.findMany>> = [];
+
+beforeAll(async () => {
+  seedSnapshot = await prisma.agentAdapter.findMany();
+});
+
 beforeEach(async () => {
   await prisma.agentAdapter.deleteMany({});
+});
+
+afterAll(async () => {
+  await prisma.agentAdapter.deleteMany({});
+  if (seedSnapshot.length) {
+    // Cast: findMany rows carry `configSchema: JsonValue` (nullable), which Prisma's createMany input
+    // type won't accept directly. We're re-inserting the exact rows we snapshotted, so this is safe.
+    await prisma.agentAdapter.createMany({ data: seedSnapshot as never[], skipDuplicates: true });
+  }
 });
 
 describe("ensureBuiltinAdapters (#6)", () => {

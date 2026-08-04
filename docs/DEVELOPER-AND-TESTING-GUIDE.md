@@ -94,9 +94,11 @@ Every feature is built (and should be extended) as the same 7-layer slice, in th
 - **Tenancy + role:** resolvers call `requireRole(ctx, "admin" | "member")`, which returns a tenancy
   object exposing `.workspaceId` and `.userId`. **Every query filters by `tenancy.workspaceId`; every
   mutation writes it.** Mutations that change config are `"admin"`; reads are `"member"`.
-- **Migrations vs test DB:** production uses `prisma migrate` (the timestamped SQL dirs). The **test DB
-  uses `prisma db push`** (see §5.2) — so anything a migration does in *raw SQL* (partial indexes,
-  backfills, triggers) is **absent in tests**. Don't write a test that depends on a raw-SQL-only artifact.
+- **Migrations vs test DB:** production **and the test DB** both run the real migration chain
+  (`prisma migrate deploy`, the timestamped SQL dirs) — so raw-SQL artifacts (seed rows, partial/
+  expression indexes, backfills) **are present in tests too**. (This closed a former gap where the test
+  DB used `db push` and those artifacts were invisible; see §5.2.) Prisma finds the migrations via
+  `packages/database/prisma.config.ts` (`migrations.path`), not the schema folder.
 
 ### 3.2 Wiring cheat-sheet (the exact glue)
 
@@ -170,12 +172,17 @@ is "call util + Prisma," the util test + integration test already cover it.
     go stale across files that toggle flags). Committed so CI inherits it; the flag-cache unit test opts
     back out.
   - `@` → `apps/web/src`; `graphql` deduped to one instance (avoids cross-realm `GraphQLSchema` errors).
-- **Global setup** (`tests/setup.ts`): `beforeAll` runs `prisma db push` + truncates; `afterAll`
-  truncates + disconnects. It **`TRUNCATE`s `feature_flags` + `licenses` per file** so every file starts
-  from all-flags-at-default; a file that needs an opt-in flag on must seed it in its own
-  `beforeAll`/`beforeEach`. **No `afterEach`** — e2e files intentionally share state across `it`s.
-- **Test DB uses `db push`, not `migrate`** → raw-SQL migration artifacts (partial unique indexes,
-  backfills) are **not present**. Design assertions accordingly.
+- **Global setup** (`tests/setup.ts`): `beforeAll` runs `prisma migrate deploy` (via
+  `--config ../../packages/database/prisma.config.ts`; strips `AI_AGENT`/`CLAUDECODE` so Prisma's agent
+  guardrail doesn't block the non-interactive deploy) + truncates; `afterAll` truncates + disconnects.
+  It **`TRUNCATE`s `feature_flags` + `licenses` per file** (plus the data tables listed in `truncateAll`)
+  so every file starts from all-flags-at-default; a file that needs an opt-in flag on must seed it in its
+  own `beforeAll`/`beforeEach`. `agent_adapters` is **not** truncated — the 11 migration-seeded adapters
+  persist across files. **No `afterEach`** — e2e files intentionally share state across `it`s.
+- **The test DB runs the real migrations** → raw-SQL artifacts (seed rows, partial unique indexes such as
+  `one_active_per_env_provider` and `agent_runs_task_single_queued`, backfills) **are enforced in tests**,
+  matching production. Write assertions that respect those constraints (e.g. demote the current `active`
+  row before inserting a new one).
 - **Helpers** (`tests/helpers.ts`): `adminSetup/adminLogin/adminLogout`, `createTestAgent/Task/Project`,
   `addProjectMember`, `buildRequest` (adds bearer + default `x-forwarded-for`), `callRoute` (wraps a
   route handler with the `{ params: Promise.resolve(...) }` App-Router context), and `runGraphQL(query,
@@ -204,8 +211,18 @@ rm -rf apps/web/.next && npx turbo run build --filter=@agentcenter/web   # expec
 ```
 
 Test DB (local): `postgresql://dharmikjagodana:yourpassword@127.0.0.1:5432/clawd_test`. Start Postgres
-first; some e2e tests also need Redis running (they are environmentally skipped/failing without it — that
-is not a product regression).
+first; the e2e suite also needs **Redis** (`brew install redis`; the stock brew service aborts on a broken
+`redisbloom` module path, so run a bare server: `redis-server --port 6379 --daemonize yes --save "" --appendonly no`).
+
+**First-time local dev DB** (the app runs against `clawd`, per `apps/web/.env`):
+```bash
+createdb clawd    # or: psql -d postgres -c 'CREATE DATABASE clawd;'
+cd packages/database && npx dotenv -e ../../apps/web/.env -- \
+  env -u AI_AGENT -u CLAUDECODE npx prisma migrate deploy    # applies all migrations + raw-SQL seeds
+```
+Feature flags aren't seeded (the old `seed-flags.ts` has a stale import) — that's fine, the app falls back
+to `FLAG_DEFAULTS`; toggle features from *Settings → Feature flags*. The test DB (`clawd_test`) is migrated
+automatically by `tests/setup.ts`.
 
 ### 5.4 Anatomy of the two test styles
 
@@ -289,6 +306,11 @@ Representative slices and where each is verified (non-exhaustive; the pattern is
   string — graphql-yoga may mask `"Requires 'admin' role"`.
 - **`env.ts` production checks** belong in `validateEnv()`, **not** `.superRefine` on the schema —
   a refinement breaks `lenientSchema.extend()` at import time (bit the SECRET_ENCRYPTION_KEY boot check).
-- **Raw-SQL migration artifacts are invisible in tests** (`db push` ≠ `migrate`) — e.g. a partial unique
-  index enforced only in prod. Don't assert on it in an integration test.
+- **Raw-SQL migration artifacts ARE enforced in tests** now (the test DB runs `migrate deploy`, not
+  `db push`). A partial unique index like `one_active_per_env_provider` will reject a second `active` row —
+  so services must demote-then-insert. (Historically the test DB used `db push` and these were invisible,
+  which masked exactly this class of bug; the fix was wiring `migrations.path` into `prisma.config.ts`.)
+- **Prisma's agent guardrail** blocks destructive migrate commands when `AI_AGENT`/`CLAUDECODE` are set.
+  `setup.ts` strips them for its `migrate deploy`; to run migrate commands manually, prefix with
+  `env -u AI_AGENT -u CLAUDECODE …`.
 - **Test files share the DB** — truncate what you create in `beforeEach`, and seed opt-in flags per file.
