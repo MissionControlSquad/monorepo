@@ -8,8 +8,8 @@ import {
   DELETE_AGENT_INSTRUCTION,
   SEED_AGENT_INSTRUCTIONS,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
-import { useResourceDialog } from "@/hooks/useCrud";
+import { Button, Card, Badge } from "@/components/ui";
+import { InstructionFileDialog } from "@/components/dialogs/InstructionFileDialog";
 
 // Epic #18: per-agent instruction bundles (AGENTS.md). AGENT_INSTRUCTIONS-gated. Pick an agent, edit
 // its markdown instruction files, seed the role default bundle. Persisted config — delivery into a
@@ -49,20 +49,8 @@ export default function InstructionsPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fileOpen, setFileOpen] = useState(false);
   const refresh = () => refetch({ requestPolicy: "network-only" });
-
-  const fileDlg = useResourceDialog({
-    empty: { fileName: "" },
-    submit: async (v) => {
-      const name = v.fileName.trim();
-      if (!name) return "File name is required";
-      const res = await upsert({ agentId, fileName: name, content: `# ${name}\n\n` });
-      if (res.error) return res.error.graphQLErrors?.[0]?.message ?? "Invalid file name";
-      setSelected(name);
-      return null;
-    },
-    onDone: refresh,
-  });
 
   // Keep the editor in sync with the selected file.
   useEffect(() => {
@@ -129,25 +117,13 @@ export default function InstructionsPage() {
         </select>
       </div>
 
-      <FormDialog
-        open={fileDlg.open}
-        onOpenChange={fileDlg.setOpen}
-        title="Add instruction file"
-        onSubmit={fileDlg.onSubmit}
-        submitLabel="Add file"
-        busy={fileDlg.busy}
-        error={fileDlg.error}
-        submitDisabled={!fileDlg.values.fileName.trim()}
-      >
-        <FormField label="File name">
-          <Input
-            className="font-mono"
-            placeholder="NEW.md"
-            value={fileDlg.values.fileName}
-            onChange={(e) => fileDlg.set("fileName", e.target.value)}
-          />
-        </FormField>
-      </FormDialog>
+      <InstructionFileDialog
+        open={fileOpen}
+        onOpenChange={setFileOpen}
+        agentId={agentId}
+        onCreated={setSelected}
+        onSaved={refresh}
+      />
 
       {agentId && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[220px_1fr]">
@@ -178,7 +154,7 @@ export default function InstructionsPage() {
                 {f.fileName === "AGENTS.md" && <Badge variant="blue">core</Badge>}
               </button>
             ))}
-            <Button size="sm" variant="ghost" className="w-full" onClick={fileDlg.openCreate}>
+            <Button size="sm" variant="ghost" className="w-full" onClick={() => setFileOpen(true)}>
               + Add file
             </Button>
           </Card>

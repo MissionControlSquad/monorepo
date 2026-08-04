@@ -2,16 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation } from "urql";
-import { AGENT_CAPABILITIES } from "@agentcenter/utils";
 import {
   AGENTS_QUERY,
   AGENT_CAPABILITY_GRANTS_QUERY,
   AGENT_AUTHZ_EVENTS_QUERY,
 } from "@/lib/graphql/queries";
-import { GRANT_AGENT_CAPABILITY, REVOKE_AGENT_CAPABILITY } from "@/lib/graphql/mutations";
+import { REVOKE_AGENT_CAPABILITY } from "@/lib/graphql/mutations";
 import { AGENT_AUTHZ_DECISION } from "@agentcenter/utils";
-import { Button, Card, Badge, FormField, FormDialog } from "@/components/ui";
-import { useResourceDialog } from "@/hooks/useCrud";
+import { Button, Card, Badge } from "@/components/ui";
+import { AgentCapabilityGrantDialog } from "@/components/dialogs/AgentCapabilityGrantDialog";
 
 // Epic #21: agent authorization. AGENT_AUTHZ-gated. Grant capabilities to an agent (the agent analog
 // of a human role) and review recent denials. Grants only bite when the agent is in restricted mode
@@ -54,28 +53,18 @@ export default function AgentAuthzPage() {
     variables: { agentId },
     pause: !agentId,
   });
-  const [, grant] = useMutation(GRANT_AGENT_CAPABILITY);
   const [, revoke] = useMutation(REVOKE_AGENT_CAPABILITY);
 
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const grants = grantsData?.agentCapabilityGrants ?? [];
   const events = eventsData?.agentAuthzEvents ?? [];
-  const grantedCaps = new Set(grants.map((g) => g.capability));
+  const grantedCaps = grants.map((g) => g.capability);
 
   function refresh() {
     refetchGrants({ requestPolicy: "network-only" });
     refetchEvents({ requestPolicy: "network-only" });
   }
-
-  const dlg = useResourceDialog({
-    empty: { cap: AGENT_CAPABILITIES[0] as string },
-    submit: async (v) => {
-      if (grantedCaps.has(v.cap)) return "That capability is already granted";
-      const r = await grant({ agentId, capability: v.cap });
-      return r.error?.message ?? null;
-    },
-    onDone: refresh,
-  });
 
   async function onRevoke(id: string) {
     setBusy(true);
@@ -113,36 +102,18 @@ export default function AgentAuthzPage() {
 
       {agentId && (
         <>
-          <FormDialog
-            open={dlg.open}
-            onOpenChange={dlg.setOpen}
-            title="Grant capability"
-            description="Grants are enforced when the agent runs restricted."
-            onSubmit={dlg.onSubmit}
-            submitLabel="Grant"
-            busy={dlg.busy}
-            error={dlg.error}
-          >
-            <FormField label="Capability">
-              <select
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={dlg.values.cap}
-                onChange={(e) => dlg.set("cap", e.target.value)}
-              >
-                {AGENT_CAPABILITIES.map((c) => (
-                  <option key={c} value={c} disabled={grantedCaps.has(c)}>
-                    {c}
-                    {grantedCaps.has(c) ? " (granted)" : ""}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-          </FormDialog>
+          <AgentCapabilityGrantDialog
+            open={open}
+            onOpenChange={setOpen}
+            agentId={agentId}
+            grantedCaps={grantedCaps}
+            onSaved={refresh}
+          />
 
           <Card className="space-y-2 p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-medium text-foreground">Granted capabilities</h2>
-              <Button size="sm" onClick={dlg.openCreate}>Grant capability</Button>
+              <Button size="sm" onClick={() => setOpen(true)}>Grant capability</Button>
             </div>
             {grants.length === 0 && (
               <p className="text-sm text-muted-foreground">
