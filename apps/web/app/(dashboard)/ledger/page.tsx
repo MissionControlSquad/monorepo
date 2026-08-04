@@ -11,7 +11,7 @@ import {
 } from "@/lib/graphql/queries";
 import { CREATE_LEDGER_EVENT, DELETE_LEDGER_EVENT } from "@/lib/graphql/mutations";
 import { formatCents as money } from "@agentcenter/utils";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
 
 // Epic #16: business finance ledger (human P&L). API-gated by the LEDGER feature + buildbase role
 // (admin records/edits/deletes; member views). Workspace-scoped server-side. NOT agent cost (#4).
@@ -90,6 +90,7 @@ export default function LedgerPage() {
   const [, deleteEvent] = useMutation(DELETE_LEDGER_EVENT);
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     kind: "expense",
     category: "",
@@ -136,6 +137,7 @@ export default function LedgerPage() {
         return;
       }
       setForm((f) => ({ ...f, category: "", biller: "", amount: "", description: "" }));
+      setOpen(false);
       refresh();
     } finally {
       setBusy(null);
@@ -154,10 +156,15 @@ export default function LedgerPage() {
 
   return (
     <div className="mx-auto space-y-6 p-4 sm:p-6">
-      <h1 className="text-lg font-semibold text-foreground">Ledger</h1>
-      <p className="-mt-4 text-sm text-muted-foreground">
-        Your business revenue &amp; expenses (P&amp;L). Separate from agent run cost.
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Ledger</h1>
+          <p className="text-sm text-muted-foreground">
+            Your business revenue &amp; expenses (P&amp;L). Separate from agent run cost.
+          </p>
+        </div>
+        <Button onClick={() => setOpen(true)}>Record entry</Button>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <SummaryCard
@@ -178,59 +185,55 @@ export default function LedgerPage() {
         <SummaryCard label="Entries" value={String(summary?.eventCount ?? 0)} />
       </div>
 
-      {/* Record an entry */}
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-foreground">Record an entry</h2>
-        <Card className="space-y-3 p-4">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-6">
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="Record a ledger entry"
+        onSubmit={onCreate}
+        submitLabel="Add entry"
+        busy={busy === "create"}
+        error={formError}
+        submitDisabled={!form.category.trim() || !form.amount.trim()}
+      >
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Kind">
             <select
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={form.kind}
               onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value }))}
             >
               <option value="revenue">revenue</option>
               <option value="expense">expense</option>
             </select>
-            <input
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm sm:col-span-2"
-              placeholder="Category"
-              value={form.category}
-              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-            />
-            <input
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-              placeholder="Biller / vendor"
-              value={form.biller}
-              onChange={(e) => setForm((f) => ({ ...f, biller: e.target.value }))}
-            />
-            <input
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-              placeholder="Amount ($)"
+          </FormField>
+          <FormField label="Amount ($)">
+            <Input
               inputMode="decimal"
+              placeholder="0.00"
               value={form.amount}
               onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
             />
-            <input
-              type="date"
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-              value={form.date}
-              onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <input
-              className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-              placeholder="Description (optional)"
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            />
-            <Button size="sm" disabled={busy === "create"} onClick={onCreate}>
-              Add entry
-            </Button>
-          </div>
-          {formError && <p className="text-sm text-destructive">{formError}</p>}
-        </Card>
-      </section>
+          </FormField>
+        </div>
+        <FormField label="Category">
+          <Input
+            placeholder="e.g. Hosting"
+            value={form.category}
+            onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+          />
+        </FormField>
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Biller / vendor (optional)">
+            <Input value={form.biller} onChange={(e) => setForm((f) => ({ ...f, biller: e.target.value }))} />
+          </FormField>
+          <FormField label="Date">
+            <Input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
+          </FormField>
+        </div>
+        <FormField label="Description (optional)">
+          <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+        </FormField>
+      </FormDialog>
 
       {/* Spend/revenue by category */}
       <section className="space-y-2">
