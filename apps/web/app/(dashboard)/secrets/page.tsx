@@ -20,7 +20,7 @@ import {
   IMPORT_SECRETS,
   CHECK_SECRET_PROVIDER_HEALTH,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
 
 // Epic #5: secrets vault. API-gated by SECRETS_VAULT + buildbase role (admin manages; member views
 // metadata). Values are write-only — they are never fetched back, only rotated. Encryption at rest
@@ -83,6 +83,7 @@ export default function SecretsPage() {
   const [, importSecrets] = useMutation(IMPORT_SECRETS);
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: "",
     value: "",
@@ -195,6 +196,7 @@ export default function SecretsPage() {
           });
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create");
       setForm({ name: "", value: "", description: "", providerId: "", personal: false });
+      setOpen(false);
       refresh();
     } finally {
       setBusy(null);
@@ -246,11 +248,54 @@ export default function SecretsPage() {
 
   return (
     <div className="mx-auto space-y-6 p-4 sm:p-6">
-      <h1 className="text-lg font-semibold text-foreground">Secrets</h1>
-      <p className="-mt-4 text-sm text-muted-foreground">
-        Encrypted at rest (AES-256-GCM). Values are write-only — they are never shown again, only
-        rotated. Bind a secret to an agent to inject it as an env var.
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Secrets</h1>
+          <p className="text-sm text-muted-foreground">
+            Encrypted at rest (AES-256-GCM). Values are write-only — they are never shown again, only
+            rotated. Bind a secret to an agent to inject it as an env var.
+          </p>
+        </div>
+        <Button onClick={() => setOpen(true)}>New secret</Button>
+      </div>
+
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="New secret"
+        description="Encrypted at rest. The value is write-only — you can rotate it later but never read it back."
+        onSubmit={onCreate}
+        submitLabel="Add secret"
+        busy={busy === "create"}
+        error={error}
+        submitDisabled={!form.name.trim() || !form.value}
+      >
+        <FormField label="Name">
+          <Input placeholder="e.g. OPENAI_API_KEY" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+        </FormField>
+        <FormField label="Value (write-only)">
+          <Input type="password" value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))} />
+        </FormField>
+        <FormField label="Description (optional)">
+          <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+        </FormField>
+        <FormField label="Provider">
+          <select
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+            value={form.providerId}
+            onChange={(e) => setForm((f) => ({ ...f, providerId: e.target.value }))}
+          >
+            <option value="">Local envelope</option>
+            {providers.map((p) => (
+              <option key={p.id} value={p.id}>{p.name} ({p.kind})</option>
+            ))}
+          </select>
+        </FormField>
+        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <input type="checkbox" checked={form.personal} onChange={(e) => setForm((f) => ({ ...f, personal: e.target.checked }))} />
+          Personal (only you can see &amp; manage it)
+        </label>
+      </FormDialog>
 
       {/* Provider configs — point the vault at an external backend (aws/vault) or the local
           envelope (env). `config` holds only non-secret settings; backend creds are Secrets. */}
@@ -328,55 +373,6 @@ export default function SecretsPage() {
       </Card>
 
       {/* Create */}
-      <Card className="space-y-3 p-4">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Name (e.g. OPENAI_API_KEY)"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Value (write-only)"
-            type="password"
-            value={form.value}
-            onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Description (optional)"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-          <select
-            className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-            value={form.providerId}
-            onChange={(e) => setForm((f) => ({ ...f, providerId: e.target.value }))}
-          >
-            <option value="">local envelope</option>
-            {providers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.kind})
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={form.personal}
-              onChange={(e) => setForm((f) => ({ ...f, personal: e.target.checked }))}
-            />
-            personal (only you can see &amp; manage it)
-          </label>
-          <Button size="sm" disabled={busy === "create"} onClick={onCreate}>
-            Add secret
-          </Button>
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </Card>
 
       {/* Bulk import — paste a .env (KEY=VALUE lines). Values are encrypted on the way in. */}
       <Card className="space-y-2 p-4">
