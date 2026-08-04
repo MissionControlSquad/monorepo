@@ -8,19 +8,18 @@ import {
   SECRET_ACCESS_EVENTS_QUERY,
 } from "@/lib/graphql/queries";
 import {
-  CREATE_SECRET,
-  CREATE_USER_SECRET,
   ROTATE_SECRET,
   BIND_SECRET,
   UNBIND_SECRET,
   UPDATE_SECRET,
   SET_SECRET_STATUS,
-  CREATE_SECRET_PROVIDER,
   DELETE_SECRET_PROVIDER,
-  IMPORT_SECRETS,
   CHECK_SECRET_PROVIDER_HEALTH,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
+import { Button, Card, Badge } from "@/components/ui";
+import { SecretDialog } from "@/components/dialogs/SecretDialog";
+import { SecretProviderDialog } from "@/components/dialogs/SecretProviderDialog";
+import { SecretImportDialog } from "@/components/dialogs/SecretImportDialog";
 
 // Epic #5: secrets vault. API-gated by SECRETS_VAULT + buildbase role (admin manages; member views
 // metadata). Values are write-only — they are never fetched back, only rotated. Encryption at rest
@@ -63,39 +62,23 @@ const STATUS_VARIANT: Record<string, "green" | "yellow" | "gray"> = {
   archived: "gray",
 };
 
-const PROVIDER_KINDS = ["env", "aws", "vault"];
-
 export default function SecretsPage() {
   const [{ data }, refetch] = useQuery<{ secrets: Secret[] }>({ query: SECRETS_QUERY });
   const [{ data: providerData }, refetchProviders] = useQuery<{ secretProviders: Provider[] }>({
     query: SECRET_PROVIDERS_QUERY,
   });
-  const [, createSecret] = useMutation(CREATE_SECRET);
-  const [, createUserSecret] = useMutation(CREATE_USER_SECRET);
   const [, rotateSecret] = useMutation(ROTATE_SECRET);
   const [, bindSecret] = useMutation(BIND_SECRET);
   const [, unbindSecret] = useMutation(UNBIND_SECRET);
   const [, setStatus] = useMutation(SET_SECRET_STATUS);
   const [, updateSecret] = useMutation(UPDATE_SECRET);
-  const [, createProvider] = useMutation(CREATE_SECRET_PROVIDER);
   const [, deleteProvider] = useMutation(DELETE_SECRET_PROVIDER);
   const [, checkProviderHealth] = useMutation(CHECK_SECRET_PROVIDER_HEALTH);
-  const [, importSecrets] = useMutation(IMPORT_SECRETS);
 
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    value: "",
-    description: "",
-    providerId: "",
-    personal: false,
-  });
-  const [providerForm, setProviderForm] = useState({ name: "", kind: "env" });
   const [providerOpen, setProviderOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [importText, setImportText] = useState("");
-  const [importOverwrite, setImportOverwrite] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const [rotateVal, setRotateVal] = useState<Record<string, string>>({});
   const [bindForm, setBindForm] = useState<Record<string, { env: string; agentId: string }>>({});
@@ -111,25 +94,6 @@ export default function SecretsPage() {
     id ? (providers.find((p) => p.id === id)?.name ?? "unknown") : null;
   const refresh = () => refetch({ requestPolicy: "network-only" });
   const refreshProviders = () => refetchProviders({ requestPolicy: "network-only" });
-
-  async function onCreateProvider() {
-    setError(null);
-    if (!providerForm.name.trim()) return setError("Provider name is required");
-    setBusy("provider");
-    try {
-      const res = await createProvider({
-        name: providerForm.name.trim(),
-        kind: providerForm.kind,
-      });
-      if (res.error)
-        return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create provider");
-      setProviderForm({ name: "", kind: "env" });
-      setProviderOpen(false);
-      refreshProviders();
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function onCheckProvider(id: string) {
     setBusy(id);
@@ -151,56 +115,6 @@ export default function SecretsPage() {
     try {
       await deleteProvider({ id });
       refreshProviders();
-      refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onImport() {
-    setError(null);
-    setImportResult(null);
-    if (!importText.trim()) return setError("Paste some KEY=VALUE lines to import");
-    setBusy("import");
-    try {
-      const res = await importSecrets({ text: importText, overwrite: importOverwrite });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to import");
-      const s = res.data?.importSecrets;
-      if (s) {
-        setImportResult(
-          `Imported: ${s.created} created, ${s.rotated} rotated, ${s.skipped} skipped` +
-            (s.invalidLines ? `, ${s.invalidLines} invalid line(s) ignored` : ""),
-        );
-        setImportText("");
-        setImportOpen(false);
-      }
-      refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onCreate() {
-    setError(null);
-    if (!form.name.trim()) return setError("Name is required");
-    if (!form.value) return setError("Value is required");
-    setBusy("create");
-    try {
-      const res = form.personal
-        ? await createUserSecret({
-            name: form.name.trim(),
-            value: form.value,
-            description: form.description.trim() || null,
-          })
-        : await createSecret({
-            name: form.name.trim(),
-            value: form.value,
-            description: form.description.trim() || null,
-            providerId: form.providerId || null,
-          });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create");
-      setForm({ name: "", value: "", description: "", providerId: "", personal: false });
-      setOpen(false);
       refresh();
     } finally {
       setBusy(null);
@@ -266,43 +180,13 @@ export default function SecretsPage() {
         </div>
       </div>
 
-      <FormDialog
-        open={open}
-        onOpenChange={setOpen}
-        title="New secret"
-        description="Encrypted at rest. The value is write-only — you can rotate it later but never read it back."
-        onSubmit={onCreate}
-        submitLabel="Add secret"
-        busy={busy === "create"}
-        error={error}
-        submitDisabled={!form.name.trim() || !form.value}
-      >
-        <FormField label="Name">
-          <Input placeholder="e.g. OPENAI_API_KEY" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-        </FormField>
-        <FormField label="Value (write-only)">
-          <Input type="password" value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))} />
-        </FormField>
-        <FormField label="Description (optional)">
-          <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
-        </FormField>
-        <FormField label="Provider">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={form.providerId}
-            onChange={(e) => setForm((f) => ({ ...f, providerId: e.target.value }))}
-          >
-            <option value="">Local envelope</option>
-            {providers.map((p) => (
-              <option key={p.id} value={p.id}>{p.name} ({p.kind})</option>
-            ))}
-          </select>
-        </FormField>
-        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <input type="checkbox" checked={form.personal} onChange={(e) => setForm((f) => ({ ...f, personal: e.target.checked }))} />
-          Personal (only you can see &amp; manage it)
-        </label>
-      </FormDialog>
+      {error && (
+        <p className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+
+      <SecretDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
       {/* Provider configs — point the vault at an external backend (aws/vault) or the local
           envelope (env). `config` holds only non-secret settings; backend creds are Secrets. */}
@@ -317,36 +201,11 @@ export default function SecretsPage() {
           Where secrets are stored. Default is the local envelope.
         </p>
 
-        <FormDialog
+        <SecretProviderDialog
           open={providerOpen}
           onOpenChange={setProviderOpen}
-          title="Add secret provider"
-          description="Point the vault at an external backend (aws/vault) or the local envelope."
-          onSubmit={onCreateProvider}
-          submitLabel="Add provider"
-          busy={busy === "provider"}
-          error={error}
-          submitDisabled={!providerForm.name.trim()}
-        >
-          <FormField label="Name">
-            <Input
-              placeholder="e.g. prod-vault"
-              value={providerForm.name}
-              onChange={(e) => setProviderForm((f) => ({ ...f, name: e.target.value }))}
-            />
-          </FormField>
-          <FormField label="Kind">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={providerForm.kind}
-              onChange={(e) => setProviderForm((f) => ({ ...f, kind: e.target.value }))}
-            >
-              {PROVIDER_KINDS.map((k) => (
-                <option key={k} value={k}>{k}</option>
-              ))}
-            </select>
-          </FormField>
-        </FormDialog>
+          onSaved={refreshProviders}
+        />
         <div className="space-y-1">
           {providers.length === 0 && (
             <p className="text-xs text-muted-foreground">
@@ -389,31 +248,13 @@ export default function SecretsPage() {
       {/* Create */}
 
       {/* Bulk import — paste a .env (KEY=VALUE lines). Values are encrypted on the way in. */}
-      <FormDialog
+      <SecretImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
-        title="Bulk import secrets"
-        description="Paste a .env (KEY=VALUE lines). Values are encrypted on the way in."
-        onSubmit={onImport}
-        submitLabel="Import"
-        busy={busy === "import"}
-        error={error}
-        submitDisabled={!importText.trim()}
-      >
-        <FormField label="KEY=VALUE lines">
-          <textarea
-            className="h-40 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
-            placeholder={"# paste a .env\nOPENAI_API_KEY=sk-...\nSTRIPE_KEY=sk_live_..."}
-            value={importText}
-            onChange={(e) => setImportText(e.target.value)}
-          />
-        </FormField>
-        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <input type="checkbox" checked={importOverwrite} onChange={(e) => setImportOverwrite(e.target.checked)} />
-          Overwrite existing (rotate)
-        </label>
-        {importResult && <p className="text-xs text-muted-foreground">{importResult}</p>}
-      </FormDialog>
+        onImported={setImportResult}
+        onSaved={refresh}
+      />
+      {importResult && <p className="text-xs text-muted-foreground">{importResult}</p>}
 
       {secrets.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No secrets yet.</Card>
