@@ -4,20 +4,12 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation } from "urql";
 import { Target } from "lucide-react";
-import { GOAL_LEVELS, GOAL_STATUSES, GOAL_STATUS } from "@agentcenter/utils";
+import { GOAL_STATUSES, GOAL_STATUS } from "@agentcenter/utils";
 import { GOALS_QUERY, AGENTS_QUERY } from "@/lib/graphql/queries";
-import { CREATE_GOAL, UPDATE_GOAL, DELETE_GOAL } from "@/lib/graphql/mutations";
-import {
-  Button,
-  Card,
-  Badge,
-  Input,
-  FormField,
-  FormDialog,
-  ConfirmDialog,
-  EmptyState,
-} from "@/components/ui";
-import { useResourceDialog, useConfirmDelete } from "@/hooks/useCrud";
+import { UPDATE_GOAL, DELETE_GOAL } from "@/lib/graphql/mutations";
+import { Button, Card, Badge, ConfirmDialog, EmptyState } from "@/components/ui";
+import { GoalDialog } from "@/components/dialogs/GoalDialog";
+import { useConfirmDelete } from "@/hooks/useCrud";
 
 // Epic #11: goals / OKRs. GOALS-gated. Hierarchical (company → team → task); each goal optionally
 // owned by an agent. Renders the tree indented by depth with inline status / owner quick-edits.
@@ -37,7 +29,6 @@ interface AgentLite {
   name: string;
 }
 
-const LEVELS = GOAL_LEVELS;
 const STATUSES = GOAL_STATUSES;
 const STATUS_VARIANT: Record<string, "gray" | "blue" | "green" | "purple"> = {
   [GOAL_STATUS.PLANNED]: "gray",
@@ -49,29 +40,15 @@ const STATUS_VARIANT: Record<string, "gray" | "blue" | "green" | "purple"> = {
 export default function GoalsPage() {
   const [{ data }, refetch] = useQuery<{ goals: Goal[] }>({ query: GOALS_QUERY });
   const [{ data: agentsData }] = useQuery<{ agents: AgentLite[] }>({ query: AGENTS_QUERY });
-  const [, createGoal] = useMutation(CREATE_GOAL);
   const [, updateGoal] = useMutation(UPDATE_GOAL);
   const [, deleteGoal] = useMutation(DELETE_GOAL);
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const goals = data?.goals ?? [];
   const agents = agentsData?.agents ?? [];
   const agentName = (id: string | null) => agents.find((a) => a.id === id)?.name ?? null;
   const refresh = () => refetch({ requestPolicy: "network-only" });
-
-  const dlg = useResourceDialog({
-    empty: { title: "", level: "task", parentId: "" },
-    submit: async (v) => {
-      if (!v.title.trim()) return "Title is required";
-      const r = await createGoal({
-        title: v.title.trim(),
-        level: v.level,
-        parentId: v.parentId || undefined,
-      });
-      return r.error?.graphQLErrors?.[0]?.message ?? r.error?.message ?? null;
-    },
-    onDone: refresh,
-  });
 
   const del = useConfirmDelete<Goal>({
     onDelete: async (g) => {
@@ -122,50 +99,10 @@ export default function GoalsPage() {
             Hierarchical goals (company → team → task), each optionally owned by an agent.
           </p>
         </div>
-        <Button onClick={dlg.openCreate}>New goal</Button>
+        <Button onClick={() => setOpen(true)}>New goal</Button>
       </div>
 
-      <FormDialog
-        open={dlg.open}
-        onOpenChange={dlg.setOpen}
-        title="New goal"
-        onSubmit={dlg.onSubmit}
-        submitLabel="Add goal"
-        busy={dlg.busy}
-        error={dlg.error}
-        submitDisabled={!dlg.values.title.trim()}
-      >
-        <FormField label="Title">
-          <Input
-            placeholder="e.g. Ship checkout v2"
-            value={dlg.values.title}
-            onChange={(e) => dlg.set("title", e.target.value)}
-          />
-        </FormField>
-        <FormField label="Level">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={dlg.values.level}
-            onChange={(e) => dlg.set("level", e.target.value)}
-          >
-            {LEVELS.map((l) => (
-              <option key={l} value={l}>{l}</option>
-            ))}
-          </select>
-        </FormField>
-        <FormField label="Parent goal">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={dlg.values.parentId}
-            onChange={(e) => dlg.set("parentId", e.target.value)}
-          >
-            <option value="">No parent</option>
-            {goals.map((g) => (
-              <option key={g.id} value={g.id}>under: {g.title}</option>
-            ))}
-          </select>
-        </FormField>
-      </FormDialog>
+      <GoalDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
       {ordered.length === 0 ? (
         <EmptyState

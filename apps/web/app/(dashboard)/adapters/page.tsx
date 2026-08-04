@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { Boxes } from "lucide-react";
-import { Card, Badge, Button, Spinner, EmptyState, Input, FormField, FormDialog } from "@/components/ui";
+import { Card, Badge, Button, Spinner, EmptyState } from "@/components/ui";
+import { AdapterInstallDialog } from "@/components/dialogs/AdapterInstallDialog";
 
 // Epic #2 (Adapter Manager): instance-admin view of installed provider adapters. MULTI_PROVIDER_ADAPTERS
 // gated. Lists each adapter with its transport/auth kind + model-profile count and lets an admin
@@ -33,22 +34,11 @@ const SET_ADAPTER_ENABLED = `
   }
 `;
 
-const INSTALL_ADAPTER = `
-  mutation ($type: String!, $displayName: String!, $transport: String, $authKind: String) {
-    installAdapter(type: $type, displayName: $displayName, transport: $transport, authKind: $authKind) {
-      type
-    }
-  }
-`;
-
 const REMOVE_ADAPTER = `
   mutation ($adapterType: String!) {
     removeAdapter(adapterType: $adapterType)
   }
 `;
-
-const TRANSPORTS = ["local", "gateway", "cloud"];
-const AUTH_KINDS = ["none", "apiKey", "subscription", "secretBinding"];
 
 interface Adapter {
   type: string;
@@ -66,49 +56,15 @@ export default function AdaptersPage() {
     query: ADAPTERS_QUERY,
   });
   const [, setEnabled] = useMutation(SET_ADAPTER_ENABLED);
-  const [, installAdapter] = useMutation(INSTALL_ADAPTER);
   const [, removeAdapter] = useMutation(REMOVE_ADAPTER);
   const [busy, setBusy] = useState<string | null>(null);
   const [showInstall, setShowInstall] = useState(false);
-  const [form, setForm] = useState({
-    type: "",
-    displayName: "",
-    transport: "local",
-    authKind: "apiKey",
-  });
-  const [installError, setInstallError] = useState<string | null>(null);
   const adapters = useMemo(() => data?.agentAdapters ?? [], [data]);
 
   async function toggle(a: Adapter) {
     setBusy(a.type);
     try {
       await setEnabled({ type: a.type, enabled: !a.enabled });
-      refetch({ requestPolicy: "network-only" });
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onInstall() {
-    setInstallError(null);
-    if (!form.type.trim() || !form.displayName.trim()) {
-      setInstallError("Type and display name are required");
-      return;
-    }
-    setBusy("install");
-    try {
-      const res = await installAdapter({
-        type: form.type.trim(),
-        displayName: form.displayName.trim(),
-        transport: form.transport,
-        authKind: form.authKind,
-      });
-      if (res.error) {
-        setInstallError(res.error.graphQLErrors[0]?.message ?? "Install failed");
-        return;
-      }
-      setForm({ type: "", displayName: "", transport: "local", authKind: "apiKey" });
-      setShowInstall(false);
       refetch({ requestPolicy: "network-only" });
     } finally {
       setBusy(null);
@@ -141,56 +97,11 @@ export default function AdaptersPage() {
         </Button>
       </div>
 
-      <FormDialog
+      <AdapterInstallDialog
         open={showInstall}
         onOpenChange={setShowInstall}
-        title="Register an external adapter"
-        description="Adds the adapter to the registry so it can be enabled and assigned. It starts disabled."
-        onSubmit={onInstall}
-        submitLabel="Install"
-        busy={busy === "install"}
-        error={installError}
-        submitDisabled={!form.type.trim() || !form.displayName.trim()}
-      >
-        <FormField label="Type">
-          <Input
-            placeholder="e.g. cursor-cloud"
-            value={form.type}
-            onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-          />
-        </FormField>
-        <FormField label="Display name">
-          <Input
-            placeholder="e.g. Cursor (Cloud)"
-            value={form.displayName}
-            onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
-          />
-        </FormField>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Transport">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={form.transport}
-              onChange={(e) => setForm((f) => ({ ...f, transport: e.target.value }))}
-            >
-              {TRANSPORTS.map((tr) => (
-                <option key={tr} value={tr}>{tr}</option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Auth">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={form.authKind}
-              onChange={(e) => setForm((f) => ({ ...f, authKind: e.target.value }))}
-            >
-              {AUTH_KINDS.map((ak) => (
-                <option key={ak} value={ak}>{ak}</option>
-              ))}
-            </select>
-          </FormField>
-        </div>
-      </FormDialog>
+        onSaved={() => refetch({ requestPolicy: "network-only" })}
+      />
 
       {fetching && adapters.length === 0 ? (
         <div className="flex justify-center p-8">
