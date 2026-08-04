@@ -9,8 +9,6 @@ import {
   PIPELINE_CASE_EVENTS_QUERY,
 } from "@/lib/graphql/queries";
 import {
-  CREATE_PIPELINE,
-  ADD_PIPELINE_STAGE,
   SET_PIPELINE_SEQUENTIAL,
   UPDATE_PIPELINE_STAGE,
   DELETE_PIPELINE_STAGE,
@@ -22,7 +20,8 @@ import {
   TRANSITION_CASE,
   REJECT_CASE,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
+import { Button, Card, Badge } from "@/components/ui";
+import { PipelineDialog } from "@/components/dialogs/PipelineDialog";
 
 // Epic #7: pipelines (multi-stage case workflows). PIPELINES_ROUTINES-gated. Admin builds
 // pipelines/stages; members work cases (claim → transition forward → done, or reject).
@@ -280,39 +279,9 @@ function PipelineCard({
 
 export default function PipelinesPage() {
   const [{ data }, refetch] = useQuery<{ pipelines: Pipeline[] }>({ query: PIPELINES_QUERY });
-  const [, createPipeline] = useMutation(CREATE_PIPELINE);
-  const [, addStage] = useMutation(ADD_PIPELINE_STAGE);
 
-  const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
   const pipelines = data?.pipelines ?? [];
-
-  async function onCreate() {
-    if (!name.trim()) return;
-    setBusy(true);
-    try {
-      const res = await createPipeline({ name: name.trim() });
-      const pid = res.data?.createPipeline?.id;
-      if (pid) {
-        // Seed a sensible default 3-stage flow (Intake → Review → Done).
-        await addStage({ pipelineId: pid, name: "Intake", order: 0 });
-        await addStage({
-          pipelineId: pid,
-          name: "Review",
-          order: 1,
-          isReviewStage: true,
-          requireApproval: true,
-        });
-        await addStage({ pipelineId: pid, name: "Done", order: 2 });
-      }
-      setName("");
-      setOpen(false);
-      refetch({ requestPolicy: "network-only" });
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="mx-auto space-y-6 p-4 sm:p-6">
@@ -326,20 +295,11 @@ export default function PipelinesPage() {
         <Button onClick={() => setOpen(true)}>New pipeline</Button>
       </div>
 
-      <FormDialog
+      <PipelineDialog
         open={open}
         onOpenChange={setOpen}
-        title="New pipeline"
-        description="Seeds a default 3-stage flow: Intake → Review → Done."
-        onSubmit={onCreate}
-        submitLabel="Create pipeline"
-        busy={busy}
-        submitDisabled={!name.trim()}
-      >
-        <FormField label="Name">
-          <Input placeholder="e.g. Content review" value={name} onChange={(e) => setName(e.target.value)} />
-        </FormField>
-      </FormDialog>
+        onSaved={() => refetch({ requestPolicy: "network-only" })}
+      />
 
       {pipelines.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No pipelines yet.</Card>
