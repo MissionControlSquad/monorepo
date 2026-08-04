@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -50,7 +50,9 @@ import {
   Gavel,
   Building2,
   ClipboardCheck,
-  ChevronDown,
+  Server,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useQuery } from "urql";
 import {
@@ -59,9 +61,9 @@ import {
 } from "@agentcenter/graphql-client/queries";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
+import { useTheme } from "@/hooks/useTheme";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { API_ROUTES } from "@/lib/api-routes";
-import { Button } from "../../ui";
 import { ProfileAvatar } from "../../ui/ProfileAvatar";
 import { SupportMenu } from "../../support/SupportMenu";
 
@@ -69,7 +71,7 @@ interface IconRailProps {
   onCreateTask: () => void;
 }
 
-// Sidebar is grouped by domain so ~44 destinations stay scannable instead of one long list.
+// Top-level sections shown on the icon rail; each expands to its items in the panel.
 export type NavGroup =
   | "Overview"
   | "Inbox"
@@ -80,7 +82,6 @@ export type NavGroup =
   | "Finance & insights"
   | "Content & platform";
 
-/** Order the groups render in. */
 export const NAV_GROUPS: NavGroup[] = [
   "Overview",
   "Inbox",
@@ -91,6 +92,18 @@ export const NAV_GROUPS: NavGroup[] = [
   "Finance & insights",
   "Content & platform",
 ];
+
+/** Rail icon + short label per group. */
+const GROUP_META: Record<NavGroup, { icon: typeof LayoutDashboard; short: string }> = {
+  Overview: { icon: LayoutDashboard, short: "Overview" },
+  Inbox: { icon: Inbox, short: "Inbox" },
+  Agents: { icon: Bot, short: "Agents" },
+  Work: { icon: FolderKanban, short: "Work" },
+  Communication: { icon: MessageSquare, short: "Comms" },
+  Infrastructure: { icon: Server, short: "Infra" },
+  "Finance & insights": { icon: CreditCard, short: "Finance" },
+  "Content & platform": { icon: Boxes, short: "Content" },
+};
 
 export interface NavItem {
   href: string;
@@ -190,49 +203,34 @@ function isActive(pathname: string | null, href: string): boolean {
   return pathname.startsWith(href);
 }
 
-const COLLAPSED_GROUPS_KEY = "sidebar-collapsed-groups";
-
 export function IconRail({ onCreateTask }: IconRailProps) {
   const { currentUserProfile } = useAppContext();
   const { isEnabled } = useFeatureFlags();
+  const { isDark, setTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
-  // Paperclip parity: live actionable counts badged onto the nav.
+
   const [{ data: badges }] = useQuery<{
     sidebarBadges: { approvals: number; review: number; attention: number };
   }>({ query: SIDEBAR_BADGES_QUERY });
   const [{ data: pref }] = useQuery<{
     sidebarPreference: { orderedIds: string[]; hiddenIds: string[] };
   }>({ query: SIDEBAR_PREFERENCE_QUERY });
-  const badgeFor = (href: string): number => {
-    const b = badges?.sidebarBadges;
-    if (!b) return 0;
-    if (href === "/attention") return b.attention;
-    if (href === "/review") return b.review;
-    if (href === "/approvals") return b.approvals;
-    return 0;
-  };
+
+  const badgeFor = useCallback(
+    (href: string): number => {
+      const b = badges?.sidebarBadges;
+      if (!b) return 0;
+      if (href === "/attention") return b.attention;
+      if (href === "/review") return b.review;
+      if (href === "/approvals") return b.approvals;
+      return 0;
+    },
+    [badges],
+  );
+
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  // Per-group collapse (persisted). Groups default open.
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
-    try {
-      return new Set(JSON.parse(localStorage.getItem(COLLAPSED_GROUPS_KEY) || "[]"));
-    } catch {
-      return new Set();
-    }
-  });
-  const toggleGroup = useCallback((group: string) => {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(group)) next.delete(group);
-      else next.add(group);
-      localStorage.setItem(COLLAPSED_GROUPS_KEY, JSON.stringify([...next]));
-      return next;
-    });
-  }, []);
 
   const handleLogout = useCallback(async () => {
     setUserMenuOpen(false);
@@ -251,166 +249,200 @@ export function IconRail({ onCreateTask }: IconRailProps) {
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [userMenuOpen]);
 
-  const visibleItems = orderNavItems(
-    NAV_ITEMS,
-    pref?.sidebarPreference?.orderedIds ?? [],
-    pref?.sidebarPreference?.hiddenIds ?? [],
-  ).filter(({ flag }) => !flag || isEnabled(flag));
+  const visibleItems = useMemo(
+    () =>
+      orderNavItems(
+        NAV_ITEMS,
+        pref?.sidebarPreference?.orderedIds ?? [],
+        pref?.sidebarPreference?.hiddenIds ?? [],
+      ).filter(({ flag }) => !flag || isEnabled(flag)),
+    [pref, isEnabled],
+  );
+
+  // Which group the current route belongs to (drives the panel + active rail icon).
+  const routeGroup = useMemo<NavGroup>(() => {
+    const match = visibleItems.find((it) => isActive(pathname, it.href));
+    return match?.group ?? "Overview";
+  }, [pathname, visibleItems]);
+
+  const [selectedGroup, setSelectedGroup] = useState<NavGroup>(routeGroup);
+  useEffect(() => setSelectedGroup(routeGroup), [routeGroup]);
+
+  const groupBadge = useCallback(
+    (group: NavGroup) =>
+      visibleItems.filter((it) => it.group === group).reduce((n, it) => n + badgeFor(it.href), 0),
+    [visibleItems, badgeFor],
+  );
+
+  const visibleGroups = NAV_GROUPS.filter((g) => visibleItems.some((it) => it.group === g));
+  const panelItems = visibleItems.filter((it) => it.group === selectedGroup);
 
   return (
-    <div className="w-60 h-full flex flex-col border-r border-border bg-background shrink-0">
-      {/* Brand */}
-      <Link
-        href="/"
-        className="flex items-center gap-2.5 px-4 h-14 shrink-0 border-b border-border"
-        title="AgentCenter"
-      >
-        <Image src="/logo.png" alt="AgentCenter" width={24} height={24} className="rounded-md" />
-        <span className="text-sm font-semibold text-foreground">AgentCenter</span>
-      </Link>
+    <div className="flex h-full shrink-0">
+      {/* ── Rail: brand + section icons + actions ── */}
+      <div className="flex h-full w-[72px] shrink-0 flex-col items-center border-r border-border bg-background py-3">
+        <Link href="/" className="mb-3 flex h-9 w-9 items-center justify-center" title="AgentCenter">
+          <Image src="/logo.png" alt="AgentCenter" width={28} height={28} className="rounded-md" />
+        </Link>
 
-      {/* Primary action */}
-      <div className="px-3 pt-3">
-        <Button
-          variant="primary"
-          onClick={onCreateTask}
-          className="w-full justify-start gap-2"
-          title="New Task"
-        >
-          <SquarePen className="w-4 h-4" />
-          New task
-        </Button>
-      </div>
-
-      {/* Grouped navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-3">
-        {NAV_GROUPS.map((group) => {
-          const items = visibleItems.filter((it) => it.group === group);
-          if (items.length === 0) return null;
-          const isCollapsed = collapsedGroups.has(group);
-          return (
-            <div key={group}>
+        <div className="flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto">
+          {visibleGroups.map((group) => {
+            const { icon: Icon, short } = GROUP_META[group];
+            const active = selectedGroup === group;
+            const count = groupBadge(group);
+            return (
               <button
-                onClick={() => toggleGroup(group)}
-                className="group/hdr flex w-full items-center justify-between px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70 hover:text-muted-foreground"
-                aria-expanded={!isCollapsed}
+                key={group}
+                onClick={() => setSelectedGroup(group)}
+                title={group}
+                className={`relative flex w-14 flex-col items-center gap-1 rounded-lg py-2 transition-colors ${
+                  active
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
               >
-                <span>{group}</span>
-                <ChevronDown
-                  className={`h-3.5 w-3.5 opacity-0 transition-all group-hover/hdr:opacity-100 ${
-                    isCollapsed ? "-rotate-90" : ""
-                  }`}
-                />
+                <Icon className="h-5 w-5" />
+                <span className="text-[10px] leading-none">{short}</span>
+                {count > 0 && (
+                  <span className="absolute right-2 top-1 h-2 w-2 rounded-full bg-primary" />
+                )}
               </button>
-              {!isCollapsed && (
-                <div className="space-y-0.5">
-                  {items.map(({ href, icon: Icon, label }) => {
-                    const count = badgeFor(href);
-                    const active = isActive(pathname, href);
-                    return (
-                      <Link
-                        key={href}
-                        href={href}
-                        title={label}
-                        className={`relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors ${
-                          active
-                            ? "bg-muted font-medium text-foreground"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`}
-                      >
-                        <Icon className="h-[18px] w-[18px] shrink-0" />
-                        <span className="truncate">{label}</span>
-                        {count > 0 && (
-                          <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold leading-none text-primary-foreground">
-                            {count > 9 ? "9+" : count}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* Footer: account + support */}
-      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-3 py-2">
-        <div className="relative min-w-0" ref={menuRef}>
-          <button
-            onClick={() => setUserMenuOpen((v) => !v)}
-            className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 hover:bg-muted transition-colors"
-            title={currentUserProfile?.displayName ?? "Account"}
-            aria-label={currentUserProfile?.displayName ?? "Account"}
-          >
-            {currentUserProfile?.id ? (
-              <ProfileAvatar profileId={currentUserProfile.id} size="sm" />
-            ) : (
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
-                ?
-              </span>
-            )}
-            <span className="truncate text-sm text-foreground">
-              {currentUserProfile?.displayName ?? "Account"}
-            </span>
-          </button>
-
-          {userMenuOpen && (
-            <div className="absolute bottom-full left-0 mb-2 w-52 rounded-lg border border-border bg-background py-1 shadow-lg z-[100]">
-              {currentUserProfile && (
-                <div className="border-b border-border px-3 py-2">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {currentUserProfile.displayName}
-                  </p>
-                  {currentUserProfile.username && (
-                    <p className="truncate text-xs text-muted-foreground">
-                      @{currentUserProfile.username}
-                    </p>
-                  )}
-                </div>
-              )}
-              <div className="py-0.5">
-                <Link
-                  href="/profile"
-                  onClick={() => setUserMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
-                >
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  Profile
-                </Link>
-                <Link
-                  href="/settings"
-                  onClick={() => setUserMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
-                >
-                  <Settings className="h-4 w-4 text-muted-foreground" />
-                  Settings
-                </Link>
-                <a
-                  href="https://billing.stripe.com/p/login/dRm7sN0KKdnfbs4afl53O00"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setUserMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
-                >
-                  <CreditCard className="h-4 w-4 text-muted-foreground" />
-                  Billing
-                </a>
-                <Button
-                  variant="ghost"
-                  onClick={handleLogout}
-                  className="h-auto w-full justify-start gap-2.5 rounded-none px-3 py-1.5 text-sm font-normal text-foreground hover:bg-muted"
-                >
-                  <LogOut className="h-4 w-4 text-muted-foreground" />
-                  Log out
-                </Button>
-              </div>
-            </div>
-          )}
+            );
+          })}
         </div>
 
-        <SupportMenu />
+        {/* Actions */}
+        <div className="flex flex-col items-center gap-1 pt-2">
+          <button
+            onClick={onCreateTask}
+            title="New task"
+            aria-label="New task"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground hover:opacity-90"
+          >
+            <SquarePen className="h-[18px] w-[18px]" />
+          </button>
+          <Link
+            href="/search"
+            title="Search"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <Search className="h-[18px] w-[18px]" />
+          </Link>
+          <button
+            onClick={() => setTheme(isDark ? "light" : "dark")}
+            title="Toggle theme"
+            aria-label="Toggle theme"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            {isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+          </button>
+          <SupportMenu />
+
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setUserMenuOpen((v) => !v)}
+              className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full ring-2 ring-transparent transition-all hover:ring-border"
+              title={currentUserProfile?.displayName ?? "Account"}
+              aria-label={currentUserProfile?.displayName ?? "Account"}
+            >
+              {currentUserProfile?.id ? (
+                <ProfileAvatar profileId={currentUserProfile.id} size="md+" />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center bg-muted text-sm font-medium text-muted-foreground">
+                  ?
+                </span>
+              )}
+            </button>
+
+            {userMenuOpen && (
+              <div className="absolute bottom-0 left-full z-[100] ml-2 w-52 rounded-lg border border-border bg-background py-1 shadow-lg">
+                {currentUserProfile && (
+                  <div className="border-b border-border px-3 py-2">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {currentUserProfile.displayName}
+                    </p>
+                    {currentUserProfile.username && (
+                      <p className="truncate text-xs text-muted-foreground">
+                        @{currentUserProfile.username}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className="py-0.5">
+                  <Link
+                    href="/profile"
+                    onClick={() => setUserMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+                  >
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    Profile
+                  </Link>
+                  <Link
+                    href="/settings"
+                    onClick={() => setUserMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+                  >
+                    <Settings className="h-4 w-4 text-muted-foreground" />
+                    Settings
+                  </Link>
+                  <a
+                    href="https://billing.stripe.com/p/login/dRm7sN0KKdnfbs4afl53O00"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setUserMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+                  >
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    Billing
+                  </a>
+                  <button
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+                  >
+                    <LogOut className="h-4 w-4 text-muted-foreground" />
+                    Log out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Panel: items of the selected section ── */}
+      <div className="flex h-full w-[216px] shrink-0 flex-col border-r border-border bg-background">
+        <div className="flex h-14 shrink-0 items-center px-4">
+          <span className="text-sm font-semibold text-foreground">{selectedGroup}</span>
+        </div>
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
+          {panelItems.map(({ href, icon: Icon, label }) => {
+            const active = isActive(pathname, href);
+            const count = badgeFor(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                title={label}
+                className={`relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                  active
+                    ? "bg-primary/10 font-medium text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                {active && (
+                  <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+                )}
+                <Icon className="h-[18px] w-[18px] shrink-0" />
+                <span className="truncate">{label}</span>
+                {count > 0 && (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold leading-none text-primary-foreground">
+                    {count > 9 ? "9+" : count}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     </div>
   );
