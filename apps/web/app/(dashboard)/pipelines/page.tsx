@@ -22,7 +22,7 @@ import {
   TRANSITION_CASE,
   REJECT_CASE,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
 
 // Epic #7: pipelines (multi-stage case workflows). PIPELINES_ROUTINES-gated. Admin builds
 // pipelines/stages; members work cases (claim → transition forward → done, or reject).
@@ -284,6 +284,7 @@ export default function PipelinesPage() {
   const [, addStage] = useMutation(ADD_PIPELINE_STAGE);
 
   const [name, setName] = useState("");
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const pipelines = data?.pipelines ?? [];
 
@@ -306,6 +307,7 @@ export default function PipelinesPage() {
         await addStage({ pipelineId: pid, name: "Done", order: 2 });
       }
       setName("");
+      setOpen(false);
       refetch({ requestPolicy: "network-only" });
     } finally {
       setBusy(false);
@@ -314,22 +316,30 @@ export default function PipelinesPage() {
 
   return (
     <div className="mx-auto space-y-6 p-4 sm:p-6">
-      <h1 className="text-lg font-semibold text-foreground">Pipelines</h1>
-      <p className="-mt-4 text-sm text-muted-foreground">
-        Multi-stage case workflows. Claim a case, advance it forward through stages, or reject it.
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Pipelines</h1>
+          <p className="text-sm text-muted-foreground">
+            Multi-stage case workflows. Claim a case, advance it forward through stages, or reject it.
+          </p>
+        </div>
+        <Button onClick={() => setOpen(true)}>New pipeline</Button>
+      </div>
 
-      <Card className="flex gap-2 p-4">
-        <input
-          className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-          placeholder="New pipeline name (seeds Intake → Review → Done)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Button size="sm" disabled={busy} onClick={onCreate}>
-          Create
-        </Button>
-      </Card>
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="New pipeline"
+        description="Seeds a default 3-stage flow: Intake → Review → Done."
+        onSubmit={onCreate}
+        submitLabel="Create pipeline"
+        busy={busy}
+        submitDisabled={!name.trim()}
+      >
+        <FormField label="Name">
+          <Input placeholder="e.g. Content review" value={name} onChange={(e) => setName(e.target.value)} />
+        </FormField>
+      </FormDialog>
 
       {pipelines.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No pipelines yet.</Card>
