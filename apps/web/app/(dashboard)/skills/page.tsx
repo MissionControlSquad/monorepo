@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "urql";
 import {
   SKILLS_QUERY,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/graphql/queries";
 import {
   CREATE_SKILL,
+  IMPORT_SKILL_PACKAGE,
   FORK_SKILL,
   STAR_SKILL,
   UNSTAR_SKILL,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/graphql/mutations";
 import { Button, Card, Badge } from "@/components/ui";
 import { SkillComments } from "@/components/skills/SkillComments";
+import { SkillUpdatePanel } from "@/components/skills/SkillUpdatePanel";
 
 // Epic #10: skills library. SKILLS_TEAMS-gated. Reusable markdown capability modules with versions,
 // stars, forks; assign to agents from the agent view.
@@ -57,6 +59,15 @@ interface CatalogSkill {
 export default function SkillsPage() {
   const [{ data }, refetch] = useQuery<{ skills: Skill[] }>({ query: SKILLS_QUERY });
   const [, createSkill] = useMutation(CREATE_SKILL);
+  const [, importPackage] = useMutation(IMPORT_SKILL_PACKAGE);
+  const importInput = useRef<HTMLInputElement>(null);
+  async function onImport(files: FileList) {
+    const payload = await Promise.all(
+      Array.from(files).map(async (f) => ({ path: (f as any).webkitRelativePath || f.name, content: await f.text() })),
+    );
+    const r = await importPackage({ files: payload });
+    if (!r.error) refetch({ requestPolicy: "network-only" });
+  }
   const [, forkSkill] = useMutation(FORK_SKILL);
   const [, starSkill] = useMutation(STAR_SKILL);
   const [, unstarSkill] = useMutation(UNSTAR_SKILL);
@@ -74,6 +85,7 @@ export default function SkillsPage() {
   const [openAudit, setOpenAudit] = useState<string | null>(null);
   const [openVersions, setOpenVersions] = useState<string | null>(null);
   const [openComments, setOpenComments] = useState<string | null>(null);
+  const [openUpdates, setOpenUpdates] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     icon: "",
@@ -115,7 +127,13 @@ export default function SkillsPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
-      <h1 className="text-lg font-semibold text-foreground">Skills</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-lg font-semibold text-foreground">Skills</h1>
+        <>
+          <input ref={importInput} type="file" multiple className="hidden" onChange={(e) => e.target.files?.length && onImport(e.target.files)} />
+          <Button size="sm" variant="secondary" onClick={() => importInput.current?.click()}>Import package</Button>
+        </>
+      </div>
       <p className="-mt-4 text-sm text-muted-foreground">
         Reusable capability modules (markdown). Version on edit, fork, star, and assign to agents.
       </p>
@@ -256,6 +274,13 @@ export default function SkillsPage() {
               </Button>
               <Button
                 size="sm"
+                variant="secondary"
+                onClick={() => setOpenUpdates((o) => (o === s.id ? null : s.id))}
+              >
+                Updates
+              </Button>
+              <Button
+                size="sm"
                 variant={s.sharingScope === "public" ? "primary" : "secondary"}
                 disabled={busy === s.id}
                 title="Publish to the cross-workspace catalog"
@@ -313,6 +338,7 @@ export default function SkillsPage() {
           {openAudit === s.id && <SkillAuditPanel skillId={s.id} />}
           {openVersions === s.id && <SkillVersionsPanel skillId={s.id} />}
           {openComments === s.id && <SkillComments skillId={s.id} />}
+          {openUpdates === s.id && <SkillUpdatePanel skillId={s.id} onChanged={() => refetch({ requestPolicy: "network-only" })} />}
         </Card>
       ))}
     </div>
