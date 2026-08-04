@@ -4,20 +4,12 @@ import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { Gauge } from "lucide-react";
 import { MONITORS_QUERY } from "@/lib/graphql/queries";
-import { CREATE_MONITOR, UPDATE_MONITOR, DELETE_MONITOR } from "@/lib/graphql/mutations";
-import { MONITOR_METRICS, MONITOR_COMPARATORS, monitorMetricLabel } from "@agentcenter/utils";
+import { UPDATE_MONITOR, DELETE_MONITOR } from "@/lib/graphql/mutations";
+import { monitorMetricLabel } from "@agentcenter/utils";
 import type { MonitorMetric } from "@agentcenter/utils";
-import {
-  Button,
-  Card,
-  Badge,
-  Input,
-  FormField,
-  FormDialog,
-  ConfirmDialog,
-  EmptyState,
-} from "@/components/ui";
-import { useResourceDialog, useConfirmDelete } from "@/hooks/useCrud";
+import { Button, Card, Badge, ConfirmDialog, EmptyState } from "@/components/ui";
+import { MonitorDialog } from "@/components/dialogs/MonitorDialog";
+import { useConfirmDelete } from "@/hooks/useCrud";
 
 // Tier C: workspace health monitors. MONITORS-gated. A monitor is a named threshold over a computed
 // metric, evaluated live on load (the auto-firing scheduler is deferred — needs the execution engine).
@@ -36,29 +28,14 @@ const COMPARATOR_LABEL: Record<string, string> = { gt: ">", gte: "≥", lt: "<",
 
 export default function MonitorsPage() {
   const [{ data }, refetch] = useQuery<{ monitors: MonitorEval[] }>({ query: MONITORS_QUERY });
-  const [, createMonitor] = useMutation(CREATE_MONITOR);
   const [, updateMonitor] = useMutation(UPDATE_MONITOR);
   const [, deleteMonitor] = useMutation(DELETE_MONITOR);
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const monitors = data?.monitors ?? [];
   const breachedCount = monitors.filter((m) => m.breached).length;
   const refresh = () => refetch({ requestPolicy: "network-only" });
-
-  const dlg = useResourceDialog({
-    empty: { name: "", metric: MONITOR_METRICS[0] as string, comparator: "gt", threshold: "0" },
-    submit: async (v) => {
-      if (!v.name.trim()) return "Name is required";
-      const res = await createMonitor({
-        name: v.name.trim(),
-        metric: v.metric,
-        comparator: v.comparator,
-        threshold: Number(v.threshold) || 0,
-      });
-      return res.error?.graphQLErrors?.[0]?.message ?? res.error?.message ?? null;
-    },
-    onDone: refresh,
-  });
 
   const del = useConfirmDelete<MonitorEval>({
     onDelete: async (m) => {
@@ -80,59 +57,10 @@ export default function MonitorsPage() {
             Threshold alerts over live workspace metrics, evaluated on load.
           </p>
         </div>
-        <Button onClick={dlg.openCreate}>New monitor</Button>
+        <Button onClick={() => setOpen(true)}>New monitor</Button>
       </div>
 
-      <FormDialog
-        open={dlg.open}
-        onOpenChange={dlg.setOpen}
-        title="New monitor"
-        description="Alert when a workspace metric crosses a threshold."
-        onSubmit={dlg.onSubmit}
-        submitLabel="Add monitor"
-        busy={dlg.busy}
-        error={dlg.error}
-        submitDisabled={!dlg.values.name.trim()}
-      >
-        <FormField label="Name">
-          <Input
-            placeholder="e.g. Too many blocked agents"
-            value={dlg.values.name}
-            onChange={(e) => dlg.set("name", e.target.value)}
-          />
-        </FormField>
-        <FormField label="Metric">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={dlg.values.metric}
-            onChange={(e) => dlg.set("metric", e.target.value)}
-          >
-            {MONITOR_METRICS.map((m) => (
-              <option key={m} value={m}>{monitorMetricLabel(m as MonitorMetric)}</option>
-            ))}
-          </select>
-        </FormField>
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Comparator">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={dlg.values.comparator}
-              onChange={(e) => dlg.set("comparator", e.target.value)}
-            >
-              {MONITOR_COMPARATORS.map((c) => (
-                <option key={c} value={c}>{COMPARATOR_LABEL[c]}</option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Threshold">
-            <Input
-              type="number"
-              value={dlg.values.threshold}
-              onChange={(e) => dlg.set("threshold", e.target.value)}
-            />
-          </FormField>
-        </div>
-      </FormDialog>
+      <MonitorDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
       {monitors.length === 0 ? (
         <EmptyState
