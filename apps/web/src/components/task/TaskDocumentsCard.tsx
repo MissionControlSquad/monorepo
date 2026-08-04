@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery } from "urql";
 import { FileText, ChevronRight } from "lucide-react";
 import { DOCUMENTS_BY_TASK_QUERY } from "@/lib/graphql/queries";
+import { DocumentAnnotations } from "./DocumentAnnotations";
 import { Badge } from "@/components/ui";
 import { TimeAgo } from "@/components/common/TimeAgo";
 
@@ -66,6 +67,7 @@ export function TaskDocumentsCard({ taskId }: { taskId: string }) {
                   ) : (
                     <p className="text-xs text-muted-foreground">No content.</p>
                   )}
+                  {d.content && <DocumentAnnotations documentId={d.id} content={d.content} />}
                   <p className="mt-2 text-[11px] text-muted-foreground">
                     {d.createdBy?.name ? `${d.createdBy.name} · ` : ""}
                     <TimeAgo date={d.createdAt} />
