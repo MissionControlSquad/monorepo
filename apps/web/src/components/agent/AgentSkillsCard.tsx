@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AGENT_SKILLS_QUERY, SKILLS_QUERY } from "@/lib/graphql/queries";
 import { ASSIGN_SKILL, UNASSIGN_SKILL } from "@/lib/graphql/mutations";
 import { Card, Button, Badge } from "@/components/ui";
+import { AgentSkillSyncStatus } from "./AgentSkillSyncStatus";
 
 // Epic #10: assign reusable skills to an agent. This is the UI home for agentSkills(agentId) +
 // assign/unassign — the skills library is authored on /skills, attached to agents here.
@@ -64,6 +65,7 @@ export function AgentSkillsCard({ agentId }: { agentId: string }) {
 
   return (
     <Card padding="lg" className="space-y-4">
+      <AgentSkillSyncStatus agentId={agentId} />
       <div>
         <h2 className="text-base font-semibold text-foreground">Skills</h2>
         <p className="text-sm text-muted-foreground mt-1">
