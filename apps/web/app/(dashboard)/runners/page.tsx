@@ -25,7 +25,7 @@ import {
   CANCEL_AGENT_RUN,
   PROMOTE_AGENT_RUN_REVIEW,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
 import { Server, Bot, Box } from "lucide-react";
 
 // Tier D: Runners dashboard. BYO hosts (register a server + run raw commands over direct SSH — the
@@ -364,6 +364,7 @@ export default function RunnersPage() {
   const sandboxProviders = sbxData?.sandboxProviders ?? [];
 
   const [form, setForm] = useState({ name: "", host: "", port: "22", username: "root", key: "" });
+  const [hostOpen, setHostOpen] = useState(false);
   const [hostCmd, setHostCmd] = useState<Record<string, string>>({});
   const [agentId, setAgentId] = useState("");
   const [agentCmd, setAgentCmd] = useState("");
@@ -465,6 +466,7 @@ export default function RunnersPage() {
       });
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to add host");
       setForm({ name: "", host: "", port: "22", username: "root", key: "" });
+      setHostOpen(false);
       refetchHosts({ requestPolicy: "network-only" });
     } finally {
       setBusy(null);
@@ -513,54 +515,48 @@ export default function RunnersPage() {
 
       {/* ── BYO Hosts ─────────────────────────────────────────── */}
       <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Server className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">BYO servers (direct SSH)</h2>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Server className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-foreground">BYO servers (direct SSH)</h2>
+          </div>
+          <Button size="sm" onClick={() => setHostOpen(true)}>Add host</Button>
         </div>
 
-        <Card className="grid gap-2 p-4 sm:grid-cols-2">
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="name"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
-            placeholder="host or IP"
-            value={form.host}
-            onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="port"
-            value={form.port}
-            onChange={(e) => setForm((f) => ({ ...f, port: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="username"
-            value={form.username}
-            onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
-          />
-          <textarea
-            className="rounded border border-border bg-background px-3 py-2 font-mono text-xs sm:col-span-2"
-            rows={3}
-            placeholder="SSH private key (PEM) — stored encrypted, never shown again"
-            value={form.key}
-            onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))}
-          />
-          <div className="sm:col-span-2">
-            <Button
-              size="sm"
-              loading={busy === "host"}
-              disabled={busy === "host"}
-              onClick={onCreateHost}
-            >
-              Add host
-            </Button>
+        <FormDialog
+          open={hostOpen}
+          onOpenChange={setHostOpen}
+          title="Add BYO server"
+          description="Run commands on your own server over SSH. The private key is stored encrypted, never shown again."
+          onSubmit={onCreateHost}
+          submitLabel="Add host"
+          busy={busy === "host"}
+          error={error}
+          submitDisabled={!form.name.trim() || !form.host.trim() || !form.key.trim()}
+        >
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Name">
+              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+            </FormField>
+            <FormField label="Host or IP">
+              <Input className="font-mono" value={form.host} onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))} />
+            </FormField>
+            <FormField label="Port">
+              <Input value={form.port} onChange={(e) => setForm((f) => ({ ...f, port: e.target.value }))} />
+            </FormField>
+            <FormField label="Username">
+              <Input value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
+            </FormField>
           </div>
-        </Card>
+          <FormField label="SSH private key (PEM)">
+            <textarea
+              className="h-28 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
+              placeholder="Stored encrypted, never shown again"
+              value={form.key}
+              onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))}
+            />
+          </FormField>
+        </FormDialog>
 
         {hosts.map((h) => (
           <Card key={h.id} className="space-y-2 p-4">
