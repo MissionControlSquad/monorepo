@@ -92,6 +92,8 @@ export default function SecretsPage() {
     personal: false,
   });
   const [providerForm, setProviderForm] = useState({ name: "", kind: "env" });
+  const [providerOpen, setProviderOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [importOverwrite, setImportOverwrite] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
@@ -122,6 +124,7 @@ export default function SecretsPage() {
       if (res.error)
         return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create provider");
       setProviderForm({ name: "", kind: "env" });
+      setProviderOpen(false);
       refreshProviders();
     } finally {
       setBusy(null);
@@ -169,6 +172,7 @@ export default function SecretsPage() {
             (s.invalidLines ? `, ${s.invalidLines} invalid line(s) ignored` : ""),
         );
         setImportText("");
+        setImportOpen(false);
       }
       refresh();
     } finally {
@@ -256,7 +260,10 @@ export default function SecretsPage() {
             rotated. Bind a secret to an agent to inject it as an env var.
           </p>
         </div>
-        <Button onClick={() => setOpen(true)}>New secret</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setImportOpen(true)}>Bulk import</Button>
+          <Button onClick={() => setOpen(true)}>New secret</Button>
+        </div>
       </div>
 
       <FormDialog
@@ -302,10 +309,44 @@ export default function SecretsPage() {
       <Card className="space-y-3 p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Providers</h2>
-          <span className="text-xs text-muted-foreground">
-            Where secrets are stored. Default is the local envelope.
-          </span>
+          <Button size="sm" variant="ghost" onClick={() => setProviderOpen(true)}>
+            Add provider
+          </Button>
         </div>
+        <p className="-mt-1 text-xs text-muted-foreground">
+          Where secrets are stored. Default is the local envelope.
+        </p>
+
+        <FormDialog
+          open={providerOpen}
+          onOpenChange={setProviderOpen}
+          title="Add secret provider"
+          description="Point the vault at an external backend (aws/vault) or the local envelope."
+          onSubmit={onCreateProvider}
+          submitLabel="Add provider"
+          busy={busy === "provider"}
+          error={error}
+          submitDisabled={!providerForm.name.trim()}
+        >
+          <FormField label="Name">
+            <Input
+              placeholder="e.g. prod-vault"
+              value={providerForm.name}
+              onChange={(e) => setProviderForm((f) => ({ ...f, name: e.target.value }))}
+            />
+          </FormField>
+          <FormField label="Kind">
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={providerForm.kind}
+              onChange={(e) => setProviderForm((f) => ({ ...f, kind: e.target.value }))}
+            >
+              {PROVIDER_KINDS.map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </FormField>
+        </FormDialog>
         <div className="space-y-1">
           {providers.length === 0 && (
             <p className="text-xs text-muted-foreground">
@@ -343,69 +384,36 @@ export default function SecretsPage() {
             </div>
           ))}
         </div>
-        <div className="flex gap-2 border-t border-border pt-3">
-          <input
-            className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Provider name (e.g. prod-vault)"
-            value={providerForm.name}
-            onChange={(e) => setProviderForm((f) => ({ ...f, name: e.target.value }))}
-          />
-          <select
-            className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-            value={providerForm.kind}
-            onChange={(e) => setProviderForm((f) => ({ ...f, kind: e.target.value }))}
-          >
-            {PROVIDER_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy === "provider"}
-            onClick={onCreateProvider}
-          >
-            Add provider
-          </Button>
-        </div>
       </Card>
 
       {/* Create */}
 
       {/* Bulk import — paste a .env (KEY=VALUE lines). Values are encrypted on the way in. */}
-      <Card className="space-y-2 p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Bulk import</h2>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={importOverwrite}
-              onChange={(e) => setImportOverwrite(e.target.checked)}
-            />
-            overwrite existing (rotate)
-          </label>
-        </div>
-        <textarea
-          className="h-24 w-full rounded border border-border bg-background px-3 py-1.5 font-mono text-xs"
-          placeholder={"# paste a .env\nOPENAI_API_KEY=sk-...\nSTRIPE_KEY=sk_live_..."}
-          value={importText}
-          onChange={(e) => setImportText(e.target.value)}
-        />
-        <div className="flex items-center justify-between">
-          {importResult ? (
-            <p className="text-xs text-muted-foreground">{importResult}</p>
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              Existing names are skipped unless overwrite is checked.
-            </span>
-          )}
-          <Button size="sm" variant="secondary" disabled={busy === "import"} onClick={onImport}>
-            Import
-          </Button>
-        </div>
-      </Card>
+      <FormDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Bulk import secrets"
+        description="Paste a .env (KEY=VALUE lines). Values are encrypted on the way in."
+        onSubmit={onImport}
+        submitLabel="Import"
+        busy={busy === "import"}
+        error={error}
+        submitDisabled={!importText.trim()}
+      >
+        <FormField label="KEY=VALUE lines">
+          <textarea
+            className="h-40 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
+            placeholder={"# paste a .env\nOPENAI_API_KEY=sk-...\nSTRIPE_KEY=sk_live_..."}
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+          />
+        </FormField>
+        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <input type="checkbox" checked={importOverwrite} onChange={(e) => setImportOverwrite(e.target.checked)} />
+          Overwrite existing (rotate)
+        </label>
+        {importResult && <p className="text-xs text-muted-foreground">{importResult}</p>}
+      </FormDialog>
 
       {secrets.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No secrets yet.</Card>
