@@ -16,7 +16,7 @@ import {
   RAISE_BUDGET_AND_RESUME,
 } from "@/lib/graphql/mutations";
 import { BUDGET_WINDOWS, IncidentThreshold, formatCents as money } from "@agentcenter/utils";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
 import { FinanceEventsSection } from "@/components/finance/FinanceEventsSection";
 
 // Epic #4: agent budgets / cost dashboard. API-gated by the BUDGETS feature + buildbase role
@@ -98,6 +98,7 @@ export default function FinancePage() {
   const [, raiseAndResume] = useMutation(RAISE_BUDGET_AND_RESUME);
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: "",
     limit: "",
@@ -138,6 +139,7 @@ export default function FinancePage() {
         return;
       }
       setForm({ name: "", limit: "", window: "monthly", hardStop: true, warn: "80" });
+      setOpen(false);
       refetchPolicies({ requestPolicy: "network-only" });
       refetchSummary({ requestPolicy: "network-only" });
     } finally {
@@ -331,57 +333,52 @@ export default function FinancePage() {
 
       {/* Budget policies */}
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-foreground">Budget policies</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Budget policies</h2>
+          <Button size="sm" onClick={() => setOpen(true)}>New budget</Button>
+        </div>
 
-        <Card className="space-y-3 p-4">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
-            <input
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm sm:col-span-2"
-              placeholder="Budget name"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            />
-            <input
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-              placeholder="Limit ($)"
-              inputMode="decimal"
-              value={form.limit}
-              onChange={(e) => setForm((f) => ({ ...f, limit: e.target.value }))}
-            />
-            <select
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-              value={form.window}
-              onChange={(e) => setForm((f) => ({ ...f, window: e.target.value }))}
-            >
-              {WINDOWS.map((w) => (
-                <option key={w} value={w}>
-                  {w}
-                </option>
-              ))}
-            </select>
-            <input
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-              placeholder="Warn %"
-              inputMode="numeric"
-              value={form.warn}
-              onChange={(e) => setForm((f) => ({ ...f, warn: e.target.value }))}
-            />
+        <FormDialog
+          open={open}
+          onOpenChange={setOpen}
+          title="New workspace budget"
+          onSubmit={onCreate}
+          submitLabel="Add budget"
+          busy={busy === "create"}
+          error={formError}
+          submitDisabled={!form.name.trim() || !form.limit.trim()}
+        >
+          <FormField label="Name">
+            <Input placeholder="e.g. Monthly cap" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+          </FormField>
+          <div className="grid grid-cols-3 gap-4">
+            <FormField label="Limit ($)">
+              <Input inputMode="decimal" placeholder="500" value={form.limit} onChange={(e) => setForm((f) => ({ ...f, limit: e.target.value }))} />
+            </FormField>
+            <FormField label="Window">
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={form.window}
+                onChange={(e) => setForm((f) => ({ ...f, window: e.target.value }))}
+              >
+                {WINDOWS.map((w) => (
+                  <option key={w} value={w}>{w}</option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Warn %">
+              <Input inputMode="numeric" value={form.warn} onChange={(e) => setForm((f) => ({ ...f, warn: e.target.value }))} />
+            </FormField>
           </div>
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 text-sm text-foreground">
-              <input
-                type="checkbox"
-                checked={form.hardStop}
-                onChange={(e) => setForm((f) => ({ ...f, hardStop: e.target.checked }))}
-              />
-              Hard stop (auto-pause agents on breach)
-            </label>
-            <Button size="sm" disabled={busy === "create"} onClick={onCreate}>
-              Add workspace budget
-            </Button>
-          </div>
-          {formError && <p className="text-sm text-destructive">{formError}</p>}
-        </Card>
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={form.hardStop}
+              onChange={(e) => setForm((f) => ({ ...f, hardStop: e.target.checked }))}
+            />
+            Hard stop (auto-pause agents on breach)
+          </label>
+        </FormDialog>
 
         {policies.length === 0 && (
           <Card className="p-8 text-center text-sm text-muted-foreground">
