@@ -4,18 +4,10 @@ import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { KeyRound } from "lucide-react";
 import { API_KEYS_QUERY } from "@/lib/graphql/queries";
-import { MINT_API_KEY, REVOKE_API_KEY } from "@/lib/graphql/mutations";
-import {
-  Button,
-  Card,
-  Badge,
-  Input,
-  FormField,
-  FormDialog,
-  ConfirmDialog,
-  EmptyState,
-} from "@/components/ui";
-import { useResourceDialog, useConfirmDelete } from "@/hooks/useCrud";
+import { REVOKE_API_KEY } from "@/lib/graphql/mutations";
+import { Button, Card, Badge, ConfirmDialog, EmptyState } from "@/components/ui";
+import { ApiKeyDialog } from "@/components/dialogs/ApiKeyDialog";
+import { useConfirmDelete } from "@/hooks/useCrud";
 
 // Epic #12: API keys for CLI / programmatic access. API_KEYS-gated, admin. The plaintext key is shown
 // exactly once at mint (reveal banner); afterwards only the prefix is visible.
@@ -32,26 +24,11 @@ interface ApiKey {
 
 export default function ApiKeysPage() {
   const [{ data, fetching }, refetch] = useQuery<{ apiKeys: ApiKey[] }>({ query: API_KEYS_QUERY });
-  const [, mint] = useMutation(MINT_API_KEY);
   const [, revoke] = useMutation(REVOKE_API_KEY);
+  const [open, setOpen] = useState(false);
   const [revealed, setRevealed] = useState<{ name: string; plainKey: string } | null>(null);
   const keys = data?.apiKeys ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
-
-  const dlg = useResourceDialog({
-    empty: { name: "", expiresAt: "" },
-    submit: async (v) => {
-      if (!v.name.trim()) return "Name is required";
-      const res = await mint({
-        name: v.name.trim(),
-        expiresAt: v.expiresAt ? new Date(v.expiresAt).toISOString() : null,
-      });
-      if (res.error) return res.error.graphQLErrors[0]?.message ?? "Mint failed";
-      setRevealed({ name: v.name.trim(), plainKey: res.data.mintApiKey.plainKey });
-      return null;
-    },
-    onDone: refresh,
-  });
 
   const del = useConfirmDelete<ApiKey>({
     onDelete: async (k) => {
@@ -71,7 +48,7 @@ export default function ApiKeysPage() {
             only once — store it somewhere safe.
           </p>
         </div>
-        <Button onClick={dlg.openCreate}>Mint key</Button>
+        <Button onClick={() => setOpen(true)}>Mint key</Button>
       </div>
 
       {revealed && (
@@ -96,32 +73,7 @@ export default function ApiKeysPage() {
         </Card>
       )}
 
-      <FormDialog
-        open={dlg.open}
-        onOpenChange={dlg.setOpen}
-        title="Mint API key"
-        description="Shown once at creation — copy it before closing."
-        onSubmit={dlg.onSubmit}
-        submitLabel="Mint key"
-        busy={dlg.busy}
-        error={dlg.error}
-        submitDisabled={!dlg.values.name.trim()}
-      >
-        <FormField label="Name">
-          <Input
-            placeholder="e.g. ci-deploy"
-            value={dlg.values.name}
-            onChange={(e) => dlg.set("name", e.target.value)}
-          />
-        </FormField>
-        <FormField label="Expires (optional)">
-          <Input
-            type="date"
-            value={dlg.values.expiresAt}
-            onChange={(e) => dlg.set("expiresAt", e.target.value)}
-          />
-        </FormField>
-      </FormDialog>
+      <ApiKeyDialog open={open} onOpenChange={setOpen} onMinted={setRevealed} onSaved={refresh} />
 
       {keys.length === 0 && !fetching ? (
         <EmptyState

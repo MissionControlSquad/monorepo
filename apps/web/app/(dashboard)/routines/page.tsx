@@ -4,15 +4,13 @@ import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { ROUTINES_QUERY, AGENTS_QUERY, GOALS_QUERY } from "@/lib/graphql/queries";
 import {
-  CREATE_ROUTINE,
   TRIGGER_ROUTINE_NOW,
   ADD_ROUTINE_TRIGGER,
   UPDATE_ROUTINE,
   REGENERATE_TRIGGER_PUBLIC_ID,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
-
-const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
+import { Button, Card, Badge } from "@/components/ui";
+import { RoutineDialog } from "@/components/dialogs/RoutineDialog";
 
 // Epic #7: routines (scheduled/triggered workflow docs). PIPELINES_ROUTINES-gated + buildbase role
 // (admin manages; member can trigger). Firing a routine creates a Task as its output.
@@ -43,7 +41,6 @@ export default function RoutinesPage() {
   const [{ data: goalsData }] = useQuery<{ goals: { id: string; title: string }[] }>({
     query: GOALS_QUERY,
   });
-  const [, createRoutine] = useMutation(CREATE_ROUTINE);
   const [, triggerNow] = useMutation(TRIGGER_ROUTINE_NOW);
   const [, addTrigger] = useMutation(ADD_ROUTINE_TRIGGER);
   const [, updateRoutine] = useMutation(UPDATE_ROUTINE);
@@ -54,54 +51,10 @@ export default function RoutinesPage() {
 
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    definition: '{\n  "steps": []\n}',
-    description: "",
-    assigneeAgentId: "",
-    priority: "",
-    goalId: "",
-  });
-  const [error, setError] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<Record<string, string>>({});
 
   const routines = data?.routines ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
-
-  async function onCreate() {
-    setError(null);
-    if (!form.name.trim()) return setError("Name is required");
-    let definition: unknown;
-    try {
-      definition = JSON.parse(form.definition);
-    } catch {
-      return setError("Definition must be valid JSON");
-    }
-    setBusy("create");
-    try {
-      const res = await createRoutine({
-        name: form.name.trim(),
-        definition,
-        description: form.description.trim() || null,
-        assigneeAgentId: form.assigneeAgentId || null,
-        priority: form.priority || null,
-        goalId: form.goalId || null,
-      });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create");
-      setForm({
-        name: "",
-        definition: '{\n  "steps": []\n}',
-        description: "",
-        assigneeAgentId: "",
-        priority: "",
-        goalId: "",
-      });
-      setOpen(false);
-      refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function onRegenerateTrigger(triggerId: string, routineId: string) {
     setBusy(routineId);
@@ -160,68 +113,7 @@ export default function RoutinesPage() {
         <Button onClick={() => setOpen(true)}>New routine</Button>
       </div>
 
-      <FormDialog
-        open={open}
-        onOpenChange={setOpen}
-        title="New routine"
-        onSubmit={onCreate}
-        submitLabel="Create routine"
-        busy={busy === "create"}
-        error={error}
-        submitDisabled={!form.name.trim()}
-      >
-        <FormField label="Name">
-          <Input placeholder="Routine name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-        </FormField>
-        <FormField label="Description (optional)">
-          <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
-        </FormField>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <FormField label="Assignee (optional)">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={form.assigneeAgentId}
-              onChange={(e) => setForm((f) => ({ ...f, assigneeAgentId: e.target.value }))}
-            >
-              <option value="">None</option>
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Priority (optional)">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={form.priority}
-              onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
-            >
-              <option value="">None</option>
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Goal (optional)">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={form.goalId}
-              onChange={(e) => setForm((f) => ({ ...f, goalId: e.target.value }))}
-            >
-              <option value="">None</option>
-              {goals.map((g) => (
-                <option key={g.id} value={g.id}>{g.title}</option>
-              ))}
-            </select>
-          </FormField>
-        </div>
-        <FormField label="Definition (JSON)">
-          <textarea
-            className="h-32 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
-            value={form.definition}
-            onChange={(e) => setForm((f) => ({ ...f, definition: e.target.value }))}
-          />
-        </FormField>
-      </FormDialog>
+      <RoutineDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
       {routines.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No routines yet.</Card>
