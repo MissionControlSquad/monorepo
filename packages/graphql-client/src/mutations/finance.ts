@@ -71,3 +71,53 @@ export const RAISE_BUDGET_AND_RESUME = gql`
     }
   }
 `;
+
+// Domain 12 GAP-1: ingest a non-inference finance event (admin).
+export const INGEST_FINANCE_EVENT = gql`
+  mutation IngestFinanceEvent(
+    $eventKind: String!
+    $amountCents: Int!
+    $direction: String
+    $biller: String
+    $description: String
+    $estimated: Boolean
+    $idempotencyKey: String
+  ) {
+    ingestFinanceEvent(
+      eventKind: $eventKind
+      amountCents: $amountCents
+      direction: $direction
+      biller: $biller
+      description: $description
+      estimated: $estimated
+      idempotencyKey: $idempotencyKey
+    ) {
+      id
+      eventKind
+      direction
+      amountCents
+    }
+  }
+`;
+
+// Domain 12 GAP-6 A13: reprice an unpriced/estimated cost event.
+export const REPRICE_COST_EVENT = gql`
+  mutation RepriceCostEvent($costEventId: String!, $amountCents: Int!) {
+    repriceCostEvent(costEventId: $costEventId, amountCents: $amountCents) {
+      id
+      amountCents
+      costStatus
+    }
+  }
+`;
+
+// Domain 14 #18: set an agent's token salary (0 removes it).
+export const SET_AGENT_SALARY = gql`
+  mutation SetAgentSalary($agentId: String!, $monthlyCents: Int!) {
+    setAgentSalary(agentId: $agentId, monthlyCents: $monthlyCents) {
+      id
+      limitCents
+      isSalary
+    }
+  }
+`;

@@ -1,0 +1,12 @@
+---
+service: issue-dependency-wakeups
+kind: service
+status: Missing
+priority: P2
+gate: buildable-now
+---
+# issue-dependency-wakeups · ❌ Missing
+**What it is:** wake a **blocked** task when its blockers resolve (idempotent, throttled).
+**Monorepo:** tasks block + surface in attention, but do NOT auto-resume when the blocker clears.
+**Required:** on task→done, re-evaluate + wake dependents (fits the reap/recovery cron). Buildable-now — **high value/low effort**.
+**Covers:** features/P2-additional-differences.mdx · SERVICE-AUDIT #82.

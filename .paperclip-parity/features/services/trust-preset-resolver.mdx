@@ -1,0 +1,12 @@
+---
+service: trust-preset-resolver
+kind: service
+status: Present
+priority: P2
+gate: buildable-now
+---
+# trust-preset-resolver · 🟡 Partial
+**What it is:** resolve a named trust preset → concrete containment settings.
+**Monorepo:** trust levels present; the named-preset resolver is thin.
+**Required:** a preset table + resolver. Buildable-now.
+**Done this session:** built + tested (see parity branch). **Covers:** features/P1-sandbox-execution.mdx · SERVICE-AUDIT #169.

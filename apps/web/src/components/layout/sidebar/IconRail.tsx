@@ -38,11 +38,23 @@ import {
   Boxes,
   Search,
   Images,
+  FileBox,
+  FlaskConical,
+  GitBranch,
+  ServerCog,
   GanttChart,
   Gauge,
   Cpu,
   Container,
+  Gavel,
+  Building2,
+  ClipboardCheck,
 } from "lucide-react";
+import { useQuery } from "urql";
+import {
+  SIDEBAR_BADGES_QUERY,
+  SIDEBAR_PREFERENCE_QUERY,
+} from "@agentcenter/graphql-client/queries";
 import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
@@ -55,10 +67,19 @@ interface IconRailProps {
   onCreateTask: () => void;
 }
 
-const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; flag?: string }[] = [
+export interface NavItem {
+  href: string;
+  icon: typeof LayoutDashboard;
+  label: string;
+  flag?: string;
+}
+
+export const NAV_ITEMS: NavItem[] = [
   { href: "/", icon: LayoutDashboard, label: "Home" },
   { href: "/search", icon: Search, label: "Search" },
   { href: "/attention", icon: Inbox, label: "Attention", flag: FLAG_KEYS.ATTENTION },
+  { href: "/review", icon: ClipboardCheck, label: "Needs my review", flag: FLAG_KEYS.GOVERNANCE },
+  { href: "/approvals", icon: Gavel, label: "Approvals", flag: FLAG_KEYS.GOVERNANCE },
   { href: "/agents", icon: Bot, label: "Agents" },
   {
     href: "/adapters",
@@ -73,10 +94,17 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
     flag: FLAG_KEYS.AGENT_INSTRUCTIONS,
   },
   { href: "/org-chart", icon: Network, label: "Org chart", flag: FLAG_KEYS.ORG_CHART },
+  { href: "/companies", icon: Building2, label: "Companies", flag: FLAG_KEYS.AGENT_COMPANIES },
   { href: "/agent-authz", icon: Lock, label: "Agent access", flag: FLAG_KEYS.AGENT_AUTHZ },
   { href: "/channels", icon: MessageSquare, label: "Channels", flag: FLAG_KEYS.CHANNELS },
   { href: "/projects", icon: FolderKanban, label: "Projects" },
   { href: "/artifacts", icon: Images, label: "Artifacts" },
+  { href: "/assets", icon: FileBox, label: "Assets", flag: FLAG_KEYS.ASSETS },
+  { href: "/smoke-lab", icon: FlaskConical, label: "Smoke lab", flag: FLAG_KEYS.SMOKE_LAB },
+  { href: "/cloud-upstreams", icon: GitBranch, label: "Cloud upstreams", flag: FLAG_KEYS.CLOUD_UPSTREAMS },
+  { href: "/provider-auth", icon: KeyRound, label: "Provider auth", flag: FLAG_KEYS.PROVIDER_AUTH },
+  { href: "/local-services", icon: ServerCog, label: "Local services", flag: FLAG_KEYS.LOCAL_SERVICES },
+  { href: "/adapter-plugins", icon: Puzzle, label: "Adapter plugins" },
   { href: "/timeline", icon: GanttChart, label: "Timeline" },
   { href: "/analytics", icon: BarChart3, label: "Analytics", flag: FLAG_KEYS.ANALYTICS },
   { href: "/runners", icon: Cpu, label: "Runners", flag: FLAG_KEYS.RUNNERS },
@@ -111,6 +139,28 @@ const NAV_ITEMS: { href: string; icon: typeof LayoutDashboard; label: string; fl
   },
 ];
 
+/**
+ * Apply a user's sidebar preference: items in `orderedIds` come first (in that order), the rest keep
+ * their default order; items in `hiddenIds` are dropped. Pure — shared with the customize panel.
+ */
+export function orderNavItems(
+  items: NavItem[],
+  orderedIds: string[],
+  hiddenIds: string[],
+): NavItem[] {
+  const hidden = new Set(hiddenIds);
+  const rank = new Map(orderedIds.map((href, i) => [href, i]));
+  return items
+    .filter((it) => !hidden.has(it.href))
+    .slice()
+    .sort((a, b) => {
+      const ra = rank.has(a.href) ? rank.get(a.href)! : Infinity;
+      const rb = rank.has(b.href) ? rank.get(b.href)! : Infinity;
+      if (ra !== rb) return ra - rb;
+      return items.indexOf(a) - items.indexOf(b); // stable: default order for unranked
+    });
+}
+
 function isActive(pathname: string | null, href: string): boolean {
   if (!pathname) return false;
   if (href === "/") return pathname === "/" || pathname === "/recurring-tasks";
@@ -122,6 +172,21 @@ export function IconRail({ onCreateTask }: IconRailProps) {
   const { isEnabled } = useFeatureFlags();
   const router = useRouter();
   const pathname = usePathname();
+  // Paperclip parity: live actionable counts badged onto the nav.
+  const [{ data: badges }] = useQuery<{
+    sidebarBadges: { approvals: number; review: number; attention: number };
+  }>({ query: SIDEBAR_BADGES_QUERY });
+  const [{ data: pref }] = useQuery<{
+    sidebarPreference: { orderedIds: string[]; hiddenIds: string[] };
+  }>({ query: SIDEBAR_PREFERENCE_QUERY });
+  const badgeFor = (href: string): number => {
+    const b = badges?.sidebarBadges;
+    if (!b) return 0;
+    if (href === "/attention") return b.attention;
+    if (href === "/review") return b.review;
+    if (href === "/approvals") return b.approvals;
+    return 0;
+  };
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -151,22 +216,34 @@ export function IconRail({ onCreateTask }: IconRailProps) {
 
       {/* Navigation */}
       <nav className="flex flex-col items-center gap-0.5">
-        {NAV_ITEMS.filter(({ flag }) => !flag || isEnabled(flag)).map(
-          ({ href, icon: Icon, label }) => (
-            <Link
-              key={href}
-              href={href}
-              title={label}
-              className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
-                isActive(pathname, href)
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              <Icon className="w-[20px] h-[20px]" />
-            </Link>
-          ),
-        )}
+        {orderNavItems(
+          NAV_ITEMS,
+          pref?.sidebarPreference?.orderedIds ?? [],
+          pref?.sidebarPreference?.hiddenIds ?? [],
+        )
+          .filter(({ flag }) => !flag || isEnabled(flag))
+          .map(({ href, icon: Icon, label }) => {
+            const count = badgeFor(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                title={count > 0 ? `${label} (${count})` : label}
+                className={`relative w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
+                  isActive(pathname, href)
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                <Icon className="w-[20px] h-[20px]" />
+                {count > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+                    {count > 9 ? "9+" : count}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
       </nav>
 
       <div className="flex-1" />

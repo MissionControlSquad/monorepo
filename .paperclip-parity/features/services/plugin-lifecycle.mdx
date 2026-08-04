@@ -1,0 +1,11 @@
+---
+service: plugin-lifecycle
+kind: service
+status: Missing
+priority: P3
+gate: infra-gated
+---
+# plugin-lifecycle · ❌ Missing
+**What it is:** plugin state machine (installed→ready→disabled) + worker coordination (~31KB).
+**Monorepo:** enable/disable metadata only; no runtime lifecycle. **Required:** part of the plugin runtime.
+**Covers:** features/P3-plugin-runtime.mdx · SERVICE-AUDIT #114.

@@ -1,0 +1,24 @@
+// Local service supervision (parity #95). Registry + observed state for local_stdio services the
+// supervisor keeps alive (e.g. MCP runtime slots). The supervisor reports lifecycle here and consults
+// the pure restart-storm / idle-evict policies; the actual spawn/kill/health-probe is the infra seam.
+// D5: workspaceId no FK; kind/status are TEXT. LOCAL_SERVICES-flag-gated.
+model LocalService {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  key            String // stable service key (e.g. "mcp:filesystem")
+  kind           String    @default("local_stdio") // local_stdio | http | ...
+  status         String    @default("stopped") // stopped | starting | running | crashed | evicted | suppressed
+  command        String? // launch command (display/audit)
+  pid            Int?
+  restartCount   Int       @default(0)
+  restartHistory Json? // recent restart timestamps (ms epoch) for storm detection
+  lastHealthyAt  DateTime?
+  lastActivityAt DateTime?
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, status])
+  @@map("local_services")
+}

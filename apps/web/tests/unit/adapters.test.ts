@@ -6,6 +6,7 @@ import {
   registerAdapter,
   buildAdapterInvocation,
   BUILTIN_ADAPTER_KEYS,
+  canonicalAdapterKey,
   substituteAdapterToken,
   resolveAdapterModels,
   loadAdapterPlugins,
@@ -29,13 +30,61 @@ describe("adapter registry", () => {
       "codex",
       "claude",
       "gemini",
+      "cursor",
+      "grok",
+      "opencode",
+      "pi",
+      "hermes",
       "process",
       "shell",
       "http",
     ]);
     for (const k of BUILTIN_ADAPTER_KEYS) expect(isAdapterKey(k)).toBe(true);
     expect(isAdapterKey("nope")).toBe(false);
-    expect(listAdapters().length).toBeGreaterThanOrEqual(6);
+    expect(listAdapters().length).toBeGreaterThanOrEqual(12);
+  });
+
+  it("ships the newly-ported local runtimes (cursor/grok/opencode/pi/hermes) with install guards", () => {
+    // cursor uses its own installer script (not npm); the rest are npm globals; hermes probe-only.
+    expect(getAdapter("cursor")).toMatchObject({ binName: "cursor-agent" });
+    expect(getAdapter("cursor")!.installCommand).toContain("cursor.com/install");
+    expect(getAdapter("grok")!.installCommand).toContain("@vibe-kit/grok-cli");
+    expect(getAdapter("opencode")!.installCommand).toContain("opencode-ai");
+    expect(getAdapter("pi")!.installCommand).toContain("@mariozechner/pi-coding-agent");
+    // hermes: package name deployment-specific → probe-only (binName, no install)
+    expect(getAdapter("hermes")).toMatchObject({ binName: "hermes" });
+    expect(getAdapter("hermes")!.installCommand).toBeUndefined();
+
+    expect(argvOf(buildAdapterInvocation("opencode", { ...base, model: "gpt-x" }))).toEqual([
+      "opencode",
+      "run",
+      "--model",
+      "gpt-x",
+      "the brief",
+    ]);
+    expect(argvOf(buildAdapterInvocation("cursor", base))).toEqual([
+      "cursor-agent",
+      "-p",
+      "the brief",
+    ]);
+  });
+
+  it("resolves Tier-A / *_local key aliases to the canonical code module (gap 4.0)", () => {
+    // the seeded DB row key resolves to the openclaw runtime
+    expect(getAdapter("openclaw-gateway")!.key).toBe("openclaw");
+    expect(isAdapterKey("openclaw-gateway")).toBe(true);
+    // *_local spellings map to their canonical keys
+    expect(getAdapter("cursor_local")!.key).toBe("cursor");
+    expect(getAdapter("claude_local")!.key).toBe("claude");
+    expect(argvOf(buildAdapterInvocation("codex_local", { ...base, model: "o4" }))).toEqual([
+      "codex",
+      "exec",
+      "-m",
+      "o4",
+      "the brief",
+    ]);
+    // an unaliased unknown key is still unknown
+    expect(isAdapterKey("totally-unknown")).toBe(false);
   });
 
   it("openclaw builds a run argv + openclaw layout; model flows through", () => {
@@ -202,5 +251,41 @@ describe("adapter registry", () => {
     expect(substituteAdapterToken("{taskId}-{model}-{workspaceDir}", { ...base, model: "m" })).toBe(
       "t_1-m-/work",
     );
+  });
+});
+
+// Registry unification (parity #6): every seeded AgentAdapter DB row `type` must canonicalize to a
+// registered Tier-D runtime module. The DB seeds hyphen spellings (`claude-local`, `openclaw-gateway`);
+// a missing hyphen alias previously left those rows unresolvable at launch.
+describe("adapter registry unification (Tier-A DB ↔ Tier-D code)", () => {
+  // The exact `type` values seeded in migration 20260711140000_add_agent_adapters.
+  const SEEDED_DB_ADAPTER_TYPES = [
+    "openclaw-gateway",
+    "claude-local",
+    "codex-local",
+    "cursor-local",
+    "gemini-local",
+    "grok-local",
+    "opencode-local",
+    "pi-local",
+    "hermes", // seeded bare (no -local suffix) — matches the code key directly
+  ];
+
+  it.each(SEEDED_DB_ADAPTER_TYPES)("resolves seeded DB adapter %s to a code module", (type) => {
+    const adapter = getAdapter(type);
+    expect(adapter, `DB adapter '${type}' must resolve to a Tier-D module`).toBeDefined();
+    expect(BUILTIN_ADAPTER_KEYS).toContain(adapter!.key);
+  });
+
+  it("canonicalizes both hyphen and underscore DB spellings", () => {
+    expect(canonicalAdapterKey("claude-local")).toBe("claude");
+    expect(canonicalAdapterKey("claude_local")).toBe("claude");
+    expect(canonicalAdapterKey("openclaw-gateway")).toBe("openclaw");
+    expect(canonicalAdapterKey("cursor-local")).toBe("cursor");
+  });
+
+  it("leaves unknown / already-canonical keys unchanged (identity)", () => {
+    expect(canonicalAdapterKey("claude")).toBe("claude");
+    expect(canonicalAdapterKey("totally-unknown")).toBe("totally-unknown");
   });
 });

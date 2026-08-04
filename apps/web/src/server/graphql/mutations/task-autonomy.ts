@@ -9,7 +9,14 @@ import {
   applyDecomposition,
 } from "@/server/services/plan-decomposition";
 import { holdSubtree, releaseSubtreeHold } from "@/server/services/task-tree-hold";
+import { cancelSubtree, restoreSubtree } from "@/server/services/subtree-control";
 import { createWatchdog, evaluateWatchdogs } from "@/server/services/task-watchdog";
+import { armTaskMonitor, clearTaskMonitor } from "@/server/services/task-monitors";
+import {
+  createThreadInteraction,
+  resolveThreadInteraction,
+} from "@/server/services/thread-interactions";
+import { GraphQLError } from "graphql";
 
 // Epic #8: task-autonomy mutations. Proposing is member; reviewing/applying/holding/watchdogs are
 // admin (the human review gate). Checkout itself is agent-only via REST (POST /api/tasks/checkout).
@@ -56,6 +63,47 @@ builder.mutationField("applyDecomposition", (t) =>
       requireRole(ctx, "admin");
       const { taskIds } = await applyDecomposition(args.id);
       return taskIds;
+    },
+  }),
+);
+
+// Domain 9 #11: arm a one-shot "check back later" monitor on a task. member+, TASK_AUTONOMY-gated.
+builder.mutationField("armTaskMonitor", (t) =>
+  t.prismaField({
+    type: "Task",
+    args: {
+      taskId: t.arg.string({ required: true }),
+      nextCheckAt: t.arg({ type: "DateTime", required: true }),
+      notes: t.arg.string(),
+      maxAttempts: t.arg.int(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
+      requireRole(ctx, "member");
+      if (args.maxAttempts != null && args.maxAttempts < 1)
+        throw new GraphQLError("maxAttempts must be >= 1", {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      await armTaskMonitor({
+        taskId: args.taskId,
+        nextCheckAt: args.nextCheckAt,
+        notes: args.notes ?? null,
+        maxAttempts: args.maxAttempts ?? null,
+      });
+      return ctx.prisma.task.findUniqueOrThrow({ ...query, where: { id: args.taskId } });
+    },
+  }),
+);
+
+builder.mutationField("clearTaskMonitor", (t) =>
+  t.field({
+    type: "Boolean",
+    args: { taskId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
+      requireRole(ctx, "member");
+      await clearTaskMonitor(args.taskId);
+      return true;
     },
   }),
 );
@@ -122,6 +170,107 @@ builder.mutationField("evaluateWatchdogsNow", (t) =>
       requireRole(ctx, "admin");
       const decisions = await evaluateWatchdogs();
       return decisions.length;
+    },
+  }),
+);
+
+// Domain 8 G6.5: create + resolve typed thread interactions. Create is member+ (an agent posts an
+// ask); resolving/dismissing is member+ (a human decides). THREAD_INTERACTIONS-gated.
+builder.mutationField("createThreadInteraction", (t) =>
+  t.prismaField({
+    type: "TaskThreadInteraction",
+    args: {
+      taskId: t.arg.string({ required: true }),
+      kind: t.arg.string({ required: true }),
+      payload: t.arg({ type: "JSON", required: true }),
+      sourceRunId: t.arg.string(),
+      sourceMessageId: t.arg.string(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.THREAD_INTERACTIONS);
+      const tenancy = requireRole(ctx, "member");
+      const it = await createThreadInteraction({
+        taskId: args.taskId,
+        kind: args.kind,
+        payload: args.payload as never,
+        sourceRunId: args.sourceRunId ?? null,
+        sourceMessageId: args.sourceMessageId ?? null,
+        createdByProfileId: tenancy.userId,
+      });
+      return ctx.prisma.taskThreadInteraction.findUniqueOrThrow({ ...query, where: { id: it.id } });
+    },
+  }),
+);
+
+builder.mutationField("resolveThreadInteraction", (t) =>
+  t.prismaField({
+    type: "TaskThreadInteraction",
+    args: {
+      id: t.arg.string({ required: true }),
+      decision: t.arg.string({ required: true }), // resolved | dismissed
+      result: t.arg({ type: "JSON" }),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.THREAD_INTERACTIONS);
+      const tenancy = requireRole(ctx, "member");
+      const decision = args.decision === "dismissed" ? "dismissed" : "resolved";
+      const it = await resolveThreadInteraction({
+        id: args.id,
+        decision,
+        result: (args.result ?? null) as never,
+        resolvedByProfileId: tenancy.userId,
+      });
+      return ctx.prisma.taskThreadInteraction.findUniqueOrThrow({ ...query, where: { id: it.id } });
+    },
+  }),
+);
+
+// Domain 8 G6.7: cancel a task (terminal, distinct from done). member+; not a terminal→terminal no-op.
+builder.mutationField("cancelTask", (t) =>
+  t.prismaField({
+    type: "Task",
+    args: { taskId: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, "member");
+      const task = await ctx.prisma.task.findFirst({
+        where: { id: args.taskId, deletedAt: null },
+        select: { id: true, status: true },
+      });
+      if (!task) throw new GraphQLError("Task not found", { extensions: { code: "NOT_FOUND" } });
+      if (task.status === "done" || task.status === "cancelled")
+        throw new GraphQLError(`Task is already ${task.status}`, {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      await ctx.prisma.task.update({
+        where: { id: task.id },
+        data: { status: "cancelled", cancelledAt: new Date() },
+      });
+      return ctx.prisma.task.findUniqueOrThrow({ ...query, where: { id: task.id } });
+    },
+  }),
+);
+
+// Domain 8 G6.6: cancel / restore a whole task subtree. admin (destructive across the tree).
+builder.mutationField("cancelSubtree", (t) =>
+  t.field({
+    type: "Int",
+    args: { rootTaskId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
+      requireRole(ctx, "admin");
+      return cancelSubtree(args.rootTaskId);
+    },
+  }),
+);
+
+builder.mutationField("restoreSubtree", (t) =>
+  t.field({
+    type: "Int",
+    args: { rootTaskId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
+      requireRole(ctx, "admin");
+      return restoreSubtree(args.rootTaskId);
     },
   }),
 );

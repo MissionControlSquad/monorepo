@@ -1,0 +1,12 @@
+---
+service: change-consent-gate
+kind: service
+status: Partial
+priority: P2
+gate: buildable-now
+---
+# change-consent-gate · 🟡 Partial
+**What it is:** an agent must get consent before changing its own name/role/capabilities.
+**Monorepo:** simplified via approvals + agent-authz; no dedicated consent-gate on profile fields.
+**Required:** a consent gate keyed on `AGENT_PROFILE_CHANGE_CONSENT_FIELDS`. Buildable-now.
+**Covers:** SERVICE-AUDIT #23.

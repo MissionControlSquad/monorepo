@@ -1,0 +1,12 @@
+---
+service: agent-permissions
+kind: service
+status: Partial
+priority: P1
+gate: buildable-now
+---
+# agent-permissions · 🟡 Partial
+**What it is:** per-agent capability/permission model.
+**Monorepo:** `agent-authz.ts` (`AgentCapabilityGrant` grant/revoke + deny audit); route `/agent-authz`.
+**Required:** richer permission surface (tool-level grants) overlaps the tool subsystem (P3).
+**Covers:** features/P0-review-approvals-governance.mdx · SERVICE-AUDIT #10.

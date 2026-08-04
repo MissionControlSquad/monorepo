@@ -97,49 +97,6 @@ model UserNotification {
   @@map("user_notifications")
 }
 
-model PushSubscription {
-  id        String   @id @default(cuid())
-  userId    String
-  endpoint  String
-  p256dh    String
-  auth      String
-  userAgent String?
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, endpoint])
-  @@map("push_subscriptions")
-}
-
-model UserNotificationPreference {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  // Per-type toggles
-  taskDone                   Boolean @default(true)
-  taskNeedsReview            Boolean @default(true)
-  taskClarificationRequested Boolean @default(true)
-  taskApproved               Boolean @default(true)
-  taskRejected               Boolean @default(true)
-  newComment                 Boolean @default(false)
-  mention                    Boolean @default(true)
-  deliverableSubmitted       Boolean @default(true)
-  taskAssigned               Boolean @default(true)
-  teamUpdate                 Boolean @default(true)
-  documentAdded              Boolean @default(true)
-
-  // Per-channel toggles
-  pushEnabled  Boolean @default(true)
-  emailEnabled Boolean @default(false)
-  inAppEnabled Boolean @default(true)
-
-  // Quiet hours
-  quietStart String?
-  quietEnd   String?
-  timezone   String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_notification_preferences")
-}
+// PushSubscription + UserNotificationPreference models removed in the buildbase notification
+// cutover — buildbase owns push/email delivery and per-type user preferences.
+// See .paperclip-parity/BUILDBASE-NOTIFICATION-CUTOVER.mdx.

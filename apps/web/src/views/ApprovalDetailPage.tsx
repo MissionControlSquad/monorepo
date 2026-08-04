@@ -13,6 +13,7 @@ import {
   RESUBMIT_APPROVAL,
   CANCEL_APPROVAL,
   ADD_APPROVAL_COMMENT,
+  CAST_APPROVAL_VOTE,
 } from "@/lib/graphql/mutations";
 import { Breadcrumbs, Button, Card, Badge, PageLayout } from "@/components/ui";
 import { Input } from "@/components/ui/shadcn/input";
@@ -41,6 +42,7 @@ interface Approval {
   subjectId: string;
   taskId: string | null;
   status: string;
+  requiredApprovals: number;
   reason: string | null;
   decisionNote: string | null;
   resubmitCount: number;
@@ -70,6 +72,7 @@ export function ApprovalDetailPage({ approvalId }: { approvalId: string }) {
   const [, requestChanges] = useMutation(REQUEST_APPROVAL_CHANGES);
   const [, resubmit] = useMutation(RESUBMIT_APPROVAL);
   const [, cancel] = useMutation(CANCEL_APPROVAL);
+  const [, castVote] = useMutation(CAST_APPROVAL_VOTE);
   const [, addComment] = useMutation(ADD_APPROVAL_COMMENT);
 
   const [note, setNote] = useState("");
@@ -89,6 +92,28 @@ export function ApprovalDetailPage({ approvalId }: { approvalId: string }) {
       }
       toast.success(ok);
       setNote("");
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function vote(kind: "approve" | "reject") {
+    setBusy(true);
+    try {
+      const res = await castVote({ id: approvalId, vote: kind });
+      if (res.error) {
+        toast.error(String((res.error as Error).message).replace("[GraphQL] ", ""));
+        return;
+      }
+      const r = res.data?.castApprovalVote as
+        { status: string; approveVotes: number; requiredApprovals: number } | undefined;
+      if (r?.status === "approved") toast.success("Quorum reached — approved");
+      else if (r?.status === "rejected") toast.success("Rejected");
+      else
+        toast.success(
+          `Vote recorded — ${r?.approveVotes ?? 0}/${r?.requiredApprovals ?? 0} approvals`,
+        );
       refresh();
     } finally {
       setBusy(false);
@@ -128,6 +153,7 @@ export function ApprovalDetailPage({ approvalId }: { approvalId: string }) {
   }
 
   const isPending = approval.status === ApprovalStatus.PENDING;
+  const isQuorum = (approval.requiredApprovals ?? 1) > 1;
   const canResubmit =
     approval.status === ApprovalStatus.NEEDS_CHANGES || approval.status === ApprovalStatus.REJECTED;
   const isFinal =
@@ -149,6 +175,7 @@ export function ApprovalDetailPage({ approvalId }: { approvalId: string }) {
             <h1 className="text-lg font-semibold text-foreground">{approval.title}</h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {approval.subjectType} · requested by {approval.requestedBy?.displayName ?? "—"}
+              {isQuorum && ` · board vote (needs ${approval.requiredApprovals} approvals)`}
               {approval.resubmitCount > 0 && ` · resubmitted ${approval.resubmitCount}×`}
             </p>
           </div>
@@ -189,7 +216,19 @@ export function ApprovalDetailPage({ approvalId }: { approvalId: string }) {
               placeholder="Optional decision note (shown to the requester)"
             />
             <div className="flex flex-wrap gap-2">
-              {isPending && (
+              {isPending && isQuorum && (
+                // Domain 14 #14: board quorum — each admin casts one vote; the approval only
+                // finalizes once approve votes reach requiredApprovals (a single reject finalizes it).
+                <>
+                  <Button size="sm" disabled={busy} onClick={() => vote("approve")}>
+                    Vote to approve
+                  </Button>
+                  <Button size="sm" variant="danger" disabled={busy} onClick={() => vote("reject")}>
+                    Vote to reject
+                  </Button>
+                </>
+              )}
+              {isPending && !isQuorum && (
                 <>
                   <Button
                     size="sm"

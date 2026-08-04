@@ -1,0 +1,20 @@
+// Live Gateway device pairing (parity Domain-10 A5/A6 / GAP-1). A runtime machine authenticates to the
+// gateway by signing a server nonce with its Ed25519 device key; the machine is pinned by fingerprint
+// and must be board-approved before it can connect. Complements the existing UsedNonce replay guard.
+// D5: workspaceId no FK; status TEXT. LIVE_GATEWAY-gated.
+model LiveGatewayDevice {
+  id                  String    @id @default(cuid())
+  workspaceId         String
+  machineFingerprint  String    @unique
+  publicKeyRaw        String // base64 raw Ed25519 public key (32 bytes)
+  label               String?
+  status              String    @default("pending") // pending | approved | revoked
+  approvedByProfileId String?
+  approvedAt          DateTime?
+  lastSeenAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([workspaceId, status])
+  @@map("live_gateway_devices")
+}

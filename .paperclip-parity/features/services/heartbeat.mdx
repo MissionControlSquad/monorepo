@@ -1,0 +1,12 @@
+---
+service: heartbeat
+kind: service
+status: Present
+priority: P1
+gate: infra-gated
+---
+# heartbeat · ✅ Present
+**What it is:** agent heartbeat + auto-sleep + reap loop.
+**Monorepo:** `agentHeartbeat` + cron `auto-sleep`/`reap-stale-work`.
+**Required:** cron scheduler for continuous operation.
+**Covers:** features/P1-heartbeat-scheduling-recovery.mdx · SERVICE-AUDIT #68.

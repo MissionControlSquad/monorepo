@@ -1,0 +1,33 @@
+---
+feature: Plugin runtime (worker / loader / jobs)
+priority: P3
+status: Missing
+gate: infra-gated
+---
+
+# Plugin runtime · P3 · ❌ Missing (registry is P2)
+
+**What it is:** actually *running* a plugin — discovering + loading its code, spawning an out-of-process
+worker, exposing host services to it, dispatching tool calls, running its scheduled jobs, and managing
+plugin-owned agents/routines/skills.
+
+**Status in our monorepo (verified):** **absent.** The monorepo has the registry (`plugins.ts`,
+metadata-only) but **none** of the ~25 Paperclip runtime services.
+
+**Paperclip runtime services (all Missing):**
+- `plugin-loader.ts` (~87KB) — discovery + install + runtime activation.
+- `plugin-worker-manager.ts` (~46KB) — spawn workers, JSON-RPC over stdio, crash recovery + backoff.
+- `plugin-lifecycle.ts` (~31KB) — state machine + worker coordination.
+- `plugin-host-services.ts` (~110KB) — host API exposed to workers (activity/agents/budgets/costs/issues…).
+- `plugin-job-{scheduler,coordinator,store}.ts` — cron scheduler + persistence for `plugin_jobs`.
+- `plugin-event-bus.ts` / `plugin-stream-bus.ts` — deliver domain events to workers + SSE.
+- `plugin-tool-{registry,dispatcher}.ts` — plugin-contributed tools (overlaps the tool subsystem).
+- `plugin-runtime-sandbox.ts`, `plugin-state-store.ts`, `plugin-secrets-handler.ts`, `plugin-database.ts`, `plugin-environment-driver.ts`, `plugin-managed-{agents,routines,skills}.ts`, `plugin-local-folders.ts`, `plugin-dev-watcher.ts`, `plugin-capability-validator.ts`, `plugin-log-retention.ts`, `adapter-plugin-store.ts`.
+- Total ~540KB of Paperclip source.
+
+**What's required:** a full out-of-process worker runtime — a large multi-session epic. Needs a long-lived
+host (workers), a JSON-RPC transport, the host-services API surface, and capability enforcement.
+
+**Priority rationale:** Big infra epic; the registry already lets admins manage plugins, so this is deferred.
+
+**Depends on:** long-lived server for workers; the capability-enforcement model; overlaps the tool subsystem.

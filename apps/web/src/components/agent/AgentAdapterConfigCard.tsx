@@ -13,7 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/shadcn/select";
 import { UPDATE_AGENT_PROFILE } from "@agentcenter/graphql-client/mutations/agents";
-import { adapterConfigFields } from "@agentcenter/utils";
+import { JsonSchemaForm } from "@/components/common/JsonSchemaForm";
+import { parseJsonSchema } from "@agentcenter/utils";
 
 // Epic #2: per-agent adapter + model + config editor. Wires the staged Agent.adapterType/adapterConfig/
 // llmModel columns into an editable surface (Paperclip AgentConfigForm parity). The config fields are
@@ -94,7 +95,7 @@ export function AgentAdapterConfigCard({
 
   const selectedAdapter = adapters.find((a) => a.type === selectedType);
   const fields = useMemo(
-    () => (selectedAdapter ? adapterConfigFields(selectedAdapter.configSchema) : []),
+    () => (selectedAdapter ? parseJsonSchema(selectedAdapter.configSchema) : []),
     [selectedAdapter],
   );
 
@@ -102,10 +103,6 @@ export function AgentAdapterConfigCard({
   useEffect(() => {
     setConfig(selectedType === adapterType ? (adapterConfig ?? {}) : {});
   }, [selectedType, adapterType, adapterConfig]);
-
-  function setField(key: string, value: unknown) {
-    setConfig((c) => ({ ...c, [key]: value }));
-  }
 
   async function save() {
     if (!selectedType) {
@@ -186,59 +183,13 @@ export function AgentAdapterConfigCard({
         </label>
       </div>
 
-      {fields.length > 0 && (
-        <div className="space-y-3 border-t border-border pt-4">
-          {fields.map((f) => (
-            <label key={f.key} className="block space-y-1">
-              <span className="text-sm font-medium text-foreground">
-                {f.label}
-                {f.required && <span className="text-destructive"> *</span>}
-              </span>
-              {f.type === "boolean" ? (
-                <input
-                  type="checkbox"
-                  checked={Boolean(config[f.key] ?? f.default ?? false)}
-                  onChange={(e) => setField(f.key, e.target.checked)}
-                  className="ml-1 h-4 w-4"
-                />
-              ) : f.type === "enum" ? (
-                <Select
-                  value={String(config[f.key] ?? f.default ?? "")}
-                  onValueChange={(v) => setField(f.key, v)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {f.enumValues?.map((v) => (
-                      <SelectItem key={v} value={v}>
-                        {v}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  type={f.secret ? "password" : f.type === "number" ? "number" : "text"}
-                  value={String(config[f.key] ?? "")}
-                  placeholder={f.default !== undefined ? String(f.default) : undefined}
-                  onChange={(e) =>
-                    setField(
-                      f.key,
-                      f.type === "number"
-                        ? e.target.value === ""
-                          ? undefined
-                          : Number(e.target.value)
-                        : e.target.value,
-                    )
-                  }
-                />
-              )}
-              {f.description && (
-                <span className="text-xs text-muted-foreground">{f.description}</span>
-              )}
-            </label>
-          ))}
+      {fields.length > 0 && selectedAdapter && (
+        <div className="border-t border-border pt-4">
+          <JsonSchemaForm
+            schema={selectedAdapter.configSchema}
+            value={config}
+            onChange={setConfig}
+          />
         </div>
       )}
 

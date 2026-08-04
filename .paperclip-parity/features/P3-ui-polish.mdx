@@ -1,0 +1,30 @@
+---
+feature: UI polish (dark mode, DesignGuide, AgentToolsTab, per-company tabs)
+priority: P3
+status: Missing / Partial
+gate: buildable-now / infra-gated
+---
+
+# UI polish · P3 · ❌/🟡 The remaining Paperclip UI gaps
+
+Lower-priority UI surfaces Paperclip has that the monorepo lacks.
+
+| Surface | Status | Gate | Note |
+|---|---|---|---|
+| **Dark mode / theme toggle** | Missing | buildable-now | `app/globals.css` has a single light `:root` — **no `.dark`, no `prefers-color-scheme`, no `dark:` variants, no switcher**. Needs a full dark token set designed across all `--color-*` + a toggle (a real design task, not a mechanical port). |
+| **DesignGuide** showcase | Missing | buildable-now | Internal component/token gallery page (supports the design-guide skill). Low functional value. |
+| **AgentToolsTab + tools/\*** (MCP profiles/policies/gateways/audit/runtime/smoke-lab) | Missing | infra-gated | Agent-scoped tool config — blocked on the tool subsystem (P3 tools-mcp). |
+| **Per-company settings/access/invites/skills/environments tabs** | Partial | mixed | Monorepo collapses to one `AgentCompaniesPage`. access/invites = buildbase-owned; skills/env tabs = buildable-now. |
+| **Unified tabbed Inbox** (mine/recent/unread/blocked/all) | Partial | buildable-now | Split across attention/review/activity; a consolidated shell would match Paperclip's `Inbox.tsx`. |
+| **Per-user secret tabs** (My Secrets / import-from-vault / missing-secrets banner) | Partial | buildable-now | `secrets/page.tsx` is workspace-vault + a personal toggle; no dedicated user-secret tabs. |
+| **CloudUpstream** (cloud sync/fork) | Missing | infra-gated | No upstream-sync surface. |
+| **Workspace switcher / Training / App-store (apps/\*)** | Missing | buildbase-owned / infra-gated | Workspace switch + membership = buildbase; app store/connections = needs plugin+tool runtime. |
+| **Environment / runner / execution-workspace detail pages** | Partial/Missing | buildable-now | Backends wired; rich per-item management views thin. |
+
+**What's required:** each row's UI; the buildable-now ones (dark mode, DesignGuide, inbox shell, user-secret
+tabs, env/runner detail pages) need only frontend; the rest wait on the tool runtime or buildbase.
+
+**Priority rationale:** Polish + depth; none blocks core function. Dark mode is the highest-visibility but
+needs a real palette design pass.
+
+**Depends on:** tool runtime (AgentToolsTab), buildbase (access/switcher), design pass (dark mode).

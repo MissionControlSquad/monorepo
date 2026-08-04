@@ -5,7 +5,7 @@
  */
 
 /** Goal hierarchy levels + statuses — single source of truth (mirrors the GoalLevel/GoalStatus enums). */
-export const GOAL_LEVEL = { COMPANY: "company", TEAM: "team", TASK: "task" } as const;
+export const GOAL_LEVEL = { COMPANY: "company", TEAM: "team", AGENT: "agent", TASK: "task" } as const;
 export const GOAL_LEVELS = Object.values(GOAL_LEVEL);
 export type GoalLevel = (typeof GOAL_LEVELS)[number];
 

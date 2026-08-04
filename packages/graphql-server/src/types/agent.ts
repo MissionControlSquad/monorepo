@@ -8,6 +8,7 @@ builder.prismaObject("Agent", {
     role: t.exposeString("role"),
     status: t.exposeString("status"),
     reportsToAgentId: t.exposeString("reportsToAgentId", { nullable: true }), // Epic #19
+    companyId: t.exposeString("companyId", { nullable: true }), // Domain 14 #10
     detailedStatus: t.exposeString("detailedStatus", { nullable: true }),
     statusMessage: t.exposeString("statusMessage", { nullable: true }),
     currentTaskId: t.exposeString("currentTaskId", { nullable: true }),

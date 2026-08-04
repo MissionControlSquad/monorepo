@@ -1,0 +1,30 @@
+---
+feature: Deferred execution infra
+priority: P3
+status: Partial
+gate: needs-key / infra-gated
+---
+
+# Deferred execution infra · P3 · 🟡 Partial (gated on real infra/keys)
+
+The runtime seams whose **code is present** but which need a real host/key/account to run — grouped here
+because none is "missing," each is "unrun."
+
+| Item | Status | Gate | Note |
+|---|---|---|---|
+| **Live provider-key verification** | not run | needs-provider-key | No cloud sandbox path has executed for real; needs ONE key (e2b/daytona/modal) to verify end-to-end. |
+| **Cloudflare bridge Worker** | client-only | buildbase-owned | `sandbox/cloudflare.ts` calls a companion Worker over REST; the **Worker source is NOT in this repo** (Paperclip's bridge-template, deployed via wrangler to a CF account). |
+| **exe.dev transport** | unrun | needs-provider-key | REST VM lifecycle + `ssh` subprocess; needs `EXE_DEV_API_KEY` + `EXE_DEV_SSH_KEY`. |
+| **SSH transport / PTY** | unrun | needs-real-ssh-host | `ssh.ts` real `ssh2` client; PTY relay exercised only against real infra. |
+| **In-flight run cancel** (sandbox + live gateway) | missing | needs-provider-key / buildable-now | `cancelAgentRun` = queued-only; live protocol has no cancel frame. Protocol addition is buildable-now; provider kill needs a key. |
+| **Custom-image snapshot** (e2b/modal/novita/cf/k8s/exe-dev) | missing per provider | needs-provider-key | Only `local` (stub) + `daytona` implement `snapshot()`. |
+| **OTel telemetry pipeline** | traces only | infra-gated | `otel-bootstrap.ts` is a no-op unless the SDK is installed + `OTEL_EXPORTER_OTLP_ENDPOINT` set; metrics/log exporters absent. |
+| **Log redaction (central)** | partial | buildable-now | API-key + run-status redaction exist; no general structured-log redactor. |
+| **Push / email delivery** | code present | infra-gated | Needs VAPID (push) / SMTP (email). |
+
+**What's required:** the corresponding external resource per row (a provider key, a CF account, an SSH host,
+an OTLP endpoint, VAPID/SMTP). The **buildable-now** exceptions: the live-gateway cancel frame, the
+in-flight cancel *token* plumbing, and a central log redactor.
+
+**Priority rationale:** All gated on infra/credentials the repo can't self-provide — deferred until a real
+environment is available. Not blockers for the platform to function.

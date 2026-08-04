@@ -1,0 +1,330 @@
+---
+title: "Parity Gap Analysis — UI (pages / components / design system)"
+domain: ui
+paperclip_root: /Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/paperclip
+monorepo_root: /Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo
+status: draft
+generated: 2026-07-17
+---
+
+# UI — Parity Gap Analysis
+
+## TL;DR
+
+Paperclip's UI is a **single-page React app** (`ui/src`, react-router) with ~90 route pages, ~250
+shared components, a mature design system (`DesignGuide.tsx` = 87KB living showcase, `design-guide`
+skill, design tokens, status/priority systems), and several *very deep* pages (`IssueDetail` 205KB,
+`Secrets` 159KB, `CompanySkills` 193KB, `Pipelines` 211KB, `PipelineSettings` 152KB, `Inbox` 124KB,
+`SkillStudio` 125KB, `AgentDetail` 171KB). Config/infra surfaces (environments, sandbox templates,
+adapters, plugins/MCP, app connections, secret vaults) are first-class settings pages.
+
+Our monorepo UI is a **Next.js app-router** app (`apps/web/app/(dashboard)/*` routes + thin
+`apps/web/src/views` + `apps/web/src/components`) using `urql` against a co-located GraphQL server.
+It has broad *breadth* — most epics have a route — but each page is 1 file, 100–600 lines, mostly a
+flat list + form + a few `useMutation`s. Every page is flag-gated (`packages/utils/src/feature-flag-keys.ts`)
+and admin-checked server-side. We have the plumbing (GraphQL ops for adapters, sandbox-providers,
+secrets, plugins, skills, agent-memory) but the **rich config UIs are missing or stubbed**.
+
+**Biggest UI gaps (config/infra, the focus areas):**
+
+| Surface | Paperclip | Monorepo | Status |
+|---|---|---|---|
+| **Execution Environments** (ssh/sandbox drivers, per-env env vars, connectivity probe, image/template capture) | `CompanyEnvironments.tsx` (79KB) | none | ❌ |
+| **Environment-variables editor** (dotenv paste, per-row secret binding, convert-to-secret, sensitive heuristics) | `components/environment-variables-editor/` | none | ❌ |
+| **App connections + MCP gateways** (OAuth apps, catalog browse, BYO MCP server, gateway tokens/tools) | `pages/apps/*` + `apps/gateways/*` | none | ❌ |
+| **Sandbox image/template capture** (interactive xterm SSH setup session → capture/rollback) | in `CompanyEnvironments` | none | ❌ |
+| **Adapter Manager** (install npm/local, reload, reinstall, override built-ins) | `AdapterManager.tsx` (27KB) | `adapters/page.tsx` enable-toggle only (125 ln) | 🟡 |
+| **Plugin manager + per-plugin settings** (marketplace, JSON-schema config, runtime dashboard, local folders) | `PluginManager` + `PluginSettings` (75KB) | `plugins/page.tsx` install-JSON + toggle (168 ln) | 🟡 |
+| **Unified Agent Detail** (Instructions/Skills/Config/Tools/Runs/Budget/Keys tabs) | `AgentDetail.tsx` (171KB) | split across `instructions/`, `agent-authz/`, `runners/`; profile view has no config tabs | 🟡 |
+| **Execution Workspace detail** (services/ports/runtime-config editor, provision/teardown) | `ExecutionWorkspaceDetail.tsx` (63KB) | none (only `terminals/`, `runners/`) | ❌ |
+| **Skill Studio authoring IDE** (file tree, versions, test harness/inputs) | `SkillStudio` + `CompanySkills` | `skills/page.tsx` file editor + lint (595 ln) | 🟡 |
+| **Agent tools / effective-access** (permitted vs installed, per-connection install) | `AgentToolsTab.tsx` | none | ❌ |
+| **Memory inspection** | *(none — Paperclip has no memory UI either)* | none | ⚪ n/a |
+
+Legend: ✅ parity · 🟡 partial · ❌ missing · ⚪ not-a-gap · 🚫 buildbase-owned.
+Deep backend/depth for adapters, sandbox, memory, skills, plugins/MCP, secrets is tracked in sibling
+docs `02`,`03`,`04`,`05`,`06`,`07` — **this doc scopes the UI surface only** and cross-refs those.
+
+---
+
+## 1. Full page inventory — Paperclip → monorepo
+
+Paperclip routes: `ui/src/App.tsx`. Monorepo routes: `apps/web/app/(dashboard)/*/page.tsx`.
+
+| Paperclip page (path) | What it lets a user do | Monorepo equivalent | Status |
+|---|---|---|---|
+| `Dashboard` / `DashboardLive` | home overview, live runs | `(dashboard)/(home)/page.tsx` | ✅ |
+| `Timeline` | work timeline feed | `timeline/` (`WorkTimelinePage`) | ✅ |
+| `Inbox` (124KB) | unified inbox: mine/recent/unread/blocked/all, join requests | `attention/` + `channels/` (thinner) | 🟡 |
+| `WhatNeedsMe` (Decisions) | approvals/decisions needing me | `attention/` | 🟡 |
+| `Agents` list | agent roster w/ tabs/filters | `agents/page.tsx` (`AgentsPage`) | ✅ |
+| `AgentDetail` (171KB) | 7-tab agent config (see §5) | `agents/[agentId]` (`AgentProfilePage`, tasks/deliverables/activity only) | 🟡 |
+| `NewAgent` | create-agent wizard | `agents/new` (`NewAgentWizard`) | ✅ |
+| `AgentToolsTab` | effective tool access / install | — | ❌ |
+| `OrgChart` | reporting hierarchy | `org-chart/page.tsx` | ✅ |
+| `Projects` / `ProjectDetail` | projects, issues, workspaces, budget, config | `projects/` + `projects/[projectId]` (`ProjectDetailPage`) | 🟡 |
+| `ProjectWorkspaceDetail` | project workspace runtime | partial in project detail | 🟡 |
+| `ExecutionWorkspaceDetail` (63KB) | services/ports/runtime-config editor | — (only `terminals/`,`runners/`) | ❌ |
+| `Workspaces` | workspace list | — | ❌ |
+| `Issues` / `IssueDetail` (205KB) | kanban + rich issue thread | `(home)` kanban + `task/[taskId]` (`KanbanPage`, thin task view) | 🟡 |
+| `Search` | global search | `search/page.tsx` (`SearchPage`) | ✅ |
+| `Routines` / `RoutineDetail` | scheduled + webhook-triggered routines | `routines/page.tsx` (295 ln) + `recurring-tasks/` | 🟡 |
+| `Cases` / `CaseDetail` | content/case CMS items | `cases/` + `cases/[caseId]` (`CaseDetailPage`) | 🟡 |
+| `Pipelines` (211KB) / `PipelineSettings` (152KB) / `PipelineItemDetail` / `ReviewQueue` / `Learnings` | dnd pipeline board + stage config | `pipelines/page.tsx` (412 ln, no settings/item detail) | 🟡 |
+| `Goals` / `GoalDetail` | goal tree | `goals/` + `goals/[goalId]` (`GoalDetailPage`) | ✅ |
+| `Artifacts` | deliverable artifacts | `artifacts/` + `deliverable/[id]` | ✅ |
+| `Approvals` / `ApprovalDetail` | approval queue | `approvals/` + `approvals/[approvalId]` | ✅ |
+| `Costs` (49KB, 5 tabs) | spend/budgets/providers/billers/finance | `finance/page.tsx` (419) + `ledger/` (354) | 🟡 |
+| `Activity` | activity feed | `activity/page.tsx` | ✅ |
+| `BoardChat` (40KB) | conference-room chat | `boardroom/page.tsx` (163 ln) | 🟡 |
+| `CompanySkills` (193KB) / `SkillStudio` (125KB) | skill library + authoring IDE | `skills/page.tsx` (595 ln) | 🟡 |
+| `TeamCatalog` (95KB) | installable team templates + wizard | `teams/page.tsx` (300 ln) | 🟡 |
+| `CompanyExport` / `CompanyImport` | portable-package export/import wizard | `portability/page.tsx` (187 ln) | 🟡 |
+| `CloudUpstream` (27KB) | push to Paperclip Cloud | — | ❌ (see doc 10/13) |
+| `Companies` / `CompanySwitcher` | switch/create company | buildbase org switch | 🚫 |
+| `CompanySettings` / `CompanyAccess` / `CompanyInvites` / `InstanceGeneralSettings` | org/members/invites/general | buildbase org-settings | 🚫 |
+| `CompanyEnvironments` (79KB) | execution environments (ssh/sandbox) | — | ❌ |
+| `Secrets` (159KB, 3 tabs) | company + user secrets, vaults/providers | `secrets/page.tsx` (595 ln, no user-secrets/vaults tabs) | 🟡 |
+| `AdapterManager` (27KB) | install/reload/reinstall adapters | `adapters/page.tsx` (125 ln, toggle only) | 🟡 |
+| `PluginManager` / `PluginSettings` (75KB) | marketplace + per-plugin config/runtime | `plugins/page.tsx` + `plugins/[pluginId]` (6 ln stub) | 🟡 |
+| `InstanceExperimentalSettings` (36KB) | experimental feature-flag toggles | `settings/page.tsx` (shutdown/password/governance) | 🟡 |
+| `InstanceSettings` / `InstanceAccess` | heartbeats / instance access | partial in `settings/`, `reliability/`, `monitors/` | 🟡 |
+| `apps/Connections`,`Browse`,`AppDetail`,`AppsReview` | OAuth app connections + catalog | — | ❌ |
+| `apps/gateways/*` (`GatewaysList`,`GatewayDetail`) | MCP gateway mgmt (tokens/tools) | — | ❌ |
+| `ProfileSettings` / `UserProfile` | user profile | `profile/` (`ProfilePage`) | ✅ |
+| `Auth` / `CliAuth` / `BoardClaim` / `InviteLanding` | auth / CLI pairing / invite | `cli-auth/` (`CliAuthApprovePage`); rest buildbase | 🟡/🚫 |
+| `DesignGuide` (87KB) | living design-system showcase | — (no `/design-guide` route) | ❌ |
+| `Onboarding` (`OnboardingWizard`/`OnboardingChat`) | first-run onboarding | `onboarding/page.tsx` | 🟡 |
+| Monorepo-only routes | — | `api-keys/`, `observability/`, `agent-authz/`, `analytics/`, `channels/`, `agent/[id]/edit` | ✅ ours |
+
+---
+
+## 2. Design system & app shell
+
+| Aspect | Paperclip | Monorepo | Status |
+|---|---|---|---|
+| Component library | `ui/src/components` (~250) + `components/ui` primitives | `apps/web/src/components/ui` (Badge, Button, Card, ConfirmDialog, Form, Input, Breadcrumbs, EmptyState, Spinner…) + shadcn subfolder | 🟡 (far fewer) |
+| Design tokens / theme | Tailwind + tokens, `ThemeToggle`, documented in `design-guide` skill + `doc/design/TOKEN-AUDIT.md` | Tailwind (`packages/tailwind-config`) + shadcn tokens; theme via `providers` | 🟡 |
+| Living showcase | `DesignGuide.tsx` (87KB) at `/design-guide` | none | ❌ |
+| Status/priority system | `StatusBadge`,`StatusGlyph`,`StatusIcon`,`PriorityIcon`,`ResourceStatusChip`,`BlockedReasonChip` | `Badge` variants only | 🟡 |
+| Shell / nav | `Layout`,`Sidebar*` (10+ pieces), `CommandPalette`, `MobileBottomNav`, `SecondarySidebar`, `CompanySettingsSidebar`, `InstanceSidebar`, `AppsSidebar`, `KeyboardShortcutsCheatsheet` | `components/layout` + `(dashboard)/layout.tsx` | 🟡 |
+| Markdown/editor | `MarkdownBody`,`MarkdownEditor`,`InlineEditor`,`JsonSchemaForm`,`ScheduleEditor`,`FileTree`,`WorkspaceFileBrowser` | shadcn `form` + react-hook-form; **no `JsonSchemaForm`** | 🟡 |
+| Reusable config editors | `environment-variables-editor/`, `SecretBindingPicker`, `StageSecretsPanel`, `AgentConfigForm`, `TrustPresetSection` | none of these | ❌ |
+
+**Note:** `JsonSchemaForm` is a load-bearing primitive — Paperclip renders sandbox-provider config,
+plugin `instanceConfigSchema`, and adapter config from JSON Schema through it. Porting it is a
+prerequisite for the plugin/environment/adapter config UIs below (single M task that unblocks 3 gaps).
+
+---
+
+## 3. Gap deep-dive: Execution Environments UI ❌ (size **L**)
+
+**Paperclip:** `CompanyEnvironments.tsx` at `/company/settings/instance/environments` (list/create/edit
+modes), gated by `enableEnvironments` experimental flag. A user:
+- creates named environments with a **driver**: `local` | `ssh` | `sandbox`;
+- fills a driver-specific form — SSH (host/port/username/remote-path, key as literal or **secret ref**,
+  known-hosts, strict-host-key) or **sandbox** (provider + provider JSON-schema config via `JsonSchemaForm`);
+- edits **per-environment env vars** via the env-var editor (secret bindings + inline create-secret);
+- **probes connectivity** for a saved env (`probe`) or a draft (`probeConfig`) with pass/fail toasts;
+- sets the **instance-default** environment agents inherit;
+- captures a **custom sandbox image/template** via `EnvironmentImageTemplatePanel`: start an interactive
+  setup session on a sandbox provider, connect through an in-browser **xterm.js SSH terminal**, then
+  Finish/Capture, Refresh, Rollback, or Disable a template (with "out of sync with config" warning).
+
+**Monorepo:** nothing. `grep` for `companyEnvironment|environment.?variable` in `apps/web/app|src/views|src/components` = 0 hits. Sandbox *providers* exist server-side only
+(`apps/web/src/server/graphql/queries/sandbox-providers.ts`, `mutations/sandbox-run.ts`) and are
+surfaced merely as a per-agent dropdown in `runners/page.tsx` (`SET_AGENT_SANDBOX_PROVIDER`). There is
+no notion of a reusable named execution environment in the UI.
+
+**Impl plan:**
+- Route: `apps/web/app/(dashboard)/environments/page.tsx` (+ `environments/[environmentId]/page.tsx` for edit) or nest under a settings route. View: `apps/web/src/views/EnvironmentsPage.tsx`; components `EnvironmentForm`, `SshDriverFields`, `SandboxDriverFields`, `EnvironmentProbeButton`, and (stretch) `EnvironmentImageTemplatePanel` reusing `components/terminals/*` for the xterm surface.
+- GraphQL: new `queries/environments.ts` + `mutations/environments.ts` — `companyEnvironments`, `createEnvironment`, `updateEnvironment`, `deleteEnvironment`, `probeEnvironment`, `probeEnvironmentConfig`, `setDefaultEnvironment`, `startEnvironmentTemplateSession`/`captureEnvironmentTemplate`/`rollbackEnvironmentTemplate`. Reuse `SANDBOX_PROVIDERS_QUERY` for provider list + schema. Needs the `agent-templates`/sandbox services already present under `apps/web/src/server/services/sandbox/*`.
+- Prereqs: port `JsonSchemaForm` (§2) and the env-var editor (§4).
+- Gating: new flag `environments` in `feature-flag-keys.ts`; admin-only mutations server-side. Secret-ref fields require `secrets_vault`.
+- Tests: form-render + driver switch, probe pass/fail toast, default-selection, template capture happy-path (mirror `CompanyEnvironments.test.tsx`, 52KB, as the spec source).
+
+## 4. Gap deep-dive: Environment-variables editor component ❌ (size **M**)
+
+**Paperclip:** `ui/src/components/environment-variables-editor/` (`index.tsx`, `Row.tsx`,
+`SecretPicker.tsx`, `CreateSecretPopover.tsx`, `ConvertToSecretPopover.tsx`, `model.ts`,
+`parse-dotenv.ts`, `sensitive.ts`). Edits `Record<string, EnvBinding>` where each row's value source is
+`text` | `secret` (company) | `user_secret` (with `required` + version). Features: add/remove rows,
+pick/create a secret inline, **convert plaintext→secret**, **paste a `.env` blob** to bulk-populate,
+duplicate-name + reserved-prefix (`PAPERCLIP_*`) validation, **sensitive-value heuristic** nudging
+plaintext into a secret, dirty-tracking with a per-key change summary + imperative save handle. Consumed
+by `CompanyEnvironments` and agent/workspace config.
+
+**Monorepo:** none. Secrets can be *bound* server-side but there's no reusable env-var editing widget.
+
+**Impl plan:**
+- Component: `apps/web/src/components/common/EnvVarEditor/` — port `model.ts`, `parse-dotenv.ts`, `sensitive.ts` (pure, testable) verbatim; rebuild `Row`, `SecretPicker` (drive from `SECRETS_QUERY`), `CreateSecretPopover` (`CREATE_SECRET`), `ConvertToSecretPopover`.
+- Consumers: Environments (§3), agent config (§5), execution-workspace config (§7).
+- Gating: secret sources hidden unless `secrets_vault`.
+- Tests: port `EnvironmentVariablesEditor.test.tsx`, `parse-dotenv.test.ts`, `sensitive.test.ts`, `model.test.ts` (they exist in Paperclip — near drop-in).
+
+## 5. Gap deep-dive: Unified Agent Detail tabs 🟡 (size **L**)
+
+**Paperclip:** `AgentDetail.tsx` — 7-tab shell: **Dashboard** (runs/heartbeats/assigned), **Instructions**
+(bundle file editor: system/agent md + per-file add/save/delete like `TOOLS.md`, local-adapter path
+config), **Skills** (`AgentSkillsTab`), **Configuration** (adapter+model selector, adapter config,
+trust presets: low-trust review, can-create-agents/skills, assign-lock), **Tools** (`AgentToolsTab`:
+permitted-vs-installed effective access), **Runs** (history → single run), **Budget**
+(`BudgetPolicyCard`), plus **Keys** (per-agent API tokens).
+
+**Monorepo:** the agent surface is *fragmented*: `agents/[agentId]/page.tsx` → `AgentProfilePage` shows
+only tasks/deliverables/activity; instructions live in a separate top-level `instructions/page.tsx`;
+capability grants in `agent-authz/page.tsx`; runtime/sandbox selection in `runners/page.tsx`. No tools
+tab, no per-agent budget card, no unified config shell. GraphQL exists
+(`mutations/agent-instructions.ts`, `agent-runtime.ts`, `agent-authz.ts`, `agent-memory.ts`).
+
+**Impl plan:**
+- Introduce a tabbed shell in `AgentProfilePage` (or new `views/AgentDetailPage.tsx`) with tabs: Overview, Instructions, Skills, Configuration, Tools, Runs, Budget, Keys — folding the standalone `instructions/` and `agent-authz/` pages in as tabs (keep routes as redirects).
+- Reuse existing ops; add a Tools tab (see §6) and a budget card wired to finance/ledger ops. Config tab wires `SET_AGENT_RUNTIME`/`SET_AGENT_SANDBOX_PROVIDER` (already in `runners/`) + trust presets.
+- Gating: tabs gated per-flag (`agent_instructions`, `skills_teams`, `agent_authz`, `budgets`, `api_keys`).
+- Tests: tab routing + each tab's primary mutation; port assertions from `AgentDetail.instructions.test.tsx`.
+
+## 6. Gap deep-dive: Agent tools / effective-access + MCP ❌ (size **M**)
+
+**Paperclip:** `AgentToolsTab.tsx` — resolved tool set the gateway will accept; distinguishes **Has
+access (permitted)** vs **Installed** (loaded into runtime context, adds cost) with per-connection
+install toggles; Allowed-tools table + Denied/suppressed list from the company catalog; deep-links to
+per-app permissions for MCP connections.
+
+**Monorepo:** none. There is no per-agent tool-resolution view and no MCP concept in the UI at all.
+
+**Impl plan:** depends on the app-connections/MCP layer (§8). Ship as the Tools tab in §5 once
+`apps`/gateways ops land. Route: tab within agent detail. GraphQL: `agentEffectiveTools(agentId)`,
+`setToolInstalled`. Gating: `plugin_sdk`/new `apps` flag. Tests: permitted-not-installed warning, toggle.
+
+## 7. Gap deep-dive: Execution Workspace detail ❌ (size **L**)
+
+**Paperclip:** `ExecutionWorkspaceDetail.tsx` — tabs Tasks/Services/Configuration/Runtime-logs/Routines
+(+ plugin tabs). Start/stop/restart **services** and run one-shot **jobs**; edit workspace settings
+(name, branch, base-ref, repo URL, cwd, provider path/ref, provision/teardown/cleanup commands);
+**runtime config**: inherit-or-override project config, advanced runtime-JSON editor for
+`commands`/`services`, and a **service-ports editor** (fixed port 1–65535 with duplicate-conflict
+warnings, inherited-service override). Runtime-logs tab shows provision/teardown stdout/stderr.
+
+**Monorepo:** none. Closest is `terminals/page.tsx` (terminal sessions) and `runners/page.tsx` (BYO
+hosts + agent-runner command queue). No workspace lifecycle/services/ports UI.
+
+**Impl plan:**
+- Route: `apps/web/app/(dashboard)/workspaces/[workspaceId]/page.tsx`; view `ExecutionWorkspacePage.tsx` with tab bar; components `WorkspaceServicesPanel`, `WorkspaceConfigForm`, `ServicePortsEditor`, `RuntimeLogsPanel`.
+- GraphQL: `queries/workspaces.ts` (`executionWorkspace`, `workspaceRuntimeLogs`) + `mutations/workspaces.ts` (`controlRuntimeCommand`, `updateWorkspaceConfig`, `setServicePort`, `closeWorkspace`). Cross-ref sandbox/adapter services (docs 02/03).
+- Gating: `enableIsolatedWorkspaces`-style flag (new `workspaces` key). Admin/owner for config edits.
+- Tests: port `ExecutionWorkspaceDetail.service-ports.test.ts` (ports conflict) + control-command disabled-state hints.
+
+## 8. Gap deep-dive: App connections + MCP gateways ❌ (size **L**)
+
+**Paperclip:** `ui/src/pages/apps/*` gated by an Apps experimental flag. `Connections` (per-app status +
+Connect), `Browse` (integration catalog + **BYO Zapier/MCP-server connect card**), `AppDetail`
+(`APP_TABS`: Setup/Review/Permissions/Activity/Test/Advanced — OAuth start, pause/resume for agents,
+per-action allow, install tools into company), and `apps/gateways/*` (`GatewaysList`, `GatewayDetail`
+`GATEWAY_TABS`: Overview/Apps&Tools/Tokens/Activity/Advanced) for **MCP gateway** management (mint
+client tokens, expose tool sets, raw protocol under Advanced).
+
+**Monorepo:** none. No app-connection, OAuth, or MCP surface in the UI. (Backend connectivity/gateway
+work is tracked in doc `10-connectivity` / `06-plugins-mcp`.)
+
+**Impl plan:**
+- Routes: `apps/web/app/(dashboard)/apps/page.tsx`, `apps/browse/`, `apps/[connectionId]/[tab]/`, `apps/gateways/`, `apps/gateways/[gatewayId]/[tab]/`. Views under `src/views`; sidebars `AppsSidebar`, `AppConnectionSidebar`.
+- GraphQL: `queries/apps.ts` + `mutations/apps.ts` (`connections`, `appCatalog`, `startOAuth`, `setAppPaused`, `setAppPermission`, `installTools`) and `gateways.ts` (`gateways`, `createGateway`, `mintGatewayToken`, `setGatewayTools`).
+- Prereq: real MCP/gateway backend (doc 06/10) — UI ships behind flag against it.
+- Gating: new `apps` + `mcp_gateways` flags, admin-only mutations.
+- Tests: connect flow, permission toggle, gateway token mint (mirror `AppDetail.test.tsx`, `Browse.test.tsx`, gateways tests).
+
+## 9. Gap deep-dive: Adapter Manager 🟡 (size **M**)
+
+**Paperclip:** `AdapterManager.tsx` (Alpha) — **install external adapter** (npm package+version OR local
+path exporting `createServerAdapter()`); External + Built-in lists with source/version/model-count/override
+badges; per-adapter **power toggle**, **Reload** (hot-swap), **Reinstall** (npm current-vs-latest check),
+**Remove** (external). Synthesizes rows for built-ins overridden by an external adapter.
+
+**Monorepo:** `adapters/page.tsx` (125 ln) — `agentAdapters` list with a single enable/disable toggle
+(`setAdapterEnabled`); `openclaw-gateway` builtIn cannot be disabled. No install/reload/reinstall/override
+of external modules.
+
+**Impl plan:** extend the existing page/view. Add `InstallAdapterDialog` (npm/local toggle + path picker
+reusing `components/common` path button), external-vs-builtin split, and per-row Reload/Reinstall/Remove.
+GraphQL additions to `mutations/adapters.ts`: `installAdapter`, `reloadAdapter`, `reinstallAdapter`,
+`removeAdapter`, plus a `checkAdapterNpmVersion` query. Gating: existing `multi_provider_adapters` +
+admin. Depends on the runtime hot-load backend (doc 02). Tests: install dialog npm/local branch,
+reinstall version-check, override-row rendering.
+
+## 10. Gap deep-dive: Plugin manager + per-plugin settings 🟡 (size **L**)
+
+**Paperclip:** `PluginManager.tsx` (Alpha) — install by npm name; **Bundled** plugins (Install-from-path,
+Enable, Open Settings) with Experimental badges (notably `sandbox_provider` env-driver plugins);
+**Installed** list (status/version/categories, enable/disable, two-step uninstall, Configure link);
+error-state inline banner + full-error dialog. `PluginSettings.tsx` — per-plugin **Configuration** tab
+(auto `JsonSchemaForm` from `instanceConfigSchema` + Save/Test, OR a plugin-contributed custom settings
+page via slots; env-driver plugins deep-link to Environments), **local-folders** config (host path per
+folder + health metrics), and a **Status** runtime dashboard (worker PID/uptime/pending-RPC/crash counts,
+recent job runs, webhook deliveries, logs — polled 30s), plus Health/Permissions.
+
+**Monorepo:** `plugins/page.tsx` (168 ln) — install by pasting **manifest JSON**, enable/disable/uninstall,
+declared (not granted) capabilities shown. `plugins/[pluginId]/page.tsx` is a **6-line stub**.
+
+**Impl plan:**
+- Flesh out `plugins/[pluginId]/page.tsx` → `PluginDetailPage` (view already scaffolded) with Configuration/Status tabs; add Bundled section + full-error dialog to `plugins/page.tsx`.
+- Prereq: `JsonSchemaForm` (§2) for `instanceConfigSchema`.
+- GraphQL: extend `plugins.ts` — `pluginRuntimeStatus`, `pluginJobRuns`, `pluginWebhookDeliveries`, `pluginLogs`, `setPluginConfig`, `testPluginConfig`, `setPluginLocalFolder`. Cross-ref plugin SDK backend (doc 06).
+- Gating: existing `plugin_sdk` + admin.
+- Tests: config-save, runtime-dashboard poll render, uninstall two-step, error dialog.
+
+## 11. Gap deep-dive: Secrets vault depth 🟡 (size **M**)
+
+**Paperclip:** `Secrets.tsx` (159KB) — 3 tabs. **Secrets**: unified table of company + user-secret
+definitions, filter by status/provider/provided-by, row actions (view details, **references/usage**,
+rotate, disable/activate, archive, delete, copy key); create dialog choosing company (managed vs external
+ref) vs user-provided, provider select (`local_encrypted`/`aws_secrets_manager`/`gcp_secret_manager`/`vault`)
++ specific **provider vault**, health/block-reason display, AWS path preview; detail panel with
+details/usage/**access-events** audit tabs. **My secrets**: users set their own values, missing-required
+banner. **Vaults**: create/edit provider vaults (AWS region/KMS/tags, GCP project, Vault mount/path), set
+default, disable, health-check, **AWS discovery preview**, and **bulk import from external vault**.
+
+**Monorepo:** `secrets/page.tsx` (595 ln) is respectable — create/rotate/bind/unbind/update/status,
+providers (`CREATE/DELETE_SECRET_PROVIDER`), import, access-events query. **Missing:** the *My secrets*
+(user-secret) tab, the *Vaults* management tab (health-check, AWS discovery, bulk vault import), and the
+references/usage drill-down.
+
+**Impl plan:** add tabs to the existing page: `MyUserSecretsTab` (`CREATE_USER_SECRET` + set-value dialog),
+`VaultsTab` (provider CRUD is present server-side; add health-check + `IMPORT_SECRETS` bulk dialog + AWS
+discovery). GraphQL mostly exists (`secrets.ts` has `IMPORT_SECRETS`, providers); add `secretReferences`,
+`vaultHealthCheck`, `discoverVaultCandidates`. Cross-ref doc 07. Gating: existing `secrets_vault` + admin.
+Tests: user-secret set/missing-banner, vault health-check, references drill-down.
+
+## 12. Other partial pages (lower-priority UI depth)
+
+| Page | Monorepo gap | Plan sketch | Size |
+|---|---|---|---|
+| `Pipelines`/`PipelineSettings`/`PipelineItemDetail` | our `pipelines/page.tsx` lacks dnd board, stage-settings, item detail, breakdown-routing, archive | add `pipelines/[pipelineId]/settings` + `.../items/[caseId]` routes; `PipelineBoard` (dnd-kit), `PipelineSettingsPage`; ops in `mutations/pipelines.ts` (extend). `pipelines_routines` flag | M |
+| `RoutineDetail` triggers | our routines lack webhook triggers, signing-secret rotation, per-trigger cron/timezone | add `routines/[routineId]` view with Triggers tab; `mutations/recurring-tasks.ts` extend (`addTrigger`, `rotateTriggerSecret`) | M |
+| `SkillStudio` + `CompanySkills` detail tabs | our `skills/page.tsx` has file editor+lint but no Versions/Agents tabs, no test harness/inputs, no folder tree | new `skills/studio/[skillId]` route + `SkillStudioPage`; extend `skills.ts` ops (versions, test-runs). `skills_teams` flag. Cross-ref doc 05 | L |
+| `TeamCatalog` install wizard | our `teams/page.tsx` lacks preview (hierarchy/projects/skills/files) + multi-step install w/ manager pick | add `TeamPreview` + wizard to teams view; `PREVIEW_TEAM_INSTALL_QUERY` exists | M |
+| `CompanyExport`/`CompanyImport` | our `portability/page.tsx` lacks file-tree selection, preview pane, GitHub-URL import, rename-map | expand portability view; `EXPORT_WORKSPACE_BUNDLE`/`IMPORT_WORKSPACE_BUNDLE` exist. `workspace_portability` flag | M |
+| `Costs` (5 tabs) | our `finance`+`ledger` cover spend/budgets but lack providers/billers/incidents-resolution UI | add Providers/Billers/Incidents tabs to finance view; `finance.ts` ops. `budgets`/`ledger` flags | M |
+| `DesignGuide` showcase | no `/design-guide` route | add `(dashboard)/design-guide/page.tsx` showcasing our `components/ui`; supports the `design-guide` skill workflow | S |
+| `InstanceExperimentalSettings` | our `settings/page.tsx` has no experimental-flag toggle grid | add a flags panel wired to `mutations/feature-flags.ts` (exists) | S |
+
+## 13. Not-a-gap / boundary notes
+
+- **Memory inspection ⚪** — Paperclip has *no* memory-inspection UI (grep for `agentMemory|MemoryEntry`
+  in `ui/src` = 0); memory is authored via the Instructions bundle. Our monorepo matches: `memory` flag +
+  `server/services/agent-memory.ts` + a self-append API route, no UI. Not a UI parity gap; depth tracked in doc 04.
+- **Human auth / billing / org & member settings 🚫** — `Auth`, `Companies`, `CompanySettings`,
+  `CompanyAccess`, `CompanyInvites`, `InstanceGeneralSettings`, `InviteLanding` are buildbase-owned; do not port.
+- **`CliAuth` / `BoardClaim`** — CLI/device pairing UX; we have `cli-auth/` (`CliAuthApprovePage`). Keep.
+
+---
+
+## 14. Prioritized UI backlog (this domain)
+
+1. **L** — App connections + MCP gateways (§8) — unblocks Agent Tools tab; highest strategic value.
+2. **L** — Execution Environments UI (§3) + **M** env-var editor (§4) — core control-plane surface we entirely lack.
+3. **M** — `JsonSchemaForm` primitive (§2) — unblocks §3, §9, §10.
+4. **L** — Plugin manager + per-plugin settings (§10).
+5. **L** — Unified Agent Detail tabs (§5) + **M** Agent Tools tab (§6).
+6. **L** — Execution Workspace detail (§7).
+7. **M** — Adapter Manager install/reload (§9); Secrets user-secrets + vaults (§11).
+8. **M/S** — Pipelines settings, Routine triggers, SkillStudio, Teams wizard, Portability, Costs tabs, DesignGuide, experimental-flags panel (§12).

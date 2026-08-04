@@ -33,6 +33,23 @@ const SET_ADAPTER_ENABLED = `
   }
 `;
 
+const INSTALL_ADAPTER = `
+  mutation ($type: String!, $displayName: String!, $transport: String, $authKind: String) {
+    installAdapter(type: $type, displayName: $displayName, transport: $transport, authKind: $authKind) {
+      type
+    }
+  }
+`;
+
+const REMOVE_ADAPTER = `
+  mutation ($adapterType: String!) {
+    removeAdapter(adapterType: $adapterType)
+  }
+`;
+
+const TRANSPORTS = ["local", "gateway", "cloud"];
+const AUTH_KINDS = ["none", "apiKey", "subscription", "secretBinding"];
+
 interface Adapter {
   type: string;
   displayName: string;
@@ -49,7 +66,17 @@ export default function AdaptersPage() {
     query: ADAPTERS_QUERY,
   });
   const [, setEnabled] = useMutation(SET_ADAPTER_ENABLED);
+  const [, installAdapter] = useMutation(INSTALL_ADAPTER);
+  const [, removeAdapter] = useMutation(REMOVE_ADAPTER);
   const [busy, setBusy] = useState<string | null>(null);
+  const [showInstall, setShowInstall] = useState(false);
+  const [form, setForm] = useState({
+    type: "",
+    displayName: "",
+    transport: "local",
+    authKind: "apiKey",
+  });
+  const [installError, setInstallError] = useState<string | null>(null);
   const adapters = useMemo(() => data?.agentAdapters ?? [], [data]);
 
   async function toggle(a: Adapter) {
@@ -62,15 +89,108 @@ export default function AdaptersPage() {
     }
   }
 
+  async function onInstall() {
+    setInstallError(null);
+    if (!form.type.trim() || !form.displayName.trim()) {
+      setInstallError("Type and display name are required");
+      return;
+    }
+    setBusy("install");
+    try {
+      const res = await installAdapter({
+        type: form.type.trim(),
+        displayName: form.displayName.trim(),
+        transport: form.transport,
+        authKind: form.authKind,
+      });
+      if (res.error) {
+        setInstallError(res.error.graphQLErrors[0]?.message ?? "Install failed");
+        return;
+      }
+      setForm({ type: "", displayName: "", transport: "local", authKind: "apiKey" });
+      setShowInstall(false);
+      refetch({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onRemove(a: Adapter) {
+    if (!confirm(`Remove adapter "${a.displayName}"?`)) return;
+    setBusy(a.type);
+    try {
+      await removeAdapter({ adapterType: a.type });
+      refetch({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">Adapters</h1>
-        <p className="text-sm text-muted-foreground">
-          Provider adapters agents can run on. Enable the ones your organization uses; assign one to
-          an agent from its settings. The built-in gateway is always available.
-        </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Adapters</h1>
+          <p className="text-sm text-muted-foreground">
+            Provider adapters agents can run on. Enable the ones your organization uses; assign one
+            to an agent from its settings. The built-in gateway is always available.
+          </p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={() => setShowInstall((v) => !v)}>
+          {showInstall ? "Cancel" : "Install adapter"}
+        </Button>
       </div>
+
+      {showInstall && (
+        <Card className="space-y-3 p-4">
+          <h2 className="text-sm font-semibold text-foreground">Register an external adapter</h2>
+          <p className="-mt-1 text-xs text-muted-foreground">
+            Adds the adapter to the registry so it can be enabled and assigned. It starts disabled.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input
+              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+              placeholder="type (e.g. cursor-cloud)"
+              value={form.type}
+              onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+            />
+            <input
+              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+              placeholder="Display name"
+              value={form.displayName}
+              onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
+            />
+            <select
+              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+              value={form.transport}
+              onChange={(e) => setForm((f) => ({ ...f, transport: e.target.value }))}
+            >
+              {TRANSPORTS.map((tr) => (
+                <option key={tr} value={tr}>
+                  transport: {tr}
+                </option>
+              ))}
+            </select>
+            <select
+              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+              value={form.authKind}
+              onChange={(e) => setForm((f) => ({ ...f, authKind: e.target.value }))}
+            >
+              {AUTH_KINDS.map((ak) => (
+                <option key={ak} value={ak}>
+                  auth: {ak}
+                </option>
+              ))}
+            </select>
+          </div>
+          {installError && <p className="text-sm text-destructive">{installError}</p>}
+          <div className="flex justify-end">
+            <Button size="sm" disabled={busy === "install"} onClick={onInstall}>
+              Install
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {fetching && adapters.length === 0 ? (
         <div className="flex justify-center p-8">
@@ -104,18 +224,30 @@ export default function AdaptersPage() {
                   </span>
                 </div>
               </div>
-              <Button
-                variant={a.enabled ? "secondary" : "primary"}
-                size="sm"
-                disabled={busy === a.type || (a.builtIn && a.enabled)}
-                loading={busy === a.type}
-                onClick={() => toggle(a)}
-                title={
-                  a.builtIn && a.enabled ? "The built-in adapter cannot be disabled" : undefined
-                }
-              >
-                {a.enabled ? "Disable" : "Enable"}
-              </Button>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  variant={a.enabled ? "secondary" : "primary"}
+                  size="sm"
+                  disabled={busy === a.type || (a.builtIn && a.enabled)}
+                  loading={busy === a.type}
+                  onClick={() => toggle(a)}
+                  title={
+                    a.builtIn && a.enabled ? "The built-in adapter cannot be disabled" : undefined
+                  }
+                >
+                  {a.enabled ? "Disable" : "Enable"}
+                </Button>
+                {!a.builtIn && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy === a.type}
+                    onClick={() => onRemove(a)}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
             </Card>
           ))}
         </div>

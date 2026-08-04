@@ -40,4 +40,8 @@ release/
 # Turbo
 .turbo
 .claude/settings.local.json
-.paperclip-parity/
+# NOTE: .paperclip-parity/ is tracked on the feat/paperclip-parity branch so the parity tracker +
+# domain docs travel with the repo (portable across machines). Keep it ignored on other branches.
+
+# Operator DB dumps (db:backup)
+backups/

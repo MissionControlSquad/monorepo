@@ -1,0 +1,382 @@
+---
+title: "Heartbeat / Scheduling / Watchdog / Wakeup — Parity Gap Analysis"
+domain: heartbeat-scheduling
+paperclip_root: "/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/paperclip"
+monorepo_root: "/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo"
+boundary: "buildbase owns human auth/billing only — everything here is control-plane, in scope to port."
+generated: 2026-07-17
+---
+
+# Heartbeat / Scheduling / Watchdog / Wakeup
+
+This domain is how agents get **woken, scheduled, run, retried, reaped, and recovered**. It is
+the beating heart of a control plane that runs AI on remote machines.
+
+## 0. Architectural framing (read first — it shapes every gap)
+
+The two systems sit on fundamentally different execution substrates, and that explains most gaps.
+
+| | Paperclip | Monorepo |
+| --- | --- | --- |
+| Runtime | Long-running Node server | Serverless Next.js on Vercel |
+| Scheduler | In-process `setInterval` loop (default 30s), `server/src/index.ts:978` | Vercel cron routes, **min granularity 5 min** (`apps/web/vercel.json`) |
+| Process tracking | In-memory `runningProcesses` map + pid/pgid liveness | Stateless; no in-memory run handles |
+| Wake delivery | Scheduler picks up DB `heartbeat_runs` rows | Runner **outbound short-poll** (NAT-safe) + optional live-gateway push |
+| Startup recovery | Rich startup sequence (`index.ts:878-964`) | None — no long-lived process; cron is the only backstop |
+
+Consequence: Paperclip's tight, stateful, per-second scheduler cannot be copied 1:1. The monorepo
+must express equivalent behaviour as **idempotent cron sweeps + lease/fencing + outbound poll**.
+The good news: the monorepo already nailed the two hardest primitives for the serverless model —
+**lease + fencing** and **redelivery + dead-letter** — which Paperclip does more implicitly.
+
+---
+
+## 1. Capability inventory & status
+
+Legend: ✅ at parity · 🟡 partial · ❌ missing
+
+| # | Capability | Paperclip | Monorepo | Status |
+| --- | --- | --- | --- | --- |
+| 1 | Central interval scheduler that wakes agents | `index.ts:978`, `heartbeat.ts:16890` (`tickTimers`) | agents self-poll; `auto-sleep` only sleeps them | ❌ |
+| 2 | DB-backed wakeup queue w/ coalescing + idempotency | `agent_wakeup_requests`, `enqueueWakeup` `heartbeat.ts:15045` | `LivePendingDelivery` (push, flag-gated), no coalescing | 🟡 |
+| 3 | Run lifecycle ledger (session/usage/process) | `heartbeat_runs` schema | `RoutineRun` / `RunnerCommand` / `Task.status` — no unified run | 🟡 |
+| 4 | Concurrency control (per-agent slots + priority order) | `startNextQueuedRunForAgent` `heartbeat.ts:11609` | single active task via lease + preflight guard | 🟡 |
+| 5 | Task checkout / lease / **fencing token** | `checkoutRunId`/`executionRunId` locks, `sweepStaleIssueLocks` | `task-checkout.ts` (opaque token, atomic claim) | ✅ |
+| 6 | Scheduled retries + transient backoff + process-loss retry | `scheduledRetryAt`, `promoteDueScheduledRetries` `heartbeat.ts:10144` | runner `timeout` reap only; no retry/backoff | ❌ |
+| 7 | Orphaned-run reaper (pid liveness, detached procs) | `reapOrphanedRuns` `heartbeat.ts:11278` | `reapStuckRunnerCommands` + `sweepExpiredCheckouts` | 🟡 |
+| 8 | Stranded assigned-work reconciliation (re-dispatch/continue) | `reconcileStrandedAssignedIssues` (`recovery/service.ts`), semantics §9 | none — watchdog releases lease but never re-wakes | ❌ |
+| 9 | **Task watchdog** (verify stopped subtree via agent) | `task-watchdogs.ts`, `issue_watchdogs`, `reconcileTaskWatchdogs` | different concept (infra lease/heartbeat watchdog) | ❌ |
+| 10 | Silent active-run watchdog (output-silence) | `scanSilentActiveRuns` `recovery/service.ts:2047`, `heartbeat_run_watchdog_decisions` | none (no run-output stream) | ❌ |
+| 11 | Issue monitors (one-shot deferred wake) | `issues.monitorNextCheckAt`, `tickDueIssueMonitors` | `monitors.ts` = workspace-health thresholds, on-demand | ❌ |
+| 12 | Recurring runs w/ cron + tz + concurrency/catch-up policy | `routines.ts` `tickScheduledTriggers` `:2915`, `cron.ts` parser | 2 subsystems, **no cron parser + no scanner loop** | 🟡 |
+| 13 | Redelivery + dead-letter of wake deliveries | implicit (`resumeQueuedRuns` + coalesce) | `redeliverStalePending` + `deadLetterExhaustedDeliveries` | ✅ |
+| 14 | Startup crash-recovery sequence | `index.ts:878-964` | none (serverless) — cron `reap-stale-work` is the substitute | 🟡 |
+| 15 | Auto-sleep on heartbeat timeout | `agents.lastHeartbeatAt` + invokability | `auto-sleep` cron `findStaleAgents→IDLE` | ✅ |
+| 16 | Scheduling suppression / pause gating | `resolveSchedulingSuppression`, worktree cutoff, project pause | preflight shutdown/vacation short-circuit; project-pause in recurring gen | 🟡 |
+
+---
+
+## 2. Detail + gap plans
+
+### 1. Central interval scheduler — ❌
+
+**Paperclip.** A single `setInterval` (`server/src/index.ts:978`, interval `heartbeatSchedulerIntervalMs`
+default 30s, min 10s — `config.ts:332`) runs `heartbeat.tickTimers(now)` (`heartbeat.ts:16890`). For every
+invokable agent it reads the per-agent heartbeat policy (`parseHeartbeatPolicy` `:10350`: `intervalSec`,
+`maxConcurrentRuns`, stored in `agents.heartbeat` jsonb), compares `now − lastHeartbeatAt` against
+`intervalSec`, and calls `enqueueWakeup` with `source:"timer"`. Same tick fires due issue monitors.
+
+**Monorepo.** There is no server-driven agent wake. Agents run a daemon that **pulls**: `heartbeat-preflight`
+(`apps/web/app/api/agents/me/heartbeat-preflight/route.ts:18`) is the "should I work?" gate, and
+`auto-sleep` (`apps/web/app/api/cron/auto-sleep/route.ts`) only demotes silent agents to `IDLE`. Nothing
+proactively enqueues interval-based wakes.
+
+**Gap plan (size M).** This is partly an architectural *choice* (pull vs push), not a pure miss — the
+outbound-poll model is a NAT-pull differentiator. Recommended: keep pull as primary, but add a
+`/api/cron/heartbeat-tick` route (register in `vercel.json`, `*/1 * * * *` if plan allows, else reuse the
+5-min `reap-stale-work`) that:
+- **prisma:** none new for interval itself (reuse `Agent.lastHeartbeat`); add `Agent.heartbeatIntervalSec Int?`.
+- **server:** `enqueueAgentWake(agentId, reason)` service that writes to the wakeup queue (see #2) for agents
+  whose `now − lastHeartbeat > heartbeatIntervalSec` **and** who have assigned actionable work
+  (`Task.status in (todo,in_progress)`), mirroring `tickTimers`' `eligibleIssue` guard.
+- **security:** Bearer `CRON_SECRET` like other crons.
+- **tests:** interval-elapsed enqueues once; not-elapsed skips; no-work agent skipped.
+
+### 2. DB-backed wakeup queue with coalescing — 🟡
+
+**Paperclip.** `agent_wakeup_requests` (`packages/db/schema/agent_wakeup_requests.ts`): `source`, `reason`,
+`payload`, `status(queued|skipped|…)`, **`coalescedCount`**, `idempotencyKey`, `runId`. `enqueueWakeup`
+(`heartbeat.ts:15045`) coalesces a new wake into an already-queued/running run for the same task instead of
+stacking duplicates (`filterZombieCoalesceTarget` `:3077`, coalesce logic `:15834-16177`), and honours an
+`idempotencyKey` so retries can't double-fire.
+
+**Monorepo.** The nearest thing is `LivePendingDelivery` (`live-gateway.prisma:68`): `idempotencyKey @unique`,
+`attempts`, `deadLetteredAt`, `expiresAt`. But it is a **push delivery channel gated by `LIVE_GATEWAY`
+(default off)**, not a general reason-carrying wake queue, and it has **no coalescing** (no notion of "fold
+this wake into the run already handling this task").
+
+**Gap plan (size M).** Introduce a first-class `AgentWakeup` model rather than overloading `LivePendingDelivery`:
+- **prisma** (`task-autonomy.prisma` or new `wakeup.prisma`): `AgentWakeup { id, workspaceId, agentProfileId,
+  taskId?, source, reason, payload Json?, status(queued|claimed|coalesced|skipped|done), coalescedCount Int
+  @default(0), idempotencyKey String?, claimedAt?, finishedAt?, createdAt }` with
+  `@@unique([agentProfileId, idempotencyKey])` and index `[agentProfileId, status]`.
+- **server:** `enqueueWakeup()` that, in one transaction, either coalesces (`coalescedCount++`) into an
+  existing `queued`/`claimed` wake for the same `taskId`+reason class or inserts a new row.
+- **API:** `heartbeat-preflight` returns the next claimable wake; runner poll claims it (`updateMany WHERE
+  status=queued` atomic, mirroring `claimCommandsForAgent` `runner-commands.ts:209`).
+- **security:** agent-key scoped; wakes only visible to their target agent + workspace.
+- **tests:** coalesce two wakes → one row `coalescedCount=1`; idempotency-key replay is a no-op.
+
+### 3. Run lifecycle ledger — 🟡
+
+**Paperclip.** `heartbeat_runs` is a rich execution ledger: `status(queued|running|scheduled_retry|
+succeeded|failed|timed_out|cancelled|coalesced)`, `sessionIdBefore/After`, `usageJson`, `resultJson`,
+`processPid/processGroupId/processStartedAt`, `lastOutputAt/Seq/Stream`, `retryOfRunId`,
+`processLossRetryCount`, `scheduledRetryAt/Attempt/Reason`, `livenessState`, `continuationAttempt`,
+`contextSnapshot`. Every run is one row; retries/continuations link via `retryOfRunId`.
+
+**Monorepo.** Execution is spread across `RoutineRun` (`pipeline.prisma:90`), `RunnerCommand`
+(`runner-command.prisma:26`: status/claimedAt/timeoutMs/exitCode), and `Task.status`. There is no unified
+"agent run" row carrying session id, token usage, process handles, or retry lineage.
+
+**Gap plan (size L).** Full parity is large and not all of it is needed. Prioritise the fields the other
+gaps depend on:
+- **prisma:** add an `AgentRun { id, workspaceId, agentProfileId, taskId?, status, sessionId?, usage Json?,
+  result Json?, retryOfRunId?, retryCount, scheduledRetryAt?, lastOutputAt?, startedAt?, finishedAt?,
+  error? }`. This becomes the anchor for #6/#7/#10.
+- **server:** funnel runner-command execution results and routine runs into `AgentRun` finalization.
+- Defer process pid/pgid tracking — irrelevant on serverless (runners own their own OS process; the runner
+  daemon should self-report liveness via heartbeat instead).
+- **tests:** run finalize is compare-and-set on status; retry links preserve lineage.
+
+### 4. Concurrency control — 🟡
+
+**Paperclip.** `startNextQueuedRunForAgent` (`heartbeat.ts:11609`) holds a per-agent start lock
+(`withAgentStartLock`), computes `availableSlots = maxConcurrentRuns − runningCount` (`:11625`), then
+dispatches queued runs **ordered by dependency-readiness → issue status (in_progress first) → priority →
+FIFO** (`:11659-11674`).
+
+**Monorepo.** Concurrency is implicitly "one active task per agent": the checkout lease plus the
+`heartbeat-preflight` overlapping guard (`currentTaskId` set + `lastHeartbeat` < 5 min,
+`route.ts:58-90`) prevent a second concurrent claim. There is no multi-slot concurrency and no
+priority-ordered dispatch queue (tasks carry `priority`/`dueDate` but nothing orders a wake queue by them).
+
+**Gap plan (size M).** Once #2 (`AgentWakeup`) exists:
+- **prisma:** `Agent.maxConcurrentRuns Int @default(1)`.
+- **server:** claim step selects up to `maxConcurrentRuns − activeCount` wakes ordered by task
+  `dependency-ready → status → priority → createdAt` (port the comparator at `heartbeat.ts:11659`).
+- **tests:** slot cap respected; priority ordering; blocked-dependency task deprioritised.
+- Low urgency if the product intends strict single-task agents — then this is documented parity-by-design.
+
+### 5. Task checkout / lease / fencing — ✅
+
+**Paperclip.** Issue-ownership lock (`checkoutRunId`) + active-execution lock (`executionRunId`) on `issues`
+(`schema/issues.ts:39-40`), compare-and-clear on finalize, stale-lock sweeper `sweepStaleIssueLocks`
+(semantics `execution-semantics.md §5`).
+
+**Monorepo — at/above parity.** `task-checkout.ts` is a cleaner, explicit implementation: atomic claim via a
+single conditional `UPDATE ... WHERE checkedOutByProfileId IS NULL OR checkoutLeaseExpiresAt < now()`
+(`:48-56`), an **opaque `checkoutToken` fencing token** minted per claim (`:47`), token-gated `renewCheckout`
+(`:63`) and `releaseCheckout` (`:81`) that reject a reclaimed task, plus `sweepExpiredCheckouts` (`:98`) and
+`forceReleaseCheckout` (`:112`) for recovery. Fields on `Task` (`task.prisma:77-90`). **No action needed** —
+if anything Paperclip could learn from the explicit fencing token.
+
+### 6. Scheduled retries + transient backoff + process-loss retry — ❌
+
+**Paperclip.** Runs can enter `status:"scheduled_retry"` with `scheduledRetryAt/Attempt/Reason`;
+`promoteDueScheduledRetries` (`heartbeat.ts:10144`) promotes due rows back to queued (startup + every tick).
+Bounded transient backoff schedule (`BOUNDED_TRANSIENT_HEARTBEAT_RETRY_DELAYS_MS` `:328`), single
+process-loss retry (`processLossRetryCount < 1` `:11376`), max-turn continuations
+(`MAX_TURN_CONTINUATION_*`), interaction-continuation infra retry — all idempotent via `retryOfRunId` +
+attempt + reason, with transactional dedupe of an existing continuation (`heartbeat.ts:9663-9771`).
+
+**Monorepo.** Only a terminal `timeout` reap for runner commands (`reapStuckRunnerCommands` `:170`, past
+`claimedAt+timeoutMs+60s`). No scheduled-retry queue, no exponential/bounded backoff, no single process-loss
+retry, no continuation retries. `TaskRecoveryAction` records an attempt but never schedules a backed-off wake.
+
+**Gap plan (size M).** Build on `AgentRun` (#3) + `AgentWakeup` (#2):
+- **prisma:** `AgentRun.scheduledRetryAt?`, `.retryCount`, `.retryReason?` (already proposed in #3).
+- **server:** on transient failure, set `scheduledRetryAt = now + backoff[retryCount]` (bounded array like
+  Paperclip's `[…]`); a `promoteDueRetries()` step inside `reap-stale-work` re-enqueues due retries as wakes.
+  Cap retries; on exhaustion open a `TaskRecoveryAction`.
+- **security:** cron-gated; retries preserve original assignee (no reassignment — matches Paperclip §13).
+- **tests:** backoff schedule; cap enforced; idempotent promotion (double-tick promotes once).
+
+### 7. Orphaned-run reaper — 🟡
+
+**Paperclip.** `reapOrphanedRuns` (`heartbeat.ts:11278`) scans `running` rows whose in-memory handle is gone,
+checks OS pid/pgid liveness for local-child adapters, handles detached processes
+(`DETACHED_PROCESS_ERROR_CODE`), and finalizes lost runs `failed/process_lost` with a single retry when
+eligible. Runs at startup and every tick (5-min staleness threshold periodically).
+
+**Monorepo — partial.** `reap-stale-work` reaps stuck **runner commands** (`reapStuckRunnerCommands`) and
+expired **checkouts** (`sweepExpiredCheckouts`), which covers the serverless-relevant cases. Missing: no
+"run" concept to reap (see #3), no pid-liveness/detached-process handling (correctly N/A on serverless — the
+runner daemon owns the OS process). The real gap is that a reaped command/lease does not trigger a
+**continuation/re-dispatch** (that's #8).
+
+**Gap plan (size S).** Mostly closed once #3 + #8 land. Concretely: when `reapStuckRunnerCommands` times out a
+command tied to an in-progress task, emit a stranded-work signal (feed #8) instead of leaving the task
+silently stuck. **prisma:** none. **server:** hook in `runner-commands.ts:170`. **tests:** timed-out command
+on active task opens recovery/continuation.
+
+### 8. Stranded assigned-work reconciliation — ❌
+
+**Paperclip.** `reconcileStrandedAssignedIssues` (recovery service, `execution-semantics.md §9`): a stranded
+assigned `todo` whose last run failed/timed-out and has no live path gets **one** dispatch-recovery wake
+(§9.1); a stranded assigned `in_progress` whose live run vanished gets **one** continuation wake (§9.2);
+if that also fails it moves the issue `blocked` + opens an explicit `issue_recovery_actions` row. Bounded,
+idempotent by recovery fingerprint; preserves owner; cheap-model status-only recovery lane (§9.3).
+
+**Monorepo.** None. The infra watchdog (#9-monorepo) releases an expired lease so *someone else* can reclaim,
+but nothing **re-wakes the same owner** to continue, and there is no "retry once then escalate to blocked +
+recovery action" ladder. `TaskRecoveryAction` exists as a record but no reconciler drives the ladder.
+
+**Gap plan (size L).** This is the highest-value gap for "running AI on remote machines" robustness.
+- **prisma:** reuse `TaskRecoveryAction` (`task-autonomy.prisma:84`); add `fingerprint String`,
+  `attemptCount Int`, `@@unique([taskId, fingerprint, status])` for idempotency (port from
+  `issue_recovery_actions.ts:64`).
+- **server:** a `reconcileStrandedWork(now)` step in `reap-stale-work` that finds tasks assigned +
+  non-terminal + no live wake/run/lease, and: (a) if last run failed → enqueue one recovery wake;
+  (b) if that recovery wake already ran and still stranded → set task `blocked` + open `TaskRecoveryAction`.
+- **UI:** surface the recovery action on the task detail (owner, cause, next action) — port the affordance
+  from Paperclip's recovery surfaces.
+- **security:** never reassign (owner-preserving, matches §14); recovery wakes are `CRON_SECRET`-gated.
+- **tests:** todo-strand → 1 wake; in_progress-strand → 1 continuation; second failure → blocked+action;
+  fingerprint dedupe prevents wake storms.
+
+### 9. Task watchdog (verify a stopped subtree) — ❌ (naming collision!)
+
+**Paperclip.** A **product feature**: user assigns a watchdog *agent* to an issue; when the whole subtree
+comes to rest with no live path, `reconcileTaskWatchdogs` computes a SHA-256 **stop fingerprint** over the
+stopped leaves + config (`task-watchdogs.ts`, doc `TASK-WATCHDOG.md`), and wakes the watchdog agent to
+verify each stopped leaf as a *claim* and restore a live path if the stop was wrong. Scope-enforced
+server-side (`task-watchdog-scope.ts`), one reusable review task per watched issue, config in
+`issue_watchdogs` table.
+
+**Monorepo — different concept under the same word.** `task-watchdog.ts` + `TaskWatchdog`
+(`task-autonomy.prisma:50`) is an **infra** watchdog: conditions `lease_expired`/`no_heartbeat`
+(`conditionHolds :37`), actions `release_checkout`/`pause_subtree` (`performAction :61`), fired by
+`evaluateWatchdogs` in the reap cron. Useful, but it is **not** the verification-agent-on-stopped-subtree.
+
+**Gap plan (size L).** Net-new product feature; keep the existing infra watchdog and add a distinct
+`SubtreeWatchdog`:
+- **prisma:** `SubtreeWatchdog { id, workspaceId, taskId @unique-active, watchdogAgentProfileId, instructions?,
+  status, lastReviewedFingerprint?, watchdogTaskId?, triggerCount }` (port `issue_watchdogs.ts`).
+- **server:** subtree walk over `parentTaskId` excluding watchdog-origin tasks; stop-fingerprint compute;
+  wake watchdog agent when fingerprint is new; scope guard on all watchdog-origin mutations.
+- **API/UI:** `GET/PUT/DELETE /api/tasks/:id/watchdog`; task-properties "Watchdog" row (port
+  `TASK-WATCHDOG.md` §Configuration).
+- **security:** the scope contract is the crux — watchdog may mutate only inside the watched subtree, may not
+  self-trigger, may not approve board/spend/security. Port `task-watchdog-scope.ts` verbatim-in-spirit.
+- **tests:** fingerprint suppression (no re-fire on identical stop); config change invalidates fingerprint;
+  out-of-scope mutation rejected at route layer.
+
+### 10. Silent active-run watchdog (output silence) — ❌
+
+**Paperclip.** `scanSilentActiveRuns` (`recovery/service.ts:2047`) classifies a still-`running` run's output
+silence as `ok|suspicious|critical|snoozed|not_applicable` from `heartbeat_runs.lastOutputAt`, creates at most
+one review action per run, and records operator decisions (`snooze`/`continue`/`dismissed_false_positive`) in
+`heartbeat_run_watchdog_decisions`. Distinct from process death — a live-but-mute run.
+
+**Monorepo.** Nothing. There is no run-output stream (`lastOutputAt`) to measure silence against; `auto-sleep`
+is heartbeat-timeout only (agent-level, not run-level).
+
+**Gap plan (size M, depends on #3).** Requires the runner daemon to report `lastOutputAt` progress.
+- **prisma:** `AgentRun.lastOutputAt?` (from #3) + `RunWatchdogDecision { runId, outcome, quietUntil? }`.
+- **server:** `scanSilentRuns()` in `reap-stale-work`: `running` runs whose `lastOutputAt` is older than a
+  suspicious/critical threshold → open a review `TaskRecoveryAction` (do **not** kill the run — matches
+  Paperclip). Honour `snooze` windows.
+- **UI:** surface `outputSilence` summary on the live-run view + snooze/continue/dismiss actions.
+- **tests:** silence classification thresholds; snooze suppresses re-creation; continue re-arms after 30 min.
+
+### 11. Issue monitors (one-shot deferred wake) — ❌
+
+**Paperclip.** A per-issue **one-shot** deferred wake: `issues.monitorNextCheckAt/monitorNotes/…`
+(`schema/issues.ts:57-62`), `executionPolicy.monitor` (`execution-semantics.md §8 "Issue monitors"`).
+`tickDueIssueMonitors` (inside `tickTimers`) fires an `issue_monitor_due` wake to the assignee when
+`nextCheckAt` passes, clears it, and requires explicit re-arm; bounded by `timeoutAt`/`maxAttempts` with a
+`recoveryPolicy` (`wake_owner`/`create_recovery_issue`/`escalate_to_board`). This is how agents "come back
+later" to poll GitHub checks / Vercel deploys / review services.
+
+**Monorepo.** `monitors.ts` is a *different* thing — workspace-health threshold monitors (open incidents /
+pipeline cases), evaluated **on-demand** (`evaluateMonitors :39`), no scheduled wake to a task owner.
+
+**Gap plan (size M).** Distinct feature from `Monitor`:
+- **prisma:** add `Task.monitorNextCheckAt?`, `.monitorNotes?`, `.monitorAttemptCount`, `.monitorMaxAttempts?`,
+  `.monitorTimeoutAt?`, `.monitorRecoveryPolicy?`; index `[workspaceId, monitorNextCheckAt]` (port
+  `issues.ts:94`).
+- **server:** in the heartbeat-tick / reap cron, find `monitorNextCheckAt <= now`, enqueue an
+  `issue_monitor_due` wake (#2), clear the schedule, enforce bounds → `recoveryPolicy` on exhaustion.
+- **API:** agent tool to arm/re-arm a monitor with a non-secret `notes` (redact `externalRef`).
+- **tests:** fires once + clears; re-arm required; exhausted `maxAttempts` follows recovery policy.
+
+### 12. Recurring runs / routines (cron scheduling) — 🟡
+
+**Paperclip.** `routine_triggers` (`schema/routines.ts:103`): `kind`, `cronExpression`, `timezone`,
+`nextRunAt`, plus webhook `publicId`/`secretId`/`signingMode` (HMAC). A real cron parser
+(`services/cron.ts` `parseCron`/`nextCronTick`) + tz-aware `nextCronTickInTimeZone` (`routines.ts:222`).
+`tickScheduledTriggers` (`routines.ts:2915`) scans due triggers, **optimistically claims** each
+(`UPDATE ... WHERE nextRunAt = <observed>` `:2971`), advances to next tick, and enqueues honouring
+**concurrency policy** (`coalesce_if_active|skip_if_active|always_enqueue`, `constants.ts:551`),
+**catch-up policy** (`skip_missed|enqueue_missed_with_cap` capped by `MAX_CATCH_UP_RUNS` `:2957-2969`),
+**activity gate** (`require_external_activity` `:2999`), and project-pause suppression.
+
+**Monorepo — two partial subsystems, neither auto-fires on cron.**
+- `RecurringTask` (`task.prisma:172`, `recurring-tasks.ts`): **structured** recurrence only (daily/weekly/
+  monthly, no raw cron), **lazy generation** when tasks are listed (`generateRecurringTasks :347`, not a
+  cron), catch-up = **collapse** (`while(nextDue<=now)` advance → one task `:396`). Sound, but not schedule-
+  driven and no concurrency/activity-gate policy.
+- `Routine`/`RoutineTrigger` (`pipeline.prisma:25/56`, `routines.ts`): trigger types `cron|manual|webhook`,
+  stores `recurrenceConfig`+`nextFireAt`+`publicId`, scan index `[type,isEnabled,nextFireAt]` — **but there
+  is no cron-expression parser and no scanner loop**, so cron triggers never fire automatically. Only
+  `manual`/`webhook` firing works today.
+
+**Gap plan (size M).** The scaffolding is ~70% there; wire the scanner + parser:
+- **server:** add a cron parser (there's a battle-tested one to port at Paperclip `services/cron.ts` +
+  `nextCronTickInTimeZone` `routines.ts:222`); add a `tickRoutineTriggers()` step to a cron route that scans
+  `nextFireAt <= now`, **optimistic-claims** (`updateMany WHERE nextFireAt = observed`), advances to next
+  tick, and fires (reusing `triggerRoutineNow`).
+- **prisma:** add `RoutineTrigger.cronExpression?`, `.timezone?`; add `Routine.concurrencyPolicy`,
+  `.catchUpPolicy` enums; optionally webhook `secretId`/`signingMode` for HMAC parity.
+- **schedule:** because Vercel cron floor is 5 min, sub-5-min cron routines will fire coarsely — document, or
+  run a lightweight external ticker; that's the substrate tax, not a logic gap.
+- **security:** webhook triggers need HMAC signing + replay window (Paperclip `signingMode`/`replayWindowSec`);
+  optimistic-claim prevents double-fire across concurrent cron invocations.
+- **tests:** cron→nextFireAt advance; optimistic-claim dedupe under concurrency; catch-up cap; skip-if-active.
+
+### 13. Redelivery + dead-letter — ✅
+
+**Monorepo — at/above parity, and a differentiator.** `redeliverStalePending` (`live-task-delivery.ts:553`,
+`REDELIVER_STALE_MS=60s`, `MAX_DELIVERY_ATTEMPTS=5`) re-pushes un-acked live deliveries to still-connected
+agents; `deadLetterExhaustedDeliveries(5, now)` (`database/src/live-gateway/index.ts:253`) dead-letters past
+the cap (`LivePendingDelivery.deadLetteredAt`, `expiresAt` 24h TTL). Paperclip has no explicit dead-letter —
+its wakeups coalesce and are re-driven by `resumeQueuedRuns`. The monorepo's push+pull hybrid with explicit
+DLQ is genuinely stronger for the remote-execution use case. **No action.**
+
+### 14. Startup crash-recovery sequence — 🟡 (architectural)
+
+**Paperclip.** On boot (`index.ts:878-964`): hot-restart adoption → reap orphaned runs → promote scheduled
+retries → resume queued runs → reconcile stranded work → issue-graph liveness → task-watchdogs → silent-run
+scan → sweep stale locks → productivity review.
+
+**Monorepo.** No long-lived process ⇒ no startup hook. The `reap-stale-work` cron (every 5 min) is the moral
+equivalent and already runs a subset (watchdogs → checkout sweep → command reap → terminal reap → dead-letter
+→ redeliver). **Gap = the missing steps are the missing features above (#6/#8/#10), not a missing runner.**
+Once those land, expand the `reap-stale-work` sequence to match Paperclip's ordering. No separate work item.
+
+### 15. Auto-sleep on heartbeat timeout — ✅
+
+`auto-sleep` cron (`route.ts`) `findStaleAgents(5min)` → re-check `isAgentStill` (race-safe) →
+`applyAgentStatusUpdate(IDLE)`. Parity with Paperclip's `lastHeartbeatAt`-driven invokability.
+**One fix (size S):** `auto-sleep` is **not registered in `vercel.json`** — add it (`*/5 * * * *`) or fold
+its logic into `reap-stale-work`, otherwise stale agents are only demoted when triggered manually.
+
+### 16. Scheduling suppression / pause — 🟡
+
+**Paperclip.** `resolveSchedulingSuppression` (whole-instance), worktree run-execution cutoff, project-pause,
+company-inactive — all checked inside `enqueueWakeup`/`tickTimers` before a wake is created.
+
+**Monorepo.** Partial + scattered: preflight short-circuits on shutdown/vacation/overlap
+(`heartbeat-preflight/route.ts:23-90`); recurring generation skips shutdown/archived projects
+(`recurring-tasks.ts`); routine tick would need project-pause. **Gap plan (size S):** centralise a
+`isWakeSuppressed({workspace, project, agent})` guard and call it from the new wake-enqueue path (#1/#2) and
+the routine scanner (#12), so suppression is uniform rather than per-callsite.
+
+---
+
+## 3. Prioritised backlog (by robustness value for remote AI execution)
+
+1. **#8 Stranded-work reconciliation (L)** — the core "don't let remote work sit dead forever" ladder.
+2. **#2 Wakeup queue + coalescing (M)** + **#1 heartbeat-tick cron (M)** — the delivery substrate #6/#8/#11 need.
+3. **#6 Scheduled retries + backoff (M)** — turn one-shot timeouts into bounded, owner-preserving retries.
+4. **#12 Routine cron scanner + parser (M)** — scaffolding exists; wire the loop to make cron routines real.
+5. **#10 Silent-run watchdog (M)** + **#11 Issue monitors (M)** — need runner `lastOutputAt` + monitor fields.
+6. **#9 Subtree watchdog (L)** — net-new product feature; rename-disambiguate from the infra watchdog first.
+7. **#15 register auto-sleep (S)**, **#7 reaper→continuation hook (S)**, **#16 unify suppression (S)** — quick wins.
+
+## 4. Boundary note
+
+Nothing in this domain belongs to buildbase (human auth/billing only). All 16 capabilities are control-plane
+scheduling/execution and are fully in scope to port. Agent-key auth on runner/preflight endpoints and
+`CRON_SECRET` on cron routes are the relevant security primitives; keep human/billing auth out of the wake path.

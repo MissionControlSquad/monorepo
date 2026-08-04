@@ -48,14 +48,7 @@ const serverSchema = z.object({
   // dev/test fall back to an insecure default in secrets-crypto.ts.
   SECRET_ENCRYPTION_KEY: z.string().optional(),
 
-  // ── Web Push (optional — only needed for push notifications) ──
-  VAPID_PUBLIC_KEY: z
-    .string()
-    .default(
-      "BEAGuNNkK6E6ijU7Q8PrUwQB5E6yxVGGiPZtYd7jrLJlt19ge_9pYT76yrWgLr7WH4zrN33oWk-T_UEBoerEBus",
-    ),
-  VAPID_PRIVATE_KEY: z.string().optional(),
-  VAPID_SUBJECT: z.string().default("mailto:dharmendra@agentcenter.cloud"),
+  // Web Push removed — buildbase owns push delivery (its own service worker + subscription).
 
   // ── Email via Resend (optional — only needed for email notifications) ──
   RESEND_API_KEY: z.string().optional(),
@@ -123,7 +116,14 @@ function validateEnv(): ServerEnv {
 
   // In production runtime, use strict schema and fail hard
   if (process.env.NODE_ENV === "production") {
-    return serverSchema.parse(process.env);
+    const prod = serverSchema.parse(process.env);
+    // Fail fast at BOOT (not at first secret op) if the vault master key is missing/weak — otherwise the
+    // secrets vault would run on the dev insecure default. secrets-crypto also throws at use time; this
+    // surfaces it during startup. (Kept out of the zod schema so lenientSchema.extend() still works.)
+    if ((prod.SECRET_ENCRYPTION_KEY ?? "").length < 32) {
+      throw new Error("SECRET_ENCRYPTION_KEY must be set (>=32 chars) in production");
+    }
+    return prod;
   }
 
   // In development/test, try strict first and warn, then fall back to lenient

@@ -13,14 +13,7 @@ import {
   CLEAR_PLUGIN_ERROR,
 } from "@/lib/graphql/mutations";
 import { Breadcrumbs, Button, Card, Badge, PageLayout } from "@/components/ui";
-import { Input } from "@/components/ui/shadcn/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/shadcn/select";
+import { JsonSchemaForm } from "@/components/common/JsonSchemaForm";
 import { adapterConfigFields } from "@agentcenter/utils";
 
 // Epic #6: per-plugin detail — manifest info, capabilities, tools/jobs, a config form rendered from
@@ -187,62 +180,16 @@ export function PluginDetailPage({ pluginId }: { pluginId: string }) {
         )}
       </Card>
 
-      {/* Config */}
+      {/* Config — rendered from the manifest's configSchema via the shared JsonSchemaForm primitive
+          (validation + secret masking), replacing the hand-rolled field rendering. */}
       {fields.length > 0 && (
         <Card padding="lg" className="space-y-3">
           <h2 className="text-sm font-semibold text-foreground">Configuration</h2>
-          {fields.map((f) => (
-            <label key={f.key} className="block space-y-1">
-              <span className="text-sm font-medium text-foreground">
-                {f.label}
-                {f.required && <span className="text-destructive"> *</span>}
-              </span>
-              {f.type === "boolean" ? (
-                <input
-                  type="checkbox"
-                  checked={Boolean(config[f.key] ?? f.default ?? false)}
-                  onChange={(e) => setLocalConfig((c) => ({ ...c, [f.key]: e.target.checked }))}
-                  className="ml-1 h-4 w-4"
-                />
-              ) : f.type === "enum" ? (
-                <Select
-                  value={String(config[f.key] ?? f.default ?? "")}
-                  onValueChange={(v) => setLocalConfig((c) => ({ ...c, [f.key]: v }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {f.enumValues?.map((v) => (
-                      <SelectItem key={v} value={v}>
-                        {v}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  type={f.secret ? "password" : f.type === "number" ? "number" : "text"}
-                  value={String(config[f.key] ?? "")}
-                  placeholder={f.default !== undefined ? String(f.default) : undefined}
-                  onChange={(e) =>
-                    setLocalConfig((c) => ({
-                      ...c,
-                      [f.key]:
-                        f.type === "number"
-                          ? e.target.value === ""
-                            ? undefined
-                            : Number(e.target.value)
-                          : e.target.value,
-                    }))
-                  }
-                />
-              )}
-              {f.description && (
-                <span className="text-xs text-muted-foreground">{f.description}</span>
-              )}
-            </label>
-          ))}
+          <JsonSchemaForm
+            schema={plugin.manifest?.configSchema}
+            value={config}
+            onChange={setLocalConfig}
+          />
           <div className="flex justify-end border-t border-border pt-3">
             <Button
               size="sm"

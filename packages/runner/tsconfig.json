@@ -14,6 +14,9 @@
     "baseUrl": ".",
     "paths": {
       "@agentcenter/utils": ["../utils/dist/index.d.ts"],
+      "@agentcenter/utils/remote-http-endpoint-guard": [
+        "../utils/dist/remote-http-endpoint-guard.d.ts"
+      ],
       "@agentcenter/types": ["../types/dist/index.d.ts"]
     }
   },

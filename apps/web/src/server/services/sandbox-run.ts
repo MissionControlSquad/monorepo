@@ -25,6 +25,9 @@ import { isFeatureEnabled } from "@/server/feature-flags";
 import { assembleContextBundle } from "./agent-context";
 import { getSandboxProvider } from "./sandbox-providers";
 import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
+import { captureRunMemory } from "./agent-memory";
+import { stampRunReview } from "./run-review";
+import { scheduleRunRetryIfTransient } from "./run-retry";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertExecutionAllowed } from "./execution-policy";
 import { resolveEnvironmentExecution, type EnvExecutionResolution } from "./environments";
@@ -292,7 +295,15 @@ export async function runTaskInSandbox(input: {
   // secrets take precedence on any key collision.
   const env: Record<string, string> = {
     ...(envRes?.envVars ?? {}),
-    ...(await resolveEnvForAgent(input.workspaceId, agent.id)),
+    // Audit-on-resolve (Domain 7 P1): this is a REAL use of the agent's secrets (injected into the
+    // run), so pass a consumer context — one `injected` access event is written per bound secret.
+    ...(await resolveEnvForAgent(input.workspaceId, agent.id, {
+      actorType: "agent",
+      actorId: agent.id,
+      consumerType: "agent",
+      consumerId: agent.id,
+      runId: run.id,
+    })),
   };
 
   // In-sandbox API bridge (Plan 6): a run-scoped token the in-box agent can use to post progress back
@@ -448,6 +459,44 @@ export async function runTaskInSandbox(input: {
       `Sandbox run (${providerKey}) — ${runStatus}${exitCode != null ? `, exit ${exitCode}` : ""}\n\n${stdout || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
     );
 
+    // Post-run memory auto-capture (Domain 4 GAP-B): persist run residue when the agent's effective
+    // provider is `db`. Best-effort — never fails the run; no-op for none/markdown.
+    await captureRunMemory({
+      workspaceId: input.workspaceId,
+      agentId: agent.id,
+      agentProvider: agent.memoryProvider ?? null,
+      taskId: input.taskId,
+      runId: run.id,
+      summary:
+        `Run ${runStatus} (${providerKey}${exitCode != null ? `, exit ${exitCode}` : ""}).\n${stdout || ""}`.trim(),
+    });
+
+    // Untrusted-output review gate (Domain 8 G2, LOW_TRUST_REVIEW-gated): stamp the run's reviewState +
+    // source-trust from the agent's trust profile. A low-trust/untrusted agent (or one whose profile
+    // requires it) → `needs_review` + quarantined; standard/trusted → `approved`. Makes the previously
+    // dead requireUntrustedPrReview toggle real. Best-effort — never fails the run.
+    if (await isFeatureEnabled(FLAG_KEYS.LOW_TRUST_REVIEW)) {
+      await stampRunReview(
+        run.id,
+        {
+          trustLevel: agent.trustLevel ?? null,
+          lowTrustContainment: agent.trustProfile?.lowTrustContainment ?? null,
+          requireUntrustedPrReview: agent.trustProfile?.requireUntrustedPrReview ?? null,
+        },
+        { agentId: agent.id },
+      );
+    }
+
+    // Scheduled-retry (Domain 9 #6): a transient timeout schedules a bounded-backoff re-dispatch (the
+    // reap cron promotes it). No-op for a clean failure or an exhausted retry budget. Best-effort.
+    if (runStatus === "timeout" && (await isFeatureEnabled(FLAG_KEYS.RUNNERS))) {
+      await scheduleRunRetryIfTransient({
+        id: run.id,
+        status: runStatus,
+        retryCount: run.retryCount,
+      });
+    }
+
     return {
       runId: run.id,
       providerKey,
@@ -499,18 +548,40 @@ export async function enqueueSandboxRun(input: {
   // Same resolution + fail-closed admission as the sync path — so an inadmissible run never queues.
   const { providerKey } = await resolveAndAdmitTarget(input.workspaceId, agent, input.providerKey);
 
-  const run = await prisma.agentRun.create({
-    data: {
-      workspaceId: input.workspaceId,
-      agentId: agent.id,
-      taskId: input.taskId,
-      kind: "sandbox",
-      providerKey,
-      status: "queued",
-      requestedByProfileId: input.requestedByProfileId ?? null,
-    },
+  // Coalesce (prevents double-dispatch): a task may have at most one QUEUED run. Two overlapping reap
+  // ticks (or a manual enqueue racing the cron) would otherwise create two queued rows → drain claims
+  // both → the task runs twice (duplicate commits/PRs/cost). A partial-unique index on
+  // (taskId) WHERE status='queued' is the race backstop; the pre-check is the fast path.
+  const existing = await prisma.agentRun.findFirst({
+    where: { taskId: input.taskId, status: "queued", kind: "sandbox" },
+    select: { id: true, providerKey: true },
   });
-  return { runId: run.id, providerKey };
+  if (existing) return { runId: existing.id, providerKey: existing.providerKey ?? providerKey };
+
+  try {
+    const run = await prisma.agentRun.create({
+      data: {
+        workspaceId: input.workspaceId,
+        agentId: agent.id,
+        taskId: input.taskId,
+        kind: "sandbox",
+        providerKey,
+        status: "queued",
+        requestedByProfileId: input.requestedByProfileId ?? null,
+      },
+    });
+    return { runId: run.id, providerKey };
+  } catch (err) {
+    // Lost the race to a concurrent enqueue → return the winner's queued run instead of a duplicate.
+    if ((err as { code?: string }).code === "P2002") {
+      const winner = await prisma.agentRun.findFirst({
+        where: { taskId: input.taskId, status: "queued", kind: "sandbox" },
+        select: { id: true, providerKey: true },
+      });
+      if (winner) return { runId: winner.id, providerKey: winner.providerKey ?? providerKey };
+    }
+    throw err;
+  }
 }
 
 /**

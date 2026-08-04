@@ -108,3 +108,30 @@ export const PREVIEW_TEAM_INSTALL_QUERY = gql`
     }
   }
 `;
+
+// Domain 5 GAP-D: static security audit of a skill bundle.
+export const AUDIT_SKILL_QUERY = gql`
+  query AuditSkill($skillId: String!) {
+    auditSkill(skillId: $skillId) {
+      verdict
+      findings {
+        code
+        severity
+        message
+        path
+      }
+    }
+  }
+`;
+
+// Domain 5: version history of a skill bundle (Skill Studio Versions tab).
+export const SKILL_VERSIONS_QUERY = gql`
+  query SkillVersions($skillId: String!) {
+    skillVersions(skillId: $skillId) {
+      id
+      revisionNumber
+      label
+      createdAt
+    }
+  }
+`;

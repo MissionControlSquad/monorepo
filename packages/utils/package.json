@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./zip": "./src/zip.ts"
+    "./zip": "./src/zip.ts",
+    "./remote-http-endpoint-guard": "./src/remote-http-endpoint-guard.ts"
   },
   "files": [
     "src",

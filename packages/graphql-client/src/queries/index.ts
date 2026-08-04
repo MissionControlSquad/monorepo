@@ -68,6 +68,7 @@ export {
   DELIVERABLE_VERSIONS_QUERY,
   WORKSPACE_DELIVERABLES_QUERY,
 } from "./deliverables";
+export { WORK_PRODUCTS_BY_TASK_QUERY } from "./work-products";
 
 export { AGENT_ACTIONS_BY_AGENT_QUERY } from "./agent-actions";
 
@@ -124,6 +125,16 @@ export {
   BUDGET_INCIDENTS_QUERY,
   COST_BREAKDOWN_QUERY,
   COST_TREND_QUERY,
+  FINANCE_EVENT_SUMMARY_QUERY,
+  FINANCE_EVENTS_BY_BILLER_QUERY,
+  FINANCE_EVENTS_BY_KIND_QUERY,
+  FINANCE_EVENTS_QUERY,
+  COST_WINDOW_SPEND_QUERY,
+  COST_BY_TASK_TREE_QUERY,
+  COST_BILLING_SPLIT_QUERY,
+  AGENT_SALARY_QUERY,
+  PROVIDER_QUOTA_WINDOWS_QUERY,
+  UNPRICED_COST_EVENTS_QUERY,
 } from "./finance";
 
 export {
@@ -153,6 +164,7 @@ export {
   PENDING_DECOMPOSITIONS_QUERY,
   TASK_TREE_HOLDS_QUERY,
   TASK_RECOVERY_ACTIONS_QUERY,
+  THREAD_INTERACTIONS_QUERY,
 } from "./task-autonomy";
 
 export { CASES_QUERY, CASE_QUERY, LABELS_QUERY, CASE_EVENTS_QUERY } from "./cases";
@@ -162,6 +174,8 @@ export {
   SKILL_FILES_QUERY,
   SKILL_CATALOG_QUERY,
   LINT_SKILL_QUERY,
+  AUDIT_SKILL_QUERY,
+  SKILL_VERSIONS_QUERY,
   AGENT_SKILLS_QUERY,
   TEAMS_QUERY,
   PREVIEW_TEAM_INSTALL_QUERY,
@@ -174,7 +188,7 @@ export { PLUGINS_QUERY, PLUGIN_QUERY } from "./plugins";
 export { API_KEYS_QUERY } from "./api-keys";
 export { TERMINAL_SESSIONS_QUERY } from "./terminals";
 export { AGENT_INSTRUCTIONS_QUERY } from "./agent-instructions";
-export { ORG_CHART_QUERY } from "./org-chart";
+export { ORG_CHART_QUERY, ORG_CHART_SVG_QUERY } from "./org-chart";
 export { ATTENTION_FEED_QUERY } from "./attention";
 export { AGENT_CAPABILITY_GRANTS_QUERY, AGENT_AUTHZ_EVENTS_QUERY } from "./agent-authz";
 export { PROFILE_ANALYTICS_QUERY } from "./profile-analytics";
@@ -184,8 +198,9 @@ export { CLI_AUTH_CHALLENGE_QUERY } from "./cli-auth";
 export { WORK_TIMELINE_QUERY } from "./timeline";
 
 export { AGENT_GOVERNANCE_QUERY } from "./agent-governance";
+export { AGENT_TRUST_PROFILE_QUERY } from "./agent-trust";
 
-export { TASK_RELATIONS_QUERY } from "./task-relations";
+export { TASK_RELATIONS_QUERY, BLOCKER_DIAGNOSTICS_QUERY } from "./task-relations";
 
 export { TASK_EXTERNAL_LINKS_QUERY } from "./external-links";
 
@@ -199,6 +214,13 @@ export { RUNNER_HOSTS_QUERY } from "./runner-hosts";
 export { RUNTIME_ADAPTERS_QUERY } from "./runtime-adapters";
 export { SANDBOX_PROVIDERS_QUERY } from "./sandbox-providers";
 export { AGENT_RUNS_QUERY, AGENT_RUN_LIVE_STATUS_QUERY } from "./agent-runs";
+export { AGENT_COMPANIES_QUERY, AGENT_COMPANY_QUERY, EXPORT_COMPANY_PACKAGE_QUERY } from "./agent-companies";
+export {
+  MEMORY_OPERATIONS_QUERY,
+  AGENT_MEMORY_ENTRIES_QUERY,
+  COMPANY_MEMORY_DEFAULT_QUERY,
+  SEARCH_AGENT_MEMORY_QUERY,
+} from "./memory";
 export {
   ENVIRONMENTS_QUERY,
   ENVIRONMENT_CAPABILITIES_QUERY,
@@ -212,3 +234,21 @@ export {
   PROJECT_WORKSPACES_QUERY,
   EXECUTION_WORKSPACES_QUERY,
 } from "./execution-workspaces";
+export { SIDEBAR_BADGES_QUERY } from "./sidebar-badges";
+export { SIDEBAR_PREFERENCE_QUERY } from "./sidebar-preferences";
+export { PROJECT_DOC_COMMENTS_QUERY } from "./project-doc-comments";
+export { FOLDERS_QUERY, FOLDER_ITEMS_QUERY } from "./folders";
+export { ASSETS_QUERY, ASSET_DOWNLOAD_URL_QUERY } from "./assets";
+export { EXTERNAL_OBJECTS_QUERY } from "./external-objects";
+export { CLOUD_UPSTREAMS_QUERY, CLOUD_UPSTREAM_PLAN_QUERY } from "./cloud-upstreams";
+export { INBOX_POLICIES_QUERY } from "./inbox-policies";
+export { SKILL_COMMENTS_QUERY } from "./skill-comments";
+export { ANNOTATION_THREADS_QUERY } from "./document-annotations";
+export { PROVIDER_AUTH_STATES_QUERY } from "./provider-auth";
+export { ADAPTER_PLUGINS_QUERY } from "./adapter-plugins";
+export { SMOKE_CASES_QUERY } from "./smoke-lab";
+export { LOCAL_SERVICES_QUERY } from "./local-services";
+export { AGENT_SKILL_SNAPSHOT_QUERY } from "./agent-skills-sync";
+export { SKILL_UPDATE_STATUS_QUERY } from "./skill-lifecycle";
+export { FLAGGED_AGENTS_QUERY } from "./productivity-reviews";
+export { DECISIONS_QUERY } from "./decision-training";

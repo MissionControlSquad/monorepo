@@ -162,6 +162,46 @@ describe("bindings + env resolution (Epic #5)", () => {
     );
     expect(r.errors).toBeDefined();
   });
+
+  // Domain 7 P1: audit-on-resolve at the USE site.
+  it("writes an `injected` access event per bound secret ONLY when a consumer context is passed", async () => {
+    const agentId = await makeAgentInWs(WS_A);
+    const s = await makeSecret(WS_A, "OPENAI", "sk-xyz");
+    await gql(
+      `mutation($s:String!,$a:String!){ bindSecret(secretId:$s, scope:"agent", agentId:$a, envVarName:"OPENAI_API_KEY"){ id } }`,
+      { s: s.data.createSecret.id, a: agentId },
+      await cookieFor(WS_A, "admin"),
+    );
+    const secretId = s.data.createSecret.id;
+
+    // Presence-check path (no context) → NO injected audit (avoids spamming the ledger).
+    await resolveEnvForAgent(WS_A, agentId);
+    expect(await prisma.secretAccessEvent.count({ where: { secretId, action: "injected" } })).toBe(
+      0,
+    );
+
+    // Real USE path (run injection) → one `injected` event with full provenance.
+    const env = await resolveEnvForAgent(WS_A, agentId, {
+      actorType: "agent",
+      actorId: agentId,
+      consumerType: "agent",
+      consumerId: agentId,
+      runId: "run_abc",
+    });
+    expect(env).toEqual({ OPENAI_API_KEY: "sk-xyz" });
+    const injected = await prisma.secretAccessEvent.findFirst({
+      where: { secretId, action: "injected" },
+    });
+    expect(injected).toMatchObject({
+      actorType: "agent",
+      agentId,
+      consumerType: "agent",
+      consumerId: agentId,
+      configPath: "env.OPENAI_API_KEY",
+      outcome: "success",
+      runId: "run_abc",
+    });
+  });
 });
 
 describe("lifecycle status (Epic #5)", () => {
@@ -302,6 +342,34 @@ describe("provider configs (Epic #5)", () => {
     await gql(CREATE_PROVIDER, { n: "dup", k: "env" }, admin);
     const again = await gql(CREATE_PROVIDER, { n: "dup", k: "env" }, admin);
     expect(again.errors).toBeDefined();
+  });
+
+  // Domain 7 P2: health check writes the previously-never-written healthy/lastCheckedAt/lastError.
+  it("checkSecretProviderHealth persists health: env healthy, unconfigured vault coming_soon", async () => {
+    const admin = await cookieFor(WS_A, "admin");
+    const CHECK = `mutation($id:String!){ checkSecretProviderHealth(id:$id){ id healthy lastCheckedAt lastError } }`;
+
+    const env = await gql(CREATE_PROVIDER, { n: "local", k: "env" }, admin);
+    const envHealth = await gql(CHECK, { id: env.data.createSecretProvider.id }, admin);
+    expect(envHealth.data.checkSecretProviderHealth).toMatchObject({
+      healthy: true,
+      lastError: null,
+    });
+    expect(envHealth.data.checkSecretProviderHealth.lastCheckedAt).toBeTruthy();
+
+    // a vault with no config → unhealthy with a missing-config error
+    const vault = await gql(CREATE_PROVIDER, { n: "v", k: "vault" }, admin);
+    const vaultHealth = await gql(CHECK, { id: vault.data.createSecretProvider.id }, admin);
+    expect(vaultHealth.data.checkSecretProviderHealth.healthy).toBe(false);
+    expect(vaultHealth.data.checkSecretProviderHealth.lastError).toMatch(/missing required config/);
+
+    // member cannot run a health check
+    const denied = await gql(
+      CHECK,
+      { id: env.data.createSecretProvider.id },
+      await cookieFor(WS_A, "member"),
+    );
+    expect(denied.errors).toBeDefined();
   });
 });
 

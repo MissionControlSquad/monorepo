@@ -51,6 +51,12 @@ export const SECRET_ACCESS_EVENTS_QUERY = gql`
       actorType
       actorId
       version
+      consumerType
+      consumerId
+      configPath
+      outcome
+      errorCode
+      runId
       createdAt
     }
   }

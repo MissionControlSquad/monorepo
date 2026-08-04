@@ -3,6 +3,8 @@ import { EventTypes, TaskStatus, ProfileKind, NotificationKind } from "../../con
 import {
   getTaskCreatorProfile,
   getTaskProjectId,
+  getTaskWorkspaceId,
+  getProjectWorkspaceId,
   getProjectHumanUserIdsByProjectId,
   getHumanUserIdsFromProfileIds,
 } from "@agentcenter/database";
@@ -44,7 +46,10 @@ function taskUrl(taskId: string, taskNumber?: number): string {
 on(EventTypes.TASK_CREATED, async (e) => {
   if (!e.assigneeIds?.length) return;
 
-  const userIds = await getUserIdsFromProfileIds(e.assigneeIds);
+  const [userIds, workspaceId] = await Promise.all([
+    getUserIdsFromProfileIds(e.assigneeIds),
+    getTaskWorkspaceId(e.taskId),
+  ]);
 
   // Resolve creator's userId so we can skip them
   const creatorUserIds = e.profileId ? await getUserIdsFromProfileIds([e.profileId]) : [];
@@ -61,6 +66,7 @@ on(EventTypes.TASK_CREATED, async (e) => {
           body: `You were assigned to "${e.title}".`,
           taskId: e.taskId,
           url: taskUrl(e.taskId, e.taskNumber),
+          workspaceId: workspaceId ?? undefined,
         }),
       ),
   );
@@ -71,7 +77,10 @@ on(EventTypes.TASK_CREATED, async (e) => {
 on(EventTypes.TASK_ASSIGNEES_CHANGED, async (e) => {
   if (!e.addedIds?.length) return;
 
-  const userIds = await getUserIdsFromProfileIds(e.addedIds);
+  const [userIds, workspaceId] = await Promise.all([
+    getUserIdsFromProfileIds(e.addedIds),
+    getTaskWorkspaceId(e.taskId),
+  ]);
 
   await Promise.allSettled(
     userIds.map((userId) =>
@@ -82,6 +91,7 @@ on(EventTypes.TASK_ASSIGNEES_CHANGED, async (e) => {
         body: `You were assigned to "${e.title}".`,
         taskId: e.taskId,
         url: taskUrl(e.taskId, e.taskNumber),
+        workspaceId: workspaceId ?? undefined,
       }),
     ),
   );
@@ -91,7 +101,10 @@ on(EventTypes.TASK_ASSIGNEES_CHANGED, async (e) => {
 
 on(EventTypes.TASK_STATUS_CHANGED, async (e) => {
   if (e.toStatus === TaskStatus.DONE) {
-    const userId = await getTaskCreatorUserId(e.taskId);
+    const [userId, workspaceId] = await Promise.all([
+      getTaskCreatorUserId(e.taskId),
+      getTaskWorkspaceId(e.taskId),
+    ]);
     if (!userId) return;
     await notify({
       userId,
@@ -100,14 +113,16 @@ on(EventTypes.TASK_STATUS_CHANGED, async (e) => {
       body: `"${e.title}" has been marked as done.`,
       taskId: e.taskId,
       url: taskUrl(e.taskId, e.taskNumber),
+      workspaceId: workspaceId ?? undefined,
     });
   }
 
   if (e.toStatus === TaskStatus.REVIEW) {
     // Notify task creator + project human members
-    const [creatorId, memberIds] = await Promise.all([
+    const [creatorId, memberIds, workspaceId] = await Promise.all([
       getTaskCreatorUserId(e.taskId),
       getProjectHumanUserIds(e.taskId),
+      getTaskWorkspaceId(e.taskId),
     ]);
     const uniqueIds = [...new Set([creatorId, ...memberIds].filter(Boolean) as string[])];
 
@@ -120,6 +135,7 @@ on(EventTypes.TASK_STATUS_CHANGED, async (e) => {
           body: `"${e.title}" is ready for review.`,
           taskId: e.taskId,
           url: taskUrl(e.taskId, e.taskNumber),
+          workspaceId: workspaceId ?? undefined,
         }),
       ),
     );
@@ -129,7 +145,10 @@ on(EventTypes.TASK_STATUS_CHANGED, async (e) => {
 // ─── Clarification requested → notify creator ────────────────────────
 
 on(EventTypes.TASK_CLARIFICATION_REQUESTED, async (e) => {
-  const userId = await getTaskCreatorUserId(e.taskId);
+  const [userId, workspaceId] = await Promise.all([
+    getTaskCreatorUserId(e.taskId),
+    getTaskWorkspaceId(e.taskId),
+  ]);
   if (!userId) return;
   await notify({
     userId,
@@ -138,13 +157,17 @@ on(EventTypes.TASK_CLARIFICATION_REQUESTED, async (e) => {
     body: `${e.reviewerName} requested clarification on "${e.title}".`,
     taskId: e.taskId,
     url: taskUrl(e.taskId, e.taskNumber),
+    workspaceId: workspaceId ?? undefined,
   });
 });
 
 // ─── Task approved → notify creator ──────────────────────────────────
 
 on(EventTypes.TASK_APPROVED, async (e) => {
-  const userId = await getTaskCreatorUserId(e.taskId);
+  const [userId, workspaceId] = await Promise.all([
+    getTaskCreatorUserId(e.taskId),
+    getTaskWorkspaceId(e.taskId),
+  ]);
   if (!userId) return;
   await notify({
     userId,
@@ -153,13 +176,17 @@ on(EventTypes.TASK_APPROVED, async (e) => {
     body: `"${e.title}" was approved by ${e.reviewerName}.`,
     taskId: e.taskId,
     url: taskUrl(e.taskId, e.taskNumber),
+    workspaceId: workspaceId ?? undefined,
   });
 });
 
 // ─── Task rejected → notify creator ─────────────────────────────────
 
 on(EventTypes.TASK_REJECTED, async (e) => {
-  const userId = await getTaskCreatorUserId(e.taskId);
+  const [userId, workspaceId] = await Promise.all([
+    getTaskCreatorUserId(e.taskId),
+    getTaskWorkspaceId(e.taskId),
+  ]);
   if (!userId) return;
   await notify({
     userId,
@@ -168,6 +195,7 @@ on(EventTypes.TASK_REJECTED, async (e) => {
     body: `"${e.title}" was rejected by ${e.reviewerName}: ${e.rejectionReason}`,
     taskId: e.taskId,
     url: taskUrl(e.taskId, e.taskNumber),
+    workspaceId: workspaceId ?? undefined,
   });
 });
 
@@ -176,7 +204,10 @@ on(EventTypes.TASK_REJECTED, async (e) => {
 on(EventTypes.MESSAGE_CREATED, async (e) => {
   if (!e.mentionedProfileIds?.length) return;
 
-  const userIds = await getUserIdsFromProfileIds(e.mentionedProfileIds);
+  const [userIds, workspaceId] = await Promise.all([
+    getUserIdsFromProfileIds(e.mentionedProfileIds),
+    getTaskWorkspaceId(e.taskId),
+  ]);
   await Promise.allSettled(
     userIds.map((userId) =>
       notify({
@@ -187,6 +218,7 @@ on(EventTypes.MESSAGE_CREATED, async (e) => {
         taskId: e.taskId,
         messageId: e.messageId,
         url: taskUrl(e.taskId, e.taskNumber),
+        workspaceId: workspaceId ?? undefined,
       }),
     ),
   );
@@ -195,7 +227,10 @@ on(EventTypes.MESSAGE_CREATED, async (e) => {
 // ─── New comment on task → notify task creator ───────────────────────
 
 on(EventTypes.MESSAGE_CREATED, async (e) => {
-  const creatorUserId = await getTaskCreatorUserId(e.taskId);
+  const [creatorUserId, workspaceId] = await Promise.all([
+    getTaskCreatorUserId(e.taskId),
+    getTaskWorkspaceId(e.taskId),
+  ]);
   if (!creatorUserId) return;
 
   // Don't notify if the comment author is the task creator
@@ -210,13 +245,17 @@ on(EventTypes.MESSAGE_CREATED, async (e) => {
     taskId: e.taskId,
     messageId: e.messageId,
     url: taskUrl(e.taskId, e.taskNumber),
+    workspaceId: workspaceId ?? undefined,
   });
 });
 
 // ─── Deliverable submitted → notify task creator ─────────────────────
 
 on(EventTypes.DELIVERABLE_SUBMITTED, async (e) => {
-  const userId = await getTaskCreatorUserId(e.taskId);
+  const [userId, workspaceId] = await Promise.all([
+    getTaskCreatorUserId(e.taskId),
+    getTaskWorkspaceId(e.taskId),
+  ]);
   if (!userId) return;
   await notify({
     userId,
@@ -225,6 +264,7 @@ on(EventTypes.DELIVERABLE_SUBMITTED, async (e) => {
     body: `${e.agentName} submitted "${e.title}" for "${e.taskTitle}".`,
     taskId: e.taskId,
     url: taskUrl(e.taskId, e.taskNumber),
+    workspaceId: workspaceId ?? undefined,
   });
 });
 
@@ -233,7 +273,10 @@ on(EventTypes.DELIVERABLE_SUBMITTED, async (e) => {
 on(EventTypes.DOCUMENT_CREATED, async (e) => {
   if (!e.taskId) return;
 
-  const creatorUserId = await getTaskCreatorUserId(e.taskId);
+  const [creatorUserId, workspaceId] = await Promise.all([
+    getTaskCreatorUserId(e.taskId),
+    getTaskWorkspaceId(e.taskId),
+  ]);
   if (!creatorUserId) return;
 
   // Don't notify if the document author is the task creator
@@ -247,13 +290,17 @@ on(EventTypes.DOCUMENT_CREATED, async (e) => {
     body: `${e.creatorName} added ${e.docType} "${e.title}" to "${e.taskTitle}".`,
     taskId: e.taskId,
     url: taskUrl(e.taskId),
+    workspaceId: workspaceId ?? undefined,
   });
 });
 
 // ─── Project member added → notify human project members ─────────────
 
 on(EventTypes.PROJECT_MEMBER_ADDED, async (e) => {
-  const humanUserIds = await getProjectHumanUserIdsByProjectId(e.projectId);
+  const [humanUserIds, workspaceId] = await Promise.all([
+    getProjectHumanUserIdsByProjectId(e.projectId),
+    getProjectWorkspaceId(e.projectId),
+  ]);
   if (!humanUserIds.length) return;
 
   await Promise.allSettled(
@@ -264,6 +311,7 @@ on(EventTypes.PROJECT_MEMBER_ADDED, async (e) => {
         title: `New team member: ${e.agentName}`,
         body: `${e.agentName} joined project "${e.projectName}".`,
         url: `/projects/${e.projectId}`,
+        workspaceId: workspaceId ?? undefined,
       }),
     ),
   );
@@ -272,7 +320,10 @@ on(EventTypes.PROJECT_MEMBER_ADDED, async (e) => {
 // ─── Project member removed → notify human project members ───────────
 
 on(EventTypes.PROJECT_MEMBER_REMOVED, async (e) => {
-  const humanUserIds = await getProjectHumanUserIdsByProjectId(e.projectId);
+  const [humanUserIds, workspaceId] = await Promise.all([
+    getProjectHumanUserIdsByProjectId(e.projectId),
+    getProjectWorkspaceId(e.projectId),
+  ]);
   if (!humanUserIds.length) return;
 
   await Promise.allSettled(
@@ -283,6 +334,7 @@ on(EventTypes.PROJECT_MEMBER_REMOVED, async (e) => {
         title: `Team member left: ${e.agentName}`,
         body: `${e.agentName} was removed from project "${e.projectName}".`,
         url: `/projects/${e.projectId}`,
+        workspaceId: workspaceId ?? undefined,
       }),
     ),
   );

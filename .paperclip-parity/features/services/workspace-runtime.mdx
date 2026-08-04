@@ -1,0 +1,12 @@
+---
+service: workspace-runtime
+kind: service
+status: Partial
+priority: P1
+gate: buildable-now
+---
+# workspace-runtime · 🟡 Partial
+**What it is:** the live runtime view of a workspace (what's mounted, current cwd, dirty state).
+**Monorepo:** recording present; realization (live state) missing.
+**Required:** depends on workspace-realization. Buildable-now once realization lands.
+**Covers:** features/P1-execution-workspaces.mdx · SERVICE-AUDIT #176.

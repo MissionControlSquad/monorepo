@@ -1,0 +1,12 @@
+---
+service: execution-workspaces
+kind: service
+status: Partial
+priority: P1
+gate: buildable-now
+---
+# execution-workspaces · 🟡 Partial
+**What it is:** project workspaces + per-run realized workspace recording.
+**Monorepo:** CRUD + recording present + UI; **realization** (worktree/branch checkout, cleanupCommand) missing.
+**Required:** branch on strategyType in the sandbox script + run cleanup. Buildable-now.
+**Covers:** features/P1-execution-workspaces.mdx · SERVICE-AUDIT #58.

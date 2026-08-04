@@ -1,0 +1,30 @@
+---
+feature: Skills, teams & agent-companies
+priority: P2
+status: Partial
+gate: buildable-now
+---
+
+# Skills, teams & agent-companies · P2 · 🟡 Library present; catalog/import/studio deferred
+
+**What it is:** the reusable-capability layer — a skills library (CRUD/versions/files/fork/star/assign),
+lint + security audit + allow/deny policy; teams (author + install with collision strategy); and
+agent-companies (portable COMPANY/AGENTS.md packages with export/import + org chart).
+
+**Present in our monorepo (verified):**
+- Skills: `createSkill`/`updateSkill`(rev+1)/`delete`/`fork`/`star`/`assign`, multi-file bundles (`SkillFile`), `skillVersions`. `skills.ts` = 14.7KB (Paperclip `company-skills.ts` = 244KB).
+- Lint/audit/policy: `skill-lint.ts` (structural), `skill-audit.ts` (security scan + hard-stops), `skill-policy.ts` (allow/deny). Wired: skills page Files/Test/**Audit**/**Versions** panels.
+- Teams: `createTeam`/`addTeamMember`, `previewTeamInstall`/`installTeam` (rename/skip/replace), route `/teams`.
+- Agent-companies: create/delete/export (markdown package)/import (round-trip), `AgentCompaniesPage`, route `/companies`.
+
+**Gaps / pending:**
+- **File-based skill + team CATALOG missing** — monorepo has DB publish/browse (`sharingScope=public`), not Paperclip's packaged file catalog (`skills-catalog.ts`/`teams-catalog.ts` read a manifest + files from disk). → buildbase-owned (packaged catalog).
+- **External import (GitHub/URL/local dir) missing** — `SkillSourceType` enum has github/url but no importer code. → infra-gated (git/network fetch).
+- **Skill Studio test-run harness / runtime execution missing** — deferred by design (needs agent execution). → infra-gated.
+- **Provenance** (catalog origin) + **skill comments** + **runtime skill-selection sync** missing/diverged.
+
+**What's required:** catalog + external import + test-run studio are the deferred depth (mostly infra/buildbase). The DB library is production-usable now.
+
+**Priority rationale:** Skills/teams/companies are how capability is packaged + shared — high value, but the core library already works; the missing parts are catalog/runtime depth.
+
+**Depends on:** packaged catalog (buildbase), git/network for import, agent execution for the test studio.

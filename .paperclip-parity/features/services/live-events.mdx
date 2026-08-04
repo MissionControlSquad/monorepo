@@ -1,0 +1,12 @@
+---
+service: live-events
+kind: service
+status: Partial
+priority: P1
+gate: done (different shape)
+---
+# live-events · 🟡 Partial
+**What it is:** a server-wide live event stream.
+**Monorepo:** GraphQL subscriptions + `server/events/` bus + live-gateway WS (different shape, equivalent coverage).
+**Required:** — (no dedicated live-events socket; subscriptions cover it).
+**Covers:** SERVICE-AUDIT #94.

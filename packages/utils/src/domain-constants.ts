@@ -18,6 +18,7 @@ export const TaskStatus = {
   REVIEW: "review",
   DONE: "done",
   BLOCKED: "blocked",
+  CANCELLED: "cancelled",
 } as const;
 
 export type TaskStatusValue = (typeof TaskStatus)[keyof typeof TaskStatus];
@@ -244,6 +245,7 @@ export const StoragePrefix = {
   DELIVERABLES: "deliverables",
   ATTACHMENTS: "attachments",
   AVATARS: "avatars",
+  ASSETS: "assets",
 } as const;
 
 export type StoragePrefixValue = (typeof StoragePrefix)[keyof typeof StoragePrefix];

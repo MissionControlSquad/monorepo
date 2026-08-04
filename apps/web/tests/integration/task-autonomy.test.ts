@@ -237,3 +237,141 @@ describe("feature gate (GraphQL)", () => {
     }
   });
 });
+
+describe("typed thread interactions (Domain 8 G6.5)", () => {
+  async function tiGql(query: string, variables?: Record<string, unknown>) {
+    const { invalidateFlagCache } = await import("../../src/server/feature-flags");
+    await prisma.featureFlag.upsert({
+      where: { key: "thread_interactions" },
+      create: { key: "thread_interactions", enabled: true, managedBy: "user" },
+      update: { enabled: true },
+    });
+    invalidateFlagCache();
+    const token = await createJWT({ userId: "u", workspaceId: "ws", userRole: "member" }, SECRET);
+    const req = new Request("http://test/api/graphql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `bb-workspace-token=${token}` },
+      body: JSON.stringify({ query, variables }),
+    });
+    return JSON.parse(await (await GRAPHQL(req)).text()) as { data?: any; errors?: any };
+  }
+
+  it("creates a request_confirmation, lists it pending, then resolves it", async () => {
+    const taskId = await makeTask();
+    const created = await tiGql(
+      `mutation($t:String!,$p:JSON!){ createThreadInteraction(taskId:$t, kind:"request_confirmation", payload:$p){ id kind status } }`,
+      { t: taskId, p: { question: "Deploy to prod?" } },
+    );
+    expect(created.data.createThreadInteraction).toMatchObject({
+      kind: "request_confirmation",
+      status: "pending",
+    });
+    const id = created.data.createThreadInteraction.id;
+
+    const list = await tiGql(
+      `query($t:String!){ threadInteractions(taskId:$t, status:"pending"){ id kind } }`,
+      { t: taskId },
+    );
+    expect(list.data.threadInteractions).toHaveLength(1);
+
+    const resolved = await tiGql(
+      `mutation($id:String!,$r:JSON){ resolveThreadInteraction(id:$id, decision:"resolved", result:$r){ status result } }`,
+      { id, r: { approved: true } },
+    );
+    expect(resolved.data.resolveThreadInteraction).toMatchObject({ status: "resolved" });
+    expect(resolved.data.resolveThreadInteraction.result).toMatchObject({ approved: true });
+
+    // a second resolve on a non-pending interaction is rejected
+    const again = await tiGql(
+      `mutation($id:String!){ resolveThreadInteraction(id:$id, decision:"dismissed"){ status } }`,
+      { id },
+    );
+    expect(again.errors).toBeDefined();
+  });
+
+  it("rejects an unknown interaction kind", async () => {
+    const taskId = await makeTask();
+    const bad = await tiGql(
+      `mutation($t:String!,$p:JSON!){ createThreadInteraction(taskId:$t, kind:"nonsense", payload:$p){ id } }`,
+      { t: taskId, p: {} },
+    );
+    expect(bad.errors).toBeDefined();
+  });
+});
+
+describe("cancel task (Domain 8 G6.7)", () => {
+  async function memberGql(query: string, variables?: Record<string, unknown>) {
+    const token = await createJWT({ userId: "u", workspaceId: "ws", userRole: "member" }, SECRET);
+    const req = new Request("http://test/api/graphql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `bb-workspace-token=${token}` },
+      body: JSON.stringify({ query, variables }),
+    });
+    return JSON.parse(await (await GRAPHQL(req)).text()) as { data?: any; errors?: any };
+  }
+
+  it("cancels an active task (status cancelled + cancelledAt set)", async () => {
+    const taskId = await makeTask();
+    const r = await memberGql(
+      `mutation($id:String!){ cancelTask(taskId:$id){ id status cancelledAt } }`,
+      { id: taskId },
+    );
+    expect(r.data.cancelTask).toMatchObject({ status: "cancelled" });
+    expect(r.data.cancelTask.cancelledAt).toBeTruthy();
+  });
+
+  it("refuses to cancel a done or already-cancelled task", async () => {
+    const taskId = await makeTask();
+    await prisma.task.update({ where: { id: taskId }, data: { status: "done" } });
+    const r = await memberGql(`mutation($id:String!){ cancelTask(taskId:$id){ id } }`, {
+      id: taskId,
+    });
+    expect(r.errors).toBeDefined();
+  });
+});
+
+describe("subtree cancel / restore (Domain 8 G6.6)", () => {
+  async function adminGql(query: string, variables?: Record<string, unknown>) {
+    const { invalidateFlagCache } = await import("../../src/server/feature-flags");
+    await prisma.featureFlag.deleteMany({ where: { key: "task_autonomy" } });
+    invalidateFlagCache();
+    const token = await createJWT({ userId: "u", workspaceId: "ws", userRole: "admin" }, SECRET);
+    const req = new Request("http://test/api/graphql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: `bb-workspace-token=${token}` },
+      body: JSON.stringify({ query, variables }),
+    });
+    return JSON.parse(await (await GRAPHQL(req)).text()) as { data?: any; errors?: any };
+  }
+
+  it("cancels a subtree (root + descendants, skipping done) and restores it", async () => {
+    const root = await makeTask();
+    const child = await prisma.task.create({
+      data: { title: "c", description: "d", parentTaskId: root },
+    });
+    const grandchild = await prisma.task.create({
+      data: { title: "gc", description: "d", parentTaskId: child.id, status: "done" },
+    });
+
+    const cancel = await adminGql(`mutation($r:String!){ cancelSubtree(rootTaskId:$r) }`, {
+      r: root,
+    });
+    expect(cancel.data.cancelSubtree).toBe(2); // root + child; the done grandchild is skipped
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: root } })).status).toBe("cancelled");
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: child.id } })).status).toBe(
+      "cancelled",
+    );
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: grandchild.id } })).status).toBe(
+      "done",
+    );
+
+    const restore = await adminGql(`mutation($r:String!){ restoreSubtree(rootTaskId:$r) }`, {
+      r: root,
+    });
+    expect(restore.data.restoreSubtree).toBe(2);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: root } })).status).toBe("assigned");
+    expect(
+      (await prisma.task.findUniqueOrThrow({ where: { id: child.id } })).cancelledAt,
+    ).toBeNull();
+  });
+});

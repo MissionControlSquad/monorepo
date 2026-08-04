@@ -1,0 +1,12 @@
+---
+service: heartbeat-run-summary
+kind: service
+status: Partial
+priority: P2
+gate: buildable-now
+---
+# heartbeat-run-summary · 🟡 Partial
+**What it is:** a per-run summary (what the run did).
+**Monorepo:** run status + timeline post present; no distinct run-summary artifact.
+**Required:** a run-summary generator. Buildable-now (heuristic) / richer needs LLM.
+**Covers:** SERVICE-AUDIT #70.

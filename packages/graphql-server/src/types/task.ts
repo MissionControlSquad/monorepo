@@ -23,6 +23,12 @@ builder.prismaObject("Task", {
     checkedOutByProfileId: t.exposeString("checkedOutByProfileId", { nullable: true }),
     checkedOutAt: t.expose("checkedOutAt", { type: "DateTime", nullable: true }),
     checkoutLeaseExpiresAt: t.expose("checkoutLeaseExpiresAt", { type: "DateTime", nullable: true }),
+    cancelledAt: t.expose("cancelledAt", { type: "DateTime", nullable: true }), // Domain 8 G6.7
+    // Domain 9 #11: issue monitor (one-shot deferred wake).
+    monitorNextCheckAt: t.expose("monitorNextCheckAt", { type: "DateTime", nullable: true }),
+    monitorNotes: t.exposeString("monitorNotes", { nullable: true }),
+    monitorAttemptCount: t.exposeInt("monitorAttemptCount"),
+    monitorMaxAttempts: t.exposeInt("monitorMaxAttempts", { nullable: true }),
 
     // Relations
     createdByProfile: t.relation("createdByProfile", { nullable: true }),

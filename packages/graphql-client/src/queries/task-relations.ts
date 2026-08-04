@@ -23,3 +23,20 @@ export const TASK_RELATIONS_QUERY = gql`
     }
   }
 `;
+
+// Domain 8 G6.1: "Why is this blocked?" readiness diagnostics.
+export const BLOCKER_DIAGNOSTICS_QUERY = gql`
+  query BlockerDiagnostics($taskId: String!) {
+    blockerDiagnostics(taskId: $taskId) {
+      readiness
+      unresolvedCount
+      reasons
+      blockers {
+        taskId
+        status
+        source
+        resolved
+      }
+    }
+  }
+`;

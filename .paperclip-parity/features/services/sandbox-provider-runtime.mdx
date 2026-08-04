@@ -1,0 +1,12 @@
+---
+service: sandbox-provider-runtime
+kind: service
+status: Present
+priority: P1
+gate: done (cloud gated)
+---
+# sandbox-provider-runtime · ✅ Present
+**What it is:** provider-abstracted sandbox execution (local + cloud providers + dispatch).
+**Monorepo:** `sandbox-providers.ts` (7 providers) + `sandbox-run.ts`.
+**Required:** cloud providers need real keys; local provider works standalone.
+**Covers:** features/P1-sandbox-execution.mdx · SERVICE-AUDIT #147.

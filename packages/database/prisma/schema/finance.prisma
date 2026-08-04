@@ -46,7 +46,8 @@ model CostEvent {
   tokensIn       Int      @default(0)
   tokensOut      Int      @default(0)
   amountCents    Int      @default(0) // integer cents, no floats
-  billingType    String   @default("api") // "api" (metered) | "subscription" (flat) — split spend reporting
+  billingType    String   @default("api") // metered_api | subscription_included | subscription_overage | credits | fixed (D12 A14; legacy api/subscription normalized on write)
+  costStatus     String   @default("reported") // reported | unpriced (D12 A13 — provider cost pending repricing)
   source         String   @default("agent") // "agent" | "cloud_vm" | "manual"
   idempotencyKey String?
   occurredAt     DateTime @default(now())
@@ -68,20 +69,60 @@ model CostEvent {
   @@map("cost_events")
 }
 
+// ─── Non-inference finance ledger (Domain 12 GAP-1) ──────────────────────────────────────────────
+// Account-level provider money that is NOT per-inference cost (CostEvent) and NOT human P&L
+// (LedgerEvent): credit purchases/refunds/expiry, platform + BYOK fees, gateway overhead, training/
+// storage/bandwidth charges, subscription fees, tax/discount, manual adjustments. eventKind/direction/
+// unit are TEXT with app-level validation (D5, no PG enums). Integer cents only. BUDGETS-gated, admin.
+model FinanceEvent {
+  id                String   @id @default(cuid())
+  workspaceId       String // buildbase workspace _id; no FK (D5)
+  agentId           String?
+  taskId            String?
+  projectId         String?
+  issueId           String?
+  costEventId       String? // optional link to the inference CostEvent this charge relates to
+  eventKind         String // credit_purchase | platform_fee | byok_fee | … (see FINANCE_EVENT_KINDS)
+  direction         String   @default("debit") // debit (money out) | credit (money in)
+  biller            String? // who is charging (provider/vendor/platform)
+  provider          String?
+  billingCode       String?
+  description       String?
+  quantity          Float?
+  unit              String   @default("flat") // flat | credits | gb_month | gpu_hour | …
+  amountCents       Int      @default(0)
+  currency          String   @default("USD")
+  estimated         Boolean  @default(false)
+  externalInvoiceId String?
+  idempotencyKey    String?
+  metadataJson      Json?
+  occurredAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, occurredAt])
+  @@index([workspaceId, biller, occurredAt])
+  @@index([workspaceId, eventKind, occurredAt])
+  @@index([workspaceId, direction, occurredAt])
+  @@index([costEventId])
+  @@map("finance_events")
+}
+
 model BudgetPolicy {
-  id          String       @id @default(cuid())
-  workspaceId String
-  scope       BudgetScope
-  agentId     String? // required when scope=agent
-  name        String
-  limitCents  Int
-  window       BudgetWindow @default(monthly)
-  hardStop     Boolean      @default(false) // true = auto-pause on hard breach
-  warnPercent  Int          @default(80) // soft-warn threshold as % of limit (Paperclip parity)
-  notifyEnabled Boolean     @default(true) // emit notification on incident open
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id            String       @id @default(cuid())
+  workspaceId   String
+  scope         BudgetScope
+  agentId       String? // required when scope=agent
+  name          String
+  limitCents    Int
+  window        BudgetWindow @default(monthly)
+  hardStop      Boolean      @default(false) // true = auto-pause on hard breach
+  warnPercent   Int          @default(80) // soft-warn threshold as % of limit (Paperclip parity)
+  notifyEnabled Boolean      @default(true) // emit notification on incident open
+  isSalary      Boolean      @default(false) // Domain 14 #18 — the agent's periodic token "salary" allowance
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   agent     Agent?           @relation(fields: [agentId], references: [id], onDelete: Cascade)
   windows   QuotaWindow[]
@@ -115,7 +156,7 @@ model QuotaWindow {
 }
 
 model BudgetIncident {
-  id            String         @id @default(cuid())
+  id            String            @id @default(cuid())
   workspaceId   String
   policyId      String
   quotaWindowId String?
@@ -129,7 +170,7 @@ model BudgetIncident {
   detail        String?
   resolvedById  String?
   resolvedAt    DateTime?
-  createdAt     DateTime       @default(now())
+  createdAt     DateTime          @default(now())
 
   policy BudgetPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
   agent  Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)

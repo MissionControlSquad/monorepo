@@ -439,3 +439,140 @@ export async function computePipelineHealth(
   }
   return stale;
 }
+
+export interface PipelineStats {
+  activeCount: number;
+  doneCount: number;
+  rejectedCount: number;
+  staleCount: number;
+  /** Cases that reached `done` in the last 24h (throughput). */
+  completedLast24h: number;
+  /** Active-case distribution across stages, most-loaded first. */
+  byStage: { stageId: string; stageName: string; count: number }[];
+}
+
+/**
+ * Aggregate health metrics for a pipeline (parity #101) — the summary that complements the
+ * per-case stale list: active/done/rejected counts, SLA-breach (stale) count, recent throughput,
+ * and the active-case distribution per stage.
+ */
+export async function computePipelineStats(
+  workspaceId: string,
+  pipelineId: string,
+  now: Date = new Date(),
+): Promise<PipelineStats> {
+  const pipeline = await prisma.pipeline.findFirst({ where: { id: pipelineId, workspaceId } });
+  if (!pipeline) notFound("Pipeline");
+
+  const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const [byStatus, activeCases, completedLast24h, stages] = await Promise.all([
+    prisma.pipelineCase.groupBy({ by: ["status"], where: { pipelineId }, _count: { _all: true } }),
+    prisma.pipelineCase.findMany({
+      where: { pipelineId, status: { notIn: ["done", "rejected"] } },
+      include: { currentStage: true },
+    }),
+    prisma.pipelineCase.count({ where: { pipelineId, status: "done", updatedAt: { gte: since } } }),
+    prisma.pipelineStage.findMany({ where: { pipelineId }, select: { id: true, name: true } }),
+  ]);
+
+  const statusCount = (s: string) => byStatus.find((r) => r.status === s)?._count._all ?? 0;
+  const doneCount = statusCount("done");
+  const rejectedCount = statusCount("rejected");
+  const activeCount = activeCases.length;
+
+  let staleCount = 0;
+  const perStage = new Map<string, number>();
+  for (const c of activeCases) {
+    const stageId = c.currentStageId;
+    if (stageId) perStage.set(stageId, (perStage.get(stageId) ?? 0) + 1);
+    const sla = c.currentStage?.slaMinutes;
+    if (sla != null && (now.getTime() - c.enteredStageAt.getTime()) / 60000 > sla) staleCount++;
+  }
+
+  const stageName = new Map(stages.map((s) => [s.id, s.name]));
+  const byStage = [...perStage.entries()]
+    .map(([stageId, count]) => ({ stageId, stageName: stageName.get(stageId) ?? stageId, count }))
+    .sort((a, b) => b.count - a.count);
+
+  return { activeCount, doneCount, rejectedCount, staleCount, completedLast24h, byStage };
+}
+
+// ── Structured case outputs (parity #98) ──
+export async function recordCaseOutput(
+  workspaceId: string,
+  caseId: string,
+  input: { stageId?: string | null; key: string; value: unknown },
+): Promise<import("@agentcenter/database").PipelineCaseOutput> {
+  const c = await prisma.pipelineCase.findFirst({
+    where: { id: caseId, pipeline: { workspaceId } },
+    select: { id: true },
+  });
+  if (!c) notFound("Case");
+  const key = input.key.trim();
+  if (!key) badRequest("output key is required");
+  return prisma.pipelineCaseOutput.create({
+    data: { caseId, stageId: input.stageId ?? null, key, value: (input.value ?? null) as never },
+  });
+}
+
+export async function listCaseOutputs(
+  workspaceId: string,
+  caseId: string,
+): Promise<import("@agentcenter/database").PipelineCaseOutput[]> {
+  const c = await prisma.pipelineCase.findFirst({
+    where: { id: caseId, pipeline: { workspaceId } },
+    select: { id: true },
+  });
+  if (!c) notFound("Case");
+  return prisma.pipelineCaseOutput.findMany({ where: { caseId }, orderBy: { createdAt: "asc" } });
+}
+
+// ── Cross-stage conversation context (parity #99) ──
+export interface PipelineCaseContext {
+  caseId: string;
+  title: string;
+  currentStageId: string | null;
+  /** Chronological trail of stage transitions + notes — the "conversation" carried across stages. */
+  timeline: {
+    at: Date;
+    type: string;
+    fromStageId: string | null;
+    toStageId: string | null;
+    note: string | null;
+  }[];
+  /** Structured outputs accumulated so far. */
+  outputs: { stageId: string | null; key: string; value: unknown }[];
+}
+
+/**
+ * Assemble the context a case carries across stages (#99): its transition/note timeline plus the
+ * structured outputs accumulated so far. A downstream stage (or the case-detail UI) reads this to see
+ * what happened upstream without re-deriving it.
+ */
+export async function assembleCaseContext(
+  workspaceId: string,
+  caseId: string,
+): Promise<PipelineCaseContext> {
+  const c = await prisma.pipelineCase.findFirst({
+    where: { id: caseId, pipeline: { workspaceId } },
+    select: { id: true, title: true, currentStageId: true },
+  });
+  if (!c) notFound("Case");
+  const [events, outputs] = await Promise.all([
+    prisma.pipelineCaseEvent.findMany({ where: { caseId }, orderBy: { createdAt: "asc" } }),
+    prisma.pipelineCaseOutput.findMany({ where: { caseId }, orderBy: { createdAt: "asc" } }),
+  ]);
+  return {
+    caseId: c.id,
+    title: c.title,
+    currentStageId: c.currentStageId,
+    timeline: events.map((e) => ({
+      at: e.createdAt,
+      type: e.type,
+      fromStageId: e.fromStageId,
+      toStageId: e.toStageId,
+      note: e.note,
+    })),
+    outputs: outputs.map((o) => ({ stageId: o.stageId, key: o.key, value: o.value })),
+  };
+}

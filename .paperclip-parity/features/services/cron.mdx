@@ -1,0 +1,12 @@
+---
+service: cron
+kind: service
+status: Present
+priority: P1
+gate: infra-gated
+---
+# cron · ✅ Present
+**What it is:** scheduled background ticks.
+**Monorepo:** `app/api/cron/*` routes (reap-stale-work/auto-sleep/run-sandbox-queue/cleanup-live-gateway), CRON_SECRET-authed.
+**Required:** a cron scheduler (Vercel cron) for continuous operation.
+**Covers:** features/P1-heartbeat-scheduling-recovery.mdx · SERVICE-AUDIT #37.

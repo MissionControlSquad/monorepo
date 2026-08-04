@@ -1,0 +1,39 @@
+// Document annotation threads + comments (parity Domain-8 §2.5 / G5). A thread anchors to a text span
+// (quote + prefix/suffix context + offsets); it re-anchors on each document revision with a confidence,
+// and orphans when its anchor can't be found. Comments hang off a thread. D5: no FK on documentId.
+// DOCUMENTS-gated.
+model DocumentAnnotationThread {
+  id              String   @id @default(cuid())
+  documentId      String
+  quote           String   @db.Text
+  prefix          String
+  suffix          String
+  startOffset     Int
+  endOffset       Int
+  status          String   @default("open") // open | resolved | orphaned
+  confidence      Float    @default(1)
+  authorProfileId String?
+  authorAgentId   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  comments DocumentAnnotationComment[]
+
+  @@index([documentId, status])
+  @@map("document_annotation_threads")
+}
+
+model DocumentAnnotationComment {
+  id              String    @id @default(cuid())
+  threadId        String
+  body            String    @db.Text
+  authorProfileId String?
+  authorAgentId   String?
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  thread DocumentAnnotationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@map("document_annotation_comments")
+}

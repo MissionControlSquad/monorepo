@@ -1,0 +1,12 @@
+---
+service: issue-liveness
+kind: service
+status: Partial
+priority: P1
+gate: done
+---
+# issue-liveness · 🟡 Partial
+**What it is:** is a task's run still alive.
+**Monorepo:** `run-runtime-status.ts` (ephemeral liveness) + watchdogs (`no_heartbeat`/`lease_expired`).
+**Required:** — (ephemeral; a durable liveness ledger is optional).
+**Covers:** features/P1-heartbeat-scheduling-recovery.mdx · SERVICE-AUDIT #85.

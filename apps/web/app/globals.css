@@ -55,6 +55,51 @@
   --color-destructive-muted: oklch(0.971 0.013 17.38);
 }
 
+/* Dark theme (parity #25). `dark:` utilities apply under a `.dark` ancestor; the token overrides
+   below re-theme everything that references the semantic color vars. Applied to <html> by the
+   pre-hydration script in the root layout (respects saved choice + prefers-color-scheme). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+.dark {
+  --color-background: oklch(0.17 0.005 285.82);
+  --color-foreground: oklch(0.96 0.002 285.82);
+  --color-card: oklch(0.205 0.006 285.88);
+  --color-card-foreground: oklch(0.96 0.002 285.82);
+  --color-popover: oklch(0.205 0.006 285.88);
+  --color-popover-foreground: oklch(0.96 0.002 285.82);
+  --color-primary: oklch(0.62 0.19 264.05);
+  --color-primary-foreground: oklch(0.985 0.002 247.86);
+  --color-secondary: oklch(0.27 0.006 286.38);
+  --color-secondary-foreground: oklch(0.96 0.002 285.82);
+  --color-muted: oklch(0.27 0.006 286.38);
+  --color-muted-foreground: oklch(0.705 0.013 285.94);
+  --color-accent: oklch(0.27 0.006 286.38);
+  --color-accent-foreground: oklch(0.96 0.002 285.82);
+  --color-destructive: oklch(0.62 0.22 25.33);
+  --color-destructive-foreground: oklch(0.97 0.006 20);
+  --color-border: oklch(0.3 0.006 286.32);
+  --color-input: oklch(0.3 0.006 286.32);
+  --color-ring: oklch(0.62 0.19 264.05);
+  --color-sidebar: oklch(0.2 0.006 285.82);
+  --color-sidebar-foreground: oklch(0.96 0.002 285.82);
+  --color-sidebar-primary: oklch(0.62 0.19 264.05);
+  --color-sidebar-primary-foreground: oklch(0.985 0.002 247.86);
+  --color-sidebar-accent: oklch(0.27 0.006 286.38);
+  --color-sidebar-accent-foreground: oklch(0.96 0.002 285.82);
+  --color-sidebar-border: oklch(0.3 0.006 286.32);
+  --color-sidebar-ring: oklch(0.62 0.19 264.05);
+
+  --color-success: oklch(0.68 0.18 149.57);
+  --color-success-foreground: oklch(0.17 0.02 150);
+  --color-success-muted: oklch(0.24 0.04 155.83);
+
+  --color-warning: oklch(0.8 0.17 75.08);
+  --color-warning-foreground: oklch(0.2 0.03 80);
+  --color-warning-muted: oklch(0.25 0.035 85.28);
+
+  --color-destructive-muted: oklch(0.24 0.05 17.38);
+}
+
 @layer base {
   :root {
     /* Default 0px; overridden to 38px by the Electron main process on macOS

@@ -28,10 +28,6 @@ export const API_ROUTES = {
   profile: {
     avatar: "/api/profile/avatar",
   },
-  userNotifications: {
-    preferences: "/api/user-notifications/preferences",
-    subscribe: "/api/user-notifications/subscribe",
-  },
   support: {
     bugReport: "/api/support/bug-report",
     featureRequest: "/api/support/feature-request",

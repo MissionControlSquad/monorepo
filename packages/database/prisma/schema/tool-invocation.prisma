@@ -1,0 +1,19 @@
+// Tool runtime metrics (parity #167). One row per tool invocation the runtime performs: outcome +
+// latency + error kind, for observability and rate/health dashboards. The tool runtime is the writer;
+// toolRuntimeMetrics() aggregates. D5: workspaceId/agentId have no FK; outcome/errorKind are TEXT
+// (app-validated), not enums. High-volume append table — indexed for the aggregation query only.
+model ToolInvocation {
+  id          String   @id @default(cuid())
+  workspaceId String // no FK (D5)
+  agentId     String? // the invoking agent, when known
+  runId       String? // the run the call happened in
+  toolName    String
+  outcome     String // success | error | denied
+  durationMs  Int      @default(0)
+  errorKind   String? // coarse error class when outcome=error (timeout | http_5xx | invalid_args | ...)
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, toolName, createdAt])
+  @@index([workspaceId, createdAt])
+  @@map("tool_invocations")
+}

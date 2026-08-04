@@ -5,7 +5,13 @@
  */
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
-import { slugify as coreSlugify } from "@agentcenter/utils";
+import {
+  slugify as coreSlugify,
+  parseSkillFrontmatter,
+  classifySkillFile,
+  deriveSkillTrustLevel,
+} from "@agentcenter/utils";
+import type { Prisma } from "@agentcenter/database";
 import type {
   Skill,
   SkillFile,
@@ -66,6 +72,8 @@ export async function createSkill(input: CreateSkillInput): Promise<Skill> {
         slug: slugify(name),
         name,
         markdown: input.markdown,
+        frontmatter: (parseSkillFrontmatter(input.markdown) ?? undefined) as
+          Prisma.InputJsonValue | undefined,
         description: input.description ?? null,
         categories: input.categories ?? [],
         icon: input.icon ?? null,
@@ -129,7 +137,14 @@ export async function updateSkill(
         ...(patch.tagline !== undefined ? { tagline: patch.tagline } : {}),
         ...(patch.author !== undefined ? { author: patch.author } : {}),
         ...(patch.homepage !== undefined ? { homepage: patch.homepage } : {}),
-        ...(markdownChanged ? { markdown: patch.markdown!, currentVersion: nextVersion } : {}),
+        ...(markdownChanged
+          ? {
+              markdown: patch.markdown!,
+              currentVersion: nextVersion,
+              frontmatter: (parseSkillFrontmatter(patch.markdown!) ?? undefined) as
+                Prisma.InputJsonValue | undefined,
+            }
+          : {}),
       },
     });
     if (markdownChanged) {
@@ -254,6 +269,9 @@ export async function installCatalogSkill(
         trustLevel: source.trustLevel,
         sharingScope: "workspace", // the copy is private to the installer by default
         forkedFromSkillId: source.id,
+        // F13: stamp catalog-install provenance so update-drift (F18) + reset (F20) work.
+        originSkillId: source.id,
+        originVersion: source.currentVersion,
         createdByProfileId: createdByProfileId ?? null,
         currentVersion: 1,
       },
@@ -274,6 +292,135 @@ export async function installCatalogSkill(
     }
     await tx.skill.update({ where: { id: source.id }, data: { forkCount: { increment: 1 } } });
     return skill;
+  });
+}
+
+/**
+ * Import a skill from a package of files (parity Domain 5 F16): the SKILL.md (frontmatter → name/key/
+ * description/tags) becomes the skill, the rest become skill files (path-safety checked, trust auto-
+ * derived). Ports the shape of importCompanyPackage for skills. Rejects a package with no SKILL.md.
+ */
+export async function importSkillPackage(input: {
+  workspaceId: string;
+  files: { path: string; content: string }[];
+  sourceRef?: string | null;
+  createdByProfileId?: string | null;
+}): Promise<Skill> {
+  const manifest = input.files.find((f) => /(^|\/)SKILL\.md$/i.test(f.path));
+  if (!manifest) badRequest("package has no SKILL.md");
+  const fm = parseSkillFrontmatter(manifest.content) ?? {};
+  const name = (typeof fm.name === "string" && fm.name.trim()) || "Imported Skill";
+
+  const skill = await createSkill({
+    workspaceId: input.workspaceId,
+    name,
+    markdown: manifest.content,
+    key: typeof fm.key === "string" ? fm.key : null,
+    description: typeof fm.description === "string" ? fm.description : null,
+    categories: Array.isArray(fm.tags) ? fm.tags : null,
+    sourceType: input.sourceRef ? "url" : "local_path",
+    createdByProfileId: input.createdByProfileId ?? null,
+  });
+  if (input.sourceRef)
+    await prisma.skill.update({ where: { id: skill.id }, data: { sourceRef: input.sourceRef } });
+
+  // Attach the remaining files (SKILL.md is already the markdown). upsertSkillFile normalizes the path
+  // (rejecting traversal) and re-derives trust, so a scripts/ file correctly raises the rung.
+  for (const f of input.files) {
+    if (f === manifest) continue;
+    try {
+      await upsertSkillFile(input.workspaceId, skill.id, { path: f.path, content: f.content });
+    } catch {
+      // skip an unsafe/invalid path rather than abort the whole import
+    }
+  }
+  return prisma.skill.findUniqueOrThrow({ where: { id: skill.id } });
+}
+
+export type SkillUpdateState = "not_installed" | "up_to_date" | "update_available" | "origin_gone";
+
+export interface SkillUpdateStatus {
+  state: SkillUpdateState;
+  originVersion: number | null; // the source version this install is pinned to
+  latestVersion: number | null; // the source's current version now
+}
+
+/**
+ * Compute a catalog-installed skill's update status (F18): compare the pinned origin version to the
+ * source's current version. A skill with no origin is `not_installed`; a deleted/unpublished source is
+ * `origin_gone`.
+ */
+export async function computeSkillUpdateStatus(
+  workspaceId: string,
+  skillId: string,
+): Promise<SkillUpdateStatus> {
+  const skill = await loadSkill(workspaceId, skillId);
+  if (!skill.originSkillId)
+    return { state: "not_installed", originVersion: null, latestVersion: null };
+  const source = await prisma.skill.findFirst({
+    where: { id: skill.originSkillId, sharingScope: "public" },
+    select: { currentVersion: true },
+  });
+  if (!source)
+    return { state: "origin_gone", originVersion: skill.originVersion, latestVersion: null };
+  return {
+    state: source.currentVersion > (skill.originVersion ?? 0) ? "update_available" : "up_to_date",
+    originVersion: skill.originVersion,
+    latestVersion: source.currentVersion,
+  };
+}
+
+/**
+ * Reset a catalog-installed skill to its origin's current content (F20): re-copy the source markdown +
+ * files, snapshot a new local revision, and re-pin originVersion. Discards local edits. Rejects a skill
+ * with no origin or whose source is gone.
+ */
+export async function resetSkillToOrigin(
+  workspaceId: string,
+  skillId: string,
+  actorProfileId?: string | null,
+): Promise<Skill> {
+  const skill = await loadSkill(workspaceId, skillId);
+  if (!skill.originSkillId) badRequest("this skill was not installed from a catalog");
+  const source = await prisma.skill.findFirst({
+    where: { id: skill.originSkillId, sharingScope: "public" },
+    include: { files: true },
+  });
+  if (!source) badRequest("the origin skill is no longer available");
+
+  return prisma.$transaction(async (tx) => {
+    const nextRev = skill.currentVersion + 1;
+    const updated = await tx.skill.update({
+      where: { id: skill.id },
+      data: {
+        markdown: source.markdown,
+        trustLevel: source.trustLevel,
+        currentVersion: nextRev,
+        originVersion: source.currentVersion,
+      },
+    });
+    await tx.skillVersion.create({
+      data: {
+        workspaceId,
+        skillId: skill.id,
+        revisionNumber: nextRev,
+        content: source.markdown,
+        createdByProfileId: actorProfileId ?? null,
+      },
+    });
+    // Replace files with the source's current set.
+    await tx.skillFile.deleteMany({ where: { skillId: skill.id } });
+    if (source.files.length) {
+      await tx.skillFile.createMany({
+        data: source.files.map((f) => ({
+          skillId: skill.id,
+          path: f.path,
+          content: f.content,
+          kind: classifySkillFile(f.path),
+        })),
+      });
+    }
+    return updated;
   });
 }
 
@@ -375,11 +522,21 @@ export async function upsertSkillFile(
 ): Promise<SkillFile> {
   await loadSkill(workspaceId, skillId); // 404s cross-workspace / missing
   const path = normalizeSkillFilePath(input.path);
-  return prisma.skillFile.upsert({
+  const kind = classifySkillFile(path);
+  const file = await prisma.skillFile.upsert({
     where: { skillId_path: { skillId, path } },
-    create: { skillId, path, content: input.content },
-    update: { content: input.content },
+    create: { skillId, path, content: input.content, kind },
+    update: { content: input.content, kind },
   });
+  await recomputeSkillTrust(skillId); // F3: adding a script/asset raises the stored trust rung
+  return file;
+}
+
+/** Recompute a skill's trust level from its current file set (F3). A script → scripts_executables. */
+async function recomputeSkillTrust(skillId: string): Promise<void> {
+  const files = await prisma.skillFile.findMany({ where: { skillId }, select: { path: true } });
+  const derived = deriveSkillTrustLevel(files.map((f) => f.path));
+  await prisma.skill.update({ where: { id: skillId }, data: { trustLevel: derived } });
 }
 
 export async function deleteSkillFile(
@@ -389,6 +546,7 @@ export async function deleteSkillFile(
 ): Promise<boolean> {
   await loadSkill(workspaceId, skillId);
   const res = await prisma.skillFile.deleteMany({ where: { skillId, path } });
+  if (res.count > 0) await recomputeSkillTrust(skillId); // removing a script may lower the rung
   return res.count > 0;
 }
 

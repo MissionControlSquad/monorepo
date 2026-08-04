@@ -1,0 +1,12 @@
+---
+service: execution-policy-bootstrap
+kind: service
+status: Partial
+priority: P1
+gate: buildable-now
+---
+# execution-policy-bootstrap · 🟡 Partial
+**What it is:** seed default execution policy on startup.
+**Monorepo:** execution-policy present; explicit bootstrap seeding thin.
+**Required:** a default-policy seeder. Small.
+**Covers:** features/P1-environments-leases.mdx · SERVICE-AUDIT #56.

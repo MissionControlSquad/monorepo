@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";
 import { Header } from "./Header";
 import { IconRail } from "./sidebar/IconRail";
+import { CommandPalette } from "./CommandPalette";
 import { ActivityDrawer } from "./ActivityDrawer";
 import { ProfileSidebar } from "./ProfileSidebar";
 import { useProfileSidebar } from "../context/ProfileSidebarContext";
@@ -63,12 +64,8 @@ export function AppShell({ children, modal }: AppShellProps) {
 
   useEffect(() => setMounted(true), []);
 
-  // Register service worker for push notifications
-  useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    }
-  }, []);
+  // Push service worker is now owned by buildbase (registers public/push-sw.js via its own
+  // usePushNotifications hook inside the notifications settings screen). Our VAPID SW is removed.
 
   // Lock body scroll when activity sheet is open
   useEffect(() => {
@@ -146,6 +143,8 @@ export function AppShell({ children, modal }: AppShellProps) {
 
   return (
     <SupportContextProvider>
+      {/* Global Cmd/Ctrl-K quick switcher */}
+      {!isOnboarding && <CommandPalette onCreateTask={handleOpenCreateTask} />}
       <div
         className="flex bg-muted"
         style={{

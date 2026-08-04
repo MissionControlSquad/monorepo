@@ -1,0 +1,12 @@
+---
+service: heartbeat-run-runtime-status
+kind: service
+status: Present
+priority: P1
+gate: done
+---
+# heartbeat-run-runtime-status · ✅ Present
+**What it is:** in-memory live run status (queued→running→done), secret-redacted, ~90s TTL.
+**Monorepo:** `run-runtime-status.ts`.
+**Required:** —
+**Covers:** features/P1-heartbeat-scheduling-recovery.mdx · SERVICE-AUDIT #69.

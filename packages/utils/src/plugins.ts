@@ -4,19 +4,8 @@
  */
 import { z } from "zod";
 import { PLUGIN_API_VERSION, PLUGIN_CATEGORIES, isPluginCapability } from "./plugin-constants";
-
-/**
- * Validate a 5-field cron expression (each field: a star, N, N-M, step, or comma list).
- * Ported verbatim from Paperclip `validators/plugin.ts`.
- */
-const CRON_FIELD =
-  /^(\*(?:\/[0-9]+)?|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?)(?:,(\*(?:\/[0-9]+)?|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?))*$/;
-export function isValidCron(expression: string): boolean {
-  const trimmed = expression.trim();
-  if (!trimmed) return false;
-  const fields = trimmed.split(/\s+/);
-  return fields.length === 5 && fields.every((f) => CRON_FIELD.test(f));
-}
+// Cron validation now lives in ./cron (a full field-range-aware parser, superseding the old regex).
+import { isValidCron } from "./cron";
 
 const toolSchema = z.object({
   name: z.string().min(1),

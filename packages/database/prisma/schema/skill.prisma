@@ -52,6 +52,7 @@ model Skill {
   name               String
   description        String?
   markdown           String
+  frontmatter        Json? // parsed SKILL.md frontmatter (Domain 5 GAP-A): recommendedForRoles/requires/tags/defaultInstall
   // Appearance / provenance metadata (Paperclip skill catalog parity). All optional, display-only.
   icon               String? // emoji or short glyph
   color              String? // hex/tailwind token for the card accent
@@ -64,6 +65,11 @@ model Skill {
   categories         String[]          @default([])
   sharingScope       SkillSharingScope @default(workspace)
   forkedFromSkillId  String?
+  // Catalog-install provenance + update lifecycle (Domain 5 F13/F18/F20). Set when a skill is installed
+  // from a public catalog skill: originSkillId points at the source, originVersion pins the source's
+  // version at install time so drift (update_available) can be detected and resetToOrigin can re-sync.
+  originSkillId      String?
+  originVersion      Int?
   starCount          Int               @default(0)
   installCount       Int               @default(0)
   forkCount          Int               @default(0)
@@ -93,6 +99,7 @@ model SkillFile {
   skillId   String
   path      String // e.g. "SKILL.md", "scripts/run.py", "reference/api.md"
   content   String   @db.Text
+  kind      String? // classified file kind (Domain 5 GAP-A): skill|markdown|reference|script|asset|other
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -210,4 +217,21 @@ model TeamInstall {
   @@index([teamId])
   @@index([workspaceId])
   @@map("team_installs")
+}
+
+// ─── Skill governance policy (Domain 5 GAP-F) ────────────────────────────────
+// One allow/deny policy document per workspace over skill actions × subjects × resources. defaultEffect
+// + rules Json (validated app-side by @agentcenter/utils skill-policy). revision gives optimistic
+// concurrency on replace. SKILLS_TEAMS-gated; replace is admin.
+model SkillPolicy {
+  id                 String   @id @default(cuid())
+  workspaceId        String   @unique // buildbase workspace _id; no FK (D5)
+  defaultEffect      String   @default("allow") // allow | deny
+  rules              Json     @default("[]")
+  revision           Int      @default(1)
+  updatedByProfileId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("skill_policies")
 }

@@ -40,3 +40,15 @@ export const CANCEL_AGENT_RUN = gql`
     cancelAgentRun(runId: $runId)
   }
 `;
+
+// Domain 8 G2: board reviewer promotes/requests-changes on a quarantined run's output.
+export const PROMOTE_AGENT_RUN_REVIEW = gql`
+  mutation PromoteAgentRunReview($runId: String!, $decision: String!) {
+    promoteAgentRunReview(runId: $runId, decision: $decision) {
+      id
+      reviewState
+      reviewedByProfileId
+      reviewedAt
+    }
+  }
+`;

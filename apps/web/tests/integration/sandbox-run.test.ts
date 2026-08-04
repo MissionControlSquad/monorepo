@@ -14,6 +14,13 @@ import {
   autoDispatchSandboxForAssignment,
 } from "../../src/server/services/sandbox-run";
 import { getOrCreateAgentProfileId } from "../../src/server/agent-profile";
+import { promoteAgentRunReview } from "../../src/server/services/run-review";
+import {
+  scheduleRunRetryIfTransient,
+  promoteDueRunRetries,
+} from "../../src/server/services/run-retry";
+import { reconcileStrandedWork } from "../../src/server/services/stranded-work";
+import { armTaskMonitor, tickDueTaskMonitors } from "../../src/server/services/task-monitors";
 import { createEnvironment } from "../../src/server/services/environments";
 import { getRunRuntimeStatus } from "../../src/server/services/run-runtime-status";
 import { createSecret, bindSecret } from "../../src/server/services/secrets";
@@ -487,5 +494,292 @@ describe("environment-driven execution (Plan 1 wiring)", () => {
     });
     expect(result.providerKey).toBe("local");
     expect(result.exitCode).toBe(0);
+  });
+});
+
+describe("untrusted-output review gate (Domain 8 G2)", () => {
+  async function enableLowTrustReview(on = true) {
+    await prisma.featureFlag.upsert({
+      where: { key: "low_trust_review" },
+      create: { key: "low_trust_review", enabled: on, managedBy: "user" },
+      update: { enabled: on },
+    });
+    invalidateFlagCache();
+  }
+
+  it("stamps needs_review + quarantined sourceTrust for a review-required agent (flag on)", async () => {
+    await enableLowTrustReview();
+    // A STANDARD-trust agent (so it may run on `local`) whose profile requires untrusted-PR review.
+    const agentId = await makeAgent("local", "standard");
+    await prisma.agentTrustProfile.create({
+      data: { agentId, workspaceId: WS, trustLevel: "standard", requireUntrustedPrReview: true },
+    });
+    const taskId = await makeTask();
+    const result = await runTaskInSandbox({ workspaceId: WS, taskId, agentId });
+    expect(result.exitCode).toBe(0);
+
+    const run = await prisma.agentRun.findUniqueOrThrow({ where: { id: result.runId } });
+    expect(run.reviewState).toBe("needs_review");
+    expect(run.sourceTrust).toMatchObject({
+      preset: "low_trust_review",
+      disposition: "quarantined",
+    });
+  });
+
+  it("stamps approved for a standard agent, and is a no-op when the flag is off", async () => {
+    // flag ON, plain standard agent → approved
+    await enableLowTrustReview();
+    const trusted = await makeAgent("local", "standard");
+    const t1 = await makeTask();
+    const r1 = await runTaskInSandbox({ workspaceId: WS, taskId: t1, agentId: trusted });
+    expect((await prisma.agentRun.findUniqueOrThrow({ where: { id: r1.runId } })).reviewState).toBe(
+      "approved",
+    );
+
+    // flag OFF → not evaluated at all (reviewState stays null)
+    await enableLowTrustReview(false);
+    const agentId = await makeAgent("local", "standard");
+    await prisma.agentTrustProfile.create({
+      data: { agentId, workspaceId: WS, trustLevel: "standard", requireUntrustedPrReview: true },
+    });
+    const t2 = await makeTask();
+    const r2 = await runTaskInSandbox({ workspaceId: WS, taskId: t2, agentId });
+    expect(
+      (await prisma.agentRun.findUniqueOrThrow({ where: { id: r2.runId } })).reviewState,
+    ).toBeNull();
+  });
+
+  it("promoteAgentRunReview flips a quarantined run to approved (only from needs_review)", async () => {
+    await enableLowTrustReview();
+    const agentId = await makeAgent("local", "standard");
+    await prisma.agentTrustProfile.create({
+      data: { agentId, workspaceId: WS, trustLevel: "standard", requireUntrustedPrReview: true },
+    });
+    const taskId = await makeTask();
+    const { runId } = await runTaskInSandbox({ workspaceId: WS, taskId, agentId });
+
+    const promoted = await promoteAgentRunReview({
+      workspaceId: WS,
+      runId,
+      decision: "approved",
+      reviewedByProfileId: "profile_board",
+    });
+    expect(promoted.reviewState).toBe("approved");
+    expect(promoted.sourceTrust).toMatchObject({
+      disposition: "trusted",
+      promotedByProfileId: "profile_board",
+    });
+    expect(promoted.reviewedByProfileId).toBe("profile_board");
+
+    // a run not awaiting review can't be promoted
+    await expect(
+      promoteAgentRunReview({
+        workspaceId: WS,
+        runId,
+        decision: "approved",
+        reviewedByProfileId: "profile_board",
+      }),
+    ).rejects.toThrow(/awaiting review/);
+  });
+});
+
+describe("scheduled run retries (Domain 9 #6)", () => {
+  it("schedules a retry for a transient timeout, then promotes it to a fresh queued run", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await makeTask();
+    // A timed-out source run under the retry cap.
+    const source = await prisma.agentRun.create({
+      data: {
+        workspaceId: WS,
+        agentId,
+        taskId,
+        kind: "sandbox",
+        providerKey: "local",
+        status: "timeout",
+        retryCount: 0,
+      },
+    });
+
+    const now = new Date("2026-07-19T12:00:00Z");
+    const at = await scheduleRunRetryIfTransient(
+      { id: source.id, status: "timeout", retryCount: 0 },
+      now,
+    );
+    expect(at).not.toBeNull();
+    const scheduled = await prisma.agentRun.findUniqueOrThrow({ where: { id: source.id } });
+    expect(scheduled.scheduledRetryAt?.toISOString()).toBe(at!.toISOString());
+    expect(scheduled.retryReason).toBe("timeout");
+
+    // Not yet due → nothing promoted.
+    expect(await promoteDueRunRetries(new Date(at!.getTime() - 1000))).toBe(0);
+
+    // Due → one fresh queued run for the same agent/task, retryCount+1, linked to the source.
+    expect(await promoteDueRunRetries(new Date(at!.getTime() + 1000))).toBe(1);
+    const retry = await prisma.agentRun.findFirstOrThrow({
+      where: { retryOfRunId: source.id },
+    });
+    expect(retry).toMatchObject({
+      status: "queued",
+      agentId,
+      taskId,
+      retryCount: 1,
+      providerKey: "local",
+    });
+    // source schedule cleared → a second tick does not double-promote
+    expect(await promoteDueRunRetries(new Date(at!.getTime() + 2000))).toBe(0);
+  });
+
+  it("does not schedule a retry for a clean failure or an exhausted budget", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await makeTask();
+    // clean failure → no retry
+    const failed = await prisma.agentRun.create({
+      data: { workspaceId: WS, agentId, taskId, kind: "sandbox", status: "failed", retryCount: 0 },
+    });
+    expect(
+      await scheduleRunRetryIfTransient({ id: failed.id, status: "failed", retryCount: 0 }),
+    ).toBeNull();
+    // exhausted budget → no retry even for a timeout
+    const exhausted = await prisma.agentRun.create({
+      data: { workspaceId: WS, agentId, taskId, kind: "sandbox", status: "timeout", retryCount: 4 },
+    });
+    expect(
+      await scheduleRunRetryIfTransient({ id: exhausted.id, status: "timeout", retryCount: 4 }),
+    ).toBeNull();
+  });
+});
+
+describe("stranded-work reconciliation (Domain 9 #8)", () => {
+  async function failedRun(agentId: string, taskId: string) {
+    return prisma.agentRun.create({
+      data: {
+        workspaceId: WS,
+        agentId,
+        taskId,
+        kind: "sandbox",
+        providerKey: "local",
+        status: "failed",
+        scheduledRetryAt: null,
+      },
+    });
+  }
+  // Move a task to an actionable status (makeTask creates it 'assigned' already).
+  async function assignedTask() {
+    return makeTask();
+  }
+
+  it("re-dispatches a stranded task once (owner-preserving), then escalates to blocked", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await assignedTask();
+    await failedRun(agentId, taskId);
+
+    // First reconcile → one re-dispatch (a fresh queued run) + a recovery action.
+    const r1 = await reconcileStrandedWork(new Date());
+    expect(r1.redispatched).toBe(1);
+    expect(r1.escalated).toBe(0);
+    const queued = await prisma.agentRun.findFirst({
+      where: { taskId, status: "queued" },
+    });
+    expect(queued).not.toBeNull();
+    expect(
+      await prisma.taskRecoveryAction.count({ where: { taskId, reason: "stranded_work" } }),
+    ).toBe(1);
+
+    // While a queued run exists, the task is in-flight → a second reconcile is a no-op.
+    const r2 = await reconcileStrandedWork(new Date());
+    expect(r2).toMatchObject({ redispatched: 0, escalated: 0 });
+
+    // The re-dispatch also fails (simulate): mark the queued run failed, then reconcile → escalate.
+    await prisma.agentRun.update({ where: { id: queued!.id }, data: { status: "failed" } });
+    const r3 = await reconcileStrandedWork(new Date());
+    expect(r3.escalated).toBe(1);
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
+    expect(task.status).toBe("blocked");
+    // a blocked task drops out → no further recovery
+    expect(await reconcileStrandedWork(new Date())).toMatchObject({
+      redispatched: 0,
+      escalated: 0,
+    });
+  });
+
+  it("ignores a run pending a scheduled retry (the retry system owns it)", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await assignedTask();
+    await prisma.agentRun.create({
+      data: {
+        workspaceId: WS,
+        agentId,
+        taskId,
+        kind: "sandbox",
+        providerKey: "local",
+        status: "timeout",
+        scheduledRetryAt: new Date(Date.now() + 60_000), // retry pending
+      },
+    });
+    expect(await reconcileStrandedWork(new Date())).toMatchObject({
+      redispatched: 0,
+      escalated: 0,
+    });
+  });
+
+  it("ignores a non-sandbox agent (nothing to re-dispatch)", async () => {
+    const agentId = await makeAgent(); // no sandboxProvider / environment
+    const taskId = await assignedTask();
+    await failedRun(agentId, taskId);
+    expect(await reconcileStrandedWork(new Date())).toMatchObject({
+      redispatched: 0,
+      escalated: 0,
+    });
+  });
+});
+
+describe("issue monitors — one-shot deferred wake (Domain 9 #11)", () => {
+  async function assignAgent(taskId: string, agentId: string) {
+    const profileId = await getOrCreateAgentProfileId(agentId);
+    await prisma.taskAssignee.create({ data: { taskId, profileId } });
+  }
+
+  it("arms then fires a due monitor: re-dispatches the assignee + clears the one-shot schedule", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await makeTask();
+    await assignAgent(taskId, agentId);
+
+    await armTaskMonitor({
+      taskId,
+      nextCheckAt: new Date("2026-07-19T12:00:00Z"),
+      notes: "poll deploy",
+    });
+
+    // not due yet → nothing fires, schedule intact
+    expect(await tickDueTaskMonitors(new Date("2026-07-19T11:59:00Z"))).toBe(0);
+    expect(
+      (await prisma.task.findUniqueOrThrow({ where: { id: taskId } })).monitorNextCheckAt,
+    ).not.toBeNull();
+
+    // due → one dispatch, schedule cleared (one-shot), attempt counted
+    expect(await tickDueTaskMonitors(new Date("2026-07-19T12:01:00Z"))).toBe(1);
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
+    expect(task.monitorNextCheckAt).toBeNull();
+    expect(task.monitorAttemptCount).toBe(1);
+    expect(await prisma.agentRun.count({ where: { taskId, status: "queued" } })).toBe(1);
+
+    // one-shot: a second tick does nothing (must be re-armed)
+    expect(await tickDueTaskMonitors(new Date("2026-07-19T12:05:00Z"))).toBe(0);
+  });
+
+  it("does not fire past maxAttempts (disarms without dispatching)", async () => {
+    const agentId = await makeAgent("local");
+    const taskId = await makeTask();
+    await assignAgent(taskId, agentId);
+    // already at the cap
+    await armTaskMonitor({ taskId, nextCheckAt: new Date("2026-07-19T12:00:00Z"), maxAttempts: 1 });
+    await prisma.task.update({ where: { id: taskId }, data: { monitorAttemptCount: 1 } });
+
+    expect(await tickDueTaskMonitors(new Date("2026-07-19T12:01:00Z"))).toBe(0);
+    expect(await prisma.agentRun.count({ where: { taskId } })).toBe(0);
+    // schedule still cleared (consumed)
+    expect(
+      (await prisma.task.findUniqueOrThrow({ where: { id: taskId } })).monitorNextCheckAt,
+    ).toBeNull();
   });
 });

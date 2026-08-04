@@ -12,3 +12,10 @@ export const ORG_CHART_QUERY = gql`
     }
   }
 `;
+
+// Domain 14 #16: server-rendered org-chart SVG for sharing/embedding.
+export const ORG_CHART_SVG_QUERY = gql`
+  query OrgChartSvg {
+    orgChartSvg
+  }
+`;

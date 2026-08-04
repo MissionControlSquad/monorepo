@@ -6,6 +6,7 @@ import { applyAgentStatusUpdate } from "../../agent-status";
 import { ensureAgentProfile } from "../../agent-profile";
 import { pubsub, PubSubEvent } from "../../pubsub";
 import { findProfileForAgentId } from "@agentcenter/database";
+import { requireRole } from "@/server/tenancy";
 
 /**
  * Resolve an agent by apiKey argument.
@@ -29,9 +30,11 @@ builder.mutationField("updateAgentStatus", (t) =>
       currentTaskId: t.arg.string(),
       currentTask: t.arg.string(),
     },
-    resolve: async (query, _root, args) => {
-      const agent = await agentModel.delegate.findUnique({
-        where: { id: args.id },
+    resolve: async (query, _root, args, ctx) => {
+      // Tenancy: scope the agent to the caller's workspace so one workspace can't mutate another's agent.
+      const tenancy = requireRole(ctx, "member");
+      const agent = await agentModel.delegate.findFirst({
+        where: { id: args.id, workspaceId: tenancy.workspaceId },
       });
       if (!agent) throw new Error(`Agent not found: ${args.id}`);
 
@@ -130,10 +133,13 @@ builder.mutationField("updateAgentProfile", (t) =>
       llmModel: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
-      // Require authenticated admin session for profile updates
-      if (!ctx.session?.profileId) {
-        throw new Error("Authentication required");
-      }
+      // Tenancy: require a workspace member and confirm the agent belongs to that workspace.
+      const tenancy = requireRole(ctx, "member");
+      const owned = await agentModel.delegate.findFirst({
+        where: { id: args.id, workspaceId: tenancy.workspaceId },
+        select: { id: true },
+      });
+      if (!owned) throw new Error(`Agent not found: ${args.id}`);
 
       const data: Record<string, unknown> = {};
       if (args.name !== undefined && args.name !== null) data.name = args.name;
@@ -172,7 +178,14 @@ builder.mutationField("setAgentActivation", (t) =>
       id: t.arg.string({ required: true }),
       deactivated: t.arg.boolean({ required: true }),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
+      // Tenancy: activation/deactivation is workspace-scoped, admin-gated.
+      const tenancy = requireRole(ctx, "admin");
+      const owned = await agentModel.delegate.findFirst({
+        where: { id: args.id, workspaceId: tenancy.workspaceId },
+        select: { id: true },
+      });
+      if (!owned) throw new Error(`Agent not found: ${args.id}`);
       if (args.deactivated) {
         const agent = await agentModel.delegate.findUnique({
           where: { id: args.id },

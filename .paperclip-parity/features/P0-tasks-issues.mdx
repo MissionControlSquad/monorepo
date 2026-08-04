@@ -1,0 +1,31 @@
+---
+feature: Tasks & issues
+priority: P0
+status: Present
+gate: buildable-now
+---
+
+# Tasks & issues · P0 · ✅ Present
+
+**What it is:** the unit of work — CRUD, statuses, assignment, kanban, decomposition, monitors,
+watchdogs, recovery, lease checkout, tree holds, typed relations, external links, recurring, templates,
+and structured agent→human thread interactions.
+
+**Present in our monorepo (verified):**
+- CRUD + lifecycle: `mutations/tasks.ts`, `task.prisma:TaskStatus{inbox,assigned,in_progress,review,done,blocked,cancelled}`, REST `app/api/tasks/[id]`.
+- Assignment + kanban: `TaskAssignee`, `views/KanbanPage.tsx`, `components/kanban/*`, REST `app/api/tasks/board`; `services/mention-auto-assign.ts`.
+- Decomposition (review-gated): `PlanDecomposition`, `proposeDecomposition/reviewDecomposition/applyDecomposition`, surfaced in `ReviewInboxPage`.
+- Monitors/watchdogs/recovery/checkout: `task-autonomy.prisma` (TaskWatchdog, TaskRecoveryAction, TaskTreeHold), services `task-monitors.ts`, `task-watchdog.ts`, `stranded-work.ts`, `task-checkout.ts`; fired from cron `reap-stale-work`.
+- Relations + links: `TaskRelation{blocks,relates_to,duplicates}`, `blockerDiagnostics`, `ExternalLink`, `TaskRelationsCard`/`TaskExternalLinksCard`.
+- Recurring + templates: `RecurringTask`, `TaskTemplate`, `saveTaskAsTemplate`/`instantiateTemplate`.
+- Thread interactions: `TaskThreadInteraction` (suggest_tasks/ask_user_questions/request_confirmation), `TaskThreadInteractionsCard` (THREAD_INTERACTIONS-gated).
+
+**Gaps / pending:**
+- Watchdog conditions `no_progress`/`stuck_in_status` and actions `notify`/`escalate`/`reassign` are enum-present but effect-inert (return-false / record-only) — see P1 heartbeat.
+- Auto-fire of monitors/watchdogs/recovery is cron-gated (works via manual mutations now).
+
+**What's required:** Nothing for the core; the deferred watchdog signals are P1 polish.
+
+**Priority rationale:** Core loop — agents act on tasks.
+
+**Depends on:** cron scheduler for continuous auto-recovery (P1 #11).

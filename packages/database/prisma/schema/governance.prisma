@@ -25,26 +25,29 @@ enum TrustLevel {
 }
 
 model Approval {
-  id            String              @id @default(cuid())
-  workspaceId   String // buildbase workspace _id; no FK
-  subjectType   ApprovalSubjectType
-  subjectId     String // Task.id | Deliverable.id | agent-spec id (polymorphic, no FK)
-  taskId        String? // explicit approval↔task link
-  status        ApprovalStatus      @default(pending)
-  title         String
-  reason        String?
-  requestedById String
-  decidedById   String?
-  decidedAt     DateTime?
-  decisionNote  String?
-  resubmitCount Int                 @default(0)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  id                String              @id @default(cuid())
+  workspaceId       String // buildbase workspace _id; no FK
+  subjectType       ApprovalSubjectType
+  subjectId         String // Task.id | Deliverable.id | agent-spec id (polymorphic, no FK)
+  payload           Json? // subject-specific spec (e.g. hire_agent: {name, role, reportsToAgentId, level})
+  taskId            String? // explicit approval↔task link
+  status            ApprovalStatus      @default(pending)
+  requiredApprovals Int                 @default(1) // Domain 14 #14 — N-of-M board quorum (1 = single decider)
+  title             String
+  reason            String?
+  requestedById     String
+  decidedById       String?
+  decidedAt         DateTime?
+  decisionNote      String?
+  resubmitCount     Int                 @default(0)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   requestedBy Profile           @relation("ApprovalRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
   decidedBy   Profile?          @relation("ApprovalDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
   task        Task?             @relation("ApprovalTask", fields: [taskId], references: [id], onDelete: SetNull)
   comments    ApprovalComment[]
+  votes       ApprovalVote[]
 
   @@index([workspaceId, status])
   @@index([subjectType, subjectId])
@@ -52,6 +55,21 @@ model Approval {
   @@index([requestedById])
   @@index([status, createdAt])
   @@map("approvals")
+}
+
+// Domain 14 #14: a single board member's vote on an approval (for N-of-M quorum). One vote per voter.
+model ApprovalVote {
+  id             String   @id @default(cuid())
+  approvalId     String
+  voterProfileId String
+  vote           String // approve | reject
+  createdAt      DateTime @default(now())
+
+  approval Approval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  @@unique([approvalId, voterProfileId])
+  @@index([approvalId])
+  @@map("approval_votes")
 }
 
 model ApprovalComment {

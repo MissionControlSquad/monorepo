@@ -1,0 +1,12 @@
+---
+service: local-service-supervisor
+kind: service
+status: Missing
+priority: P3
+gate: infra-gated
+---
+# local-service-supervisor · ❌ Missing
+**What it is:** supervise local helper processes (plugin/env services) with restart.
+**Monorepo:** none (serverless model).
+**Required:** a process supervisor — only relevant for a long-lived host. Infra-gated.
+**Covers:** features/P3-plugin-runtime.mdx · SERVICE-AUDIT #95.

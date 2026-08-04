@@ -1,0 +1,12 @@
+---
+service: agent-instructions
+kind: service
+status: Present
+priority: P2
+gate: done (delivery deferred)
+---
+# agent-instructions · ✅ Present
+**What it is:** AGENTS.md instruction bundles per agent.
+**Monorepo:** `agent-instructions` GraphQL (upsert/seed/delete) + route `/instructions`.
+**Required:** live delivery into a running agent is deferred (infra).
+**Covers:** SERVICE-AUDIT #8.

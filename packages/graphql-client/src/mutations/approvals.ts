@@ -63,3 +63,40 @@ export const ADD_APPROVAL_COMMENT = gql`
     }
   }
 `;
+
+// Domain 14 #3: propose hiring an agent (creates a pending hire_agent approval; approving it hires).
+export const REQUEST_AGENT_HIRE = gql`
+  mutation RequestAgentHire(
+    $name: String!
+    $role: String!
+    $reportsToAgentId: String
+    $level: String
+    $personality: String
+    $reason: String
+  ) {
+    requestAgentHire(
+      name: $name
+      role: $role
+      reportsToAgentId: $reportsToAgentId
+      level: $level
+      personality: $personality
+      reason: $reason
+    ) {
+      id
+      status
+      subjectType
+      payload
+    }
+  }
+`;
+
+// Domain 14 #14: cast a board-quorum vote on an approval.
+export const CAST_APPROVAL_VOTE = gql`
+  mutation CastApprovalVote($id: String!, $vote: String!) {
+    castApprovalVote(id: $id, vote: $vote) {
+      status
+      approveVotes
+      requiredApprovals
+    }
+  }
+`;

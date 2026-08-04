@@ -2,7 +2,12 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole, scoped, requireTenancy } from "@/server/tenancy";
-import { reviewCases, computePipelineHealth, staleClaimedCases } from "@/server/services/pipelines";
+import {
+  reviewCases,
+  computePipelineHealth,
+  computePipelineStats,
+  staleClaimedCases,
+} from "@/server/services/pipelines";
 
 // Epic #7: routines + pipelines reads — PIPELINES_ROUTINES-gated, workspace-scoped, member+.
 
@@ -153,6 +158,38 @@ builder.queryField("pipelineHealth", (t) =>
       const tenancy = requireTenancy(ctx);
       requireRole(ctx, "member");
       return computePipelineHealth(tenancy.workspaceId, args.pipelineId);
+    },
+  }),
+);
+
+// Parity #101: aggregate pipeline metrics (summary complementing the per-case stale list).
+const PipelineStageCount = builder.simpleObject("PipelineStageCount", {
+  fields: (t) => ({
+    stageId: t.string(),
+    stageName: t.string(),
+    count: t.int(),
+  }),
+});
+const PipelineStatsType = builder.simpleObject("PipelineStats", {
+  fields: (t) => ({
+    activeCount: t.int(),
+    doneCount: t.int(),
+    rejectedCount: t.int(),
+    staleCount: t.int(),
+    completedLast24h: t.int(),
+    byStage: t.field({ type: [PipelineStageCount] }),
+  }),
+});
+
+builder.queryField("pipelineStats", (t) =>
+  t.field({
+    type: PipelineStatsType,
+    args: { pipelineId: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
+      const tenancy = requireTenancy(ctx);
+      requireRole(ctx, "member");
+      return computePipelineStats(tenancy.workspaceId, args.pipelineId);
     },
   }),
 );

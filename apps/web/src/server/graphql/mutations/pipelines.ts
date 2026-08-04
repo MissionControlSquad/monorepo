@@ -103,6 +103,8 @@ builder.mutationField("addRoutineTrigger", (t) =>
       routineId: t.arg.string({ required: true }),
       type: t.arg.string({ required: true }),
       recurrenceConfig: t.arg({ type: "JSON" }),
+      cronExpression: t.arg.string(),
+      timezone: t.arg.string(),
       nextFireAt: t.arg({ type: "DateTime" }),
     },
     resolve: async (query, _root, args, ctx) => {
@@ -112,6 +114,8 @@ builder.mutationField("addRoutineTrigger", (t) =>
       const trigger = await addRoutineTrigger(tenancy.workspaceId, args.routineId, {
         type,
         recurrenceConfig: args.recurrenceConfig ?? undefined,
+        cronExpression: args.cronExpression ?? null,
+        timezone: args.timezone ?? null,
         nextFireAt: args.nextFireAt ?? null,
       });
       return ctx.prisma.routineTrigger.findUniqueOrThrow({ ...query, where: { id: trigger.id } });

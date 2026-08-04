@@ -5,29 +5,45 @@ enum DeliverableKind {
   code
   file
   link
+  // Domain 8 G1 — work-product output types (a run's produced artifact, not just authored content).
+  pull_request
+  branch
+  commit
+  preview_url
+  runtime_service
 }
 
 model Deliverable {
-  id         String          @id @default(cuid())
-  taskId     String
-  profileId  String
-  projectId  String?
-  title      String
-  kind       DeliverableKind
-  content    String?
-  language   String?
-  storageKey String?         // R2 object key
-  fileName   String?
-  mimeType   String?
-  fileSize   Int?
-  url        String?
-  version    Int             @default(1)
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  id             String          @id @default(cuid())
+  taskId         String
+  profileId      String
+  projectId      String?
+  title          String
+  kind           DeliverableKind
+  content        String?
+  language       String?
+  storageKey     String? // R2 object key
+  fileName       String?
+  mimeType       String?
+  fileSize       Int?
+  url            String?
+  version        Int             @default(1)
+  // Domain 8 G1 — work-product governance (TEXT + app validation, D5). For output-type deliverables
+  // (pull_request/branch/…): who provides it, its external id, the review gate, its lifecycle status,
+  // health, whether it is the canonical one for its (task,kind), and the run that produced it.
+  provider       String? // paperclip | github | vercel | s3 | custom
+  externalId     String?
+  reviewState    String? // none | needs_review | approved | changes_requested
+  outputStatus   String? // active | ready_for_review | approved | changes_requested | merged | closed | failed | archived | draft
+  healthStatus   String          @default("unknown") // unknown | healthy | degraded | down
+  isPrimary      Boolean         @default(false)
+  createdByRunId String? // the AgentRun that produced this output (Domain 8 G3 lineage)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
-  task     Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  profile  Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  project  Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  task        Task                    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  profile     Profile                 @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  project     Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
   versions    DeliverableVersion[]
   annotations DeliverableAnnotation[]
   votes       DeliverableVote[]
@@ -36,6 +52,7 @@ model Deliverable {
   @@index([profileId])
   @@index([taskId, profileId])
   @@index([projectId])
+  @@index([taskId, kind])
   @@map("deliverables")
 }
 

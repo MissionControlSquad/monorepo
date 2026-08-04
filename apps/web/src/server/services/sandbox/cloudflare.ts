@@ -11,6 +11,7 @@
  * Destroy: DELETE {base}/api/paperclip-sandbox/v1/leases/{providerLeaseId}.
  */
 import { defineCloudProvider, type SandboxHandle } from "./types";
+import { guardedFetch } from "@agentcenter/utils/remote-http-endpoint-guard";
 
 const API_PREFIX = "/api/paperclip-sandbox/v1";
 const DEFAULT_CWD = "/workspace/paperclip";
@@ -43,7 +44,7 @@ export const cloudflareProvider = defineCloudProvider({
       "Content-Type": "application/json",
     };
 
-    const acquireRes = await fetch(bridgeUrl(base, "/leases/acquire"), {
+    const acquireRes = await guardedFetch(bridgeUrl(base, "/leases/acquire"), {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -65,7 +66,7 @@ export const cloudflareProvider = defineCloudProvider({
       id: lease.providerLeaseId,
       providerKey: "cloudflare",
       exec: async (command, opts) => {
-        const res = await fetch(bridgeUrl(base, "/exec"), {
+        const res = await guardedFetch(bridgeUrl(base, "/exec"), {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -90,10 +91,13 @@ export const cloudflareProvider = defineCloudProvider({
         };
       },
       destroy: async () => {
-        await fetch(bridgeUrl(base, `/leases/${encodeURIComponent(lease.providerLeaseId)}`), {
-          method: "DELETE",
-          headers,
-        }).catch(() => {});
+        await guardedFetch(
+          bridgeUrl(base, `/leases/${encodeURIComponent(lease.providerLeaseId)}`),
+          {
+            method: "DELETE",
+            headers,
+          },
+        ).catch(() => {});
       },
     };
   },

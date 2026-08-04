@@ -52,6 +52,19 @@ describe("goals CRUD + hierarchy (Epic #11)", () => {
     expect(r.data.createGoal).toMatchObject({ title: "Ship v1", level: "task", status: "planned" });
   });
 
+  it("supports the full company → team → agent → task hierarchy (Domain 14 #9)", async () => {
+    const member = await cookieFor(WS_A, "member");
+    const company = (await gql(CREATE, { t: "Company OKR", l: "company" }, member)).data.createGoal;
+    const team = (await gql(CREATE, { t: "Team OKR", l: "team", p: company.id }, member)).data
+      .createGoal;
+    const agentGoal = (await gql(CREATE, { t: "Agent goal", l: "agent", p: team.id }, member)).data
+      .createGoal;
+    expect(agentGoal).toMatchObject({ level: "agent", parentId: team.id });
+    const task = (await gql(CREATE, { t: "Task goal", l: "task", p: agentGoal.id }, member)).data
+      .createGoal;
+    expect(task.parentId).toBe(agentGoal.id);
+  });
+
   it("creates a child under a parent; list returns both; child exposes parentId", async () => {
     const member = await cookieFor(WS_A, "member");
     const parent = (await gql(CREATE, { t: "Company OKR", l: "company" }, member)).data.createGoal;

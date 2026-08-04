@@ -1,0 +1,94 @@
+// Plugin runtime data (parity #105/#111/#112/#113/#117/#118/#119/#120/#125/#127/#128). The storage +
+// coordination half of the plugin runtime that sits on top of the Plugin registry. The actual worker
+// process/sandbox that executes jobs and dispatches tools is the infra-gated half (deferred); these
+// tables are what it reads/writes. All workspaceId-scoped, no FK (D5); status/level/kind are TEXT.
+
+// A unit of plugin work: an enqueued or scheduled job the worker claims (lease), runs, and settles.
+model PluginJob {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  pluginId     String // manifest slug
+  jobKey       String // which declared job (manifest.jobs[].jobKey)
+  payload      Json?
+  status       String    @default("queued") // queued | running | done | failed
+  scheduledFor DateTime  @default(now()) // earliest run time (delay / cron next-tick)
+  schedule     String? // cron expr for a recurring job (re-enqueued after each run)
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(3)
+  lockedAt     DateTime? // lease start (null = unclaimed)
+  lockedBy     String? // worker id holding the lease
+  lastError    String?
+  result       Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([workspaceId, status, scheduledFor])
+  @@index([workspaceId, pluginId])
+  @@map("plugin_jobs")
+}
+
+// Namespaced per-plugin key/value store (#125 state-store + #105 plugin-database, one table, namespaced).
+model PluginKv {
+  id          String   @id @default(cuid())
+  workspaceId String
+  pluginId    String
+  namespace   String   @default("state") // "state" | "db:<collection>" | ...
+  key         String
+  value       Json
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([workspaceId, pluginId, namespace, key])
+  @@index([workspaceId, pluginId, namespace])
+  @@map("plugin_kv")
+}
+
+// A platform entity a plugin manages (#118 agents / #119 routines / #120 skills). Lets uninstall clean
+// up everything a plugin created, and prevents two plugins from claiming the same resource.
+model PluginManagedResource {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  pluginId     String
+  resourceType String // agent | routine | skill
+  resourceId   String // the platform-side id
+  externalRef  String? // the plugin-side identifier, when different
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@unique([workspaceId, resourceType, resourceId])
+  @@index([workspaceId, pluginId])
+  @@map("plugin_managed_resources")
+}
+
+// A tool a plugin contributes to the tool gateway (#128 registry). The dispatcher (#127) resolves a
+// tool name to its owning plugin. One tool name per workspace (first registrant owns it).
+model PluginTool {
+  id          String   @id @default(cuid())
+  workspaceId String
+  pluginId    String
+  toolName    String
+  displayName String
+  description String?
+  inputSchema Json? // draft-07 JSON Schema for the tool's arguments
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, toolName])
+  @@index([workspaceId, pluginId])
+  @@map("plugin_tools")
+}
+
+// Plugin log line (#117). Append-only; pruned by age/count retention. Indexed for the retention sweep.
+model PluginLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  pluginId    String
+  level       String // debug | info | warn | error
+  message     String
+  data        Json?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, pluginId, createdAt])
+  @@map("plugin_logs")
+}

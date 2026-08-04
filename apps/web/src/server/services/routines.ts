@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
+import { isValidCron, nextCronTick } from "@agentcenter/utils";
 import type { Routine, RoutineRun, RoutineTrigger } from "@agentcenter/database";
 
 function badRequest(message: string): never {
@@ -134,17 +135,36 @@ export async function addRoutineTrigger(
   input: {
     type: "cron" | "manual" | "webhook";
     recurrenceConfig?: unknown;
+    cronExpression?: string | null;
+    timezone?: string | null;
     nextFireAt?: Date | null;
   },
+  now: Date = new Date(),
 ): Promise<RoutineTrigger> {
   const routine = await prisma.routine.findFirst({ where: { id: routineId, workspaceId } });
   if (!routine) throw new GraphQLError("Routine not found", { extensions: { code: "NOT_FOUND" } });
+
+  // A cron trigger validates its expression and computes its first fire from `now`, so the scanner
+  // (tickRoutineTriggers) has a due-time to key off. The trigger's own timezone wins, else the routine's.
+  let cronExpression: string | null = null;
+  let nextFireAt = input.nextFireAt ?? null;
+  const timezone = input.timezone ?? null;
+  if (input.type === "cron") {
+    const expr = (input.cronExpression ?? "").trim();
+    if (!expr || !isValidCron(expr))
+      badRequest("cron trigger requires a valid 5-field cron expression");
+    cronExpression = expr;
+    nextFireAt = nextCronTick(expr, now, timezone ?? routine.timezone ?? "UTC");
+  }
+
   return prisma.routineTrigger.create({
     data: {
       routineId,
       type: input.type,
       recurrenceConfig: (input.recurrenceConfig ?? undefined) as never,
-      nextFireAt: input.nextFireAt ?? null,
+      cronExpression,
+      timezone,
+      nextFireAt,
       // Only webhook triggers get a public fire id.
       publicId: input.type === "webhook" ? generatePublicId() : null,
     },
@@ -228,4 +248,55 @@ export async function triggerRoutineNow(args: {
       },
     });
   }
+}
+
+/**
+ * Cron scanner (Domain 9 #12) — fire every enabled cron trigger whose nextFireAt has passed. Called
+ * from the reap-stale-work cron. For each due trigger it OPTIMISTICALLY CLAIMS the exact due-time
+ * (updateMany WHERE nextFireAt = observed) so two overlapping cron invocations can't double-fire, then
+ * advances nextFireAt to the next tick and fires the routine. A trigger whose routine is inactive or
+ * whose expression became invalid is advanced/parked, never fired. Best-effort per trigger; one bad
+ * routine never blocks the rest. Returns how many routines were fired.
+ */
+export async function tickRoutineTriggers(now: Date = new Date()): Promise<number> {
+  const due = await prisma.routineTrigger.findMany({
+    where: { type: "cron", isEnabled: true, nextFireAt: { lte: now } },
+    include: {
+      routine: { select: { id: true, workspaceId: true, isActive: true, timezone: true } },
+    },
+    take: 200,
+  });
+
+  let fired = 0;
+  for (const trigger of due) {
+    const observed = trigger.nextFireAt;
+    if (!observed || !trigger.cronExpression) continue;
+
+    // Advance to the next tick FIRST (compute-and-set), guarded by the observed due-time so a
+    // concurrent invocation that already advanced this trigger loses the race and skips it.
+    const tz = trigger.timezone ?? trigger.routine.timezone ?? "UTC";
+    const next = isValidCron(trigger.cronExpression)
+      ? nextCronTick(trigger.cronExpression, now, tz)
+      : null;
+    const claim = await prisma.routineTrigger.updateMany({
+      where: { id: trigger.id, nextFireAt: observed },
+      data: { nextFireAt: next },
+    });
+    if (claim.count === 0) continue; // another invocation claimed this tick
+
+    // Only an active routine actually fires; the schedule still advanced above so it self-heals.
+    if (!trigger.routine.isActive) continue;
+    try {
+      await triggerRoutineNow({
+        workspaceId: trigger.routine.workspaceId,
+        routineId: trigger.routine.id,
+        triggeredBy: "cron",
+        triggerId: trigger.id,
+      });
+      fired++;
+    } catch {
+      // A failed fire is recorded as a failed RoutineRun by triggerRoutineNow; keep scanning.
+    }
+  }
+  return fired;
 }

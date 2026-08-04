@@ -1,0 +1,33 @@
+---
+feature: Heartbeat, scheduling & recovery
+priority: P1
+status: Present
+gate: infra-gated (cron)
+---
+
+# Heartbeat, scheduling & recovery · P1 · ✅ Present (cron-driven)
+
+**What it is:** keeping the system self-healing — stale-work reaping, auto-sleep, stranded-work
+reconcile, watchdogs, scheduled retries+backoff, lease/command/terminal reaping, dead-letter, run
+liveness, and the "wake later" scheduler (task monitors + routine triggers).
+
+**Present in our monorepo (verified):**
+- Cron routes: `app/api/cron/{reap-stale-work,auto-sleep,run-sandbox-queue,cleanup-live-gateway}` (CRON_SECRET-authed, registered in `vercel.json`).
+- `reap-stale-work` orchestrates 11 reapers: checkout sweep, runner-command/lease/terminal reap, dead-letter + redeliver, routine triggers, run-retry promote, task-monitor tick, stranded-work reconcile.
+- Auto-sleep: `findStaleAgents` (5-min, race re-check).
+- Stranded-work: `stranded-work.ts` (re-dispatch once → escalate to blocked + `TaskRecoveryAction`, MAX=1).
+- Watchdogs: `task-watchdog.ts` — `lease_expired`+`no_heartbeat` live; actions `release_checkout`+`pause_subtree` real.
+- Scheduled retries: `run-retry.ts` (bounded backoff, optimistic-claim re-queue).
+- Wake scheduler: `task-monitors.ts:tickDueTaskMonitors` + `routines.ts:tickRoutineTriggers` (5-field cron) + in-proc `sandbox-drain-loop.ts`.
+- Run liveness: `run-runtime-status.ts` (in-mem ~90s TTL, secret-redacted).
+
+**Gaps / pending:**
+- **Watchdog conditions `no_progress`/`stuck_in_status` return false; actions `notify`/`escalate`/`reassign` are record-only** — enum-present, effect-inert (buildable-now to wire).
+- Auto-firing is cron-gated (works now via manual mutations `evaluateWatchdogsNow`/`triggerRecurringTask`).
+- No single unified "wake-scheduler" abstraction (it's cron-tick-driven).
+
+**What's required:** a cron scheduler (Vercel cron or a long-lived tick) for continuous operation; wire the deferred watchdog signals/actions (buildable-now).
+
+**Priority rationale:** Autonomous agents stall; without recovery the system silently wedges. Production-critical.
+
+**Depends on:** cron scheduler / long-lived server.

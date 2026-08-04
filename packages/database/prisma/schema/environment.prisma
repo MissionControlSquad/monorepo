@@ -9,18 +9,18 @@
 // the server; reads expose a masked `configPublic`. ENVIRONMENTS-flag-gated, admin-only mutations.
 
 model Environment {
-  id                 String   @id @default(cuid())
+  id                 String             @id @default(cuid())
   workspaceId        String // buildbase workspace _id; no FK (D5)
   name               String
   description        String?
-  driver             String   @default("local") // local | ssh | sandbox | plugin
-  status             String   @default("active") // active | archived
-  config             Json     @default("{}") // driver-specific; secrets as {secretRef:{name}}
-  envVars            Json     @default("{}") // merged into the run env
+  driver             String             @default("local") // local | ssh | sandbox | plugin
+  status             String             @default("active") // active | archived
+  config             Json               @default("{}") // driver-specific; secrets as {secretRef:{name}}
+  envVars            Json               @default("{}") // merged into the run env
   metadata           Json?
   createdByProfileId String? // buildbase userId
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
   leases             EnvironmentLease[]
 
   @@unique([workspaceId, name])

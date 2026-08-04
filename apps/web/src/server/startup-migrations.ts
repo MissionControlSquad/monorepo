@@ -8,7 +8,8 @@ import {
   updateProfileAvatarUrl,
   ensureFeatureFlagExists,
 } from "@agentcenter/database";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, FLAG_DEFAULTS, type FlagKey } from "@agentcenter/utils";
+import { ensureBuiltinAdapters } from "@/server/adapters/registry";
 
 /**
  * Convert raw presigned R2 URLs in Profile.avatarUrl to proxy paths.
@@ -158,6 +159,22 @@ async function ensureFeatureFlags() {
     },
   ];
 
+  // Catch-all: every remaining FLAG_KEYS entry (not in the curated list above) gets a user-managed
+  // row seeded at its FLAG_DEFAULTS value. Without this, newer flags have no DB row — the UI's flag
+  // panel (which reads DB rows only) can't list them and their FeatureGate falls back to the default,
+  // leaving the feature both hidden and impossible to enable. ensureFeatureFlagExists is a
+  // non-destructive upsert, so this never overrides a curated entry or an admin's toggle.
+  const curated = new Set(defaults.map((d) => d.key));
+  for (const key of Object.values(FLAG_KEYS)) {
+    if (curated.has(key)) continue;
+    defaults.push({
+      key,
+      enabled: FLAG_DEFAULTS[key as FlagKey] ?? false,
+      managedBy: "user",
+      description: `${key} (experimental)`,
+    });
+  }
+
   let created = 0;
   for (const flag of defaults) {
     const didCreate = await ensureFeatureFlagExists(flag);
@@ -173,6 +190,7 @@ export async function runStartupMigrations() {
   try {
     await normalizeAvatarUrls();
     await ensureFeatureFlags();
+    await ensureBuiltinAdapters();
   } catch (err) {
     // Log but don't crash the server — these are best-effort fixes
     console.error("[startup] Migration error (non-fatal):", err);

@@ -1,0 +1,12 @@
+---
+service: external-objects
+kind: service
+status: Missing
+priority: P2
+gate: needs-github-token
+---
+# external-objects · ❌ Missing
+**What it is:** pluggable external-object system (detectors/resolvers/snapshots) — e.g. live GitHub PR/issue state (945 ln).
+**Monorepo:** only `ExternalLink` (dead URL) + work-product provider/externalId.
+**Required:** detector/resolver framework + a GitHub provider (needs a token + the SSRF guard).
+**Covers:** features/P2-external-objects-github.mdx · SERVICE-AUDIT #59.

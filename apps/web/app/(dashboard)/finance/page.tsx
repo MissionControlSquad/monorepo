@@ -15,8 +15,9 @@ import {
   RESOLVE_BUDGET_INCIDENT,
   RAISE_BUDGET_AND_RESUME,
 } from "@/lib/graphql/mutations";
-import { BUDGET_WINDOWS, IncidentThreshold } from "@agentcenter/utils";
+import { BUDGET_WINDOWS, IncidentThreshold, formatCents as money } from "@agentcenter/utils";
 import { Button, Card, Badge } from "@/components/ui";
+import { FinanceEventsSection } from "@/components/finance/FinanceEventsSection";
 
 // Epic #4: agent budgets / cost dashboard. API-gated by the BUDGETS feature + buildbase role
 // (admin manages policies + resolves incidents; member views). All data is workspace-scoped
@@ -59,10 +60,6 @@ interface Bucket {
 }
 
 const WINDOWS = BUDGET_WINDOWS;
-
-function money(cents: number): string {
-  return `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
@@ -328,6 +325,9 @@ export default function FinancePage() {
           ))}
         </Card>
       </section>
+
+      {/* Provider account activity: finance events + rolling windows + billing split */}
+      <FinanceEventsSection />
 
       {/* Budget policies */}
       <section className="space-y-2">

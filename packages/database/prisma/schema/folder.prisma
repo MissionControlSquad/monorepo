@@ -1,0 +1,34 @@
+// Folders (parity #64) — a lightweight, nestable organization tree for a workspace. Items (tasks,
+// projects, agents, companies) are placed into folders via a generic FolderItem join so no existing
+// entity needs a folderId column. D5: workspaceId has no FK; itemType is TEXT (app-validated).
+model Folder {
+  id                 String   @id @default(cuid())
+  workspaceId        String // no FK (D5)
+  name               String
+  parentFolderId     String? // null = a top-level folder
+  order              Int      @default(0)
+  createdByProfileId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  parent   Folder?      @relation("FolderTree", fields: [parentFolderId], references: [id], onDelete: Cascade)
+  children Folder[]     @relation("FolderTree")
+  items    FolderItem[]
+
+  @@index([workspaceId, parentFolderId])
+  @@map("folders")
+}
+
+model FolderItem {
+  id       String   @id @default(cuid())
+  folderId String
+  itemType String // task | project | agent | company
+  itemId   String
+  addedAt  DateTime @default(now())
+
+  folder Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@unique([folderId, itemType, itemId])
+  @@index([itemType, itemId])
+  @@map("folder_items")
+}

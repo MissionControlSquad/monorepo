@@ -1,0 +1,12 @@
+---
+service: issue-continuation-summary
+kind: service
+status: Missing
+priority: P2
+gate: buildable-now / needs-LLM
+---
+# issue-continuation-summary · ❌ Missing
+**What it is:** auto-generate a "Continuation Summary" doc + next-action when a task/run is interrupted/waits (284 ln).
+**Monorepo:** none — no run→run handoff summary.
+**Required:** a summary generator on run-wait/interrupt. Heuristic buildable-now; rich needs the LLM relay.
+**Covers:** features/P2-additional-differences.mdx · SERVICE-AUDIT #81.

@@ -1,7 +1,11 @@
 import { builder } from "../builder";
+import { redactQuarantinedText, type SourceTrust } from "@agentcenter/utils";
 
 // Tier D: the run ledger — one row per agent execution (sandbox/runner/…). Output is the run's own
 // captured stdout/stderr; exposed to member+ under the RUNNERS gate at the query layer.
+//
+// Domain 8 G2 containment: a QUARANTINED run's stdout/stderr must not flow verbatim into a higher-trust
+// read until a board reviewer promotes it — so these two fields redact until reviewState is `approved`.
 builder.prismaObject("AgentRun", {
   fields: (t) => ({
     id: t.exposeID("id"),
@@ -13,10 +17,23 @@ builder.prismaObject("AgentRun", {
     sandboxId: t.exposeString("sandboxId", { nullable: true }),
     status: t.exposeString("status"),
     exitCode: t.exposeInt("exitCode", { nullable: true }),
-    stdout: t.exposeString("stdout", { nullable: true }),
-    stderr: t.exposeString("stderr", { nullable: true }),
+    stdout: t.string({
+      nullable: true,
+      resolve: (run) =>
+        redactQuarantinedText(run.sourceTrust as SourceTrust | null, run.reviewState, run.stdout),
+    }),
+    stderr: t.string({
+      nullable: true,
+      resolve: (run) =>
+        redactQuarantinedText(run.sourceTrust as SourceTrust | null, run.reviewState, run.stderr),
+    }),
     errorMessage: t.exposeString("errorMessage", { nullable: true }),
     costCents: t.exposeInt("costCents", { nullable: true }),
+    // Domain 8 G2 — untrusted-output review gate.
+    reviewState: t.exposeString("reviewState", { nullable: true }),
+    sourceTrust: t.expose("sourceTrust", { type: "JSON", nullable: true }),
+    reviewedByProfileId: t.exposeString("reviewedByProfileId", { nullable: true }),
+    reviewedAt: t.expose("reviewedAt", { type: "DateTime", nullable: true }),
     startedAt: t.expose("startedAt", { type: "DateTime" }),
     finishedAt: t.expose("finishedAt", { type: "DateTime", nullable: true }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),

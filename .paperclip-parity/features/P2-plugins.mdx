@@ -1,0 +1,27 @@
+---
+feature: Plugins (registry)
+priority: P2
+status: Present (registry); runtime is P3
+gate: buildable-now
+---
+
+# Plugins (registry) · P2 · ✅ Registry present · runtime → see P3
+
+**What it is:** the plugin **install-time contract** — manifest validation, install/upgrade, per-workspace
+config (JsonSchemaForm), enable/disable, uninstall, declared capabilities, and the detail UI.
+
+**Present in our monorepo (verified):**
+- `services/plugins.ts` (147 lines) — **metadata-only by design** ("v1 is the install-time contract only: a registered plugin is inert metadata (no runtime)").
+- Manifest validation (core subset of Paperclip `plugin-manifest-validator.ts`), install/upgrade (upsert), config validation (`setPluginConfig` via JSON-schema), enable/disable, uninstall, list/get, clear-error.
+- Capabilities recorded (NOT granted/enforced — spec D2).
+- UI: `plugins/page.tsx` + `PluginDetailPage` (manifest/capabilities/tools/jobs/config via **shared JsonSchemaForm**/error surface/lifecycle).
+
+**Gaps / pending:**
+- **The entire plugin RUNTIME is missing** — worker/loader/job-scheduler/event-bus/host-services/tool-dispatch/managed-agents-routines-skills (~25 Paperclip services). See `features/P3-plugin-runtime.mdx`.
+- Capability **enforcement** missing (recorded, not granted).
+
+**What's required:** nothing more for the registry; the runtime is a separate P3 epic.
+
+**Priority rationale:** The registry lets admins manage plugin metadata + config today (useful standalone); actual plugin execution is deferred infra.
+
+**Depends on:** the plugin runtime (P3) for plugins to *do* anything.

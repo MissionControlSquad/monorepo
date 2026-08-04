@@ -1,0 +1,249 @@
+---
+domain: Cost / Usage / Telemetry / Observability
+paperclip_root: /Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/paperclip
+monorepo_root: /Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo
+status: analysis-complete
+verdict: near-parity on cost/budget; real gaps in non-inference finance ledger, provider quota polling, first-party telemetry pipeline, and OTel/structured-logging depth
+---
+
+# Cost / Usage / Telemetry / Observability — Parity Gap Analysis
+
+## Boundary (memory: buildbase-boundary)
+
+buildbase owns **human billing/payments and plan entitlements** only. **Usage/cost
+_attribution_ for agents is ours.** Both codebases respect this: Paperclip's
+`cost_events` + `finance_events` and the monorepo's `CostEvent` + `LedgerEvent` are
+workspace/company-scoped agent-cost ledgers, never human card billing. The monorepo
+is explicit about the split — Epic #4 (`finance.prisma`, agent LLM/run cost + budgets)
+vs Epic #16 (`ledger.prisma`, human business P&L), never conflated.
+
+## Executive summary
+
+The monorepo is **already at strong parity** on the core cost/budget spine. It has an
+immutable `CostEvent` ledger with the same attribution dimensions
+(agent/task/project/issue/biller/model/provider/tokens/cents), budget policies with
+soft-warn + hard-stop + auto-pause + approval-gated resume, running quota windows,
+a unified `costBreakdown` group-by query, cost trend, finance summary, per-agent window
+spend, live incident subscriptions, and shipped dashboards (`/finance`, `/ledger`,
+`/observability`, `/monitors`, `/analytics`). The monorepo even **exceeds** Paperclip
+with on-demand `Monitor` thresholds and a first-class human P&L ledger.
+
+The **real gaps** are the "second half" of Paperclip's cost/observability story:
+
+1. **Non-inference finance ledger** (`finance_events`) — platform fees, credit
+   purchases/refunds/expiry, BYOK fees, gateway overhead, training/storage charges,
+   manual adjustments, debit/credit, estimated flag, external invoice id. **❌ absent.**
+2. **Provider quota-windows polling** — live rate-limit / credit windows pulled from
+   provider APIs via adapters (`getQuotaWindows`). **❌ absent.**
+3. **First-party telemetry pipeline** — schema-led event contract, proposal workflow,
+   PII/redaction boundary, retention classes. **❌ absent** (only in-memory notification
+   counters).
+4. **OpenTelemetry tracing** (opt-in, traces-only). **❌ absent.**
+5. **Structured-logging depth** — pino + secret redaction + HTTP log policy + per-run
+   log store (S3, sha256, offset reads). **🟡 home-grown JSON console logger only.**
+6. **Smaller deltas** — recursive issue-tree cost+runtime rollup, project-scope budgets,
+   richer `billingType` enum with split API/subscription reporting, `unpriced` cost state.
+
+---
+
+## Feature inventory & parity table
+
+Legend: ✅ present · 🟡 partial · ❌ missing
+
+### A. Cost ledger & attribution
+
+| # | Feature | Paperclip | Monorepo | Status |
+|---|---------|-----------|----------|--------|
+| A1 | Immutable per-event cost ledger (agent/issue/project/goal/run/biller/model/provider/tokens/cents) | `packages/db/src/schema/cost_events.ts:8-53` | `packages/database/prisma/schema/finance.prisma:36-69` (`CostEvent`) | ✅ |
+| A2 | Cost-event ingestion (validate → insert → roll monthly spend → evaluate budget) | `server/src/services/costs.ts:56-105`; route `server/src/routes/costs.ts:113-142` | `apps/web/src/server/services/cost.ts:82` (`recordCostEvent`); REST `apps/web/app/api/cost-events/route.ts:16`; heartbeat `apps/web/src/server/events/ingest.ts`; GraphQL `ingestCostEvent` | ✅ |
+| A3 | Idempotent ingest (dedupe key, no double-count) | not present (relies on caller) | `finance.prisma:64` unique `(workspaceId, idempotencyKey)`; `cost.ts:104-123` | ✅ (monorepo stronger) |
+| A4 | Company-summary spend vs budget + utilization % | `costs.ts:107-146` (`summary`) | GraphQL `financeSummary` `queries/finance.ts:196`; `observability.ts` `monthSpendCents` | ✅ |
+| A5 | Breakdown by agent | `costs.ts:byAgent` | `costBreakdown(groupBy:agent)` `queries/finance.ts:102` | ✅ |
+| A6 | Breakdown by provider+model | `costs.ts:byProvider` | `costBreakdown(groupBy:provider/model)` | ✅ |
+| A7 | Breakdown by biller | `costs.ts:byBiller` | `costBreakdown(groupBy:biller)` | ✅ |
+| A8 | Breakdown by agent×model | `costs.ts:byAgentModel` | `costBreakdown` composite / `profile-analytics.ts summarizeProfileCosts` | ✅ |
+| A9 | Breakdown by project (run→activity→issue→project chain) | `costs.ts:byProject` (recursive link via `activityLog`) | `costBreakdown(groupBy:project)` — but only via direct `CostEvent.projectId`, no run→issue→project inference | 🟡 |
+| A10 | Rolling window spend (5h/24h/7d per provider) | `costs.ts:windowSpend` | not present (only policy windows) | 🟡 |
+| A11 | Cost trend over time (daily series) | not present | `costTrend` `queries/finance.ts:159` | ✅ (monorepo extra) |
+| A12 | Recursive **issue-tree** cost + **runtime** rollup (distinct runs, live wall-clock) | `costs.ts:issueTreeSummary` (~L148-320, WITH RECURSIVE + `heartbeat_runs` duration); route `routes/costs.ts:175` | flat `costBreakdown(groupBy:issue)` only; no descendant rollup, no runtime | 🟡 |
+| A13 | `unpriced` cost status / repricing state | `constants.ts:742` `COST_STATUSES`, `cost_events.costStatus` | trusts `amountCents`; no status column | 🟡 |
+| A14 | Rich `billingType` (metered_api / subscription_included / subscription_overage / credits / fixed) + split API-vs-subscription run counts & token sums in reports | `constants.ts:732-740`; `costs.ts:byAgent/byProvider/byBiller` split expressions | `billingType` only `api`/`subscription` (`cost.ts:97`); reports don't split run counts | 🟡 |
+
+### B. Budgets & enforcement
+
+| # | Feature | Paperclip | Monorepo | Status |
+|---|---------|-----------|----------|--------|
+| B1 | Budget policy (scope, window, amount, warnPercent, hardStop, notify, isActive) | `packages/db/src/schema/budget_policies.ts`; `server/src/services/budgets.ts` | `finance.prisma:71-95` (`BudgetPolicy`); `services/budgets.ts` | ✅ |
+| B2 | Running quota-window spend (race-safe increment) | `budgets.ts computeObservedAmount` (query-time) | `finance.prisma:97-115` (`QuotaWindow`); `cost.ts:43 incrementQuotaWindow` atomic | ✅ (monorepo materializes windows) |
+| B3 | Soft-warn + hard-breach incidents | `budgets.ts createIncidentIfNeeded`; `budget_incidents.ts` | `finance.prisma:117-142` (`BudgetIncident`); `services/budget-enforcement.ts:48/107` | ✅ |
+| B4 | Auto-pause scope + cancel in-flight work on hard breach | `budgets.ts pauseAndCancelScopeForBudget` (+ `cancelWorkForScope` hook) | `budget-enforcement.ts` (`applyAgentStatusUpdate` → blocked, cancels work) | ✅ |
+| B5 | Approval-gated resume (`budget_override_required`) | `budgets.ts` builds `approvals` row; `resolveIncident` | `budget-enforcement.ts:78-92` opens `budget_override`; `raiseBudgetAndResume` / `resolveBudgetIncident` mutations | ✅ |
+| B6 | Live incident push | activity-log driven | GraphQL subscription `subscriptions/budgetIncidentChanged.ts` | ✅ (monorepo stronger) |
+| B7 | Budget scope: **project** | `scopeType` company/agent/**project** (`budgets.ts resolveScopeRecord`) | scope only workspace/agent (`BudgetScope`) — **no project** | 🟡 |
+| B8 | Budget window kinds: lifetime + calendar_month_utc | `budgets.ts resolveWindow` | hourly/daily/weekly/monthly; no lifetime | 🟡 |
+| B9 | Budget overview endpoint (policies + incidents + status) | `routes/costs.ts` `/budgets/overview` | `budgetPolicies` + `budgetIncidents` queries + `/finance` page | ✅ |
+
+### C. Non-inference finance / financial accounting
+
+| # | Feature | Paperclip | Monorepo | Status |
+|---|---------|-----------|----------|--------|
+| C1 | `finance_events` ledger: non-inference charges (platform_fee, credit_purchase/refund/expiry, byok_fee, gateway_overhead, training/storage, manual_adjustment), debit/credit, estimated, currency, quantity/unit, external invoice id, cost-event link | `packages/db/src/schema/finance_events.ts`; `server/src/services/finance.ts`; `constants.ts:745-780` (kinds/units/directions) | **❌ none.** `LedgerEvent` (`ledger.prisma`) is human P&L (revenue/expense), not agent-provider financial events; `CostEvent` is inference-only | ❌ |
+| C2 | Finance summary / by-biller / by-kind (debit/credit/net/estimated) | `finance.ts summary/byBiller/byKind`; routes `costs.ts` `/finance-*` | not present | ❌ |
+| C3 | Finance-event REST/CLI ingest (board-gated) | `routes/costs.ts:145` (`/finance-events`); `cli/.../cost.ts` | not present | ❌ |
+
+### D. Provider quota / rate-limit observability
+
+| # | Feature | Paperclip | Monorepo | Status |
+|---|---------|-----------|----------|--------|
+| D1 | Live provider quota windows (rate-limit / credit windows polled from provider APIs, per adapter, timeout-guarded, fan-out) | `server/src/services/quota-windows.ts`; type `packages/shared/src/types/quota.ts`; route `routes/costs.ts` `/quota-windows`; adapter hook `getQuotaWindows` | **❌ none** (adapters have no quota hook; no provider-usage polling) | ❌ |
+
+### E. Telemetry pipeline
+
+| # | Feature | Paperclip | Monorepo | Status |
+|---|---------|-----------|----------|--------|
+| E1 | First-party telemetry contract (generated event schema, typed emit helpers, client) | `packages/shared/src/telemetry/*` (`generated/paperclip-telemetry.ts`, `events.ts`, `client.ts`); `doc/TELEMETRY_WORKFLOW.md` | not present | ❌ |
+| E2 | Proposed-event workflow (`@ts-expect-error` marker, extractor, runtime swallow) | `doc/TELEMETRY_WORKFLOW.md`; `scripts/extract-proposed-events.mjs` | not present | ❌ |
+| E3 | Retention classes / windows | `packages/shared/src/telemetry/retention.ts` | not present | ❌ |
+| E4 | PII / secret emission boundary contract | `packages/shared/src/telemetry/README.md` | partial (redaction only in logging) | ❌ |
+| E5 | In-process operational metrics | not the same shape | `services/notification-metrics.ts` (in-memory counters) | 🟡 (monorepo extra, not exported) |
+
+### F. Tracing, structured logging, run logs
+
+| # | Feature | Paperclip | Monorepo | Status |
+|---|---------|-----------|----------|--------|
+| F1 | OpenTelemetry opt-in tracing (OTLP grpc/http, service identity, dynamic peer deps, zero-overhead when off) | `doc/observability.md`; server OTel bootstrap | **❌ none** (`instrumentation.ts` register hook exists but no OTel/spans) | ❌ |
+| F2 | Structured logger (pino) + file+console transports + level policy | `server/src/middleware/logger.ts` (pino/pino-http) | home-grown JSON `apps/web/src/server/logger.ts` (info/warn/error) | 🟡 |
+| F3 | Secret/auth redaction in logs | `server/src/middleware/redact-sensitive.ts`, `log-redaction.ts`, `http-log-policy.ts` | 🟡 partial; no dedicated redaction middleware | 🟡 |
+| F4 | Error capture (Sentry/Datadog-ready) | via logger | `error-tracking.ts captureError` (stdout, integration point documented not wired) | 🟡 |
+| F5 | Per-run log store: stdout/stderr/system transcript, local+S3, sha256, offset/range reads, finalize, retention | `server/src/services/run-log-store.ts`; `plugin-log-retention.ts` | **❌ none** | ❌ |
+| F6 | Workspace observability rollup dashboard | `doc/observability.md` (traces only, no summary UI) | `services/observability.ts getWorkspaceSummary`; `/observability` page | ✅ (monorepo extra) |
+| F7 | On-demand health Monitors (threshold over metric) | not present | `monitor.prisma`; `services/monitors.ts`; `/monitors` page | ✅ (monorepo extra) |
+
+### G. Feature flags
+
+| Flag | Monorepo | Paperclip analog |
+|------|----------|------------------|
+| `BUDGETS` `"budgets"` (default on) | `packages/utils/src/feature-flag-keys.ts:12` | gates cost/budget/finance |
+| `LEDGER` `"ledger"` | `:13` | human P&L |
+| `OBSERVABILITY` `"observability"` | `:22` | observability page |
+| `ANALYTICS` `"analytics"` | `:4` | analytics |
+| _(none)_ | no `cost` / `usage` / `telemetry` / `finance` flag | add `telemetry`, `provider_quota` for new work |
+
+---
+
+## Gap implementation plans
+
+### GAP 1 — Non-inference finance ledger (`FinanceEvent`)  — size **M**
+Mirrors Paperclip `finance_events.ts` + `finance.ts`. Distinct from `LedgerEvent` (human P&L)
+and `CostEvent` (inference). Captures account-level provider money: credit purchases/refunds,
+platform/BYOK fees, gateway overhead, training/storage, manual adjustments.
+
+- **prisma** (`finance.prisma`): `model FinanceEvent { id, workspaceId, agentId?, taskId?,
+  projectId?, issueId?, costEventId?, billingCode?, description?, eventKind (enum), direction
+  (debit|credit, default debit), biller, provider?, model?, pricingTier?, region?, quantity?,
+  unit (enum), amountCents Int, currency @default("USD"), estimated Boolean @default(false),
+  externalInvoiceId?, metadataJson Json?, occurredAt, createdAt }`. Enums `FinanceEventKind`
+  (14 kinds — copy from `constants.ts:745`), `FinanceDirection`, `FinanceUnit`. Indexes on
+  `(workspaceId, occurredAt)`, `(workspaceId, biller, occurredAt)`, `(workspaceId, eventKind,
+  occurredAt)`, `(workspaceId, direction, occurredAt)`, `costEventId`.
+- **server**: `services/finance-events.ts` → `recordFinanceEvent` (validate FK-belongs-to-
+  workspace, no re-derivation), `summary` (debit/credit/net/estimated/count), `byBiller`,
+  `byKind`. Reuse Prisma `aggregate`/`groupBy`.
+- **API**: GraphQL `financeEventSummary`, `financeByBiller`, `financeByKind`, `financeEvents`
+  queries + `ingestFinanceEvent` mutation (admin/board role). Optional REST
+  `POST /api/finance-events` mirroring cost-events route with a `FINANCE_REPORT` capability.
+- **UI**: new tab on `/finance` page ("Financial") — summary tiles (debit/credit/net/estimated),
+  by-biller card, by-kind card, recent finance-event timeline. Reuse existing Card/Badge.
+- **security**: workspace-scoped everywhere; write gated to admin (buildbase role), never agent
+  API key (these are human-entered account charges). Integer cents only. FK-belongs-to-workspace
+  checks like `finance.ts assertBelongsToCompany`.
+- **tests**: ingest validation, debit/credit netting, estimated split, workspace isolation,
+  cost-event linkage.
+
+### GAP 2 — Provider quota-windows polling  — size **M**
+Mirrors `quota-windows.ts` + `types/quota.ts`.
+
+- **types** (`@agentcenter/utils` or shared): `QuotaWindow { label, usedPercent, resetsAt,
+  valueLabel, detail }`, `ProviderQuotaResult { provider, source?, ok, errorFamily?, error?,
+  windows[] }`.
+- **server**: `services/provider-quota.ts` → `fetchAllQuotaWindows(workspaceId)` fans out over
+  registered adapters that implement an optional `getQuotaWindows()`, `Promise.allSettled` +
+  per-provider ~20s timeout, failures returned as `{ ok:false }` rather than throwing. Add the
+  optional hook to the adapter interface.
+- **API**: GraphQL `providerQuotaWindows` query (admin-gated), short cache (reuse
+  `server/cache.ts`) since provider APIs are rate-limited.
+- **UI**: `ProviderQuotaCard` on `/finance` or `/observability` — per-provider windows with
+  used% bars + reset countdown + credit remaining.
+- **security**: validate workspace resolves; requires provider credentials — board/admin only;
+  never expose raw credentials, only derived windows.
+- **tests**: adapter fan-out, one-provider-timeout-doesn't-block-others, error shaping.
+- Flag: `provider_quota` (default off until an adapter implements the hook).
+
+### GAP 3 — First-party telemetry pipeline  — size **L**
+Mirrors `packages/shared/src/telemetry/*` + `TELEMETRY_WORKFLOW.md` + `retention.ts`.
+
+- **package** `packages/telemetry`: `generated/telemetry.ts` (event-name union
+  `EventName`, `EventDimensionsMap`, `SCHEMA_VERSION`, `makeEvent`/`makeBatch`), `client.ts`
+  (queue + flush + **swallow unregistered names**), `events.ts` (typed emit helpers),
+  `retention.ts` (`RETENTION_DAYS` classes + `EVENT_RETENTION_CLASS`), `README.md` (PII/secret
+  emission boundary; primitives-only dimension values).
+- **proposal workflow**: `scripts/extract-proposed-events.mjs` scanning `@ts-expect-error --
+  proposed-telemetry(<issue>): <rationale>` markers; a doc `docs/TELEMETRY_WORKFLOW.md`.
+- **server sink**: `services/telemetry-sink.ts` receiving batches; canonicalization at the
+  receiving layer (not emitters); persistence to a `telemetry_events` table or external
+  sink; retention pruning job keyed by class window.
+- **UI**: none required initially (data-infra concern); optionally surface event volume on
+  `/observability`.
+- **security**: hard boundary — no PII/secrets/prompts/model-output/private-paths in dimensions;
+  primitives only (`string|number|boolean`); reuse existing redaction; drop `null`/objects.
+- **tests**: unregistered-name swallow, dimension primitive validation, retention-class mapping,
+  extractor provenance (repo-relative paths only).
+- Flag: `telemetry` (default off). **Scope note:** this is the biggest lift; land as its own epic.
+
+### GAP 4 — OpenTelemetry opt-in tracing  — size **S–M**
+Mirrors `doc/observability.md`.
+
+- **bootstrap**: extend `apps/web/instrumentation.ts` `register()` — when
+  `OTEL_EXPORTER_OTLP_ENDPOINT` is set, dynamically import `@opentelemetry/sdk-node` +
+  `auto-instrumentations-node` (optional peer deps, not in default lockfile) and start the SDK;
+  select exporter by `OTEL_EXPORTER_OTLP_PROTOCOL` (grpc default); disable chatty `fs`/`dns`/`net`
+  instrumentations; **zero import / zero overhead when the env var is unset**; single warn on
+  unknown protocol; single diagnostic if packages missing (server stays up).
+- **docs**: `docs/observability.md` (protocol→exporter table, env setup, traces-only scope).
+- **security**: no PII in span attributes; keep default sampling; endpoint from env only.
+- **tests**: unit — resolver picks exporter by protocol; boot with endpoint unset imports nothing.
+
+### GAP 5 — Structured-logging depth (pino + redaction + run-log store)  — size **M**
+- **pino** (`S`): replace/wrap `server/logger.ts` with pino + pino-http; dual transport
+  (pretty console + JSON file), level policy (silence health 200s, warn 4xx, error 5xx), redact
+  `authorization`/secrets — mirror `middleware/logger.ts`, `redact-sensitive.ts`,
+  `http-log-policy.ts`, `log-redaction.ts`. Wire `error-tracking.ts` to the same pino instance.
+- **run-log store** (`M`): `services/run-log-store.ts` — `begin/append/finalize/read` per
+  heartbeat run; local-file default, S3 provider (reuse existing storage), sha256, gzip,
+  offset/range reads; retention job. Ties into the remote-exec robustness backlog (memory).
+- **tests**: redaction never leaks secrets; range reads; finalize sha256; retention purge.
+
+### GAP 6 — Smaller deltas  — size **S** (each)
+- **A9/A12 issue-tree rollup**: add a `costByIssueTree(issueId, excludeRoot)` GraphQL query using
+  a recursive descendant CTE over `Task/issue` parent links, summing `CostEvent` + distinct-run
+  wall-clock runtime (join run/heartbeat durations). Port `costs.ts issueTreeSummary`.
+- **A10 rolling window spend**: `costWindowSpend` query (5h/24h/7d per provider) — small
+  group-by, add to `/finance`.
+- **A14 billingType**: widen enum to Paperclip's 6 values; add split API-vs-subscription run
+  counts + token sums to `costBreakdown`. Migration + report expression change.
+- **B7/B8 budget scope+window**: add `project` to `BudgetScope`, `lifetime` to `BudgetWindow`;
+  extend enforcement + upsert.
+- **A13 unpriced state**: add `costStatus` (`reported`|`unpriced`) to `CostEvent` for
+  provider-cost-pending events + a repricing path.
+
+---
+
+## Notes / cross-refs
+- The monorepo trusts caller-reported `amountCents` (like Paperclip) — **neither** derives cost
+  from a server-side model-price table; a `MODEL_PRICING` table is optional future depth, not a
+  Paperclip parity gap.
+- `/monitors` (on-demand thresholds) and the human `/ledger` P&L are monorepo features Paperclip
+  lacks — no action needed; note them as differentiators.
+- Prioritization (aligns with memory backlog): GAP 5-run-log + GAP 2-quota feed the remote-exec
+  robustness story; GAP 1-finance and GAP 6 are quick attribution depth; GAP 3-telemetry and
+  GAP 4-OTel are standalone observability epics.

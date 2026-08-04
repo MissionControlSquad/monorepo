@@ -23,7 +23,7 @@ enum RoutineRunStatus {
 }
 
 model Routine {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   workspaceId        String // buildbase workspace _id; no FK (D5)
   name               String
   description        String?
@@ -38,8 +38,8 @@ model Routine {
   assigneeAgentId    String? // the agent whose profile the generated task is assigned to
   priority           Priority?
   goalId             String? // the goal generated tasks advance
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   createdByProfile Profile?          @relation("RoutineCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: SetNull)
   project          Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -58,6 +58,8 @@ model RoutineTrigger {
   routineId        String
   type             RoutineTriggerType
   recurrenceConfig Json? // reuses RecurringTask.recurrenceConfig shape (cron)
+  cronExpression   String? // 5-field cron (Domain 9 #12); drives nextFireAt for type=cron triggers
+  timezone         String? // IANA tz the cron is interpreted in; falls back to the routine's timezone
   nextFireAt       DateTime?
   publicId         String?            @unique // nanoid; public fire URL (webhook)
   isEnabled        Boolean            @default(true)
@@ -130,15 +132,15 @@ enum PipelineCaseEventType {
 }
 
 model Pipeline {
-  id          String   @id @default(cuid())
-  workspaceId String
-  projectId   String?
-  name        String
-  description String?
-  isActive    Boolean  @default(true)
-  sequentialOnly Boolean @default(false) // cases must advance one stage at a time (no skipping)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  workspaceId    String
+  projectId      String?
+  name           String
+  description    String?
+  isActive       Boolean  @default(true)
+  sequentialOnly Boolean  @default(false) // cases must advance one stage at a time (no skipping)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   project Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   stages  PipelineStage[]
@@ -150,8 +152,8 @@ model Pipeline {
 }
 
 model PipelineStage {
-  id            String  @id @default(cuid())
-  pipelineId    String
+  id              String  @id @default(cuid())
+  pipelineId      String
   name            String
   order           Int
   isReviewStage   Boolean @default(false) // surfaces cases in the review-cases inbox
@@ -167,18 +169,19 @@ model PipelineStage {
 }
 
 model PipelineCase {
-  id                 String     @id @default(cuid())
+  caseOutputs        PipelineCaseOutput[]
+  id                 String               @id @default(cuid())
   pipelineId         String
   currentStageId     String?
   title              String
   payload            Json?
-  status             CaseStatus @default(open)
+  status             CaseStatus           @default(open)
   claimedByProfileId String?
   claimedAt          DateTime?
   linkedTaskId       String?
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
-  enteredStageAt     DateTime   @default(now())
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  enteredStageAt     DateTime             @default(now())
 
   pipeline     Pipeline            @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   currentStage PipelineStage?      @relation("CaseCurrentStage", fields: [currentStageId], references: [id], onDelete: SetNull)
@@ -208,4 +211,20 @@ model PipelineCaseEvent {
 
   @@index([caseId, createdAt])
   @@map("pipeline_case_events")
+}
+
+// Structured per-stage outputs a case produced (parity #98). Keyed data emitted while the case sat on
+// a stage — distinct from the case's freeform payload. D5: no cross-workspace FK beyond the case.
+model PipelineCaseOutput {
+  id        String   @id @default(cuid())
+  caseId    String
+  stageId   String?
+  key       String
+  value     Json
+  createdAt DateTime @default(now())
+
+  case PipelineCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, stageId])
+  @@map("pipeline_case_outputs")
 }

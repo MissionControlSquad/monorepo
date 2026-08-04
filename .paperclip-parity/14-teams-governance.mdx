@@ -1,0 +1,349 @@
+---
+title: "Teams / Org-Chart / Boardroom / Governance / Agent-Companies — Parity Gap Analysis"
+domain: teams-governance
+paperclip_root: "/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/paperclip"
+monorepo_root: "/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo"
+generated: 2026-07-17
+status_legend: "✅ at parity · 🟡 partial · ❌ missing"
+---
+
+# Teams / Org-Chart / Boardroom / Governance / Agent-Companies
+
+Boundary: **buildbase owns HUMAN orgs / workspaces / RBAC.** Everything below is about how
+**AGENTS** are organized into companies/teams, their hierarchy, delegation, and the governance
+that gates their work. In the monorepo every agent-domain model is `workspaceId`-scoped with **no FK**
+to buildbase (design note "D5") — humans (`Profile`) only appear as approval *deciders*, never as org nodes.
+
+Paperclip framing (`doc/PRODUCT.md`, `doc/GOAL.md`): Paperclip is the *control plane for autonomous AI
+companies*. A **company** is the first-order object; every employee is an agent; the CEO is the root of an
+org chart; all work traces up a goal hierarchy (**company → team → agent → task**); the human "board"
+governs via approvals and budgets. The portable format is the markdown-first **Agent Companies Spec**
+(`agentcompanies/v1`, `docs/companies/companies-spec.md`): `COMPANY.md` / `TEAM.md` / `AGENTS.md` /
+`PROJECT.md` / `TASK.md` / `SKILL.md` packages, importable/exportable as git-native folders.
+
+---
+
+## Executive summary
+
+The monorepo has ported the **runtime spine** of this domain well: agent org-chart with `reportsTo`
+(Epic #19), an installable **Team catalog** (Epic #10), agent-domain **Approvals** (Epic #3), **agent-authz**
+capability grants (#21, = Paperclip `principal_permission_grants`), **agent governance** provisioning knob
+(A.4), per-agent **trust profiles**, workspace-scoped **budgets** with auto-pause (#4), **deliverable voting**,
+and a **Boardroom** concierge chat (#15). Flags exist for each (`org_chart`, `skills_teams`, `governance`,
+`agent_authz`, `budgets`, `voting`, `board_chat`).
+
+The **biggest structural gap is the Agent-Companies package model** — Paperclip's entire portability story
+is markdown `COMPANY.md`/`TEAM.md`/`AGENTS.md` packages (`agentcompanies/v1`) with a shipped **teams-catalog
+package**, git/GitHub-native import graph, `.paperclip.yaml` vendor sidecar, collision handling, and a
+README + Mermaid org-chart generator. The monorepo has **no `Company`/`AgentCompany` entity at all** (only
+a goal-tree *level* named "company"), and its portability is a **credential-free JSON bundle**, not markdown
+packages. Secondary gaps: **delegation is only convention** (no policy engine either side, but Paperclip
+ships a rich CEO-delegation persona + hire-hook + goal-alignment; monorepo has neither), the **`hire_agent`
+approval subject type is defined but unwired**, there is **no board-quorum/multi-approver** governance,
+and no per-agent configurable approval-policy engine.
+
+| # | Feature | Status | Size |
+|---|---|---|---|
+| 1 | Agent org-chart / `reportsTo` hierarchy | ✅ | — |
+| 2 | Team catalog (installable role bundles) | ✅ | — |
+| 3 | Agent-domain Approvals | 🟡 | S |
+| 4 | Agent-authz capability grants | ✅ | — |
+| 5 | Agent governance / provisioning gate | ✅ | — |
+| 6 | Per-agent trust profiles | ✅ | — |
+| 7 | Agent budgets (cost caps + auto-pause) | ✅ | — |
+| 8 | Boardroom | 🟡 | S |
+| 9 | Goal hierarchy (company→team→agent→task) | 🟡 | S |
+| 10 | **Agent-Companies package model (markdown COMPANY/TEAM/AGENTS.md, `agentcompanies/v1`)** | ❌ | **L** |
+| 11 | **Shipped teams-catalog *package* (bundled markdown teams)** | 🟡 | **M** |
+| 12 | **Company export/import (markdown packages + README/org-chart + collision)** | ❌ | **L** |
+| 13 | Delegation model (CEO persona, subtask handoff, hire-hook) | ❌ | M |
+| 14 | Board-quorum / multi-approver governance | ❌ | M |
+| 15 | Per-agent approval-policy engine | ❌ | M |
+| 16 | Org-chart SVG/PNG render endpoint | 🟡 | S |
+| 17 | MCP tool-access governance gateway | ❌ (separate domain) | — |
+| 18 | Token "salary" budgeting | ❌ | S |
+
+---
+
+## Feature-by-feature
+
+### 1. Agent org-chart / `reportsTo` hierarchy — ✅
+
+Self-referential agent manager/report edge; the CEO (`reportsTo: null`) is the tree root.
+
+- **Paperclip:** `packages/db/src/schema/agents.ts:24` (`reportsTo` self-FK), index `:43`; org tree endpoint
+  `GET /companies/:companyId/org` at `server/src/routes/agents.ts:2048` (`orgForCompany`, lean tree at `:1688`);
+  invalid-chain guard `services/agent-invokability.ts` (`listInvalidOrgChainDescendantIds`); UI
+  `ui/src/pages/OrgChart.tsx`, `Org.tsx`, `NewAgent.tsx:272` (`ReportsToPicker`), root-manager assignment in
+  `services/built-in-agents.ts:1434–1551`.
+- **Monorepo:** `packages/database/prisma/schema/agent.prisma:153` (`reportsToAgentId`), relation `AgentOrg`
+  `:154–155`, index `:162`; service `apps/web/src/server/services/org-chart.ts` (`assertNoReportingCycle`,
+  re-exports `buildOrgTree`/`wouldCreateCycle`/`getAgentOrgChainHealth` from `packages/utils/src/org-chart.ts`
+  + `org-layout.ts`); GraphQL `graphql/queries/org-chart.ts` + `mutations/org-chart.ts` (`SET_AGENT_REPORTS_TO`);
+  UI `apps/web/app/(dashboard)/org-chart/page.tsx` (zoomable graph, `computeOrgLayout`). Flag `org_chart`
+  (`feature-flag-keys.ts:28`, default true).
+- **Verdict:** Parity, with a monorepo *bonus* (`AgentLevel` enum, cycle-guard as first-class service).
+
+### 2. Team catalog (installable role bundles) — ✅
+
+A **Team** is a reusable bundle of agent roles; installing it spawns one agent per member under a target manager.
+
+- **Paperclip:** `packages/teams-catalog` (shipped npm package `@paperclipai/teams-catalog`), types
+  `src/types.ts` (`CatalogTeam` with `rootAgentSlugs`, `manager`, `requiredSkills`, `trustLevel`,
+  `schema: "agentcompanies/v1"`); catalog content e.g.
+  `catalog/bundled/company-defaults/core-exec-team/TEAM.md` (frontmatter `manager: agents/ceo/AGENTS.md`,
+  `includes: [cto, qa, first-project]`); service `server/src/services/teams-catalog.ts` (1036 LOC — list,
+  resolve, install, provenance `renderCatalogProvenanceYaml:451` with `reportsToExistingAgentId`, skill prep);
+  routes `server/src/routes/teams-catalog.ts` (`GET /teams/catalog`, `/:id`, `/:id/files`,
+  `GET/POST /companies/:companyId/teams/catalog/installed`); UI `ui/src/pages/TeamCatalog.tsx`, `TeamCard.tsx`.
+- **Monorepo:** `packages/database/prisma/schema/skill.prisma` — enums `TeamKind` `:29`,
+  `TeamTrustLevel` `:34`, `CollisionStrategy` `:41`; models `Team` `:154` ("Paperclip team catalog parity"),
+  `TeamMember` `:181` (`templateId`→code `AGENT_TEMPLATES`, `skills[]`, `order`), `TeamInstall` `:199`
+  (`collisionStrategy`, `createdAgentIds[]`). Service `services/teams.ts` (install → one Agent per member);
+  GraphQL under `queries/skills.ts` (`TEAMS_QUERY`, `CREATE_TEAM`, `ADD_TEAM_MEMBER`, `INSTALL_TEAM`,
+  `PREVIEW_TEAM_INSTALL_QUERY`); UI `app/(dashboard)/teams/page.tsx`. Flag `skills_teams`
+  (`feature-flag-keys.ts:19`).
+- **Verdict:** Runtime parity. **Gap:** monorepo teams are **DB rows built from code-level `AGENT_TEMPLATES`**,
+  whereas Paperclip ships **markdown `TEAM.md` packages** with git provenance and `agentcompanies/v1` schema.
+  See #11 for the packaging gap.
+
+### 3. Agent-domain Approvals — 🟡 (S)
+
+Human decides; approval resolution transitions the linked work item and can trigger side effects (hire).
+
+- **Paperclip:** `packages/db/src/schema/approvals.ts` (`type` free-text, `requestedByAgentId`,
+  `status` pending/approved/rejected/revision_requested, `payload`), link table `issue_approvals.ts`; service
+  `server/src/services/approvals.ts` (built-in `type: "hire_agent"` reconciled at `:109/:134/:202` →
+  `built-in-agents.ensure`, `notifyHireApproved`), `services/issue-approvals.ts`; plan-approval flow via
+  `request_confirmation` targeting a plan doc; UI `ui/src/pages/Approvals.tsx`, `ApprovalDetail.tsx`.
+- **Monorepo:** `governance.prisma:5` `ApprovalStatus {pending,approved,rejected,needs_changes,cancelled}`,
+  `:13` `ApprovalSubjectType {task,deliverable,hire_agent,budget_override}`, model `Approval` `:27`
+  (polymorphic `subjectType`/`subjectId`, `taskId`, `resubmitCount`), `ApprovalComment` `:57`; service
+  `services/approvals.ts` (Epic #3, decision transitions linked task); GraphQL `queries/approvals.ts` +
+  `mutations/approvals.ts`; UI `app/(dashboard)/approvals/page.tsx` + `[approvalId]/page.tsx`
+  (`src/views/ApprovalDetailPage.tsx`); REST fallback `app/api/approvals/route.ts`, `[id]/route.ts`.
+- **Gap (S):** the `hire_agent` subject type is **defined but unwired** — no `hire_agent`/`hireAgent`
+  producer in `apps/web/src`. Paperclip's approval→hire reconciliation (agent actually gets created on
+  approve) is missing. Fix: on `Approval(subjectType=hire_agent).approved`, create the Agent from
+  `subjectId`/payload and notify (mirror `approvals.ts:134` + `hire-hook.ts`). Also no plan/`request_confirmation`
+  document-revision approval loop.
+
+### 4. Agent-authz capability grants — ✅
+
+The agent analog of a human role — grant/deny a capability to an agent, optionally project-scoped, with audit.
+
+- **Paperclip:** `packages/db/src/schema/principal_permission_grants.ts` (`principalType`,`principalId`,
+  `permissionKey`,`scope`), services `agent-permissions.ts`, `principal-access-compatibility.ts`,
+  `tool-access-policy.ts`.
+- **Monorepo:** `agent-authz.prisma` — `AgentAuthzDecision {allow,deny}` `:7`, `AgentCapabilityGrant` `:12`
+  (`agentId`,`capability`,`projectScope`,`grantedByProfileId`), `AgentAuthzEvent` `:25` (audit); service
+  `services/agent-authz.ts` (Epic #21, default-open); GraphQL `queries/agent-authz.ts`+`mutations`; UI
+  `app/(dashboard)/agent-authz/page.tsx`; REST `app/api/agent-trust/check/route.ts`. Flag `agent_authz`
+  (`feature-flag-keys.ts:30`). Header note: "ports Paperclip principal_permission_grants (principalType=agent)".
+- **Verdict:** Parity (open-by-default matches Paperclip's "restrictions are opt-in" principle from PRODUCT.md).
+
+### 5. Agent governance / provisioning gate — ✅
+
+Workspace-level knob: when on, a newly created agent starts `pending_setup` and needs approval to run.
+
+- **Paperclip:** approval `type: "hire_agent"` gate + `built-in-agents` `defaultManager`/pending flow
+  (`services/built-in-agents.ts:1452–1551`, `services/hire-hook.ts`).
+- **Monorepo:** `services/agent-governance.ts` (Epic A.4, `requireAgentApproval`); GraphQL
+  `queries/agent-governance.ts`+`mutations/agent-governance.ts`. Flag `governance` (`feature-flag-keys.ts:11`).
+- **Verdict:** Parity for the *gate*. (The actual hire *fulfilment* wiring is the #3 gap.)
+
+### 6. Per-agent trust profiles — ✅ (monorepo bonus)
+
+- **Monorepo:** `governance.prisma:20` `TrustLevel {untrusted,low,standard,trusted}`, `:73` `AgentTrustProfile`
+  (1:1 Agent; `lowTrustContainment`, `requireUntrustedPrReview`, `autoPromoteWorkProduct`,
+  `changeConsentRequired`, `executionAllowlist[]`); service `services/trust.ts`.
+- **Paperclip:** closest analogs are `agent-invokability`, `issue-execution-policy`, and per-agent
+  `permissions` jsonb (`agents.ts:35`). Monorepo's structured trust profile is **richer** here.
+
+### 7. Agent budgets — ✅
+
+Cost caps / quota windows with warn %, hard-stop, and auto-pause + resume-gated-by-approval.
+
+- **Paperclip:** `packages/db/src/schema/budget_policies.ts` (`scopeType`/`scopeId`, `metric`, `windowKind`,
+  `amount`, `warnPercent`, `hardStopEnabled`), `budget_incidents.ts`, `cost_events.ts`, `finance_events.ts`;
+  service `server/src/services/budgets.ts`. Agent row also carries `budgetMonthlyCents`/`spentMonthlyCents`
+  (`agents.ts:30`).
+- **Monorepo:** `finance.prisma` — `CostEvent` `:36` (`tokensIn/Out` `:46–47`, `amountCents`), `BudgetPolicy`
+  `:71` (`scope`,`limitCents`,`window`,`hardStop`,`warnPercent`), `QuotaWindow` `:97`, `BudgetIncident` `:117`
+  (`autoPaused`, `approvalId`→budget_override gate `:128`); services `budgets.ts`, `budget-enforcement.ts`,
+  `budget-window.ts`, `cost.ts`, `ledger.ts`; GraphQL `finance.ts` + subscription `budgetIncidentChanged.ts`;
+  UI `app/(dashboard)/finance/page.tsx`. Flag `budgets` (`feature-flag-keys.ts:12`).
+- **Verdict:** Parity (monorepo incident/subscription flow is arguably ahead). See #18 for the "salary" nuance.
+
+### 8. Boardroom — 🟡 (S)
+
+- **Monorepo:** `boardroom.prisma` — `BoardRole {user,assistant}` `:6`, `BoardThread` `:11` (one per workspace),
+  `BoardMessage` `:23` (`feedbackScore`/`feedbackReason`); service `services/boardroom.ts` (Epic #15,
+  `unavailableRelay` default so it works without a live model); GraphQL `boardroom.ts`; UI
+  `app/(dashboard)/boardroom/page.tsx`; prompt `packages/utils/src/boardroom.ts`. Flag `board_chat`
+  (`feature-flag-keys.ts:23`, **default false**).
+- **Paperclip:** `ui/src/pages/BoardChat.tsx`, `server/src/routes/board-chat.ts`, `services/board-auth.ts`,
+  `board_api_keys` — a **board principal** with its own auth/API keys that governs the company.
+- **Gap (S):** monorepo Boardroom is a human↔assistant **concierge chat only**; the LLM relay is a deferred
+  seam and there is **no board *principal*/board API-key/board-authz** concept. This overlaps #14 (no
+  board-vote/approval authority). Wiring the relay + a board principal closes it.
+
+### 9. Goal hierarchy (company→team→agent→task) — 🟡 (S)
+
+Keeps agents aligned: every task traces up to the company goal ("why am I doing this?").
+
+- **Paperclip:** `packages/db/src/schema/goals.ts` (self-ref `parentId`, `ownerAgentId`,
+  `level` default "task"); `GOAL_LEVELS = ["company","team","agent","task"]`
+  (`packages/shared/src/constants.ts:477`), statuses `planned/active/achieved/cancelled` (`:480`); service
+  `server/src/services/goals.ts`, `issue-goal-fallback.ts`; UI `Goals.tsx`, `GoalDetail.tsx`. Issues carry
+  parentage so all work chains to the company goal (`doc/PRODUCT.md` task hierarchy).
+- **Monorepo:** `goal.prisma` — hierarchical goal tree with `GoalLevel` incl. `company`/`team` (`:6`),
+  agent-owned. Levels present.
+- **Gap (S):** monorepo `GoalLevel` is described as **company → team → task** (no explicit **agent** level),
+  and there is no `company` *entity* the top-level goal binds to (see #10). Add `agent` to the level enum and
+  bind the company-level goal to a real company object for full "trace to company goal" parity.
+
+### 10. Agent-Companies package model (`agentcompanies/v1`) — ❌ (L)
+
+**The core structural gap.** Paperclip's whole org/portability model is markdown-first packages.
+
+- **Paperclip:** normative spec `docs/companies/companies-spec.md` (`agentcompanies/v1-draft`): package kinds
+  `COMPANY.md`/`TEAM.md`/`AGENTS.md`/`PROJECT.md`/`TASK.md`/`SKILL.md`, reserved files, frontmatter schemas
+  (`manager`, `reportsTo`, `includes`, `owner`, `assignee`, `recurring`), source refs with pinned GitHub
+  commits + sha256, resolution/import-graph rules, `.paperclip.yaml` vendor sidecar (adapter config, budgets,
+  approval policies, routine triggers). Inventory: `doc/AGENTCOMPANIES_SPEC_INVENTORY.md`. Shared types
+  `packages/shared/src/types/company-portability.ts`, validators `.../validators/company-portability.ts`.
+  Company is a first-order runtime object (`schema/companies.ts`, `doc/PRODUCT.md`).
+- **Monorepo:** **no `Company`/`AgentCompany` Prisma model, service, or resolver.** "company" appears only as a
+  goal-tree *level* (`goal.prisma:6`) and as an external harness skill (`company-creator`, not repo code).
+- **Impl plan (L):**
+  - **Prisma** (`packages/database/prisma/schema/company.prisma`): `AgentCompany { id, workspaceId, slug,
+    name, description, goals String[], schemaVersion, license, authors Json, sourceRef, createdAt }`;
+    add nullable `companyId` to `Agent`, `Team`, `Project`, `Goal`, `Task` (all workspace-scoped, no FK to
+    buildbase). Reuse existing `reportsToAgentId` as the org edge inside a company.
+  - **Package parser/emitter** (`packages/utils/src/agent-companies/`): frontmatter+markdown reader/writer for
+    the 6 package kinds; import-graph resolver (`includes`, local relative paths, pinned GitHub refs with
+    sha256 verify, fail-closed on mismatch); `.paperclip.yaml`↔`mission-control.yaml` vendor sidecar mapping
+    (adapter/budget/approval-policy/routine). Mirror Paperclip `company-portability.ts`.
+  - **Service** `services/agent-companies.ts`: `createCompany`, `installTeamIntoCompany` (attach subtree under
+    a target manager — reuse `teams.ts` install), `resolveImportGraph`, `previewImport`.
+  - **GraphQL** `queries/agent-companies.ts`+`mutations`: CRUD + import preview/commit.
+  - **UI** `app/(dashboard)/companies/page.tsx` + `[companyId]/page.tsx`: company list, goal, org-chart embed,
+    teams, budgets rollup.
+  - **Security:** path containment (imports stay within managed roots), remote refs must resolve to validated
+    immutable content, redact secrets on export, no arbitrary host-path reads (mirror PRODUCT.md invariants).
+  - **Tests:** parser round-trip (COMPANY→disk→COMPANY), import-graph resolution + collision, sha256
+    fail-closed, secret-omission on export.
+
+### 11. Shipped teams-catalog *package* (bundled markdown teams) — 🟡 (M)
+
+- **Paperclip:** `packages/teams-catalog` ships **markdown** team packages (`core-exec-team`,
+  `product-engineering`, `product-design`, `content-machine`, …) each a `TEAM.md` + `agents/*/AGENTS.md` +
+  `projects/*` tree with `requiredSkills`, generated manifest, `catalog-builder.ts`, trust levels.
+- **Monorepo:** teams are DB rows assembled from code-level `AGENT_TEMPLATES` (`TeamMember.templateId`) — no
+  markdown source-of-truth, no git provenance, no shipped package.
+- **Impl plan (M):** add a `packages/teams-catalog` (or `apps/web/content/teams/`) of markdown `TEAM.md`
+  packages consumed by the #10 parser; make `services/teams.ts` install from markdown packages (with
+  `sourceRef`/provenance on `Team`/`TeamInstall`) instead of, or in addition to, `AGENT_TEMPLATES`. Depends on #10.
+
+### 12. Company export/import (markdown packages + README/org-chart + collision) — ❌ (L)
+
+- **Paperclip:** `server/src/services/company-portability.ts` (export manifest + markdown emission +
+  `.paperclip.yaml` sidecars; import graph resolution, collision handling, entity creation; recurring
+  task↔routine mapping), `company-export-readme.ts` (README + **Mermaid org-chart**); routes
+  `server/src/routes/companies.ts` (`/export`, `/exports/preview`, `/exports`, `/import/preview`, `/import`);
+  UI `ui/src/pages/CompanyExport.tsx` / `CompanyImport.tsx`, `PackageFileTree.tsx`, `lib/zip.ts` (ZIP from
+  scratch), `api/companies.ts`; CLI `cli/src/commands/client/company.ts`.
+- **Monorepo:** `portability.prisma` `WorkspaceImport` `:6` + `services/portability.ts` (Epic #14) export/import
+  a **credential-free JSON bundle** of agents/projects/skills (excludes budgets/secrets) — **not** markdown
+  company packages, no README/org-chart generation, no `.paperclip.yaml`, no GitHub-native install.
+- **Impl plan (L):** build on #10's parser/emitter. Add `exportCompanyPackage`/`importCompanyPackage` to
+  `services/agent-companies.ts` (markdown tree + ZIP), a README+Mermaid generator
+  (`packages/utils/src/agent-companies/readme.ts`), import-preview UI with a package file tree + collision
+  strategy (reuse `CollisionStrategy` enum), and GitHub-shorthand/URL source input. Keep the JSON `WorkspaceImport`
+  path as a complementary format. Tests: package round-trip, collision, Mermaid output, attribution/license
+  survival.
+
+### 13. Delegation model — ❌ (M)
+
+Neither side has a *delegation policy engine*, but Paperclip ships a working **delegation-by-convention**
+system the monorepo lacks entirely.
+
+- **Paperclip:** CEO persona `catalog/.../core-exec-team/agents/ceo/AGENTS.md` ("You MUST delegate… create a
+  subtask with `parentId`, assign the right report… if a report doesn't exist, use `paperclip-create-agent` to
+  hire one"); mechanics = issue `parentId` + single `assigneeAgentId` (`schema/issues.ts`, `services/issues.ts`),
+  `hire-hook.ts`, wake/rewake events. Delegation = decompose into child issues assigned down the org tree.
+- **Monorepo:** issues/tasks + assignment exist (`task.prisma`), and org edges exist (#1), but there is **no
+  delegation service/resolver/persona**, no hire-on-demand hook, and no "task must trace to a parent/goal"
+  enforcement.
+- **Impl plan (M):** (a) ship CEO/CTO/QA **agent-instruction** presets (there's already an `agent-instruction`
+  domain: `agent-instruction.prisma`, `services` agent instructions) that encode delegation-by-subtask;
+  (b) a `hire-hook` seam so an agent proposing a hire creates a `hire_agent` approval (closes #3);
+  (c) optional enforcement that child tasks inherit `parentId` up to a company goal (ties to #9). No new
+  heavy model needed — mostly instruction content + hire wiring.
+
+### 14. Board-quorum / multi-approver governance — ❌ (M)
+
+- Both: approvals are **single-decider** today. Paperclip has a distinct **board principal** (`board_api_keys`,
+  `board-auth.ts`) representing the human governing body but still resolves approvals 1:1.
+- **Gap:** no quorum/multi-approver ("N of M board members must approve") on either side.
+- **Impl plan (M):** extend `Approval` with `requiredApprovals Int @default(1)` + an `ApprovalVote` child table
+  (reuse `deliverable-votes.ts` shape); resolve when threshold met; surface in approvals UI. Optional; only if a
+  multi-human governance story is wanted.
+
+### 15. Per-agent approval-policy engine — ❌ (M)
+
+- **Paperclip:** `company_skill_policies` (versioned `defaultEffect` + `rules[]` evaluator,
+  `schema/company_skill_policies.ts`, `services/company-skill-policy.ts`) and MCP policies (allow/block/
+  `require_approval`/rate_limit) are configurable rule sets; `.paperclip.yaml` can carry `approval policies`
+  per package.
+- **Monorepo:** only coarse knobs — workspace `requireAgentApproval` (#5) + per-agent `AgentTrustProfile` flags
+  (#6). No rule-based "agent/role/action/source → require_approval" evaluator.
+- **Impl plan (M):** add a `GovernancePolicy { workspaceId, schemaVersion, revision, defaultEffect, rules Json }`
+  model mirroring `company_skill_policies`, a pure evaluator in `packages/utils`, and evaluate it in
+  `agent-authz.ts`/`approvals.ts`. Provides parity for Paperclip's opt-in restriction model at policy granularity.
+
+### 16. Org-chart SVG/PNG render endpoint — 🟡 (S)
+
+- **Paperclip:** `server/src/routes/org-chart-svg.ts` + `renderOrgChartSvg`/`renderOrgChartPng`
+  (`routes/agents.ts:85`) — server-rendered shareable org chart; also the Mermaid chart in exported READMEs.
+- **Monorepo:** client-side graph only (`org-layout.ts` + `org-chart/page.tsx`); no server SVG/PNG endpoint.
+- **Impl plan (S):** add a GraphQL/REST endpoint that renders `buildOrgTree` to SVG/PNG (reuse `computeOrgLayout`)
+  for sharing/embedding and for #12's README generator.
+
+### 17. MCP tool-access governance gateway — ❌ (separate domain)
+
+Called out for completeness. Paperclip has a full **MCP access-governance** stack — Applications→Connections→
+Catalog→Profiles(bindings: company/agent/project/routine/issue)→Policies→Gateway→Action Requests + audit
+(`doc/MCP-ACCESS-GOVERNANCE.md`, `services/tool-access.ts`, `tool-gateway.ts`, `tool-access-policy.ts`,
+`schema/tool_access.ts`). This is the runtime tool-authorization plane and belongs to a **connections/tools
+parity doc**, not this one. Note only: agent-authz (#4) is the coarse capability layer; this is the fine-grained
+per-tool-call layer, and the monorepo has no equivalent gateway.
+
+### 18. Token "salary" budgeting — ❌ (S)
+
+- **Paperclip:** `doc/PRODUCT.md`/`GOAL.md` frame budgets as "**token salary** budgets per agent" — a periodic
+  per-agent allowance. Implemented as `agents.budgetMonthlyCents`/`spentMonthlyCents` + `budget_policies`.
+- **Monorepo:** budgets are cost-cap/quota (`limitCents`, `tokensIn/Out` accounting) with auto-pause — no
+  "salary"/periodic-allowance framing. No `salary`/`tokenSalary` identifier anywhere.
+- **Impl plan (S):** mostly framing — add an agent-scoped recurring `BudgetPolicy(window=month, scope=agent)`
+  preset + surface it as "salary" in the agent profile/finance UI. No structural change required.
+
+---
+
+## Boundary notes
+
+- Human RBAC / workspace membership / auth = **buildbase** (out of scope). Monorepo correctly keeps agent-domain
+  models workspace-scoped with no FK; `Profile` appears only as approval decider / grant granter.
+- Paperclip's `company_memberships`, `instance_user_roles`, `board_api_keys`, `join_requests`, `invites` are the
+  **human** side and should **not** be re-ported — buildbase owns them. The **board *principal*** concept (a
+  governing authority over the agent company) is the one gray area worth a decision (#8/#14): it can be modeled
+  as a buildbase role acting on agent-domain approvals rather than a new entity.
+
+## Highest-leverage next steps
+
+1. **#10 + #12 + #11 (Agent-Companies package model)** — the defining structural gap; unlocks portable
+   companies, markdown team catalog, and the ClipMart/ClipHub-style reusable-company story from `GOAL.md`. **L×2.**
+2. **#3 + #13 (wire `hire_agent` + delegation presets)** — cheap, high-value: makes approvals and the org chart
+   *do something* (agents hire and delegate). **S/M.**
+3. **#9 (add `agent` goal level + bind company goal)** and **#16 (server org-chart render)** — small parity fills. **S.**

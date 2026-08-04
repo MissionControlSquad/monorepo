@@ -228,7 +228,7 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
             <div className="flex items-center justify-between pt-4 border-t border-border">
               <Link
                 href={`/agents?id=${agentId}`}
-                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-gray-800 transition"
+                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition"
               >
                 Cancel
               </Link>

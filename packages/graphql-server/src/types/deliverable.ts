@@ -16,6 +16,14 @@ builder.prismaObject("Deliverable", {
     fileSize: t.exposeInt("fileSize", { nullable: true }),
     url: t.exposeString("url", { nullable: true }),
     version: t.exposeInt("version"),
+    // Domain 8 G1 — work-product governance.
+    provider: t.exposeString("provider", { nullable: true }),
+    externalId: t.exposeString("externalId", { nullable: true }),
+    reviewState: t.exposeString("reviewState", { nullable: true }),
+    outputStatus: t.exposeString("outputStatus", { nullable: true }),
+    healthStatus: t.exposeString("healthStatus"),
+    isPrimary: t.exposeBoolean("isPrimary"),
+    createdByRunId: t.exposeString("createdByRunId", { nullable: true }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
     updatedAt: t.expose("updatedAt", { type: "DateTime" }),
 

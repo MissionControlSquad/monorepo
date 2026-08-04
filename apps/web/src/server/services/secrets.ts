@@ -14,6 +14,7 @@ import type {
   SecretProviderKind,
 } from "@agentcenter/database";
 import { encryptSecret, decryptSecret, CURRENT_KEY_ID } from "./secrets-crypto";
+import { checkSecretProviderConfigHealth } from "@agentcenter/utils";
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
@@ -30,6 +31,13 @@ export function recordSecretAccess(input: {
   actorId?: string | null;
   agentId?: string | null;
   version?: number | null;
+  // Audit-on-resolve provenance (Domain 7 P1).
+  consumerType?: string | null;
+  consumerId?: string | null;
+  configPath?: string | null;
+  outcome?: string | null;
+  errorCode?: string | null;
+  runId?: string | null;
   metadata?: Record<string, unknown> | null;
 }) {
   return prisma.secretAccessEvent.create({
@@ -40,9 +48,28 @@ export function recordSecretAccess(input: {
       actorId: input.actorId ?? null,
       agentId: input.agentId ?? null,
       version: input.version ?? null,
+      consumerType: input.consumerType ?? null,
+      consumerId: input.consumerId ?? null,
+      configPath: input.configPath ?? null,
+      outcome: input.outcome ?? null,
+      errorCode: input.errorCode ?? null,
+      runId: input.runId ?? null,
       metadata: (input.metadata ?? undefined) as never,
     },
   });
+}
+
+/**
+ * Who/what is resolving a secret, for audit-on-resolve (Domain 7 P1). Passed ONLY at real USE sites
+ * (run injection), NOT the presence-check/listing paths — auditing those would spam the ledger (the
+ * Phase-1 note). When present, resolveEnvForAgent writes one `injected` event per resolved binding.
+ */
+export interface SecretConsumerContext {
+  actorType: "user" | "agent" | "system";
+  actorId?: string | null;
+  consumerType: string; // "agent" | "environment" | "system"
+  consumerId: string;
+  runId?: string | null;
 }
 
 export interface CreateSecretInput {
@@ -312,6 +339,7 @@ export async function getDecrypted(
 export async function resolveWorkspaceSecret(
   workspaceId: string,
   name: string,
+  consumer?: SecretConsumerContext,
 ): Promise<string | null> {
   const secret = await prisma.secret.findFirst({
     where: { workspaceId, name, status: "active" },
@@ -319,7 +347,22 @@ export async function resolveWorkspaceSecret(
   });
   if (!secret) return null;
   const decrypted = await getDecrypted(workspaceId, secret.id);
-  return decrypted?.value ?? null;
+  const value = decrypted?.value ?? null;
+  // Audit-on-resolve (Domain 7 A3): EVERY resolve of a stored secret is recorded, not just agent
+  // env-injection — so BYO creds / git tokens / plugin+environment config resolves leave a trail too.
+  // Best-effort: audit must never break the resolve. Pass a `consumer` at real use sites for provenance.
+  await recordSecretAccess({
+    secretId: secret.id,
+    action: "read",
+    actorType: consumer?.actorType ?? "system",
+    actorId: consumer?.actorId ?? null,
+    consumerType: consumer?.consumerType ?? "system",
+    consumerId: consumer?.consumerId ?? "server",
+    configPath: name,
+    outcome: value != null ? "resolved" : "decrypt_failed",
+    runId: consumer?.runId ?? null,
+  }).catch(() => {});
+  return value;
 }
 
 export async function bindSecret(args: {
@@ -424,6 +467,7 @@ export function mergeEnvBindings(
 export async function resolveEnvForAgent(
   workspaceId: string,
   agentId: string,
+  consumer?: SecretConsumerContext,
 ): Promise<Record<string, string>> {
   const agent = await prisma.agent.findFirst({
     where: { id: agentId, workspaceId },
@@ -451,6 +495,24 @@ export async function resolveEnvForAgent(
     const row = await prisma.secretVersion.findUnique({
       where: { secretId_version: { secretId: b.secretId, version } },
     });
+    // Audit-on-resolve at the USE site (Domain 7 P1): write one event per binding — `injected` on
+    // success, `missing` when the pinned version row is gone. Best-effort; never block the run.
+    if (consumer) {
+      await recordSecretAccess({
+        secretId: b.secretId,
+        action: "injected",
+        actorType: consumer.actorType,
+        actorId: consumer.actorId ?? null,
+        agentId: agent.id,
+        version,
+        consumerType: consumer.consumerType,
+        consumerId: consumer.consumerId,
+        configPath: `env.${b.envVarName}`,
+        outcome: row ? "success" : "missing",
+        errorCode: row ? null : "version_not_found",
+        runId: consumer.runId ?? null,
+      }).catch(() => {});
+    }
     if (!row) continue;
     entries.push({
       envVarName: b.envVarName,
@@ -483,6 +545,8 @@ export async function createSecretProvider(input: {
     where: { workspaceId: input.workspaceId, name },
   });
   if (dup) badRequest(`a provider named "${name}" already exists in this workspace`);
+  // Domain 7 P2: a provider may be created then configured — config completeness is surfaced by the
+  // health check (checkSecretProviderHealth), not enforced here, so a bare provider row is allowed.
   return prisma.secretProviderConfig.create({
     data: {
       workspaceId: input.workspaceId,
@@ -497,6 +561,27 @@ export function listSecretProviders(workspaceId: string) {
   return prisma.secretProviderConfig.findMany({
     where: { workspaceId },
     orderBy: { name: "asc" },
+  });
+}
+
+/**
+ * Run a provider's health check (Domain 7 P2) and PERSIST the outcome onto healthy/lastCheckedAt/
+ * lastError — fields the model has always had but nothing ever wrote. Pure module logic lives in
+ * @agentcenter/utils; env is healthy, aws/vault report `coming_soon` until a real resolver lands.
+ */
+export async function checkSecretProviderHealth(
+  workspaceId: string,
+  id: string,
+): Promise<SecretProviderConfig> {
+  const provider = await prisma.secretProviderConfig.findFirst({ where: { id, workspaceId } });
+  if (!provider) notFound("Provider");
+  const health = checkSecretProviderConfigHealth(
+    provider.kind,
+    (provider.config ?? {}) as Record<string, unknown>,
+  );
+  return prisma.secretProviderConfig.update({
+    where: { id: provider.id },
+    data: { healthy: health.healthy, lastCheckedAt: new Date(), lastError: health.error },
   });
 }
 

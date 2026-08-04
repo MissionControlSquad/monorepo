@@ -1,0 +1,12 @@
+---
+service: company-export-readme
+kind: service
+status: Partial
+priority: P3
+gate: buildable-now
+---
+# company-export-readme · 🟡 Partial
+**What it is:** generate a README when exporting a company package.
+**Monorepo:** company export emits the markdown package but no generated README.
+**Required:** a README generator in the export path. Small.
+**Covers:** features/P2-skills-teams-companies.mdx · SERVICE-AUDIT #28.

@@ -1,0 +1,16 @@
+// Productivity review (parity #132). A recorded verdict from the heartbeat's productivity watchdog: is
+// an agent productive / idle / stuck / struggling, with the signals it was judged on. Drives nudges /
+// escalations downstream. D5: workspaceId/agentId no FK; verdict is TEXT (app-validated). PRODUCTIVITY_REVIEW-gated.
+model ProductivityReview {
+  id          String   @id @default(cuid())
+  workspaceId String
+  agentId     String
+  verdict     String // productive | idle | stuck | struggling
+  score       Float
+  reasons     String[] @default([])
+  signals     Json?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, agentId, createdAt])
+  @@map("productivity_reviews")
+}

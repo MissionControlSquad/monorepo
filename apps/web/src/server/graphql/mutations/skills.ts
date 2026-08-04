@@ -23,6 +23,7 @@ import {
   installCatalogSkill,
 } from "@/server/services/skills";
 import { createTeam, addTeamMember, installTeam } from "@/server/services/teams";
+import { assertSkillAction, replaceSkillPolicy } from "@/server/services/skill-policy";
 
 // Epic #10: skills + teams mutations. Skill authoring/assign is member; team install is admin
 // (it provisions agents in the workspace).
@@ -46,6 +47,7 @@ builder.mutationField("createSkill", (t) =>
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
       const tenancy = requireRole(ctx, "member");
+      await assertSkillAction(tenancy.workspaceId, "create", { role: tenancy.role });
       const s = await createSkill({
         workspaceId: tenancy.workspaceId,
         createdByProfileId: tenancy.userId,
@@ -87,6 +89,12 @@ builder.mutationField("updateSkill", (t) =>
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
       const tenancy = requireRole(ctx, "member");
+      await assertSkillAction(
+        tenancy.workspaceId,
+        "edit",
+        { role: tenancy.role },
+        { skillId: args.id },
+      );
       const s = await updateSkill(
         tenancy.workspaceId,
         args.id,
@@ -117,6 +125,12 @@ builder.mutationField("deleteSkill", (t) =>
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
       const tenancy = requireRole(ctx, "member");
+      await assertSkillAction(
+        tenancy.workspaceId,
+        "remove",
+        { role: tenancy.role },
+        { skillId: args.id },
+      );
       return deleteSkill(tenancy.workspaceId, args.id);
     },
   }),
@@ -129,6 +143,12 @@ builder.mutationField("forkSkill", (t) =>
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
       const tenancy = requireRole(ctx, "member");
+      await assertSkillAction(
+        tenancy.workspaceId,
+        "create",
+        { role: tenancy.role },
+        { skillId: args.id },
+      );
       const s = await forkSkill(tenancy.workspaceId, args.id, tenancy.userId);
       return ctx.prisma.skill.findUniqueOrThrow({ ...query, where: { id: s.id } });
     },
@@ -200,6 +220,7 @@ builder.mutationField("installCatalogSkill", (t) =>
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
       const tenancy = requireRole(ctx, "member");
+      await assertSkillAction(tenancy.workspaceId, "install", { role: tenancy.role });
       const skill = await installCatalogSkill(tenancy.workspaceId, args.skillId, tenancy.userId);
       return ctx.prisma.skill.findUniqueOrThrow({ ...query, where: { id: skill.id } });
     },
@@ -316,6 +337,29 @@ builder.mutationField("installTeam", (t) =>
         installedByProfileId: tenancy.userId,
       });
       return ctx.prisma.teamInstall.findUniqueOrThrow({ ...query, where: { id: res.installId } });
+    },
+  }),
+);
+
+// Domain 5 GAP-F: replace the workspace skill policy (admin). Optimistic concurrency via expectedRevision.
+builder.mutationField("replaceSkillPolicy", (t) =>
+  t.field({
+    type: "JSON",
+    args: {
+      defaultEffect: t.arg.string({ required: true }),
+      rules: t.arg({ type: "JSON", required: true }),
+      expectedRevision: t.arg.int(),
+    },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "admin");
+      return replaceSkillPolicy({
+        workspaceId: tenancy.workspaceId,
+        defaultEffect: args.defaultEffect,
+        rules: args.rules,
+        expectedRevision: args.expectedRevision ?? null,
+        updatedByProfileId: tenancy.userId,
+      });
     },
   }),
 );

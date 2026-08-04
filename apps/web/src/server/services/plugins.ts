@@ -141,6 +141,16 @@ export async function uninstallPlugin(workspaceId: string, pluginId: string): Pr
     select: { id: true },
   });
   if (!existing) badRequest("Plugin not found");
+  // Clean up everything the plugin owned (#109): managed resources, contributed tools, KV state, and
+  // any queued jobs. Best-effort and idempotent — these tables are empty unless the runtime populated
+  // them, so this is a no-op for registry-only plugins.
+  await Promise.all([
+    prisma.pluginManagedResource.deleteMany({ where: { workspaceId, pluginId } }),
+    prisma.pluginTool.deleteMany({ where: { workspaceId, pluginId } }),
+    prisma.pluginKv.deleteMany({ where: { workspaceId, pluginId } }),
+    prisma.pluginJob.deleteMany({ where: { workspaceId, pluginId } }),
+    prisma.pluginHostService.deleteMany({ where: { workspaceId, pluginId } }),
+  ]);
   await prisma.plugin.delete({ where: { id: existing.id } });
   return true;
 }

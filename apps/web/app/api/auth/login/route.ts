@@ -15,7 +15,9 @@ const loginLimiter = createRateLimiter({ max: 5, windowSec: 60 });
 
 export async function POST(request: Request) {
   const ip = getClientIp(request.headers);
-  const check = loginLimiter.check(ip);
+  // Redis-backed so the brute-force cap is SHARED across instances (the sync check() is per-process and
+  // would let attempts scale with instance count on serverless/multi-replica).
+  const check = await loginLimiter.checkAsync(ip);
   if (!check.allowed) {
     return NextResponse.json(
       { error: "Too many login attempts. Try again later." },

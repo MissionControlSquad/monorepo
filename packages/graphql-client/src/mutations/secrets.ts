@@ -104,3 +104,15 @@ export const SET_SECRET_STATUS = gql`
     }
   }
 `;
+
+// Domain 7 P2: run + persist a secret provider health check.
+export const CHECK_SECRET_PROVIDER_HEALTH = gql`
+  mutation CheckSecretProviderHealth($id: String!) {
+    checkSecretProviderHealth(id: $id) {
+      id
+      healthy
+      lastCheckedAt
+      lastError
+    }
+  }
+`;

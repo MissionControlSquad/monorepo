@@ -9,6 +9,7 @@ export const APPROVALS_QUERY = gql`
       subjectType
       subjectId
       status
+      requiredApprovals
       reason
       decisionNote
       resubmitCount
@@ -35,6 +36,7 @@ export const APPROVAL_QUERY = gql`
       subjectId
       taskId
       status
+      requiredApprovals
       reason
       decisionNote
       resubmitCount

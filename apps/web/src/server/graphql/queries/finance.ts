@@ -1,10 +1,16 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import {
+  FLAG_KEYS,
+  COST_WINDOWS,
+  summarizeCostWindows,
+  splitByBillingFamily,
+} from "@agentcenter/utils";
 import type { BudgetWindow, IncidentStatus } from "@agentcenter/database";
 import { requireRole, scoped, requireTenancy } from "@/server/tenancy";
 import { prisma } from "@/server/prisma";
 import { windowBounds } from "@/server/services/budget-window";
+import { costByTaskTree } from "@/server/services/cost-rollup";
 import { costBreakdownCache, costTrendCache, financeSummaryCache } from "@/server/cache";
 
 // Epic #4: finance/budget read layer — BUDGETS-gated, workspace-scoped, member+.
@@ -94,6 +100,25 @@ builder.queryField("budgetIncidents", (t) =>
         ...query,
         where: scoped(ctx, args.status ? { status: args.status as IncidentStatus } : {}),
         orderBy: { createdAt: "desc" },
+      });
+    },
+  }),
+);
+
+// Domain 12 A13: cost events an agent reported without a real price (costStatus "unpriced"), awaiting
+// an admin reprice. This is the drill-down that makes repriceCostEvent reachable. Workspace-scoped.
+builder.queryField("unpricedCostEvents", (t) =>
+  t.prismaField({
+    type: ["CostEvent"],
+    args: { limit: t.arg.int({ defaultValue: 50 }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      requireRole(ctx, "member");
+      return ctx.prisma.costEvent.findMany({
+        ...query,
+        where: scoped(ctx, { costStatus: "unpriced" }),
+        orderBy: { occurredAt: "desc" },
+        take: Math.min(args.limit ?? 50, 200),
       });
     },
   }),
@@ -267,6 +292,115 @@ builder.queryField("agentWindowSpend", (t) =>
         }),
       );
       return out;
+    },
+  }),
+);
+
+// Domain 12 GAP-6 A10: rolling per-provider spend over the standard windows (5h / 24h / 7d). Pure
+// aggregation over CostEvent occurredAt. BUDGETS-gated, member+, workspace-scoped.
+const CostWindowSpend = builder.simpleObject("CostWindowSpend", {
+  fields: (t) => ({
+    provider: t.string(),
+    window: t.string(),
+    amountCents: t.int(),
+    eventCount: t.int(),
+  }),
+});
+
+builder.queryField("costWindowSpend", (t) =>
+  t.field({
+    type: [CostWindowSpend],
+    resolve: async (_root, _args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      requireRole(ctx, "member");
+      const now = new Date();
+      const longest = Math.max(...COST_WINDOWS.map((w) => w.ms));
+      const rows = await prisma.costEvent.findMany({
+        where: scoped(ctx, { occurredAt: { gte: new Date(now.getTime() - longest) } }),
+        select: { provider: true, amountCents: true, occurredAt: true },
+      });
+      return summarizeCostWindows(rows, now);
+    },
+  }),
+);
+
+// Domain 12 GAP-6 A12: recursive issue-tree cost + runtime rollup over a task subtree.
+const TaskTreeCost = builder.simpleObject("TaskTreeCost", {
+  fields: (t) => ({
+    rootTaskId: t.string(),
+    taskCount: t.int(),
+    costCents: t.int(),
+    eventCount: t.int(),
+    runCount: t.int(),
+    runtimeSeconds: t.int(),
+  }),
+});
+
+builder.queryField("costByTaskTree", (t) =>
+  t.field({
+    type: TaskTreeCost,
+    args: {
+      rootTaskId: t.arg.string({ required: true }),
+      excludeRoot: t.arg.boolean(),
+    },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      const tenancy = requireRole(ctx, "member");
+      return costByTaskTree(tenancy.workspaceId, args.rootTaskId, args.excludeRoot ?? false);
+    },
+  }),
+);
+
+// Domain 12 GAP-6 A14: split spend into metered (API) vs subscription vs other families.
+const BillingSplit = builder.simpleObject("BillingSplit", {
+  fields: (t) => ({
+    meteredCents: t.int(),
+    subscriptionCents: t.int(),
+    otherCents: t.int(),
+    meteredCount: t.int(),
+    subscriptionCount: t.int(),
+    otherCount: t.int(),
+  }),
+});
+
+builder.queryField("costBillingSplit", (t) =>
+  t.field({
+    type: BillingSplit,
+    args: { from: t.arg({ type: "DateTime" }), to: t.arg({ type: "DateTime" }) },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      requireRole(ctx, "member");
+      const rows = await prisma.costEvent.findMany({
+        where: scoped(ctx, {
+          ...(args.from || args.to
+            ? {
+                occurredAt: {
+                  ...(args.from ? { gte: args.from } : {}),
+                  ...(args.to ? { lte: args.to } : {}),
+                },
+              }
+            : {}),
+        }),
+        select: { billingType: true, amountCents: true },
+      });
+      return splitByBillingFamily(rows);
+    },
+  }),
+);
+
+// Domain 14 #18: an agent's token salary policy (null when unset).
+builder.queryField("agentSalary", (t) =>
+  t.prismaField({
+    type: "BudgetPolicy",
+    nullable: true,
+    args: { agentId: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.BUDGETS);
+      const tenancy = requireRole(ctx, "member");
+      return ctx.prisma.budgetPolicy.findFirst({
+        ...query,
+        where: { workspaceId: tenancy.workspaceId, agentId: args.agentId, isSalary: true },
+      });
     },
   }),
 );

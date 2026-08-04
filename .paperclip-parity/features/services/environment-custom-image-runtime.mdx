@@ -1,0 +1,12 @@
+---
+service: environment-custom-image-runtime
+kind: service
+status: Partial
+priority: P1
+gate: needs-provider-key
+---
+# environment-custom-image-runtime · 🟡 Partial
+**What it is:** run against a captured custom image + snapshot lifecycle.
+**Monorepo:** `environment-custom-images.ts` (capture/rollback/drift); `snapshot()` only local(stub)+daytona.
+**Required:** per-provider snapshot — needs a real provider key.
+**Covers:** features/P1-environments-leases.mdx · SERVICE-AUDIT #46.

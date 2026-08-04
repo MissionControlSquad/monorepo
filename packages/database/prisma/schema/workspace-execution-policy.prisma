@@ -5,13 +5,13 @@
 // One row per workspace. EXECUTION_POLICY-flag-gated, admin-only writes.
 
 model WorkspaceExecutionPolicy {
-  id                      String   @id @default(cuid())
-  workspaceId             String   @unique // buildbase workspace _id; no FK (D5)
-  executionMode           String   @default("any") // any | kubernetes
-  enableIsolatedWorkspaces Boolean @default(false)
-  updatedByProfileId      String?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  id                       String   @id @default(cuid())
+  workspaceId              String   @unique // buildbase workspace _id; no FK (D5)
+  executionMode            String   @default("any") // any | kubernetes
+  enableIsolatedWorkspaces Boolean  @default(false)
+  updatedByProfileId       String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   @@map("workspace_execution_policies")
 }

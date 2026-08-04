@@ -1,0 +1,29 @@
+---
+feature: Sandbox execution (+ 7 providers)
+priority: P1
+status: Partial (plumbing present; only `local` run for real)
+gate: needs-provider-key
+---
+
+# Sandbox execution · P1 · 🟡 Plumbing complete, cloud never run for real
+
+**What it is:** actually running an agent's task in an isolated sandbox — dispatch (sync/queue/drain),
+cancel, retry, 7 cloud providers + a `local` reference, run review/promote.
+
+**Present in our monorepo (verified):**
+- Dispatch: `sandbox-run.ts` — `runTaskInSandbox` (compose script → admit → lease → exec → capture → post to timeline), `enqueueSandboxRun` (queued), `drainSandboxRunQueue` (atomic claim), persistent `sandbox-drain-loop.ts` + cron `run-sandbox-queue`.
+- 7 provider adapters: `sandbox/{e2b,daytona,modal,novita,cloudflare,kubernetes,exe-dev}.ts` registered in `sandbox-providers.ts`; each `loadOptionalModule` at runtime; fail-closed with actionable errors.
+- `local` reference provider: real `child_process` + tmp dir, process-group kill on timeout, output caps. Non-isolating (barred for low-trust).
+- Retry: `run-retry.ts` (`scheduleRunRetryIfTransient`/`promoteDueRunRetries`, `retryOfRunId` lineage) — fires on timeout, RUNNERS-gated.
+- Run review/promote: `run-review.ts` (`stampRunReview`/`promoteAgentRunReview`), LOW_TRUST_REVIEW-gated.
+- Retain-on-failure: `environment-leases.ts` (status=retained, 24h TTL, reaped).
+
+**Gaps / pending:**
+- **Never run against a real provider** — only `local` has executed. SDKs not installed; BYO creds from vault. Gate = **needs-provider-key**, not "missing."
+- **In-flight cancel MISSING:** `cancelAgentRun` cancels queued-only ("a running run cannot be cleanly killed in this model"). Needs a cooperative cancel token + provider kill-by-id.
+
+**What's required:** one real provider key (e2b/daytona/modal…) to run + verify end-to-end; then implement in-flight cancel per provider.
+
+**Priority rationale:** This is *how agents actually do work* — the most production-critical runtime. The plumbing is done; only live credentials + in-flight cancel remain.
+
+**Depends on:** a real sandbox-provider key; cron or long-lived server for the queue.

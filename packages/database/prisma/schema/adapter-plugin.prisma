@@ -1,0 +1,22 @@
+// Adapter-plugin store (parity #5). The DB-backed, per-workspace analog of Paperclip's
+// adapter-plugins.json: a declarative runtime adapter defined purely by data (a base adapter + a baked
+// template), with zero code execution. Rows are loaded into the in-process adapter registry at startup
+// and after edits. Validation reuses adapterFromPluginSpec. D5: workspaceId no FK; base is TEXT.
+model AdapterPlugin {
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  key                String // the runtime adapter key (e.g. "aider")
+  displayName        String?
+  base               String // process | shell | http
+  template           Json // string | string[] — the baked argv/command/URL template
+  models             String[] @default([])
+  supportsModel      Boolean  @default(false)
+  enabled            Boolean  @default(true)
+  createdByProfileId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, enabled])
+  @@map("adapter_plugins")
+}

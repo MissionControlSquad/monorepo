@@ -1,0 +1,24 @@
+// External objects (parity #59). A cached reference to a resource in an external system (GitHub issue /
+// PR / repo / commit / file), linkable to an internal entity (a task, deliverable, …). A provider
+// (#65) parses the ref and fetches a snapshot of display fields. D5: workspaceId no FK; provider /
+// objectType are TEXT. EXTERNAL_OBJECTS-flag-gated.
+model ExternalObject {
+  id          String   @id @default(cuid())
+  workspaceId String
+  provider    String // github | ...
+  objectType  String // repo | issue | pull | commit | file
+  externalId  String // canonical id, e.g. owner/repo#123
+  url         String
+  title       String?
+  state       String?
+  snapshot    Json? // cached raw fields from the provider
+  linkedType  String? // task | deliverable | project | ... (what references it)
+  linkedId    String?
+  fetchedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, provider, externalId])
+  @@index([workspaceId, linkedType, linkedId])
+  @@map("external_objects")
+}

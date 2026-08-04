@@ -161,7 +161,7 @@ export function ChannelListSidebar() {
     <>
       <div className="flex-shrink-0 px-3 py-3 border-b border-border space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
             <MessageSquare className="w-4 h-4 text-muted-foreground" />
             Channels
           </h2>

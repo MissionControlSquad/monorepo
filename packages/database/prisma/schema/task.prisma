@@ -7,6 +7,7 @@ enum TaskStatus {
   review
   done
   blocked
+  cancelled // Domain 8 G6.7 — terminal, distinct from done; work abandoned
 }
 
 enum Priority {
@@ -27,6 +28,7 @@ model Task {
   updatedAt          DateTime   @updatedAt
   dueDate            DateTime?
   deletedAt          DateTime?
+  cancelledAt        DateTime? // Domain 8 G6.7 — when the task was cancelled
   tags               String[]   @default([])
   taskNumber         Int        @default(autoincrement())
   parentTaskId       String?
@@ -35,16 +37,16 @@ model Task {
   blockedByTaskId    String?
   recurringTaskId    String?
 
-  createdByProfile  Profile?      @relation("TaskCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: SetNull)
-  recurringTask     RecurringTask? @relation("TaskFromRecurring", fields: [recurringTaskId], references: [id], onDelete: SetNull)
-  parentTask        Task?          @relation("TaskParentChild", fields: [parentTaskId], references: [id], onDelete: SetNull)
-  childTasks        Task[]         @relation("TaskParentChild")
-  blockedByTask     Task?          @relation("TaskBlockedBy", fields: [blockedByTaskId], references: [id], onDelete: SetNull)
-  blockingTasks     Task[]         @relation("TaskBlockedBy")
-  project           Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  goal              Goal?          @relation("GoalTasks", fields: [goalId], references: [id], onDelete: SetNull) // Epic #11b
+  createdByProfile  Profile?           @relation("TaskCreatedByProfile", fields: [createdByProfileId], references: [id], onDelete: SetNull)
+  recurringTask     RecurringTask?     @relation("TaskFromRecurring", fields: [recurringTaskId], references: [id], onDelete: SetNull)
+  parentTask        Task?              @relation("TaskParentChild", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  childTasks        Task[]             @relation("TaskParentChild")
+  blockedByTask     Task?              @relation("TaskBlockedBy", fields: [blockedByTaskId], references: [id], onDelete: SetNull)
+  blockingTasks     Task[]             @relation("TaskBlockedBy")
+  project           Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  goal              Goal?              @relation("GoalTasks", fields: [goalId], references: [id], onDelete: SetNull) // Epic #11b
   assignees         TaskAssignee[]
-  agentsWorkingOn   Agent[]        @relation("AgentCurrentTask")
+  agentsWorkingOn   Agent[]            @relation("AgentCurrentTask")
   messages          Message[]
   activities        Activity[]
   subscriptions     Subscription[]
@@ -55,6 +57,45 @@ model Task {
   documents         Document[]
   notifications     Notification[]
   userNotifications UserNotification[]
+  approvals         Approval[]         @relation("ApprovalTask")
+  costEvents        CostEvent[] // Epic #4
+  routineRuns       RoutineRun[]       @relation("TaskFromRoutineRun") // Epic #7
+  pipelineCases     PipelineCase[]     @relation("TaskFromPipelineCase")
+  caseLinks         CaseTaskLink[]     @relation("CaseTaskLink") // Epic #17
+  // Tier C: typed task dependency graph (beyond the single blockedByTaskId).
+  relationsFrom     TaskRelation[]     @relation("TaskRelationSource")
+  relationsTo       TaskRelation[]     @relation("TaskRelationTarget")
+  externalLinks     ExternalLink[]     @relation("TaskExternalLinks")
+
+  // Epic #8: lease-based atomic checkout + autonomy hardening.
+  checkedOutByProfileId  String?
+  checkedOutAt           DateTime?
+  checkoutLeaseExpiresAt DateTime? // lease TTL; an expired lease is reclaimable
+  checkoutToken          String? // opaque fencing token per checkout
+
+  checkedOutBy       Profile?                @relation("TaskCheckedOutBy", fields: [checkedOutByProfileId], references: [id], onDelete: SetNull)
+  watchdogs          TaskWatchdog[]
+  decompositions     PlanDecomposition[]
+  treeHold           TaskTreeHold?
+  recoveryActions    TaskRecoveryAction[]
+  threadInteractions TaskThreadInteraction[]
+
+  // Domain 9 #11: issue monitor — a one-shot deferred "check back later" wake an agent arms while
+  // working (e.g. poll a GitHub check / deploy). When monitorNextCheckAt passes, the reap cron
+  // re-dispatches the assignee and clears the schedule; re-arm is explicit. Bounded by maxAttempts.
+  monitorNextCheckAt  DateTime?
+  monitorNotes        String?
+  monitorAttemptCount Int       @default(0)
+  monitorMaxAttempts  Int? // null = unbounded
+
+  // Domain 8 §2.1 / G6.4 — task origin & provenance + per-origin idempotency. An autonomy creator
+  // (routine / watchdog / plan-decomposition) stamps how a task came to exist; originFingerprint is a
+  // stable hash of the origin identity so a duplicate create is a no-op (partial-unique index in the
+  // migration). requestDepth bounds recursive autonomy (a task that spawns tasks).
+  originKind        String? // routine | watchdog | decomposition | recovery | manual | ...
+  originRunId       String? // the run/cycle that produced this task
+  originFingerprint String? // stable idempotency key; unique when set
+  requestDepth      Int     @default(0)
 
   @@unique([taskNumber])
   @@index([status])
@@ -64,32 +105,11 @@ model Task {
   @@index([projectId])
   @@index([projectId, status])
   @@index([goalId])
-  approvals     Approval[]     @relation("ApprovalTask")
-  costEvents    CostEvent[] // Epic #4
-  routineRuns   RoutineRun[]   @relation("TaskFromRoutineRun") // Epic #7
-  pipelineCases PipelineCase[] @relation("TaskFromPipelineCase")
-  caseLinks     CaseTaskLink[] @relation("CaseTaskLink") // Epic #17
-  // Tier C: typed task dependency graph (beyond the single blockedByTaskId).
-  relationsFrom TaskRelation[] @relation("TaskRelationSource")
-  relationsTo   TaskRelation[] @relation("TaskRelationTarget")
-  externalLinks ExternalLink[] @relation("TaskExternalLinks")
-
-  // Epic #8: lease-based atomic checkout + autonomy hardening.
-  checkedOutByProfileId  String?
-  checkedOutAt           DateTime?
-  checkoutLeaseExpiresAt DateTime? // lease TTL; an expired lease is reclaimable
-  checkoutToken          String? // opaque fencing token per checkout
-
-  checkedOutBy    Profile?             @relation("TaskCheckedOutBy", fields: [checkedOutByProfileId], references: [id], onDelete: SetNull)
-  watchdogs       TaskWatchdog[]
-  decompositions  PlanDecomposition[]
-  treeHold        TaskTreeHold?
-  recoveryActions TaskRecoveryAction[]
-
   @@index([checkedOutByProfileId])
   @@index([checkoutLeaseExpiresAt])
   @@index([projectId, createdAt])
   @@index([deletedAt])
+  @@index([monitorNextCheckAt])
   @@index([status, deletedAt])
   @@map("tasks")
 }
@@ -104,12 +124,12 @@ enum TaskRelationType {
 }
 
 model TaskRelation {
-  id           String           @id @default(cuid())
-  sourceTaskId String
-  targetTaskId String
-  type         TaskRelationType @default(relates_to)
+  id                 String           @id @default(cuid())
+  sourceTaskId       String
+  targetTaskId       String
+  type               TaskRelationType @default(relates_to)
   createdByProfileId String?
-  createdAt    DateTime         @default(now())
+  createdAt          DateTime         @default(now())
 
   sourceTask Task @relation("TaskRelationSource", fields: [sourceTaskId], references: [id], onDelete: Cascade)
   targetTask Task @relation("TaskRelationTarget", fields: [targetTaskId], references: [id], onDelete: Cascade)
@@ -161,7 +181,7 @@ model TaskTemplate {
   id          String   @id @default(cuid())
   name        String
   description String?
-  subtasks    Json     // Array of {title, description, priority?, tags?}
+  subtasks    Json // Array of {title, description, priority?, tags?}
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -176,7 +196,7 @@ model RecurringTask {
   status             TaskStatus @default(inbox)
   priority           Priority?
   tags               String[]   @default([])
-  recurrenceConfig   Json       // { type, interval, daysOfWeek?, dayOfMonth?, time? }
+  recurrenceConfig   Json // { type, interval, daysOfWeek?, dayOfMonth?, time? }
   isActive           Boolean    @default(true)
   timezone           String     @default("UTC")
   nextDueAt          DateTime?

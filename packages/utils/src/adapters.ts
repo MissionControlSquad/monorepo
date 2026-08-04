@@ -10,6 +10,28 @@
  * by the @agentcenter/runner daemon and the control plane.
  */
 
+/** A single provider quota/rate-limit window (Domain 12 GAP-2). */
+export interface ProviderQuotaWindow {
+  /** e.g. "requests (5h)" | "credits" | "tokens (24h)". */
+  label: string;
+  /** 0-100 percent of the window consumed; null when unknown. */
+  usedPercent: number | null;
+  /** ISO timestamp when the window resets; null when unknown. */
+  resetsAt: string | null;
+  /** Human display value, e.g. "1,234 / 5,000". */
+  valueLabel?: string | null;
+  detail?: string | null;
+}
+
+/** The result of polling one provider's quota (never throws — failures are shaped). */
+export interface ProviderQuotaResult {
+  provider: string;
+  ok: boolean;
+  windows: ProviderQuotaWindow[];
+  errorFamily?: "timeout" | "provider_error" | "unsupported";
+  error?: string;
+}
+
 /** Where an adapter expects the context bundle materialised on disk (relative to cwd). */
 export interface AdapterLayout {
   instructionsFile: string; // AGENTS.md-style
@@ -65,6 +87,13 @@ export interface Adapter {
    * Runs on the machine that has the CLI (the runner). Falls back to `models` when absent/failing.
    */
   detectModels?(): Promise<string[]>;
+  /**
+   * Optional live provider quota/rate-limit windows (Domain 12 GAP-2) — e.g. poll the provider API for
+   * remaining requests/credits in the current window. Runs where the adapter can reach the provider
+   * (the runner). Absent → the provider reports no quota windows. Never throws to the fan-out; the
+   * service timeout-guards + shapes failures.
+   */
+  getQuotaWindows?(): Promise<ProviderQuotaWindow[]>;
   /**
    * Shell command that installs the runtime binary inside a fresh sandbox. The sandbox seam runs it
    * idempotently: `command -v <binName> || <installCommand>`. Omit for adapters with no binary
@@ -257,15 +286,144 @@ const httpAdapter: Adapter = {
   },
 };
 
+// ─── Additional local-CLI runtimes (Domain 2, gap 4.8) ──────────────────────
+// Ported as thin code modules mirroring the four above: build() an argv launch + an idempotent
+// sandbox install (`command -v binName || installCommand`) + a model flag. Invocations follow each
+// CLI's print/non-interactive form; they are best-effort mirrors of Paperclip's per-runtime adapters
+// and should be reconfirmed against a live CLI when a real key lands (nothing has run for real yet).
+
+const cursorAdapter: Adapter = {
+  key: "cursor",
+  displayName: "Cursor Agent",
+  requiresTemplate: false,
+  supportsModel: true,
+  models: [],
+  // The Cursor CLI installs via its own script (not npm); binary is `cursor-agent`.
+  installCommand: "curl https://cursor.com/install -fsS | bash",
+  binName: "cursor-agent",
+  build: (ctx) => ({
+    argv: ["cursor-agent", "-p", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    mode: "spawn",
+    cwd: ctx.workspaceDir,
+    useShell: false,
+    layout: GENERIC_LAYOUT,
+  }),
+};
+
+const grokAdapter: Adapter = {
+  key: "grok",
+  displayName: "Grok CLI",
+  requiresTemplate: false,
+  supportsModel: true,
+  models: [],
+  installCommand: "npm install -g @vibe-kit/grok-cli",
+  binName: "grok",
+  build: (ctx) => ({
+    argv: ["grok", "-p", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    mode: "spawn",
+    cwd: ctx.workspaceDir,
+    useShell: false,
+    layout: GENERIC_LAYOUT,
+  }),
+};
+
+const opencodeAdapter: Adapter = {
+  key: "opencode",
+  displayName: "opencode",
+  requiresTemplate: false,
+  supportsModel: true,
+  models: [],
+  installCommand: "npm install -g opencode-ai",
+  binName: "opencode",
+  build: (ctx) => ({
+    argv: ["opencode", "run", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    mode: "spawn",
+    cwd: ctx.workspaceDir,
+    useShell: false,
+    layout: GENERIC_LAYOUT,
+  }),
+};
+
+const piAdapter: Adapter = {
+  key: "pi",
+  displayName: "Pi Coding Agent",
+  requiresTemplate: false,
+  supportsModel: true,
+  models: [],
+  installCommand: "npm install -g @mariozechner/pi-coding-agent",
+  binName: "pi",
+  build: (ctx) => ({
+    argv: ["pi", "-p", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    mode: "spawn",
+    cwd: ctx.workspaceDir,
+    useShell: false,
+    layout: GENERIC_LAYOUT,
+  }),
+};
+
+const hermesAdapter: Adapter = {
+  key: "hermes",
+  displayName: "Hermes",
+  requiresTemplate: false,
+  supportsModel: true,
+  models: [],
+  // Hermes CLI package name is deployment-specific; leave install unset (probe-only) until confirmed.
+  binName: "hermes",
+  build: (ctx) => ({
+    argv: ["hermes", "run", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    mode: "spawn",
+    cwd: ctx.workspaceDir,
+    useShell: false,
+    layout: GENERIC_LAYOUT,
+  }),
+};
+
 const BUILTIN_ADAPTERS: Adapter[] = [
   openclawAdapter,
   codexAdapter,
   claudeAdapter,
   geminiAdapter,
+  cursorAdapter,
+  grokAdapter,
+  opencodeAdapter,
+  piAdapter,
+  hermesAdapter,
   processAdapter,
   shellAdapter,
   httpAdapter,
 ];
+
+// Adapter key aliases (Domain 2, gap 4.0): the Tier-A `AgentAdapter` DB rows and some external configs
+// use different spellings than the Tier-D code keys. Resolve them to the one canonical module so an
+// agent bound to e.g. "openclaw-gateway" (the seeded DB row) still runs the `openclaw` runtime.
+// Both spellings are aliased: the seeded `AgentAdapter` DB rows use hyphens (`claude-local`,
+// `openclaw-gateway`); some external/legacy configs use underscores. Missing hyphen forms were a bug
+// — a `claude-local` agent failed to resolve its runtime module (canonicalized to identity).
+const ADAPTER_KEY_ALIASES: Record<string, string> = {
+  "openclaw-gateway": "openclaw",
+  openclaw_gateway: "openclaw",
+  "claude-local": "claude",
+  claude_local: "claude",
+  "codex-local": "codex",
+  codex_local: "codex",
+  "gemini-local": "gemini",
+  gemini_local: "gemini",
+  "cursor-local": "cursor",
+  cursor_local: "cursor",
+  "grok-local": "grok",
+  grok_local: "grok",
+  "opencode-local": "opencode",
+  opencode_local: "opencode",
+  "pi-local": "pi",
+  pi_local: "pi",
+  "hermes-local": "hermes",
+  hermes_local: "hermes",
+};
+
+/** Canonicalize an adapter key through the alias table (identity when not aliased). */
+export function canonicalAdapterKey(key: string): string {
+  return ADAPTER_KEY_ALIASES[key] ?? key;
+}
 
 // ─── Registry ───────────────────────────────────────────────────────────────
 
@@ -277,7 +435,7 @@ export function registerAdapter(adapter: Adapter): void {
 }
 
 export function getAdapter(key: string): Adapter | undefined {
-  return registry.get(key);
+  return registry.get(key) ?? registry.get(canonicalAdapterKey(key));
 }
 
 export function listAdapters(): Adapter[] {
@@ -285,14 +443,14 @@ export function listAdapters(): Adapter[] {
 }
 
 export function isAdapterKey(key: string): boolean {
-  return registry.has(key);
+  return registry.has(key) || registry.has(canonicalAdapterKey(key));
 }
 
 export const BUILTIN_ADAPTER_KEYS = BUILTIN_ADAPTERS.map((a) => a.key);
 
 /** Resolve an adapter and build its invocation, or throw a clear error if the key is unknown. */
 export function buildAdapterInvocation(key: string, ctx: AdapterContext): AdapterInvocation {
-  const adapter = registry.get(key);
+  const adapter = getAdapter(key);
   if (!adapter) throw new Error(`Unknown runtime adapter: ${key}`);
   return adapter.build(ctx);
 }

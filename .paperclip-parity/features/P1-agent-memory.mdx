@@ -1,0 +1,33 @@
+---
+feature: Agent memory
+priority: P1
+status: Partial
+gate: buildable-now
+---
+
+# Agent memory · P1 · 🟡 Present; cost-linkage + eval gaps
+
+**What it is:** two-layer agent memory — entries store, provider binding (none/markdown/db), post-run
+capture, pre-run hydrate/inject, recall search, forget, provenance/cost audit, and provider settings.
+
+**Present in our monorepo (verified):**
+- Store: `AgentMemory` (content + provenance sourceTaskId/sourceKind/sourceRefId).
+- Provider binding: `agent.memoryProvider` (default none); resolution agent→company→none; `db` is the only control-plane-stored provider (markdown/none are runner-side).
+- Capture-on-run: `captureRunMemory` (db-only, best-effort, records `capture` op).
+- Hydrate/inject: `assembleInjectedMemory` (newest-20, 8k cap, records `query` op).
+- Search + forget: `searchAgentMemory` (substring ILIKE), `forgetAgentMemory`.
+- Audit: `MemoryOperation` (every path routes through `recordMemoryOperation`).
+- Provider settings: `WorkspaceMemorySetting` company default, `setAgentMemoryProvider`/`setCompanyMemoryProvider`.
+- UI: profile memory card (view/search/forget + activity log + per-agent + company-default backend).
+
+**Gaps / pending:**
+- **GAP-G cost linkage PARTIAL:** the audit table has `costCents`/`costEventId`/token columns but the service **never populates them** (only `attributionMode`). → wire memory op token usage into a `CostEvent` and back-link (buildable-now).
+- **Search is substring, not vector** — `embeddingTokens` column unused; no embedding recall.
+- **GAP-H eval suite MISSING** — no memory-quality eval harness.
+- **GAP-E adapter memory interface** — memory isn't adapter-pluggable (db provider is hardcoded control-plane).
+
+**What's required (buildable-now):** populate cost fields on memory ops (GAP-G); optionally an eval harness (GAP-H) and vector recall.
+
+**Priority rationale:** Memory makes agents improve over runs; cost-linkage matters for spend accounting.
+
+**Depends on:** nothing external for GAP-G; an embedding provider for vector recall.

@@ -1,0 +1,139 @@
+# 13 — Deployment Modes / CLI / Config / Trust Presets — Parity Gap Analysis
+
+**Domain:** Deployment modes, self-host/Docker, the operator CLI, the config/env surface, and trust presets.
+**Paperclip root:** `/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/paperclip`
+**Monorepo root:** `/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo`
+**Boundary:** buildbase owns human auth/billing/hosting-account only. Everything below is control-plane / operator / agent-runtime surface we own.
+
+---
+
+## 0. Executive summary
+
+Paperclip is a **self-hostable single-binary control plane**: one `paperclipai` CLI does interactive onboarding, diagnostics, config management, DB backup, server start, *and* a full REST client (companies/issues/agents/routines/secrets/etc.). It ships a formal **two-mode deployment model** (`local_trusted` vs `authenticated`, with `private`/`public` exposure and a separate `loopback|lan|tailnet|custom` bind model), a rich JSON config schema, first-class Docker/Compose/Podman-Quadlet/ECS packaging, an embedded Postgres so it runs with zero external deps, and enforced **low-trust containment presets** (`standard` / `low_trust_review`) plus an isolated untrusted-PR-review Docker workflow.
+
+Our monorepo is architecturally different and much thinner on this domain:
+
+- **Deployment**: we are a **Vercel-hosted SaaS** (`apps/web`) plus an optional **self-hosted Docker Compose** (`apps/web/self-hosted/`, `ghcr.io` image). We have **no deployment-mode concept** (no local_trusted/authenticated/exposure/bind model) — auth is always-on via buildbase. Env is a flat `zod` schema in `apps/web/src/server/env.ts`.
+- **CLI**: `@agentcenter/runner` is a **narrow, stateless agent-runner daemon** (`login`/`start`/`run-once`/`run-task`/`adapters`) — its differentiator is NAT-safe outbound-only polling. It is **not** an operator/admin CLI: no onboard, doctor, configure, db-backup, no REST-client subcommands, no server-start.
+- **Trust presets**: we have `packages/utils/src/trust.ts` (`evaluateTrust`, levels untrusted/low/standard/trusted, `lowTrustContainment`, `requireUntrustedPrReview`) — a **pure decision function** with a comparable model, but **no runtime sandbox/isolated-workspace enforcement, no fail-closed managed low-trust runs, and no untrusted-PR-review container**.
+
+Biggest gaps (all owned by us, not buildbase): **self-host onboarding/doctor CLI**, **deployment-mode + bind model**, **structured config file**, **embedded-DB zero-dep story**, and **runtime low-trust containment + untrusted-review sandbox**.
+
+---
+
+## 1. Deployment modes
+
+| # | Feature | Paperclip (file:line) | Monorepo status | Impl plan / size |
+|---|---|---|---|---|
+| 1.1 | Formal runtime auth modes: `local_trusted` vs `authenticated` | `doc/DEPLOYMENT-MODES.md:8-31`; `packages/shared/src/config-schema.ts:49` (`deploymentMode` enum, default `local_trusted`) | ❌ We are always-authenticated (buildbase). No "no-login local" mode exists. | Introduce a `DEPLOYMENT_MODE` concept for self-host only (`local_trusted` = skip buildbase login, seed a local admin principal). See §5.1. **L** |
+| 1.2 | Exposure policy `private` vs `public` w/ mode-aware hardening | `doc/DEPLOYMENT-MODES.md:13-18, 50-65`; `config-schema.ts:50` (`exposure`) | ❌ No exposure model; Vercel deploy is implicitly public, self-host compose is unopinionated. | Add `DEPLOYMENT_EXPOSURE` env + doctor-style hardening checks (rate-limit defaults, explicit public URL requirement). **M** |
+| 1.3 | Reachability/bind model `loopback\|lan\|tailnet\|custom` decoupled from auth | `doc/DEPLOYMENT-MODES.md:20-40`; `config-schema.ts:51` (`bind`), `cli/src/config/server-bind.ts`, `shared/src/network-bind.ts` (`validateConfiguredBindMode`) | ❌ Next.js server binds via host env only; no tailnet detection, no bind abstraction. | Self-host-only bind resolver (HOST/PORT already exist in compose); tailnet IP detection is niche — likely skip. **M** |
+| 1.4 | `local_trusted → authenticated` claim flow (anti-lockout, one-time claim URL) | `doc/DEPLOYMENT-MODES.md:118-129` | ❌ N/A today (no local_trusted). Needed only if 1.1 lands. | Depends on 1.1; buildbase owns human identity so claim maps a buildbase user onto the local admin row. **M** (after 1.1) |
+| 1.5 | First-admin bootstrap for fresh authenticated installs (`bootstrap_pending`, browser claim, CLI `auth bootstrap-ceo`) | `doc/DEPLOYMENT-MODES.md:131-160`; `cli/src/commands/auth-bootstrap-ceo.ts` | 🟡 Self-host has admin seeding via `SETUP.md`/`setup.sh` but no formal bootstrap-pending state or one-time invite CLI. | Since buildbase owns human auth, first-admin = first buildbase owner; add a self-host "claim this instance" screen. **M** |
+| 1.6 | Single canonical `PUBLIC_URL` derives auth/callback/allowlist defaults | `doc/DOCKER.md:102-134` (`PAPERCLIP_PUBLIC_URL`) | 🟡 `NEXT_PUBLIC_MC_URL` exists (`env.ts:90`, compose `PUBLIC_URL`) but doesn't derive auth/hostname-allowlist. | Wire `NEXT_PUBLIC_MC_URL` as the single source for buildbase callback + trusted-origins in self-host. **S** |
+| 1.7 | Hostname allowlist for private-mode access (`allowed-hostname` cmd) | `config-schema.ts:56` (`allowedHostnames`); `cli/src/commands/allowed-hostname.ts`; `cli/src/config/hostnames.ts` | ❌ No hostname allowlist mechanism. | Only needed if we add private/LAN self-host mode. **S–M** |
+
+**Net:** The whole deployment-mode/exposure/bind taxonomy is absent. It is meaningful only for the **self-host** path (Vercel SaaS never needs local_trusted). Recommend scoping this as a self-host feature set, not touching the hosted product.
+
+---
+
+## 2. CLI capabilities
+
+Paperclip `paperclipai` (`cli/src/index.ts:47-203`) is a single operator+client CLI. Our `agentcenter-runner` (`packages/runner/src/index.ts`) is a runner daemon only. Mapping:
+
+| # | Capability | Paperclip (file:line) | Monorepo status | Plan / size |
+|---|---|---|---|---|
+| 2.1 | Interactive first-run wizard `onboard` (+ `--yes`, `--bind`, `--run`) | `cli/src/index.ts:67-75`; `cli/src/commands/onboard.ts` | ❌ No onboarding CLI. Self-host uses `setup.sh` shell script (`apps/web/self-hosted/setup.sh`). | Add an `onboard` command to a new operator CLI (or extend runner) that writes config + `.env`. **L** |
+| 2.2 | `doctor` diagnostics (+ `--repair`, mode-aware checks) | `cli/src/index.ts:77-87`; `cli/src/commands/doctor.ts`; `cli/src/checks/*` (config/database/agent-jwt-secret checks) | ❌ No diagnostics command. | Add `doctor` running env/DB/secret/connectivity checks; reuse `env.ts` zod errors. High operator value. **M** |
+| 2.3 | `configure --section <llm\|database\|logging\|server\|storage\|secrets>` | `cli/src/index.ts:96-102`; `cli/src/commands/configure.ts` | ❌ Config is env-only, hand-edited `.env`. | Depends on structured config (§4). **M** |
+| 2.4 | `env` — print deployment env from config | `cli/src/index.ts:89-94`; `cli/src/commands/env.ts` | 🟡 `.env.example` documents vars; no generator. | Add `env` printer once config schema exists. **S** |
+| 2.5 | `run` — bootstrap (onboard+doctor) then start server; `--bind`, `--repair` | `cli/src/index.ts:125-134`; `cli/src/commands/run.ts` | ❌ Server start is `docker compose up` / Vercel; no single-command bootstrap+run. | Self-host convenience wrapper around compose. **M** |
+| 2.6 | `db:backup` one-off + scheduled backups (retention, prefix, json) | `cli/src/index.ts:104-115`; `cli/src/commands/db-backup.ts`; `config-schema.ts:23-40` (`databaseBackupConfigSchema`) | ❌ No backup command; rely on Postgres/Vercel-managed backups. | Add `db:backup` for self-host (pg_dump wrapper + retention). **M** |
+| 2.7 | `auth bootstrap-ceo` first-admin invite | `cli/src/index.ts:191-201`; `cli/src/commands/auth-bootstrap-ceo.ts` | ❌ None (buildbase-owned first login). | See 1.5. **M** |
+| 2.8 | Agent enrollment / API tokens: `connect`, `token agent/board create\|list\|revoke` | `cli/src/commands/client/connect.ts`; `cli/src/commands/client/token.ts:62-145` | 🟡 Runner `login` stores an `mc_…` agent key (`packages/runner/src/index.ts:82-108`, `config.ts`) but there's **no CLI to mint/list/revoke** keys — done in web UI only. | Add `token`/`connect` subcommands hitting our REST key routes. **M** |
+| 2.9 | Full REST client surface (company, issue, agent, project, goal, approval, activity, dashboard, cost, workspace, access, routine, adapter, asset, skill, secrets, cloud, teams, pipelines, feedback, prompt) | `cli/src/index.ts:161-189` (20+ `register*Commands`) | ❌ Runner has none of these — it only polls work + reports results. | Large surface; port opportunistically per-domain (companion parity docs). Not blocking. **L** |
+| 2.10 | Runtime adapter listing / selection (`adapters`, `--runtime`, `--runtime-template`) | `cli/src/commands/client/adapter.ts:19-89` (server-side registry) | ✅ Runner `adapters` command + `--runtime`/`--runtime-template`/`--model` (`index.ts:126-134,82-108`; `config.ts:15-23`). Adapters: openclaw/codex/claude/gemini/process/shell + plugin adapters. | Parity here; runner adapter model is a genuine strength. **—** |
+| 2.11 | Data-dir / multi-instance isolation (`--data-dir`, `-i/--instance`) | `cli/src/index.ts:48-49,130`; `cli/src/config/data-dir.ts`, `home.ts` | 🟡 Runner has `workDir` + `~/.agentcenter/runner.json` (`config.ts:25-31`) but no multi-instance/data-dir isolation. | Low priority for a stateless daemon. **S** |
+| 2.12 | Heartbeat run (single agent invoke, stream logs) | `cli/src/index.ts:138-159`; `cli/src/commands/heartbeat-run.ts` | ✅ Runner `run-task <taskId>` + `run-once` are the equivalent (`index.ts:158-176`). | Comparable. **—** |
+| 2.13 | Telemetry opt-in/config | `cli/src/telemetry.ts`; `config-schema.ts:101` (`telemetryConfigSchema`) | ❌ Runner has none. | Optional. **S** |
+
+**Net:** Our runner is a good *agent-execution* CLI (NAT-safe outbound polling is a differentiator Paperclip does not center on) but there is **no operator/admin CLI** at all. The onboard/doctor/configure/env/run/db:backup cluster (2.1–2.6) is the highest-leverage gap for self-host adoption.
+
+---
+
+## 3. Trust presets & untrusted execution
+
+| # | Feature | Paperclip (file:line) | Monorepo status | Plan / size |
+|---|---|---|---|---|
+| 3.1 | Named trust presets `standard` / `low_trust_review` enforced in CE | `doc/LOW-TRUST-PRESETS.md:6-12` | 🟡 We have `TrustLevel = untrusted\|low\|standard\|trusted` + `evaluateTrust` (`packages/utils/src/trust.ts:5-41`) — comparable named-level model, but no "preset" resolution from policy JSON. | Map our levels to preset names; add a resolver. **S** |
+| 3.2 | Preset resolution from layered JSON policy (agent perms + project + issue/run), narrower-wins intersection, fail-closed | `doc/LOW-TRUST-PRESETS.md:14-27` (`permissions.trustPreset`, `authorizationPolicy.trustBoundary`, `executionWorkspacePolicy`, `executionPolicy`) | ❌ `evaluateTrust` takes a single flat profile (`trust.ts:8-14`) — no multi-source intersection / scope resolution / fail-closed. | Build a layered resolver (agent→project→issue) intersecting to narrowest scope. **L** |
+| 3.3 | Containment semantics: low-trust agent can't read/mutate agent config, instruction bundles, skills; raw output not auto-promoted | `doc/LOW-TRUST-PRESETS.md:34-42` | 🟡 `lowTrustContainment` blocks `host_write` (`trust.ts:34-35`) and `requireUntrustedPrReview` gates `pr_merge` (`trust.ts:37-39`) — partial. No read/mutate scoping of config/skills, no output-promotion gate. | Extend `TrustCheckKind` + enforce at API resolvers for config/skill/instruction reads. **M–L** |
+| 3.4 | **Runtime** containment: managed low-trust runs **fail closed** unless `sandbox` driver + `isolated_workspace` mode + in-boundary issue + allowlisted secret bindings; inline secrets rejected | `doc/LOW-TRUST-PRESETS.md:44-59` | ❌ No runtime enforcement tying trust to sandbox driver / isolated workspace. We *have* sandbox providers (E2B/Modal/etc. per `env.ts:34-41`) but no policy that **requires** them for low-trust. | Add a run-admission check: if resolved preset = low_trust, require sandbox execution env + reject inline secrets. **L** |
+| 3.5 | Untrusted-PR-review isolated Docker workflow (separate home/work volumes, no host mounts, `review-checkout-pr`, codex/claude/gh preinstalled) | `doc/UNTRUSTED-PR-REVIEW.md` (full); `docker/untrusted-review/`, `docker/docker-compose.untrusted-review.yml`, `docker/untrusted-review/bin/review-checkout-pr` | ❌ No untrusted-review container or workflow. | Port the compose + checkout script; low effort, high security value for reviewing hostile PRs. **M** |
+| 3.6 | Trust decision surface = agent-domain governance (not human RBAC) | `doc/LOW-TRUST-PRESETS.md:28-42`; ours `trust.ts:1-3` explicitly "agent-domain governance (not human RBAC)" | ✅ Design intent matches. | — |
+
+**Net:** Our `trust.ts` is a solid *pure-logic* foundation and conceptually aligned, but Paperclip enforces trust at **three real layers** we don't: (a) layered policy resolution/intersection, (b) API read/mutate containment, (c) **runtime fail-closed sandbox admission**. Plus the untrusted-review Docker workflow is entirely missing.
+
+---
+
+## 4. Config surface
+
+| # | Feature | Paperclip (file:line) | Monorepo status | Plan / size |
+|---|---|---|---|---|
+| 4.1 | Structured JSON config file with `$meta` versioning + source (`onboard`/`configure`/`doctor`) | `packages/shared/src/config-schema.ts:11-15,106-135`; `cli/src/config/store.ts` | ❌ Flat env only (`apps/web/src/server/env.ts`); no config file, no versioning. | Introduce optional `agentcenter.config.json` (zod) for self-host, layered over env. **M–L** |
+| 4.2 | Sectioned config: llm / database / logging / server / auth / storage / secrets / telemetry / backup | `config-schema.ts:17-104` | 🟡 Partial via env: DB (`POSTGRES_*`), auth (`AUTH_SECRET`), storage (R2 vs Paperclip's local/S3), redis. No logging/server/backup/secrets-provider sections. | Add sections as config lands. **M** |
+| 4.3 | Embedded Postgres (zero external DB dep) vs external `postgres` mode | `config-schema.ts:29-41` (`mode: embedded-postgres\|postgres`, embedded data dir/port) | ❌ We **always** need external Postgres (compose runs `postgres:16-alpine`; Vercel uses managed PG). No embedded/zero-dep option. | Embedded PG is a real adoption differentiator for self-host but heavy to add. Consider bundling. **L** |
+| 4.4 | Pluggable storage provider: `local_disk` \| `s3` | `config-schema.ts:66-90` | 🟡 We have R2 (S3-compatible) optional (`env.ts:24-29`), but no local-disk provider and no provider abstraction. | Add local-disk storage provider for self-host w/o R2. **M** |
+| 4.5 | Secrets provider `local_encrypted` (master key file) + `strictMode` | `config-schema.ts:92-99`; `cli/src/config/secrets-key.ts` | 🟡 We have a vault master key `SECRET_ENCRYPTION_KEY` (`env.ts:47-49`) + per-workspace vault; no key-file/provider abstraction, no strictMode toggle. | Comparable capability; add strictMode + file-based key option. **S–M** |
+| 4.6 | Auth base-URL modes (`auto`/`explicit`) + `disableSignUp` + public-URL-required validation | `config-schema.ts:59-63,161-181` | 🟡 buildbase owns auth; `NEXT_PUBLIC_MC_URL` is the closest. `disableSignUp` has no equivalent (buildbase-managed). | Mostly buildbase boundary; only wire self-host public URL. **S** |
+| 4.7 | DB backup config (interval/retention/dir) | `config-schema.ts:23-40` | ❌ None (see 2.6). | With `db:backup`. **M** |
+| 4.8 | Env-file loading + telemetry init from config, data-dir override hook | `cli/src/index.ts:56-65`; `cli/src/config/env.ts`, `data-dir.ts` | 🟡 Runner loads `~/.agentcenter/runner.json` + env (`config.ts:33-69`); web uses `env.ts` only. | Fine for runner; no gap for daemon. **—** |
+| 4.9 | Config validation errors surfaced (zod) | `config-schema.ts` (zod `superRefine` for mode/exposure/bind coherence, `:139-181`) | ✅ `env.ts:118-141` zod validation w/ build-lenient + prod-strict split; good pattern. | Parity on validation approach; missing the cross-field coherence rules (which don't apply without modes). **—** |
+
+**Net:** Our config is a **flat env schema** vs Paperclip's **layered, sectioned, versioned config file**. The two most adoption-relevant config gaps: **embedded Postgres** (4.3) and **local-disk storage** (4.4) — both remove external-dependency friction for self-host.
+
+---
+
+## 5. Docker / self-host packaging
+
+| # | Feature | Paperclip (file:line) | Monorepo status | Plan / size |
+|---|---|---|---|---|
+| 5.1 | Single app image w/ UID/GID matching + agent CLIs preinstalled (claude/codex/opencode) | `Dockerfile` (root), `doc/DOCKER.md:8-50,136-159` | 🟡 `apps/web/Dockerfile` (Next.js standalone, multi-stage) exists but **no agent-CLI preinstall** and no UID/GID build args. | Add agent CLIs + UID/GID args to self-host image if we want in-container adapter runs. **M** |
+| 5.2 | Compose variants: quickstart (embedded), full-stack (Postgres), untrusted-review | `docker/docker-compose.quickstart.yml`, `docker-compose.yml`, `docker-compose.untrusted-review.yml`; `doc/DOCKER.md:52-100` | 🟡 We have `self-hosted/docker-compose.yml` (Postgres+Redis+app, well-hardened: `read_only`, `cap_drop`, `no-new-privileges`, `pids_limit`), `.prod.yml`, `.buildbase.yml`. **No quickstart/embedded variant, no untrusted-review variant.** | Our compose is actually *more hardened*; add embedded/quickstart + untrusted-review variants. **M** |
+| 5.3 | Podman Quadlet (systemd) units | `docker/quadlet/*.container|.pod`; `doc/DOCKER.md:161-227` | ❌ None. | Niche; add quadlet units for systemd self-host if demanded. **S–M** |
+| 5.4 | ECS task definition (cloud deploy) | `docker/ecs-task-definition.json` | ❌ None (we deploy web via Vercel). | Low priority given Vercel-first. **S** |
+| 5.5 | Onboard smoke test image (fresh-machine `npx onboard --yes` validation) | `docker/Dockerfile.onboard-smoke`; `scripts/docker-onboard-smoke.sh`; `doc/DOCKER.md:228-262` | ❌ None (no onboard flow to smoke-test). | Depends on §2.1 onboard. **M** |
+| 5.6 | Agent-runtime images per adapter (base/claude/codex/gemini/hermes/opencode/pi + buildx bake) | `docker/agent-runtime/Dockerfile.*`, `buildx-bake.hcl` | ❌ No per-adapter runtime images. We run adapters via the runner daemon on the host. | Consider for sandbox/isolated execution (ties to §3.4). **L** |
+| 5.7 | Published image registry | `ghcr.io/...` via release scripts | ✅ `ghcr.io/missioncontrolsquad/agentcenter:${APP_VERSION}` (`self-hosted/docker-compose.yml`). | Parity. **—** |
+| 5.8 | Self-host setup docs + `.env.example` + `setup.sh` | `doc/DOCKER.md`, `SETUP.md`-style | ✅ `apps/web/self-hosted/SETUP.md`, `.env.example`, `setup.sh`, `DEPLOYMENT.md`. | Reasonable parity on docs. **—** |
+
+**Net:** Our self-host Docker story is **security-hardened and real** (arguably better container hardening than Paperclip), but lacks: (a) a **zero-dep quickstart** (needs embedded PG §4.3), (b) the **untrusted-review** container (§3.5), (c) agent-CLI-in-image for in-container adapter runs, and (d) systemd/Quadlet + smoke-test tooling.
+
+---
+
+## 6. Publishing / releasing
+
+| # | Feature | Paperclip (file:line) | Monorepo status | Plan / size |
+|---|---|---|---|---|
+| 6.1 | npm publish of CLI w/ workspace-ref rewriting + esbuild bundle | `doc/PUBLISHING.md:18-65`; `scripts/build-npm.sh`, `release-package-map.mjs` | 🟡 Runner publishes to npm (`@agentcenter/runner`, esbuild bundle in `package.json` build script) but no workspace-ref-rewrite tooling (runner deps are dev-only, so simpler). | Fine for the single runner package. **—** |
+| 6.2 | Calendar versioning + canary-on-master + manual stable promotion + GitHub releases | `doc/RELEASING.md:5-50` | ❌ Runner at `0.1.0` semver; no documented canary/stable/calendar release automation. | Add a release runbook if we ship the runner/CLI broadly. **S–M** |
+| 6.3 | UI package published as prebuilt assets | `doc/PUBLISHING.md:67-90` | ❌ N/A — our UI ships inside the Next.js app/image, not as an npm package. | No gap (different architecture). **—** |
+
+---
+
+## 7. Prioritized gap backlog (self-host + trust focused)
+
+1. **Untrusted-PR-review Docker workflow** (§3.5, §5.2) — port `docker/untrusted-review/` + compose + `review-checkout-pr`. High security value, isolated, **M**.
+2. **Operator CLI: `doctor` + `env`** (§2.2, §2.4) — diagnostics over existing `env.ts`, no new architecture. **M**.
+3. **Runtime low-trust admission** (§3.4) — require sandbox execution env + reject inline secrets when resolved preset is low-trust; we already have sandbox providers. **L**.
+4. **Layered trust-preset resolver** (§3.1–3.2) — extend `trust.ts` from flat profile to agent→project→issue intersection, fail-closed. **L**.
+5. **Local-disk storage provider + embedded/quickstart compose** (§4.4, §5.2) — reduces external-dep friction for self-host. **M** (embedded PG §4.3 is the **L** stretch).
+6. **Deployment-mode/exposure/bind model** (§1.1–1.3) — only if we pursue no-login local self-host; large and buildbase-adjacent, so lowest priority. **L**.
+
+---
+
+## 8. Boundary notes (buildbase)
+
+- **Human auth / first-admin / sign-up disabling** (§1.4–1.5, §4.6): buildbase owns human identity/billing/hosting-account. Paperclip's `local_trusted` (no-login) and `bootstrap-ceo` invite have **no clean analog** while buildbase is mandatory — a self-host "local_trusted" mode would mean *bypassing* buildbase human-auth, which is a product/boundary decision, not just eng.
+- Everything in **§2 (operator CLI), §3 (trust presets/containment), §4 (config file, storage, secrets, embedded DB), §5 (Docker/self-host packaging)** is squarely **ours** and portable without touching buildbase.
+- Our **NAT-safe outbound-only runner** (`packages/runner/README.md`) is a genuine differentiator Paperclip's CLI model does not emphasize — worth preserving as the agent-execution path even as we add operator tooling.

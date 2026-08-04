@@ -1,0 +1,17 @@
+// Tool content-guard (parity #163 — data half). Workspace-defined DENY/REDACT rules over tool I/O
+// content. Persisted here + evaluated by the pure evaluator in @agentcenter/utils; ENFORCEMENT is
+// the tool runtime's job (absent). D5: workspaceId no FK; action/appliesTo are TEXT.
+model ToolContentGuard {
+  id          String   @id @default(cuid())
+  workspaceId String
+  pattern     String // literal substring or /regex/flags
+  action      String // deny | redact
+  appliesTo   String   @default("both") // input | output | both
+  priority    Int      @default(0)
+  reason      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@map("tool_content_guards")
+}

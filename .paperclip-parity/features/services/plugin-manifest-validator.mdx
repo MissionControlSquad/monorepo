@@ -1,0 +1,12 @@
+---
+service: plugin-manifest-validator
+kind: service
+status: Present
+priority: P2
+gate: done
+---
+# plugin-manifest-validator · ✅ Present
+**What it is:** validate a plugin manifest.
+**Monorepo:** `plugins.ts:validateManifest` (core subset).
+**Required:** full manifest surface (UI slots/API routes/webhooks) deferred with the runtime.
+**Covers:** features/P2-plugins.mdx · SERVICE-AUDIT #121.

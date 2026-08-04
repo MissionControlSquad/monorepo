@@ -1,7 +1,11 @@
 /**
  * Structured logger for server-side code.
  * Mirrors the API logger format for consistency.
+ *
+ * Every emitted line is passed through redactSensitive() so a bearer token / DB URL / provider key /
+ * email that slips into `message` or `extra` (or an error stack) never lands in stdout / log aggregation.
  */
+import { redactSensitive } from "@agentcenter/utils";
 
 type LogLevel = "info" | "warn" | "error";
 
@@ -19,7 +23,8 @@ function emit(
     ...extra,
   };
 
-  const json = JSON.stringify(entry);
+  // Redact secrets on the fully-serialized line (covers message + nested extra + any embedded stack).
+  const json = redactSensitive(JSON.stringify(entry));
 
   switch (level) {
     case "warn":
