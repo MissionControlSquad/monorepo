@@ -26,8 +26,8 @@ import {
 } from "@/lib/graphql/mutations";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
-import { Button, Card, Badge } from "@/components/ui";
-import { Container, ShieldCheck, Bot, Boxes, GitBranch } from "lucide-react";
+import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
+import { ShieldCheck, Bot, Boxes, GitBranch } from "lucide-react";
 
 // Tier D / Phase 3: Environments dashboard — the first-class "where/how a run executes" model.
 // ENVIRONMENTS-gated in nav; every mutation re-checks the flag + admin server-side. Config secrets are
@@ -98,6 +98,7 @@ export default function EnvironmentsPage() {
   const [probe, setProbe] = useState<
     Record<string, { ok: boolean; summary: string; details?: string | null }>
   >({});
+  const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: "",
     driver: "local",
@@ -140,6 +141,7 @@ export default function EnvironmentsPage() {
       });
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Create failed");
       setForm((f) => ({ ...f, name: "", description: "", host: "", keySecret: "", provider: "" }));
+      setOpen(false);
       refresh();
     } finally {
       setBusy(null);
@@ -193,64 +195,65 @@ export default function EnvironmentsPage() {
 
   return (
     <div className="mx-auto space-y-8 p-4 sm:p-6">
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">Environments</h1>
-        <p className="text-sm text-muted-foreground">
-          Define where and how a run executes — a driver (local, SSH, sandbox, or plugin), its
-          config, and env vars. Agents bind to an environment. Secrets are referenced by vault name
-          and never leave the server.
-        </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Environments</h1>
+          <p className="text-sm text-muted-foreground">
+            Define where and how a run executes — a driver (local, SSH, sandbox, or plugin), its
+            config, and env vars. Agents bind to an environment. Secrets are referenced by vault name
+            and never leave the server.
+          </p>
+        </div>
+        <Button onClick={() => setOpen(true)}>New environment</Button>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {/* ── Create ─────────────────────────────────────────────── */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Container className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">New environment</h2>
-        </div>
-        <Card className="space-y-3 p-4">
-          <div className="flex flex-wrap gap-2">
-            <input
-              className="min-w-[10rem] flex-1 rounded border border-border bg-background px-3 py-1.5 text-sm"
-              placeholder="name"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            />
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="New environment"
+        onSubmit={onCreate}
+        submitLabel="Create environment"
+        busy={busy === "create"}
+        error={error}
+        submitDisabled={!form.name.trim()}
+      >
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Name">
+            <Input placeholder="e.g. staging-box" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+          </FormField>
+          <FormField label="Driver">
             <select
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={form.driver}
               onChange={(e) => setForm((f) => ({ ...f, driver: e.target.value }))}
             >
               {drivers.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
+                <option key={d} value={d}>{d}</option>
               ))}
             </select>
-          </div>
-          <p className="text-xs text-muted-foreground">{DRIVER_HELP[form.driver]}</p>
+          </FormField>
+        </div>
+        <p className="text-xs text-muted-foreground">{DRIVER_HELP[form.driver]}</p>
 
-          {(form.driver === "sandbox" || form.driver === "local") && (
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              Machine reuse
-              <select
-                className="rounded border border-border bg-background px-2 py-1 text-sm"
-                value={form.leasePolicy}
-                onChange={(e) => setForm((f) => ({ ...f, leasePolicy: e.target.value }))}
-              >
-                <option value="ephemeral">ephemeral (fresh box each run)</option>
-                <option value="reuse_by_environment">reuse (keep the box between runs)</option>
-                <option value="retain_on_failure">
-                  retain on failure (keep only failed boxes)
-                </option>
-              </select>
-            </label>
-          )}
-
-          {form.driver === "sandbox" && (
+        {(form.driver === "sandbox" || form.driver === "local") && (
+          <FormField label="Machine reuse">
             <select
-              className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={form.leasePolicy}
+              onChange={(e) => setForm((f) => ({ ...f, leasePolicy: e.target.value }))}
+            >
+              <option value="ephemeral">ephemeral (fresh box each run)</option>
+              <option value="reuse_by_environment">reuse (keep the box between runs)</option>
+              <option value="retain_on_failure">retain on failure (keep only failed boxes)</option>
+            </select>
+          </FormField>
+        )}
+
+        {form.driver === "sandbox" && (
+          <FormField label="Provider">
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={form.provider}
               onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))}
             >
@@ -261,49 +264,29 @@ export default function EnvironmentsPage() {
                 </option>
               ))}
             </select>
-          )}
+          </FormField>
+        )}
 
-          {form.driver === "ssh" && (
-            <div className="flex flex-wrap gap-2">
-              <input
-                className="min-w-[10rem] flex-1 rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
-                placeholder="host or IP"
-                value={form.host}
-                onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))}
-              />
-              <input
-                className="w-28 rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
-                placeholder="user"
-                value={form.username}
-                onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
-              />
-              <input
-                className="min-w-[10rem] flex-1 rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
-                placeholder="vault secret name for private key"
-                value={form.keySecret}
-                onChange={(e) => setForm((f) => ({ ...f, keySecret: e.target.value }))}
-              />
+        {form.driver === "ssh" && (
+          <div className="grid grid-cols-[1fr_6rem] gap-4">
+            <FormField label="Host or IP">
+              <Input className="font-mono" value={form.host} onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))} />
+            </FormField>
+            <FormField label="User">
+              <Input className="font-mono" value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
+            </FormField>
+            <div className="col-span-2">
+              <FormField label="Private-key vault secret name">
+                <Input className="font-mono" value={form.keySecret} onChange={(e) => setForm((f) => ({ ...f, keySecret: e.target.value }))} />
+              </FormField>
             </div>
-          )}
-
-          <input
-            className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="description (optional)"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              loading={busy === "create"}
-              disabled={busy === "create"}
-              onClick={onCreate}
-            >
-              Create environment
-            </Button>
           </div>
-        </Card>
-      </section>
+        )}
+
+        <FormField label="Description (optional)">
+          <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+        </FormField>
+      </FormDialog>
 
       {/* ── List ───────────────────────────────────────────────── */}
       <section className="space-y-3">
