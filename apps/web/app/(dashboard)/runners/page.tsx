@@ -368,6 +368,7 @@ export default function RunnersPage() {
   const [hostCmd, setHostCmd] = useState<Record<string, string>>({});
   const [agentId, setAgentId] = useState("");
   const [agentCmd, setAgentCmd] = useState("");
+  const [queueOpen, setQueueOpen] = useState(false);
   const [rt, setRt] = useState({ adapter: "", model: "", template: "" });
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -496,6 +497,7 @@ export default function RunnersPage() {
       const res = await queueAgent({ agentId, command: agentCmd.trim() });
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Queue failed");
       setAgentCmd("");
+      setQueueOpen(false);
       setHistoryKey((k) => k + 1);
     } finally {
       setBusy(null);
@@ -608,44 +610,53 @@ export default function RunnersPage() {
 
       {/* ── Agent runners ─────────────────────────────────────── */}
       <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Bot className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">Agent runners (daemon pull)</h2>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Bot className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-foreground">Agent runners (daemon pull)</h2>
+          </div>
+          <Button size="sm" onClick={() => setQueueOpen(true)}>Queue command</Button>
         </div>
         <p className="-mt-1 text-xs text-muted-foreground">
           Queue a command an agent&apos;s <code>@agentcenter/runner</code> daemon pulls on its next
           poll. Works behind NAT — the machine only makes outbound connections.
         </p>
-        <Card className="flex flex-wrap items-end gap-2 p-4">
-          <select
-            className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-            value={agentId}
-            onChange={(e) => setAgentId(e.target.value)}
-          >
-            <option value="">Select agent…</option>
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.identityEmoji ? `${a.identityEmoji} ` : ""}
-                {a.name}
-              </option>
-            ))}
-          </select>
-          <input
-            className="min-w-[10rem] flex-1 rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
-            placeholder="command to queue"
-            value={agentCmd}
-            onChange={(e) => setAgentCmd(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && onQueueAgent()}
-          />
-          <Button
-            size="sm"
-            loading={busy === "agent"}
-            disabled={busy === "agent"}
-            onClick={onQueueAgent}
-          >
-            Queue
-          </Button>
-        </Card>
+
+        <FormDialog
+          open={queueOpen}
+          onOpenChange={setQueueOpen}
+          title="Queue a runner command"
+          description="The agent's runner daemon pulls this on its next poll."
+          onSubmit={onQueueAgent}
+          submitLabel="Queue"
+          busy={busy === "agent"}
+          error={error}
+          submitDisabled={!agentId || !agentCmd.trim()}
+        >
+          <FormField label="Agent">
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={agentId}
+              onChange={(e) => setAgentId(e.target.value)}
+            >
+              <option value="">Select agent…</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.identityEmoji ? `${a.identityEmoji} ` : ""}
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Command">
+            <Input
+              className="font-mono"
+              placeholder="e.g. git pull && npm test"
+              value={agentCmd}
+              onChange={(e) => setAgentCmd(e.target.value)}
+            />
+          </FormField>
+        </FormDialog>
 
         {/* Per-agent runtime: which adapter + model the runner uses for the selected agent. */}
         <Card className="space-y-2 p-4">
@@ -749,10 +760,21 @@ export default function RunnersPage() {
         </div>
 
         <Card className="space-y-2 p-4">
-          <p className="text-xs font-medium text-muted-foreground">
-            Sandbox for the selected agent (uses the agent picker above)
-          </p>
+          <p className="text-xs font-medium text-muted-foreground">Sandbox for a selected agent</p>
           <div className="flex flex-wrap items-end gap-2">
+            <select
+              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+              value={agentId}
+              onChange={(e) => setAgentId(e.target.value)}
+            >
+              <option value="">Select agent…</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.identityEmoji ? `${a.identityEmoji} ` : ""}
+                  {a.name}
+                </option>
+              ))}
+            </select>
             <select
               className="rounded border border-border bg-background px-2 py-1.5 text-sm"
               value={sbx.provider}
