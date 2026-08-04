@@ -4,10 +4,11 @@ import { useState } from "react";
 import { useQuery, useMutation, useClient } from "urql";
 import { Users } from "lucide-react";
 import { TEAMS_QUERY, PREVIEW_TEAM_INSTALL_QUERY } from "@/lib/graphql/queries";
-import { CREATE_TEAM, ADD_TEAM_MEMBER, INSTALL_TEAM } from "@/lib/graphql/mutations";
+import { INSTALL_TEAM } from "@/lib/graphql/mutations";
 import { COLLISION_STRATEGIES } from "@agentcenter/utils";
-import { Button, Card, Badge, Input, FormField, FormDialog, EmptyState } from "@/components/ui";
-import { useResourceDialog } from "@/hooks/useCrud";
+import { Button, Card, Badge, EmptyState } from "@/components/ui";
+import { TeamDialog } from "@/components/dialogs/TeamDialog";
+import { TeamMemberDialog } from "@/components/dialogs/TeamMemberDialog";
 
 // Epic #10: teams catalog. SKILLS_TEAMS-gated (admin installs). A team is an installable bundle of
 // agent roles; installing creates one agent per member with a collision strategy.
@@ -44,8 +45,6 @@ function actionVariant(action: string): "green" | "yellow" | "gray" | "red" {
 
 export default function TeamsPage() {
   const [{ data }, refetch] = useQuery<{ teams: Team[] }>({ query: TEAMS_QUERY });
-  const [, createTeam] = useMutation(CREATE_TEAM);
-  const [, addMember] = useMutation(ADD_TEAM_MEMBER);
   const [, installTeam] = useMutation(INSTALL_TEAM);
   const client = useClient();
 
@@ -54,40 +53,17 @@ export default function TeamsPage() {
   const [strategy, setStrategy] = useState<Record<string, string>>({});
   const [result, setResult] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<Record<string, PlanItem[]>>({});
+  const [teamOpen, setTeamOpen] = useState(false);
+  const [memberOpen, setMemberOpen] = useState(false);
   const [memberTeamId, setMemberTeamId] = useState<string | null>(null);
   const allTeams = data?.teams ?? [];
   const allTags = [...new Set(allTeams.flatMap((t) => t.tags))].sort();
   const teams = tagFilter ? allTeams.filter((t) => t.tags.includes(tagFilter)) : allTeams;
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
-  const teamDlg = useResourceDialog({
-    empty: { name: "", icon: "", tagline: "", tags: "" },
-    submit: async (v) => {
-      if (!v.name.trim()) return "Team name is required";
-      const r = await createTeam({
-        name: v.name.trim(),
-        icon: v.icon.trim() || null,
-        tagline: v.tagline.trim() || null,
-        tags: v.tags.split(",").map((s) => s.trim()).filter(Boolean),
-      });
-      return r.error?.message ?? null;
-    },
-    onDone: refresh,
-  });
-
-  const memberDlg = useResourceDialog({
-    empty: { name: "", role: "" },
-    submit: async (v) => {
-      if (!memberTeamId) return "No team selected";
-      if (!v.name.trim() || !v.role.trim()) return "Name and role are required";
-      const r = await addMember({ teamId: memberTeamId, name: v.name.trim(), role: v.role.trim() });
-      return r.error?.message ?? null;
-    },
-    onDone: refresh,
-  });
   const openAddMember = (id: string) => {
     setMemberTeamId(id);
-    memberDlg.openCreate();
+    setMemberOpen(true);
   };
 
   async function act(fn: () => Promise<unknown>, key: string) {
@@ -109,53 +85,16 @@ export default function TeamsPage() {
             Installable bundles of agent roles. Installing creates one agent per member.
           </p>
         </div>
-        <Button onClick={teamDlg.openCreate}>New team</Button>
+        <Button onClick={() => setTeamOpen(true)}>New team</Button>
       </div>
 
-      <FormDialog
-        open={teamDlg.open}
-        onOpenChange={teamDlg.setOpen}
-        title="New team"
-        onSubmit={teamDlg.onSubmit}
-        submitLabel="Create team"
-        busy={teamDlg.busy}
-        error={teamDlg.error}
-        submitDisabled={!teamDlg.values.name.trim()}
-      >
-        <div className="grid grid-cols-[4rem_1fr] gap-4">
-          <FormField label="Icon">
-            <Input placeholder="👥" value={teamDlg.values.icon} onChange={(e) => teamDlg.set("icon", e.target.value)} />
-          </FormField>
-          <FormField label="Name">
-            <Input placeholder="e.g. Growth Squad" value={teamDlg.values.name} onChange={(e) => teamDlg.set("name", e.target.value)} />
-          </FormField>
-        </div>
-        <FormField label="Tagline (optional)">
-          <Input value={teamDlg.values.tagline} onChange={(e) => teamDlg.set("tagline", e.target.value)} />
-        </FormField>
-        <FormField label="Tags (comma-separated, optional)">
-          <Input placeholder="growth, marketing" value={teamDlg.values.tags} onChange={(e) => teamDlg.set("tags", e.target.value)} />
-        </FormField>
-      </FormDialog>
-
-      <FormDialog
-        open={memberDlg.open}
-        onOpenChange={memberDlg.setOpen}
-        title="Add role"
-        description="Add a role to the team; installing creates one agent for it."
-        onSubmit={memberDlg.onSubmit}
-        submitLabel="Add role"
-        busy={memberDlg.busy}
-        error={memberDlg.error}
-        submitDisabled={!memberDlg.values.name.trim() || !memberDlg.values.role.trim()}
-      >
-        <FormField label="Member name">
-          <Input value={memberDlg.values.name} onChange={(e) => memberDlg.set("name", e.target.value)} />
-        </FormField>
-        <FormField label="Role">
-          <Input placeholder="e.g. Backend Developer" value={memberDlg.values.role} onChange={(e) => memberDlg.set("role", e.target.value)} />
-        </FormField>
-      </FormDialog>
+      <TeamDialog open={teamOpen} onOpenChange={setTeamOpen} onSaved={refresh} />
+      <TeamMemberDialog
+        open={memberOpen}
+        onOpenChange={setMemberOpen}
+        teamId={memberTeamId}
+        onSaved={refresh}
+      />
 
       {allTags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">

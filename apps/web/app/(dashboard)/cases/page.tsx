@@ -6,15 +6,14 @@ import { useQuery, useMutation } from "urql";
 import { Ticket } from "lucide-react";
 import { CASES_QUERY, LABELS_QUERY } from "@/lib/graphql/queries";
 import {
-  CREATE_CASE,
   SET_CASE_STATUS,
-  CREATE_LABEL,
   ADD_CASE_LABEL,
   REMOVE_CASE_LABEL,
 } from "@/lib/graphql/mutations";
 import { CASE_STATES, CaseState } from "@agentcenter/utils";
-import { Button, Card, Badge, Input, FormField, FormDialog, EmptyState } from "@/components/ui";
-import { useResourceDialog } from "@/hooks/useCrud";
+import { Button, Card, Badge, EmptyState } from "@/components/ui";
+import { CaseDialog } from "@/components/dialogs/CaseDialog";
+import { LabelDialog } from "@/components/dialogs/LabelDialog";
 
 // Epic #17: cases (support-ticket / work-item). CASES-gated + buildbase role (member works cases;
 // admin curates the label catalog). Distinct from pipeline cases (Epic #7).
@@ -48,37 +47,16 @@ export default function CasesPage() {
   const [{ data: labelData }, refetchLabels] = useQuery<{ labels: Label[] }>({
     query: LABELS_QUERY,
   });
-  const [, createCase] = useMutation(CREATE_CASE);
   const [, setStatus] = useMutation(SET_CASE_STATUS);
-  const [, createLabel] = useMutation(CREATE_LABEL);
   const [, addLabel] = useMutation(ADD_CASE_LABEL);
   const [, removeLabel] = useMutation(REMOVE_CASE_LABEL);
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [caseOpen, setCaseOpen] = useState(false);
+  const [labelOpen, setLabelOpen] = useState(false);
   const cases = data?.cases ?? [];
   const labels = labelData?.labels ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
-
-  const caseDlg = useResourceDialog({
-    empty: { title: "", caseType: "bug" },
-    submit: async (v) => {
-      if (!v.title.trim()) return "Title is required";
-      const res = await createCase({ title: v.title.trim(), caseType: v.caseType.trim() || "bug" });
-      return res.error?.graphQLErrors?.[0]?.message ?? res.error?.message ?? null;
-    },
-    onDone: refresh,
-  });
-
-  const labelDlg = useResourceDialog({
-    empty: { name: "", color: "#6366f1" },
-    submit: async (v) => {
-      if (!v.name.trim()) return "Label name is required";
-      const res = await createLabel({ name: v.name.trim(), color: v.color });
-      if (res.error) return res.error.graphQLErrors?.[0]?.message ?? "Failed to create label";
-      return null;
-    },
-    onDone: () => refetchLabels({ requestPolicy: "network-only" }),
-  });
 
   async function act(fn: () => Promise<unknown>, key: string) {
     setBusy(key);
@@ -99,61 +77,15 @@ export default function CasesPage() {
             Support tickets / work items with labels, task links, and a full event timeline.
           </p>
         </div>
-        <Button onClick={caseDlg.openCreate}>New case</Button>
+        <Button onClick={() => setCaseOpen(true)}>New case</Button>
       </div>
 
-      <FormDialog
-        open={caseDlg.open}
-        onOpenChange={caseDlg.setOpen}
-        title="Open a case"
-        onSubmit={caseDlg.onSubmit}
-        submitLabel="Open case"
-        busy={caseDlg.busy}
-        error={caseDlg.error}
-        submitDisabled={!caseDlg.values.title.trim()}
-      >
-        <FormField label="Title">
-          <Input
-            placeholder="Short summary"
-            value={caseDlg.values.title}
-            onChange={(e) => caseDlg.set("title", e.target.value)}
-          />
-        </FormField>
-        <FormField label="Type">
-          <Input
-            placeholder="e.g. bug, feature, incident"
-            value={caseDlg.values.caseType}
-            onChange={(e) => caseDlg.set("caseType", e.target.value)}
-          />
-        </FormField>
-      </FormDialog>
-
-      <FormDialog
-        open={labelDlg.open}
-        onOpenChange={labelDlg.setOpen}
-        title="New label"
-        onSubmit={labelDlg.onSubmit}
-        submitLabel="Add label"
-        busy={labelDlg.busy}
-        error={labelDlg.error}
-        submitDisabled={!labelDlg.values.name.trim()}
-      >
-        <FormField label="Name">
-          <Input
-            placeholder="e.g. urgent"
-            value={labelDlg.values.name}
-            onChange={(e) => labelDlg.set("name", e.target.value)}
-          />
-        </FormField>
-        <FormField label="Color">
-          <input
-            type="color"
-            className="h-9 w-16 rounded-md border border-input bg-background"
-            value={labelDlg.values.color}
-            onChange={(e) => labelDlg.set("color", e.target.value)}
-          />
-        </FormField>
-      </FormDialog>
+      <CaseDialog open={caseOpen} onOpenChange={setCaseOpen} onSaved={refresh} />
+      <LabelDialog
+        open={labelOpen}
+        onOpenChange={setLabelOpen}
+        onSaved={() => refetchLabels({ requestPolicy: "network-only" })}
+      />
 
       {/* Label catalog (display + open the create-label modal) */}
       <Card className="flex flex-wrap items-center gap-2 p-3">
@@ -162,7 +94,7 @@ export default function CasesPage() {
         {labels.map((l) => (
           <Badge key={l.id} variant="gray">{l.name}</Badge>
         ))}
-        <Button size="sm" variant="ghost" onClick={labelDlg.openCreate}>
+        <Button size="sm" variant="ghost" onClick={() => setLabelOpen(true)}>
           + Label
         </Button>
       </Card>
