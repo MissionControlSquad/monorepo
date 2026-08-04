@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import { Gauge } from "lucide-react";
 import { MONITORS_QUERY } from "@/lib/graphql/queries";
@@ -95,7 +96,11 @@ export default function MonitorsPage() {
                 onClick={async () => {
                   setBusy(m.id);
                   try {
-                    await updateMonitor({ id: m.id, isActive: !m.isActive });
+                    const res = await updateMonitor({ id: m.id, isActive: !m.isActive });
+                    if (res.error) {
+                      toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to update status");
+                      return;
+                    }
                     refresh();
                   } finally {
                     setBusy(null);

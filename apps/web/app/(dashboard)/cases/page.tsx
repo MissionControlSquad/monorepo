@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import { Ticket } from "lucide-react";
 import { CASES_QUERY, LABELS_QUERY } from "@/lib/graphql/queries";
@@ -61,7 +62,12 @@ export default function CasesPage() {
   async function act(fn: () => Promise<unknown>, key: string) {
     setBusy(key);
     try {
-      await fn();
+      const r = await fn();
+      if (r && typeof r === "object" && "error" in r && r.error) {
+        const err = r.error as { graphQLErrors?: { message: string }[]; message?: string };
+        toast.error(err.graphQLErrors?.[0]?.message ?? err.message ?? "Something went wrong");
+        return;
+      }
       refresh();
     } finally {
       setBusy(null);

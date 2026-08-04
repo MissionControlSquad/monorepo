@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import {
   PIPELINES_QUERY,
@@ -102,7 +103,12 @@ function PipelineCard({
   async function act(fn: () => Promise<unknown>, key: string) {
     setBusy(key);
     try {
-      await fn();
+      const r = await fn();
+      if (r && typeof r === "object" && "error" in r && r.error) {
+        const err = r.error as { graphQLErrors?: { message: string }[]; message?: string };
+        toast.error(err.graphQLErrors?.[0]?.message ?? err.message ?? "Something went wrong");
+        return;
+      }
       refresh();
     } finally {
       setBusy(null);
@@ -152,7 +158,7 @@ function PipelineCard({
               className="text-xs text-destructive"
               onClick={async () => {
                 const res = await deleteStage({ stageId: s.id });
-                if (res.error) alert(res.error.graphQLErrors[0]?.message ?? "Cannot delete stage");
+                if (res.error) toast.error(res.error.graphQLErrors[0]?.message ?? "Cannot delete stage");
                 else onStagesChanged();
               }}
             >

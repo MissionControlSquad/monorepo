@@ -81,8 +81,14 @@ export default function ApprovalsPage() {
   async function decide(id: string, kind: "approve" | "reject") {
     setBusyId(id);
     try {
-      if (kind === "approve") await approve({ id });
-      else await reject({ id, decisionNote: "Changes needed" });
+      const res =
+        kind === "approve"
+          ? await approve({ id })
+          : await reject({ id, decisionNote: "Changes needed" });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Something went wrong");
+        return;
+      }
       refetch({ requestPolicy: "network-only" });
     } finally {
       setBusyId(null);

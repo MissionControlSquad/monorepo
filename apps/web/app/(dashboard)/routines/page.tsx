@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import { ROUTINES_QUERY, AGENTS_QUERY, GOALS_QUERY } from "@/lib/graphql/queries";
 import {
@@ -59,7 +60,11 @@ export default function RoutinesPage() {
   async function onRegenerateTrigger(triggerId: string, routineId: string) {
     setBusy(routineId);
     try {
-      await regenerateTrigger({ triggerId });
+      const res = await regenerateTrigger({ triggerId });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to regenerate trigger");
+        return;
+      }
       refetch({ requestPolicy: "network-only" });
     } finally {
       setBusy(null);
@@ -69,7 +74,11 @@ export default function RoutinesPage() {
   async function onToggleActive(id: string, isActive: boolean) {
     setBusy(id);
     try {
-      await updateRoutine({ id, isActive });
+      const res = await updateRoutine({ id, isActive });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to update status");
+        return;
+      }
       refetch({ requestPolicy: "network-only" });
     } finally {
       setBusy(null);
@@ -80,6 +89,10 @@ export default function RoutinesPage() {
     setBusy(id);
     try {
       const res = await triggerNow({ routineId: id });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to trigger routine");
+        return;
+      }
       const run = res.data?.triggerRoutineNow;
       if (run)
         setLastRun((m) => ({
@@ -94,7 +107,11 @@ export default function RoutinesPage() {
   async function onAddWebhook(id: string) {
     setBusy(id);
     try {
-      await addTrigger({ routineId: id, type: "webhook" });
+      const res = await addTrigger({ routineId: id, type: "webhook" });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to add webhook");
+        return;
+      }
       refresh();
     } finally {
       setBusy(null);

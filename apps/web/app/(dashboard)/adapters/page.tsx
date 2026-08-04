@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import { Boxes } from "lucide-react";
 import { Card, Badge, Button, Spinner, EmptyState } from "@/components/ui";
@@ -64,7 +65,11 @@ export default function AdaptersPage() {
   async function toggle(a: Adapter) {
     setBusy(a.type);
     try {
-      await setEnabled({ type: a.type, enabled: !a.enabled });
+      const res = await setEnabled({ type: a.type, enabled: !a.enabled });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to update adapter");
+        return;
+      }
       refetch({ requestPolicy: "network-only" });
     } finally {
       setBusy(null);
@@ -75,7 +80,11 @@ export default function AdaptersPage() {
     if (!confirm(`Remove adapter "${a.displayName}"?`)) return;
     setBusy(a.type);
     try {
-      await removeAdapter({ adapterType: a.type });
+      const res = await removeAdapter({ adapterType: a.type });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to remove adapter");
+        return;
+      }
       refetch({ requestPolicy: "network-only" });
     } finally {
       setBusy(null);

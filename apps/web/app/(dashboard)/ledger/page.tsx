@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import {
   LEDGER_SUMMARY_QUERY,
@@ -105,7 +106,11 @@ export default function LedgerPage() {
   async function onDelete(id: string) {
     setBusy(id);
     try {
-      await deleteEvent({ id });
+      const res = await deleteEvent({ id });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to delete");
+        return;
+      }
       refresh();
     } finally {
       setBusy(null);

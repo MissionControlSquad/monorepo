@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import {
   FINANCE_SUMMARY_QUERY,
@@ -116,7 +117,11 @@ export default function FinancePage() {
   async function onDelete(id: string) {
     setBusy(id);
     try {
-      await deletePolicy({ id });
+      const res = await deletePolicy({ id });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to delete");
+        return;
+      }
       refetchPolicies({ requestPolicy: "network-only" });
       refetchSummary({ requestPolicy: "network-only" });
     } finally {
@@ -127,7 +132,11 @@ export default function FinancePage() {
   async function onResolve(id: string) {
     setBusy(id);
     try {
-      await resolveIncident({ id });
+      const res = await resolveIncident({ id });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to resolve incident");
+        return;
+      }
       refetchIncidents({ requestPolicy: "network-only" });
       refetchSummary({ requestPolicy: "network-only" });
     } finally {

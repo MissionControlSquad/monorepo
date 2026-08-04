@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import { Inbox } from "lucide-react";
 import { INBOX_POLICIES_QUERY } from "@/lib/graphql/queries";
@@ -48,7 +49,7 @@ export default function InboxPoliciesPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={actionVariant(p.action)}>{p.action}</Badge>
-                  <Button variant="ghost" size="sm" onClick={async () => { await del({ id: p.id }); refresh(); }}>Delete</Button>
+                  <Button variant="ghost" size="sm" onClick={async () => { const res = await del({ id: p.id }); if (res.error) { toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to delete"); return; } refresh(); }}>Delete</Button>
                 </div>
               </li>
             ))}
