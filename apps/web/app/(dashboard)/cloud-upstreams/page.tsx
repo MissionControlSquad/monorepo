@@ -34,7 +34,7 @@ export default function CloudUpstreamsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
+    <div className="mx-auto space-y-6 p-6">
       <div>
         <h1 className="text-xl font-semibold text-foreground">Cloud upstreams</h1>
         <p className="text-sm text-muted-foreground">Remote git fork/sync per project, with drift state.</p>

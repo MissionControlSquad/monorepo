@@ -33,7 +33,7 @@ export default function InboxPoliciesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
+    <div className="mx-auto space-y-6 p-6">
       <div>
         <h1 className="text-xl font-semibold text-foreground">Inbox policies</h1>
         <p className="text-sm text-muted-foreground">How agents route inbox items: auto-handle, route to a human, or ignore.</p>

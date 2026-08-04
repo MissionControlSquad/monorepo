@@ -65,7 +65,7 @@ export default function BoardroomPage() {
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-3xl flex-col gap-4 p-4 sm:p-6">
+    <div className="mx-auto flex h-full flex-col gap-4 p-4 sm:p-6">
       <div>
         <h1 className="text-lg font-semibold text-foreground">Boardroom</h1>
         <p className="text-sm text-muted-foreground">

@@ -313,7 +313,7 @@ export default function PipelinesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <h1 className="text-lg font-semibold text-foreground">Pipelines</h1>
       <p className="-mt-4 text-sm text-muted-foreground">
         Multi-stage case workflows. Claim a case, advance it forward through stages, or reject it.

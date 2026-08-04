@@ -501,7 +501,7 @@ export default function RunnersPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-4 sm:p-6">
+    <div className="mx-auto space-y-8 p-4 sm:p-6">
       <div>
         <h1 className="text-lg font-semibold text-foreground">Runners</h1>
         <p className="text-sm text-muted-foreground">

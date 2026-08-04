@@ -147,7 +147,7 @@ export default function RoutinesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <h1 className="text-lg font-semibold text-foreground">Routines</h1>
       <p className="-mt-4 text-sm text-muted-foreground">
         Reusable workflows with run history + immutable revisions. Firing a routine generates a

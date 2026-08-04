@@ -245,7 +245,7 @@ export default function SecretsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <h1 className="text-lg font-semibold text-foreground">Secrets</h1>
       <p className="-mt-4 text-sm text-muted-foreground">
         Encrypted at rest (AES-256-GCM). Values are write-only — they are never shown again, only

@@ -110,7 +110,7 @@ export default function InstructionsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
+    <div className="mx-auto space-y-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Agent instructions</h1>

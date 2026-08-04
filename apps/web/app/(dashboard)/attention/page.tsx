@@ -66,7 +66,7 @@ export default function AttentionPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
+    <div className="mx-auto space-y-4 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Attention</h1>

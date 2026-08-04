@@ -126,7 +126,7 @@ export default function SkillsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-foreground">Skills</h1>
         <>
