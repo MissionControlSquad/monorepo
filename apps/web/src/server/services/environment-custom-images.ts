@@ -108,6 +108,16 @@ export async function captureCustomImage(
     const prior = await tx.environmentCustomImageTemplate.findFirst({
       where: { environmentId, provider: providerKey, status: "active" },
     });
+    // Demote the prior active template BEFORE inserting the new one. A partial unique index
+    // — (environmentId, provider) WHERE status = 'active' — permits only one active row per
+    // env+provider, so two active rows (even momentarily inside this txn) violate it. The
+    // supersededByTemplateId back-pointer is stamped in a second update once `created` exists.
+    if (prior) {
+      await tx.environmentCustomImageTemplate.update({
+        where: { id: prior.id },
+        data: { status: "superseded" },
+      });
+    }
     const created = await tx.environmentCustomImageTemplate.create({
       data: {
         workspaceId,
@@ -125,7 +135,7 @@ export async function captureCustomImage(
     if (prior) {
       await tx.environmentCustomImageTemplate.update({
         where: { id: prior.id },
-        data: { status: "superseded", supersededByTemplateId: created.id },
+        data: { supersededByTemplateId: created.id },
       });
     }
     return created;

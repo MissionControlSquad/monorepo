@@ -117,14 +117,17 @@ beforeAll(async () => {
   // re-asserts it for each file. cacheTtl() reads it at call time.
   process.env.DISABLE_FLAG_CACHE = "1";
 
-  // Push schema to test database
-  execSync(
-    "npx prisma db push --skip-generate --accept-data-loss --schema ../../packages/database/prisma/schema",
-    {
-      stdio: "inherit",
-      env: { ...process.env },
-    },
-  );
+  // Bring the test database up to the migrated schema. We run the real migration chain
+  // (`migrate deploy`) rather than `db push` so the test DB is prod-faithful: raw-SQL migration
+  // artifacts (seed rows like the built-in adapters, partial/expression indexes, backfills) are
+  // present, closing the long-standing "db push != migrate" gap. After the first run this is a fast
+  // no-op ("No pending migrations"). AI_AGENT/CLAUDECODE are stripped so Prisma's agent guardrail
+  // doesn't block the non-interactive deploy; harmless no-op for normal/CI runs where they're unset.
+  const { AI_AGENT: _ai, CLAUDECODE: _cc, ...cleanEnv } = process.env;
+  execSync("npx prisma migrate deploy --config ../../packages/database/prisma.config.ts", {
+    stdio: "inherit",
+    env: cleanEnv,
+  });
 
   // Start with a clean database
   await truncateAll();
