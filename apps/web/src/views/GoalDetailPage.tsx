@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Loader2, AlertCircle, Plus, Trash2 } from "lucide-react";
 import { GOAL_QUERY, GOALS_QUERY, AGENTS_QUERY } from "@/lib/graphql/queries";
 import { CREATE_GOAL, UPDATE_GOAL, DELETE_GOAL } from "@/lib/graphql/mutations";
-import { Breadcrumbs, Button, Card, Badge, PageLayout } from "@/components/ui";
+import { Breadcrumbs, Button, Card, Badge, PageLayout, Textarea } from "@/components/ui";
 import { Input } from "@/components/ui/shadcn/input";
 import {
   Select,
@@ -162,13 +162,13 @@ export function GoalDetailPage({ goalId }: { goalId: string }) {
               onBlur={() => title.trim() && title !== goal.title && patch({ title: title.trim() })}
               className="text-lg font-semibold"
             />
-            <textarea
+            <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onBlur={() => description !== (goal.description ?? "") && patch({ description })}
               rows={4}
               placeholder="Describe this goal…"
-              className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="resize-y rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </Card>
 

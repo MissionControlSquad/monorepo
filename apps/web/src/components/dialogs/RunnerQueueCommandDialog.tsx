@@ -2,7 +2,7 @@
 
 import { useMutation } from "urql";
 import { QUEUE_AGENT_COMMAND } from "@/lib/graphql/mutations";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 interface AgentLite {
@@ -57,8 +57,7 @@ export function RunnerQueueCommandDialog({
       submitDisabled={!agentId || !f.values.command.trim()}
     >
       <FormField label="Agent">
-        <select
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        <Select
           value={agentId}
           onChange={(e) => onAgentChange(e.target.value)}
         >
@@ -69,7 +68,7 @@ export function RunnerQueueCommandDialog({
               {a.name}
             </option>
           ))}
-        </select>
+        </Select>
       </FormField>
       <FormField label="Command">
         <Input

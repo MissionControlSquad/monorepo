@@ -3,7 +3,7 @@
 import { useQuery, useMutation } from "urql";
 import { SECRET_PROVIDERS_QUERY } from "@/lib/graphql/queries";
 import { CREATE_SECRET, CREATE_USER_SECRET } from "@/lib/graphql/mutations";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, Checkbox, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 interface SecretDialogProps {
@@ -68,8 +68,7 @@ export function SecretDialog({ open, onOpenChange, onSaved }: SecretDialogProps)
         <Input value={f.values.description} onChange={(e) => f.set("description", e.target.value)} />
       </FormField>
       <FormField label="Provider">
-        <select
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        <Select
           value={f.values.providerId}
           onChange={(e) => f.set("providerId", e.target.value)}
         >
@@ -77,10 +76,10 @@ export function SecretDialog({ open, onOpenChange, onSaved }: SecretDialogProps)
           {providers.map((p) => (
             <option key={p.id} value={p.id}>{p.name} ({p.kind})</option>
           ))}
-        </select>
+        </Select>
       </FormField>
       <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <input type="checkbox" checked={f.values.personal} onChange={(e) => f.set("personal", e.target.checked)} />
+        <Checkbox checked={f.values.personal} onChange={(e) => f.set("personal", e.target.checked)} />
         Personal (only you can see &amp; manage it)
       </label>
     </FormDialog>

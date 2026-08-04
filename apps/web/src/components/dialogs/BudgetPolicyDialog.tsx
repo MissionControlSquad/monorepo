@@ -3,7 +3,7 @@
 import { useMutation } from "urql";
 import { CREATE_BUDGET_POLICY } from "@/lib/graphql/mutations";
 import { BUDGET_WINDOWS } from "@agentcenter/utils";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, Checkbox, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 const WINDOWS = BUDGET_WINDOWS;
@@ -58,22 +58,21 @@ export function BudgetPolicyDialog({ open, onOpenChange, onSaved }: BudgetPolicy
           <Input inputMode="decimal" placeholder="500" value={f.values.limit} onChange={(e) => f.set("limit", e.target.value)} />
         </FormField>
         <FormField label="Window">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={f.values.window}
             onChange={(e) => f.set("window", e.target.value)}
           >
             {WINDOWS.map((w) => (
               <option key={w} value={w}>{w}</option>
             ))}
-          </select>
+          </Select>
         </FormField>
         <FormField label="Warn %">
           <Input inputMode="numeric" value={f.values.warn} onChange={(e) => f.set("warn", e.target.value)} />
         </FormField>
       </div>
       <label className="flex items-center gap-2 text-sm text-foreground">
-        <input type="checkbox" checked={f.values.hardStop} onChange={(e) => f.set("hardStop", e.target.checked)} />
+        <Checkbox checked={f.values.hardStop} onChange={(e) => f.set("hardStop", e.target.checked)} />
         Hard stop (auto-pause agents on breach)
       </label>
     </FormDialog>

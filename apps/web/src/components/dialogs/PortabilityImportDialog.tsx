@@ -3,7 +3,7 @@
 import { useMutation } from "urql";
 import { IMPORT_WORKSPACE_BUNDLE } from "@/lib/graphql/mutations";
 import { COLLISION_STRATEGIES } from "@agentcenter/utils";
-import { FormField, FormDialog } from "@/components/ui";
+import { Select, Textarea, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 interface ImportSummary {
@@ -55,19 +55,18 @@ export function PortabilityImportDialog({ open, onOpenChange, onImported }: Port
       submitDisabled={!f.values.pasted.trim()}
     >
       <FormField label="On collision">
-        <select
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        <Select
           value={f.values.strategy}
           onChange={(e) => f.set("strategy", e.target.value)}
         >
           {COLLISION_STRATEGIES.map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
-        </select>
+        </Select>
       </FormField>
       <FormField label="Bundle JSON">
-        <textarea
-          className="h-48 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
+        <Textarea
+          className="h-48 font-mono text-xs"
           placeholder="Paste a workspace bundle JSON here…"
           value={f.values.pasted}
           onChange={(e) => f.set("pasted", e.target.value)}

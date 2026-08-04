@@ -2,7 +2,7 @@
 
 import { useMutation } from "urql";
 import { CREATE_LEDGER_EVENT } from "@/lib/graphql/mutations";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 function todayISO(): string {
@@ -52,14 +52,13 @@ export function LedgerEntryDialog({ open, onOpenChange, onSaved }: LedgerEntryDi
     >
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Kind">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={f.values.kind}
             onChange={(e) => f.set("kind", e.target.value)}
           >
             <option value="revenue">revenue</option>
             <option value="expense">expense</option>
-          </select>
+          </Select>
         </FormField>
         <FormField label="Amount ($)">
           <Input inputMode="decimal" placeholder="0.00" value={f.values.amount} onChange={(e) => f.set("amount", e.target.value)} />

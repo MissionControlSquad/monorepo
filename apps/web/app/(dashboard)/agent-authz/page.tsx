@@ -9,7 +9,7 @@ import {
 } from "@/lib/graphql/queries";
 import { REVOKE_AGENT_CAPABILITY } from "@/lib/graphql/mutations";
 import { AGENT_AUTHZ_DECISION } from "@agentcenter/utils";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Select } from "@/components/ui";
 import { AgentCapabilityGrantDialog } from "@/components/dialogs/AgentCapabilityGrantDialog";
 
 // Epic #21: agent authorization. AGENT_AUTHZ-gated. Grant capabilities to an agent (the agent analog
@@ -88,18 +88,14 @@ export default function AgentAuthzPage() {
             otherwise agents run open by default.
           </p>
         </div>
-        <select
-          className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-          value={agentId}
-          onChange={(e) => setAgentId(e.target.value)}
-        >
+        <Select size="sm" value={agentId} onChange={(e) => setAgentId(e.target.value)}>
           {agents.length === 0 && <option value="">No agents</option>}
           {agents.map((a) => (
             <option key={a.id} value={a.id}>
               {a.name} · {a.role}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {agentId && (

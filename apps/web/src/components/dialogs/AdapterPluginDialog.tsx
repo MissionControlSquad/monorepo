@@ -2,7 +2,7 @@
 
 import { useMutation } from "urql";
 import { UPSERT_ADAPTER_PLUGIN } from "@/lib/graphql/mutations";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 interface AdapterPluginDialogProps {
@@ -46,15 +46,14 @@ export function AdapterPluginDialog({ open, onOpenChange, onSaved }: AdapterPlug
         <Input placeholder="e.g. aider" value={f.values.key} onChange={(e) => f.set("key", e.target.value)} />
       </FormField>
       <FormField label="Base">
-        <select
+        <Select
           value={f.values.base}
           onChange={(e) => f.set("base", e.target.value)}
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
         >
           <option value="process">process</option>
           <option value="shell">shell</option>
           <option value="http">http</option>
-        </select>
+        </Select>
       </FormField>
       <FormField label="Template">
         <Input

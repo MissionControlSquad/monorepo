@@ -3,7 +3,7 @@
 import { useMutation } from "urql";
 import { AGENT_CAPABILITIES } from "@agentcenter/utils";
 import { GRANT_AGENT_CAPABILITY } from "@/lib/graphql/mutations";
-import { FormField, FormDialog } from "@/components/ui";
+import { Select, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 interface AgentCapabilityGrantDialogProps {
@@ -49,8 +49,7 @@ export function AgentCapabilityGrantDialog({
       error={f.error}
     >
       <FormField label="Capability">
-        <select
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        <Select
           value={f.values.cap}
           onChange={(e) => f.set("cap", e.target.value)}
         >
@@ -60,7 +59,7 @@ export function AgentCapabilityGrantDialog({
               {granted.has(c) ? " (granted)" : ""}
             </option>
           ))}
-        </select>
+        </Select>
       </FormField>
     </FormDialog>
   );

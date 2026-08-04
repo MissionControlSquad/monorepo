@@ -2,7 +2,7 @@
 
 import { useMutation } from "urql";
 import { INSTALL_PLUGIN } from "@/lib/graphql/mutations";
-import { Button, FormField, FormDialog } from "@/components/ui";
+import { Button, Textarea, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 const SAMPLE = JSON.stringify(
@@ -59,8 +59,8 @@ export function PluginInstallDialog({ open, onOpenChange, onSaved }: PluginInsta
       submitDisabled={!f.values.manifest.trim()}
     >
       <FormField label="Manifest JSON">
-        <textarea
-          className="h-56 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
+        <Textarea
+          className="h-56 font-mono text-xs"
           placeholder="Paste a plugin manifest JSON…"
           value={f.values.manifest}
           onChange={(e) => f.set("manifest", e.target.value)}

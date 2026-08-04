@@ -4,7 +4,7 @@ import { useMutation } from "urql";
 import { CREATE_MONITOR } from "@/lib/graphql/mutations";
 import { MONITOR_METRICS, MONITOR_COMPARATORS, monitorMetricLabel } from "@agentcenter/utils";
 import type { MonitorMetric } from "@agentcenter/utils";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 const COMPARATOR_LABEL: Record<string, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
@@ -55,27 +55,25 @@ export function MonitorDialog({ open, onOpenChange, onSaved }: MonitorDialogProp
         />
       </FormField>
       <FormField label="Metric">
-        <select
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        <Select
           value={f.values.metric}
           onChange={(e) => f.set("metric", e.target.value)}
         >
           {MONITOR_METRICS.map((m) => (
             <option key={m} value={m}>{monitorMetricLabel(m as MonitorMetric)}</option>
           ))}
-        </select>
+        </Select>
       </FormField>
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Comparator">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={f.values.comparator}
             onChange={(e) => f.set("comparator", e.target.value)}
           >
             {MONITOR_COMPARATORS.map((c) => (
               <option key={c} value={c}>{COMPARATOR_LABEL[c]}</option>
             ))}
-          </select>
+          </Select>
         </FormField>
         <FormField label="Threshold">
           <Input type="number" value={f.values.threshold} onChange={(e) => f.set("threshold", e.target.value)} />

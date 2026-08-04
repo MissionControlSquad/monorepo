@@ -3,7 +3,7 @@
 import { useQuery, useMutation } from "urql";
 import { ENVIRONMENT_CAPABILITIES_QUERY } from "@/lib/graphql/queries";
 import { CREATE_ENVIRONMENT } from "@/lib/graphql/mutations";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 const DRIVER_HELP: Record<string, string> = {
@@ -97,37 +97,34 @@ export function EnvironmentDialog({ open, onOpenChange, onSaved }: EnvironmentDi
           <Input placeholder="e.g. staging-box" value={f.values.name} onChange={(e) => f.set("name", e.target.value)} />
         </FormField>
         <FormField label="Driver">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={f.values.driver}
             onChange={(e) => f.set("driver", e.target.value)}
           >
             {drivers.map((d) => (
               <option key={d} value={d}>{d}</option>
             ))}
-          </select>
+          </Select>
         </FormField>
       </div>
       <p className="text-xs text-muted-foreground">{DRIVER_HELP[f.values.driver]}</p>
 
       {(f.values.driver === "sandbox" || f.values.driver === "local") && (
         <FormField label="Machine reuse">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={f.values.leasePolicy}
             onChange={(e) => f.set("leasePolicy", e.target.value)}
           >
             <option value="ephemeral">ephemeral (fresh box each run)</option>
             <option value="reuse_by_environment">reuse (keep the box between runs)</option>
             <option value="retain_on_failure">retain on failure (keep only failed boxes)</option>
-          </select>
+          </Select>
         </FormField>
       )}
 
       {f.values.driver === "sandbox" && (
         <FormField label="Provider">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={f.values.provider}
             onChange={(e) => f.set("provider", e.target.value)}
           >
@@ -137,7 +134,7 @@ export function EnvironmentDialog({ open, onOpenChange, onSaved }: EnvironmentDi
                 {p.displayName} {p.isolating ? "(isolated)" : "(on host)"}
               </option>
             ))}
-          </select>
+          </Select>
         </FormField>
       )}
 

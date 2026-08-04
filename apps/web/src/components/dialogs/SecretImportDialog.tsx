@@ -2,7 +2,7 @@
 
 import { useMutation } from "urql";
 import { IMPORT_SECRETS } from "@/lib/graphql/mutations";
-import { FormField, FormDialog } from "@/components/ui";
+import { Textarea, Checkbox, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 interface SecretImportDialogProps {
@@ -49,15 +49,15 @@ export function SecretImportDialog({ open, onOpenChange, onImported, onSaved }: 
       submitDisabled={!f.values.text.trim()}
     >
       <FormField label="KEY=VALUE lines">
-        <textarea
-          className="h-40 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
+        <Textarea
+          className="h-40 font-mono text-xs"
           placeholder={"# paste a .env\nOPENAI_API_KEY=sk-...\nSTRIPE_KEY=sk_live_..."}
           value={f.values.text}
           onChange={(e) => f.set("text", e.target.value)}
         />
       </FormField>
       <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <input type="checkbox" checked={f.values.overwrite} onChange={(e) => f.set("overwrite", e.target.checked)} />
+        <Checkbox checked={f.values.overwrite} onChange={(e) => f.set("overwrite", e.target.checked)} />
         Overwrite existing (rotate)
       </label>
     </FormDialog>

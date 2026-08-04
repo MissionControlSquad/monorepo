@@ -3,7 +3,7 @@
 import { useQuery, useMutation } from "urql";
 import { AGENTS_QUERY, GOALS_QUERY } from "@/lib/graphql/queries";
 import { CREATE_ROUTINE } from "@/lib/graphql/mutations";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, Textarea, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
@@ -79,8 +79,7 @@ export function RoutineDialog({ open, onOpenChange, onSaved }: RoutineDialogProp
       </FormField>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <FormField label="Assignee (optional)">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={f.values.assigneeAgentId}
             onChange={(e) => f.set("assigneeAgentId", e.target.value)}
           >
@@ -88,11 +87,10 @@ export function RoutineDialog({ open, onOpenChange, onSaved }: RoutineDialogProp
             {agents.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
-          </select>
+          </Select>
         </FormField>
         <FormField label="Priority (optional)">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={f.values.priority}
             onChange={(e) => f.set("priority", e.target.value)}
           >
@@ -100,11 +98,10 @@ export function RoutineDialog({ open, onOpenChange, onSaved }: RoutineDialogProp
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
-          </select>
+          </Select>
         </FormField>
         <FormField label="Goal (optional)">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={f.values.goalId}
             onChange={(e) => f.set("goalId", e.target.value)}
           >
@@ -112,12 +109,12 @@ export function RoutineDialog({ open, onOpenChange, onSaved }: RoutineDialogProp
             {goals.map((g) => (
               <option key={g.id} value={g.id}>{g.title}</option>
             ))}
-          </select>
+          </Select>
         </FormField>
       </div>
       <FormField label="Definition (JSON)">
-        <textarea
-          className="h-32 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
+        <Textarea
+          className="h-32 font-mono text-xs"
           value={f.values.definition}
           onChange={(e) => f.set("definition", e.target.value)}
         />

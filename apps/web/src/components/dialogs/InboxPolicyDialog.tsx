@@ -2,7 +2,7 @@
 
 import { useMutation } from "urql";
 import { SET_INBOX_POLICY } from "@/lib/graphql/mutations";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 const ITEM_KINDS = ["mention", "task_review", "clarification", "handoff", "approval"];
@@ -45,26 +45,24 @@ export function InboxPolicyDialog({ open, onOpenChange, onSaved }: InboxPolicyDi
       error={f.error}
     >
       <FormField label="Item kind">
-        <select
+        <Select
           value={f.values.itemKind}
           onChange={(e) => f.set("itemKind", e.target.value)}
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
         >
           {ITEM_KINDS.map((k) => (
             <option key={k} value={k}>{k}</option>
           ))}
-        </select>
+        </Select>
       </FormField>
       <FormField label="Action">
-        <select
+        <Select
           value={f.values.action}
           onChange={(e) => f.set("action", e.target.value)}
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
         >
           {ACTIONS.map((a) => (
             <option key={a} value={a}>{a}</option>
           ))}
-        </select>
+        </Select>
       </FormField>
       <FormField label="Agent ID (optional)">
         <Input

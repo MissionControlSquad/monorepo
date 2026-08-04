@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "urql";
 import { GOAL_LEVELS } from "@agentcenter/utils";
 import { GOALS_QUERY } from "@/lib/graphql/queries";
 import { CREATE_GOAL } from "@/lib/graphql/mutations";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 const LEVELS = GOAL_LEVELS;
@@ -59,19 +59,17 @@ export function GoalDialog({ open, onOpenChange, onSaved }: GoalDialogProps) {
         />
       </FormField>
       <FormField label="Level">
-        <select
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        <Select
           value={f.values.level}
           onChange={(e) => f.set("level", e.target.value)}
         >
           {LEVELS.map((l) => (
             <option key={l} value={l}>{l}</option>
           ))}
-        </select>
+        </Select>
       </FormField>
       <FormField label="Parent goal">
-        <select
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+        <Select
           value={f.values.parentId}
           onChange={(e) => f.set("parentId", e.target.value)}
         >
@@ -79,7 +77,7 @@ export function GoalDialog({ open, onOpenChange, onSaved }: GoalDialogProps) {
           {goals.map((g) => (
             <option key={g.id} value={g.id}>under: {g.title}</option>
           ))}
-        </select>
+        </Select>
       </FormField>
     </FormDialog>
   );

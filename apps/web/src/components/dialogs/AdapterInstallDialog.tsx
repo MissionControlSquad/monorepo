@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "urql";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 const INSTALL_ADAPTER = `
@@ -61,26 +61,24 @@ export function AdapterInstallDialog({ open, onOpenChange, onSaved }: AdapterIns
       </FormField>
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Transport">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={f.values.transport}
             onChange={(e) => f.set("transport", e.target.value)}
           >
             {TRANSPORTS.map((tr) => (
               <option key={tr} value={tr}>{tr}</option>
             ))}
-          </select>
+          </Select>
         </FormField>
         <FormField label="Auth">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={f.values.authKind}
             onChange={(e) => f.set("authKind", e.target.value)}
           >
             {AUTH_KINDS.map((ak) => (
               <option key={ak} value={ak}>{ak}</option>
             ))}
-          </select>
+          </Select>
         </FormField>
       </div>
     </FormDialog>

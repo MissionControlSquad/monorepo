@@ -2,7 +2,7 @@
 
 import { useMutation } from "urql";
 import { CREATE_RUNNER_HOST } from "@/lib/graphql/mutations";
-import { Input, FormField, FormDialog } from "@/components/ui";
+import { Input, Textarea, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 interface RunnerHostDialogProps {
@@ -60,8 +60,8 @@ export function RunnerHostDialog({ open, onOpenChange, onSaved }: RunnerHostDial
         </FormField>
       </div>
       <FormField label="SSH private key (PEM)">
-        <textarea
-          className="h-28 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
+        <Textarea
+          className="h-28 font-mono text-xs"
           placeholder="Stored encrypted, never shown again"
           value={f.values.key}
           onChange={(e) => f.set("key", e.target.value)}

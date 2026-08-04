@@ -21,7 +21,7 @@ import {
 } from "@/lib/graphql/mutations";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 import { MEMORY_PROVIDERS, FLAG_KEYS } from "@agentcenter/utils";
-import { Breadcrumbs, Card, Button, ConfirmDialog, PageLayout } from "../components/ui";
+import { Breadcrumbs, Card, Button, ConfirmDialog, PageLayout, Select, Checkbox } from "../components/ui";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -393,8 +393,7 @@ function AgentGovernanceCard() {
         </div>
       </div>
       <label className="flex items-center gap-2 text-sm text-foreground">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={requireApproval}
           disabled={saving}
           onChange={(e) => toggle(e.target.checked)}
@@ -450,8 +449,9 @@ function MemoryDefaultCard() {
       </div>
       <label className="flex items-center gap-2 text-sm text-foreground">
         Default backend
-        <select
-          className="rounded border border-border bg-background px-3 py-1.5 text-sm"
+        <Select
+          size="sm"
+          className="px-3 py-1.5"
           value={current}
           disabled={saving}
           onChange={(e) => onChange(e.target.value)}
@@ -461,7 +461,7 @@ function MemoryDefaultCard() {
               {p}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
     </Card>
   );
@@ -541,12 +541,10 @@ function FeatureFlagsCard() {
                 )}
               </div>
               <label className="inline-flex shrink-0 cursor-pointer items-center">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={f.enabled}
                   disabled={locked || busy === f.key}
                   onChange={(e) => toggle(f.key, e.target.checked)}
-                  className="h-4 w-4"
                 />
               </label>
             </li>
