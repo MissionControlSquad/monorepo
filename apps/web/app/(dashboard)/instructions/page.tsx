@@ -8,7 +8,8 @@ import {
   DELETE_AGENT_INSTRUCTION,
   SEED_AGENT_INSTRUCTIONS,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
+import { useResourceDialog } from "@/hooks/useCrud";
 
 // Epic #18: per-agent instruction bundles (AGENTS.md). AGENT_INSTRUCTIONS-gated. Pick an agent, edit
 // its markdown instruction files, seed the role default bundle. Persisted config — delivery into a
@@ -47,10 +48,21 @@ export default function InstructionsPage() {
   const files = data?.agentInstructions ?? [];
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [newFile, setNewFile] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const refresh = () => refetch({ requestPolicy: "network-only" });
+
+  const fileDlg = useResourceDialog({
+    empty: { fileName: "" },
+    submit: async (v) => {
+      const name = v.fileName.trim();
+      if (!name) return "File name is required";
+      const res = await upsert({ agentId, fileName: name, content: `# ${name}\n\n` });
+      if (res.error) return res.error.graphQLErrors?.[0]?.message ?? "Invalid file name";
+      setSelected(name);
+      return null;
+    },
+    onDone: refresh,
+  });
 
   // Keep the editor in sync with the selected file.
   useEffect(() => {
@@ -79,21 +91,6 @@ export default function InstructionsPage() {
     setBusy(true);
     try {
       await seed({ agentId });
-      refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function addFile() {
-    setError(null);
-    const name = newFile.trim();
-    if (!name) return;
-    setBusy(true);
-    try {
-      const res = await upsert({ agentId, fileName: name, content: `# ${name}\n\n` });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Invalid file name");
-      setNewFile("");
-      setSelected(name);
       refresh();
     } finally {
       setBusy(false);
@@ -132,6 +129,26 @@ export default function InstructionsPage() {
         </select>
       </div>
 
+      <FormDialog
+        open={fileDlg.open}
+        onOpenChange={fileDlg.setOpen}
+        title="Add instruction file"
+        onSubmit={fileDlg.onSubmit}
+        submitLabel="Add file"
+        busy={fileDlg.busy}
+        error={fileDlg.error}
+        submitDisabled={!fileDlg.values.fileName.trim()}
+      >
+        <FormField label="File name">
+          <Input
+            className="font-mono"
+            placeholder="NEW.md"
+            value={fileDlg.values.fileName}
+            onChange={(e) => fileDlg.set("fileName", e.target.value)}
+          />
+        </FormField>
+      </FormDialog>
+
       {agentId && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[220px_1fr]">
           <Card className="space-y-2 p-3">
@@ -161,18 +178,9 @@ export default function InstructionsPage() {
                 {f.fileName === "AGENTS.md" && <Badge variant="blue">core</Badge>}
               </button>
             ))}
-            <div className="flex gap-1 pt-1">
-              <input
-                className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
-                placeholder="NEW.md"
-                value={newFile}
-                onChange={(e) => setNewFile(e.target.value)}
-              />
-              <Button size="sm" disabled={!newFile.trim() || busy} onClick={addFile}>
-                Add
-              </Button>
-            </div>
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            <Button size="sm" variant="ghost" className="w-full" onClick={fileDlg.openCreate}>
+              + Add file
+            </Button>
           </Card>
 
           <Card className="space-y-2 p-3">
