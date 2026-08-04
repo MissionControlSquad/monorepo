@@ -5,9 +5,12 @@ name: CI
 # Vitest suite (unit + integration + e2e, backed by Postgres + Redis, real Prisma migrations) +
 # a production build of the web app.
 
-# Runs only on pull requests targeting `main` — the gate that must be green before a PR merges.
+# The gate for `main`: runs on every PR into main (must be green before merge) and on anything that
+# lands directly on main (direct push / merge), so main itself never sits broken.
 on:
   pull_request:
+    branches: [main]
+  push:
     branches: [main]
 
 concurrency:
