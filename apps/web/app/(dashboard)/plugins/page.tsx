@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useQuery, useMutation } from "urql";
 import { PLUGINS_QUERY } from "@/lib/graphql/queries";
 import { INSTALL_PLUGIN, SET_PLUGIN_ENABLED, UNINSTALL_PLUGIN } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Plug } from "lucide-react";
+import { Button, Card, Badge, FormField, FormDialog, ConfirmDialog, EmptyState } from "@/components/ui";
+import { useResourceDialog, useConfirmDelete } from "@/hooks/useCrud";
 
 // Epic #6: plugin SDK registry. PLUGIN_SDK-gated (experimental, admin). Install a plugin by pasting
 // its manifest JSON; enable/disable/uninstall. Capabilities shown are DECLARED, not granted (no
@@ -43,9 +45,7 @@ export default function PluginsPage() {
   const [, setEnabled] = useMutation(SET_PLUGIN_ENABLED);
   const [, uninstall] = useMutation(UNINSTALL_PLUGIN);
 
-  const [manifest, setManifest] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const plugins = data?.plugins ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
@@ -59,61 +59,73 @@ export default function PluginsPage() {
     }
   }
 
-  async function onInstall() {
-    setError(null);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(manifest);
-    } catch {
-      return setError("Manifest is not valid JSON");
-    }
-    setBusy("install");
-    try {
-      const res = await install({ manifest: parsed });
-      if (res.error) {
-        setError(res.error.graphQLErrors[0]?.message ?? "Install failed");
-        return;
+  const dlg = useResourceDialog({
+    empty: { manifest: "" },
+    submit: async (v) => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(v.manifest);
+      } catch {
+        return "Manifest is not valid JSON";
       }
-      setManifest("");
-      refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
+      const res = await install({ manifest: parsed });
+      if (res.error) return res.error.graphQLErrors?.[0]?.message ?? "Install failed";
+      return null;
+    },
+    onDone: refresh,
+  });
+
+  const del = useConfirmDelete<Plugin>({
+    onDelete: async (p) => {
+      const r = await uninstall({ pluginId: p.pluginId });
+      return r.error?.message ?? null;
+    },
+    onDone: refresh,
+  });
 
   return (
     <div className="mx-auto space-y-6 p-4 sm:p-6">
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">Plugins</h1>
-        <p className="text-sm text-muted-foreground">
-          Install plugins by manifest. Declared capabilities are recorded for review — plugin
-          execution is not yet enabled on this instance.
-        </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Plugins</h1>
+          <p className="text-sm text-muted-foreground">
+            Install plugins by manifest. Declared capabilities are recorded for review — plugin
+            execution is not yet enabled on this instance.
+          </p>
+        </div>
+        <Button onClick={dlg.openCreate}>Install plugin</Button>
       </div>
 
-      <Card className="space-y-3 p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-foreground">Install</h2>
-          <Button size="sm" variant="secondary" onClick={() => setManifest(SAMPLE)}>
-            Load sample
-          </Button>
-        </div>
-        <textarea
-          className="h-40 w-full rounded border border-border bg-background px-3 py-1.5 font-mono text-xs"
-          placeholder="Paste a plugin manifest JSON…"
-          value={manifest}
-          onChange={(e) => setManifest(e.target.value)}
-        />
-        <div className="flex justify-end">
-          <Button size="sm" disabled={!manifest.trim() || busy === "install"} onClick={onInstall}>
-            Install plugin
-          </Button>
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </Card>
+      <FormDialog
+        open={dlg.open}
+        onOpenChange={dlg.setOpen}
+        title="Install plugin"
+        description="Paste a plugin manifest JSON. Declared capabilities are recorded for review."
+        onSubmit={dlg.onSubmit}
+        submitLabel="Install plugin"
+        busy={dlg.busy}
+        error={dlg.error}
+        submitDisabled={!dlg.values.manifest.trim()}
+      >
+        <FormField label="Manifest JSON">
+          <textarea
+            className="h-56 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
+            placeholder="Paste a plugin manifest JSON…"
+            value={dlg.values.manifest}
+            onChange={(e) => dlg.set("manifest", e.target.value)}
+          />
+        </FormField>
+        <Button type="button" size="sm" variant="ghost" onClick={() => dlg.set("manifest", SAMPLE)}>
+          Load sample
+        </Button>
+      </FormDialog>
 
       {plugins.length === 0 && (
-        <Card className="p-8 text-center text-sm text-muted-foreground">No plugins installed.</Card>
+        <EmptyState
+          icon={<Plug className="h-8 w-8" />}
+          title="No plugins installed"
+          description="Install a plugin by pasting its manifest."
+        />
       )}
 
       {plugins.map((p) => (
@@ -141,12 +153,7 @@ export default function PluginsPage() {
               >
                 {p.enabled ? "Disable" : "Enable"}
               </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={busy === p.pluginId}
-                onClick={() => act(() => uninstall({ pluginId: p.pluginId }), p.pluginId)}
-              >
+              <Button size="sm" variant="secondary" onClick={() => del.ask(p)}>
                 Uninstall
               </Button>
             </span>
@@ -163,6 +170,15 @@ export default function PluginsPage() {
           )}
         </Card>
       ))}
+
+      <ConfirmDialog
+        isOpen={del.isOpen}
+        onClose={del.cancel}
+        onConfirm={del.confirm}
+        title="Uninstall plugin?"
+        description={`"${del.target?.displayName}" and its recorded capabilities will be removed.`}
+        confirmLabel="Uninstall"
+      />
     </div>
   );
 }

@@ -10,7 +10,8 @@ import {
 } from "@/lib/graphql/queries";
 import { GRANT_AGENT_CAPABILITY, REVOKE_AGENT_CAPABILITY } from "@/lib/graphql/mutations";
 import { AGENT_AUTHZ_DECISION } from "@agentcenter/utils";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, FormField, FormDialog } from "@/components/ui";
+import { useResourceDialog } from "@/hooks/useCrud";
 
 // Epic #21: agent authorization. AGENT_AUTHZ-gated. Grant capabilities to an agent (the agent analog
 // of a human role) and review recent denials. Grants only bite when the agent is in restricted mode
@@ -56,7 +57,6 @@ export default function AgentAuthzPage() {
   const [, grant] = useMutation(GRANT_AGENT_CAPABILITY);
   const [, revoke] = useMutation(REVOKE_AGENT_CAPABILITY);
 
-  const [cap, setCap] = useState<string>(AGENT_CAPABILITIES[0]);
   const [busy, setBusy] = useState(false);
   const grants = grantsData?.agentCapabilityGrants ?? [];
   const events = eventsData?.agentAuthzEvents ?? [];
@@ -66,15 +66,17 @@ export default function AgentAuthzPage() {
     refetchGrants({ requestPolicy: "network-only" });
     refetchEvents({ requestPolicy: "network-only" });
   }
-  async function onGrant() {
-    setBusy(true);
-    try {
-      await grant({ agentId, capability: cap });
-      refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
+
+  const dlg = useResourceDialog({
+    empty: { cap: AGENT_CAPABILITIES[0] as string },
+    submit: async (v) => {
+      if (grantedCaps.has(v.cap)) return "That capability is already granted";
+      const r = await grant({ agentId, capability: v.cap });
+      return r.error?.message ?? null;
+    },
+    onDone: refresh,
+  });
+
   async function onRevoke(id: string) {
     setBusy(true);
     try {
@@ -111,26 +113,37 @@ export default function AgentAuthzPage() {
 
       {agentId && (
         <>
-          <Card className="flex flex-wrap items-center gap-2 p-4">
-            <select
-              className="rounded border border-border bg-background px-2 py-1 text-sm"
-              value={cap}
-              onChange={(e) => setCap(e.target.value)}
-            >
-              {AGENT_CAPABILITIES.map((c) => (
-                <option key={c} value={c} disabled={grantedCaps.has(c)}>
-                  {c}
-                  {grantedCaps.has(c) ? " (granted)" : ""}
-                </option>
-              ))}
-            </select>
-            <Button size="sm" disabled={busy || grantedCaps.has(cap)} onClick={onGrant}>
-              Grant capability
-            </Button>
-          </Card>
+          <FormDialog
+            open={dlg.open}
+            onOpenChange={dlg.setOpen}
+            title="Grant capability"
+            description="Grants are enforced when the agent runs restricted."
+            onSubmit={dlg.onSubmit}
+            submitLabel="Grant"
+            busy={dlg.busy}
+            error={dlg.error}
+          >
+            <FormField label="Capability">
+              <select
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={dlg.values.cap}
+                onChange={(e) => dlg.set("cap", e.target.value)}
+              >
+                {AGENT_CAPABILITIES.map((c) => (
+                  <option key={c} value={c} disabled={grantedCaps.has(c)}>
+                    {c}
+                    {grantedCaps.has(c) ? " (granted)" : ""}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          </FormDialog>
 
           <Card className="space-y-2 p-4">
-            <h2 className="text-sm font-medium text-foreground">Granted capabilities</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-foreground">Granted capabilities</h2>
+              <Button size="sm" onClick={dlg.openCreate}>Grant capability</Button>
+            </div>
             {grants.length === 0 && (
               <p className="text-sm text-muted-foreground">
                 No explicit grants — this agent relies on its role defaults.
