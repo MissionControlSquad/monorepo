@@ -18,6 +18,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Fast-feedback unit tests that need no database (kept from the original workflow).
+  unit-no-db:
+    name: Unit (no DB)
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PRISMA_URL: "postgresql://unused:unused@localhost:5432/unused"
+      POSTGRES_URL_NON_POOLING: "postgresql://unused:unused@localhost:5432/unused"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.1"
+          cache: "npm"
+      - run: npm ci
+      - name: Generate Prisma Client
+        run: cd packages/database && npx prisma generate
+      - name: Run unit tests (no DB)
+        run: cd apps/web && npm run test:unit:no-db
+
   verify:
     name: Typecheck + Lint
     runs-on: ubuntu-latest
