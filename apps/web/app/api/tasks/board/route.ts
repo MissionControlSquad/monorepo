@@ -14,6 +14,7 @@ const STATUS_COLUMNS = [
   TaskStatus.REVIEW,
   TaskStatus.BLOCKED,
   TaskStatus.DONE,
+  TaskStatus.CANCELLED,
 ] as const;
 
 export async function GET(request: Request) {
