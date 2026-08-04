@@ -1,6 +1,62 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+/**
+ * Controlled form state for a self-contained dialog COMPONENT (the parent owns `open`). Resets to
+ * `empty` — or to `editing` mapped through `toValues` — whenever the dialog opens, so one dialog
+ * component handles both create and edit. `submit(values, editing)` returns an inline error message,
+ * or null/undefined on success (which closes the dialog via onOpenChange(false) and runs onDone).
+ *
+ * Use this INSIDE an extracted `<XDialog>` component; use `useResourceDialog` when a page owns the
+ * open state + trigger inline.
+ */
+export function useResourceForm<T extends Record<string, unknown>, E = unknown>(opts: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  empty: T;
+  editing?: E | null;
+  toValues?: (editing: E) => T;
+  submit: (values: T, editing: E | null) => Promise<string | null | undefined | void>;
+  onDone?: () => void;
+}) {
+  const { open, onOpenChange, empty, editing, toValues, submit, onDone } = opts;
+  const [values, setValues] = useState<T>(empty);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Reset (create) or prefill (edit) each time the dialog opens.
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setValues(editing && toValues ? toValues(editing) : empty);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const set = useCallback(<K extends keyof T>(key: K, val: T[K]) => {
+    setValues((v) => ({ ...v, [key]: val }));
+  }, []);
+
+  const onSubmit = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const err = await submit(values, editing ?? null);
+      if (err) {
+        setError(err);
+        return;
+      }
+      onOpenChange(false);
+      onDone?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  }, [values, editing, submit, onOpenChange, onDone]);
+
+  return { values, set, setValues, busy, error, isEditing: editing != null, onSubmit };
+}
 
 /**
  * Reusable create/edit dialog state for a resource, so pages don't re-implement the
