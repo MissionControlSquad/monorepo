@@ -10,7 +10,7 @@ import {
   RUN_SMOKE_CASE,
   RUN_SMOKE_SUITE,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Input, EmptyState } from "@/components/ui";
+import { Button, Card, Badge, Input, EmptyState, FormField, FormDialog } from "@/components/ui";
 
 // Tool smoke-lab (parity #153). SMOKE_LAB-gated, admin. Saved cases assert how a tool call should be
 // admitted (allow/deny); running one drives the real tool gateway (access policy + content guards +
@@ -36,6 +36,7 @@ export default function SmokeLabPage() {
   const [, runSuite] = useMutation(RUN_SMOKE_SUITE);
 
   const [form, setForm] = useState({ name: "", toolName: "", expectDecision: "allow" });
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
@@ -51,6 +52,7 @@ export default function SmokeLabPage() {
     setBusy(false);
     if (r.error) return setError(r.error.message);
     setForm({ name: "", toolName: "", expectDecision: "allow" });
+    setOpen(false);
     refresh();
   }
 
@@ -75,42 +77,52 @@ export default function SmokeLabPage() {
             Assert how a tool call should be admitted, then run it through the real gateway.
           </p>
         </div>
-        <Button onClick={onRunSuite} disabled={busy || cases.length === 0}>
-          {busy ? "Running…" : "Run all"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={onRunSuite} disabled={busy || cases.length === 0}>
+            {busy ? "Running…" : "Run all"}
+          </Button>
+          <Button onClick={() => setOpen(true)}>New case</Button>
+        </div>
       </div>
 
       {summary && <p className="text-sm font-medium text-foreground">{summary}</p>}
 
-      <Card padding="lg" className="space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">New case</h2>
-        <div className="flex flex-wrap items-end gap-2">
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="New smoke case"
+        description="Assert how a tool call should be admitted; running it drives the real gateway."
+        onSubmit={onCreate}
+        submitLabel="Add case"
+        busy={busy}
+        error={error}
+        submitDisabled={!form.name.trim() || !form.toolName.trim()}
+      >
+        <FormField label="Case name">
           <Input
-            placeholder="Case name"
+            placeholder="e.g. Block shell in prod"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-48"
           />
+        </FormField>
+        <FormField label="Tool name">
           <Input
-            placeholder="Tool name (e.g. shell)"
+            placeholder="e.g. shell"
             value={form.toolName}
             onChange={(e) => setForm({ ...form, toolName: e.target.value })}
-            className="w-48"
           />
+        </FormField>
+        <FormField label="Expected decision">
           <select
             value={form.expectDecision}
             onChange={(e) => setForm({ ...form, expectDecision: e.target.value })}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
           >
-            <option value="allow">expect allow</option>
-            <option value="deny">expect deny</option>
+            <option value="allow">Expect allow</option>
+            <option value="deny">Expect deny</option>
           </select>
-          <Button onClick={onCreate} disabled={busy}>
-            Add
-          </Button>
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </Card>
+        </FormField>
+      </FormDialog>
 
       {cases.length === 0 && !fetching ? (
         <EmptyState icon={<FlaskConical className="h-8 w-8" />} title="No smoke cases" description="Add a case to validate your tool-access policy." />

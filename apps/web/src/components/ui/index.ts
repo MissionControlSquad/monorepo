@@ -7,6 +7,7 @@ export { Input } from "./Input";
 export { Badge } from "./Badge";
 export { Card } from "./Card";
 export { ConfirmDialog } from "./ConfirmDialog";
+export { FormDialog } from "./FormDialog";
 export { EmptyState } from "./EmptyState";
 export { FormField } from "./FormField";
 export { StatusPill } from "./StatusPill";
