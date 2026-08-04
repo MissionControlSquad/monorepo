@@ -107,6 +107,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/local-services", icon: ServerCog, label: "Local services", flag: FLAG_KEYS.LOCAL_SERVICES },
   { href: "/adapter-plugins", icon: Puzzle, label: "Adapter plugins" },
   { href: "/inbox-policies", icon: MailCheck, label: "Inbox policies", flag: FLAG_KEYS.INBOX_POLICY },
+  { href: "/agent-insights", icon: Activity, label: "Agent insights", flag: FLAG_KEYS.PRODUCTIVITY_REVIEW },
   { href: "/timeline", icon: GanttChart, label: "Timeline" },
   { href: "/analytics", icon: BarChart3, label: "Analytics", flag: FLAG_KEYS.ANALYTICS },
   { href: "/runners", icon: Cpu, label: "Runners", flag: FLAG_KEYS.RUNNERS },
