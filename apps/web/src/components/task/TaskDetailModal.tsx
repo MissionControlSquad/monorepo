@@ -51,6 +51,7 @@ import { useAppContext } from "../context/AppContext";
 import { TaskComments } from "./TaskComments";
 import { TaskRelationsCard } from "./TaskRelationsCard";
 import { TaskExternalLinksCard } from "./TaskExternalLinksCard";
+import { TaskGithubObjectsCard } from "./TaskGithubObjectsCard";
 import { TaskBlockerDiagnosticsCard } from "./TaskBlockerDiagnosticsCard";
 import { TaskThreadInteractionsCard } from "./TaskThreadInteractionsCard";
 import { TaskWorkProductsCard } from "./TaskWorkProductsCard";
@@ -1187,6 +1188,7 @@ export function TaskDetailModal({
                   <TaskRelationsCard taskId={resolvedTaskId} />
                   <div className="border-t border-border" />
                   <TaskExternalLinksCard taskId={resolvedTaskId} />
+                  <TaskGithubObjectsCard taskId={resolvedTaskId} />
                 </>
               )}
 
