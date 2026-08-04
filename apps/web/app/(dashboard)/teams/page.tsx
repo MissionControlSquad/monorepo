@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useClient } from "urql";
+import { Users } from "lucide-react";
 import { TEAMS_QUERY, PREVIEW_TEAM_INSTALL_QUERY } from "@/lib/graphql/queries";
 import { CREATE_TEAM, ADD_TEAM_MEMBER, INSTALL_TEAM } from "@/lib/graphql/mutations";
 import { COLLISION_STRATEGIES } from "@agentcenter/utils";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Input, FormField, FormDialog, EmptyState } from "@/components/ui";
+import { useResourceDialog } from "@/hooks/useCrud";
 
 // Epic #10: teams catalog. SKILLS_TEAMS-gated (admin installs). A team is an installable bundle of
 // agent roles; installing creates one agent per member with a collision strategy.
@@ -48,16 +50,45 @@ export default function TeamsPage() {
   const client = useClient();
 
   const [busy, setBusy] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", icon: "", tagline: "", tags: "" });
   const [tagFilter, setTagFilter] = useState<string | null>(null);
-  const [memberForm, setMemberForm] = useState<Record<string, { name: string; role: string }>>({});
   const [strategy, setStrategy] = useState<Record<string, string>>({});
   const [result, setResult] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<Record<string, PlanItem[]>>({});
+  const [memberTeamId, setMemberTeamId] = useState<string | null>(null);
   const allTeams = data?.teams ?? [];
   const allTags = [...new Set(allTeams.flatMap((t) => t.tags))].sort();
   const teams = tagFilter ? allTeams.filter((t) => t.tags.includes(tagFilter)) : allTeams;
   const refresh = () => refetch({ requestPolicy: "network-only" });
+
+  const teamDlg = useResourceDialog({
+    empty: { name: "", icon: "", tagline: "", tags: "" },
+    submit: async (v) => {
+      if (!v.name.trim()) return "Team name is required";
+      const r = await createTeam({
+        name: v.name.trim(),
+        icon: v.icon.trim() || null,
+        tagline: v.tagline.trim() || null,
+        tags: v.tags.split(",").map((s) => s.trim()).filter(Boolean),
+      });
+      return r.error?.message ?? null;
+    },
+    onDone: refresh,
+  });
+
+  const memberDlg = useResourceDialog({
+    empty: { name: "", role: "" },
+    submit: async (v) => {
+      if (!memberTeamId) return "No team selected";
+      if (!v.name.trim() || !v.role.trim()) return "Name and role are required";
+      const r = await addMember({ teamId: memberTeamId, name: v.name.trim(), role: v.role.trim() });
+      return r.error?.message ?? null;
+    },
+    onDone: refresh,
+  });
+  const openAddMember = (id: string) => {
+    setMemberTeamId(id);
+    memberDlg.openCreate();
+  };
 
   async function act(fn: () => Promise<unknown>, key: string) {
     setBusy(key);
@@ -71,96 +102,88 @@ export default function TeamsPage() {
 
   return (
     <div className="mx-auto space-y-6 p-4 sm:p-6">
-      <h1 className="text-lg font-semibold text-foreground">Teams</h1>
-      <p className="-mt-4 text-sm text-muted-foreground">
-        Installable bundles of agent roles. Installing creates one agent per member.
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Teams</h1>
+          <p className="text-sm text-muted-foreground">
+            Installable bundles of agent roles. Installing creates one agent per member.
+          </p>
+        </div>
+        <Button onClick={teamDlg.openCreate}>New team</Button>
+      </div>
 
-      <Card className="space-y-2 p-4">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[4rem_1fr]">
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-center text-sm"
-            placeholder="👥"
-            value={form.icon}
-            onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="New team name"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          />
+      <FormDialog
+        open={teamDlg.open}
+        onOpenChange={teamDlg.setOpen}
+        title="New team"
+        onSubmit={teamDlg.onSubmit}
+        submitLabel="Create team"
+        busy={teamDlg.busy}
+        error={teamDlg.error}
+        submitDisabled={!teamDlg.values.name.trim()}
+      >
+        <div className="grid grid-cols-[4rem_1fr] gap-4">
+          <FormField label="Icon">
+            <Input placeholder="👥" value={teamDlg.values.icon} onChange={(e) => teamDlg.set("icon", e.target.value)} />
+          </FormField>
+          <FormField label="Name">
+            <Input placeholder="e.g. Growth Squad" value={teamDlg.values.name} onChange={(e) => teamDlg.set("name", e.target.value)} />
+          </FormField>
         </div>
-        <input
-          className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-          placeholder="Tagline (optional)"
-          value={form.tagline}
-          onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))}
-        />
-        <div className="flex gap-2">
-          <input
-            className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Tags, comma-separated (optional)"
-            value={form.tags}
-            onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
-          />
-          <Button
-            size="sm"
-            disabled={!form.name.trim() || busy === "create"}
-            onClick={() =>
-              act(async () => {
-                await createTeam({
-                  name: form.name.trim(),
-                  icon: form.icon.trim() || null,
-                  tagline: form.tagline.trim() || null,
-                  tags: form.tags
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                });
-                setForm({ name: "", icon: "", tagline: "", tags: "" });
-              }, "create")
-            }
-          >
-            Create team
-          </Button>
-        </div>
-      </Card>
+        <FormField label="Tagline (optional)">
+          <Input value={teamDlg.values.tagline} onChange={(e) => teamDlg.set("tagline", e.target.value)} />
+        </FormField>
+        <FormField label="Tags (comma-separated, optional)">
+          <Input placeholder="growth, marketing" value={teamDlg.values.tags} onChange={(e) => teamDlg.set("tags", e.target.value)} />
+        </FormField>
+      </FormDialog>
+
+      <FormDialog
+        open={memberDlg.open}
+        onOpenChange={memberDlg.setOpen}
+        title="Add role"
+        description="Add a role to the team; installing creates one agent for it."
+        onSubmit={memberDlg.onSubmit}
+        submitLabel="Add role"
+        busy={memberDlg.busy}
+        error={memberDlg.error}
+        submitDisabled={!memberDlg.values.name.trim() || !memberDlg.values.role.trim()}
+      >
+        <FormField label="Member name">
+          <Input value={memberDlg.values.name} onChange={(e) => memberDlg.set("name", e.target.value)} />
+        </FormField>
+        <FormField label="Role">
+          <Input placeholder="e.g. Backend Developer" value={memberDlg.values.role} onChange={(e) => memberDlg.set("role", e.target.value)} />
+        </FormField>
+      </FormDialog>
 
       {allTags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           <FilterChip label="All" active={tagFilter === null} onClick={() => setTagFilter(null)} />
           {allTags.map((tag) => (
-            <FilterChip
-              key={tag}
-              label={tag}
-              active={tagFilter === tag}
-              onClick={() => setTagFilter(tag)}
-            />
+            <FilterChip key={tag} label={tag} active={tagFilter === tag} onClick={() => setTagFilter(tag)} />
           ))}
         </div>
       )}
 
-      {teams.length === 0 && (
-        <Card className="p-8 text-center text-sm text-muted-foreground">No teams yet.</Card>
-      )}
-      {teams.map((tm) => {
-        const mf = memberForm[tm.id] ?? { name: "", role: "" };
-        return (
+      {teams.length === 0 ? (
+        <EmptyState
+          icon={<Users className="h-8 w-8" />}
+          title="No teams yet"
+          description="Create a team, add roles, then install it to spin up agents."
+        />
+      ) : (
+        teams.map((tm) => (
           <Card key={tm.id} className="space-y-3 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="flex flex-wrap items-center gap-2">
                 {tm.icon && <span className="text-base">{tm.icon}</span>}
                 <span className="font-medium text-foreground">{tm.name}</span>
-                {tm.tagline && (
-                  <span className="text-xs text-muted-foreground">— {tm.tagline}</span>
-                )}
+                {tm.tagline && <span className="text-xs text-muted-foreground">— {tm.tagline}</span>}
                 <Badge variant="gray">{tm.members.length} roles</Badge>
                 <span className="text-xs text-muted-foreground">{tm.installCount} installs</span>
                 {tm.tags.map((tag) => (
-                  <Badge key={tag} variant="blue">
-                    {tag}
-                  </Badge>
+                  <Badge key={tag} variant="blue">{tag}</Badge>
                 ))}
               </span>
               <span className="flex items-center gap-2">
@@ -170,9 +193,7 @@ export default function TeamsPage() {
                   onChange={(e) => setStrategy((s) => ({ ...s, [tm.id]: e.target.value }))}
                 >
                   {STRATEGIES.map((s) => (
-                    <option key={s} value={s}>
-                      on collision: {s}
-                    </option>
+                    <option key={s} value={s}>on collision: {s}</option>
                   ))}
                 </select>
                 <Button
@@ -200,10 +221,7 @@ export default function TeamsPage() {
                   disabled={tm.members.length === 0 || busy === tm.id}
                   onClick={() =>
                     act(async () => {
-                      const res = await installTeam({
-                        teamId: tm.id,
-                        collisionStrategy: strategy[tm.id] ?? "rename",
-                      });
+                      const res = await installTeam({ teamId: tm.id, collisionStrategy: strategy[tm.id] ?? "rename" });
                       const ids = res.data?.installTeam?.createdAgentIds ?? [];
                       setResult((r) => ({ ...r, [tm.id]: `installed — ${ids.length} agent(s)` }));
                       setPreview((p) => ({ ...p, [tm.id]: [] }));
@@ -211,6 +229,9 @@ export default function TeamsPage() {
                   }
                 >
                   Install
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => openAddMember(tm.id)}>
+                  Add role
                 </Button>
               </span>
             </div>
@@ -233,45 +254,12 @@ export default function TeamsPage() {
             {result[tm.id] && <p className="text-xs text-muted-foreground">{result[tm.id]}</p>}
             <div className="flex flex-wrap gap-2">
               {tm.members.map((m) => (
-                <Badge key={m.id} variant="blue">
-                  {m.name} · {m.role}
-                </Badge>
+                <Badge key={m.id} variant="blue">{m.name} · {m.role}</Badge>
               ))}
             </div>
-            <div className="flex gap-2">
-              <input
-                className="w-1/2 rounded border border-border bg-background px-2 py-1 text-sm"
-                placeholder="Member name"
-                value={mf.name}
-                onChange={(e) =>
-                  setMemberForm((s) => ({ ...s, [tm.id]: { ...mf, name: e.target.value } }))
-                }
-              />
-              <input
-                className="w-1/2 rounded border border-border bg-background px-2 py-1 text-sm"
-                placeholder="Role"
-                value={mf.role}
-                onChange={(e) =>
-                  setMemberForm((s) => ({ ...s, [tm.id]: { ...mf, role: e.target.value } }))
-                }
-              />
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={!mf.name.trim() || !mf.role.trim() || busy === tm.id}
-                onClick={() =>
-                  act(async () => {
-                    await addMember({ teamId: tm.id, name: mf.name.trim(), role: mf.role.trim() });
-                    setMemberForm((s) => ({ ...s, [tm.id]: { name: "", role: "" } }));
-                  }, tm.id)
-                }
-              >
-                Add role
-              </Button>
-            </div>
           </Card>
-        );
-      })}
+        ))
+      )}
     </div>
   );
 }
