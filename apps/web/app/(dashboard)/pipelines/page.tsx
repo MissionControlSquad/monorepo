@@ -21,7 +21,7 @@ import {
   TRANSITION_CASE,
   REJECT_CASE,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Spinner } from "@/components/ui";
 import { PipelineDialog } from "@/components/dialogs/PipelineDialog";
 
 // Epic #7: pipelines (multi-stage case workflows). PIPELINES_ROUTINES-gated. Admin builds
@@ -284,7 +284,7 @@ function PipelineCard({
 }
 
 export default function PipelinesPage() {
-  const [{ data }, refetch] = useQuery<{ pipelines: Pipeline[] }>({ query: PIPELINES_QUERY });
+  const [{ data, fetching }, refetch] = useQuery<{ pipelines: Pipeline[] }>({ query: PIPELINES_QUERY });
 
   const [open, setOpen] = useState(false);
   const pipelines = data?.pipelines ?? [];
@@ -307,7 +307,12 @@ export default function PipelinesPage() {
         onSaved={() => refetch({ requestPolicy: "network-only" })}
       />
 
-      {pipelines.length === 0 && (
+      {fetching && pipelines.length === 0 && (
+        <div className="flex justify-center p-8">
+          <Spinner />
+        </div>
+      )}
+      {pipelines.length === 0 && !fetching && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No pipelines yet.</Card>
       )}
       {pipelines.map((p) => (

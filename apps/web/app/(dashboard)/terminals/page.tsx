@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "urql";
 import { TERMINAL_STATE } from "@agentcenter/utils";
 import { TERMINAL_SESSIONS_QUERY } from "@/lib/graphql/queries";
 import { CLOSE_TERMINAL_SESSION } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, EmptyState } from "@/components/ui";
+import { Button, Card, Badge, EmptyState, Spinner } from "@/components/ui";
 import { TerminalSessionDialog } from "@/components/dialogs/TerminalSessionDialog";
 import { SquareTerminal } from "lucide-react";
 import { TerminalConsole } from "@/components/terminals/TerminalConsole";
@@ -41,7 +41,7 @@ const STATE_VARIANT: Record<string, "gray" | "blue" | "green" | "yellow" | "red"
 };
 
 export default function TerminalsPage() {
-  const [{ data }, refetch] = useQuery<{ terminalSessions: Session[] }>({
+  const [{ data, fetching }, refetch] = useQuery<{ terminalSessions: Session[] }>({
     query: TERMINAL_SESSIONS_QUERY,
   });
   const [, close] = useMutation(CLOSE_TERMINAL_SESSION);
@@ -122,7 +122,12 @@ export default function TerminalsPage() {
         />
       )}
 
-      {sessions.length === 0 && (
+      {fetching && sessions.length === 0 && (
+        <div className="flex justify-center p-8">
+          <Spinner />
+        </div>
+      )}
+      {sessions.length === 0 && !fetching && (
         <EmptyState
           icon={<SquareTerminal className="h-8 w-8" />}
           title="No terminal sessions"

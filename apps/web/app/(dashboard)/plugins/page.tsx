@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "urql";
 import { PLUGINS_QUERY } from "@/lib/graphql/queries";
 import { SET_PLUGIN_ENABLED, UNINSTALL_PLUGIN } from "@/lib/graphql/mutations";
 import { Plug } from "lucide-react";
-import { Button, Card, Badge, ConfirmDialog, EmptyState } from "@/components/ui";
+import { Button, Card, Badge, ConfirmDialog, EmptyState, Spinner } from "@/components/ui";
 import { PluginInstallDialog } from "@/components/dialogs/PluginInstallDialog";
 import { useConfirmDelete } from "@/hooks/useCrud";
 
@@ -27,7 +27,7 @@ interface Plugin {
 }
 
 export default function PluginsPage() {
-  const [{ data }, refetch] = useQuery<{ plugins: Plugin[] }>({ query: PLUGINS_QUERY });
+  const [{ data, fetching }, refetch] = useQuery<{ plugins: Plugin[] }>({ query: PLUGINS_QUERY });
   const [, setEnabled] = useMutation(SET_PLUGIN_ENABLED);
   const [, uninstall] = useMutation(UNINSTALL_PLUGIN);
 
@@ -69,7 +69,12 @@ export default function PluginsPage() {
 
       <PluginInstallDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
-      {plugins.length === 0 && (
+      {fetching && plugins.length === 0 && (
+        <div className="flex justify-center p-8">
+          <Spinner />
+        </div>
+      )}
+      {plugins.length === 0 && !fetching && (
         <EmptyState
           icon={<Plug className="h-8 w-8" />}
           title="No plugins installed"

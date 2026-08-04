@@ -12,7 +12,7 @@ import {
   REMOVE_CASE_LABEL,
 } from "@/lib/graphql/mutations";
 import { CASE_STATES, CaseState } from "@agentcenter/utils";
-import { Button, Card, Badge, EmptyState } from "@/components/ui";
+import { Button, Card, Badge, EmptyState, Spinner } from "@/components/ui";
 import { CaseDialog } from "@/components/dialogs/CaseDialog";
 import { LabelDialog } from "@/components/dialogs/LabelDialog";
 
@@ -44,7 +44,7 @@ function statusVariant(s: string): "gray" | "blue" | "yellow" | "green" | "red" 
 }
 
 export default function CasesPage() {
-  const [{ data }, refetch] = useQuery<{ cases: CaseRow[] }>({ query: CASES_QUERY });
+  const [{ data, fetching }, refetch] = useQuery<{ cases: CaseRow[] }>({ query: CASES_QUERY });
   const [{ data: labelData }, refetchLabels] = useQuery<{ labels: Label[] }>({
     query: LABELS_QUERY,
   });
@@ -105,7 +105,11 @@ export default function CasesPage() {
         </Button>
       </Card>
 
-      {cases.length === 0 ? (
+      {fetching && cases.length === 0 ? (
+        <div className="flex justify-center p-8">
+          <Spinner />
+        </div>
+      ) : cases.length === 0 ? (
         <EmptyState
           icon={<Ticket className="h-8 w-8" />}
           title="No cases yet"

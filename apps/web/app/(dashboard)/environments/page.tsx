@@ -24,7 +24,7 @@ import {
 } from "@/lib/graphql/mutations";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Spinner } from "@/components/ui";
 import { EnvironmentDialog } from "@/components/dialogs/EnvironmentDialog";
 import { ShieldCheck, Bot, Boxes, GitBranch } from "lucide-react";
 
@@ -52,7 +52,7 @@ interface Environment {
   createdAt: string;
 }
 export default function EnvironmentsPage() {
-  const [{ data }, refetch] = useQuery<{ environments: Environment[] }>({
+  const [{ data, fetching }, refetch] = useQuery<{ environments: Environment[] }>({
     query: ENVIRONMENTS_QUERY,
   });
   const [, archiveEnv] = useMutation(ARCHIVE_ENVIRONMENT);
@@ -141,7 +141,14 @@ export default function EnvironmentsPage() {
       {/* ── List ───────────────────────────────────────────────── */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">Environments</h2>
-        {envs.length === 0 && <p className="text-sm text-muted-foreground">No environments yet.</p>}
+        {fetching && envs.length === 0 && (
+          <div className="flex justify-center p-8">
+            <Spinner />
+          </div>
+        )}
+        {envs.length === 0 && !fetching && (
+          <p className="text-sm text-muted-foreground">No environments yet.</p>
+        )}
         {envs.map((env) => (
           <Card key={env.id} className="space-y-2 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">

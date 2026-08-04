@@ -10,7 +10,7 @@ import {
   UPDATE_ROUTINE,
   REGENERATE_TRIGGER_PUBLIC_ID,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Spinner } from "@/components/ui";
 import { RoutineDialog } from "@/components/dialogs/RoutineDialog";
 
 // Epic #7: routines (scheduled/triggered workflow docs). PIPELINES_ROUTINES-gated + buildbase role
@@ -35,7 +35,7 @@ interface Routine {
 }
 
 export default function RoutinesPage() {
-  const [{ data }, refetch] = useQuery<{ routines: Routine[] }>({ query: ROUTINES_QUERY });
+  const [{ data, fetching }, refetch] = useQuery<{ routines: Routine[] }>({ query: ROUTINES_QUERY });
   const [{ data: agentsData }] = useQuery<{ agents: { id: string; name: string }[] }>({
     query: AGENTS_QUERY,
   });
@@ -132,7 +132,12 @@ export default function RoutinesPage() {
 
       <RoutineDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
-      {routines.length === 0 && (
+      {fetching && routines.length === 0 && (
+        <div className="flex justify-center p-8">
+          <Spinner />
+        </div>
+      )}
+      {routines.length === 0 && !fetching && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No routines yet.</Card>
       )}
 

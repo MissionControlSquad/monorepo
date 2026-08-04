@@ -43,7 +43,9 @@ export default function AgentAuthzPage() {
     if (!agentId && agents.length) setAgentId(agents[0].id);
   }, [agents, agentId]);
 
-  const [{ data: grantsData }, refetchGrants] = useQuery<{ agentCapabilityGrants: Grant[] }>({
+  const [{ data: grantsData, fetching: grantsFetching }, refetchGrants] = useQuery<{
+    agentCapabilityGrants: Grant[];
+  }>({
     query: AGENT_CAPABILITY_GRANTS_QUERY,
     variables: { agentId },
     pause: !agentId,
@@ -115,7 +117,7 @@ export default function AgentAuthzPage() {
               <h2 className="text-sm font-medium text-foreground">Granted capabilities</h2>
               <Button size="sm" onClick={() => setOpen(true)}>Grant capability</Button>
             </div>
-            {grants.length === 0 && (
+            {grants.length === 0 && !grantsFetching && (
               <p className="text-sm text-muted-foreground">
                 No explicit grants — this agent relies on its role defaults.
               </p>
@@ -142,7 +144,7 @@ export default function AgentAuthzPage() {
 
           <Card className="space-y-2 p-4">
             <h2 className="text-sm font-medium text-foreground">Recent authorization events</h2>
-            {events.length === 0 && (
+            {events.length === 0 && !grantsFetching && (
               <p className="text-sm text-muted-foreground">No denials recorded.</p>
             )}
             {events.map((e) => (

@@ -23,7 +23,7 @@ import {
   CANCEL_AGENT_RUN,
   PROMOTE_AGENT_RUN_REVIEW,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Spinner } from "@/components/ui";
 import { RunnerHostDialog } from "@/components/dialogs/RunnerHostDialog";
 import { RunnerQueueCommandDialog } from "@/components/dialogs/RunnerQueueCommandDialog";
 import { Server, Bot, Box } from "lucide-react";
@@ -339,7 +339,7 @@ function CommandHistory({ targetKind }: { targetKind: string }) {
 }
 
 export default function RunnersPage() {
-  const [{ data: hostData }, refetchHosts] = useQuery<{ runnerHosts: Host[] }>({
+  const [{ data: hostData, fetching: hostsFetching }, refetchHosts] = useQuery<{ runnerHosts: Host[] }>({
     query: RUNNER_HOSTS_QUERY,
   });
   const [{ data: agentData }] = useQuery<{ agents: AgentLite[] }>({ query: AGENTS_FOR_TASK_QUERY });
@@ -529,7 +529,12 @@ export default function RunnersPage() {
             </div>
           </Card>
         ))}
-        {hosts.length === 0 && (
+        {hostsFetching && hosts.length === 0 && (
+          <div className="flex justify-center p-8">
+            <Spinner />
+          </div>
+        )}
+        {hosts.length === 0 && !hostsFetching && (
           <Card className="p-6 text-center text-sm text-muted-foreground">
             No hosts registered.
           </Card>
