@@ -10,7 +10,7 @@ import {
   UPDATE_ROUTINE,
   REGENERATE_TRIGGER_PUBLIC_ID,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
 
 const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 
@@ -53,6 +53,7 @@ export default function RoutinesPage() {
   const goals = goalsData?.goals ?? [];
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: "",
     definition: '{\n  "steps": []\n}',
@@ -95,6 +96,7 @@ export default function RoutinesPage() {
         priority: "",
         goalId: "",
       });
+      setOpen(false);
       refresh();
     } finally {
       setBusy(null);
@@ -148,78 +150,78 @@ export default function RoutinesPage() {
 
   return (
     <div className="mx-auto space-y-6 p-4 sm:p-6">
-      <h1 className="text-lg font-semibold text-foreground">Routines</h1>
-      <p className="-mt-4 text-sm text-muted-foreground">
-        Reusable workflows with run history + immutable revisions. Firing a routine generates a
-        task.
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Routines</h1>
+          <p className="text-sm text-muted-foreground">
+            Reusable workflows with run history + immutable revisions. Firing a routine generates a task.
+          </p>
+        </div>
+        <Button onClick={() => setOpen(true)}>New routine</Button>
+      </div>
 
-      <Card className="space-y-3 p-4">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Routine name"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="New routine"
+        onSubmit={onCreate}
+        submitLabel="Create routine"
+        busy={busy === "create"}
+        error={error}
+        submitDisabled={!form.name.trim()}
+      >
+        <FormField label="Name">
+          <Input placeholder="Routine name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+        </FormField>
+        <FormField label="Description (optional)">
+          <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+        </FormField>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <FormField label="Assignee (optional)">
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={form.assigneeAgentId}
+              onChange={(e) => setForm((f) => ({ ...f, assigneeAgentId: e.target.value }))}
+            >
+              <option value="">None</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Priority (optional)">
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={form.priority}
+              onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
+            >
+              <option value="">None</option>
+              {PRIORITIES.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Goal (optional)">
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={form.goalId}
+              onChange={(e) => setForm((f) => ({ ...f, goalId: e.target.value }))}
+            >
+              <option value="">None</option>
+              {goals.map((g) => (
+                <option key={g.id} value={g.id}>{g.title}</option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+        <FormField label="Definition (JSON)">
+          <textarea
+            className="h-32 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
+            value={form.definition}
+            onChange={(e) => setForm((f) => ({ ...f, definition: e.target.value }))}
           />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Description (optional)"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-        </div>
-        {/* Metadata applied to each generated task */}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <select
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            value={form.assigneeAgentId}
-            onChange={(e) => setForm((f) => ({ ...f, assigneeAgentId: e.target.value }))}
-          >
-            <option value="">Assign to… (optional)</option>
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            value={form.priority}
-            onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
-          >
-            <option value="">Priority… (optional)</option>
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <select
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            value={form.goalId}
-            onChange={(e) => setForm((f) => ({ ...f, goalId: e.target.value }))}
-          >
-            <option value="">Goal… (optional)</option>
-            {goals.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.title}
-              </option>
-            ))}
-          </select>
-        </div>
-        <textarea
-          className="h-24 w-full rounded border border-border bg-background px-3 py-1.5 font-mono text-xs"
-          value={form.definition}
-          onChange={(e) => setForm((f) => ({ ...f, definition: e.target.value }))}
-        />
-        <div className="flex justify-end">
-          <Button size="sm" disabled={busy === "create"} onClick={onCreate}>
-            Create routine
-          </Button>
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </Card>
+        </FormField>
+      </FormDialog>
 
       {routines.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No routines yet.</Card>
