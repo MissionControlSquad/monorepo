@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "urql";
+import { useQuery } from "urql";
 import { EXPORT_WORKSPACE_BUNDLE, WORKSPACE_IMPORTS } from "@/lib/graphql/queries";
-import { IMPORT_WORKSPACE_BUNDLE } from "@/lib/graphql/mutations";
-import { COLLISION_STRATEGIES } from "@agentcenter/utils";
-import { Button, Card, Badge, FormField, FormDialog } from "@/components/ui";
-import { useResourceDialog } from "@/hooks/useCrud";
+import { Button, Card, Badge } from "@/components/ui";
+import { PortabilityImportDialog } from "@/components/dialogs/PortabilityImportDialog";
 
 // Epic #14: workspace portability. WORKSPACE_PORTABILITY-gated. Export renders a credential-free JSON
 // bundle of the workspace's agents/projects/skills; import (admin) re-creates them with a collision
@@ -31,7 +29,6 @@ interface ImportRow {
   createdAt: string;
 }
 
-const STRATEGIES = COLLISION_STRATEGIES;
 
 export default function PortabilityPage() {
   const [{ data: exp }, refetchExport] = useQuery<{ exportWorkspaceBundle: unknown }>({
@@ -40,8 +37,7 @@ export default function PortabilityPage() {
   const [{ data: hist }, refetchHist] = useQuery<{ workspaceImports: ImportRow[] }>({
     query: WORKSPACE_IMPORTS,
   });
-  const [, importBundle] = useMutation(IMPORT_WORKSPACE_BUNDLE);
-
+  const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
 
   const bundle = exp?.exportWorkspaceBundle;
@@ -58,23 +54,6 @@ export default function PortabilityPage() {
     URL.revokeObjectURL(url);
   }
 
-  const importDlg = useResourceDialog({
-    empty: { strategy: "rename", pasted: "" },
-    submit: async (v) => {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(v.pasted);
-      } catch {
-        return "Pasted text is not valid JSON";
-      }
-      const res = await importBundle({ bundle: parsed, collisionStrategy: v.strategy });
-      if (res.error) return res.error.graphQLErrors?.[0]?.message ?? "Import failed";
-      setSummary(res.data?.importWorkspaceBundle?.summary ?? null);
-      return null;
-    },
-    onDone: () => refetchHist({ requestPolicy: "network-only" }),
-  });
-
   return (
     <div className="mx-auto space-y-6 p-4 sm:p-6">
       <div className="flex items-start justify-between gap-2">
@@ -85,40 +64,17 @@ export default function PortabilityPage() {
             import one into this workspace. Bundles never contain secrets or credentials.
           </p>
         </div>
-        <Button onClick={importDlg.openCreate}>Import bundle</Button>
+        <Button onClick={() => setOpen(true)}>Import bundle</Button>
       </div>
 
-      <FormDialog
-        open={importDlg.open}
-        onOpenChange={importDlg.setOpen}
-        title="Import workspace bundle"
-        description="Provisions agents / projects / skills from a bundle. Admin only; never contains secrets."
-        onSubmit={importDlg.onSubmit}
-        submitLabel="Import bundle"
-        busy={importDlg.busy}
-        error={importDlg.error}
-        submitDisabled={!importDlg.values.pasted.trim()}
-      >
-        <FormField label="On collision">
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={importDlg.values.strategy}
-            onChange={(e) => importDlg.set("strategy", e.target.value)}
-          >
-            {STRATEGIES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </FormField>
-        <FormField label="Bundle JSON">
-          <textarea
-            className="h-48 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
-            placeholder="Paste a workspace bundle JSON here…"
-            value={importDlg.values.pasted}
-            onChange={(e) => importDlg.set("pasted", e.target.value)}
-          />
-        </FormField>
-      </FormDialog>
+      <PortabilityImportDialog
+        open={open}
+        onOpenChange={setOpen}
+        onImported={(s) => {
+          setSummary(s);
+          refetchHist({ requestPolicy: "network-only" });
+        }}
+      />
 
       {summary && (
         <Card className="border-success bg-success-muted p-4 text-sm text-foreground">

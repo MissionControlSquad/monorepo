@@ -4,10 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation } from "urql";
 import { PLUGINS_QUERY } from "@/lib/graphql/queries";
-import { INSTALL_PLUGIN, SET_PLUGIN_ENABLED, UNINSTALL_PLUGIN } from "@/lib/graphql/mutations";
+import { SET_PLUGIN_ENABLED, UNINSTALL_PLUGIN } from "@/lib/graphql/mutations";
 import { Plug } from "lucide-react";
-import { Button, Card, Badge, FormField, FormDialog, ConfirmDialog, EmptyState } from "@/components/ui";
-import { useResourceDialog, useConfirmDelete } from "@/hooks/useCrud";
+import { Button, Card, Badge, ConfirmDialog, EmptyState } from "@/components/ui";
+import { PluginInstallDialog } from "@/components/dialogs/PluginInstallDialog";
+import { useConfirmDelete } from "@/hooks/useCrud";
 
 // Epic #6: plugin SDK registry. PLUGIN_SDK-gated (experimental, admin). Install a plugin by pasting
 // its manifest JSON; enable/disable/uninstall. Capabilities shown are DECLARED, not granted (no
@@ -25,27 +26,13 @@ interface Plugin {
   enabled: boolean;
 }
 
-const SAMPLE = JSON.stringify(
-  {
-    apiVersion: 1,
-    id: "acme-connector",
-    version: "1.0.0",
-    displayName: "Acme Connector",
-    description: "Syncs Acme issues",
-    category: "connector",
-    capabilities: ["projects.read", "issues.create"],
-  },
-  null,
-  2,
-);
-
 export default function PluginsPage() {
   const [{ data }, refetch] = useQuery<{ plugins: Plugin[] }>({ query: PLUGINS_QUERY });
-  const [, install] = useMutation(INSTALL_PLUGIN);
   const [, setEnabled] = useMutation(SET_PLUGIN_ENABLED);
   const [, uninstall] = useMutation(UNINSTALL_PLUGIN);
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const plugins = data?.plugins ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
@@ -58,22 +45,6 @@ export default function PluginsPage() {
       setBusy(null);
     }
   }
-
-  const dlg = useResourceDialog({
-    empty: { manifest: "" },
-    submit: async (v) => {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(v.manifest);
-      } catch {
-        return "Manifest is not valid JSON";
-      }
-      const res = await install({ manifest: parsed });
-      if (res.error) return res.error.graphQLErrors?.[0]?.message ?? "Install failed";
-      return null;
-    },
-    onDone: refresh,
-  });
 
   const del = useConfirmDelete<Plugin>({
     onDelete: async (p) => {
@@ -93,32 +64,10 @@ export default function PluginsPage() {
             execution is not yet enabled on this instance.
           </p>
         </div>
-        <Button onClick={dlg.openCreate}>Install plugin</Button>
+        <Button onClick={() => setOpen(true)}>Install plugin</Button>
       </div>
 
-      <FormDialog
-        open={dlg.open}
-        onOpenChange={dlg.setOpen}
-        title="Install plugin"
-        description="Paste a plugin manifest JSON. Declared capabilities are recorded for review."
-        onSubmit={dlg.onSubmit}
-        submitLabel="Install plugin"
-        busy={dlg.busy}
-        error={dlg.error}
-        submitDisabled={!dlg.values.manifest.trim()}
-      >
-        <FormField label="Manifest JSON">
-          <textarea
-            className="h-56 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
-            placeholder="Paste a plugin manifest JSON…"
-            value={dlg.values.manifest}
-            onChange={(e) => dlg.set("manifest", e.target.value)}
-          />
-        </FormField>
-        <Button type="button" size="sm" variant="ghost" onClick={() => dlg.set("manifest", SAMPLE)}>
-          Load sample
-        </Button>
-      </FormDialog>
+      <PluginInstallDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
       {plugins.length === 0 && (
         <EmptyState

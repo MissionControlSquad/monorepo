@@ -9,9 +9,10 @@ import {
   LEDGER_BY_BILLER_QUERY,
   LEDGER_EVENTS_QUERY,
 } from "@/lib/graphql/queries";
-import { CREATE_LEDGER_EVENT, DELETE_LEDGER_EVENT } from "@/lib/graphql/mutations";
+import { DELETE_LEDGER_EVENT } from "@/lib/graphql/mutations";
 import { formatCents as money } from "@agentcenter/utils";
-import { Button, Card, Badge, Input, FormField, FormDialog } from "@/components/ui";
+import { Button, Card, Badge } from "@/components/ui";
+import { LedgerEntryDialog } from "@/components/dialogs/LedgerEntryDialog";
 
 // Epic #16: business finance ledger (human P&L). API-gated by the LEDGER feature + buildbase role
 // (admin records/edits/deletes; member views). Workspace-scoped server-side. NOT agent cost (#4).
@@ -55,11 +56,6 @@ interface Event {
   occurredAt: string;
 }
 
-function todayISO(): string {
-  // Deterministic yyyy-mm-dd for the date input default.
-  return new Date().toISOString().slice(0, 10);
-}
-
 function SummaryCard({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
     <Card className="p-4">
@@ -86,20 +82,10 @@ export default function LedgerPage() {
     ledgerEvents: { events: Event[]; nextCursor: string | null };
   }>({ query: LEDGER_EVENTS_QUERY, variables: { limit: 25 } });
 
-  const [, createEvent] = useMutation(CREATE_LEDGER_EVENT);
   const [, deleteEvent] = useMutation(DELETE_LEDGER_EVENT);
 
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    kind: "expense",
-    category: "",
-    biller: "",
-    amount: "",
-    date: todayISO(),
-    description: "",
-  });
-  const [formError, setFormError] = useState<string | null>(null);
 
   const summary = sumData?.ledgerSummary;
   const cats = [...(catData?.ledgerByCategory ?? [])].sort((a, b) => b.totalCents - a.totalCents);
@@ -114,34 +100,6 @@ export default function LedgerPage() {
     refetchProjects({ requestPolicy: "network-only" });
     refetchBillers({ requestPolicy: "network-only" });
     refetchEvents({ requestPolicy: "network-only" });
-  }
-
-  async function onCreate() {
-    setFormError(null);
-    const amountCents = Math.round(Number(form.amount) * 100);
-    if (!form.category.trim()) return setFormError("Category is required");
-    if (!Number.isFinite(amountCents) || amountCents <= 0)
-      return setFormError("Enter a positive amount");
-    setBusy("create");
-    try {
-      const res = await createEvent({
-        kind: form.kind,
-        category: form.category.trim(),
-        biller: form.biller.trim() || null,
-        amountCents,
-        description: form.description.trim() || null,
-        occurredAt: new Date(form.date + "T00:00:00.000Z").toISOString(),
-      });
-      if (res.error) {
-        setFormError(res.error.graphQLErrors[0]?.message ?? "Failed to record");
-        return;
-      }
-      setForm((f) => ({ ...f, category: "", biller: "", amount: "", description: "" }));
-      setOpen(false);
-      refresh();
-    } finally {
-      setBusy(null);
-    }
   }
 
   async function onDelete(id: string) {
@@ -185,55 +143,7 @@ export default function LedgerPage() {
         <SummaryCard label="Entries" value={String(summary?.eventCount ?? 0)} />
       </div>
 
-      <FormDialog
-        open={open}
-        onOpenChange={setOpen}
-        title="Record a ledger entry"
-        onSubmit={onCreate}
-        submitLabel="Add entry"
-        busy={busy === "create"}
-        error={formError}
-        submitDisabled={!form.category.trim() || !form.amount.trim()}
-      >
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Kind">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={form.kind}
-              onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value }))}
-            >
-              <option value="revenue">revenue</option>
-              <option value="expense">expense</option>
-            </select>
-          </FormField>
-          <FormField label="Amount ($)">
-            <Input
-              inputMode="decimal"
-              placeholder="0.00"
-              value={form.amount}
-              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-            />
-          </FormField>
-        </div>
-        <FormField label="Category">
-          <Input
-            placeholder="e.g. Hosting"
-            value={form.category}
-            onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-          />
-        </FormField>
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Biller / vendor (optional)">
-            <Input value={form.biller} onChange={(e) => setForm((f) => ({ ...f, biller: e.target.value }))} />
-          </FormField>
-          <FormField label="Date">
-            <Input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
-          </FormField>
-        </div>
-        <FormField label="Description (optional)">
-          <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
-        </FormField>
-      </FormDialog>
+      <LedgerEntryDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
       {/* Spend/revenue by category */}
       <section className="space-y-2">

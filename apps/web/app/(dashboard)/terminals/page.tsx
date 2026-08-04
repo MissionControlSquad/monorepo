@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { TERMINAL_STATE } from "@agentcenter/utils";
 import { TERMINAL_SESSIONS_QUERY } from "@/lib/graphql/queries";
-import { OPEN_TERMINAL_SESSION, CLOSE_TERMINAL_SESSION } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Input, FormField, FormDialog, EmptyState } from "@/components/ui";
-import { useResourceDialog } from "@/hooks/useCrud";
+import { CLOSE_TERMINAL_SESSION } from "@/lib/graphql/mutations";
+import { Button, Card, Badge, EmptyState } from "@/components/ui";
+import { TerminalSessionDialog } from "@/components/dialogs/TerminalSessionDialog";
 import { SquareTerminal } from "lucide-react";
 import { TerminalConsole } from "@/components/terminals/TerminalConsole";
 
@@ -44,10 +44,10 @@ export default function TerminalsPage() {
   const [{ data }, refetch] = useQuery<{ terminalSessions: Session[] }>({
     query: TERMINAL_SESSIONS_QUERY,
   });
-  const [, open] = useMutation(OPEN_TERMINAL_SESSION);
   const [, close] = useMutation(CLOSE_TERMINAL_SESSION);
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [revealed, setRevealed] = useState<{
     id: string;
     host: string | null;
@@ -56,23 +56,6 @@ export default function TerminalsPage() {
   const [console_, setConsole] = useState<{ id: string; token: string } | null>(null);
   const sessions = data?.terminalSessions ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
-
-  const dlg = useResourceDialog({
-    empty: { command: "", cwd: "", label: "" },
-    submit: async (v) => {
-      if (!v.command.trim()) return "An ssh command is required";
-      const res = await open({
-        command: v.command.trim(),
-        cwd: v.cwd.trim() || null,
-        label: v.label.trim() || null,
-      });
-      if (res.error) return res.error.graphQLErrors?.[0]?.message ?? "Open failed";
-      const s = res.data.openTerminalSession;
-      setRevealed({ id: s.id, host: s.host, token: s.connectToken });
-      return null;
-    },
-    onDone: refresh,
-  });
 
   async function onClose(id: string) {
     setBusy(id);
@@ -94,35 +77,10 @@ export default function TerminalsPage() {
             click Connect to open a live browser shell to a managed VM target.
           </p>
         </div>
-        <Button onClick={dlg.openCreate}>Open session</Button>
+        <Button onClick={() => setOpen(true)}>Open session</Button>
       </div>
 
-      <FormDialog
-        open={dlg.open}
-        onOpenChange={dlg.setOpen}
-        title="Open terminal session"
-        description="Authorize an SSH session; a one-time connect token is minted."
-        onSubmit={dlg.onSubmit}
-        submitLabel="Open session"
-        busy={dlg.busy}
-        error={dlg.error}
-        submitDisabled={!dlg.values.command.trim()}
-      >
-        <FormField label="SSH command">
-          <Input
-            className="font-mono"
-            placeholder="ssh user@host  |  ssh -p 2222 user@host"
-            value={dlg.values.command}
-            onChange={(e) => dlg.set("command", e.target.value)}
-          />
-        </FormField>
-        <FormField label="Working directory (optional)">
-          <Input value={dlg.values.cwd} onChange={(e) => dlg.set("cwd", e.target.value)} />
-        </FormField>
-        <FormField label="Label (optional)">
-          <Input value={dlg.values.label} onChange={(e) => dlg.set("label", e.target.value)} />
-        </FormField>
-      </FormDialog>
+      <TerminalSessionDialog open={open} onOpenChange={setOpen} onOpened={setRevealed} />
 
       {revealed && (
         <Card className="space-y-2 border-success bg-success-muted p-4">
