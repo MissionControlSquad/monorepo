@@ -2,9 +2,20 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "urql";
+import { KeyRound } from "lucide-react";
 import { API_KEYS_QUERY } from "@/lib/graphql/queries";
 import { MINT_API_KEY, REVOKE_API_KEY } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import {
+  Button,
+  Card,
+  Badge,
+  Input,
+  FormField,
+  FormDialog,
+  ConfirmDialog,
+  EmptyState,
+} from "@/components/ui";
+import { useResourceDialog, useConfirmDelete } from "@/hooks/useCrud";
 
 // Epic #12: API keys for CLI / programmatic access. API_KEYS-gated, admin. The plaintext key is shown
 // exactly once at mint (reveal banner); afterwards only the prefix is visible.
@@ -20,55 +31,47 @@ interface ApiKey {
 }
 
 export default function ApiKeysPage() {
-  const [{ data }, refetch] = useQuery<{ apiKeys: ApiKey[] }>({ query: API_KEYS_QUERY });
+  const [{ data, fetching }, refetch] = useQuery<{ apiKeys: ApiKey[] }>({ query: API_KEYS_QUERY });
   const [, mint] = useMutation(MINT_API_KEY);
   const [, revoke] = useMutation(REVOKE_API_KEY);
-
-  const [name, setName] = useState("");
-  const [expiresAt, setExpiresAt] = useState("");
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<{ name: string; plainKey: string } | null>(null);
   const keys = data?.apiKeys ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
-  async function onMint() {
-    setError(null);
-    if (!name.trim()) return setError("Name is required");
-    setBusy("mint");
-    try {
+  const dlg = useResourceDialog({
+    empty: { name: "", expiresAt: "" },
+    submit: async (v) => {
+      if (!v.name.trim()) return "Name is required";
       const res = await mint({
-        name: name.trim(),
-        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+        name: v.name.trim(),
+        expiresAt: v.expiresAt ? new Date(v.expiresAt).toISOString() : null,
       });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Mint failed");
-      setRevealed({ name: name.trim(), plainKey: res.data.mintApiKey.plainKey });
-      setName("");
-      setExpiresAt("");
-      refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
+      if (res.error) return res.error.graphQLErrors[0]?.message ?? "Mint failed";
+      setRevealed({ name: v.name.trim(), plainKey: res.data.mintApiKey.plainKey });
+      return null;
+    },
+    onDone: refresh,
+  });
 
-  async function onRevoke(id: string) {
-    setBusy(id);
-    try {
-      await revoke({ id });
-      refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
+  const del = useConfirmDelete<ApiKey>({
+    onDelete: async (k) => {
+      const r = await revoke({ id: k.id });
+      return r.error?.message ?? null;
+    },
+    onDone: refresh,
+  });
 
   return (
     <div className="mx-auto space-y-6 p-4 sm:p-6">
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">API keys</h1>
-        <p className="text-sm text-muted-foreground">
-          Personal access tokens for CLI and programmatic access to this workspace. A key is shown
-          only once — store it somewhere safe.
-        </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">API keys</h1>
+          <p className="text-sm text-muted-foreground">
+            Personal access tokens for CLI and programmatic access to this workspace. A key is shown
+            only once — store it somewhere safe.
+          </p>
+        </div>
+        <Button onClick={dlg.openCreate}>Mint key</Button>
       </div>
 
       {revealed && (
@@ -93,67 +96,77 @@ export default function ApiKeysPage() {
         </Card>
       )}
 
-      <Card className="flex flex-wrap items-end gap-2 p-4">
-        <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
-          Name
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+      <FormDialog
+        open={dlg.open}
+        onOpenChange={dlg.setOpen}
+        title="Mint API key"
+        description="Shown once at creation — copy it before closing."
+        onSubmit={dlg.onSubmit}
+        submitLabel="Mint key"
+        busy={dlg.busy}
+        error={dlg.error}
+        submitDisabled={!dlg.values.name.trim()}
+      >
+        <FormField label="Name">
+          <Input
             placeholder="e.g. ci-deploy"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={dlg.values.name}
+            onChange={(e) => dlg.set("name", e.target.value)}
           />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Expires (optional)
-          <input
+        </FormField>
+        <FormField label="Expires (optional)">
+          <Input
             type="date"
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm text-foreground"
-            value={expiresAt}
-            onChange={(e) => setExpiresAt(e.target.value)}
+            value={dlg.values.expiresAt}
+            onChange={(e) => dlg.set("expiresAt", e.target.value)}
           />
-        </label>
-        <Button size="sm" disabled={!name.trim() || busy === "mint"} onClick={onMint}>
-          Mint key
-        </Button>
-      </Card>
-      {error && <p className="-mt-4 text-sm text-destructive">{error}</p>}
+        </FormField>
+      </FormDialog>
 
-      {keys.length === 0 && (
-        <Card className="p-8 text-center text-sm text-muted-foreground">No API keys yet.</Card>
+      {keys.length === 0 && !fetching ? (
+        <EmptyState
+          icon={<KeyRound className="h-8 w-8" />}
+          title="No API keys yet"
+          description="Mint a key for CLI or programmatic access."
+        />
+      ) : (
+        keys.map((k) => {
+          const revoked = !!k.revokedAt;
+          const expired = !!k.expiresAt && new Date(k.expiresAt).getTime() <= Date.now();
+          return (
+            <Card key={k.id} className="flex flex-wrap items-center justify-between gap-2 p-4">
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-foreground">{k.name}</span>
+                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+                  {k.keyPrefix}…
+                </code>
+                {revoked && <Badge variant="red">revoked</Badge>}
+                {!revoked && expired && <Badge variant="yellow">expired</Badge>}
+                {!revoked && !expired && <Badge variant="green">active</Badge>}
+                <span className="text-xs text-muted-foreground">
+                  {k.lastUsedAt
+                    ? `last used ${new Date(k.lastUsedAt).toLocaleDateString()}`
+                    : "never used"}
+                </span>
+              </span>
+              {!revoked && (
+                <Button size="sm" variant="secondary" onClick={() => del.ask(k)}>
+                  Revoke
+                </Button>
+              )}
+            </Card>
+          );
+        })
       )}
 
-      {keys.map((k) => {
-        const revoked = !!k.revokedAt;
-        const expired = !!k.expiresAt && new Date(k.expiresAt).getTime() <= Date.now();
-        return (
-          <Card key={k.id} className="flex flex-wrap items-center justify-between gap-2 p-4">
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="font-medium text-foreground">{k.name}</span>
-              <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
-                {k.keyPrefix}…
-              </code>
-              {revoked && <Badge variant="red">revoked</Badge>}
-              {!revoked && expired && <Badge variant="yellow">expired</Badge>}
-              {!revoked && !expired && <Badge variant="green">active</Badge>}
-              <span className="text-xs text-muted-foreground">
-                {k.lastUsedAt
-                  ? `last used ${new Date(k.lastUsedAt).toLocaleDateString()}`
-                  : "never used"}
-              </span>
-            </span>
-            {!revoked && (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={busy === k.id}
-                onClick={() => onRevoke(k.id)}
-              >
-                Revoke
-              </Button>
-            )}
-          </Card>
-        );
-      })}
+      <ConfirmDialog
+        isOpen={del.isOpen}
+        onClose={del.cancel}
+        onConfirm={del.confirm}
+        title="Revoke API key?"
+        description={`"${del.target?.name}" will stop working immediately. This can't be undone.`}
+        confirmLabel="Revoke"
+      />
     </div>
   );
 }
