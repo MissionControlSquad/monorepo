@@ -148,8 +148,12 @@ export function AppShell({ children, modal }: AppShellProps) {
       <div
         className="flex bg-muted"
         style={{
-          marginTop: "var(--electron-titlebar-height, 0px)",
-          height: "calc(100dvh - var(--electron-titlebar-height, 0px))",
+          // Offset by the titlebar (desktop app) plus the connection banner when it is showing, so the
+          // fixed reconnect bar pushes the app down instead of covering the top navigation.
+          marginTop:
+            "calc(var(--electron-titlebar-height, 0px) + var(--connection-banner-height, 0px))",
+          height:
+            "calc(100dvh - var(--electron-titlebar-height, 0px) - var(--connection-banner-height, 0px))",
         }}
       >
         {/* Sidebar backdrop (mobile) */}
