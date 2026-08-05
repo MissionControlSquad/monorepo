@@ -57,6 +57,9 @@ e2e/
   an error boundary, or a bounce to `/login`. This is the net that catches a screen that breaks on a
   refactor. Flag-gated screens (finance, approvals, environments, ...) get their own specs as those
   features grow - keep this file to routes that render in any environment.
+- `project-create.spec.ts` (form flow): a user opens the New Project modal from the Projects screen,
+  fills the form, submits, and sees the success toast + the new project in the list. The template for
+  the other "fill a form and see the result" flows (create task, edit agent, ...).
 
 More specs (budget auto-pause, company/project/task, cloud-skills) to follow.
 
