@@ -13,6 +13,7 @@ import { prisma } from "@/server/prisma";
 import type { AgentContextBundle } from "@agentcenter/types";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assembleInjectedMemory, resolveEffectiveMemoryProvider } from "./agent-memory";
+import { loadRoleSkill } from "./agent-role-skill";
 
 // REST-shaped error so the route's handleError() renders a 404 (not a 500).
 function notFound(message: string): never {
@@ -48,6 +49,7 @@ interface AgentLike {
   id: string;
   name: string;
   role: string;
+  templateId?: string | null;
   personality: string | null;
   level: string | null;
   runtimeAdapter?: string | null;
@@ -113,12 +115,21 @@ export async function assembleContextBundle(
       : null,
     memory: await assembleMemoryBlock(agent),
     instructions: instructions.map((i) => ({ fileName: i.fileName, content: i.content })),
-    skills: agentSkills.map((as) => ({
-      key: as.skill.key,
-      name: as.skill.name,
-      description: as.skill.description ?? null,
-      markdown: as.skill.markdown,
-    })),
+    // Cloud-served skills: the agent's role skill (from the control plane's template library) first,
+    // then any explicitly-assigned library skills. Delivered from the server so the agent needs NO
+    // local skill files and runs correctly in any environment.
+    skills: [
+      ...(() => {
+        const roleSkill = loadRoleSkill(agent.templateId, agent.role, agent.name);
+        return roleSkill ? [roleSkill] : [];
+      })(),
+      ...agentSkills.map((as) => ({
+        key: as.skill.key,
+        name: as.skill.name,
+        description: as.skill.description ?? null,
+        markdown: as.skill.markdown,
+      })),
+    ],
     task: {
       id: task.id,
       taskNumber: task.taskNumber,

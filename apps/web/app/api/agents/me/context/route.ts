@@ -22,6 +22,7 @@ export async function GET(request: Request) {
         id: agent.id,
         name: agent.name,
         role: agent.role,
+        templateId: agent.templateId ?? null,
         personality: agent.personality ?? null,
         level: agent.level ?? null,
         runtimeAdapter: agent.runtimeAdapter ?? null,
