@@ -11,6 +11,13 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "e2e": "playwright test --config=e2e/playwright.config.ts",
+    "e2e:ui": "playwright test --config=e2e/playwright.config.ts --ui",
+    "e2e:debug": "playwright test --config=e2e/playwright.config.ts --debug",
+    "e2e:headed": "playwright test --config=e2e/playwright.config.ts --headed",
+    "e2e:report": "playwright show-report",
+    "e2e:install": "playwright install --with-deps chromium",
+    "e2e:codegen": "playwright codegen http://localhost:3000",
     "db:generate": "turbo run db:generate --filter=@agentcenter/database",
     "db:migrate": "turbo run db:migrate --filter=@agentcenter/database",
     "db:migrate:deploy": "turbo run db:migrate:deploy --filter=@agentcenter/database",
@@ -21,10 +28,10 @@
     "prepare": "husky"
   },
   "devDependencies": {
+    "@playwright/test": "1.55.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "prettier": "^3.8.1",
-    "puppeteer-core": "^23.11.1",
     "turbo": "^2.5.0"
   },
   "packageManager": "npm@10.0.0",

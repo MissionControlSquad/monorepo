@@ -45,3 +45,10 @@ release/
 
 # Operator DB dumps (db:backup)
 backups/
+
+# Playwright e2e artifacts
+e2e/.auth/
+e2e/.results/
+e2e/blob-report/
+playwright-report/
+test-results/
