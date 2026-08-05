@@ -7,8 +7,12 @@ const authFile = path.join(__dirname, "../.auth/admin.json");
 // reuses this state instead of logging in per test - the single biggest speed win Playwright offers.
 setup("authenticate as admin", async ({ page }) => {
   const user = process.env.ADMIN_USER ?? "admin";
-  const password = process.env.ADMIN_PASSWORD ?? "Admin123!";
-  if (!password) throw new Error("ADMIN_PASSWORD is required for the e2e auth setup");
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) {
+    throw new Error(
+      "ADMIN_PASSWORD is required for the e2e auth setup - set it in e2e/.env (see e2e/.env.example)",
+    );
+  }
 
   await page.goto("/login");
   await page.getByPlaceholder(/username/i).fill(user);

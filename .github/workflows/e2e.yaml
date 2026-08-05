@@ -54,8 +54,9 @@ jobs:
       NEXT_PUBLIC_MC_URL: "http://localhost:3000"
       BASE_URL: "http://localhost:3000"
       ADMIN_USER: "admin"
-      # The seed provisions admin / securepass123. Override with a secret if you change the seed.
-      ADMIN_PASSWORD: "securepass123"
+      # The seed provisions admin / securepass123 (CI-only, ephemeral DB). Set the E2E_ADMIN_PASSWORD
+      # repo secret to override - and change the seed to match if you do.
+      ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'securepass123' }}
       # In CI, boot a production server (fast + stable) rather than the dev server.
       PW_WEB_COMMAND: "npm run start --workspace @agentcenter/web"
     steps:
