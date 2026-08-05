@@ -10,7 +10,7 @@ import {
   DELETE_AGENT_COMPANY,
   IMPORT_COMPANY_PACKAGE,
 } from "@/lib/graphql/mutations";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, Textarea } from "@/components/ui";
 import { Input } from "@/components/ui/shadcn/input";
 
 // Domain 14 #10/#12: Agent-Companies — the portable "company package" surface. Lets an admin create
@@ -145,7 +145,7 @@ export function AgentCompaniesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <div className="flex items-center gap-2">
         <Building2 className="h-5 w-5 text-muted-foreground" />
         <h1 className="text-lg font-semibold text-foreground">Agent Companies</h1>
@@ -164,12 +164,11 @@ export function AgentCompaniesPage() {
           onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           placeholder="Description (optional)"
         />
-        <textarea
+        <Textarea
           value={form.goals}
           onChange={(e) => setForm((f) => ({ ...f, goals: e.target.value }))}
           placeholder="Goals — one per line (optional)"
           rows={3}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
         />
         <div className="flex items-center justify-between gap-2">
           <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">

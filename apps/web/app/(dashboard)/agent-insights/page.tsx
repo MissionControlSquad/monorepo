@@ -3,7 +3,7 @@
 import { useQuery } from "urql";
 import { Activity } from "lucide-react";
 import { FLAGGED_AGENTS_QUERY, DECISIONS_QUERY } from "@/lib/graphql/queries";
-import { Card, Badge, EmptyState } from "@/components/ui";
+import { Card, Badge, EmptyState, Spinner } from "@/components/ui";
 
 // Agent insights: productivity watchdog (parity #132) flagged agents + decision log (parity #40).
 // PRODUCTIVITY_REVIEW / DECISION_TRAINING gated (read-only; the heartbeat/runtime writes them).
@@ -12,21 +12,25 @@ interface Decision { id: string; agentId: string | null; decisionType: string; c
 const verdictVariant = (v: string) => (v === "stuck" ? "red" : v === "struggling" ? "orange" : v === "idle" ? "yellow" : "green");
 
 export default function AgentInsightsPage() {
-  const [{ data: pData }] = useQuery<{ flaggedAgents: Flagged[] }>({ query: FLAGGED_AGENTS_QUERY });
+  const [{ data: pData, fetching }] = useQuery<{ flaggedAgents: Flagged[] }>({ query: FLAGGED_AGENTS_QUERY });
   const [{ data: dData }] = useQuery<{ decisions: Decision[] }>({ query: DECISIONS_QUERY });
   const flagged = pData?.flaggedAgents ?? [];
   const decisions = (dData?.decisions ?? []).slice(0, 30);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-6">
+    <div className="mx-auto space-y-8 p-4 sm:p-6">
       <div>
-        <h1 className="text-xl font-semibold text-foreground">Agent insights</h1>
+        <h1 className="text-lg font-semibold text-foreground">Agent insights</h1>
         <p className="text-sm text-muted-foreground">Productivity flags and the agent decision log.</p>
       </div>
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">Flagged agents (productivity)</h2>
-        {flagged.length === 0 ? (
+        {fetching && flagged.length === 0 ? (
+          <div className="flex justify-center p-8">
+            <Spinner />
+          </div>
+        ) : flagged.length === 0 ? (
           <EmptyState icon={<Activity className="h-8 w-8" />} title="No flagged agents" description="Agents flagged stuck or struggling by the watchdog appear here." />
         ) : (
           <Card padding="none">

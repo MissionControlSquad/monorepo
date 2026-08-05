@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "urql";
+import { useQuery } from "urql";
 import { ServerCog } from "lucide-react";
 import { LOCAL_SERVICES_QUERY } from "@/lib/graphql/queries";
-import { REGISTER_LOCAL_SERVICE } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Input, EmptyState } from "@/components/ui";
+import { Button, Card, Badge, EmptyState } from "@/components/ui";
+import { LocalServiceDialog } from "@/components/dialogs/LocalServiceDialog";
 
 // Local service supervision (parity #95). LOCAL_SERVICES-gated, admin. Registry + observed status of
 // local_stdio services (e.g. MCP runtime slots). The supervisor (infra) transitions status; this is the
@@ -19,25 +19,22 @@ const statusVariant = (s: string) =>
 
 export default function LocalServicesPage() {
   const [{ data, fetching }, refetch] = useQuery<{ localServices: LocalService[] }>({ query: LOCAL_SERVICES_QUERY });
-  const [, register] = useMutation(REGISTER_LOCAL_SERVICE);
-  const [form, setForm] = useState({ key: "", command: "" });
+  const [open, setOpen] = useState(false);
   const rows = data?.localServices ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">Local services</h1>
-        <p className="text-sm text-muted-foreground">Supervised local_stdio services (e.g. MCP slots).</p>
-      </div>
-      <Card padding="lg" className="space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">Register service</h2>
-        <div className="flex flex-wrap items-end gap-2">
-          <Input placeholder="Key (e.g. mcp:filesystem)" value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value })} className="w-56" />
-          <Input placeholder="Launch command" value={form.command} onChange={(e) => setForm({ ...form, command: e.target.value })} className="w-64" />
-          <Button onClick={async () => { if (form.key.trim()) { await register(form); setForm({ key: "", command: "" }); refresh(); } }}>Register</Button>
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Local services</h1>
+          <p className="text-sm text-muted-foreground">Supervised local_stdio services (e.g. MCP slots).</p>
         </div>
-      </Card>
+        <Button onClick={() => setOpen(true)}>Register service</Button>
+      </div>
+
+      <LocalServiceDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
+
       {rows.length === 0 && !fetching ? (
         <EmptyState icon={<ServerCog className="h-8 w-8" />} title="No local services" description="Register a local_stdio service to supervise it." />
       ) : (

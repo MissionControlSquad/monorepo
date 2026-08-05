@@ -4,13 +4,9 @@ import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { FlaskConical } from "lucide-react";
 import { SMOKE_CASES_QUERY } from "@/lib/graphql/queries";
-import {
-  CREATE_SMOKE_CASE,
-  DELETE_SMOKE_CASE,
-  RUN_SMOKE_CASE,
-  RUN_SMOKE_SUITE,
-} from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Input, EmptyState } from "@/components/ui";
+import { DELETE_SMOKE_CASE, RUN_SMOKE_CASE, RUN_SMOKE_SUITE } from "@/lib/graphql/mutations";
+import { Button, Card, Badge, EmptyState } from "@/components/ui";
+import { SmokeCaseDialog } from "@/components/dialogs/SmokeCaseDialog";
 
 // Tool smoke-lab (parity #153). SMOKE_LAB-gated, admin. Saved cases assert how a tool call should be
 // admitted (allow/deny); running one drives the real tool gateway (access policy + content guards +
@@ -30,29 +26,16 @@ const resultVariant = (r: string | null) =>
 
 export default function SmokeLabPage() {
   const [{ data, fetching }, refetch] = useQuery<{ smokeCases: SmokeCase[] }>({ query: SMOKE_CASES_QUERY });
-  const [, create] = useMutation(CREATE_SMOKE_CASE);
   const [, del] = useMutation(DELETE_SMOKE_CASE);
   const [, run] = useMutation(RUN_SMOKE_CASE);
   const [, runSuite] = useMutation(RUN_SMOKE_SUITE);
 
-  const [form, setForm] = useState({ name: "", toolName: "", expectDecision: "allow" });
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
 
   const cases = data?.smokeCases ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
-
-  async function onCreate() {
-    if (!form.name.trim() || !form.toolName.trim()) return;
-    setBusy(true);
-    setError(null);
-    const r = await create(form);
-    setBusy(false);
-    if (r.error) return setError(r.error.message);
-    setForm({ name: "", toolName: "", expectDecision: "allow" });
-    refresh();
-  }
 
   async function onRunSuite() {
     setBusy(true);
@@ -67,50 +50,25 @@ export default function SmokeLabPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Tool smoke-lab</h1>
+          <h1 className="text-lg font-semibold text-foreground">Tool smoke-lab</h1>
           <p className="text-sm text-muted-foreground">
             Assert how a tool call should be admitted, then run it through the real gateway.
           </p>
         </div>
-        <Button onClick={onRunSuite} disabled={busy || cases.length === 0}>
-          {busy ? "Running…" : "Run all"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={onRunSuite} disabled={busy || cases.length === 0}>
+            {busy ? "Running…" : "Run all"}
+          </Button>
+          <Button onClick={() => setOpen(true)}>New case</Button>
+        </div>
       </div>
 
       {summary && <p className="text-sm font-medium text-foreground">{summary}</p>}
 
-      <Card padding="lg" className="space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">New case</h2>
-        <div className="flex flex-wrap items-end gap-2">
-          <Input
-            placeholder="Case name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-48"
-          />
-          <Input
-            placeholder="Tool name (e.g. shell)"
-            value={form.toolName}
-            onChange={(e) => setForm({ ...form, toolName: e.target.value })}
-            className="w-48"
-          />
-          <select
-            value={form.expectDecision}
-            onChange={(e) => setForm({ ...form, expectDecision: e.target.value })}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="allow">expect allow</option>
-            <option value="deny">expect deny</option>
-          </select>
-          <Button onClick={onCreate} disabled={busy}>
-            Add
-          </Button>
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </Card>
+      <SmokeCaseDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
       {cases.length === 0 && !fetching ? (
         <EmptyState icon={<FlaskConical className="h-8 w-8" />} title="No smoke cases" description="Add a case to validate your tool-access policy." />

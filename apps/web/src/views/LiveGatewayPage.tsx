@@ -27,7 +27,7 @@ import {
   Radio,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout } from "../components/ui";
+import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout, Checkbox } from "../components/ui";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -700,11 +700,10 @@ function SetupWizard({ onClose, onConnectionEstablished, existingConnectionIds }
                   key={key}
                   className="flex items-center gap-2.5 p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors cursor-pointer"
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={installChecks[key]}
                     onChange={() => setInstallChecks((p) => ({ ...p, [key]: !p[key] }))}
-                    className="h-4 w-4 rounded border-border accent-primary flex-shrink-0 cursor-pointer"
+                    className="flex-shrink-0 cursor-pointer"
                   />
                   <span className="text-xs text-foreground">{label}</span>
                 </label>
@@ -970,11 +969,10 @@ function DeleteConfirmModal({
 
           {/* Step 1 */}
           <label className="flex items-start gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/50 transition-colors cursor-pointer group">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={checks.stopped}
               onChange={() => toggle("stopped")}
-              className="mt-0.5 h-4 w-4 rounded border-border accent-primary flex-shrink-0 cursor-pointer"
+              className="mt-0.5 flex-shrink-0 cursor-pointer"
             />
             <div className="space-y-1.5 min-w-0">
               <p className="text-xs font-semibold text-foreground leading-snug">
@@ -991,11 +989,10 @@ function DeleteConfirmModal({
 
           {/* Step 2 */}
           <label className="flex items-start gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/50 transition-colors cursor-pointer group">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={checks.configRemoved}
               onChange={() => toggle("configRemoved")}
-              className="mt-0.5 h-4 w-4 rounded border-border accent-primary flex-shrink-0 cursor-pointer"
+              className="mt-0.5 flex-shrink-0 cursor-pointer"
             />
             <div className="space-y-1.5 min-w-0">
               <p className="text-xs font-semibold text-foreground leading-snug">
@@ -1016,11 +1013,10 @@ function DeleteConfirmModal({
 
           {/* Step 3 */}
           <label className="flex items-start gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/50 transition-colors cursor-pointer group">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={checks.confirmed}
               onChange={() => toggle("confirmed")}
-              className="mt-0.5 h-4 w-4 rounded border-border accent-primary flex-shrink-0 cursor-pointer"
+              className="mt-0.5 flex-shrink-0 cursor-pointer"
             />
             <div className="min-w-0">
               <p className="text-xs font-semibold text-foreground leading-snug">
@@ -1035,11 +1031,10 @@ function DeleteConfirmModal({
 
         {/* Skip option */}
         <label className="flex items-center gap-2.5 cursor-pointer">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={skipCleanup}
             onChange={() => setSkip((v) => !v)}
-            className="h-4 w-4 rounded border-border accent-destructive flex-shrink-0 cursor-pointer"
+            className="accent-destructive flex-shrink-0 cursor-pointer"
           />
           <span className="text-xs text-muted-foreground leading-snug">
             Machine is unreachable / already gone — delete anyway
@@ -1479,7 +1474,7 @@ export function LiveGatewayPage() {
   const existingIds = new Set(connections.map((c) => c.id));
 
   return (
-    <PageLayout>
+    <PageLayout maxWidth="wide">
       {showWizard && (
         <SetupWizard
           onClose={() => setShowWizard(false)}
@@ -1522,7 +1517,7 @@ export function LiveGatewayPage() {
 
         {/* How it works — shown only when no machines are connected yet */}
         {!loading && connections.length === 0 && (
-          <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             {[
               {
                 icon: <Monitor className="w-4 h-4 text-primary" />,
@@ -1553,7 +1548,7 @@ export function LiveGatewayPage() {
 
         {/* Stats — only when machines exist */}
         {connections.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             {[
               { label: "Live now", value: liveCount, highlight: liveCount > 0 },
               { label: "Total machines", value: connections.length, highlight: false },

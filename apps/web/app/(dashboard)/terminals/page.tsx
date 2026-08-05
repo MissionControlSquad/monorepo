@@ -4,8 +4,10 @@ import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { TERMINAL_STATE } from "@agentcenter/utils";
 import { TERMINAL_SESSIONS_QUERY } from "@/lib/graphql/queries";
-import { OPEN_TERMINAL_SESSION, CLOSE_TERMINAL_SESSION } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { CLOSE_TERMINAL_SESSION } from "@/lib/graphql/mutations";
+import { Button, Card, Badge, EmptyState, Spinner } from "@/components/ui";
+import { TerminalSessionDialog } from "@/components/dialogs/TerminalSessionDialog";
+import { SquareTerminal } from "lucide-react";
 import { TerminalConsole } from "@/components/terminals/TerminalConsole";
 
 // Epic #9: terminal sessions. TERMINALS-gated (experimental, admin). Authorize a session into an agent
@@ -39,17 +41,13 @@ const STATE_VARIANT: Record<string, "gray" | "blue" | "green" | "yellow" | "red"
 };
 
 export default function TerminalsPage() {
-  const [{ data }, refetch] = useQuery<{ terminalSessions: Session[] }>({
+  const [{ data, fetching }, refetch] = useQuery<{ terminalSessions: Session[] }>({
     query: TERMINAL_SESSIONS_QUERY,
   });
-  const [, open] = useMutation(OPEN_TERMINAL_SESSION);
   const [, close] = useMutation(CLOSE_TERMINAL_SESSION);
 
-  const [command, setCommand] = useState("");
-  const [cwd, setCwd] = useState("");
-  const [label, setLabel] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [revealed, setRevealed] = useState<{
     id: string;
     host: string | null;
@@ -58,28 +56,6 @@ export default function TerminalsPage() {
   const [console_, setConsole] = useState<{ id: string; token: string } | null>(null);
   const sessions = data?.terminalSessions ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
-
-  async function onOpen() {
-    setError(null);
-    if (!command.trim()) return setError("An ssh command is required");
-    setBusy("open");
-    try {
-      const res = await open({
-        command: command.trim(),
-        cwd: cwd.trim() || null,
-        label: label.trim() || null,
-      });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Open failed");
-      const s = res.data.openTerminalSession;
-      setRevealed({ id: s.id, host: s.host, token: s.connectToken });
-      setCommand("");
-      setCwd("");
-      setLabel("");
-      refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function onClose(id: string) {
     setBusy(id);
@@ -92,14 +68,19 @@ export default function TerminalsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">Terminals</h1>
-        <p className="text-sm text-muted-foreground">
-          Authorize an SSH session into an agent environment. A one-time connect token is minted;
-          click Connect to open a live browser shell to a managed VM target.
-        </p>
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Terminals</h1>
+          <p className="text-sm text-muted-foreground">
+            Authorize an SSH session into an agent environment. A one-time connect token is minted;
+            click Connect to open a live browser shell to a managed VM target.
+          </p>
+        </div>
+        <Button onClick={() => setOpen(true)}>Open session</Button>
       </div>
+
+      <TerminalSessionDialog open={open} onOpenChange={setOpen} onOpened={setRevealed} />
 
       {revealed && (
         <Card className="space-y-2 border-success bg-success-muted p-4">
@@ -141,35 +122,17 @@ export default function TerminalsPage() {
         />
       )}
 
-      <Card className="space-y-2 p-4">
-        <input
-          className="w-full rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
-          placeholder="ssh user@host  |  ssh -p 2222 user@host"
-          value={command}
-          onChange={(e) => setCommand(e.target.value)}
-        />
-        <div className="flex flex-wrap gap-2">
-          <input
-            className="flex-1 rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="cwd (optional)"
-            value={cwd}
-            onChange={(e) => setCwd(e.target.value)}
-          />
-          <input
-            className="flex-1 rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="label (optional)"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
-          <Button size="sm" disabled={!command.trim() || busy === "open"} onClick={onOpen}>
-            Open session
-          </Button>
+      {fetching && sessions.length === 0 && (
+        <div className="flex justify-center p-8">
+          <Spinner />
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </Card>
-
-      {sessions.length === 0 && (
-        <Card className="p-8 text-center text-sm text-muted-foreground">No terminal sessions.</Card>
+      )}
+      {sessions.length === 0 && !fetching && (
+        <EmptyState
+          icon={<SquareTerminal className="h-8 w-8" />}
+          title="No terminal sessions"
+          description="Open a session to authorize an SSH connection into an agent environment."
+        />
       )}
 
       {sessions.map((s) => {

@@ -81,8 +81,14 @@ export default function ApprovalsPage() {
   async function decide(id: string, kind: "approve" | "reject") {
     setBusyId(id);
     try {
-      if (kind === "approve") await approve({ id });
-      else await reject({ id, decisionNote: "Changes needed" });
+      const res =
+        kind === "approve"
+          ? await approve({ id })
+          : await reject({ id, decisionNote: "Changes needed" });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Something went wrong");
+        return;
+      }
       refetch({ requestPolicy: "network-only" });
     } finally {
       setBusyId(null);
@@ -108,7 +114,7 @@ export default function ApprovalsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
+    <div className="mx-auto space-y-4 p-4 sm:p-6">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-foreground">Approvals</h1>
         <Button size="sm" variant="secondary" onClick={() => setHireOpen((v) => !v)}>

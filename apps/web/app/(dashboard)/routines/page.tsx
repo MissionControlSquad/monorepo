@@ -1,18 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import { ROUTINES_QUERY, AGENTS_QUERY, GOALS_QUERY } from "@/lib/graphql/queries";
 import {
-  CREATE_ROUTINE,
   TRIGGER_ROUTINE_NOW,
   ADD_ROUTINE_TRIGGER,
   UPDATE_ROUTINE,
   REGENERATE_TRIGGER_PUBLIC_ID,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
-
-const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
+import { Button, Card, Badge, Spinner } from "@/components/ui";
+import { RoutineDialog } from "@/components/dialogs/RoutineDialog";
 
 // Epic #7: routines (scheduled/triggered workflow docs). PIPELINES_ROUTINES-gated + buildbase role
 // (admin manages; member can trigger). Firing a routine creates a Task as its output.
@@ -36,14 +35,13 @@ interface Routine {
 }
 
 export default function RoutinesPage() {
-  const [{ data }, refetch] = useQuery<{ routines: Routine[] }>({ query: ROUTINES_QUERY });
+  const [{ data, fetching }, refetch] = useQuery<{ routines: Routine[] }>({ query: ROUTINES_QUERY });
   const [{ data: agentsData }] = useQuery<{ agents: { id: string; name: string }[] }>({
     query: AGENTS_QUERY,
   });
   const [{ data: goalsData }] = useQuery<{ goals: { id: string; title: string }[] }>({
     query: GOALS_QUERY,
   });
-  const [, createRoutine] = useMutation(CREATE_ROUTINE);
   const [, triggerNow] = useMutation(TRIGGER_ROUTINE_NOW);
   const [, addTrigger] = useMutation(ADD_ROUTINE_TRIGGER);
   const [, updateRoutine] = useMutation(UPDATE_ROUTINE);
@@ -53,58 +51,20 @@ export default function RoutinesPage() {
   const goals = goalsData?.goals ?? [];
 
   const [busy, setBusy] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "",
-    definition: '{\n  "steps": []\n}',
-    description: "",
-    assigneeAgentId: "",
-    priority: "",
-    goalId: "",
-  });
-  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [lastRun, setLastRun] = useState<Record<string, string>>({});
 
   const routines = data?.routines ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
-  async function onCreate() {
-    setError(null);
-    if (!form.name.trim()) return setError("Name is required");
-    let definition: unknown;
-    try {
-      definition = JSON.parse(form.definition);
-    } catch {
-      return setError("Definition must be valid JSON");
-    }
-    setBusy("create");
-    try {
-      const res = await createRoutine({
-        name: form.name.trim(),
-        definition,
-        description: form.description.trim() || null,
-        assigneeAgentId: form.assigneeAgentId || null,
-        priority: form.priority || null,
-        goalId: form.goalId || null,
-      });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create");
-      setForm({
-        name: "",
-        definition: '{\n  "steps": []\n}',
-        description: "",
-        assigneeAgentId: "",
-        priority: "",
-        goalId: "",
-      });
-      refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
-
   async function onRegenerateTrigger(triggerId: string, routineId: string) {
     setBusy(routineId);
     try {
-      await regenerateTrigger({ triggerId });
+      const res = await regenerateTrigger({ triggerId });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to regenerate trigger");
+        return;
+      }
       refetch({ requestPolicy: "network-only" });
     } finally {
       setBusy(null);
@@ -114,7 +74,11 @@ export default function RoutinesPage() {
   async function onToggleActive(id: string, isActive: boolean) {
     setBusy(id);
     try {
-      await updateRoutine({ id, isActive });
+      const res = await updateRoutine({ id, isActive });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to update status");
+        return;
+      }
       refetch({ requestPolicy: "network-only" });
     } finally {
       setBusy(null);
@@ -125,6 +89,10 @@ export default function RoutinesPage() {
     setBusy(id);
     try {
       const res = await triggerNow({ routineId: id });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to trigger routine");
+        return;
+      }
       const run = res.data?.triggerRoutineNow;
       if (run)
         setLastRun((m) => ({
@@ -139,7 +107,11 @@ export default function RoutinesPage() {
   async function onAddWebhook(id: string) {
     setBusy(id);
     try {
-      await addTrigger({ routineId: id, type: "webhook" });
+      const res = await addTrigger({ routineId: id, type: "webhook" });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to add webhook");
+        return;
+      }
       refresh();
     } finally {
       setBusy(null);
@@ -147,81 +119,25 @@ export default function RoutinesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
-      <h1 className="text-lg font-semibold text-foreground">Routines</h1>
-      <p className="-mt-4 text-sm text-muted-foreground">
-        Reusable workflows with run history + immutable revisions. Firing a routine generates a
-        task.
-      </p>
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Routines</h1>
+          <p className="text-sm text-muted-foreground">
+            Reusable workflows with run history + immutable revisions. Firing a routine generates a task.
+          </p>
+        </div>
+        <Button onClick={() => setOpen(true)}>New routine</Button>
+      </div>
 
-      <Card className="space-y-3 p-4">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Routine name"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Description (optional)"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-        </div>
-        {/* Metadata applied to each generated task */}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <select
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            value={form.assigneeAgentId}
-            onChange={(e) => setForm((f) => ({ ...f, assigneeAgentId: e.target.value }))}
-          >
-            <option value="">Assign to… (optional)</option>
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            value={form.priority}
-            onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
-          >
-            <option value="">Priority… (optional)</option>
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <select
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            value={form.goalId}
-            onChange={(e) => setForm((f) => ({ ...f, goalId: e.target.value }))}
-          >
-            <option value="">Goal… (optional)</option>
-            {goals.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.title}
-              </option>
-            ))}
-          </select>
-        </div>
-        <textarea
-          className="h-24 w-full rounded border border-border bg-background px-3 py-1.5 font-mono text-xs"
-          value={form.definition}
-          onChange={(e) => setForm((f) => ({ ...f, definition: e.target.value }))}
-        />
-        <div className="flex justify-end">
-          <Button size="sm" disabled={busy === "create"} onClick={onCreate}>
-            Create routine
-          </Button>
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </Card>
+      <RoutineDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
-      {routines.length === 0 && (
+      {fetching && routines.length === 0 && (
+        <div className="flex justify-center p-8">
+          <Spinner />
+        </div>
+      )}
+      {routines.length === 0 && !fetching && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No routines yet.</Card>
       )}
 

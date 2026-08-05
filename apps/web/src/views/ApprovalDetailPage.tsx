@@ -160,7 +160,7 @@ export function ApprovalDetailPage({ approvalId }: { approvalId: string }) {
     approval.status === ApprovalStatus.APPROVED || approval.status === ApprovalStatus.CANCELLED;
 
   return (
-    <PageLayout maxWidth="narrow">
+    <PageLayout maxWidth="medium">
       <Breadcrumbs
         items={[
           { label: "Home", href: "/" },

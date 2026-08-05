@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import {
   ENVIRONMENTS_QUERY,
-  ENVIRONMENT_CAPABILITIES_QUERY,
   AGENT_ENVIRONMENT_BINDINGS_QUERY,
   ENVIRONMENT_LEASES_QUERY,
   EXECUTION_WORKSPACES_QUERY,
@@ -12,7 +11,6 @@ import {
   WORKSPACE_EXECUTION_POLICY_QUERY,
 } from "@/lib/graphql/queries";
 import {
-  CREATE_ENVIRONMENT,
   UPDATE_ENVIRONMENT,
   ARCHIVE_ENVIRONMENT,
   DELETE_ENVIRONMENT,
@@ -26,8 +24,9 @@ import {
 } from "@/lib/graphql/mutations";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
-import { Button, Card, Badge } from "@/components/ui";
-import { Container, ShieldCheck, Bot, Boxes, GitBranch } from "lucide-react";
+import { Button, Card, Badge, Spinner, Select } from "@/components/ui";
+import { EnvironmentDialog } from "@/components/dialogs/EnvironmentDialog";
+import { ShieldCheck, Bot, Boxes, GitBranch } from "lucide-react";
 
 // Tier D / Phase 3: Environments dashboard — the first-class "where/how a run executes" model.
 // ENVIRONMENTS-gated in nav; every mutation re-checks the flag + admin server-side. Config secrets are
@@ -52,32 +51,10 @@ interface Environment {
   metadata: Record<string, unknown> | null;
   createdAt: string;
 }
-interface ProviderCap {
-  key: string;
-  displayName: string;
-  isolating: boolean;
-  credentialKeys: string[];
-}
-interface Capabilities {
-  drivers: string[];
-  sandboxProviders: ProviderCap[];
-}
-
-const DRIVER_HELP: Record<string, string> = {
-  local: "Runs on the control-plane host. Not for untrusted/low-trust agents.",
-  ssh: "Runs on a reachable server over SSH (host + key from the vault).",
-  sandbox: "Provisions an isolated sandbox per run (pick a provider below).",
-  plugin: "Delegates to a registered environment plugin.",
-};
-
 export default function EnvironmentsPage() {
-  const [{ data }, refetch] = useQuery<{ environments: Environment[] }>({
+  const [{ data, fetching }, refetch] = useQuery<{ environments: Environment[] }>({
     query: ENVIRONMENTS_QUERY,
   });
-  const [{ data: capData }] = useQuery<{ environmentCapabilities: Capabilities }>({
-    query: ENVIRONMENT_CAPABILITIES_QUERY,
-  });
-  const [, createEnv] = useMutation(CREATE_ENVIRONMENT);
   const [, archiveEnv] = useMutation(ARCHIVE_ENVIRONMENT);
   const [, deleteEnv] = useMutation(DELETE_ENVIRONMENT);
   const [, updateEnv] = useMutation(UPDATE_ENVIRONMENT);
@@ -89,62 +66,15 @@ export default function EnvironmentsPage() {
   const imagesEnabled = isEnabled(FLAG_KEYS.CUSTOM_IMAGES);
 
   const envs = data?.environments ?? [];
-  const caps = capData?.environmentCapabilities;
-  const drivers = caps?.drivers ?? ["local", "ssh", "sandbox", "plugin"];
-  const providers = caps?.sandboxProviders ?? [];
 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [probe, setProbe] = useState<
     Record<string, { ok: boolean; summary: string; details?: string | null }>
   >({});
-  const [form, setForm] = useState({
-    name: "",
-    driver: "local",
-    description: "",
-    leasePolicy: "ephemeral",
-    // sandbox
-    provider: "",
-    // ssh
-    host: "",
-    username: "root",
-    keySecret: "",
-  });
+  const [open, setOpen] = useState(false);
 
   const refresh = () => refetch({ requestPolicy: "network-only" });
-
-  function buildConfig(): Record<string, unknown> {
-    if (form.driver === "sandbox") return { provider: form.provider };
-    if (form.driver === "ssh") {
-      const cfg: Record<string, unknown> = { host: form.host.trim() };
-      if (form.username.trim()) cfg.username = form.username.trim();
-      if (form.keySecret.trim()) cfg.privateKey = { secretRef: { name: form.keySecret.trim() } };
-      return cfg;
-    }
-    return {};
-  }
-
-  async function onCreate() {
-    setError(null);
-    if (!form.name.trim()) return setError("Name is required");
-    if (form.driver === "sandbox" && !form.provider) return setError("Pick a sandbox provider");
-    if (form.driver === "ssh" && !form.host.trim()) return setError("SSH host is required");
-    setBusy("create");
-    try {
-      const res = await createEnv({
-        name: form.name.trim(),
-        driver: form.driver,
-        description: form.description.trim() || null,
-        config: buildConfig(),
-        metadata: form.leasePolicy !== "ephemeral" ? { leasePolicy: form.leasePolicy } : undefined,
-      });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Create failed");
-      setForm((f) => ({ ...f, name: "", description: "", host: "", keySecret: "", provider: "" }));
-      refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function onArchive(id: string) {
     setBusy(id);
@@ -192,123 +122,33 @@ export default function EnvironmentsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-4 sm:p-6">
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">Environments</h1>
-        <p className="text-sm text-muted-foreground">
-          Define where and how a run executes — a driver (local, SSH, sandbox, or plugin), its
-          config, and env vars. Agents bind to an environment. Secrets are referenced by vault name
-          and never leave the server.
-        </p>
+    <div className="mx-auto space-y-8 p-4 sm:p-6">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Environments</h1>
+          <p className="text-sm text-muted-foreground">
+            Define where and how a run executes — a driver (local, SSH, sandbox, or plugin), its
+            config, and env vars. Agents bind to an environment. Secrets are referenced by vault name
+            and never leave the server.
+          </p>
+        </div>
+        <Button onClick={() => setOpen(true)}>New environment</Button>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {/* ── Create ─────────────────────────────────────────────── */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Container className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">New environment</h2>
-        </div>
-        <Card className="space-y-3 p-4">
-          <div className="flex flex-wrap gap-2">
-            <input
-              className="min-w-[10rem] flex-1 rounded border border-border bg-background px-3 py-1.5 text-sm"
-              placeholder="name"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            />
-            <select
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-              value={form.driver}
-              onChange={(e) => setForm((f) => ({ ...f, driver: e.target.value }))}
-            >
-              {drivers.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </div>
-          <p className="text-xs text-muted-foreground">{DRIVER_HELP[form.driver]}</p>
-
-          {(form.driver === "sandbox" || form.driver === "local") && (
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              Machine reuse
-              <select
-                className="rounded border border-border bg-background px-2 py-1 text-sm"
-                value={form.leasePolicy}
-                onChange={(e) => setForm((f) => ({ ...f, leasePolicy: e.target.value }))}
-              >
-                <option value="ephemeral">ephemeral (fresh box each run)</option>
-                <option value="reuse_by_environment">reuse (keep the box between runs)</option>
-                <option value="retain_on_failure">
-                  retain on failure (keep only failed boxes)
-                </option>
-              </select>
-            </label>
-          )}
-
-          {form.driver === "sandbox" && (
-            <select
-              className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-              value={form.provider}
-              onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))}
-            >
-              <option value="">— pick a provider —</option>
-              {providers.map((p) => (
-                <option key={p.key} value={p.key}>
-                  {p.displayName} {p.isolating ? "(isolated)" : "(on host)"}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {form.driver === "ssh" && (
-            <div className="flex flex-wrap gap-2">
-              <input
-                className="min-w-[10rem] flex-1 rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
-                placeholder="host or IP"
-                value={form.host}
-                onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))}
-              />
-              <input
-                className="w-28 rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
-                placeholder="user"
-                value={form.username}
-                onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
-              />
-              <input
-                className="min-w-[10rem] flex-1 rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
-                placeholder="vault secret name for private key"
-                value={form.keySecret}
-                onChange={(e) => setForm((f) => ({ ...f, keySecret: e.target.value }))}
-              />
-            </div>
-          )}
-
-          <input
-            className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="description (optional)"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              loading={busy === "create"}
-              disabled={busy === "create"}
-              onClick={onCreate}
-            >
-              Create environment
-            </Button>
-          </div>
-        </Card>
-      </section>
+      <EnvironmentDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
       {/* ── List ───────────────────────────────────────────────── */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">Environments</h2>
-        {envs.length === 0 && <p className="text-sm text-muted-foreground">No environments yet.</p>}
+        {fetching && envs.length === 0 && (
+          <div className="flex justify-center p-8">
+            <Spinner />
+          </div>
+        )}
+        {envs.length === 0 && !fetching && (
+          <p className="text-sm text-muted-foreground">No environments yet.</p>
+        )}
         {envs.map((env) => (
           <Card key={env.id} className="space-y-2 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -651,8 +491,8 @@ function AgentBindingsSection({ envs }: { envs: Environment[] }) {
               {a.identityEmoji ? `${a.identityEmoji} ` : ""}
               {a.name}
             </span>
-            <select
-              className="rounded border border-border bg-background px-2 py-1 text-sm disabled:opacity-50"
+            <Select
+              size="sm"
               value={a.environmentId ?? ""}
               disabled={busy === a.id}
               onChange={(e) => bind(a.id, e.target.value || null)}
@@ -663,7 +503,7 @@ function AgentBindingsSection({ envs }: { envs: Environment[] }) {
                   {env.name} ({env.driver})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         ))}
       </Card>

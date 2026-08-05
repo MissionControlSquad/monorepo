@@ -294,7 +294,7 @@ export function RecurringTasksPage() {
             <Repeat className="w-5 h-5 text-indigo-600" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Recurring Tasks</h1>
+            <h1 className="text-lg font-semibold text-foreground">Recurring Tasks</h1>
             <p className="text-sm text-muted-foreground">
               Blueprints that auto-generate tasks on a schedule
             </p>

@@ -81,7 +81,7 @@ export function AgentsPage() {
   }
 
   return (
-    <PageLayout>
+    <PageLayout maxWidth="wide">
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Agents" }]} />
       <ErrorBoundary
         fallback={({ resetErrorBoundary, error }) => (

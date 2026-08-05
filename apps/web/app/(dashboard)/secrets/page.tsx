@@ -8,19 +8,18 @@ import {
   SECRET_ACCESS_EVENTS_QUERY,
 } from "@/lib/graphql/queries";
 import {
-  CREATE_SECRET,
-  CREATE_USER_SECRET,
   ROTATE_SECRET,
   BIND_SECRET,
   UNBIND_SECRET,
   UPDATE_SECRET,
   SET_SECRET_STATUS,
-  CREATE_SECRET_PROVIDER,
   DELETE_SECRET_PROVIDER,
-  IMPORT_SECRETS,
   CHECK_SECRET_PROVIDER_HEALTH,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Select } from "@/components/ui";
+import { SecretDialog } from "@/components/dialogs/SecretDialog";
+import { SecretProviderDialog } from "@/components/dialogs/SecretProviderDialog";
+import { SecretImportDialog } from "@/components/dialogs/SecretImportDialog";
 
 // Epic #5: secrets vault. API-gated by SECRETS_VAULT + buildbase role (admin manages; member views
 // metadata). Values are write-only — they are never fetched back, only rotated. Encryption at rest
@@ -63,36 +62,23 @@ const STATUS_VARIANT: Record<string, "green" | "yellow" | "gray"> = {
   archived: "gray",
 };
 
-const PROVIDER_KINDS = ["env", "aws", "vault"];
-
 export default function SecretsPage() {
   const [{ data }, refetch] = useQuery<{ secrets: Secret[] }>({ query: SECRETS_QUERY });
   const [{ data: providerData }, refetchProviders] = useQuery<{ secretProviders: Provider[] }>({
     query: SECRET_PROVIDERS_QUERY,
   });
-  const [, createSecret] = useMutation(CREATE_SECRET);
-  const [, createUserSecret] = useMutation(CREATE_USER_SECRET);
   const [, rotateSecret] = useMutation(ROTATE_SECRET);
   const [, bindSecret] = useMutation(BIND_SECRET);
   const [, unbindSecret] = useMutation(UNBIND_SECRET);
   const [, setStatus] = useMutation(SET_SECRET_STATUS);
   const [, updateSecret] = useMutation(UPDATE_SECRET);
-  const [, createProvider] = useMutation(CREATE_SECRET_PROVIDER);
   const [, deleteProvider] = useMutation(DELETE_SECRET_PROVIDER);
   const [, checkProviderHealth] = useMutation(CHECK_SECRET_PROVIDER_HEALTH);
-  const [, importSecrets] = useMutation(IMPORT_SECRETS);
 
   const [busy, setBusy] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "",
-    value: "",
-    description: "",
-    providerId: "",
-    personal: false,
-  });
-  const [providerForm, setProviderForm] = useState({ name: "", kind: "env" });
-  const [importText, setImportText] = useState("");
-  const [importOverwrite, setImportOverwrite] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [providerOpen, setProviderOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const [rotateVal, setRotateVal] = useState<Record<string, string>>({});
   const [bindForm, setBindForm] = useState<Record<string, { env: string; agentId: string }>>({});
@@ -108,24 +94,6 @@ export default function SecretsPage() {
     id ? (providers.find((p) => p.id === id)?.name ?? "unknown") : null;
   const refresh = () => refetch({ requestPolicy: "network-only" });
   const refreshProviders = () => refetchProviders({ requestPolicy: "network-only" });
-
-  async function onCreateProvider() {
-    setError(null);
-    if (!providerForm.name.trim()) return setError("Provider name is required");
-    setBusy("provider");
-    try {
-      const res = await createProvider({
-        name: providerForm.name.trim(),
-        kind: providerForm.kind,
-      });
-      if (res.error)
-        return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create provider");
-      setProviderForm({ name: "", kind: "env" });
-      refreshProviders();
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function onCheckProvider(id: string) {
     setBusy(id);
@@ -147,54 +115,6 @@ export default function SecretsPage() {
     try {
       await deleteProvider({ id });
       refreshProviders();
-      refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onImport() {
-    setError(null);
-    setImportResult(null);
-    if (!importText.trim()) return setError("Paste some KEY=VALUE lines to import");
-    setBusy("import");
-    try {
-      const res = await importSecrets({ text: importText, overwrite: importOverwrite });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to import");
-      const s = res.data?.importSecrets;
-      if (s) {
-        setImportResult(
-          `Imported: ${s.created} created, ${s.rotated} rotated, ${s.skipped} skipped` +
-            (s.invalidLines ? `, ${s.invalidLines} invalid line(s) ignored` : ""),
-        );
-        setImportText("");
-      }
-      refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function onCreate() {
-    setError(null);
-    if (!form.name.trim()) return setError("Name is required");
-    if (!form.value) return setError("Value is required");
-    setBusy("create");
-    try {
-      const res = form.personal
-        ? await createUserSecret({
-            name: form.name.trim(),
-            value: form.value,
-            description: form.description.trim() || null,
-          })
-        : await createSecret({
-            name: form.name.trim(),
-            value: form.value,
-            description: form.description.trim() || null,
-            providerId: form.providerId || null,
-          });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create");
-      setForm({ name: "", value: "", description: "", providerId: "", personal: false });
       refresh();
     } finally {
       setBusy(null);
@@ -245,22 +165,47 @@ export default function SecretsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
-      <h1 className="text-lg font-semibold text-foreground">Secrets</h1>
-      <p className="-mt-4 text-sm text-muted-foreground">
-        Encrypted at rest (AES-256-GCM). Values are write-only — they are never shown again, only
-        rotated. Bind a secret to an agent to inject it as an env var.
-      </p>
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Secrets</h1>
+          <p className="text-sm text-muted-foreground">
+            Encrypted at rest (AES-256-GCM). Values are write-only — they are never shown again, only
+            rotated. Bind a secret to an agent to inject it as an env var.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setImportOpen(true)}>Bulk import</Button>
+          <Button onClick={() => setOpen(true)}>New secret</Button>
+        </div>
+      </div>
+
+      {error && (
+        <p className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+
+      <SecretDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
       {/* Provider configs — point the vault at an external backend (aws/vault) or the local
           envelope (env). `config` holds only non-secret settings; backend creds are Secrets. */}
       <Card className="space-y-3 p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Providers</h2>
-          <span className="text-xs text-muted-foreground">
-            Where secrets are stored. Default is the local envelope.
-          </span>
+          <Button size="sm" variant="ghost" onClick={() => setProviderOpen(true)}>
+            Add provider
+          </Button>
         </div>
+        <p className="-mt-1 text-xs text-muted-foreground">
+          Where secrets are stored. Default is the local envelope.
+        </p>
+
+        <SecretProviderDialog
+          open={providerOpen}
+          onOpenChange={setProviderOpen}
+          onSaved={refreshProviders}
+        />
         <div className="space-y-1">
           {providers.length === 0 && (
             <p className="text-xs text-muted-foreground">
@@ -298,118 +243,18 @@ export default function SecretsPage() {
             </div>
           ))}
         </div>
-        <div className="flex gap-2 border-t border-border pt-3">
-          <input
-            className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Provider name (e.g. prod-vault)"
-            value={providerForm.name}
-            onChange={(e) => setProviderForm((f) => ({ ...f, name: e.target.value }))}
-          />
-          <select
-            className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-            value={providerForm.kind}
-            onChange={(e) => setProviderForm((f) => ({ ...f, kind: e.target.value }))}
-          >
-            {PROVIDER_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy === "provider"}
-            onClick={onCreateProvider}
-          >
-            Add provider
-          </Button>
-        </div>
       </Card>
 
       {/* Create */}
-      <Card className="space-y-3 p-4">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Name (e.g. OPENAI_API_KEY)"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Value (write-only)"
-            type="password"
-            value={form.value}
-            onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Description (optional)"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-          <select
-            className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-            value={form.providerId}
-            onChange={(e) => setForm((f) => ({ ...f, providerId: e.target.value }))}
-          >
-            <option value="">local envelope</option>
-            {providers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.kind})
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={form.personal}
-              onChange={(e) => setForm((f) => ({ ...f, personal: e.target.checked }))}
-            />
-            personal (only you can see &amp; manage it)
-          </label>
-          <Button size="sm" disabled={busy === "create"} onClick={onCreate}>
-            Add secret
-          </Button>
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </Card>
 
       {/* Bulk import — paste a .env (KEY=VALUE lines). Values are encrypted on the way in. */}
-      <Card className="space-y-2 p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Bulk import</h2>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={importOverwrite}
-              onChange={(e) => setImportOverwrite(e.target.checked)}
-            />
-            overwrite existing (rotate)
-          </label>
-        </div>
-        <textarea
-          className="h-24 w-full rounded border border-border bg-background px-3 py-1.5 font-mono text-xs"
-          placeholder={"# paste a .env\nOPENAI_API_KEY=sk-...\nSTRIPE_KEY=sk_live_..."}
-          value={importText}
-          onChange={(e) => setImportText(e.target.value)}
-        />
-        <div className="flex items-center justify-between">
-          {importResult ? (
-            <p className="text-xs text-muted-foreground">{importResult}</p>
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              Existing names are skipped unless overwrite is checked.
-            </span>
-          )}
-          <Button size="sm" variant="secondary" disabled={busy === "import"} onClick={onImport}>
-            Import
-          </Button>
-        </div>
-      </Card>
+      <SecretImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={setImportResult}
+        onSaved={refresh}
+      />
+      {importResult && <p className="text-xs text-muted-foreground">{importResult}</p>}
 
       {secrets.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No secrets yet.</Card>
@@ -447,9 +292,7 @@ export default function SecretsPage() {
               >
                 Audit
               </Button>
-              <select
-                className="rounded border border-border bg-background px-2 py-1 text-xs"
-                value={s.status}
+              <Select size="sm" className="text-xs" value={s.status}
                 onChange={async (e) => {
                   await setStatus({ id: s.id, status: e.target.value });
                   refresh();
@@ -458,7 +301,7 @@ export default function SecretsPage() {
                 <option value="active">active</option>
                 <option value="disabled">disabled</option>
                 <option value="archived">archived</option>
-              </select>
+              </Select>
             </span>
           </div>
 

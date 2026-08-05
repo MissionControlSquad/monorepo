@@ -6,7 +6,7 @@ import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { BOARD_THREAD_QUERY } from "@/lib/graphql/queries";
 import { SEND_BOARD_MESSAGE, SET_BOARD_MESSAGE_FEEDBACK } from "@/lib/graphql/mutations";
 import { BOARD_ROLE } from "@agentcenter/utils";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, Textarea } from "@/components/ui";
 import { MarkdownComment } from "@/components/common/MarkdownComment";
 
 // Epic #15: boardroom concierge chat. BOARD_CHAT-gated (experimental, admin). A standing per-workspace
@@ -65,7 +65,7 @@ export default function BoardroomPage() {
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-3xl flex-col gap-4 p-4 sm:p-6">
+    <div className="mx-auto flex h-full flex-col gap-4 p-4 sm:p-6">
       <div>
         <h1 className="text-lg font-semibold text-foreground">Boardroom</h1>
         <p className="text-sm text-muted-foreground">
@@ -142,8 +142,7 @@ export default function BoardroomPage() {
       </Card>
 
       <Card className="flex gap-2 p-3">
-        <textarea
-          className="h-16 flex-1 resize-none rounded border border-border bg-background px-3 py-1.5 text-sm"
+        <Textarea className="h-16 resize-none text-sm"
           placeholder="Message the board concierge…"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

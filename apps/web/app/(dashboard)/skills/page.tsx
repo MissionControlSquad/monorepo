@@ -11,7 +11,6 @@ import {
   SKILL_VERSIONS_QUERY,
 } from "@/lib/graphql/queries";
 import {
-  CREATE_SKILL,
   IMPORT_SKILL_PACKAGE,
   FORK_SKILL,
   STAR_SKILL,
@@ -22,7 +21,8 @@ import {
   UPSERT_SKILL_FILE,
   DELETE_SKILL_FILE,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Textarea } from "@/components/ui";
+import { SkillDialog } from "@/components/dialogs/SkillDialog";
 import { SkillComments } from "@/components/skills/SkillComments";
 import { SkillUpdatePanel } from "@/components/skills/SkillUpdatePanel";
 
@@ -58,7 +58,6 @@ interface CatalogSkill {
 
 export default function SkillsPage() {
   const [{ data }, refetch] = useQuery<{ skills: Skill[] }>({ query: SKILLS_QUERY });
-  const [, createSkill] = useMutation(CREATE_SKILL);
   const [, importPackage] = useMutation(IMPORT_SKILL_PACKAGE);
   const importInput = useRef<HTMLInputElement>(null);
   async function onImport(files: FileList) {
@@ -86,13 +85,7 @@ export default function SkillsPage() {
   const [openVersions, setOpenVersions] = useState<string | null>(null);
   const [openComments, setOpenComments] = useState<string | null>(null);
   const [openUpdates, setOpenUpdates] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "",
-    icon: "",
-    tagline: "",
-    markdown: "# Skill\n\nDescribe what the agent should do.",
-  });
-  const [error, setError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const skills = data?.skills ?? [];
   const catalog = catData?.skillCatalog ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
@@ -106,71 +99,22 @@ export default function SkillsPage() {
       setBusy(null);
     }
   }
-  async function onCreate() {
-    setError(null);
-    if (!form.name.trim()) return setError("Name is required");
-    const res = await createSkill({
-      name: form.name.trim(),
-      markdown: form.markdown,
-      icon: form.icon.trim() || null,
-      tagline: form.tagline.trim() || null,
-    });
-    if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to create");
-    setForm({
-      name: "",
-      icon: "",
-      tagline: "",
-      markdown: "# Skill\n\nDescribe what the agent should do.",
-    });
-    refresh();
-  }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-foreground">Skills</h1>
-        <>
+        <div className="flex items-center gap-2">
           <input ref={importInput} type="file" multiple className="hidden" onChange={(e) => e.target.files?.length && onImport(e.target.files)} />
           <Button size="sm" variant="secondary" onClick={() => importInput.current?.click()}>Import package</Button>
-        </>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>New skill</Button>
+        </div>
       </div>
       <p className="-mt-4 text-sm text-muted-foreground">
         Reusable capability modules (markdown). Version on edit, fork, star, and assign to agents.
       </p>
 
-      <Card className="space-y-3 p-4">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[5rem_1fr]">
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-center text-sm"
-            placeholder="🧩"
-            value={form.icon}
-            onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="Skill name"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          />
-        </div>
-        <input
-          className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-          placeholder="Tagline (optional)"
-          value={form.tagline}
-          onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))}
-        />
-        <textarea
-          className="h-28 w-full rounded border border-border bg-background px-3 py-1.5 font-mono text-xs"
-          value={form.markdown}
-          onChange={(e) => setForm((f) => ({ ...f, markdown: e.target.value }))}
-        />
-        <div className="flex justify-end">
-          <Button size="sm" onClick={onCreate}>
-            Create skill
-          </Button>
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </Card>
+      <SkillDialog open={createOpen} onOpenChange={setCreateOpen} onSaved={refresh} />
 
       {/* Public catalog — skills other workspaces published (sharingScope=public). Install copies
           one into your workspace. */}
@@ -426,8 +370,7 @@ function SkillFilesPanel({ skillId }: { skillId: string }) {
           value={draft.path}
           onChange={(e) => setDraft((d) => ({ ...d, path: e.target.value }))}
         />
-        <textarea
-          className="h-20 w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
+        <Textarea className="h-20 font-mono text-xs"
           placeholder="file content"
           value={draft.content}
           onChange={(e) => setDraft((d) => ({ ...d, content: e.target.value }))}

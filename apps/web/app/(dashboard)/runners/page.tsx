@@ -13,10 +13,8 @@ import {
   AGENT_RUN_LIVE_STATUS_QUERY,
 } from "@/lib/graphql/queries";
 import {
-  CREATE_RUNNER_HOST,
   DELETE_RUNNER_HOST,
   RUN_COMMAND_ON_HOST,
-  QUEUE_AGENT_COMMAND,
   CANCEL_RUNNER_COMMAND,
   SET_AGENT_RUNTIME,
   SET_AGENT_SANDBOX_PROVIDER,
@@ -25,7 +23,9 @@ import {
   CANCEL_AGENT_RUN,
   PROMOTE_AGENT_RUN_REVIEW,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Spinner, Select } from "@/components/ui";
+import { RunnerHostDialog } from "@/components/dialogs/RunnerHostDialog";
+import { RunnerQueueCommandDialog } from "@/components/dialogs/RunnerQueueCommandDialog";
 import { Server, Bot, Box } from "lucide-react";
 
 // Tier D: Runners dashboard. BYO hosts (register a server + run raw commands over direct SSH — the
@@ -339,7 +339,7 @@ function CommandHistory({ targetKind }: { targetKind: string }) {
 }
 
 export default function RunnersPage() {
-  const [{ data: hostData }, refetchHosts] = useQuery<{ runnerHosts: Host[] }>({
+  const [{ data: hostData, fetching: hostsFetching }, refetchHosts] = useQuery<{ runnerHosts: Host[] }>({
     query: RUNNER_HOSTS_QUERY,
   });
   const [{ data: agentData }] = useQuery<{ agents: AgentLite[] }>({ query: AGENTS_FOR_TASK_QUERY });
@@ -349,10 +349,8 @@ export default function RunnersPage() {
   const [{ data: sbxData }] = useQuery<{ sandboxProviders: SandboxProvider[] }>({
     query: SANDBOX_PROVIDERS_QUERY,
   });
-  const [, createHost] = useMutation(CREATE_RUNNER_HOST);
   const [, deleteHost] = useMutation(DELETE_RUNNER_HOST);
   const [, runOnHost] = useMutation(RUN_COMMAND_ON_HOST);
-  const [, queueAgent] = useMutation(QUEUE_AGENT_COMMAND);
   const [, setAgentRuntime] = useMutation(SET_AGENT_RUNTIME);
   const [, setAgentSandbox] = useMutation(SET_AGENT_SANDBOX_PROVIDER);
   const [, runInSandbox] = useMutation(RUN_TASK_IN_SANDBOX);
@@ -363,10 +361,10 @@ export default function RunnersPage() {
   const adapters = adapterData?.runtimeAdapters ?? [];
   const sandboxProviders = sbxData?.sandboxProviders ?? [];
 
-  const [form, setForm] = useState({ name: "", host: "", port: "22", username: "root", key: "" });
+  const [hostOpen, setHostOpen] = useState(false);
   const [hostCmd, setHostCmd] = useState<Record<string, string>>({});
   const [agentId, setAgentId] = useState("");
-  const [agentCmd, setAgentCmd] = useState("");
+  const [queueOpen, setQueueOpen] = useState(false);
   const [rt, setRt] = useState({ adapter: "", model: "", template: "" });
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -450,27 +448,6 @@ export default function RunnersPage() {
     }
   }
 
-  async function onCreateHost() {
-    setError(null);
-    if (!form.name.trim() || !form.host.trim() || !form.key.trim())
-      return setError("name, host and private key are required");
-    setBusy("host");
-    try {
-      const res = await createHost({
-        name: form.name.trim(),
-        host: form.host.trim(),
-        port: Number(form.port) || 22,
-        username: form.username.trim() || "root",
-        privateKey: form.key,
-      });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to add host");
-      setForm({ name: "", host: "", port: "22", username: "root", key: "" });
-      refetchHosts({ requestPolicy: "network-only" });
-    } finally {
-      setBusy(null);
-    }
-  }
-
   async function onRunHost(id: string) {
     const command = (hostCmd[id] ?? "").trim();
     if (!command) return;
@@ -485,23 +462,8 @@ export default function RunnersPage() {
     }
   }
 
-  async function onQueueAgent() {
-    setError(null);
-    if (!agentId) return setError("Pick an agent");
-    if (!agentCmd.trim()) return setError("Command is required");
-    setBusy("agent");
-    try {
-      const res = await queueAgent({ agentId, command: agentCmd.trim() });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Queue failed");
-      setAgentCmd("");
-      setHistoryKey((k) => k + 1);
-    } finally {
-      setBusy(null);
-    }
-  }
-
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-4 sm:p-6">
+    <div className="mx-auto space-y-8 p-4 sm:p-6">
       <div>
         <h1 className="text-lg font-semibold text-foreground">Runners</h1>
         <p className="text-sm text-muted-foreground">
@@ -513,54 +475,19 @@ export default function RunnersPage() {
 
       {/* ── BYO Hosts ─────────────────────────────────────────── */}
       <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Server className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">BYO servers (direct SSH)</h2>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Server className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-foreground">BYO servers (direct SSH)</h2>
+          </div>
+          <Button size="sm" onClick={() => setHostOpen(true)}>Add host</Button>
         </div>
 
-        <Card className="grid gap-2 p-4 sm:grid-cols-2">
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="name"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
-            placeholder="host or IP"
-            value={form.host}
-            onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="port"
-            value={form.port}
-            onChange={(e) => setForm((f) => ({ ...f, port: e.target.value }))}
-          />
-          <input
-            className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-            placeholder="username"
-            value={form.username}
-            onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
-          />
-          <textarea
-            className="rounded border border-border bg-background px-3 py-2 font-mono text-xs sm:col-span-2"
-            rows={3}
-            placeholder="SSH private key (PEM) — stored encrypted, never shown again"
-            value={form.key}
-            onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))}
-          />
-          <div className="sm:col-span-2">
-            <Button
-              size="sm"
-              loading={busy === "host"}
-              disabled={busy === "host"}
-              onClick={onCreateHost}
-            >
-              Add host
-            </Button>
-          </div>
-        </Card>
+        <RunnerHostDialog
+          open={hostOpen}
+          onOpenChange={setHostOpen}
+          onSaved={() => refetchHosts({ requestPolicy: "network-only" })}
+        />
 
         {hosts.map((h) => (
           <Card key={h.id} className="space-y-2 p-4">
@@ -602,7 +529,12 @@ export default function RunnersPage() {
             </div>
           </Card>
         ))}
-        {hosts.length === 0 && (
+        {hostsFetching && hosts.length === 0 && (
+          <div className="flex justify-center p-8">
+            <Spinner />
+          </div>
+        )}
+        {hosts.length === 0 && !hostsFetching && (
           <Card className="p-6 text-center text-sm text-muted-foreground">
             No hosts registered.
           </Card>
@@ -612,44 +544,26 @@ export default function RunnersPage() {
 
       {/* ── Agent runners ─────────────────────────────────────── */}
       <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Bot className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">Agent runners (daemon pull)</h2>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Bot className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-foreground">Agent runners (daemon pull)</h2>
+          </div>
+          <Button size="sm" onClick={() => setQueueOpen(true)}>Queue command</Button>
         </div>
         <p className="-mt-1 text-xs text-muted-foreground">
           Queue a command an agent&apos;s <code>@agentcenter/runner</code> daemon pulls on its next
           poll. Works behind NAT — the machine only makes outbound connections.
         </p>
-        <Card className="flex flex-wrap items-end gap-2 p-4">
-          <select
-            className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-            value={agentId}
-            onChange={(e) => setAgentId(e.target.value)}
-          >
-            <option value="">Select agent…</option>
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.identityEmoji ? `${a.identityEmoji} ` : ""}
-                {a.name}
-              </option>
-            ))}
-          </select>
-          <input
-            className="min-w-[10rem] flex-1 rounded border border-border bg-background px-3 py-1.5 font-mono text-sm"
-            placeholder="command to queue"
-            value={agentCmd}
-            onChange={(e) => setAgentCmd(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && onQueueAgent()}
-          />
-          <Button
-            size="sm"
-            loading={busy === "agent"}
-            disabled={busy === "agent"}
-            onClick={onQueueAgent}
-          >
-            Queue
-          </Button>
-        </Card>
+
+        <RunnerQueueCommandDialog
+          open={queueOpen}
+          onOpenChange={setQueueOpen}
+          agents={agents}
+          agentId={agentId}
+          onAgentChange={setAgentId}
+          onSaved={() => setHistoryKey((k) => k + 1)}
+        />
 
         {/* Per-agent runtime: which adapter + model the runner uses for the selected agent. */}
         <Card className="space-y-2 p-4">
@@ -657,9 +571,7 @@ export default function RunnersPage() {
             Runtime for the selected agent (overrides the runner default)
           </p>
           <div className="flex flex-wrap items-end gap-2">
-            <select
-              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-              value={rt.adapter}
+            <Select size="sm" value={rt.adapter}
               onChange={(e) => setRt((r) => ({ ...r, adapter: e.target.value }))}
             >
               <option value="">runner default</option>
@@ -668,12 +580,10 @@ export default function RunnersPage() {
                   {a.displayName}
                 </option>
               ))}
-            </select>
+            </Select>
             {selectedAdapter?.supportsModel &&
               (selectedAdapter.models.length > 0 ? (
-                <select
-                  className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-                  value={rt.model}
+                <Select size="sm" value={rt.model}
                   onChange={(e) => setRt((r) => ({ ...r, model: e.target.value }))}
                 >
                   <option value="">default model</option>
@@ -682,7 +592,7 @@ export default function RunnersPage() {
                       {m}
                     </option>
                   ))}
-                </select>
+                </Select>
               ) : (
                 <input
                   className="rounded border border-border bg-background px-3 py-1.5 text-sm"
@@ -753,13 +663,20 @@ export default function RunnersPage() {
         </div>
 
         <Card className="space-y-2 p-4">
-          <p className="text-xs font-medium text-muted-foreground">
-            Sandbox for the selected agent (uses the agent picker above)
-          </p>
+          <p className="text-xs font-medium text-muted-foreground">Sandbox for a selected agent</p>
           <div className="flex flex-wrap items-end gap-2">
-            <select
-              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-              value={sbx.provider}
+            <Select size="sm" value={agentId}
+              onChange={(e) => setAgentId(e.target.value)}
+            >
+              <option value="">Select agent…</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.identityEmoji ? `${a.identityEmoji} ` : ""}
+                  {a.name}
+                </option>
+              ))}
+            </Select>
+            <Select size="sm" value={sbx.provider}
               onChange={(e) => setSbx((s) => ({ ...s, provider: e.target.value }))}
             >
               <option value="">none (run on runner)</option>
@@ -768,7 +685,7 @@ export default function RunnersPage() {
                   {p.displayName}
                 </option>
               ))}
-            </select>
+            </Select>
             <Button
               size="sm"
               variant="secondary"

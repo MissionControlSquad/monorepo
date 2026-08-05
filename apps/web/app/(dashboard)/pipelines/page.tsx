@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import {
   PIPELINES_QUERY,
@@ -9,8 +10,6 @@ import {
   PIPELINE_CASE_EVENTS_QUERY,
 } from "@/lib/graphql/queries";
 import {
-  CREATE_PIPELINE,
-  ADD_PIPELINE_STAGE,
   SET_PIPELINE_SEQUENTIAL,
   UPDATE_PIPELINE_STAGE,
   DELETE_PIPELINE_STAGE,
@@ -22,7 +21,8 @@ import {
   TRANSITION_CASE,
   REJECT_CASE,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Spinner, Checkbox } from "@/components/ui";
+import { PipelineDialog } from "@/components/dialogs/PipelineDialog";
 
 // Epic #7: pipelines (multi-stage case workflows). PIPELINES_ROUTINES-gated. Admin builds
 // pipelines/stages; members work cases (claim → transition forward → done, or reject).
@@ -103,7 +103,12 @@ function PipelineCard({
   async function act(fn: () => Promise<unknown>, key: string) {
     setBusy(key);
     try {
-      await fn();
+      const r = await fn();
+      if (r && typeof r === "object" && "error" in r && r.error) {
+        const err = r.error as { graphQLErrors?: { message: string }[]; message?: string };
+        toast.error(err.graphQLErrors?.[0]?.message ?? err.message ?? "Something went wrong");
+        return;
+      }
       refresh();
     } finally {
       setBusy(null);
@@ -115,8 +120,7 @@ function PipelineCard({
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium text-foreground">{pipeline.name}</span>
         <label className="flex items-center gap-1 text-xs text-muted-foreground">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={pipeline.sequentialOnly}
             onChange={async (e) => {
               await setSequential({
@@ -153,7 +157,7 @@ function PipelineCard({
               className="text-xs text-destructive"
               onClick={async () => {
                 const res = await deleteStage({ stageId: s.id });
-                if (res.error) alert(res.error.graphQLErrors[0]?.message ?? "Cannot delete stage");
+                if (res.error) toast.error(res.error.graphQLErrors[0]?.message ?? "Cannot delete stage");
                 else onStagesChanged();
               }}
             >
@@ -279,59 +283,35 @@ function PipelineCard({
 }
 
 export default function PipelinesPage() {
-  const [{ data }, refetch] = useQuery<{ pipelines: Pipeline[] }>({ query: PIPELINES_QUERY });
-  const [, createPipeline] = useMutation(CREATE_PIPELINE);
-  const [, addStage] = useMutation(ADD_PIPELINE_STAGE);
+  const [{ data, fetching }, refetch] = useQuery<{ pipelines: Pipeline[] }>({ query: PIPELINES_QUERY });
 
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const pipelines = data?.pipelines ?? [];
 
-  async function onCreate() {
-    if (!name.trim()) return;
-    setBusy(true);
-    try {
-      const res = await createPipeline({ name: name.trim() });
-      const pid = res.data?.createPipeline?.id;
-      if (pid) {
-        // Seed a sensible default 3-stage flow (Intake → Review → Done).
-        await addStage({ pipelineId: pid, name: "Intake", order: 0 });
-        await addStage({
-          pipelineId: pid,
-          name: "Review",
-          order: 1,
-          isReviewStage: true,
-          requireApproval: true,
-        });
-        await addStage({ pipelineId: pid, name: "Done", order: 2 });
-      }
-      setName("");
-      refetch({ requestPolicy: "network-only" });
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
-      <h1 className="text-lg font-semibold text-foreground">Pipelines</h1>
-      <p className="-mt-4 text-sm text-muted-foreground">
-        Multi-stage case workflows. Claim a case, advance it forward through stages, or reject it.
-      </p>
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Pipelines</h1>
+          <p className="text-sm text-muted-foreground">
+            Multi-stage case workflows. Claim a case, advance it forward through stages, or reject it.
+          </p>
+        </div>
+        <Button onClick={() => setOpen(true)}>New pipeline</Button>
+      </div>
 
-      <Card className="flex gap-2 p-4">
-        <input
-          className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-          placeholder="New pipeline name (seeds Intake → Review → Done)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Button size="sm" disabled={busy} onClick={onCreate}>
-          Create
-        </Button>
-      </Card>
+      <PipelineDialog
+        open={open}
+        onOpenChange={setOpen}
+        onSaved={() => refetch({ requestPolicy: "network-only" })}
+      />
 
-      {pipelines.length === 0 && (
+      {fetching && pipelines.length === 0 && (
+        <div className="flex justify-center p-8">
+          <Spinner />
+        </div>
+      )}
+      {pipelines.length === 0 && !fetching && (
         <Card className="p-8 text-center text-sm text-muted-foreground">No pipelines yet.</Card>
       )}
       {pipelines.map((p) => (

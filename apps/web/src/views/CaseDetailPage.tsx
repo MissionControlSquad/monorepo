@@ -13,7 +13,7 @@ import {
   REMOVE_CASE_LABEL,
   UNLINK_TASK_FROM_CASE,
 } from "@/lib/graphql/mutations";
-import { Breadcrumbs, Card, Badge, PageLayout } from "@/components/ui";
+import { Breadcrumbs, Card, Badge, PageLayout, Textarea } from "@/components/ui";
 import {
   Select,
   SelectContent,
@@ -142,7 +142,7 @@ export function CaseDetailPage({ caseId }: { caseId: string }) {
               <Badge variant="gray">{kase.caseType}</Badge>
             </div>
             <h1 className="text-lg font-semibold text-foreground">{kase.title}</h1>
-            <textarea
+            <Textarea
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               onBlur={() =>
@@ -151,7 +151,7 @@ export function CaseDetailPage({ caseId }: { caseId: string }) {
               }
               rows={4}
               placeholder="Summary…"
-              className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="resize-y rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </Card>
 

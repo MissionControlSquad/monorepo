@@ -106,6 +106,7 @@ const AGENT_BEARER_PREFIXES = [
   "/api/queue",
   "/api/storage",
   "/api/channels",
+  "/api/cost-events", // Epic #4: agents report inference cost via Bearer key (resolveAgent in handler)
 ];
 
 /** Admin-only routes under /api/agents/[id]/ that require session auth. */

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import {
   FINANCE_SUMMARY_QUERY,
@@ -10,13 +11,13 @@ import {
   COST_TREND_QUERY,
 } from "@/lib/graphql/queries";
 import {
-  CREATE_BUDGET_POLICY,
   DELETE_BUDGET_POLICY,
   RESOLVE_BUDGET_INCIDENT,
   RAISE_BUDGET_AND_RESUME,
 } from "@/lib/graphql/mutations";
-import { BUDGET_WINDOWS, IncidentThreshold, formatCents as money } from "@agentcenter/utils";
-import { Button, Card, Badge } from "@/components/ui";
+import { IncidentThreshold, formatCents as money } from "@agentcenter/utils";
+import { Button, Card, Badge, Select } from "@/components/ui";
+import { BudgetPolicyDialog } from "@/components/dialogs/BudgetPolicyDialog";
 import { FinanceEventsSection } from "@/components/finance/FinanceEventsSection";
 
 // Epic #4: agent budgets / cost dashboard. API-gated by the BUDGETS feature + buildbase role
@@ -59,7 +60,6 @@ interface Bucket {
   eventCount: number;
 }
 
-const WINDOWS = BUDGET_WINDOWS;
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
@@ -92,21 +92,14 @@ export default function FinancePage() {
     variables: { days: 30 },
   });
 
-  const [, createPolicy] = useMutation(CREATE_BUDGET_POLICY);
   const [, deletePolicy] = useMutation(DELETE_BUDGET_POLICY);
   const [, resolveIncident] = useMutation(RESOLVE_BUDGET_INCIDENT);
   const [, raiseAndResume] = useMutation(RAISE_BUDGET_AND_RESUME);
 
   const [busy, setBusy] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "",
-    limit: "",
-    window: "monthly",
-    hardStop: true,
-    warn: "80",
-  });
+  const [open, setOpen] = useState(false);
   const [raiseLimit, setRaiseLimit] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [raiseError, setRaiseError] = useState<string | null>(null);
 
   const summary = sumData?.financeSummary;
   const policies = polData?.budgetPolicies ?? [];
@@ -116,39 +109,19 @@ export default function FinancePage() {
   );
   const maxBucket = buckets.reduce((m, b) => Math.max(m, b.amountCents), 0) || 1;
 
-  async function onCreate() {
-    setFormError(null);
-    const limitCents = Math.round(Number(form.limit) * 100);
-    if (!form.name.trim()) return setFormError("Name is required");
-    if (!Number.isFinite(limitCents) || limitCents <= 0)
-      return setFormError("Enter a positive limit");
-    setBusy("create");
-    try {
-      const warnPercent = Math.round(Number(form.warn));
-      const res = await createPolicy({
-        scope: "workspace",
-        name: form.name.trim(),
-        limitCents,
-        window: form.window,
-        hardStop: form.hardStop,
-        warnPercent: Number.isFinite(warnPercent) ? warnPercent : 80,
-      });
-      if (res.error) {
-        setFormError(res.error.graphQLErrors[0]?.message ?? "Failed to create policy");
-        return;
-      }
-      setForm({ name: "", limit: "", window: "monthly", hardStop: true, warn: "80" });
-      refetchPolicies({ requestPolicy: "network-only" });
-      refetchSummary({ requestPolicy: "network-only" });
-    } finally {
-      setBusy(null);
-    }
+  function refreshBudgets() {
+    refetchPolicies({ requestPolicy: "network-only" });
+    refetchSummary({ requestPolicy: "network-only" });
   }
 
   async function onDelete(id: string) {
     setBusy(id);
     try {
-      await deletePolicy({ id });
+      const res = await deletePolicy({ id });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to delete");
+        return;
+      }
       refetchPolicies({ requestPolicy: "network-only" });
       refetchSummary({ requestPolicy: "network-only" });
     } finally {
@@ -159,7 +132,11 @@ export default function FinancePage() {
   async function onResolve(id: string) {
     setBusy(id);
     try {
-      await resolveIncident({ id });
+      const res = await resolveIncident({ id });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to resolve incident");
+        return;
+      }
       refetchIncidents({ requestPolicy: "network-only" });
       refetchSummary({ requestPolicy: "network-only" });
     } finally {
@@ -171,17 +148,17 @@ export default function FinancePage() {
     const dollars = Number(raiseLimit[inc.id]);
     const newLimitCents = Math.round(dollars * 100);
     if (!Number.isFinite(newLimitCents) || newLimitCents <= inc.spendCents) {
-      setFormError(`New limit must exceed current spend (${money(inc.spendCents)})`);
+      setRaiseError(`New limit must exceed current spend (${money(inc.spendCents)})`);
       return;
     }
     setBusy(inc.id);
     try {
       const res = await raiseAndResume({ id: inc.id, newLimitCents });
       if (res.error) {
-        setFormError(res.error.graphQLErrors[0]?.message ?? "Failed to raise & resume");
+        setRaiseError(res.error.graphQLErrors[0]?.message ?? "Failed to raise & resume");
         return;
       }
-      setFormError(null);
+      setRaiseError(null);
       refetchIncidents({ requestPolicy: "network-only" });
       refetchPolicies({ requestPolicy: "network-only" });
       refetchSummary({ requestPolicy: "network-only" });
@@ -191,7 +168,7 @@ export default function FinancePage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
       <h1 className="text-lg font-semibold text-foreground">Finance &amp; Budgets</h1>
 
       {/* Summary */}
@@ -206,6 +183,9 @@ export default function FinancePage() {
       {incidents.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-sm font-semibold text-foreground">Open incidents</h2>
+          {raiseError && (
+            <p className="text-sm text-destructive" role="alert">{raiseError}</p>
+          )}
           {incidents.map((inc) => (
             <Card
               key={inc.id}
@@ -289,9 +269,7 @@ export default function FinancePage() {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Spend by {breakdownBy}</h2>
-          <select
-            className="rounded border border-border bg-background px-2 py-1 text-xs"
-            value={breakdownBy}
+          <Select size="sm" className="text-xs" value={breakdownBy}
             onChange={(e) => setBreakdownBy(e.target.value)}
           >
             <option value="model">model</option>
@@ -301,7 +279,7 @@ export default function FinancePage() {
             <option value="biller">biller</option>
             <option value="issue">issue</option>
             <option value="billingType">billing type</option>
-          </select>
+          </Select>
         </div>
         <Card className="space-y-3 p-4">
           {buckets.length === 0 && (
@@ -331,57 +309,12 @@ export default function FinancePage() {
 
       {/* Budget policies */}
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-foreground">Budget policies</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Budget policies</h2>
+          <Button size="sm" onClick={() => setOpen(true)}>New budget</Button>
+        </div>
 
-        <Card className="space-y-3 p-4">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
-            <input
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm sm:col-span-2"
-              placeholder="Budget name"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            />
-            <input
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-              placeholder="Limit ($)"
-              inputMode="decimal"
-              value={form.limit}
-              onChange={(e) => setForm((f) => ({ ...f, limit: e.target.value }))}
-            />
-            <select
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-              value={form.window}
-              onChange={(e) => setForm((f) => ({ ...f, window: e.target.value }))}
-            >
-              {WINDOWS.map((w) => (
-                <option key={w} value={w}>
-                  {w}
-                </option>
-              ))}
-            </select>
-            <input
-              className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-              placeholder="Warn %"
-              inputMode="numeric"
-              value={form.warn}
-              onChange={(e) => setForm((f) => ({ ...f, warn: e.target.value }))}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 text-sm text-foreground">
-              <input
-                type="checkbox"
-                checked={form.hardStop}
-                onChange={(e) => setForm((f) => ({ ...f, hardStop: e.target.checked }))}
-              />
-              Hard stop (auto-pause agents on breach)
-            </label>
-            <Button size="sm" disabled={busy === "create"} onClick={onCreate}>
-              Add workspace budget
-            </Button>
-          </div>
-          {formError && <p className="text-sm text-destructive">{formError}</p>}
-        </Card>
+        <BudgetPolicyDialog open={open} onOpenChange={setOpen} onSaved={refreshBudgets} />
 
         {policies.length === 0 && (
           <Card className="p-8 text-center text-sm text-muted-foreground">

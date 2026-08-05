@@ -2,15 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation } from "urql";
-import { AGENT_CAPABILITIES } from "@agentcenter/utils";
 import {
   AGENTS_QUERY,
   AGENT_CAPABILITY_GRANTS_QUERY,
   AGENT_AUTHZ_EVENTS_QUERY,
 } from "@/lib/graphql/queries";
-import { GRANT_AGENT_CAPABILITY, REVOKE_AGENT_CAPABILITY } from "@/lib/graphql/mutations";
+import { REVOKE_AGENT_CAPABILITY } from "@/lib/graphql/mutations";
 import { AGENT_AUTHZ_DECISION } from "@agentcenter/utils";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Select } from "@/components/ui";
+import { AgentCapabilityGrantDialog } from "@/components/dialogs/AgentCapabilityGrantDialog";
 
 // Epic #21: agent authorization. AGENT_AUTHZ-gated. Grant capabilities to an agent (the agent analog
 // of a human role) and review recent denials. Grants only bite when the agent is in restricted mode
@@ -43,7 +43,9 @@ export default function AgentAuthzPage() {
     if (!agentId && agents.length) setAgentId(agents[0].id);
   }, [agents, agentId]);
 
-  const [{ data: grantsData }, refetchGrants] = useQuery<{ agentCapabilityGrants: Grant[] }>({
+  const [{ data: grantsData, fetching: grantsFetching }, refetchGrants] = useQuery<{
+    agentCapabilityGrants: Grant[];
+  }>({
     query: AGENT_CAPABILITY_GRANTS_QUERY,
     variables: { agentId },
     pause: !agentId,
@@ -53,28 +55,19 @@ export default function AgentAuthzPage() {
     variables: { agentId },
     pause: !agentId,
   });
-  const [, grant] = useMutation(GRANT_AGENT_CAPABILITY);
   const [, revoke] = useMutation(REVOKE_AGENT_CAPABILITY);
 
-  const [cap, setCap] = useState<string>(AGENT_CAPABILITIES[0]);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const grants = grantsData?.agentCapabilityGrants ?? [];
   const events = eventsData?.agentAuthzEvents ?? [];
-  const grantedCaps = new Set(grants.map((g) => g.capability));
+  const grantedCaps = grants.map((g) => g.capability);
 
   function refresh() {
     refetchGrants({ requestPolicy: "network-only" });
     refetchEvents({ requestPolicy: "network-only" });
   }
-  async function onGrant() {
-    setBusy(true);
-    try {
-      await grant({ agentId, capability: cap });
-      refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
+
   async function onRevoke(id: string) {
     setBusy(true);
     try {
@@ -86,7 +79,7 @@ export default function AgentAuthzPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
+    <div className="mx-auto space-y-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Agent authorization</h1>
@@ -95,43 +88,32 @@ export default function AgentAuthzPage() {
             otherwise agents run open by default.
           </p>
         </div>
-        <select
-          className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-          value={agentId}
-          onChange={(e) => setAgentId(e.target.value)}
-        >
+        <Select size="sm" value={agentId} onChange={(e) => setAgentId(e.target.value)}>
           {agents.length === 0 && <option value="">No agents</option>}
           {agents.map((a) => (
             <option key={a.id} value={a.id}>
               {a.name} · {a.role}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {agentId && (
         <>
-          <Card className="flex flex-wrap items-center gap-2 p-4">
-            <select
-              className="rounded border border-border bg-background px-2 py-1 text-sm"
-              value={cap}
-              onChange={(e) => setCap(e.target.value)}
-            >
-              {AGENT_CAPABILITIES.map((c) => (
-                <option key={c} value={c} disabled={grantedCaps.has(c)}>
-                  {c}
-                  {grantedCaps.has(c) ? " (granted)" : ""}
-                </option>
-              ))}
-            </select>
-            <Button size="sm" disabled={busy || grantedCaps.has(cap)} onClick={onGrant}>
-              Grant capability
-            </Button>
-          </Card>
+          <AgentCapabilityGrantDialog
+            open={open}
+            onOpenChange={setOpen}
+            agentId={agentId}
+            grantedCaps={grantedCaps}
+            onSaved={refresh}
+          />
 
           <Card className="space-y-2 p-4">
-            <h2 className="text-sm font-medium text-foreground">Granted capabilities</h2>
-            {grants.length === 0 && (
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-foreground">Granted capabilities</h2>
+              <Button size="sm" onClick={() => setOpen(true)}>Grant capability</Button>
+            </div>
+            {grants.length === 0 && !grantsFetching && (
               <p className="text-sm text-muted-foreground">
                 No explicit grants — this agent relies on its role defaults.
               </p>
@@ -158,7 +140,7 @@ export default function AgentAuthzPage() {
 
           <Card className="space-y-2 p-4">
             <h2 className="text-sm font-medium text-foreground">Recent authorization events</h2>
-            {events.length === 0 && (
+            {events.length === 0 && !grantsFetching && (
               <p className="text-sm text-muted-foreground">No denials recorded.</p>
             )}
             {events.map((e) => (

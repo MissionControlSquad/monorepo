@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useQuery, useMutation } from "urql";
 import { Puzzle } from "lucide-react";
 import { ADAPTER_PLUGINS_QUERY } from "@/lib/graphql/queries";
-import { UPSERT_ADAPTER_PLUGIN, DELETE_ADAPTER_PLUGIN } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Input, EmptyState } from "@/components/ui";
+import { DELETE_ADAPTER_PLUGIN } from "@/lib/graphql/mutations";
+import { Button, Card, Badge, EmptyState } from "@/components/ui";
+import { AdapterPluginDialog } from "@/components/dialogs/AdapterPluginDialog";
 
 // Adapter-plugin store (parity #5). Admin. Declarative runtime adapters (base + baked template, zero
 // code-exec). Loaded into the in-process registry at startup.
@@ -14,38 +15,23 @@ interface AdapterPlugin {
 }
 export default function AdapterPluginsPage() {
   const [{ data, fetching }, refetch] = useQuery<{ adapterPlugins: AdapterPlugin[] }>({ query: ADAPTER_PLUGINS_QUERY });
-  const [, upsert] = useMutation(UPSERT_ADAPTER_PLUGIN);
   const [, del] = useMutation(DELETE_ADAPTER_PLUGIN);
-  const [form, setForm] = useState({ key: "", base: "process", template: "" });
-  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const rows = data?.adapterPlugins ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
-  async function onAdd() {
-    if (!form.key.trim() || !form.template.trim()) return;
-    const r = await upsert({ key: form.key, base: form.base, template: form.template.split(/\s+/).filter(Boolean) });
-    if (r.error) return setError(r.error.message);
-    setError(null); setForm({ key: "", base: "process", template: "" }); refresh();
-  }
-
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">Adapter plugins</h1>
-        <p className="text-sm text-muted-foreground">Declarative runtime adapters (base + template). Zero code execution.</p>
-      </div>
-      <Card padding="lg" className="space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">Add adapter</h2>
-        <div className="flex flex-wrap items-end gap-2">
-          <Input placeholder="Key (e.g. aider)" value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value })} className="w-40" />
-          <select value={form.base} onChange={(e) => setForm({ ...form, base: e.target.value })} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
-            <option value="process">process</option><option value="shell">shell</option><option value="http">http</option>
-          </select>
-          <Input placeholder="Template (space-separated argv, use {prompt})" value={form.template} onChange={(e) => setForm({ ...form, template: e.target.value })} className="w-72" />
-          <Button onClick={onAdd}>Add</Button>
+    <div className="mx-auto space-y-6 p-4 sm:p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Adapter plugins</h1>
+          <p className="text-sm text-muted-foreground">Declarative runtime adapters (base + template). Zero code execution.</p>
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </Card>
+        <Button onClick={() => setOpen(true)}>Add adapter</Button>
+      </div>
+
+      <AdapterPluginDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
+
       {rows.length === 0 && !fetching ? (
         <EmptyState icon={<Puzzle className="h-8 w-8" />} title="No adapter plugins" description="Add a declarative adapter to make it selectable." />
       ) : (

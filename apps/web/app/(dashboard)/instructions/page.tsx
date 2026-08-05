@@ -8,7 +8,8 @@ import {
   DELETE_AGENT_INSTRUCTION,
   SEED_AGENT_INSTRUCTIONS,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Select, Textarea } from "@/components/ui";
+import { InstructionFileDialog } from "@/components/dialogs/InstructionFileDialog";
 
 // Epic #18: per-agent instruction bundles (AGENTS.md). AGENT_INSTRUCTIONS-gated. Pick an agent, edit
 // its markdown instruction files, seed the role default bundle. Persisted config — delivery into a
@@ -47,9 +48,8 @@ export default function InstructionsPage() {
   const files = data?.agentInstructions ?? [];
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [newFile, setNewFile] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fileOpen, setFileOpen] = useState(false);
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
   // Keep the editor in sync with the selected file.
@@ -84,21 +84,6 @@ export default function InstructionsPage() {
       setBusy(false);
     }
   }
-  async function addFile() {
-    setError(null);
-    const name = newFile.trim();
-    if (!name) return;
-    setBusy(true);
-    try {
-      const res = await upsert({ agentId, fileName: name, content: `# ${name}\n\n` });
-      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Invalid file name");
-      setNewFile("");
-      setSelected(name);
-      refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
   async function onDelete(fileName: string) {
     setBusy(true);
     try {
@@ -110,7 +95,7 @@ export default function InstructionsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
+    <div className="mx-auto space-y-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Agent instructions</h1>
@@ -118,9 +103,7 @@ export default function InstructionsPage() {
             Markdown instruction files (AGENTS.md) that configure how an agent behaves.
           </p>
         </div>
-        <select
-          className="rounded border border-border bg-background px-3 py-1.5 text-sm"
-          value={agentId}
+        <Select size="sm" value={agentId}
           onChange={(e) => setAgentId(e.target.value)}
         >
           {agents.length === 0 && <option value="">No agents</option>}
@@ -129,8 +112,16 @@ export default function InstructionsPage() {
               {a.name} · {a.role}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
+
+      <InstructionFileDialog
+        open={fileOpen}
+        onOpenChange={setFileOpen}
+        agentId={agentId}
+        onCreated={setSelected}
+        onSaved={refresh}
+      />
 
       {agentId && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[220px_1fr]">
@@ -161,18 +152,9 @@ export default function InstructionsPage() {
                 {f.fileName === "AGENTS.md" && <Badge variant="blue">core</Badge>}
               </button>
             ))}
-            <div className="flex gap-1 pt-1">
-              <input
-                className="w-full rounded border border-border bg-background px-2 py-1 font-mono text-xs"
-                placeholder="NEW.md"
-                value={newFile}
-                onChange={(e) => setNewFile(e.target.value)}
-              />
-              <Button size="sm" disabled={!newFile.trim() || busy} onClick={addFile}>
-                Add
-              </Button>
-            </div>
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            <Button size="sm" variant="ghost" className="w-full" onClick={() => setFileOpen(true)}>
+              + Add file
+            </Button>
           </Card>
 
           <Card className="space-y-2 p-3">
@@ -194,8 +176,7 @@ export default function InstructionsPage() {
                     </Button>
                   </span>
                 </div>
-                <textarea
-                  className="h-96 w-full rounded border border-border bg-background px-3 py-2 font-mono text-xs"
+                <Textarea className="h-96 font-mono text-xs"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                 />
