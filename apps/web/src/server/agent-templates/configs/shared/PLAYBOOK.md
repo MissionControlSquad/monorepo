@@ -102,6 +102,22 @@ curl -X POST "$MC/api/events/ingest" \
 # actionType examples: file_opened, file_edited, code_written, command_executed, research_done, thinking, reviewing, deploying, testing, writing_docs
 ```
 
+## Per-task context (stateless — works in ANY environment)
+
+Before working a task, fetch its full context from the cloud. This returns EVERYTHING you
+need for that one task — your identity, runtime, your **role skill** (your craft guide, served
+from the control plane), your instruction files, the task, its project, and existing
+deliverables — so you can run correctly on a fresh box, cloud sandbox, or CI **without any
+local skill/config files**. Prefer this over reading local files.
+
+```bash
+# Fetch everything you need to run ONE task (identity + skills + instructions + task + project)
+curl "$MC/api/agents/me/context?taskId=TASK_ID" \
+  -H "Authorization: Bearer $KEY"
+# Returns: { agent, runtime, memory, instructions[], skills[], task, project, deliverables[] }
+# skills[] includes your role skill guide (key "role:<templateId>") — read it before you start.
+```
+
 ## Tasks
 
 ```bash
