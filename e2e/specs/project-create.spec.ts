@@ -28,3 +28,21 @@ test("create a project from the UI", async ({ page }) => {
   await expect(page.getByText("Project created")).toBeVisible();
   await expect(page.getByText(name).first()).toBeVisible();
 });
+
+// The error state the happy path does not exercise: submitting with an empty name must show the
+// validation message and keep the modal open (nothing created).
+test("create-project form validates a required name", async ({ page }) => {
+  await page.goto("/projects");
+  await page.getByRole("button", { name: /new project/i }).first().click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("New Project", { exact: true })).toBeVisible();
+
+  // Submit with the name left blank.
+  await dialog.getByRole("button", { name: /create project/i }).click();
+
+  await expect(dialog.getByText(/project name is required/i)).toBeVisible();
+  // The modal stays open and no success toast appears.
+  await expect(dialog).toBeVisible();
+  await expect(page.getByText("Project created")).toHaveCount(0);
+});
