@@ -10,6 +10,9 @@ test("create a task from the UI", async ({ page }) => {
   const title = `E2E Task ${Date.now()}`;
 
   await page.goto("/");
+  // Wait for the shell to hydrate before clicking the rail button (the "Agents" nav label is the
+  // stable "shell ready" signal), otherwise the click can land before the handler is attached.
+  await expect(page.getByText("Agents", { exact: true }).first()).toBeVisible();
 
   // The nav rail exposes a global "New task" action (aria-label), available on every screen.
   await page.getByRole("button", { name: /new task/i }).first().click();
@@ -29,6 +32,7 @@ test("create a task from the UI", async ({ page }) => {
 // keep the modal open (nothing created, no success toast).
 test("create-task form validates required fields", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByText("Agents", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: /new task/i }).first().click();
 
   const dialog = page.getByRole("dialog");

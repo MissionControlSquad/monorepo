@@ -22,8 +22,13 @@ export default defineConfig({
   outputDir: "./.results",
   fullyParallel: true,
   forbidOnly: IS_CI,
-  retries: IS_CI ? 2 : 0,
-  workers: IS_CI ? 4 : undefined,
+  // CI runs against a production `next start` server that handles parallel workers fine. Locally we
+  // attach to `next dev`, which compiles routes on demand and drops connections (ERR_EMPTY_RESPONSE)
+  // or stalls when several cold navigations land at once - the heavy agent-lifecycle spec then blows
+  // its timeout. So run serially locally for a reliable pass, with one retry to absorb a transient
+  // dev-server drop. Override with `--workers=N` for a faster local run once routes are warm.
+  retries: IS_CI ? 2 : 1,
+  workers: IS_CI ? 4 : 1,
   timeout: 90_000,
   expect: { timeout: 15_000 },
 
