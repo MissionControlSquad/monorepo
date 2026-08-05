@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { loadRoleSkill } from "../../src/server/services/agent-role-skill";
+import { loadRoleSkill, resolveRoleTemplateId } from "../../src/server/services/agent-role-skill";
 
 // Cloud-served role skills: an agent's role skill guide comes from the control plane's template
 // library (server-side files), not local bundle files — so the agent runs correctly in any
@@ -16,16 +16,28 @@ describe("loadRoleSkill (cloud-served role skills)", () => {
     expect(skill!.markdown).not.toContain("{{agent.name}}");
   });
 
-  it("falls back to a generic role guide when no template matches (still cloud-served, not local)", () => {
-    const skill = loadRoleSkill(null, "Squad Lead");
-    expect(skill).not.toBeNull();
-    expect(skill!.key).toBe("role:generic");
-    expect(skill!.markdown).toContain("Squad Lead");
+  it("derives the specific role template from a free-text role (no templateId needed)", () => {
+    expect(loadRoleSkill(null, "Backend Developer")!.key).toBe("role:backend-dev");
+    expect(loadRoleSkill(null, "QA Engineer")!.key).toBe("role:qa-testing");
+    expect(loadRoleSkill(null, "Squad Lead")!.key).toBe("role:squad-lead");
+    expect(loadRoleSkill(null, "DevOps")!.key).toBe("role:devops");
   });
 
-  it("rejects unsafe template ids (path traversal) → falls back", () => {
-    const skill = loadRoleSkill("../../etc/passwd", "Engineer");
+  it("falls back to a generic role guide when no template matches (still cloud-served, not local)", () => {
+    const skill = loadRoleSkill(null, "Underwater Basket Weaver");
+    expect(skill).not.toBeNull();
     expect(skill!.key).toBe("role:generic");
+    expect(skill!.markdown).toContain("Underwater Basket Weaver");
+  });
+
+  it("rejects unsafe template ids (path traversal) → falls back / resolves by role", () => {
+    // unsafe id ignored; role "Engineer" has no exact template → generic
+    expect(loadRoleSkill("../../etc/passwd", "Engineer")!.key).toBe("role:generic");
+  });
+
+  it("resolveRoleTemplateId maps common roles and returns null for unknown", () => {
+    expect(resolveRoleTemplateId("Frontend Developer")).toBe("frontend-dev");
+    expect(resolveRoleTemplateId("Underwater Basket Weaver")).toBeNull();
   });
 
   it("returns null only when the agent has no role", () => {
