@@ -48,10 +48,15 @@ e2e/
 
 ## What is covered
 
-- `agent-lifecycle.spec.ts` (P0): create an agent through the wizard UI, the agent loads its role skill
-  + full config set from the cloud, it works a task and submits a deliverable, the squad lead requests
-  rework then approves, the task lands `done`. Human steps go through the UI; the agent's own runtime
-  steps go through its Bearer-key REST API (no human performs those).
+- `agent-lifecycle.spec.ts` (P0, deep): create an agent through the wizard UI, the agent loads its role
+  skill + full config set from the cloud, it works a task and submits a deliverable, the squad lead
+  requests rework then approves, the task lands `done`. Human steps go through the UI; the agent's own
+  runtime steps go through its Bearer-key REST API (no human performs those).
+- `dashboard-smoke.spec.ts` (broad, shallow): every always-present dashboard screen (Home, Search,
+  Timeline, Agents, Projects, Artifacts, Adapter plugins) renders inside the app shell without a 500,
+  an error boundary, or a bounce to `/login`. This is the net that catches a screen that breaks on a
+  refactor. Flag-gated screens (finance, approvals, environments, ...) get their own specs as those
+  features grow - keep this file to routes that render in any environment.
 
 More specs (budget auto-pause, company/project/task, cloud-skills) to follow.
 
