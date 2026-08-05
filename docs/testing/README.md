@@ -58,8 +58,11 @@ e2e/
   refactor. Flag-gated screens (finance, approvals, environments, ...) get their own specs as those
   features grow - keep this file to routes that render in any environment.
 - `project-create.spec.ts` (form flow): a user opens the New Project modal from the Projects screen,
-  fills the form, submits, and sees the success toast + the new project in the list. The template for
-  the other "fill a form and see the result" flows (create task, edit agent, ...).
+  fills the form, submits, and sees the success toast + the new project in the list. Plus the error
+  state (empty name -> validation message, modal stays open).
+- `task-create.spec.ts` (form flow): a user opens the global "New task" action from the nav rail, fills
+  title + description, submits, and sees the success toast. Plus the error state (blank fields ->
+  "Title is required" / "Description is required").
 
 More specs (budget auto-pause, company/project/task, cloud-skills) to follow.
 
