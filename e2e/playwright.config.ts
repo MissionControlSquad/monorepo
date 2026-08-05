@@ -1,5 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
+import dotenv from "dotenv";
 import path from "node:path";
+
+// Load e2e/.env (gitignored) so local runs get ADMIN_PASSWORD, BASE_URL, etc. without exporting them.
+// Real env vars already in the shell win (override: false) - that is how CI passes its values in.
+dotenv.config({ path: path.join(__dirname, ".env"), override: false });
 
 // Playwright is the single UI / E2E framework for this monorepo. The same command runs identically
 // on a dev machine and in GitHub Actions. See docs/testing/README.md.
