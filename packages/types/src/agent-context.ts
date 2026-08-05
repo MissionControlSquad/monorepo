@@ -100,4 +100,18 @@ export interface AgentContextBundle {
   deliverables: AgentContextDeliverable[];
   documents: AgentContextDocument[];
   subtasks: AgentContextSubtask[];
+  /**
+   * The agent's full config/identity file set (AGENTS.md, SOUL.md, IDENTITY.md, SKILL.md,
+   * HEARTBEAT.md, PLAYBOOK.md, TOOLS.md, USER.md, …), generated from the control-plane templates.
+   * Optional (older runners ignore it). Lets a freshly-created agent get everything it needs to
+   * operate from ONE cloud call — no local config files required.
+   */
+  configFiles?: AgentContextConfigFile[];
+  /** Version of the config bundle in `configFiles` (matches the config-bundle endpoint). */
+  configVersion?: string;
+}
+
+export interface AgentContextConfigFile {
+  filename: string;
+  content: string;
 }

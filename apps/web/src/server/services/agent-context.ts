@@ -14,6 +14,7 @@ import type { AgentContextBundle } from "@agentcenter/types";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assembleInjectedMemory, resolveEffectiveMemoryProvider } from "./agent-memory";
 import { loadRoleSkill } from "./agent-role-skill";
+import { getConfigBundleForAgent } from "@/server/agent-config-generator";
 
 // REST-shaped error so the route's handleError() renders a 404 (not a 500).
 function notFound(message: string): never {
@@ -49,6 +50,8 @@ interface AgentLike {
   id: string;
   name: string;
   role: string;
+  username?: string | null;
+  identityEmoji?: string | null;
   templateId?: string | null;
   personality: string | null;
   level: string | null;
@@ -96,6 +99,19 @@ export async function assembleContextBundle(
       include: { skill: true },
     }),
   ]);
+
+  // Generate the agent's full config/identity file set from the control-plane templates so it is
+  // delivered from the cloud alongside the per-task context (no local config files needed).
+  const configBundle = getConfigBundleForAgent({
+    id: agent.id,
+    name: agent.name,
+    role: agent.role,
+    username: agent.username ?? null,
+    identityEmoji: agent.identityEmoji ?? null,
+    personality: agent.personality ?? null,
+    level: agent.level ?? null,
+    templateId: agent.templateId ?? null,
+  });
 
   return {
     version: 1,
@@ -162,5 +178,9 @@ export async function assembleContextBundle(
       content: doc.content,
     })),
     subtasks: task.childTasks.map((c) => ({ id: c.id, title: c.title, status: c.status })),
+    // The agent's full config/identity file set, generated from the control-plane templates, so a
+    // freshly-created agent gets everything it needs to operate from ONE cloud call — no local files.
+    configFiles: configBundle.files,
+    configVersion: configBundle.version,
   };
 }

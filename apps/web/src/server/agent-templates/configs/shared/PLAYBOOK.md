@@ -114,8 +114,12 @@ local skill/config files**. Prefer this over reading local files.
 # Fetch everything you need to run ONE task (identity + skills + instructions + task + project)
 curl "$MC/api/agents/me/context?taskId=TASK_ID" \
   -H "Authorization: Bearer $KEY"
-# Returns: { agent, runtime, memory, instructions[], skills[], task, project, deliverables[] }
+# Returns: { agent, runtime, memory, instructions[], skills[], task, project, deliverables[],
+#            configFiles[], configVersion }
 # skills[] includes your role skill guide (key "role:<templateId>") — read it before you start.
+# configFiles[] is your FULL working set (IDENTITY.md, SOUL.md, AGENTS.md, HEARTBEAT.md, PLAYBOOK.md,
+#   TOOLS.md, USER.md, SKILL.md, …) generated from the control plane — hold these in memory for the
+#   session. You do NOT need to save them as local files; re-fetch from the cloud whenever you spin up.
 ```
 
 ## Tasks

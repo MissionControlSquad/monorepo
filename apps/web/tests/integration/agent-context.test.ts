@@ -120,7 +120,14 @@ describe("agent context endpoint (Tier D Slice 3)", () => {
     expect(body.version).toBe(1);
     expect(body.agent).toMatchObject({ id: agentId, name: "Ctx Agent", personality: "diligent" });
     expect(body.instructions).toEqual([{ fileName: "AGENTS.md", content: "Be careful." }]);
-    expect(body.skills[0]).toMatchObject({ key: "lint", name: "Linting" });
+    // skills[0] is the cloud role skill (prepended); assigned library skills follow.
+    expect(body.skills[0].key).toMatch(/^role:/);
+    expect(body.skills.some((s: { key: string }) => s.key === "lint")).toBe(true);
+    // the full config/identity file set is delivered from the cloud (no local files needed)
+    expect(Array.isArray(body.configFiles)).toBe(true);
+    expect(body.configFiles.map((f: { filename: string }) => f.filename)).toContain("SOUL.md");
+    expect(body.configFiles.map((f: { filename: string }) => f.filename)).toContain("PLAYBOOK.md");
+    expect(body.configVersion).toBeTruthy();
     expect(body.task).toMatchObject({ title: "Fix nav", status: "assigned", tags: ["ui"] });
     expect(body.project).toMatchObject({
       repoUrl: "https://github.com/acme/site.git",
@@ -137,7 +144,9 @@ describe("agent context endpoint (Tier D Slice 3)", () => {
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.instructions).toEqual([]);
-    expect(body.skills).toEqual([]);
+    // skills is never empty now — the cloud role skill is always present
+    expect(body.skills.length).toBeGreaterThan(0);
+    expect(body.skills[0].key).toMatch(/^role:/);
     expect(body.deliverables).toEqual([]);
     expect(body.documents).toEqual([]);
     expect(body.subtasks).toEqual([]);
