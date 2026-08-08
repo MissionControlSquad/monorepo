@@ -38,7 +38,15 @@ const agentEditSchema = z.object({
 
 type AgentEditValues = z.infer<typeof agentEditSchema>;
 
-export function AgentEditPage({ agentId }: { agentId: string }) {
+export function AgentEditPage({
+  agentId,
+  embedded = false,
+}: {
+  agentId: string;
+  // When rendered inside the Agent Detail "Settings" tab, drop the standalone-page chrome
+  // (breadcrumbs + page layout) so it nests cleanly under the shared detail header.
+  embedded?: boolean;
+}) {
   const router = useRouter();
   const [{ data, fetching }] = useQuery({ query: AGENT_QUERY, variables: { id: agentId } });
   const [{ fetching: saving }, updateProfile] = useMutation(UPDATE_AGENT_PROFILE);
@@ -103,15 +111,17 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
     );
   }
 
-  return (
-    <PageLayout maxWidth="narrow">
-      <Breadcrumbs
-        items={[
-          { label: "Home", href: "/" },
-          { label: "Agents", href: "/agents" },
-          { label: agent.name || "Edit Agent" },
-        ]}
-      />
+  const body = (
+    <>
+      {!embedded && (
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Agents", href: "/agents" },
+            { label: agent.name || "Edit Agent" },
+          ]}
+        />
+      )}
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-sm px-5 py-4 text-white">
         <div className="flex items-center justify-between gap-3">
@@ -248,6 +258,12 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
       />
 
       <AgentSkillsCard agentId={agentId} />
-    </PageLayout>
+    </>
+  );
+
+  return embedded ? (
+    <div className="space-y-6">{body}</div>
+  ) : (
+    <PageLayout maxWidth="narrow">{body}</PageLayout>
   );
 }

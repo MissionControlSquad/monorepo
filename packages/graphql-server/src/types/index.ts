@@ -33,6 +33,7 @@ import "./portability";
 import "./goal";
 import "./boardroom";
 import "./agent-authz";
+import "./tool-access";
 import "./plugin";
 import "./api-key";
 import "./terminal";
