@@ -20,6 +20,14 @@ export interface MCBridgeConfig {
    */
   fingerprint?: string;
 
+  /**
+   * Optional base64-encoded PKCS8 DER Ed25519 device private key. When set, the plugin signs the
+   * handshake nonce with it and presents the derived public key on vm.hello, enabling device pairing:
+   * MC pins the key by fingerprint and an admin must approve the device before it can connect. Leave
+   * unset to use only the install/connection token (legacy path).
+   */
+  devicePrivateKey?: string;
+
   /** Reconnect backoff base interval (ms). Default: 2000 */
   reconnectBaseMs?: number;
 

@@ -18,6 +18,7 @@ import "./reviews";
 import "./analytics";
 import "./search";
 import "./feature-flags";
+import "./live-gateway-devices";
 import "./approvals";
 import "./finance";
 import "./ledger";

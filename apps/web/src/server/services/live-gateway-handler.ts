@@ -35,6 +35,8 @@ import {
   findTaskByIdSelect,
 } from "@agentcenter/database";
 import { connectionRegistry } from "./live-connection-registry";
+import { registerDevice, verifyDeviceAuth } from "./live-gateway-devices";
+import { DEFAULT_WORKSPACE_ID } from "@/server/tenancy";
 import { pubsub, PubSubEvent } from "@agentcenter/graphql-server";
 import type {
   PluginToMC,
@@ -90,6 +92,80 @@ async function findValidInstallToken(rawToken: string) {
   return null;
 }
 
+// ─── Ed25519 device pairing gate ────────────────────────────────────────────────
+
+/**
+ * Additive device-identity gate (parity Domain-10 A5/A6 / GAP-1). When a plugin presents an Ed25519
+ * device public key + a signature over the nonce, the machine must be a board-approved, key-pinned
+ * device before the connection is accepted - layered on top of the existing bcrypt token check.
+ *
+ * Returns true to allow the handshake to continue, false if it was rejected (an error was already
+ * sent to the socket). When no `publicKey` is presented this is a no-op passthrough (returns true) so
+ * the legacy install/connection-token path keeps working unchanged.
+ *
+ * A first-contact device (unknown fingerprint) is auto-registered as `pending` and rejected until an
+ * admin approves it via the Devices UI.
+ */
+async function verifyDeviceHandshake(
+  ws: WebSocket,
+  msg: MsgHello,
+  hostname: string,
+): Promise<boolean> {
+  if (!msg.publicKey) return true; // legacy path - bcrypt token gate handles auth
+
+  if (!msg.signature) {
+    sendError(ws, "auth_failed", "Device signature required");
+    logVMActivity(
+      hostname,
+      `Auth rejected: device public key without signature from ${hostname}`,
+      "warn",
+    ).catch(() => undefined);
+    return false;
+  }
+
+  const result = await verifyDeviceAuth({
+    machineFingerprint: msg.fingerprint,
+    nonce: msg.nonce,
+    signatureB64: msg.signature,
+  });
+
+  if (result.ok) return true;
+
+  if (result.reason === "unknown_device") {
+    // First contact: pin the presented key as a pending device for admin approval, then reject.
+    await registerDevice({
+      workspaceId: DEFAULT_WORKSPACE_ID,
+      machineFingerprint: msg.fingerprint,
+      publicKeyRaw: msg.publicKey,
+      label: hostname,
+    }).catch((err) =>
+      console.error(
+        `[live-gateway] Failed to auto-register pending device ${msg.fingerprint}:`,
+        err,
+      ),
+    );
+    sendError(ws, "auth_failed", "Device not yet approved - awaiting admin approval");
+    logVMActivity(
+      hostname,
+      `Auth rejected: new device ${hostname} registered as pending - awaiting board approval`,
+      "warn",
+    ).catch(() => undefined);
+    return false;
+  }
+
+  const message =
+    result.reason === "device_pending"
+      ? "Device not yet approved - awaiting admin approval"
+      : result.reason === "device_revoked"
+        ? "Device access revoked"
+        : "Device signature verification failed";
+  sendError(ws, "auth_failed", message);
+  logVMActivity(hostname, `Auth rejected: device ${hostname} - ${result.reason}`, "warn").catch(
+    () => undefined,
+  );
+  return false;
+}
+
 // ─── vm.hello handler ─────────────────────────────────────────────────────────
 
 async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null> {
@@ -124,6 +200,9 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
     ).catch(() => undefined);
     return null;
   }
+
+  // 2.5. Ed25519 device-identity gate (additive). No-op when the plugin presents no device key.
+  if (!(await verifyDeviceHandshake(ws, msg, hostname))) return null;
 
   // 3. Check if fingerprint already registered (reconnect path)
   const existing = await findConnectionByFingerprint(msg.fingerprint);

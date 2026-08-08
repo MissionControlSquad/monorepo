@@ -23,11 +23,25 @@ import {
   ArrowRight,
   CheckCircle2,
   ShieldAlert,
+  ShieldCheck,
+  Clock,
   PlugZap,
   Radio,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout, Checkbox } from "../components/ui";
+import { useQuery, useMutation } from "urql";
+import { LIVE_GATEWAY_DEVICES_QUERY } from "@/lib/graphql/queries";
+import { APPROVE_LIVE_GATEWAY_DEVICE, REVOKE_LIVE_GATEWAY_DEVICE } from "@/lib/graphql/mutations";
+import {
+  Breadcrumbs,
+  Button,
+  Badge,
+  Card,
+  Input,
+  EmptyState,
+  PageLayout,
+  Checkbox,
+} from "../components/ui";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,7 +70,18 @@ interface LiveConnection {
   createdAt: string;
 }
 
-type Tab = "connections" | "tokens";
+interface Device {
+  id: string;
+  machineFingerprint: string;
+  label: string | null;
+  status: string;
+  approvedByProfileId: string | null;
+  approvedAt: string | null;
+  lastSeenAt: string | null;
+  createdAt: string;
+}
+
+type Tab = "connections" | "tokens" | "devices";
 type WizardStep = "prereq" | "token" | "install" | "waiting" | "done";
 type OS = "mac" | "windows" | "linux";
 
@@ -1430,6 +1455,153 @@ function ConnectionCard({
   );
 }
 
+// ─── Devices panel ────────────────────────────────────────────────────────────
+
+/** Status badge for a paired device. */
+function DeviceStatusBadge({ status }: { status: string }) {
+  if (status === "approved") return <Badge variant="green">Approved</Badge>;
+  if (status === "revoked") return <Badge variant="gray">Revoked</Badge>;
+  return <Badge variant="yellow">Pending</Badge>;
+}
+
+/**
+ * Ed25519 device pairing (GAP-1). Admins approve or deny machines that paired by signing the
+ * handshake nonce with their device key. A pending device cannot connect to the Live Gateway until
+ * approved here. Covers loading / empty / error / success states.
+ */
+function DevicesPanel() {
+  const [{ data, fetching, error }, refetch] = useQuery<{ liveGatewayDevices: Device[] }>({
+    query: LIVE_GATEWAY_DEVICES_QUERY,
+  });
+  const [, approve] = useMutation(APPROVE_LIVE_GATEWAY_DEVICE);
+  const [, revoke] = useMutation(REVOKE_LIVE_GATEWAY_DEVICE);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const devices = data?.liveGatewayDevices ?? [];
+
+  async function handleApprove(id: string) {
+    setBusyId(id);
+    try {
+      const res = await approve({ id });
+      if (res.error) throw new Error(res.error.graphQLErrors?.[0]?.message ?? "Approve failed");
+      toast.success("Device approved");
+      refetch({ requestPolicy: "network-only" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to approve device");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleRevoke(id: string) {
+    setBusyId(id);
+    try {
+      const res = await revoke({ id });
+      if (res.error) throw new Error(res.error.graphQLErrors?.[0]?.message ?? "Revoke failed");
+      toast.success("Device access revoked");
+      refetch({ requestPolicy: "network-only" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to revoke device");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-sm font-semibold text-foreground">Paired Devices</h2>
+        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+          Machines that pair by signing the handshake nonce with an Ed25519 device key. A new device
+          registers as <strong>pending</strong> and cannot connect until an admin approves it here.
+          The device key is pinned by machine fingerprint, so a leaked install token alone cannot
+          impersonate an approved machine.
+        </p>
+      </div>
+
+      {fetching ? (
+        <div className="flex items-center gap-2 py-4 text-xs text-muted-foreground">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading devices…
+        </div>
+      ) : error ? (
+        <p className="text-xs text-destructive py-2">
+          Failed to load devices. {error.graphQLErrors?.[0]?.message ?? "Please refresh."}
+        </p>
+      ) : devices.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
+          <ShieldCheck className="w-8 h-8 text-muted-foreground/40" />
+          <p className="text-xs text-muted-foreground">No paired devices yet.</p>
+          <p className="text-[11px] text-muted-foreground/70">
+            Configure a device key in the bridge plugin to pair a machine by its Ed25519 identity.
+          </p>
+        </div>
+      ) : (
+        <Card className="overflow-hidden divide-y divide-border">
+          {devices.map((d) => {
+            const busy = busyId === d.id;
+            return (
+              <div
+                key={d.id}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors group"
+              >
+                <div className="w-7 h-7 rounded-lg bg-muted border border-border flex items-center justify-center flex-shrink-0">
+                  <Monitor className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-xs font-semibold text-foreground truncate">
+                      {d.label || truncateId(d.machineFingerprint, 16)}
+                    </p>
+                    <DeviceStatusBadge status={d.status} />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5 truncate">
+                    {truncateId(d.machineFingerprint, 24)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/70 mt-0.5 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {d.status === "approved" && d.approvedAt
+                      ? `Approved ${relativeTime(d.approvedAt)}`
+                      : d.lastSeenAt
+                        ? `Last seen ${relativeTime(d.lastSeenAt)}`
+                        : `Registered ${relativeTime(d.createdAt)}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {d.status === "pending" && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={busy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
+                      disabled={busy}
+                      onClick={() => handleApprove(d.id)}
+                    >
+                      Approve
+                    </Button>
+                  )}
+                  {d.status !== "revoked" && (
+                    <button
+                      onClick={() => handleRevoke(d.id)}
+                      disabled={busy}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                      title={d.status === "pending" ? "Deny device" : "Revoke device"}
+                    >
+                      {busy ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <X className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+      )}
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function LiveGatewayPage() {
@@ -1568,7 +1740,7 @@ export function LiveGatewayPage() {
 
         {/* Tabs */}
         <div className="flex gap-0.5 mb-5 border-b border-border">
-          {(["connections", "tokens"] as Tab[]).map((t) => (
+          {(["connections", "tokens", "devices"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -1580,10 +1752,12 @@ export function LiveGatewayPage() {
             >
               {t === "connections" ? (
                 <Radio className="w-3.5 h-3.5" />
-              ) : (
+              ) : t === "tokens" ? (
                 <Key className="w-3.5 h-3.5" />
+              ) : (
+                <ShieldCheck className="w-3.5 h-3.5" />
               )}
-              {t === "connections" ? "Machines" : "Setup Keys"}
+              {t === "connections" ? "Machines" : t === "tokens" ? "Setup Keys" : "Devices"}
               {t === "connections" && connections.length > 0 && (
                 <span
                   className={`ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${
@@ -1599,6 +1773,9 @@ export function LiveGatewayPage() {
 
         {/* Tokens tab */}
         {tab === "tokens" && <TokenPanel />}
+
+        {/* Devices tab */}
+        {tab === "devices" && <DevicesPanel />}
 
         {/* Machines tab */}
         {tab === "connections" && (
