@@ -13,6 +13,7 @@ export const FLAG_KEYS = {
   LEDGER: "ledger",
   MULTI_PROVIDER_ADAPTERS: "multi_provider_adapters",
   SECRETS_VAULT: "secrets_vault",
+  SECRET_PROPOSALS: "secret_proposals",
   PIPELINES_ROUTINES: "pipelines_routines",
   TASK_AUTONOMY: "task_autonomy",
   CASES: "cases",
@@ -79,6 +80,8 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   // Opt-in: OpenClaw (builtIn) always works; extra providers unlock when enabled.
   [FLAG_KEYS.MULTI_PROVIDER_ADAPTERS]: false,
   [FLAG_KEYS.SECRETS_VAULT]: true,
+  // Human-approved secret proposals — opt-in governance surface (Paperclip #9934 port).
+  [FLAG_KEYS.SECRET_PROPOSALS]: false,
   [FLAG_KEYS.PIPELINES_ROUTINES]: true,
   [FLAG_KEYS.TASK_AUTONOMY]: true,
   [FLAG_KEYS.CASES]: true,

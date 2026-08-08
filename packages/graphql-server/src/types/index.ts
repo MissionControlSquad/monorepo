@@ -24,6 +24,7 @@ import "./finance";
 import "./ledger";
 import "./adapter";
 import "./secret";
+import "./secret-proposal";
 import "./pipeline";
 import "./task-autonomy";
 import "./case";

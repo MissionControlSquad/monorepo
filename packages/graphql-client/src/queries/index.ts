@@ -149,6 +149,8 @@ export {
 
 export { SECRETS_QUERY, SECRET_PROVIDERS_QUERY, SECRET_ACCESS_EVENTS_QUERY } from "./secrets";
 
+export { SECRET_PROPOSALS_QUERY } from "./secret-proposals";
+
 export {
   ROUTINES_QUERY,
   ROUTINE_RUNS_QUERY,
