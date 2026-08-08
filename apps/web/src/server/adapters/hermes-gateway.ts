@@ -16,6 +16,87 @@
 
 export const HERMES_GATEWAY_ADAPTER_TYPE = "hermes-gateway";
 
+/**
+ * Config schema (draft-07) for the hermes-gateway adapter's DB `AgentAdapter` row. Rendered by the
+ * shared JsonSchemaForm in the adapter-config UI (AgentAdapterConfigCard) and re-validated server-side
+ * by `validateAdapterConfig`. `apiBaseUrl` is a plain URL input; `apiKeySecretRef` carries the
+ * `secret-ref` format so it binds a vault pointer (`{ secretRef: { name } }`) via the shared
+ * secret-ref input rather than accepting an inline key - the API key is never persisted inline
+ * (`additionalProperties:false` also rejects a stray `apiKey`).
+ */
+export const HERMES_GATEWAY_CONFIG_SCHEMA = {
+  $schema: "http://json-schema.org/draft-07/schema#",
+  type: "object",
+  required: ["apiBaseUrl", "apiKeySecretRef"],
+  properties: {
+    apiBaseUrl: {
+      type: "string",
+      format: "uri",
+      title: "API base URL",
+      description: "Base URL of the running Hermes API server, e.g. https://hermes.internal/api.",
+      examples: ["https://hermes.internal/api"],
+    },
+    apiKeySecretRef: {
+      type: "object",
+      format: "secret-ref",
+      title: "API key secret",
+      description:
+        "Vault secret holding the Hermes API key. Bound by name - the key is never stored inline.",
+      required: ["secretRef"],
+      properties: {
+        secretRef: {
+          type: "object",
+          required: ["name"],
+          properties: { name: { type: "string" } },
+        },
+      },
+    },
+    sessionKeyStrategy: {
+      type: "string",
+      enum: ["issue", "agent", "run", "none"],
+      title: "Session key strategy",
+      description: "How cross-run memory is scoped when talking to Hermes.",
+    },
+    instructions: {
+      type: "string",
+      title: "Instructions",
+      description: "System instructions sent with every run.",
+    },
+    headers: {
+      type: "object",
+      title: "Extra headers",
+      description: "Optional non-secret headers as a JSON object. Auth headers are always ignored.",
+    },
+    timeoutSec: { type: "number", title: "Timeout (seconds)", minimum: 1 },
+    eventReconnectMs: { type: "number", title: "Event reconnect (ms)", minimum: 0 },
+    dangerouslyAllowInsecureRemoteHttp: {
+      type: "boolean",
+      title: "Allow insecure remote HTTP",
+      description: "Dev-only. Permit a remote plain-HTTP gateway. Leave off in production.",
+    },
+    model: { type: "string", title: "Model override" },
+  },
+} as const;
+
+/**
+ * The vault secret name a hermes-gateway `apiKeySecretRef` config value points to. Accepts the repo's
+ * `{ secretRef: { name } }` vault pointer (what the shared secret-ref binding input writes) and, for
+ * back-compat, a bare string name. Returns null when neither is present. Pure - no I/O.
+ */
+export function hermesGatewaySecretRefName(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const ref = (value as { secretRef?: { name?: unknown } }).secretRef;
+    if (ref && typeof ref.name === "string" && ref.name.trim().length > 0) {
+      return ref.name.trim();
+    }
+  }
+  return null;
+}
+
 export const DEFAULT_HERMES_TIMEOUT_SEC = 600;
 export const DEFAULT_HERMES_EVENT_RECONNECT_MS = 2_000;
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation } from "urql";
 import { toast } from "sonner";
 import { Boxes } from "lucide-react";
@@ -122,9 +123,19 @@ export function ProjectWorkspacesCard({ projectId }: { projectId: string }) {
         <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Boxes className="h-4 w-4 text-muted-foreground" /> Execution workspaces
         </h2>
-        <Button size="sm" variant="secondary" onClick={() => setOpen((v) => !v)}>
-          {open ? "Cancel" : "New workspace"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {workspaces.length > 0 && (
+            <Link
+              href={`/projects/${projectId}/workspace`}
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              View details
+            </Link>
+          )}
+          <Button size="sm" variant="secondary" onClick={() => setOpen((v) => !v)}>
+            {open ? "Cancel" : "New workspace"}
+          </Button>
+        </div>
       </div>
 
       {open && (
