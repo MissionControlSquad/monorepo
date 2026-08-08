@@ -13,6 +13,8 @@ import { prisma } from "@/server/prisma";
 import type { AgentContextBundle } from "@agentcenter/types";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assembleInjectedMemory, resolveEffectiveMemoryProvider } from "./agent-memory";
+import { loadRoleSkill } from "./agent-role-skill";
+import { getConfigBundleForAgent } from "@/server/agent-config-generator";
 
 // REST-shaped error so the route's handleError() renders a 404 (not a 500).
 function notFound(message: string): never {
@@ -48,6 +50,9 @@ interface AgentLike {
   id: string;
   name: string;
   role: string;
+  username?: string | null;
+  identityEmoji?: string | null;
+  templateId?: string | null;
   personality: string | null;
   level: string | null;
   runtimeAdapter?: string | null;
@@ -95,6 +100,19 @@ export async function assembleContextBundle(
     }),
   ]);
 
+  // Generate the agent's full config/identity file set from the control-plane templates so it is
+  // delivered from the cloud alongside the per-task context (no local config files needed).
+  const configBundle = getConfigBundleForAgent({
+    id: agent.id,
+    name: agent.name,
+    role: agent.role,
+    username: agent.username ?? null,
+    identityEmoji: agent.identityEmoji ?? null,
+    personality: agent.personality ?? null,
+    level: agent.level ?? null,
+    templateId: agent.templateId ?? null,
+  });
+
   return {
     version: 1,
     agent: {
@@ -113,12 +131,21 @@ export async function assembleContextBundle(
       : null,
     memory: await assembleMemoryBlock(agent),
     instructions: instructions.map((i) => ({ fileName: i.fileName, content: i.content })),
-    skills: agentSkills.map((as) => ({
-      key: as.skill.key,
-      name: as.skill.name,
-      description: as.skill.description ?? null,
-      markdown: as.skill.markdown,
-    })),
+    // Cloud-served skills: the agent's role skill (from the control plane's template library) first,
+    // then any explicitly-assigned library skills. Delivered from the server so the agent needs NO
+    // local skill files and runs correctly in any environment.
+    skills: [
+      ...(() => {
+        const roleSkill = loadRoleSkill(agent.templateId, agent.role, agent.name);
+        return roleSkill ? [roleSkill] : [];
+      })(),
+      ...agentSkills.map((as) => ({
+        key: as.skill.key,
+        name: as.skill.name,
+        description: as.skill.description ?? null,
+        markdown: as.skill.markdown,
+      })),
+    ],
     task: {
       id: task.id,
       taskNumber: task.taskNumber,
@@ -151,5 +178,9 @@ export async function assembleContextBundle(
       content: doc.content,
     })),
     subtasks: task.childTasks.map((c) => ({ id: c.id, title: c.title, status: c.status })),
+    // The agent's full config/identity file set, generated from the control-plane templates, so a
+    // freshly-created agent gets everything it needs to operate from ONE cloud call — no local files.
+    configFiles: configBundle.files,
+    configVersion: configBundle.version,
   };
 }

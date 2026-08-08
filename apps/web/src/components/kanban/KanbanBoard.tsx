@@ -408,6 +408,7 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
   // Keep tags stable: accumulate from all loads, reset baseline when unfiltered
   const stableTagsRef = useRef<string[]>([]);
   const allTags = useMemo(() => {
+    // eslint-disable-next-line react-hooks/refs -- seeds accumulation from a ref only ever written (in the effect below) to equal this memo's own output, so the read is stable; react-hooks/refs false positive
     const tagSet = new Set<string>(stableTagsRef.current);
     for (const task of allTasks) {
       task.tags?.forEach((tag: string) => tagSet.add(tag));

@@ -146,6 +146,7 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
 
     if (isInitialLoadRef.current && count > 0 && !isFetching) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      // eslint-disable-next-line react-hooks/immutability -- run-once flag updated inside this scroll effect; intended imperative behavior, not reactive-value mutation
       isInitialLoadRef.current = false;
     } else if (count > prevCount && prevCount > 0) {
       const el = scrollRef.current;
@@ -155,6 +156,7 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
       }
     }
 
+    // eslint-disable-next-line react-hooks/immutability -- prev-value flag updated inside this scroll effect; intended imperative behavior, not reactive-value mutation
     prevCountRef.current = count;
   }, [messages.length, isFetching]);
 
