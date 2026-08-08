@@ -6,6 +6,49 @@
 /** How an adapter handles skills. unsupported = the runtime brings its own; we don't manage them. */
 export type SkillSyncMode = "unsupported" | "persistent" | "ephemeral";
 
+/**
+ * How a skill-sync request MERGES the requested skill set into an agent's current desired set
+ * (parity Paperclip #10978 "require explicit merge modes"). Callers must choose explicitly so reruns
+ * never silently discard operator edits:
+ *   - `add`     union: keep current, add requested (requested wins on version conflicts). Non-destructive.
+ *   - `remove`  delete only the requested skills from the current set; leave the rest untouched.
+ *   - `replace` overwrite: the requested set becomes the complete desired set (the legacy behavior).
+ */
+export type SkillMergeMode = "add" | "remove" | "replace";
+
+/** The three valid merge modes, for validation/enum registration. */
+export const SKILL_MERGE_MODES = ["add", "remove", "replace"] as const;
+
+/** A desired-skill selection keyed by skillId, with an optional pinned version. */
+export interface DesiredSkillEntry {
+  skillId: string;
+  pinnedVersion?: number | null;
+}
+
+/**
+ * PURE set-math for merge modes. Given the agent's `current` desired entries and the `requested` entries,
+ * return the final desired set for the chosen `mode`. Keyed by skillId — no I/O, no dedupe surprises.
+ * Mirrors Paperclip's `mergeDesiredSkillEntries`. `replace` ignores `current`; `remove` ignores requested
+ * versions (it only needs the keys); `add` unions with requested overriding current on the same skillId.
+ */
+export function applySkillMergeMode(
+  current: DesiredSkillEntry[],
+  requested: DesiredSkillEntry[],
+  mode: SkillMergeMode,
+): DesiredSkillEntry[] {
+  if (mode === "replace") return requested;
+
+  const requestedKeys = new Set(requested.map((e) => e.skillId));
+  if (mode === "remove") {
+    return current.filter((e) => !requestedKeys.has(e.skillId));
+  }
+
+  // add: union, requested entry wins on the same skillId (so a re-pin updates the version).
+  const merged = new Map(current.map((e) => [e.skillId, e]));
+  for (const e of requested) merged.set(e.skillId, e);
+  return Array.from(merged.values());
+}
+
 export type SkillEntryState =
   | "installed" // desired, present on runtime, version matches
   | "stale" // desired, present, but the runtime version differs from desired
