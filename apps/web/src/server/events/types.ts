@@ -52,6 +52,17 @@ export type AgentJoinedEvent = {
   agentName: string;
 };
 
+/** Fired by the wake-queue drainer when a coalesced agent wake is delivered (proactive wake substrate). */
+export type AgentWakeDeliveredEvent = {
+  type: typeof EventTypes.AGENT_WAKE_DELIVERED;
+  wakeupId: string;
+  agentId: string;
+  reason: string;
+  /** How many requests coalesced onto this wake (>= 1). */
+  coalescedCount: number;
+  workspaceId?: string | null;
+};
+
 // Task domain events
 export type TaskCreatedEvent = {
   type: typeof EventTypes.TASK_CREATED;
@@ -289,6 +300,7 @@ export type SystemEvent =
   | AgentStatusChangedEvent
   | AgentStatusAppliedEvent
   | AgentJoinedEvent
+  | AgentWakeDeliveredEvent
   | TaskCreatedEvent
   | TaskStatusChangedEvent
   | TaskAssigneesChangedEvent

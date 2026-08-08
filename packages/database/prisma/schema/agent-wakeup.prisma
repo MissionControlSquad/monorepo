@@ -1,0 +1,36 @@
+// ─── Proactive agent-wake substrate (parity: agentWakeupRequests + heartbeat.wakeup) ───────────────
+// A DB-backed, coalescing per-agent wake queue. The recovery paths (stranded-work re-dispatch,
+// dependency wakeups, run-retry promotion) enqueue a COALESCED wake instead of relying on the agent to
+// self-poll: two requests for the same agent + reason while a row is still `queued` fold onto that one
+// row (coalescedCount++), so a burst of triggers wakes the agent once. The reap cron drains due wakes,
+// marking them `delivered` (atomic claim, no double-claim) or `suppressed` (a deactivated/missing agent,
+// or a worktree / db-restore instance - ported from Paperclip's scheduling-suppression guard). D5:
+// workspaceId is the buildbase workspace id (no FK); agentId has no FK (mirrors the other parity models).
+
+enum AgentWakeupStatus {
+  queued // waiting to be delivered
+  delivered // claimed + pushed by the drainer
+  suppressed // dropped without delivery (agent deactivated/missing or instance suppressed)
+}
+
+model AgentWakeup {
+  id             String            @id @default(cuid())
+  workspaceId    String? // buildbase workspace id (D5); no FK; nullable (mirrors Agent.workspaceId)
+  agentId        String // agent to wake; no FK (D5)
+  reason         String // wake reason (stranded_work | dependency_ready | run_retry | ...)
+  status         AgentWakeupStatus @default(queued)
+  // Number of requests folded onto this row (starts at 1 for the initial request; ++ per coalesce).
+  coalescedCount Int               @default(1)
+  // agentId + reason coalescing key. A partial UNIQUE index (WHERE status = 'queued'), added in the
+  // migration SQL, enforces at most one queued row per key so concurrent requests coalesce, not duplicate.
+  dedupeKey      String
+  notBefore      DateTime? // earliest delivery instant; null = due immediately
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  deliveredAt    DateTime?
+
+  @@index([agentId, status])
+  @@index([status, notBefore])
+  @@index([workspaceId])
+  @@map("agent_wakeups")
+}

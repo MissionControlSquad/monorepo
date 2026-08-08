@@ -19,6 +19,7 @@
  *  - pruneTelemetry — retention-prune first-party telemetry events by class (Domain 12 E).
  *  - drainMemoryJobs — run one lease-protected batch of async memory-capture jobs (MEMORY-gated).
  *  - refreshDueExternalObjects — re-fetch stale cached PR/issue snapshots (EXTERNAL_OBJECTS-gated).
+ *  - drainAgentWakeups — deliver the coalesced proactive per-agent wake queue, respecting suppression (parity: heartbeat.wakeup).
  *
  * Registered in vercel.json to run every 5 minutes.
  */
@@ -42,6 +43,7 @@ import { drainMemoryJobs } from "@/server/services/memory-jobs";
 import { refreshDueExternalObjects } from "@/server/services/external-objects";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
+import { drainAgentWakeups } from "@/server/services/agent-wakeups";
 
 export async function GET(request: Request) {
   try {
@@ -98,6 +100,9 @@ export async function GET(request: Request) {
     // Stranded-work reconciliation runs AFTER retry promotion so a run that just earned a retry (now
     // queued) is not mistaken for stranded. Owner-preserving re-dispatch → escalate-to-blocked ladder.
     const stranded = await reconcileStrandedWork(now);
+    // Drain the proactive wake queue LAST so it delivers the coalesced wakes that retry-promotion and
+    // stranded re-dispatch just enqueued this tick (respecting per-agent / instance suppression).
+    const wakes = await drainAgentWakeups(now);
     return successResponse({
       ok: true,
       watchdogsFired: watchdogDecisions.length,
@@ -119,6 +124,8 @@ export async function GET(request: Request) {
       memoryJobsDrained: memoryJobs.completed,
       memoryJobsFailed: memoryJobs.failed,
       externalObjectsRefreshed: externalObjects.refreshed,
+      wakesDelivered: wakes.delivered,
+      wakesSuppressed: wakes.suppressed,
       at: now.toISOString(),
     });
   } catch (err) {

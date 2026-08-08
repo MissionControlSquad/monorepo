@@ -1,8 +1,10 @@
 import { prisma } from "@/server/prisma";
 import { taskModel } from "@/server/models/task";
+import { getProfileAgentId } from "@agentcenter/database";
 import { TaskStatus } from "@/server/constants";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
+import { tryRequestAgentWake, WAKE_REASON } from "./agent-wakeups";
 
 // Dependency wakeups (parity #1): when a blocker task reaches a terminal status (done/cancelled),
 // wake the tasks it was blocking so an agent can pick them up — closing the autonomy gap where a
@@ -91,8 +93,25 @@ export async function wakeDependentsOf(completedTaskId: string): Promise<string[
       toStatus: TaskStatus.INBOX,
       changes: [{ field: "status", from: TaskStatus.BLOCKED, to: TaskStatus.INBOX }],
     });
+    // Proactively wake this task's agent assignees so a now-unblocked task is picked up promptly
+    // instead of waiting for the next self-poll; coalesced per agent + reason.
+    await wakeAssigneeAgents(task.id);
     woken.push(task.id);
   }
 
   return woken;
+}
+
+/** Enqueue a coalesced DEPENDENCY_READY wake for every agent currently assigned to `taskId`. */
+async function wakeAssigneeAgents(taskId: string): Promise<void> {
+  const assignees = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { assignees: { select: { profileId: true } } },
+  });
+  if (!assignees) return;
+  for (const { profileId } of assignees.assignees) {
+    const agentId = await getProfileAgentId(profileId);
+    if (!agentId) continue; // human assignee — nothing to wake
+    await tryRequestAgentWake(agentId, WAKE_REASON.DEPENDENCY_READY);
+  }
 }
