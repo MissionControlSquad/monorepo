@@ -611,6 +611,39 @@ const hermesAdapter: Adapter = {
   }),
 };
 
+/**
+ * Hermes GATEWAY adapter — reaches an already-running Hermes API server over HTTP + SSE (ported from
+ * Paperclip's `hermes_gateway`). Unlike the `hermes` adapter (a local CLI-spawn shim), this starts no
+ * process: `build()` renders a `POST /v1/runs` HTTP invocation against the configured Hermes base URL
+ * (supplied via `ctx.template[0]`). The real run-request/SSE-stream consume seam lives in the
+ * control-plane service `apps/web/src/server/adapters/hermes-gateway.ts`; the base URL + auth
+ * secret-ref config schema is seeded as the DB `AgentAdapter` row (transport "gateway").
+ */
+const hermesGatewayAdapter: Adapter = {
+  key: "hermes-gateway",
+  displayName: "Hermes Gateway",
+  requiresTemplate: false,
+  supportsModel: true,
+  models: [],
+  // No binary to install — the runtime is a remote Hermes server, not a local CLI.
+  build: (ctx) => {
+    const baseRaw = typeof ctx.template === "string" ? ctx.template : ctx.template?.[0];
+    const base = (baseRaw ? substituteAdapterToken(baseRaw, ctx) : "").replace(/\/+$/, "");
+    return {
+      mode: "http",
+      url: `${base}/v1/runs`,
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        input: brief(ctx),
+        idempotency_key: ctx.taskId,
+        ...(ctx.model ? { model: ctx.model } : {}),
+      }),
+      layout: GENERIC_LAYOUT,
+    };
+  },
+};
+
 const BUILTIN_ADAPTERS: Adapter[] = [
   openclawAdapter,
   codexAdapter,
@@ -621,6 +654,7 @@ const BUILTIN_ADAPTERS: Adapter[] = [
   opencodeAdapter,
   piAdapter,
   hermesAdapter,
+  hermesGatewayAdapter,
   processAdapter,
   shellAdapter,
   httpAdapter,
@@ -651,6 +685,9 @@ const ADAPTER_KEY_ALIASES: Record<string, string> = {
   pi_local: "pi",
   "hermes-local": "hermes",
   hermes_local: "hermes",
+  // hermes-gateway keeps its own runtime module (HTTP + SSE, not a CLI spawn); only the underscore
+  // spelling needs to resolve back to the canonical hyphen key.
+  hermes_gateway: "hermes-gateway",
 };
 
 /** Canonicalize an adapter key through the alias table (identity when not aliased). */
