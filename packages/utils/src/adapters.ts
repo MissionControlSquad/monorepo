@@ -11,7 +11,11 @@
  */
 
 import type { TranscriptEntry } from "./adapter-transcript";
-import { parseLine as parseTranscriptLine } from "./adapter-transcript";
+import {
+  parseLine as parseTranscriptLine,
+  redactCommandText,
+  redactHomePathUserSegments,
+} from "./adapter-transcript";
 
 /** A single provider quota/rate-limit window (Domain 12 GAP-2). */
 export interface ProviderQuotaWindow {
@@ -224,7 +228,8 @@ function brief(ctx: AdapterContext): string {
 // ─── Structured execution derivation (pure) ──────────────────────────────────
 // The parse + classify + derive half of the adapter execution contract. Everything here is pure and
 // fixture-testable: no process spawning, no I/O. Error-family regexes are a faithful (trimmed) port of
-// Paperclip's claude-local `parse.ts` classifiers.
+// Paperclip's claude-local / codex-local / gemini-local `parse.ts` classifiers, unioned so the one
+// shared classifier recognizes every built-in runtime's failure vocabulary.
 
 const CLAUDE_AUTH_REQUIRED_RE =
   /(?:not\s+logged\s+in|please\s+log\s+in|please\s+run\s+(?:`?claude\s+login`?|\/login)|login\s+required|requires\s+login|unauthorized|authentication\s+required)/i;
@@ -237,16 +242,34 @@ const CLAUDE_MODEL_NOT_FOUND_RE =
 const CLAUDE_REFUSAL_RE =
   /(?:\brefus(?:al|ed|es|e|ing)\b|declined\s+to\s+respond|cannot\s+assist\s+with)/i;
 
+// Codex-local (ported from paperclip codex-local `parse.ts`): "you've hit your usage limit", "model at
+// capacity" → provider_quota; "high demand"/"temporary errors" → transient_upstream (already covered by
+// the claude union but repeated for provenance); OAuth refresh-token failures → auth_required.
+const CODEX_PROVIDER_QUOTA_RE =
+  /(?:you(?:'|’)ve\s+hit\s+your\s+usage\s+limit|model\s+(?:is\s+)?at\s+capacity|at\s+capacity\s+for\s+this\s+model|capacity\s+limit)/i;
+const CODEX_AUTH_REQUIRED_RE =
+  /(?:refresh[_\s-]?token[_\s-]?(?:reused|expired|invalidated|revoked|invalid)|refresh\s+token\s+(?:has\s+)?(?:already\s+been\s+used|expired|been\s+invalidated|been\s+revoked)|\binvalid_grant\b|missing\s+bearer)/i;
+
+// Gemini-local (ported from paperclip gemini-local `parse.ts`): RESOURCE_EXHAUSTED / quota / billing →
+// provider_quota; missing/invalid API key or "not authenticated" / "run `gemini auth` first" → auth_required.
+const GEMINI_PROVIDER_QUOTA_RE =
+  /(?:resource_exhausted|\bquota\b|billing\s+details)/i;
+const GEMINI_AUTH_REQUIRED_RE =
+  /(?:not\s+authenticated|please\s+authenticate|api[_ ]?key\s+(?:required|missing|invalid)|invalid\s+credentials|manual\s+authorization\s+is\s+required|run\s+`?gemini\s+auth(?:\s+login)?`?\s+first)/i;
+
 /**
  * Classify a blob of stdout/stderr into a machine-readable {@link AdapterErrorFamily}, or `null` when it
  * matches no known family. Checked most-specific-first so provider-quota wins over generic rate-limit.
+ * The regexes union the claude/codex/gemini runtime vocabularies so a single classifier serves them all.
  */
 export function classifyErrorFamily(text: string): AdapterErrorFamily | null {
   if (!text) return null;
-  if (CLAUDE_PROVIDER_QUOTA_RE.test(text)) return "provider_quota";
+  if (CLAUDE_PROVIDER_QUOTA_RE.test(text) || CODEX_PROVIDER_QUOTA_RE.test(text) || GEMINI_PROVIDER_QUOTA_RE.test(text))
+    return "provider_quota";
   if (CLAUDE_TRANSIENT_UPSTREAM_RE.test(text)) return "transient_upstream";
   if (CLAUDE_MODEL_NOT_FOUND_RE.test(text)) return "model_not_found";
-  if (CLAUDE_AUTH_REQUIRED_RE.test(text)) return "auth_required";
+  if (CLAUDE_AUTH_REQUIRED_RE.test(text) || CODEX_AUTH_REQUIRED_RE.test(text) || GEMINI_AUTH_REQUIRED_RE.test(text))
+    return "auth_required";
   if (CLAUDE_REFUSAL_RE.test(text)) return "model_refusal";
   return null;
 }
@@ -322,15 +345,342 @@ function extractClaudeOutcome(stdout: string): {
   return { usage, model, isError, subtype };
 }
 
+// ─── Codex JSONL parsing (ported from paperclip codex-local) ─────────────────
+// The codex CLI (`codex exec`) streams newline-delimited JSON protocol events: `thread.started` (session
+// + model), `turn.started`, `item.started`/`item.completed` (each carrying an `item` of type
+// agent_message / reasoning / command_execution / tool_use / file_change / error), and the terminal
+// `turn.completed` (usage) / `turn.failed` (error). Only item events carry transcript turns; the
+// envelopes feed usage/outcome derivation via {@link extractCodexOutcome}.
+
+/** Redact home-path user segments + obvious command secrets before an event body is persisted/streamed. */
+function scrubText(text: string): string {
+  return redactCommandText(redactHomePathUserSegments(text));
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function asStr(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+/** Map one codex `item` (already unwrapped) into transcript events, or `null` when it carries no turn. */
+function codexItemEvents(
+  item: Record<string, unknown>,
+  ts: number,
+  phase: "started" | "completed",
+): AdapterTranscriptEvent[] | null {
+  const itemType = asStr(item.type);
+  if (itemType === "agent_message") {
+    const text = asStr(item.text);
+    return text ? [{ kind: "assistant", ts, text: scrubText(text) }] : null;
+  }
+  if (itemType === "reasoning") {
+    const text = asStr(item.text);
+    return text ? [{ kind: "thinking", ts, text: scrubText(text) }] : null;
+  }
+  if (itemType === "command_execution") {
+    const command = asStr(item.command);
+    if (phase === "started") {
+      return [{ kind: "tool_call", ts, tool: "command_execution", args: { command: scrubText(command) } }];
+    }
+    const status = asStr(item.status);
+    const exitCode =
+      typeof item.exit_code === "number" && Number.isFinite(item.exit_code) ? item.exit_code : null;
+    const isError =
+      (exitCode !== null && exitCode !== 0) ||
+      status === "failed" ||
+      status === "error" ||
+      status === "errored" ||
+      status === "cancelled";
+    return [
+      {
+        kind: "tool_result",
+        ts,
+        tool: "command_execution",
+        result: scrubText(asStr(item.aggregated_output).replace(/\s+$/, "")),
+        isError,
+      },
+    ];
+  }
+  if (itemType === "tool_use") {
+    const name = asStr(item.name) || "tool";
+    if (phase === "started") {
+      return [{ kind: "tool_call", ts, tool: name, args: item.input ?? {} }];
+    }
+    const status = asStr(item.status);
+    const isError = item.is_error === true || status === "failed" || status === "error";
+    return [
+      {
+        kind: "tool_result",
+        ts,
+        tool: name,
+        result: item.content ?? item.output ?? item.result,
+        isError,
+      },
+    ];
+  }
+  if (itemType === "tool_result" && phase === "completed") {
+    const isError = item.is_error === true || asStr(item.status) === "error";
+    return [
+      {
+        kind: "tool_result",
+        ts,
+        tool: asStr(item.name) || undefined,
+        result: item.content ?? item.output ?? item.result,
+        isError,
+      },
+    ];
+  }
+  // file_change / unknown item types → no transcript turn.
+  return null;
+}
+
+/**
+ * Codex JSONL line parser (a concrete per-runtime `parseLine`). Recognizes `item.started`/`item.completed`
+ * and maps their inner `item` to assistant/thinking/tool_call/tool_result turns; every other line (protocol
+ * envelopes, blank/non-JSON logs) returns `null`. Usage/model/outcome come from {@link extractCodexOutcome}.
+ */
+function codexParseLine(line: string, ts = Date.now()): AdapterTranscriptEvent[] | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed[0] !== "{") return null;
+  let event: Record<string, unknown>;
+  try {
+    event = JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const type = asStr(event.type);
+  if (type !== "item.started" && type !== "item.completed") return null;
+  const item = asRecord(event.item);
+  if (!item) return null;
+  return codexItemEvents(item, ts, type === "item.started" ? "started" : "completed");
+}
+
+/**
+ * Extract usage/model + terminal error from a codex JSONL stdout blob. `thread.started` carries the model;
+ * `turn.completed` carries per-run token usage; `turn.failed` / `error` events mark the run as failed.
+ * codex `input_tokens` already excludes cache reads (`cached_input_tokens`), so - unlike claude's
+ * cache-creation add - only `input_tokens` counts toward `tokensIn`.
+ */
+function extractCodexOutcome(stdout: string): {
+  usage: AdapterUsage | null;
+  model: string | null;
+  isError: boolean;
+  subtype: string;
+} {
+  let model: string | null = null;
+  let usage: AdapterUsage | null = null;
+  let isError = false;
+  let subtype = "";
+  for (const raw of stdout.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line[0] !== "{") continue;
+    let event: Record<string, unknown>;
+    try {
+      event = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const type = asStr(event.type);
+    if (type === "thread.started") {
+      if (typeof event.model === "string") model = event.model;
+    } else if (type === "turn.completed") {
+      const u = asRecord(event.usage) ?? {};
+      usage = {
+        tokensIn: asNum(u.input_tokens),
+        tokensOut: asNum(u.output_tokens),
+        model,
+      };
+    } else if (type === "turn.failed" || type === "error") {
+      isError = true;
+      subtype = type;
+    }
+  }
+  if (usage && !usage.model) usage.model = model;
+  return { usage, model, isError, subtype };
+}
+
+// ─── Gemini JSONL parsing (ported from paperclip gemini-local) ───────────────
+// The gemini CLI streams newline-delimited JSON: assistant turns arrive as `{type:"assistant",
+// message:{content:[…]}}` (legacy) or `{type:"message",role:"assistant",content:…}` (v0.38+), plus
+// `{type:"text",part:{text}}`; the terminal `{type:"result",…}` carries usage under `usage` /
+// `usageMetadata` / `stats`. Only assistant/text/tool turns become transcript events.
+
+/** Collect assistant text lines from a gemini `message`/`content` value (string, {text}, or {content:[…]}). */
+function geminiMessageText(message: unknown): string[] {
+  if (typeof message === "string") {
+    const t = message.trim();
+    return t ? [t] : [];
+  }
+  const record = asRecord(message);
+  if (!record) return [];
+  const out: string[] = [];
+  const direct = asStr(record.text).trim();
+  if (direct) out.push(direct);
+  const content = Array.isArray(record.content) ? record.content : [];
+  for (const partRaw of content) {
+    const part = asRecord(partRaw);
+    if (!part) continue;
+    const type = asStr(part.type).trim();
+    if (type === "output_text" || type === "text" || type === "content") {
+      const text = asStr(part.text).trim() || asStr(part.content).trim();
+      if (text) out.push(text);
+    }
+  }
+  return out;
+}
+
+/**
+ * Gemini JSONL line parser (a concrete per-runtime `parseLine`). Maps `assistant`/`message`(assistant)/
+ * `text` events to assistant turns, `thinking`/`reasoning` to thinking, and `tool_call`/`tool_result`
+ * to tool turns; envelopes (`init`/`result`/`system`/user+system messages) and blank/non-JSON lines
+ * return `null`. Usage/model/outcome come from {@link extractGeminiOutcome}.
+ */
+function geminiParseLine(line: string, ts = Date.now()): AdapterTranscriptEvent[] | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed[0] !== "{") return null;
+  let event: Record<string, unknown>;
+  try {
+    event = JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const type = asStr(event.type).trim().toLowerCase();
+  if (type === "assistant") {
+    const texts = geminiMessageText(event.message);
+    return texts.length ? texts.map((text) => ({ kind: "assistant", ts, text: scrubText(text) })) : null;
+  }
+  if (type === "message") {
+    if (asStr(event.role).trim().toLowerCase() !== "assistant") return null;
+    const texts = geminiMessageText(event.content);
+    return texts.length ? texts.map((text) => ({ kind: "assistant", ts, text: scrubText(text) })) : null;
+  }
+  if (type === "text") {
+    const part = asRecord(event.part);
+    const text = asStr(part?.text ?? event.text).trim();
+    return text ? [{ kind: "assistant", ts, text: scrubText(text) }] : null;
+  }
+  if (type === "thinking" || type === "reasoning") {
+    const text = asStr(event.text ?? event.thinking ?? event.reasoning).trim();
+    return text ? [{ kind: "thinking", ts, text: scrubText(text) }] : null;
+  }
+  if (type === "tool_call" || type === "tool_use" || type === "function_call") {
+    return [
+      {
+        kind: "tool_call",
+        ts,
+        tool: asStr(event.name ?? event.tool) || "tool",
+        args: event.input ?? event.arguments ?? event.args,
+      },
+    ];
+  }
+  if (type === "tool_result" || type === "function_result") {
+    return [
+      {
+        kind: "tool_result",
+        ts,
+        tool: asStr(event.name) || undefined,
+        result: event.output ?? event.result ?? event.content,
+        isError: Boolean(event.is_error ?? event.error),
+      },
+    ];
+  }
+  return null;
+}
+
+/** Accumulate gemini token usage from a `usage` / `usageMetadata` / `stats` object across its many key spellings. */
+function accumulateGeminiUsage(
+  target: { input: number; output: number },
+  usageRaw: unknown,
+): void {
+  const usage = asRecord(usageRaw) ?? {};
+  const meta = asRecord(usage.usageMetadata);
+  const source = meta && Object.keys(meta).length > 0 ? meta : usage;
+  target.input +=
+    asNum(source.input_tokens) || asNum(source.inputTokens) || asNum(source.promptTokenCount);
+  target.output +=
+    asNum(source.output_tokens) || asNum(source.outputTokens) || asNum(source.candidatesTokenCount);
+}
+
+/**
+ * Extract usage/model + terminal error from a gemini JSONL stdout blob. Token usage accumulates from any
+ * `result`/`step_finish` event's `usage`/`usageMetadata`/`stats`; `result` status/is_error and `error`/
+ * `system(subtype:error)` events mark the run failed. A turn-limit result maps to the `error_max_turns`
+ * subtype so the shared derivation reports `max_turns` - mirroring claude's subtype channel.
+ */
+function extractGeminiOutcome(stdout: string): {
+  usage: AdapterUsage | null;
+  model: string | null;
+  isError: boolean;
+  subtype: string;
+} {
+  let model: string | null = null;
+  let sawUsage = false;
+  let isError = false;
+  let subtype = "";
+  const totals = { input: 0, output: 0 };
+  for (const raw of stdout.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line[0] !== "{") continue;
+    let event: Record<string, unknown>;
+    try {
+      event = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    if (typeof event.model === "string" && event.model) model = event.model;
+    const type = asStr(event.type).trim().toLowerCase();
+    if (type === "result") {
+      const usageSource = event.usage ?? event.usageMetadata ?? event.stats;
+      if (usageSource !== undefined) {
+        accumulateGeminiUsage(totals, usageSource);
+        sawUsage = true;
+      }
+      const status = asStr(event.status).toLowerCase();
+      if (event.is_error === true || asStr(event.subtype).toLowerCase() === "error" || status === "error" || status === "failed")
+        isError = true;
+      const stopReasons = [event.status, event.stopReason, event.stop_reason, event.errorCode, event.error_code]
+        .map((v) => asStr(v).trim().toLowerCase());
+      if (stopReasons.some((r) => r === "turn_limit" || r === "max_turns" || r === "max_turns_exhausted" || r === "turn_limit_exhausted"))
+        subtype = "error_max_turns";
+    } else if (type === "step_finish" || event.usage !== undefined || event.usageMetadata !== undefined) {
+      accumulateGeminiUsage(totals, event.usage ?? event.usageMetadata);
+      sawUsage = true;
+    } else if (type === "error") {
+      isError = true;
+    } else if (type === "system" && asStr(event.subtype).trim().toLowerCase() === "error") {
+      isError = true;
+    }
+  }
+  const usage: AdapterUsage | null = sawUsage
+    ? { tokensIn: totals.input, tokensOut: totals.output, model }
+    : null;
+  return { usage, model, isError, subtype };
+}
+
+/** The usage/outcome extractor a runtime plugs into {@link deriveAdapterExecutionResult}. */
+type OutcomeExtractor = (stdout: string) => {
+  usage: AdapterUsage | null;
+  model: string | null;
+  isError: boolean;
+  subtype: string;
+};
+
 /**
  * The shared, PURE structured-result derivation an adapter's `execute()` delegates to. Builds the typed
- * transcript via the adapter's `parseLine` (or {@link defaultLineParser}), extracts usage/model, and
- * classifies the outcome into a {@link AdapterExecutionResult}. No process is spawned — the sandbox seam
- * has already run the runtime and captured its output.
+ * transcript via the adapter's `parseLine` (or {@link defaultLineParser}), extracts usage/model via the
+ * per-runtime `extractOutcome` (default: claude's), and classifies the outcome into a
+ * {@link AdapterExecutionResult}. No process is spawned - the sandbox seam has already run the runtime and
+ * captured its output.
  */
 export function deriveAdapterExecutionResult(
   adapter: Pick<Adapter, "parseLine">,
   input: AdapterExecutionInput,
+  extractOutcome: OutcomeExtractor = extractClaudeOutcome,
 ): AdapterExecutionResult {
   const ts = input.ts ?? Date.now();
   const lineParser = adapter.parseLine?.bind(adapter) ?? defaultLineParser;
@@ -340,7 +690,7 @@ export function deriveAdapterExecutionResult(
     if (events) transcript.push(...events);
   }
 
-  const { usage, isError, subtype } = extractClaudeOutcome(input.stdout);
+  const { usage, isError, subtype } = extractOutcome(input.stdout);
   const combined = `${input.stdout}\n${input.stderr ?? ""}`;
   const errorFamily = classifyErrorFamily(combined) ?? undefined;
   const timedOut = Boolean(input.timedOut);
@@ -404,6 +754,12 @@ const codexAdapter: Adapter = {
     useShell: false,
     layout: GENERIC_LAYOUT,
   }),
+  // Adapter-owned execution contract (parity slice): codex `exec` streams JSONL protocol events, so it
+  // gets a real per-runtime line parser + codex-specific usage/outcome derivation.
+  parseLine: codexParseLine,
+  execute(input) {
+    return deriveAdapterExecutionResult(this, input, extractCodexOutcome);
+  },
 };
 
 const claudeAdapter: Adapter = {
@@ -445,6 +801,12 @@ const geminiAdapter: Adapter = {
     useShell: false,
     layout: GENERIC_LAYOUT,
   }),
+  // Adapter-owned execution contract (parity slice): the gemini CLI streams JSONL assistant turns +
+  // a terminal result envelope, so it gets a real per-runtime line parser + gemini-specific derivation.
+  parseLine: geminiParseLine,
+  execute(input) {
+    return deriveAdapterExecutionResult(this, input, extractGeminiOutcome);
+  },
 };
 
 /** Generic: run ANY command as the agent (argv template). The Paperclip "process" adapter analog. */
