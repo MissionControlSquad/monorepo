@@ -12,6 +12,8 @@ import { randomBytes, createHash } from "crypto";
 import { prisma } from "@/server/prisma";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { presignTaskAttachment, confirmTaskAttachment } from "@/server/services/task-attachments";
+import { resolveEffectiveMemoryProvider } from "@/server/services/agent-memory";
+import { resolveMemoryAdapter, type MemoryScope } from "@/server/services/memory-adapter";
 
 const TOKEN_PREFIX = "rbt_";
 const MAX_BRIDGE_MESSAGE = 8_000;
@@ -91,6 +93,80 @@ export async function bridgeConfirmAttachment(
   if (!attachmentId?.trim()) return false;
   await confirmTaskAttachment(run.workspaceId, attachmentId, byteSize);
   return true;
+}
+
+const MAX_MEMORY_NOTE = 8_000;
+
+/**
+ * Resolve the memory adapter a run may use, or null. Least-privilege: the scope is ALWAYS the run's own
+ * workspace + agent (from the verified token, never client input), so an in-run agent can only ever
+ * touch its OWN memory. A run with no agent, or whose effective provider stores nothing control-plane-
+ * side (`none`/`markdown`), gets null - the tool is unavailable for it.
+ */
+async function resolveRunMemory(
+  run: VerifiedRun,
+): Promise<{ adapter: ReturnType<typeof resolveMemoryAdapter>; scope: MemoryScope } | null> {
+  if (!run.agentId) return null;
+  const agent = await prisma.agent.findFirst({
+    where: { id: run.agentId, workspaceId: run.workspaceId },
+    select: { memoryProvider: true },
+  });
+  if (!agent) return null;
+  const provider = await resolveEffectiveMemoryProvider(run.workspaceId, agent.memoryProvider);
+  const adapter = resolveMemoryAdapter(provider);
+  if (!adapter) return null;
+  return { adapter, scope: { workspaceId: run.workspaceId, agentId: run.agentId } };
+}
+
+/**
+ * memory.note - the in-run agent records a memory entry to its OWN store, stamped with run/agent
+ * provenance. Returns the new entry's id, or null when memory is unavailable for the run or the note
+ * is empty. Cost rolls into the run (attributionMode `included_in_run`).
+ */
+export async function bridgeMemoryNote(
+  run: VerifiedRun,
+  content: string,
+): Promise<{ id: string } | null> {
+  const trimmed = content?.trim();
+  if (!trimmed) return null;
+  const mem = await resolveRunMemory(run);
+  if (!mem?.adapter) return null;
+  const entry = await mem.adapter.append(mem.scope, trimmed.slice(0, MAX_MEMORY_NOTE), {
+    taskId: run.taskId,
+    runId: run.runId,
+    sourceKind: "run",
+    sourceRefId: run.runId,
+  });
+  return { id: entry.id };
+}
+
+/**
+ * memory.search - the in-run agent recalls from its OWN store (ILIKE substring recall). Empty query
+ * returns recent entries. Returns null when memory is unavailable for the run.
+ */
+export async function bridgeMemorySearch(
+  run: VerifiedRun,
+  query: string,
+  limit?: number,
+): Promise<Array<{ id: string; content: string; createdAt: string }> | null> {
+  const mem = await resolveRunMemory(run);
+  if (!mem?.adapter) return null;
+  const rows = await mem.adapter.search(mem.scope, query ?? "", limit);
+  return rows.map((r) => ({ id: r.id, content: r.content, createdAt: r.createdAt.toISOString() }));
+}
+
+/**
+ * memory.forget - the in-run agent deletes one entry from its OWN store. Scope-bound, so an id owned by
+ * another agent is a no-op (returns false). Returns null when memory is unavailable for the run.
+ */
+export async function bridgeMemoryForget(
+  run: VerifiedRun,
+  memoryId: string,
+): Promise<boolean | null> {
+  if (!memoryId?.trim()) return null;
+  const mem = await resolveRunMemory(run);
+  if (!mem?.adapter) return null;
+  return mem.adapter.forget(mem.scope, memoryId.trim());
 }
 
 /** Attach a freshly-minted token to a run (call once at run start). */
