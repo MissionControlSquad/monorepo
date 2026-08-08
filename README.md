@@ -64,8 +64,8 @@ npm run operator help                # list commands
 
 It also manages the standalone runner daemon (`@agentcenter/runner`) - installing it, running it as
 a login service, and updating it. `install` / `update` only print copy-pasteable steps, and
-`service:install` prints the unit by default; nothing privileged or destructive runs without an
-explicit flag.
+`service:install` prints the unit by default and `service:uninstall` refuses without `--force`;
+nothing privileged or destructive runs without an explicit flag.
 
 ```bash
 npm run operator install                  # print managed-install steps (npm i -g / npx) + login hint
@@ -74,7 +74,11 @@ npm run operator service:install          # render the launchd (macOS) / systemd
 npm run operator service:install -- --write  # write the unit to the user path (the only fs write)
 npm run operator service:start            # launchctl load / systemctl --user start
 npm run operator service:stop             # launchctl unload / systemctl --user stop
+npm run operator service:restart          # stop then start (launchctl reload / systemctl --user restart)
 npm run operator service:status           # launchctl list / systemctl --user status
+npm run operator service:health           # probe active state (launchctl list / systemctl is-active)
+npm run operator service:logs -- --lines 200 --follow  # tail journalctl / the plist StandardOut/Err logs
+npm run operator service:uninstall -- --force  # stop + remove the unit file (refuses without --force)
 ```
 
 The platform is auto-detected: macOS gets a `~/Library/LaunchAgents` plist driven by `launchctl`,

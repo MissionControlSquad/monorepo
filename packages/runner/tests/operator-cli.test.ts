@@ -12,6 +12,11 @@ import {
   resolveService,
   serviceInstall,
   serviceCtl,
+  serviceRestart,
+  serviceHealth,
+  serviceLogs,
+  serviceUninstall,
+  launchdLogPaths,
   installSteps,
   updateSteps,
   installCmd,
@@ -285,5 +290,152 @@ describe("operator CLI - makeDefaultHandlers() wiring for service commands", () 
     expect(typeof handlers["service:install"]).toBe("function");
     expect(typeof handlers.install).toBe("function");
     expect(typeof handlers.update).toBe("function");
+    expect(typeof handlers["service:restart"]).toBe("function");
+    expect(typeof handlers["service:health"]).toBe("function");
+    expect(typeof handlers["service:logs"]).toBe("function");
+    expect(typeof handlers["service:uninstall"]).toBe("function");
+  });
+});
+
+describe("operator CLI - service:restart shell-out", () => {
+  it("uses `systemctl --user restart <unit>` on Linux", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    serviceRestart(["--now"], { platform: "linux", home: "/home/x", spawn, errorLog: () => {} });
+    const [cmd, args] = spawn.mock.calls[0] as unknown as [string, string[]];
+    expect(cmd).toBe("systemctl");
+    expect(args).toEqual(["--user", "restart", SYSTEMD_UNIT, "--now"]);
+  });
+
+  it("unloads then loads the plist on macOS (stop → start)", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    serviceRestart([], { platform: "darwin", home: "/Users/x", spawn, errorLog: () => {} });
+    const plist = `/Users/x/Library/LaunchAgents/${LAUNCHD_LABEL}.plist`;
+    expect(spawn.mock.calls[0]).toEqual(["launchctl", ["unload", "-w", plist], expect.anything()]);
+    expect(spawn.mock.calls[1]).toEqual(["launchctl", ["load", "-w", plist], expect.anything()]);
+  });
+
+  it("returns 1 on an unsupported platform without spawning", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    const code = serviceRestart([], { platform: "win32", spawn, errorLog: () => {} });
+    expect(code).toBe(1);
+    expect(spawn).not.toHaveBeenCalled();
+  });
+});
+
+describe("operator CLI - service:health probe", () => {
+  it("uses `systemctl --user is-active <unit>` on Linux", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    serviceHealth([], { platform: "linux", home: "/home/x", spawn, errorLog: () => {} });
+    const [cmd, args] = spawn.mock.calls[0] as unknown as [string, string[]];
+    expect(cmd).toBe("systemctl");
+    expect(args).toEqual(["--user", "is-active", SYSTEMD_UNIT]);
+  });
+
+  it("uses `launchctl list <label>` on macOS", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    serviceHealth([], { platform: "darwin", home: "/Users/x", spawn, errorLog: () => {} });
+    const [cmd, args] = spawn.mock.calls[0] as unknown as [string, string[]];
+    expect(cmd).toBe("launchctl");
+    expect(args).toEqual(["list", LAUNCHD_LABEL]);
+  });
+
+  it("returns 1 on an unsupported platform without spawning", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    expect(serviceHealth([], { platform: "win32", spawn, errorLog: () => {} })).toBe(1);
+    expect(spawn).not.toHaveBeenCalled();
+  });
+});
+
+describe("operator CLI - service:logs tail", () => {
+  it("uses `journalctl --user -u <unit> --lines N` on Linux, honoring --lines + --follow", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    serviceLogs(["--lines", "50", "--follow"], { platform: "linux", home: "/home/x", spawn, errorLog: () => {} });
+    const [cmd, args] = spawn.mock.calls[0] as unknown as [string, string[]];
+    expect(cmd).toBe("journalctl");
+    expect(args).toEqual(["--user", "-u", SYSTEMD_UNIT, "--lines", "50", "--follow"]);
+  });
+
+  it("defaults to 100 lines and no --follow when unspecified (Linux)", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    serviceLogs([], { platform: "linux", home: "/home/x", spawn, errorLog: () => {} });
+    const [, args] = spawn.mock.calls[0] as unknown as [string, string[]];
+    expect(args).toEqual(["--user", "-u", SYSTEMD_UNIT, "--lines", "100"]);
+  });
+
+  it("tails the plist StandardOut/Err files on macOS (-F when following)", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    serviceLogs(["-n", "25", "-f"], { platform: "darwin", home: "/Users/x", spawn, errorLog: () => {} });
+    const logs = launchdLogPaths("/Users/x");
+    const [cmd, args] = spawn.mock.calls[0] as unknown as [string, string[]];
+    expect(cmd).toBe("tail");
+    expect(args).toEqual(["-n", "25", "-F", logs.stdout, logs.stderr]);
+  });
+
+  it("returns 1 on an unsupported platform without spawning", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    expect(serviceLogs([], { platform: "win32", spawn, errorLog: () => {} })).toBe(1);
+    expect(spawn).not.toHaveBeenCalled();
+  });
+});
+
+describe("operator CLI - service:uninstall safety", () => {
+  it("without --force refuses: removes NOTHING and does not stop the service", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    const fs = { rmSync: vi.fn() };
+    const lines: string[] = [];
+    const code = serviceUninstall([], {
+      platform: "linux",
+      home: "/home/x",
+      spawn,
+      fs,
+      log: (m: string) => lines.push(m),
+      errorLog: () => {},
+    });
+    expect(code).toBe(0);
+    expect(fs.rmSync).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
+    expect(lines.join("\n")).toContain("--force");
+  });
+
+  it("with --force stops+disables then removes the unit file (systemd)", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    const fs = { rmSync: vi.fn() };
+    const code = serviceUninstall(["--force"], {
+      platform: "linux",
+      home: "/home/x",
+      spawn,
+      fs,
+      log: () => {},
+      errorLog: () => {},
+    });
+    expect(code).toBe(0);
+    expect(spawn.mock.calls[0]).toEqual(["systemctl", ["--user", "stop", SYSTEMD_UNIT], expect.anything()]);
+    expect(spawn.mock.calls[1]).toEqual(["systemctl", ["--user", "disable", SYSTEMD_UNIT], expect.anything()]);
+    expect(fs.rmSync).toHaveBeenCalledWith(`/home/x/.config/systemd/user/${SYSTEMD_UNIT}`, { force: true });
+  });
+
+  it("with --force unloads then removes the plist (launchd)", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    const fs = { rmSync: vi.fn() };
+    serviceUninstall(["--force"], {
+      platform: "darwin",
+      home: "/Users/x",
+      spawn,
+      fs,
+      log: () => {},
+      errorLog: () => {},
+    });
+    const plist = `/Users/x/Library/LaunchAgents/${LAUNCHD_LABEL}.plist`;
+    expect(spawn.mock.calls[0]).toEqual(["launchctl", ["unload", "-w", plist], expect.anything()]);
+    expect(fs.rmSync).toHaveBeenCalledWith(plist, { force: true });
+  });
+
+  it("returns 1 on an unsupported platform and removes nothing", () => {
+    const spawn = vi.fn(() => ({ status: 0 }));
+    const fs = { rmSync: vi.fn() };
+    const code = serviceUninstall(["--force"], { platform: "win32", spawn, fs, log: () => {}, errorLog: () => {} });
+    expect(code).toBe(1);
+    expect(fs.rmSync).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
   });
 });
