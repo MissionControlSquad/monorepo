@@ -20,6 +20,8 @@ import { Button, Card, Badge, Select } from "@/components/ui";
 import { SecretDialog } from "@/components/dialogs/SecretDialog";
 import { SecretProviderDialog } from "@/components/dialogs/SecretProviderDialog";
 import { SecretImportDialog } from "@/components/dialogs/SecretImportDialog";
+import { SecretProposalsPanel } from "@/components/secrets/SecretProposalsPanel";
+import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 
 // Epic #5: secrets vault. API-gated by SECRETS_VAULT + buildbase role (admin manages; member views
 // metadata). Values are write-only — they are never fetched back, only rotated. Encryption at rest
@@ -87,6 +89,8 @@ export default function SecretsPage() {
   );
   const [openAudit, setOpenAudit] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const proposalsEnabled = useFeatureFlag("secret_proposals");
+  const [tab, setTab] = useState<"secrets" | "proposals">("secrets");
 
   const secrets = data?.secrets ?? [];
   const providers = providerData?.secretProviders ?? [];
@@ -174,19 +178,46 @@ export default function SecretsPage() {
             rotated. Bind a secret to an agent to inject it as an env var.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => setImportOpen(true)}>Bulk import</Button>
-          <Button onClick={() => setOpen(true)}>New secret</Button>
-        </div>
+        {tab === "secrets" && (
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => setImportOpen(true)}>Bulk import</Button>
+            <Button onClick={() => setOpen(true)}>New secret</Button>
+          </div>
+        )}
       </div>
 
-      {error && (
-        <p className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
-          {error}
-        </p>
+      {/* Proposals is an opt-in governance surface (SECRET_PROPOSALS). Tab hidden unless enabled. */}
+      {proposalsEnabled && (
+        <div className="flex gap-1 border-b border-border">
+          {(["secrets", "proposals"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={
+                "-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize transition-colors " +
+                (tab === t
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground")
+              }
+            >
+              {t}
+            </button>
+          ))}
+        </div>
       )}
 
-      <SecretDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
+      {proposalsEnabled && tab === "proposals" && <SecretProposalsPanel />}
+
+      {tab === "secrets" && (
+        <>
+          {error && (
+            <p className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
+
+          <SecretDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
       {/* Provider configs — point the vault at an external backend (aws/vault) or the local
           envelope (env). `config` holds only non-secret settings; backend creds are Secrets. */}
@@ -425,6 +456,8 @@ export default function SecretsPage() {
           </div>
         </Card>
       ))}
+        </>
+      )}
     </div>
   );
 }
