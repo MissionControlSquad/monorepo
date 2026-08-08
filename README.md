@@ -62,6 +62,24 @@ npm run operator db:migrate:status   # show applied / pending Prisma migrations
 npm run operator help                # list commands
 ```
 
+It also manages the standalone runner daemon (`@agentcenter/runner`) - installing it, running it as
+a login service, and updating it. `install` / `update` only print copy-pasteable steps, and
+`service:install` prints the unit by default; nothing privileged or destructive runs without an
+explicit flag.
+
+```bash
+npm run operator install                  # print managed-install steps (npm i -g / npx) + login hint
+npm run operator update                   # print the self-update hint (npm update -g)
+npm run operator service:install          # render the launchd (macOS) / systemd (Linux) unit
+npm run operator service:install -- --write  # write the unit to the user path (the only fs write)
+npm run operator service:start            # launchctl load / systemctl --user start
+npm run operator service:stop             # launchctl unload / systemctl --user stop
+npm run operator service:status           # launchctl list / systemctl --user status
+```
+
+The platform is auto-detected: macOS gets a `~/Library/LaunchAgents` plist driven by `launchctl`,
+Linux gets a `~/.config/systemd/user` unit driven by `systemctl --user`.
+
 Wraps `scripts/doctor.mjs`, `scripts/db-backup.mjs`, and `prisma migrate status`. Pass args to the
 underlying script after ` -- ` (e.g. `db:backup -- --out /backups --keep 7`).
 
