@@ -14,6 +14,7 @@ const EXPECTED_TYPES = [
   "opencode-local",
   "pi-local",
   "hermes",
+  "hermes-gateway",
 ];
 
 // agent_adapters is global seed data shared across all test files (the migration seeds 11 rows; it is

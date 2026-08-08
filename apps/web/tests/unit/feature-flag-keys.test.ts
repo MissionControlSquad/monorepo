@@ -43,8 +43,8 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.MEMORY).toBe("memory");
   });
 
-  it("has 59 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(59);
+  it("has 60 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(60);
   });
 
   it("every flag key has a matching default (FLAG_KEYS ⊇ FLAG_DEFAULTS in sync)", () => {

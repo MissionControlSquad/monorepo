@@ -39,6 +39,16 @@ async function truncateAll() {
       -- beforeAll/beforeEach (which run after this). (In-process caches reset per isolated fork.)
       feature_flags,
       licenses,
+      -- newer tables (added by later features) that must also reset per file so their rows do not
+      -- leak across shared-DB test files (e.g. memory_jobs enqueued by run-completion in one file
+      -- otherwise crowd another file's claim batch).
+      memory_jobs,
+      agent_wakeups,
+      run_log_chunks,
+      run_log_meta,
+      secret_proposals,
+      external_objects,
+      agent_runs,
       attention_dismissals,
       agent_capability_grants,
       agent_authz_events,

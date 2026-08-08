@@ -326,24 +326,27 @@ export async function runTaskInSandbox(input: {
   // Inject the agent's OWN bound secrets (LLM API keys, etc.) so a real runtime can authenticate.
   // The Environment's instance-scoped envVars (a non-secret bag) go in first; the agent's resolved
   // secrets take precedence on any key collision.
+  const instanceEnvVars = envRes?.envVars ?? {};
+  // Audit-on-resolve (Domain 7 P1): this is a REAL use of the agent's secrets (injected into the
+  // run), so pass a consumer context — one `injected` access event is written per bound secret.
+  const agentSecrets = await resolveEnvForAgent(input.workspaceId, agent.id, {
+    actorType: "agent",
+    actorId: agent.id,
+    consumerType: "agent",
+    consumerId: agent.id,
+    runId: run.id,
+  });
   const env: Record<string, string> = {
-    ...(envRes?.envVars ?? {}),
-    // Audit-on-resolve (Domain 7 P1): this is a REAL use of the agent's secrets (injected into the
-    // run), so pass a consumer context — one `injected` access event is written per bound secret.
-    ...(await resolveEnvForAgent(input.workspaceId, agent.id, {
-      actorType: "agent",
-      actorId: agent.id,
-      consumerType: "agent",
-      consumerId: agent.id,
-      runId: run.id,
-    })),
+    ...instanceEnvVars,
+    ...agentSecrets,
   };
 
   // In-sandbox API bridge (Plan 6): a run-scoped token the in-box agent can use to post progress back
   // to its task. Only injected when a public MC URL is configured; invalidated when the run finishes.
   const bridgeBaseUrl = env_.NEXT_PUBLIC_MC_URL?.replace(/\/$/, "");
+  let bridgeToken: string | null = null;
   if (bridgeBaseUrl) {
-    const bridgeToken = await attachRunBridgeToken(run.id);
+    bridgeToken = await attachRunBridgeToken(run.id);
     env.AGENTCENTER_API_URL = `${bridgeBaseUrl}/api/runner/bridge`;
     env.AGENTCENTER_RUN_ID = run.id;
     env.AGENTCENTER_RUN_TOKEN = bridgeToken;
@@ -389,8 +392,14 @@ export async function runTaskInSandbox(input: {
   // The exact secret VALUES this run resolved into its environment (LLM keys, bridge token, GIT_TOKEN,
   // …). These must never survive into stored/streamed/posted run output, so every output sink below is
   // scrubbed against this set: the live tail, the persisted stdout/stderr, the run->task message, the
-  // memory summary, and the failure message.
-  const secretValues = [...Object.values(env), ...(gitToken ? [gitToken] : [])];
+  // memory summary, and the failure message. Only TRUE secrets are scrubbed - the agent's resolved
+  // vault secrets, the run-scoped bridge token, and the git token - never the Environment's non-secret
+  // instance envVars (those are meant to appear in output).
+  const secretValues = [
+    ...Object.values(agentSecrets),
+    ...(bridgeToken ? [bridgeToken] : []),
+    ...(gitToken ? [gitToken] : []),
+  ];
 
   // Live status (Plan 6): track a redacted, TTL'd tail of this run so the UI can watch it mid-flight.
   // Secret VALUES (env + git token) are scrubbed from every streamed chunk.

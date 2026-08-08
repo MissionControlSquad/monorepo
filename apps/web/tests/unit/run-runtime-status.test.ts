@@ -25,7 +25,7 @@ describe("run runtime status", () => {
     const s = getRunRuntimeStatus("r2")!;
     expect(s.tail).not.toContain("sk-supersecret");
     expect(s.tail).not.toContain("ghp_token123");
-    expect(s.tail).toContain("«redacted»");
+    expect(s.tail).toContain("***REDACTED***");
   });
 
   it("returns null for an unknown run", () => {
