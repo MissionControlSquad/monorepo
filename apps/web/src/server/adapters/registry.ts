@@ -10,6 +10,7 @@ import Ajv, { type ValidateFunction } from "ajv";
 import { prisma } from "@/server/prisma";
 import type { AgentAdapter } from "@agentcenter/database";
 import { getAdapter as getCodeAdapter } from "@agentcenter/utils";
+import { HERMES_GATEWAY_CONFIG_SCHEMA } from "@/server/adapters/hermes-gateway";
 
 export const BUILTIN_ADAPTER_TYPE = "openclaw-gateway";
 
@@ -115,22 +116,7 @@ const BUILTIN_ADAPTER_DB: Record<
     transport: "gateway",
     authKind: "secretBinding",
     builtIn: false,
-    configSchema: {
-      $schema: "http://json-schema.org/draft-07/schema#",
-      type: "object",
-      required: ["apiBaseUrl", "apiKeySecretRef"],
-      properties: {
-        apiBaseUrl: { type: "string", format: "uri" },
-        apiKeySecretRef: { type: "string" },
-        sessionKeyStrategy: { type: "string", enum: ["issue", "agent", "run", "none"] },
-        instructions: { type: "string" },
-        headers: { type: "object" },
-        timeoutSec: { type: "number" },
-        eventReconnectMs: { type: "number" },
-        dangerouslyAllowInsecureRemoteHttp: { type: "boolean" },
-        model: { type: "string" },
-      },
-    },
+    configSchema: HERMES_GATEWAY_CONFIG_SCHEMA,
   },
 };
 

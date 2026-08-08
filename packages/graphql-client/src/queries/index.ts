@@ -240,6 +240,7 @@ export {
 } from "./environments";
 export {
   PROJECT_WORKSPACES_QUERY,
+  PROJECT_WORKSPACE_DETAIL_QUERY,
   EXECUTION_WORKSPACES_QUERY,
   EXECUTION_WORKSPACES_DETAIL_QUERY,
 } from "./execution-workspaces";

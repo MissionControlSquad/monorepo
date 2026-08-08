@@ -94,6 +94,21 @@ export function selectWorkspaceById<T extends { id: string }>(
   return list?.find((w) => w.id === id) ?? null;
 }
 
+/**
+ * The primary named project workspace out of a workspace-scoped list. Mirrors the server's
+ * `getPrimaryProjectWorkspace` ordering (isPrimary desc, then oldest createdAt) so the detail view
+ * highlights the same source template a run clones from. Never mutates the input; null when empty.
+ */
+export function selectPrimaryProjectWorkspace<
+  T extends { isPrimary: boolean; createdAt?: string | null },
+>(list: readonly T[] | undefined | null): T | null {
+  if (!list || list.length === 0) return null;
+  return [...list].sort((a, b) => {
+    if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+    return (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
+  })[0];
+}
+
 /** Compact "YYYY-MM-DD HH:MM:SS" from an ISO timestamp; empty string for a missing value. */
 export function formatTimestamp(iso: string | null | undefined): string {
   if (!iso) return "";

@@ -27,6 +27,7 @@ import {
 import {
   runHermesGateway,
   HERMES_GATEWAY_ADAPTER_TYPE,
+  hermesGatewaySecretRefName,
   type HermesGatewayConfig,
   type HermesGatewayResult,
 } from "@/server/adapters/hermes-gateway";
@@ -772,7 +773,9 @@ async function resolveHermesGatewayConfig(
   // Base URL from adapterConfig, falling back to the agent's runtimeTemplate (the code adapter's slot).
   const apiBaseUrl = str(cfg.apiBaseUrl) ?? str(agent.runtimeTemplate) ?? "";
   // The API key is stored ONLY as a vault secret-ref (never inline) — resolve it now (audited).
-  const secretRef = str(cfg.apiKeySecretRef);
+  // The adapter-config UI writes a `{ secretRef: { name } }` pointer; a bare string name is also
+  // accepted for back-compat with configs saved before the secret-ref binding input.
+  const secretRef = hermesGatewaySecretRefName(cfg.apiKeySecretRef);
   const apiKey = secretRef
     ? ((await resolveWorkspaceSecret(workspaceId, secretRef, {
         actorType: "system",

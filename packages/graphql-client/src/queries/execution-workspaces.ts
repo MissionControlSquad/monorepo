@@ -17,6 +17,29 @@ export const PROJECT_WORKSPACES_QUERY = gql`
   }
 `;
 
+// ProjectWorkspace detail read: reuses the workspace-scoped `projectWorkspaces` list resolver (no new
+// server field) but requests the full source template — setup/cleanup commands, strategy, and every
+// source setting. The detail view selects the row (or the primary) by id from this list.
+export const PROJECT_WORKSPACE_DETAIL_QUERY = gql`
+  query ProjectWorkspaceDetail($projectId: String) {
+    projectWorkspaces(projectId: $projectId) {
+      id
+      projectId
+      name
+      sourceType
+      cwd
+      repoUrl
+      repoRef
+      defaultRef
+      setupCommand
+      cleanupCommand
+      defaultStrategy
+      isPrimary
+      createdAt
+    }
+  }
+`;
+
 // Detail read: reuses the workspace-scoped `executionWorkspaces` list resolver (no new server field)
 // but requests the full runtime config + phase log; the detail view selects the row by id.
 export const EXECUTION_WORKSPACES_DETAIL_QUERY = gql`
