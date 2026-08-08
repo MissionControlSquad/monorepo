@@ -1,0 +1,25 @@
+// ─── Async memory-capture jobs (Paperclip memory-jobs port) ───────────
+// Post-run memory capture used to run inline in the run finalizer; a durable job queue lets it run
+// async and survive process loss. A job is enqueued when a run finishes; the reap cron drains it with a
+// lease + bounded-retry state machine (queued → running → done | failed), re-running the EXISTING
+// memory-capture path. leaseExpiresAt doubles as the running-lease deadline AND the not-before instant
+// for a queued job awaiting its retry backoff. MEMORY-flag gated at the drain. D5: workspaceId no FK.
+
+model MemoryJob {
+  id             String    @id @default(cuid())
+  workspaceId    String // buildbase workspace _id; no FK (D5)
+  agentId        String
+  sourceKind     String // provenance kind mirroring AgentMemory: run | issue_comment | manual_note | ...
+  sourceRefId    String? // the run / comment id that produced this capture
+  payload        Json // captured input for the memory-capture path (summary, taskId, provider, ...)
+  status         String    @default("queued") // queued | running | done | failed
+  attempts       Int       @default(0)
+  leaseExpiresAt DateTime? // running-lease deadline, or the not-before instant for a backed-off retry
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, leaseExpiresAt])
+  @@index([workspaceId, agentId])
+  @@map("memory_jobs")
+}

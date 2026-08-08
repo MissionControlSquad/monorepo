@@ -155,3 +155,41 @@ export async function deleteExternalObject(workspaceId: string, id: string): Pro
   const { count } = await prisma.externalObject.deleteMany({ where: { id, workspaceId } });
   return count > 0;
 }
+
+/** Default staleness window before a cached object is re-fetched by the background poller (6h). */
+const DEFAULT_STALENESS_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Background poller (called from the reap cron): re-fetch every cached object whose snapshot has gone
+ * stale (fetchedAt older than `stalenessMs`), oldest-first, reusing the on-demand refresh path (and so
+ * the same provider fetch — no new external API surface). A successful refresh stamps fetchedAt = now,
+ * so the object drops out of the due set until it goes stale again. Each object is best-effort: one
+ * provider failure (rate-limit, deleted upstream, …) is counted and skipped, never aborting the batch.
+ */
+export async function refreshDueExternalObjects(opts?: {
+  now?: Date;
+  stalenessMs?: number;
+  limit?: number;
+  fetcher?: GithubFetcher;
+}): Promise<{ due: number; refreshed: number; failed: number }> {
+  const now = opts?.now ?? new Date();
+  const stalenessMs = opts?.stalenessMs ?? DEFAULT_STALENESS_MS;
+  const cutoff = new Date(now.getTime() - stalenessMs);
+  const due = await prisma.externalObject.findMany({
+    where: { fetchedAt: { lte: cutoff } },
+    orderBy: { fetchedAt: "asc" },
+    take: opts?.limit ?? 50,
+  });
+
+  let refreshed = 0;
+  let failed = 0;
+  for (const obj of due) {
+    try {
+      await refreshExternalObject(obj.workspaceId, obj.id, opts?.fetcher);
+      refreshed++;
+    } catch {
+      failed++; // best-effort — a single provider failure never aborts the batch
+    }
+  }
+  return { due: due.length, refreshed, failed };
+}
