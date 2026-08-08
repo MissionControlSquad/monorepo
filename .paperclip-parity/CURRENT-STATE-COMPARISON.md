@@ -78,16 +78,20 @@ pairing #97**, agent-companies + hire_agent + org-chart SVG.
 
 ---
 
-## 3. Genuinely MISSING and BUILDABLE now (candidate "Batch 3")
+## 3. Buildable backlog — BATCH 3 landed (#104-108); remainder below
 
-1. **Unified tabbed Agent Detail** (URL `:tab` + `runs/:runId`) + AgentToolsTab (effective access UI). [M/L]
-2. **Skills catalog package + real import** (skills.sh / GitHub URL / raw / local-path resolvers). [L]
+DONE in Batch 3 (merged):
+1. ✅ **Unified tabbed Agent Detail** + AgentToolsTab — #105.
+2. ✅ **Skills catalog package + real import** (GitHub/URL/catalog resolvers) — #106. (deferred: skills.sh registry, local-path scan, multi-file tree bundles)
+4. ✅ **Artifact upload pipeline** — `TaskAttachment` + presigned upload + run-scoped agent upload — #108.
+7. ✅ **Operator CLI** (doctor / env:check / db:backup / db:migrate:status) — #104. (deferred: managed-install/service lifecycle)
+
+Still ❌ buildable (candidate Batch 4):
 3. **Onboarding local-install variant** (cloud exists; add the local branch #10786). [M]
-4. **Artifact upload pipeline** — `TaskAttachment` model + presigned upload + agent upload skill. [M]
-5. **Memory depth** — `MemoryAdapter` registry + semantic recall (pgvector) + mid-run memory tools. [M/L]
-6. **Plugin worker runtime** — fork/spawn + vm sandbox + UI extension slots + SDK package. [L, infra-ish]
-7. **Operator CLI** — doctor / env / db:backup / managed-install. [M]
+5. **Memory depth** — `MemoryAdapter` registry + semantic recall (pgvector) + mid-run memory tools. [M/L; recall needs the pgvector extension → borderline infra]
+6. **Plugin worker runtime** — fork/spawn + vm sandbox + UI extension slots + SDK package. [L, infra-ish → §5]
 8. **Pipelines/Routines/ExecWorkspace/ProjectWorkspace detail routes.** [M each]
+9. Managed-install/service-lifecycle CLI; skills.sh registry + local-path import; multi-file GitHub skill bundles. [S-M]
 
 ---
 
@@ -95,10 +99,10 @@ pairing #97**, agent-companies + hire_agent + org-chart SVG.
 
 These features LANDED but each intentionally deferred a piece - list so nothing is silently lost:
 
-- **#99 adapter execute():** structured result exposed on the run but NOT persisted to `AgentRun`
-  (no usage/errorFamily/transcript columns yet); only `claude` has a real `parseLine` (others fallback).
-- **#102 Hermes gateway:** adapter + SSE seam + registries done, but NOT wired into the run-dispatch
-  path (`sandbox-run` throws for non-spawn invocations) and no UI config form.
+- ~~#99 adapter execute() persistence~~ ✅ RESOLVED by #107 (AgentRun usage/errorFamily/exitReason
+  columns + surfaced on Runs card). Remaining: only `claude` has a real `parseLine` (others fallback).
+- ~~#102 Hermes gateway dispatch wiring~~ ✅ RESOLVED by #107 (dispatch branch resolves the vault key
+  + streams HTTP+SSE through the log store). Remaining: no UI config form for the gateway adapter.
 - **#103 AgentWakeup:** delivery = event emit + `delivered` mark; a real Live Gateway push frame is a
   deferred seam (needs a new `mc.*` wire message).
 - **#101 run log store:** local/DB store only - S3 mirroring deferred; "view full log" UI not added.
