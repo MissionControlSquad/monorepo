@@ -48,6 +48,23 @@ docker pull ghcr.io/missioncontrolsquad/agentcenter:latest
 
 Available for `linux/amd64` and `linux/arm64`.
 
+## Operator CLI
+
+`npm run operator <command>` is a small admin surface for running and diagnosing a deployment. Each
+command is a thin wrapper over the tool that already owns the work (it does not reimplement backup or
+migration logic), and its exit code is propagated so it can gate a deploy in CI.
+
+```bash
+npm run operator doctor              # environment + DB connectivity + migration status (read-only)
+npm run operator env:check           # validate required env vars are set (POSTGRES_*, AUTH_SECRET, CRON_SECRET)
+npm run operator db:backup -- --gzip # pg_dump the database to ./backups (flags pass through to scripts/db-backup.mjs)
+npm run operator db:migrate:status   # show applied / pending Prisma migrations
+npm run operator help                # list commands
+```
+
+Wraps `scripts/doctor.mjs`, `scripts/db-backup.mjs`, and `prisma migrate status`. Pass args to the
+underlying script after ` -- ` (e.g. `db:backup -- --out /backups --keep 7`).
+
 ## Documentation
 
 - [Self-Hosted Setup Guide](apps/web/self-hosted/SETUP.md) — full installation, HTTPS, backups, troubleshooting
