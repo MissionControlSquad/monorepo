@@ -13,11 +13,13 @@ import { GraphQLError } from "graphql";
 import {
   buildAdapterInvocation,
   getAdapter,
+  deriveAdapterExecutionResult,
   requiresSandboxContainment,
   resolveEffectiveWorkspaceStrategyType,
   redactRunSecrets,
   FLAG_KEYS,
   type TrustLevel,
+  type AdapterExecutionResult,
 } from "@agentcenter/utils";
 import type { AgentContextBundle } from "@agentcenter/types";
 import { getProfileAgentId } from "@agentcenter/database";
@@ -197,6 +199,13 @@ export interface SandboxRunResult {
   stderr: string;
   /** Derived from the exit: a clean exit → "review", anything else → "blocked". */
   status: "review" | "blocked";
+  /**
+   * Structured run result when the bound adapter owns an `execute()`/`parseLine` (parity slice) — the
+   * typed transcript + usage/errorFamily/exitReason derived from the captured stdout. Absent for
+   * blob-only adapters. NOT persisted yet (no schema change in this slice); persistence is deferred to
+   * a follow-up that adds usage/errorFamily/transcript columns to `AgentRun`.
+   */
+  execution?: AdapterExecutionResult;
 }
 
 /**
@@ -527,6 +536,22 @@ export async function runTaskInSandbox(input: {
       });
     }
 
+    // Adapter-owned structured result (parity slice): if the bound adapter owns an `execute()` (or at
+    // least a `parseLine`), derive the typed transcript + usage/errorFamily/exitReason from the captured
+    // stdout. Pure derivation, best-effort — never fail a run over parsing. Exposed on the run result;
+    // persistence to `AgentRun` is deferred (no schema change here).
+    let execution: AdapterExecutionResult | undefined;
+    if (adapter?.execute || adapter?.parseLine) {
+      try {
+        const execInput = { stdout, stderr, exitCode, timedOut };
+        execution = adapter.execute
+          ? adapter.execute(execInput)
+          : deriveAdapterExecutionResult(adapter, execInput);
+      } catch {
+        // ignore parse/derivation failures — the blob result is still returned below
+      }
+    }
+
     return {
       runId: run.id,
       providerKey,
@@ -535,6 +560,7 @@ export async function runTaskInSandbox(input: {
       stdout,
       stderr,
       status: exitCode === 0 ? "review" : "blocked",
+      ...(execution ? { execution } : {}),
     };
   } catch (err) {
     // Provision/exec threw before we could record a result — mark the run failed, then re-throw.

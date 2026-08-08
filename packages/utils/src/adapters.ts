@@ -10,6 +10,9 @@
  * by the @agentcenter/runner daemon and the control plane.
  */
 
+import type { TranscriptEntry } from "./adapter-transcript";
+import { parseLine as parseTranscriptLine } from "./adapter-transcript";
+
 /** A single provider quota/rate-limit window (Domain 12 GAP-2). */
 export interface ProviderQuotaWindow {
   /** e.g. "requests (5h)" | "credits" | "tokens (24h)". */
@@ -72,6 +75,67 @@ export interface HttpInvocation {
 
 export type AdapterInvocation = SpawnInvocation | HttpInvocation;
 
+// ─── Adapter-owned execution contract (Paperclip parity) ─────────────────────
+// Today the sandbox seam spawns `build()`'s argv and blob-captures stdout. Paperclip adapters instead
+// own an `execute()` that returns a STRUCTURED result (usage/model/exitReason/errorFamily) plus a
+// per-runtime line parser turning raw stdout into typed transcript events. This is a first, clean,
+// additive slice of that contract: both members are OPTIONAL, so every existing adapter keeps using the
+// `build()` path unchanged. The structured derivation is PURE (no I/O) and fixture-testable.
+
+/** A transcript event mirrors Paperclip's typed `TranscriptEntry` (assistant/tool_call/…). */
+export type AdapterTranscriptEvent = TranscriptEntry;
+
+/** Coarse run outcome — did the runtime finish cleanly, error, or run out of time? */
+export type AdapterExecutionStatus = "success" | "error" | "timeout";
+
+/** Why the run ended — the structured analog of a raw exit code (parity with Paperclip's exit reasons). */
+export type AdapterExitReason =
+  | "completed"
+  | "error"
+  | "timeout"
+  | "max_turns"
+  | "refusal"
+  | "auth_required"
+  | "unknown";
+
+/**
+ * Machine-readable failure class the control plane can act on (retry vs. surface vs. re-auth) without
+ * re-parsing free-form stderr. A faithful subset of Paperclip's `AdapterExecutionErrorFamily`.
+ */
+export type AdapterErrorFamily =
+  | "transient_upstream"
+  | "provider_quota"
+  | "model_refusal"
+  | "auth_required"
+  | "model_not_found"
+  | "unknown";
+
+/** Token/model accounting for a single run (the slice of Paperclip's `UsageSummary` we derive here). */
+export interface AdapterUsage {
+  tokensIn: number;
+  tokensOut: number;
+  model: string | null;
+}
+
+/** The captured raw output of a finished run — the input an adapter derives its structured result from. */
+export interface AdapterExecutionInput {
+  stdout: string;
+  stderr?: string;
+  exitCode: number | null;
+  timedOut?: boolean;
+  /** Observation time (ms epoch) stamped onto transcript events; defaults to now. */
+  ts?: number;
+}
+
+/** The structured result an adapter's `execute()` returns (usage/exitReason/errorFamily/transcript). */
+export interface AdapterExecutionResult {
+  status: AdapterExecutionStatus;
+  exitReason: AdapterExitReason;
+  usage?: AdapterUsage;
+  errorFamily?: AdapterErrorFamily;
+  transcript?: AdapterTranscriptEvent[];
+}
+
 export interface Adapter {
   /** Stable key used in config / selection (e.g. "openclaw", "codex", "claude", "process"). */
   key: string;
@@ -103,6 +167,20 @@ export interface Adapter {
   /** The binary probed with `command -v` before installing (guards the installCommand). */
   binName?: string;
   build(ctx: AdapterContext): AdapterInvocation;
+  /**
+   * OPTIONAL per-runtime line parser — maps one line of the runtime's native stdout (e.g. Claude
+   * stream-json) into typed transcript events, or `null` for an unrecognized/passthrough line. Mirrors
+   * Paperclip's `StdoutLineParser`. Adapters without one fall back to `defaultLineParser`.
+   */
+  parseLine?(line: string, ts?: number): AdapterTranscriptEvent[] | null;
+  /**
+   * OPTIONAL structured execution — given a finished run's captured output, derive the structured
+   * result (status/exitReason/usage/errorFamily/transcript). This is the additive, pure analog of
+   * Paperclip's `execute()`; the sandbox seam still SPAWNS `build()`, then hands the captured output
+   * here. Adapters without one keep the plain blob-capture path. Prefer `deriveAdapterExecutionResult`
+   * as the shared implementation.
+   */
+  execute?(input: AdapterExecutionInput): AdapterExecutionResult;
 }
 
 /** Models an adapter offers: live-detected if it supports it (deduped with the curated list), else curated. */
@@ -141,6 +219,155 @@ export function substituteAdapterToken(token: string, ctx: AdapterContext): stri
 
 function brief(ctx: AdapterContext): string {
   return ctx.prompt ?? ctx.taskTitle ?? ctx.taskId;
+}
+
+// ─── Structured execution derivation (pure) ──────────────────────────────────
+// The parse + classify + derive half of the adapter execution contract. Everything here is pure and
+// fixture-testable: no process spawning, no I/O. Error-family regexes are a faithful (trimmed) port of
+// Paperclip's claude-local `parse.ts` classifiers.
+
+const CLAUDE_AUTH_REQUIRED_RE =
+  /(?:not\s+logged\s+in|please\s+log\s+in|please\s+run\s+(?:`?claude\s+login`?|\/login)|login\s+required|requires\s+login|unauthorized|authentication\s+required)/i;
+const CLAUDE_PROVIDER_QUOTA_RE =
+  /(?:session\s+limit\s+(?:reached|exceeded)|out\s+of\s+extra\s+usage|claude\s+usage\s+limit\s+reached|5[-\s]?hour\s+limit\s+reached|weekly\s+limit\s+reached|usage\s+limit\s+reached|usage\s+cap\s+reached|servicequotaexceededexception)/i;
+const CLAUDE_TRANSIENT_UPSTREAM_RE =
+  /(?:rate[-\s]?limit(?:ed)?|rate_limit_error|too\s+many\s+requests|\b429\b|overloaded(?:_error)?|server\s+overloaded|service\s+unavailable|\b503\b|\b529\b|high\s+demand|try\s+again\s+later|temporarily\s+unavailable|throttl(?:ed|ing))/i;
+const CLAUDE_MODEL_NOT_FOUND_RE =
+  /(?:model[\s_-]*(?:not[\s_-]*found|does not exist|unknown|invalid)|unknown[\s_-]*model)/i;
+const CLAUDE_REFUSAL_RE =
+  /(?:\brefus(?:al|ed|es|e|ing)\b|declined\s+to\s+respond|cannot\s+assist\s+with)/i;
+
+/**
+ * Classify a blob of stdout/stderr into a machine-readable {@link AdapterErrorFamily}, or `null` when it
+ * matches no known family. Checked most-specific-first so provider-quota wins over generic rate-limit.
+ */
+export function classifyErrorFamily(text: string): AdapterErrorFamily | null {
+  if (!text) return null;
+  if (CLAUDE_PROVIDER_QUOTA_RE.test(text)) return "provider_quota";
+  if (CLAUDE_TRANSIENT_UPSTREAM_RE.test(text)) return "transient_upstream";
+  if (CLAUDE_MODEL_NOT_FOUND_RE.test(text)) return "model_not_found";
+  if (CLAUDE_AUTH_REQUIRED_RE.test(text)) return "auth_required";
+  if (CLAUDE_REFUSAL_RE.test(text)) return "model_refusal";
+  return null;
+}
+
+/** The default line parser used when an adapter declares no `parseLine`: the generic transcript codec. */
+export function defaultLineParser(line: string, ts = Date.now()): AdapterTranscriptEvent[] | null {
+  const entries = parseTranscriptLine(line, ts);
+  return entries.length > 0 ? entries : null;
+}
+
+/**
+ * Claude stream-json line parser (a concrete per-runtime `parseLine`). Reuses the shared transcript
+ * codec, which already understands Claude's `{type:"assistant", message:{content:[…]}}` blocks, and
+ * returns `null` for blank / non-JSON / unrecognized lines (Claude `system`/`result` envelopes) so
+ * they pass through instead of polluting the transcript. Usage totals come from the result envelope via
+ * {@link deriveAdapterExecutionResult}, not from this parser.
+ */
+function claudeParseLine(line: string, ts = Date.now()): AdapterTranscriptEvent[] | null {
+  const entries = parseTranscriptLine(line, ts);
+  if (entries.length === 0) return null;
+  // A line that only yields `raw` (unknown JSON / plain text) is a passthrough → null.
+  if (entries.every((e) => e.kind === "raw")) return null;
+  return entries;
+}
+
+function asNum(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * Extract usage/model + the terminal error/subtype from a Claude stream-json stdout blob. Scans for the
+ * `system/init` envelope (model) and the terminal `result` envelope (token usage + is_error + subtype).
+ * Best-effort: returns null usage when no result envelope is present.
+ */
+function extractClaudeOutcome(stdout: string): {
+  usage: AdapterUsage | null;
+  model: string | null;
+  isError: boolean;
+  subtype: string;
+} {
+  let model: string | null = null;
+  let usage: AdapterUsage | null = null;
+  let isError = false;
+  let subtype = "";
+  for (const raw of stdout.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line[0] !== "{") continue;
+    let event: Record<string, unknown>;
+    try {
+      event = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const type = typeof event.type === "string" ? event.type : "";
+    if (type === "system" && event.subtype === "init" && typeof event.model === "string") {
+      model = event.model;
+    } else if (type === "result") {
+      subtype = typeof event.subtype === "string" ? event.subtype : "";
+      isError = event.is_error === true;
+      const u =
+        typeof event.usage === "object" && event.usage !== null
+          ? (event.usage as Record<string, unknown>)
+          : {};
+      usage = {
+        // cache-creation tokens are billed prompt tokens → count as input (mirrors Paperclip).
+        tokensIn: asNum(u.input_tokens) + asNum(u.cache_creation_input_tokens),
+        tokensOut: asNum(u.output_tokens),
+        model: (typeof event.model === "string" && event.model) || model,
+      };
+    }
+  }
+  if (usage && !usage.model) usage.model = model;
+  return { usage, model, isError, subtype };
+}
+
+/**
+ * The shared, PURE structured-result derivation an adapter's `execute()` delegates to. Builds the typed
+ * transcript via the adapter's `parseLine` (or {@link defaultLineParser}), extracts usage/model, and
+ * classifies the outcome into a {@link AdapterExecutionResult}. No process is spawned — the sandbox seam
+ * has already run the runtime and captured its output.
+ */
+export function deriveAdapterExecutionResult(
+  adapter: Pick<Adapter, "parseLine">,
+  input: AdapterExecutionInput,
+): AdapterExecutionResult {
+  const ts = input.ts ?? Date.now();
+  const lineParser = adapter.parseLine?.bind(adapter) ?? defaultLineParser;
+  const transcript: AdapterTranscriptEvent[] = [];
+  for (const raw of input.stdout.split(/\r?\n/)) {
+    const events = lineParser(raw, ts);
+    if (events) transcript.push(...events);
+  }
+
+  const { usage, isError, subtype } = extractClaudeOutcome(input.stdout);
+  const combined = `${input.stdout}\n${input.stderr ?? ""}`;
+  const errorFamily = classifyErrorFamily(combined) ?? undefined;
+  const timedOut = Boolean(input.timedOut);
+  const maxTurns = subtype === "error_max_turns";
+  const failed =
+    timedOut || (input.exitCode ?? 0) !== 0 || isError || maxTurns || Boolean(errorFamily);
+
+  const status: AdapterExecutionStatus = timedOut ? "timeout" : failed ? "error" : "success";
+  const exitReason: AdapterExitReason = timedOut
+    ? "timeout"
+    : errorFamily === "model_refusal"
+      ? "refusal"
+      : errorFamily === "auth_required"
+        ? "auth_required"
+        : maxTurns
+          ? "max_turns"
+          : failed
+            ? "error"
+            : "completed";
+
+  return {
+    status,
+    exitReason,
+    ...(usage ? { usage } : {}),
+    ...(errorFamily ? { errorFamily } : {}),
+    transcript,
+  };
 }
 
 // ─── Built-in adapters ──────────────────────────────────────────────────────
@@ -195,6 +422,12 @@ const claudeAdapter: Adapter = {
     useShell: false,
     layout: GENERIC_LAYOUT,
   }),
+  // Adapter-owned execution contract (parity slice): Claude runs with stream-json output, so it gets a
+  // real per-runtime line parser + structured result derivation. Other adapters keep the blob path.
+  parseLine: claudeParseLine,
+  execute(input) {
+    return deriveAdapterExecutionResult(this, input);
+  },
 };
 
 const geminiAdapter: Adapter = {
