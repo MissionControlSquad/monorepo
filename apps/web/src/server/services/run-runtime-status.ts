@@ -5,6 +5,8 @@
  * secret redaction). Deliberately ephemeral: this is a liveness surface, not the durable ledger
  * (AgentRun holds the persisted result). Best-effort — never a correctness dependency of a run.
  */
+import { redactRunSecrets } from "@agentcenter/utils";
+
 const TTL_MS = 90_000;
 const MAX_TAIL = 8_000;
 
@@ -28,11 +30,7 @@ function sweep(now: number): void {
 
 /** Redact known secret values (env values, git token) from a chunk before it is stored/surfaced. */
 function redact(text: string, values: string[]): string {
-  let out = text;
-  for (const v of values) {
-    if (v && v.length >= 4) out = out.split(v).join("«redacted»");
-  }
-  return out;
+  return redactRunSecrets(text, values);
 }
 
 /** Begin tracking a run (records the values that must be scrubbed from its live tail). */

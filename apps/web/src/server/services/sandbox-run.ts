@@ -15,6 +15,7 @@ import {
   getAdapter,
   requiresSandboxContainment,
   resolveEffectiveWorkspaceStrategyType,
+  redactRunSecrets,
   FLAG_KEYS,
   type TrustLevel,
 } from "@agentcenter/utils";
@@ -353,9 +354,15 @@ export async function runTaskInSandbox(input: {
     resolveSecret: (name: string) => resolveWorkspaceSecret(input.workspaceId, name),
   };
 
+  // The exact secret VALUES this run resolved into its environment (LLM keys, bridge token, GIT_TOKEN,
+  // …). These must never survive into stored/streamed/posted run output, so every output sink below is
+  // scrubbed against this set: the live tail, the persisted stdout/stderr, the run->task message, the
+  // memory summary, and the failure message.
+  const secretValues = [...Object.values(env), ...(gitToken ? [gitToken] : [])];
+
   // Live status (Plan 6): track a redacted, TTL'd tail of this run so the UI can watch it mid-flight.
   // Secret VALUES (env + git token) are scrubbed from every streamed chunk.
-  beginRunStatus(run.id, [...Object.values(env), ...(gitToken ? [gitToken] : [])]);
+  beginRunStatus(run.id, secretValues);
 
   let handle: SandboxHandle | undefined;
   let lease: EnvironmentLease | null = null;
@@ -386,8 +393,11 @@ export async function runTaskInSandbox(input: {
         onLog: (chunk) => appendRunLog(run.id, chunk.data),
       });
       exitCode = result.exitCode;
-      stdout = result.stdout.slice(-MAX_OUTPUT_CHARS);
-      stderr = result.stderr.slice(-MAX_OUTPUT_CHARS);
+      // Redact resolved secret values BEFORE the tail slice so a secret straddling the cut can't leak
+      // a partial. Everything downstream (persist, run->task post, memory summary, return) derives from
+      // these already-redacted strings.
+      stdout = redactRunSecrets(result.stdout, secretValues).slice(-MAX_OUTPUT_CHARS);
+      stderr = redactRunSecrets(result.stderr, secretValues).slice(-MAX_OUTPUT_CHARS);
       timedOut = result.timedOut ?? false;
     } catch (execErr) {
       // exec itself blew up — release as a failure (retain_on_failure keeps the box), then re-throw.
@@ -509,7 +519,12 @@ export async function runTaskInSandbox(input: {
   } catch (err) {
     // Provision/exec threw before we could record a result — mark the run failed, then re-throw.
     setRunPhase(run.id, "failed");
-    const message = err instanceof Error ? err.message : String(err);
+    // A provision/exec error message can echo a resolved secret (e.g. a git error printing the token in
+    // the remote URL), so scrub it before it is persisted or posted to the task timeline.
+    const message = redactRunSecrets(
+      err instanceof Error ? err.message : String(err),
+      secretValues,
+    );
     await prisma.agentRun
       .update({
         where: { id: run.id },
