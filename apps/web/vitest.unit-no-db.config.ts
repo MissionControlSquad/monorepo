@@ -37,6 +37,7 @@ export default defineConfig({
       "tests/unit/org-chart.test.ts",
       "tests/unit/attention.test.ts",
       "tests/unit/agent-authz.test.ts",
+      "tests/unit/system-notice-humanizer.test.ts",
     ],
   },
   resolve: {

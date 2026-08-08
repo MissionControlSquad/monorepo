@@ -14,6 +14,8 @@ import { TimeAgo } from "../common/TimeAgo";
 import { MarkdownWithMentions } from "../common/MarkdownWithMentions";
 import { CopyButton } from "../common/CopyButton";
 import { MessageReactions } from "./MessageReactions";
+import { TaskChatSystemNotice } from "./TaskChatSystemNotice";
+import { humanizeSystemNotice } from "../../lib/system-notice-humanizer";
 import { Button } from "../ui";
 import { MessageCircle, Send, Loader2 } from "lucide-react";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
@@ -247,6 +249,20 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
           <div className="space-y-4">
             {messages.map((message: TaskMessage & { _optimistic?: boolean }) => {
               const sender = message.fromProfile;
+              // Machine-authored recovery / system notices (sandbox run outcomes, review
+              // decisions) render as a compact humanized row instead of a raw text block.
+              // Unknown / ordinary chat falls through to the normal bubble.
+              const notice = message._optimistic ? null : humanizeSystemNotice(message.content);
+              if (notice) {
+                return (
+                  <TaskChatSystemNotice
+                    key={message.id}
+                    notice={notice}
+                    rawContent={message.content}
+                    createdAt={message.createdAt}
+                  />
+                );
+              }
               return (
                 <div
                   key={message.id}
