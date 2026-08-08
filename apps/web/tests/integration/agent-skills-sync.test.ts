@@ -57,4 +57,48 @@ describe("agent skill sync (#F22)", () => {
     expect(snap.entries).toHaveLength(0);
     expect(await prisma.agentSkill.count({ where: { agentId } })).toBe(0);
   });
+
+  it("merge modes: add unions, remove deletes only the given, replace overwrites (#10978)", async () => {
+    const s1 = await createSkill({ workspaceId: WS, name: "S1", markdown: "# a" });
+    const s2 = await createSkill({ workspaceId: WS, name: "S2", markdown: "# b" });
+    const s3 = await createSkill({ workspaceId: WS, name: "S3", markdown: "# c" });
+
+    const linkedIds = async () =>
+      (
+        await prisma.agentSkill.findMany({
+          where: { agentId, workspaceId: WS },
+          select: { skillId: true },
+        })
+      )
+        .map((l) => l.skillId)
+        .sort();
+
+    // replace (explicit) sets the baseline {s1, s2}
+    await syncAgentSkills(WS, agentId, [{ skillId: s1.id }, { skillId: s2.id }], "replace");
+    expect(await linkedIds()).toEqual([s1.id, s2.id].sort());
+
+    // add s3 → union, s1/s2 preserved
+    await syncAgentSkills(WS, agentId, [{ skillId: s3.id }], "add");
+    expect(await linkedIds()).toEqual([s1.id, s2.id, s3.id].sort());
+
+    // remove s1 → only s1 dropped
+    await syncAgentSkills(WS, agentId, [{ skillId: s1.id }], "remove");
+    expect(await linkedIds()).toEqual([s2.id, s3.id].sort());
+
+    // replace with {s1} → complete overwrite
+    await syncAgentSkills(WS, agentId, [{ skillId: s1.id }], "replace");
+    expect(await linkedIds()).toEqual([s1.id]);
+  });
+
+  it("default mode is replace (backward-compat)", async () => {
+    const s1 = await createSkill({ workspaceId: WS, name: "S1", markdown: "# a" });
+    const s2 = await createSkill({ workspaceId: WS, name: "S2", markdown: "# b" });
+    await syncAgentSkills(WS, agentId, [{ skillId: s1.id }]);
+    await syncAgentSkills(WS, agentId, [{ skillId: s2.id }]); // no mode → replace
+    const linked = await prisma.agentSkill.findMany({
+      where: { agentId },
+      select: { skillId: true },
+    });
+    expect(linked.map((l) => l.skillId)).toEqual([s2.id]);
+  });
 });

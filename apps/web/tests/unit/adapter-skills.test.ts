@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { reconcileAgentSkills, adapterSkillMode } from "@agentcenter/utils";
+import { reconcileAgentSkills, adapterSkillMode, applySkillMergeMode } from "@agentcenter/utils";
 
 describe("adapterSkillMode", () => {
   it("maps known adapters to a mode, unknown → unsupported", () => {
@@ -48,5 +48,49 @@ describe("reconcileAgentSkills (#F22)", () => {
       { skillId: "x", state: "external", desiredVersion: null, actualVersion: 1 },
     ]);
     expect(r.warnings[0]).toMatch(/does not support managed skills/);
+  });
+});
+
+describe("applySkillMergeMode (#10978 explicit merge modes)", () => {
+  const current = [
+    { skillId: "s1", pinnedVersion: 1 },
+    { skillId: "s2", pinnedVersion: null },
+  ];
+
+  it("replace: the requested set becomes the whole desired set (current is discarded)", () => {
+    const out = applySkillMergeMode(current, [{ skillId: "s3", pinnedVersion: 2 }], "replace");
+    expect(out).toEqual([{ skillId: "s3", pinnedVersion: 2 }]);
+  });
+
+  it("add: unions current with requested (non-destructive), requested wins on conflict", () => {
+    const out = applySkillMergeMode(
+      current,
+      [
+        { skillId: "s2", pinnedVersion: 5 }, // re-pins existing s2
+        { skillId: "s3", pinnedVersion: 2 }, // brand new
+      ],
+      "add",
+    );
+    expect(out).toEqual([
+      { skillId: "s1", pinnedVersion: 1 },
+      { skillId: "s2", pinnedVersion: 5 },
+      { skillId: "s3", pinnedVersion: 2 },
+    ]);
+  });
+
+  it("remove: deletes only the requested keys, leaving the rest untouched", () => {
+    const out = applySkillMergeMode(current, [{ skillId: "s1" }], "remove");
+    expect(out).toEqual([{ skillId: "s2", pinnedVersion: null }]);
+  });
+
+  it("remove ignores requested versions and unknown keys", () => {
+    const out = applySkillMergeMode(current, [{ skillId: "nope", pinnedVersion: 9 }], "remove");
+    expect(out).toEqual(current);
+  });
+
+  it("add onto an empty current is just the requested set", () => {
+    expect(applySkillMergeMode([], [{ skillId: "s1", pinnedVersion: 1 }], "add")).toEqual([
+      { skillId: "s1", pinnedVersion: 1 },
+    ]);
   });
 });

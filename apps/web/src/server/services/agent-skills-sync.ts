@@ -1,8 +1,10 @@
 import { prisma } from "@/server/prisma";
 import {
   adapterSkillMode,
+  applySkillMergeMode,
   reconcileAgentSkills,
   type ActualSkill,
+  type SkillMergeMode,
   type SkillReconcileResult,
 } from "@agentcenter/utils";
 
@@ -41,32 +43,52 @@ export async function getAgentSkillSnapshot(
 }
 
 /**
- * Set an agent's desired skills (F22 syncAgentSkills): replace the AgentSkill set with the given
- * skillIds (+ optional pinnedVersion), validating each skill is readable in the workspace. Returns the
- * fresh snapshot. The actual push to the runtime is triggered separately (the seam).
+ * Merge the requested skills into an agent's desired AgentSkill set under an explicit `mode`
+ * (parity Paperclip #10978). Each requested skill is validated as readable in the workspace before it can
+ * be persisted; the pure {@link applySkillMergeMode} then computes the final desired set against what the
+ * agent currently has:
+ *   - `add`     union — keep current links, add the requested ones (non-destructive).
+ *   - `remove`  delete only the requested links; the rest of the current set is untouched.
+ *   - `replace` overwrite the whole set with the requested skills (the legacy default).
+ * `mode` defaults to `replace` for backward-compat with existing callers. Returns the fresh snapshot;
+ * the actual push to the runtime is triggered separately (the seam).
  */
 export async function syncAgentSkills(
   workspaceId: string,
   agentId: string,
   desiredSkills: { skillId: string; pinnedVersion?: number | null }[],
+  mode: SkillMergeMode = "replace",
 ): Promise<SkillReconcileResult & { agentId: string; adapterType: string | null }> {
-  const ids = [...new Set(desiredSkills.map((d) => d.skillId))];
-  const valid = await prisma.skill.findMany({
-    where: { id: { in: ids }, OR: [{ workspaceId }, { sharingScope: "public" }] },
-    select: { id: true },
-  });
-  const validIds = new Set(valid.map((s) => s.id));
+  // `remove` only needs the keys, so its skills need not be readable (they are being dropped). `add` and
+  // `replace` persist new links, so their skills must be readable in the workspace.
+  let requested = desiredSkills;
+  if (mode !== "remove") {
+    const ids = [...new Set(desiredSkills.map((d) => d.skillId))];
+    const valid = await prisma.skill.findMany({
+      where: { id: { in: ids }, OR: [{ workspaceId }, { sharingScope: "public" }] },
+      select: { id: true },
+    });
+    const validIds = new Set(valid.map((s) => s.id));
+    requested = desiredSkills.filter((d) => validIds.has(d.skillId));
+  }
 
   await prisma.$transaction(async (tx) => {
+    const current = (
+      await tx.agentSkill.findMany({
+        where: { agentId, workspaceId },
+        select: { skillId: true, pinnedVersion: true },
+      })
+    ).map((l) => ({ skillId: l.skillId, pinnedVersion: l.pinnedVersion }));
+
+    const finalSet = applySkillMergeMode(current, requested, mode);
+
     await tx.agentSkill.deleteMany({ where: { agentId, workspaceId } });
-    const rows = desiredSkills
-      .filter((d) => validIds.has(d.skillId))
-      .map((d) => ({
-        workspaceId,
-        agentId,
-        skillId: d.skillId,
-        pinnedVersion: d.pinnedVersion ?? null,
-      }));
+    const rows = finalSet.map((d) => ({
+      workspaceId,
+      agentId,
+      skillId: d.skillId,
+      pinnedVersion: d.pinnedVersion ?? null,
+    }));
     if (rows.length) await tx.agentSkill.createMany({ data: rows, skipDuplicates: true });
   });
 
