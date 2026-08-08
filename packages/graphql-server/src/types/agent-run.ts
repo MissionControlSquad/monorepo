@@ -29,6 +29,12 @@ builder.prismaObject("AgentRun", {
     }),
     errorMessage: t.exposeString("errorMessage", { nullable: true }),
     costCents: t.exposeInt("costCents", { nullable: true }),
+    // Structured adapter execution result (PR #99 tail) — usage/model + machine-readable outcome.
+    usageTokensIn: t.exposeInt("usageTokensIn", { nullable: true }),
+    usageTokensOut: t.exposeInt("usageTokensOut", { nullable: true }),
+    usageModel: t.exposeString("usageModel", { nullable: true }),
+    errorFamily: t.exposeString("errorFamily", { nullable: true }),
+    exitReason: t.exposeString("exitReason", { nullable: true }),
     // Domain 8 G2 — untrusted-output review gate.
     reviewState: t.exposeString("reviewState", { nullable: true }),
     sourceTrust: t.expose("sourceTrust", { type: "JSON", nullable: true }),
