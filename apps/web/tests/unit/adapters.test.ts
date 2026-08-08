@@ -35,6 +35,7 @@ describe("adapter registry", () => {
       "opencode",
       "pi",
       "hermes",
+      "hermes-gateway",
       "process",
       "shell",
       "http",

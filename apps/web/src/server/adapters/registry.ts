@@ -88,7 +88,14 @@ type AdapterAuthKind = "none" | "apiKey" | "subscription" | "secretBinding";
 // mechanisms, not user-selectable providers, so they are intentionally not seeded.
 const BUILTIN_ADAPTER_DB: Record<
   string,
-  { type: string; transport: AdapterTransport; authKind: AdapterAuthKind; builtIn: boolean }
+  {
+    type: string;
+    transport: AdapterTransport;
+    authKind: AdapterAuthKind;
+    builtIn: boolean;
+    /** Override the derived config schema (gateway adapters carry base URL + auth secret-ref). */
+    configSchema?: unknown;
+  }
 > = {
   openclaw: { type: "openclaw-gateway", transport: "gateway", authKind: "apiKey", builtIn: true },
   claude: { type: "claude-local", transport: "local", authKind: "subscription", builtIn: false },
@@ -99,6 +106,32 @@ const BUILTIN_ADAPTER_DB: Record<
   opencode: { type: "opencode-local", transport: "local", authKind: "apiKey", builtIn: false },
   pi: { type: "pi-local", transport: "local", authKind: "apiKey", builtIn: false },
   hermes: { type: "hermes", transport: "local", authKind: "apiKey", builtIn: false },
+  // Hermes HTTP + SSE gateway (reaches an already-running Hermes API server). transport "gateway",
+  // authKind "secretBinding": the API key is stored ONLY as a vault secret-ref (apiKeySecretRef),
+  // never inline — additionalProperties:false rejects a stray `apiKey`. Gated behind
+  // multi_provider_adapters like every non-builtIn provider (builtIn:false).
+  "hermes-gateway": {
+    type: "hermes-gateway",
+    transport: "gateway",
+    authKind: "secretBinding",
+    builtIn: false,
+    configSchema: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      type: "object",
+      required: ["apiBaseUrl", "apiKeySecretRef"],
+      properties: {
+        apiBaseUrl: { type: "string", format: "uri" },
+        apiKeySecretRef: { type: "string" },
+        sessionKeyStrategy: { type: "string", enum: ["issue", "agent", "run", "none"] },
+        instructions: { type: "string" },
+        headers: { type: "object" },
+        timeoutSec: { type: "number" },
+        eventReconnectMs: { type: "number" },
+        dangerouslyAllowInsecureRemoteHttp: { type: "boolean" },
+        model: { type: "string" },
+      },
+    },
+  },
 };
 
 // Derive a draft-07 config schema from what the code adapter accepts.
@@ -131,7 +164,7 @@ export async function ensureBuiltinAdapters(): Promise<string[]> {
         displayName: code.displayName,
         transport: meta.transport,
         authKind: meta.authKind,
-        configSchema: configSchemaFor(code) as never,
+        configSchema: (meta.configSchema ?? configSchemaFor(code)) as never,
         builtIn: meta.builtIn,
         enabled: true,
       },
