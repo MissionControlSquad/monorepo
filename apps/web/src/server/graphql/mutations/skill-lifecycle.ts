@@ -41,9 +41,10 @@ builder.mutationField("importSkillPackage", (t) =>
   }),
 );
 
-// Domain 5 real-import resolvers: install a skill from an external source spec (GitHub URL/owner-repo,
-// a raw http(s) URL) or the app-shipped catalog. Admin-gated (fetches remote content into the
-// workspace) + policy-checked (`import`).
+// Domain 5 real-import resolvers: install a skill from an external source spec - a GitHub single file
+// (URL/owner-repo), a GitHub folder bundle (/tree/ → SKILL.md + siblings), a raw http(s) URL, a
+// skills.sh registry ref (skillsh:<name>), or an allow-listed local path - or the app-shipped catalog.
+// Admin-gated (fetches remote content into the workspace) + policy-checked (`import`).
 builder.mutationField("importSkillFromSource", (t) =>
   t.prismaField({
     type: "Skill",
