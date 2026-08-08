@@ -14,7 +14,8 @@ import type {
   SecretProviderKind,
 } from "@agentcenter/database";
 import { encryptSecret, decryptSecret, CURRENT_KEY_ID } from "./secrets-crypto";
-import { checkSecretProviderConfigHealth } from "@agentcenter/utils";
+import { checkSecretProviderConfigHealth, getSecretProviderModule } from "@agentcenter/utils";
+import { resolveExternalSecret } from "./secret-external";
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
@@ -323,6 +324,25 @@ export async function getDecrypted(
   const secret = await prisma.secret.findFirst({ where: { id: secretId, workspaceId } });
   if (!secret) return null;
   const v = version ?? secret.currentVersion;
+
+  // External backend (Domain 7 P2): a secret bound to an aws/vault provider is fetched from that
+  // store, NOT the local envelope. Credentials in the provider config are themselves workspace
+  // secrets (resolved by name). A shaped failure surfaces as null - never a raw provider throw.
+  if (secret.providerId) {
+    const provider = await prisma.secretProviderConfig.findFirst({
+      where: { id: secret.providerId, workspaceId },
+    });
+    const mod = provider ? getSecretProviderModule(provider.kind) : undefined;
+    if (provider && mod?.implemented && (provider.kind === "aws" || provider.kind === "vault")) {
+      const result = await resolveExternalSecret(provider.kind, {
+        config: (provider.config ?? {}) as Record<string, unknown>,
+        secretName: secret.name,
+        resolveSecret: (name) => resolveWorkspaceSecret(workspaceId, name),
+      });
+      return result.ok ? { value: result.value, version: v } : null;
+    }
+  }
+
   const row = await prisma.secretVersion.findUnique({
     where: { secretId_version: { secretId, version: v } },
   });

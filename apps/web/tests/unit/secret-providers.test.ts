@@ -16,20 +16,30 @@ describe("secret provider modules (Domain 7 P2)", () => {
     });
   });
 
-  it("aws/vault validate required config and report coming_soon health", () => {
+  it("aws/vault are implemented, validate required config, and are healthy once configured", () => {
     expect(validateSecretProviderConfig("aws", {})).toMatchObject({ ok: false });
     expect(validateSecretProviderConfig("aws", { region: "us-east-1" })).toMatchObject({
       ok: true,
     });
     const awsHealth = checkSecretProviderConfigHealth("aws", { region: "us-east-1" });
-    expect(awsHealth.healthy).toBe(false);
-    expect(awsHealth.error).toMatch(/coming soon/i);
+    expect(awsHealth.healthy).toBe(true);
+    expect(awsHealth.error).toBeNull();
 
     expect(validateSecretProviderConfig("vault", { address: "x" })).toMatchObject({ ok: false });
     expect(validateSecretProviderConfig("vault", { address: "x", path: "kv" })).toMatchObject({
       ok: true,
     });
-    expect(getSecretProviderModule("aws")?.implemented).toBe(false);
+    expect(getSecretProviderModule("aws")?.implemented).toBe(true);
+    expect(getSecretProviderModule("vault")?.implemented).toBe(true);
+  });
+
+  it("rejects inline (non-secretRef) credentials in provider config", () => {
+    expect(
+      validateSecretProviderConfig("aws", { region: "us-east-1", secretAccessKey: "AKIAINLINE" }),
+    ).toMatchObject({ ok: false });
+    expect(
+      validateSecretProviderConfig("vault", { address: "x", path: "kv", token: "s.rawtoken" }),
+    ).toMatchObject({ ok: false });
   });
 
   it("an unknown kind is invalid + unhealthy", () => {
