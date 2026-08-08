@@ -53,6 +53,7 @@ import "./deliverable-votes";
 import "./monitors";
 import "./runner-commands";
 import "./agent-runs";
+import "./tool-access";
 import "./agent-companies";
 import "./memory";
 import "./finance-events";

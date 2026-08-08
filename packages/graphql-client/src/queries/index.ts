@@ -217,7 +217,8 @@ export { RUNNER_COMMANDS_QUERY } from "./runner-commands";
 export { RUNNER_HOSTS_QUERY } from "./runner-hosts";
 export { RUNTIME_ADAPTERS_QUERY } from "./runtime-adapters";
 export { SANDBOX_PROVIDERS_QUERY } from "./sandbox-providers";
-export { AGENT_RUNS_QUERY, AGENT_RUN_LIVE_STATUS_QUERY } from "./agent-runs";
+export { AGENT_RUNS_QUERY, AGENT_RUN_LIVE_STATUS_QUERY, RUN_LOG_QUERY } from "./agent-runs";
+export { AGENT_TOOL_ACCESS_POLICIES_QUERY } from "./tool-access";
 export { AGENT_COMPANIES_QUERY, AGENT_COMPANY_QUERY, EXPORT_COMPANY_PACKAGE_QUERY } from "./agent-companies";
 export {
   MEMORY_OPERATIONS_QUERY,
