@@ -307,6 +307,30 @@ export async function searchAgentMemory(
 }
 
 /**
+ * Fetch a single memory entry by id (Domain 4 GAP-F). Workspace + agent scoped so one agent can't
+ * read another's memory. Records a `get` operation. Returns null when the id is missing or out of scope.
+ */
+export async function getAgentMemory(
+  workspaceId: string,
+  agentId: string,
+  memoryId: string,
+): Promise<AgentMemory | null> {
+  const row = await prisma.agentMemory.findFirst({
+    where: { id: memoryId, workspaceId, agentId },
+  });
+  await recordMemoryOperation({
+    workspaceId,
+    agentId,
+    provider: "db",
+    opType: "get",
+    subjectId: memoryId,
+    resultCount: row ? 1 : 0,
+    success: !!row,
+  }).catch(() => {});
+  return row;
+}
+
+/**
  * Forget (delete) a single memory entry (Domain 4 GAP-F). Workspace + agent scoped so one agent can't
  * delete another's memory. Records a `forget` operation. Returns true when a row was removed.
  */
