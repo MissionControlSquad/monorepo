@@ -15,6 +15,10 @@ export const API_ROUTES = {
   channels: {
     attachments: "/api/channels/attachments",
   },
+  cliAuth: {
+    start: "/api/cli-auth/start",
+    poll: "/api/cli-auth/poll",
+  },
   license: {
     get: "/api/license",
   },

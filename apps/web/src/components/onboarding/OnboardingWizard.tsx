@@ -3,6 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { WelcomeStep } from "./WelcomeStep";
+import { InstallModeStep } from "./InstallModeStep";
+import { LocalInstallStep } from "./LocalInstallStep";
 import { UseCaseStep } from "./UseCaseStep";
 import { TeamPreviewStep, type TeamAgent } from "./TeamPreviewStep";
 import { BatchCreateStep } from "./BatchCreateStep";
@@ -12,10 +14,12 @@ import { USE_CASES } from "@/lib/onboarding-use-cases";
 import { API_ROUTES } from "@/lib/api-routes";
 import { getAgentName } from "@/lib/agent-default-names";
 import type { OnboardingUseCase } from "@/lib/onboarding-use-cases";
+import type { InstallMode } from "@/lib/onboarding-local";
 import { useAgentStatus } from "../context/AgentStatusContext";
 import { type AgentLevelValue } from "@/server/constants";
 
-type Step = "welcome" | "use-case" | "preview" | "creating" | "success";
+type Step =
+  "welcome" | "install-mode" | "local-install" | "use-case" | "preview" | "creating" | "success";
 
 function nameToUsername(name: string): string {
   return name
@@ -198,6 +202,19 @@ export function OnboardingWizard() {
     router.push("/");
   }, [router]);
 
+  const handleInstallModeSelect = useCallback(
+    (mode: InstallMode) => {
+      goToStep(mode === "local" ? "local-install" : "use-case");
+    },
+    [goToStep],
+  );
+
+  // Local self-host path: mark onboarding done, then land on the dashboard.
+  const handleLocalComplete = useCallback(async () => {
+    await fetch(API_ROUTES.onboarding.get, { method: "POST" }).catch(() => {});
+    router.push("/");
+  }, [router]);
+
   if (!resolved) {
     return (
       <div className="h-dvh bg-muted flex items-center justify-center overflow-y-auto">
@@ -212,10 +229,25 @@ export function OnboardingWizard() {
   const content = (() => {
     switch (step) {
       case "welcome":
-        return <WelcomeStep onNext={() => goToStep("use-case")} />;
+        return <WelcomeStep onNext={() => goToStep("install-mode")} />;
+
+      case "install-mode":
+        return (
+          <InstallModeStep onSelect={handleInstallModeSelect} onBack={() => goToStep("welcome")} />
+        );
+
+      case "local-install":
+        return (
+          <LocalInstallStep
+            onBack={() => goToStep("install-mode")}
+            onComplete={handleLocalComplete}
+          />
+        );
 
       case "use-case":
-        return <UseCaseStep onSelect={handleUseCaseSelect} onBack={() => handleBack("welcome")} />;
+        return (
+          <UseCaseStep onSelect={handleUseCaseSelect} onBack={() => handleBack("install-mode")} />
+        );
 
       case "preview":
         return (
