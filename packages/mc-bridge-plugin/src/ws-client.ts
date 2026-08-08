@@ -7,7 +7,13 @@
  */
 
 import { WebSocket } from "ws";
-import { randomBytes, createHash } from "node:crypto";
+import {
+  randomBytes,
+  createHash,
+  createPrivateKey,
+  createPublicKey,
+  sign as cryptoSign,
+} from "node:crypto";
 import os from "node:os";
 import * as nodeFs from "node:fs";
 import { DeliveryDedup, shouldForceReconnect } from "./delivery-dedup";
@@ -125,6 +131,9 @@ export class MCBridgeWsClient {
     const agentSlugs = agents.map((a) => a.slug);
 
     const nonce = randomBytes(16).toString("hex");
+    // When a device private key is configured, sign the nonce so MC can pair this machine by its
+    // pinned Ed25519 device key (in addition to the install/connection token).
+    const device = this.signNonce(nonce);
     this.send({
       type: "vm.hello",
       token: this.connectionToken,
@@ -138,7 +147,30 @@ export class MCBridgeWsClient {
         arch: os.arch(),
       },
       agents: agentSlugs,
+      ...(device ? { publicKey: device.publicKey, signature: device.signature } : {}),
     });
+  }
+
+  /**
+   * Sign the handshake nonce with the configured Ed25519 device key. Returns the raw base64 public
+   * key and the base64 signature, or null when no device key is configured or the key is malformed.
+   */
+  private signNonce(nonce: string): { publicKey: string; signature: string } | null {
+    if (!this.config.devicePrivateKey) return null;
+    try {
+      const privateKey = createPrivateKey({
+        key: Buffer.from(this.config.devicePrivateKey, "base64"),
+        format: "der",
+        type: "pkcs8",
+      });
+      const spki = createPublicKey(privateKey).export({ format: "der", type: "spki" }) as Buffer;
+      const publicKey = spki.subarray(spki.length - 32).toString("base64");
+      const signature = cryptoSign(null, Buffer.from(nonce), privateKey).toString("base64");
+      return { publicKey, signature };
+    } catch (err) {
+      console.error("[agentcenter-bridge] Invalid devicePrivateKey - skipping device signing:", err);
+      return null;
+    }
   }
 
   private handleMessage(raw: string): void {

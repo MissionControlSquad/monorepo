@@ -117,6 +117,8 @@ export { GLOBAL_SEARCH_QUERY, SEARCH_ALL_QUERY } from "./search";
 
 export { FEATURE_FLAGS_QUERY } from "./feature-flags";
 
+export { LIVE_GATEWAY_DEVICES_QUERY, AGENT_KEY_CLAIMS_QUERY } from "./live-gateway-devices";
+
 export { APPROVALS_QUERY, APPROVAL_QUERY } from "./approvals";
 
 export {

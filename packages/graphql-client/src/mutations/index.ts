@@ -98,6 +98,14 @@ export { UPDATE_MY_PROFILE } from "./profile";
 export { UPDATE_FEATURE_FLAG } from "./feature-flags";
 
 export {
+  APPROVE_LIVE_GATEWAY_DEVICE,
+  REVOKE_LIVE_GATEWAY_DEVICE,
+  CREATE_AGENT_KEY_CLAIM,
+  CLAIM_AGENT_KEY,
+  REVOKE_AGENT_KEY_CLAIM,
+} from "./live-gateway-devices";
+
+export {
   APPROVE_APPROVAL,
   REJECT_APPROVAL,
   REQUEST_APPROVAL_CHANGES,

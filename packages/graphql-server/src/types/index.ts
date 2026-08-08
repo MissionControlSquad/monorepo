@@ -55,3 +55,5 @@ import "./inbox-policy";
 import "./cloud-upstream";
 import "./external-object";
 import "./folder";
+import "./live-gateway-device";
+import "./agent-key-claim";

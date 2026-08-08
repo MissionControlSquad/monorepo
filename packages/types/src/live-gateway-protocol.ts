@@ -49,6 +49,18 @@ export interface MsgHello {
   meta: VMMeta;
   /** Agent slugs (username) this plugin manages — used to build LiveAgentRoute records. */
   agents?: string[];
+  /**
+   * Raw base64 Ed25519 device public key (32 bytes). Present when the machine pairs by device
+   * identity - MC pins the key by fingerprint and requires board approval. Optional: when absent the
+   * legacy bcrypt install/connection-token path is used unchanged.
+   */
+  publicKey?: string;
+  /**
+   * Base64 Ed25519 signature over the `nonce` string, produced with the device private key. Verified
+   * against the pinned device key before the connection is accepted. Required whenever `publicKey`
+   * is present.
+   */
+  signature?: string;
 }
 
 /** Periodic heartbeat — sent every 30 s by plugin. */
