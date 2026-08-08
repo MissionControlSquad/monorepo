@@ -294,5 +294,10 @@ export { UPSERT_ADAPTER_PLUGIN, DELETE_ADAPTER_PLUGIN } from "./adapter-plugins"
 export { CREATE_SMOKE_CASE, DELETE_SMOKE_CASE, RUN_SMOKE_CASE, RUN_SMOKE_SUITE } from "./smoke-lab";
 export { REGISTER_LOCAL_SERVICE } from "./local-services";
 export { SYNC_AGENT_SKILLS } from "./agent-skills-sync";
-export { RESET_SKILL_TO_ORIGIN, IMPORT_SKILL_PACKAGE } from "./skill-lifecycle";
+export {
+  RESET_SKILL_TO_ORIGIN,
+  IMPORT_SKILL_PACKAGE,
+  IMPORT_SKILL_FROM_SOURCE,
+  IMPORT_SKILL_FROM_CATALOG,
+} from "./skill-lifecycle";
 export { CREATE_FOLDER, RENAME_FOLDER, MOVE_FOLDER, DELETE_FOLDER, ADD_FOLDER_ITEM, REMOVE_FOLDER_ITEM } from "./folders";

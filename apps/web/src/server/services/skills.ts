@@ -19,6 +19,8 @@ import type {
   SkillTrustLevel,
   SkillSharingScope,
 } from "@agentcenter/database";
+import { resolveSkillSource } from "@/server/services/skill-import-sources";
+import { getCatalogEntry } from "@/server/skill-catalog/manifest";
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
@@ -305,24 +307,49 @@ export async function importSkillPackage(input: {
   files: { path: string; content: string }[];
   sourceRef?: string | null;
   createdByProfileId?: string | null;
+  // Domain 5 real-import provenance. sourceType lets a resolved import (github/url/catalog) record its
+  // origin precisely; packageName/originHash stamp verifiable provenance onto the created skill.
+  sourceType?: SkillSourceType | null;
+  packageName?: string | null;
+  originHash?: string | null;
 }): Promise<Skill> {
   const manifest = input.files.find((f) => /(^|\/)SKILL\.md$/i.test(f.path));
   if (!manifest) badRequest("package has no SKILL.md");
   const fm = parseSkillFrontmatter(manifest.content) ?? {};
   const name = (typeof fm.name === "string" && fm.name.trim()) || "Imported Skill";
 
+  // De-dupe the frontmatter key against the workspace so a re-import (or catalog install) never
+  // collides with an existing skill (createSkill rejects a duplicate key).
+  const baseKey = (typeof fm.key === "string" && fm.key.trim()) || slugify(name);
+  let key = baseKey;
+  for (
+    let i = 2;
+    await prisma.skill.findFirst({ where: { workspaceId: input.workspaceId, key } });
+    i++
+  )
+    key = `${baseKey}-${i}`;
+
+  const sourceType: SkillSourceType = input.sourceType ?? (input.sourceRef ? "url" : "local_path");
+
   const skill = await createSkill({
     workspaceId: input.workspaceId,
     name,
     markdown: manifest.content,
-    key: typeof fm.key === "string" ? fm.key : null,
+    key,
     description: typeof fm.description === "string" ? fm.description : null,
     categories: Array.isArray(fm.tags) ? fm.tags : null,
-    sourceType: input.sourceRef ? "url" : "local_path",
+    sourceType,
     createdByProfileId: input.createdByProfileId ?? null,
   });
-  if (input.sourceRef)
-    await prisma.skill.update({ where: { id: skill.id }, data: { sourceRef: input.sourceRef } });
+  if (input.sourceRef || input.packageName || input.originHash)
+    await prisma.skill.update({
+      where: { id: skill.id },
+      data: {
+        sourceRef: input.sourceRef ?? null,
+        packageName: input.packageName ?? null,
+        originHash: input.originHash ?? null,
+      },
+    });
 
   // Attach the remaining files (SKILL.md is already the markdown). upsertSkillFile normalizes the path
   // (rejecting traversal) and re-derives trust, so a scripts/ file correctly raises the rung.
@@ -335,6 +362,54 @@ export async function importSkillPackage(input: {
     }
   }
   return prisma.skill.findUniqueOrThrow({ where: { id: skill.id } });
+}
+
+/**
+ * Import a skill from an external *source spec* (Domain 5 real-import resolvers). Resolves a GitHub URL/
+ * owner-repo, a raw http(s) URL, or an app-catalog ref (`catalog:<id|key>`) to the concrete SKILL.md
+ * bundle + provenance, then installs it through the shared importSkillPackage path. The resolver layer
+ * is pure/injectable; this wrapper just fetches + stamps provenance.
+ */
+export async function importSkillFromSource(input: {
+  workspaceId: string;
+  source: string;
+  createdByProfileId?: string | null;
+}): Promise<Skill> {
+  const resolved = await resolveSkillSource(input.source).catch((err) => {
+    badRequest(err instanceof Error ? err.message : "could not resolve skill source");
+  });
+  return importSkillPackage({
+    workspaceId: input.workspaceId,
+    files: resolved.files,
+    sourceRef: resolved.provenance.sourceRef,
+    sourceType: resolved.provenance.sourceType,
+    packageName: resolved.provenance.packageName,
+    originHash: resolved.provenance.originHash,
+    createdByProfileId: input.createdByProfileId ?? null,
+  });
+}
+
+/**
+ * Install an app-shipped catalog entry by ref (id or key) through the same import path. Distinct from
+ * installCatalogSkill (which copies a public cross-workspace skill row); this installs a curated,
+ * content-addressed bundle we ship in-repo, stamping catalog provenance (packageName + contentHash).
+ */
+export async function importFromCatalog(input: {
+  workspaceId: string;
+  ref: string;
+  createdByProfileId?: string | null;
+}): Promise<Skill> {
+  const entry = getCatalogEntry(input.ref);
+  if (!entry) badRequest(`catalog skill "${input.ref}" not found`);
+  return importSkillPackage({
+    workspaceId: input.workspaceId,
+    files: entry.files.map((f) => ({ path: f.path, content: f.content })),
+    sourceRef: `catalog:${entry.id}`,
+    sourceType: "catalog",
+    packageName: entry.packageName,
+    originHash: entry.contentHash,
+    createdByProfileId: input.createdByProfileId ?? null,
+  });
 }
 
 export type SkillUpdateState = "not_installed" | "up_to_date" | "update_available" | "origin_gone";

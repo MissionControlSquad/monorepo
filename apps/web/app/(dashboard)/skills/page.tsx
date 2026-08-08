@@ -6,12 +6,15 @@ import {
   SKILLS_QUERY,
   SKILL_FILES_QUERY,
   SKILL_CATALOG_QUERY,
+  SKILL_CATALOG_PACKAGES_QUERY,
   LINT_SKILL_QUERY,
   AUDIT_SKILL_QUERY,
   SKILL_VERSIONS_QUERY,
 } from "@/lib/graphql/queries";
 import {
   IMPORT_SKILL_PACKAGE,
+  IMPORT_SKILL_FROM_SOURCE,
+  IMPORT_SKILL_FROM_CATALOG,
   FORK_SKILL,
   STAR_SKILL,
   UNSTAR_SKILL,
@@ -62,7 +65,10 @@ export default function SkillsPage() {
   const importInput = useRef<HTMLInputElement>(null);
   async function onImport(files: FileList) {
     const payload = await Promise.all(
-      Array.from(files).map(async (f) => ({ path: (f as any).webkitRelativePath || f.name, content: await f.text() })),
+      Array.from(files).map(async (f) => ({
+        path: (f as any).webkitRelativePath || f.name,
+        content: await f.text(),
+      })),
     );
     const r = await importPackage({ files: payload });
     if (!r.error) refetch({ requestPolicy: "network-only" });
@@ -79,6 +85,7 @@ export default function SkillsPage() {
 
   const [busy, setBusy] = useState<string | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [openFiles, setOpenFiles] = useState<string | null>(null);
   const [openLint, setOpenLint] = useState<string | null>(null);
   const [openAudit, setOpenAudit] = useState<string | null>(null);
@@ -105,9 +112,22 @@ export default function SkillsPage() {
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-foreground">Skills</h1>
         <div className="flex items-center gap-2">
-          <input ref={importInput} type="file" multiple className="hidden" onChange={(e) => e.target.files?.length && onImport(e.target.files)} />
-          <Button size="sm" variant="secondary" onClick={() => importInput.current?.click()}>Import package</Button>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>New skill</Button>
+          <input
+            ref={importInput}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => e.target.files?.length && onImport(e.target.files)}
+          />
+          <Button size="sm" variant="secondary" onClick={() => importInput.current?.click()}>
+            Import package
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setShowImport((v) => !v)}>
+            Import from source
+          </Button>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            New skill
+          </Button>
         </div>
       </div>
       <p className="-mt-4 text-sm text-muted-foreground">
@@ -115,6 +135,10 @@ export default function SkillsPage() {
       </p>
 
       <SkillDialog open={createOpen} onOpenChange={setCreateOpen} onSaved={refresh} />
+
+      {/* Domain 5 real-import: install from a GitHub/URL source or the app-shipped catalog. Admin-only
+          on the server (importSkillFromSource / importSkillFromCatalog). */}
+      {showImport && <ImportPanel onImported={refresh} />}
 
       {/* Public catalog — skills other workspaces published (sharingScope=public). Install copies
           one into your workspace. */}
@@ -282,10 +306,120 @@ export default function SkillsPage() {
           {openAudit === s.id && <SkillAuditPanel skillId={s.id} />}
           {openVersions === s.id && <SkillVersionsPanel skillId={s.id} />}
           {openComments === s.id && <SkillComments skillId={s.id} />}
-          {openUpdates === s.id && <SkillUpdatePanel skillId={s.id} onChanged={() => refetch({ requestPolicy: "network-only" })} />}
+          {openUpdates === s.id && (
+            <SkillUpdatePanel
+              skillId={s.id}
+              onChanged={() => refetch({ requestPolicy: "network-only" })}
+            />
+          )}
         </Card>
       ))}
     </div>
+  );
+}
+
+interface CatalogPackage {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  category: string;
+  tags: string[];
+  trustLevel: string;
+  packageName: string;
+}
+
+// Domain 5 real-import: install a skill from a GitHub/raw URL source spec, or from the app-shipped
+// content-addressed catalog. Both writes are admin-gated server-side.
+function ImportPanel({ onImported }: { onImported: () => void }) {
+  const [source, setSource] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+  const [, importFromSource] = useMutation(IMPORT_SKILL_FROM_SOURCE);
+  const [, importFromCatalog] = useMutation(IMPORT_SKILL_FROM_CATALOG);
+  const [{ data }] = useQuery<{ skillCatalogPackages: CatalogPackage[] }>({
+    query: SKILL_CATALOG_PACKAGES_QUERY,
+  });
+  const packages = data?.skillCatalogPackages ?? [];
+
+  async function onImportSource() {
+    setErr(null);
+    setOk(null);
+    if (!source.trim()) return setErr("Enter a GitHub URL, owner/repo, or a raw file URL");
+    setBusy("source");
+    try {
+      const res = await importFromSource({ source: source.trim() });
+      if (res.error) return setErr(res.error.graphQLErrors[0]?.message ?? "Import failed");
+      setOk(`Imported "${res.data?.importSkillFromSource?.name}"`);
+      setSource("");
+      onImported();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onInstallCatalog(ref: string) {
+    setErr(null);
+    setOk(null);
+    setBusy(ref);
+    try {
+      const res = await importFromCatalog({ ref });
+      if (res.error) return setErr(res.error.graphQLErrors[0]?.message ?? "Install failed");
+      setOk(`Installed "${res.data?.importSkillFromCatalog?.name}"`);
+      onImported();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card className="space-y-4 p-4">
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-foreground">Import from source</p>
+        <p className="text-xs text-muted-foreground">
+          Paste a GitHub URL (or owner/repo[/path]) or a raw SKILL.md URL. Admin only.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            className="min-w-[16rem] flex-1 rounded border border-border bg-background px-2 py-1 font-mono text-xs"
+            placeholder="github.com/owner/repo/path  ·  https://…/SKILL.md"
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+          />
+          <Button size="sm" disabled={busy === "source"} onClick={onImportSource}>
+            Import
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-2 border-t border-border pt-3">
+        <p className="text-sm font-semibold text-foreground">
+          Catalog {packages.length > 0 && `(${packages.length})`}
+        </p>
+        {packages.length === 0 && (
+          <p className="text-xs text-muted-foreground">No catalog packages available.</p>
+        )}
+        {packages.map((p) => (
+          <div
+            key={p.id}
+            className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 last:border-0 last:pb-0"
+          >
+            <span className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium text-foreground">{p.name}</span>
+              <span className="text-xs text-muted-foreground">— {p.description}</span>
+              <Badge variant="gray">{p.category}</Badge>
+              <Badge variant="blue">{p.trustLevel}</Badge>
+            </span>
+            <Button size="sm" disabled={busy === p.id} onClick={() => onInstallCatalog(p.id)}>
+              Install
+            </Button>
+          </div>
+        ))}
+      </div>
+      {err && <p className="text-xs text-destructive">{err}</p>}
+      {ok && <p className="text-xs text-emerald-600">{ok}</p>}
+    </Card>
   );
 }
 
@@ -370,7 +504,8 @@ function SkillFilesPanel({ skillId }: { skillId: string }) {
           value={draft.path}
           onChange={(e) => setDraft((d) => ({ ...d, path: e.target.value }))}
         />
-        <Textarea className="h-20 font-mono text-xs"
+        <Textarea
+          className="h-20 font-mono text-xs"
           placeholder="file content"
           value={draft.content}
           onChange={(e) => setDraft((d) => ({ ...d, content: e.target.value }))}
