@@ -346,7 +346,10 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
   async function onImportSource() {
     setErr(null);
     setOk(null);
-    if (!source.trim()) return setErr("Enter a GitHub URL, owner/repo, or a raw file URL");
+    if (!source.trim())
+      return setErr(
+        "Enter a GitHub URL/owner-repo, a GitHub folder, a raw file URL, a local path, or skillsh:<name>",
+      );
     setBusy("source");
     try {
       const res = await importFromSource({ source: source.trim() });
@@ -377,13 +380,24 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
     <Card className="space-y-4 p-4">
       <div className="space-y-1">
         <p className="text-sm font-semibold text-foreground">Import from source</p>
-        <p className="text-xs text-muted-foreground">
-          Paste a GitHub URL (or owner/repo[/path]) or a raw SKILL.md URL. Admin only.
-        </p>
+        <p className="text-xs text-muted-foreground">Paste a source spec. Admin only. Supported:</p>
+        <ul className="ml-4 list-disc space-y-0.5 text-xs text-muted-foreground">
+          <li>
+            GitHub single file - github.com/owner/repo/blob/main/path/SKILL.md (or
+            owner/repo[/path])
+          </li>
+          <li>
+            GitHub folder bundle - github.com/owner/repo/tree/main/skills/writer (SKILL.md +
+            siblings)
+          </li>
+          <li>Raw file URL - https://…/SKILL.md</li>
+          <li>skills.sh registry - skillsh:owner/repo/skill (or a https://skills.sh/… URL)</li>
+          <li>Local path - local:./bundles/writer (server-side, allow-listed)</li>
+        </ul>
         <div className="flex flex-wrap items-center gap-2">
           <input
             className="min-w-[16rem] flex-1 rounded border border-border bg-background px-2 py-1 font-mono text-xs"
-            placeholder="github.com/owner/repo/path  ·  https://…/SKILL.md"
+            placeholder="github.com/owner/repo/tree/main/writer  ·  skillsh:owner/repo/skill  ·  https://…/SKILL.md"
             value={source}
             onChange={(e) => setSource(e.target.value)}
           />

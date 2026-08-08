@@ -12,6 +12,7 @@ enum SkillSourceType {
   github
   url
   catalog
+  skills_sh
 }
 
 enum SkillTrustLevel {
