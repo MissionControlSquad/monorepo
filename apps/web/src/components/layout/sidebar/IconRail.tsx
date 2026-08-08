@@ -53,6 +53,7 @@ import {
   Server,
   Sun,
   Moon,
+  Brain,
 } from "lucide-react";
 import { useQuery } from "urql";
 import {
@@ -135,6 +136,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/companies", icon: Building2, label: "Companies", flag: FLAG_KEYS.AGENT_COMPANIES, group: "Agents" },
   { href: "/agent-authz", icon: Lock, label: "Agent access", flag: FLAG_KEYS.AGENT_AUTHZ, group: "Agents" },
   { href: "/agent-insights", icon: Activity, label: "Agent insights", flag: FLAG_KEYS.PRODUCTIVITY_REVIEW, group: "Agents" },
+  { href: "/memory", icon: Brain, label: "Agent memory", flag: FLAG_KEYS.MEMORY, group: "Agents" },
 
   // ── Work ──
   { href: "/projects", icon: FolderKanban, label: "Projects", group: "Work" },
