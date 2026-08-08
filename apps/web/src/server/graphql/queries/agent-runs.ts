@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
 import { getRunRuntimeStatus } from "@/server/services/run-runtime-status";
+import { readRunLog } from "@/server/services/run-log-store";
 
 // Tier D: the run ledger — list agent executions (sandbox/runner). RUNNERS-gated, member+.
 builder.queryField("agentRuns", (t) =>
@@ -54,6 +55,47 @@ builder.queryField("agentRunLiveStatus", (t) =>
       });
       if (!run) return null; // not this workspace's run → no leak
       return getRunRuntimeStatus(args.runId);
+    },
+  }),
+);
+
+// Per-run log store (observability): the FULL, durable (redacted) stdout/stderr transcript persisted in
+// chunks, range-readable by byte offset. Unlike agentRunLiveStatus (ephemeral in-mem tail), this is the
+// persisted ledger a Run-history view fetches after the fact. RUNNERS-gated, member+, workspace-scoped
+// (the run must belong to the caller's workspace - a foreign run returns null, no existence leak).
+const RunLogType = builder.simpleObject("RunLog", {
+  fields: (t) => ({
+    content: t.string(),
+    offset: t.int(),
+    totalBytes: t.int(),
+    nextOffset: t.int({ nullable: true }),
+    sha256: t.string({ nullable: true }),
+    finalized: t.boolean(),
+  }),
+});
+
+builder.queryField("runLog", (t) =>
+  t.field({
+    type: RunLogType,
+    nullable: true,
+    args: {
+      runId: t.arg.string({ required: true }),
+      offset: t.arg.int(),
+      limit: t.arg.int(),
+    },
+    resolve: async (_root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.RUNNERS);
+      const tenancy = requireRole(ctx, "member");
+      const run = await ctx.prisma.agentRun.findFirst({
+        where: { id: args.runId, workspaceId: tenancy.workspaceId },
+        select: { id: true },
+      });
+      if (!run) return null; // not this workspace's run → no leak
+      const result = await readRunLog(args.runId, {
+        offset: args.offset ?? undefined,
+        limit: args.limit ?? undefined,
+      });
+      return result;
     },
   }),
 );

@@ -1,0 +1,39 @@
+// Per-run log store (observability parity): the FULL, persisted stdout/stderr transcript of a run,
+// appended in chunks and finalized with a byte total + sha256. Complements AgentRun.stdout/stderr,
+// which keep only a truncated tail for quick display. Ported (first slice) from Paperclip's run-log
+// store - local/DB persistence only; S3 mirroring is deferred. Workspace-scoped, keyed by runId
+// (AgentRun.id), no FK (D5). Every persisted chunk is passed through redactSensitive() first, so a
+// secret that slips into run output never lands in the durable transcript.
+
+// One appended slice of a run's transcript. Ordered by (runId, seq); byteOffset is the running byte
+// position of this chunk within the whole-run concatenation, so a range read can locate a slice.
+model RunLogChunk {
+  id          String   @id @default(cuid())
+  workspaceId String
+  runId       String
+  seq         Int // monotonic per-run sequence (append order across both streams)
+  stream      String // stdout | stderr
+  content     String   @db.Text // redacted chunk text
+  byteOffset  Int // byte offset of this chunk within the whole-run concatenation
+  byteLength  Int // byte length of `content` (utf8) - avoids recomputing on read
+  createdAt   DateTime @default(now())
+
+  @@unique([runId, seq])
+  @@index([workspaceId, runId])
+  @@map("run_log_chunks")
+}
+
+// The finalize summary for a run's transcript: total bytes, sha256 over the concatenation, and when it
+// was sealed. One row per run (upserted on finalize).
+model RunLogMeta {
+  id          String   @id @default(cuid())
+  workspaceId String
+  runId       String   @unique
+  totalBytes  Int      @default(0)
+  sha256      String
+  finalizedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, runId])
+  @@map("run_log_meta")
+}

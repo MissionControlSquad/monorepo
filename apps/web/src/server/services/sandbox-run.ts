@@ -38,6 +38,10 @@ import {
   recordWorkspaceOperation,
 } from "./execution-workspaces";
 import { beginRunStatus, setRunPhase, appendRunLog } from "./run-runtime-status";
+import {
+  appendRunLog as appendRunLogChunk,
+  finalizeRunLog,
+} from "./run-log-store";
 import { attachRunBridgeToken } from "./run-bridge";
 import { resolveActiveImageRef } from "./environment-custom-images";
 import { env as env_ } from "../env";
@@ -129,6 +133,27 @@ async function postRunToTask(agentId: string, taskId: string, summary: string): 
     });
   } catch {
     // Never fail the run because the timeline post failed.
+  }
+}
+
+/**
+ * Persist a run's captured output to the durable run-log store, then finalize (sha256 + totalBytes).
+ * Best-effort: the durable transcript is an observability surface, never a correctness dependency of a
+ * run, so a store failure must not fail the run. Chunks are written sequentially to keep seq/byteOffset
+ * ordered; redaction is applied inside appendRunLogChunk.
+ */
+async function persistRunLog(
+  workspaceId: string,
+  runId: string,
+  chunks: { stream: "stdout" | "stderr"; data: string }[],
+): Promise<void> {
+  try {
+    for (const c of chunks) {
+      await appendRunLogChunk(workspaceId, runId, c.stream, c.data);
+    }
+    await finalizeRunLog(workspaceId, runId);
+  } catch {
+    // Never fail a run because the durable transcript could not be written/sealed.
   }
 }
 
@@ -380,21 +405,34 @@ export async function runTaskInSandbox(input: {
     let stdout: string;
     let stderr: string;
     let timedOut = false;
+    // Durable transcript capture: buffer every streamed chunk (in order, with its stream) so we can
+    // persist the FULL redacted transcript to the run-log store after exec. Kept separate from the
+    // synchronous live tail above; ordering is guaranteed by persisting sequentially post-exec.
+    const logChunks: { stream: "stdout" | "stderr"; data: string }[] = [];
     try {
       const result = await handle.exec(script, {
         timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-        onLog: (chunk) => appendRunLog(run.id, chunk.data),
+        onLog: (chunk) => {
+          appendRunLog(run.id, chunk.data);
+          logChunks.push({ stream: chunk.stream, data: chunk.data });
+        },
       });
       exitCode = result.exitCode;
       stdout = result.stdout.slice(-MAX_OUTPUT_CHARS);
       stderr = result.stderr.slice(-MAX_OUTPUT_CHARS);
       timedOut = result.timedOut ?? false;
     } catch (execErr) {
-      // exec itself blew up — release as a failure (retain_on_failure keeps the box), then re-throw.
+      // exec itself blew up - persist whatever transcript we captured (best-effort), then release as a
+      // failure (retain_on_failure keeps the box) and re-throw.
+      await persistRunLog(input.workspaceId, run.id, logChunks);
       setRunPhase(run.id, "failed");
       await releaseLease({ lease, handle, outcome: "failure" });
       throw execErr;
     }
+
+    // Persist + seal the full transcript to the run-log store (redaction happens inside append). The
+    // truncated tail on AgentRun (below) stays for quick display. Best-effort - never fail the run.
+    await persistRunLog(input.workspaceId, run.id, logChunks);
 
     // Release the machine per the lease policy (ephemeral destroys; reuse keeps; retain keeps on fail).
     await releaseLease({
