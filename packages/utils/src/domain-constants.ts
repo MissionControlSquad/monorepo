@@ -70,6 +70,8 @@ export const EventTypes = {
   /** Emitted from central agent-status when a direct update changes status (for history/activity only; agentState does not listen) */
   AGENT_STATUS_APPLIED: "agent.status_applied",
   AGENT_JOINED: "agent.joined",
+  /** Emitted by the wake-queue drainer when a coalesced agent wake is delivered (proactive wake substrate) */
+  AGENT_WAKE_DELIVERED: "agent.wake_delivered",
 
   // Task
   TASK_CREATED: "task.created",

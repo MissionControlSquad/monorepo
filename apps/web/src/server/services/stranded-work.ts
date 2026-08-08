@@ -8,6 +8,7 @@
  */
 import { prisma } from "@/server/prisma";
 import { enqueueSandboxRun } from "./sandbox-run";
+import { tryRequestAgentWake, WAKE_REASON } from "./agent-wakeups";
 import { TaskStatus } from "../constants";
 
 const RECOVERY_REASON = "stranded_work";
@@ -96,6 +97,11 @@ export async function reconcileStrandedWork(now: Date = new Date()): Promise<Str
             attemptedAt: now,
             resolution: "redispatched",
           },
+        });
+        // Proactively wake the (owner-preserving) agent so it acts on the fresh run instead of waiting
+        // to self-poll; coalesces with any other stranded-work wake for the same agent.
+        await tryRequestAgentWake(agent.id, WAKE_REASON.STRANDED_WORK, {
+          workspaceId: run.workspaceId,
         });
         redispatched++;
       } catch {

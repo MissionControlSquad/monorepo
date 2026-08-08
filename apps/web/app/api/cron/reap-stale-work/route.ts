@@ -17,6 +17,7 @@
  *  - scanSilentRuns — record output-silence verdicts for running runs gone quiet (Domain 9 #10).
  *  - reconcileActiveSubtreeWatchdogs — wake a verify agent when a stopped subtree's fingerprint changes (Domain 9 #9).
  *  - pruneTelemetry — retention-prune first-party telemetry events by class (Domain 12 E).
+ *  - drainAgentWakeups — deliver the coalesced proactive per-agent wake queue, respecting suppression (parity: heartbeat.wakeup).
  *
  * Registered in vercel.json to run every 5 minutes.
  */
@@ -36,6 +37,7 @@ import { tickDueTaskMonitors } from "@/server/services/task-monitors";
 import { scanSilentRuns } from "@/server/services/run-silence-watchdog";
 import { reconcileActiveSubtreeWatchdogs } from "@/server/services/subtree-watchdog";
 import { pruneTelemetry } from "@/server/services/telemetry-sink";
+import { drainAgentWakeups } from "@/server/services/agent-wakeups";
 
 export async function GET(request: Request) {
   try {
@@ -80,6 +82,9 @@ export async function GET(request: Request) {
     // Stranded-work reconciliation runs AFTER retry promotion so a run that just earned a retry (now
     // queued) is not mistaken for stranded. Owner-preserving re-dispatch → escalate-to-blocked ladder.
     const stranded = await reconcileStrandedWork(now);
+    // Drain the proactive wake queue LAST so it delivers the coalesced wakes that retry-promotion and
+    // stranded re-dispatch just enqueued this tick (respecting per-agent / instance suppression).
+    const wakes = await drainAgentWakeups(now);
     return successResponse({
       ok: true,
       watchdogsFired: watchdogDecisions.length,
@@ -98,6 +103,8 @@ export async function GET(request: Request) {
       silentRunsFlagged: silentRuns.length,
       subtreeWatchdogsWoken: subtreeWake.toWake,
       telemetryPruned,
+      wakesDelivered: wakes.delivered,
+      wakesSuppressed: wakes.suppressed,
       at: now.toISOString(),
     });
   } catch (err) {

@@ -8,6 +8,7 @@ import { logError } from "@/server/logger";
 import { prisma } from "@/server/prisma";
 import type { AgentRun } from "@agentcenter/database";
 import { nextRetryAt, shouldRetryRun } from "@agentcenter/utils";
+import { tryRequestAgentWake, WAKE_REASON } from "./agent-wakeups";
 
 /**
  * At run finalization: if the run ended in a transient status (timeout) under the retry cap, stamp
@@ -85,6 +86,10 @@ export async function promoteDueRunRetries(now: Date = new Date()): Promise<numb
           retryCount: run.retryCount + 1,
           requestedByProfileId: run.requestedByProfileId,
         },
+      });
+      // Proactively wake the owning agent for the promoted retry (coalesced per agent + reason).
+      await tryRequestAgentWake(run.agentId, WAKE_REASON.RUN_RETRY, {
+        workspaceId: run.workspaceId,
       });
       promoted++;
     } catch {
