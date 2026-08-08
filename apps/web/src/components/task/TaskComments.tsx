@@ -15,9 +15,10 @@ import { MarkdownWithMentions } from "../common/MarkdownWithMentions";
 import { CopyButton } from "../common/CopyButton";
 import { MessageReactions } from "./MessageReactions";
 import { Button } from "../ui";
-import { MessageCircle, Send, Loader2 } from "lucide-react";
+import { MessageCircle, Send, Loader2, Check } from "lucide-react";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { useAppContext } from "../context/AppContext";
+import { useComposerDraft } from "../../lib/useComposerDraft";
 import type { TaskMessage } from "@agentcenter/types";
 
 interface TaskCommentsProps {
@@ -25,7 +26,12 @@ interface TaskCommentsProps {
 }
 
 export function TaskComments({ taskId }: TaskCommentsProps) {
-  const [newComment, setNewComment] = useState("");
+  const {
+    value: newComment,
+    setValue: setNewComment,
+    draftSaved,
+    clear: clearComposerDraft,
+  } = useComposerDraft(taskId);
   const [isSending, setIsSending] = useState(false);
   const { currentUserProfile } = useAppContext();
   const client = useClient();
@@ -146,6 +152,7 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
 
     if (isInitialLoadRef.current && count > 0 && !isFetching) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      // eslint-disable-next-line react-hooks/immutability -- run-once flag updated inside this scroll effect; intended imperative behavior, not reactive-value mutation
       isInitialLoadRef.current = false;
     } else if (count > prevCount && prevCount > 0) {
       const el = scrollRef.current;
@@ -155,6 +162,7 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
       }
     }
 
+    // eslint-disable-next-line react-hooks/immutability -- prev-value flag updated inside this scroll effect; intended imperative behavior, not reactive-value mutation
     prevCountRef.current = count;
   }, [messages.length, isFetching]);
 
@@ -200,7 +208,8 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
         _optimistic: true,
       },
     ]);
-    setNewComment("");
+    // Clear the composer + persisted draft on send; restore if it fails.
+    clearComposerDraft();
     setIsSending(true);
 
     // Fire mutation in background
@@ -210,6 +219,8 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
         if (result.error) {
           toast.error("Failed to send comment. Please try again.");
           setOptimisticMessages((prev) => prev.filter((m) => m.content !== content));
+          // Restore the unsent text so the draft is not lost.
+          setNewComment(content);
         }
       },
     );
@@ -327,7 +338,16 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
             placeholder="Write a comment... (@ to mention)"
             rows={3}
           />
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between gap-2">
+            <span
+              className={`inline-flex items-center gap-1 text-xs text-muted-foreground transition-opacity ${
+                draftSaved && !isSending ? "opacity-100" : "opacity-0"
+              }`}
+              aria-live="polite"
+            >
+              <Check className="w-3 h-3" />
+              Draft saved
+            </span>
             <Button
               type="submit"
               variant="primary"
