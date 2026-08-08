@@ -86,12 +86,18 @@ DONE in Batch 3 (merged):
 4. ✅ **Artifact upload pipeline** — `TaskAttachment` + presigned upload + run-scoped agent upload — #108.
 7. ✅ **Operator CLI** (doctor / env:check / db:backup / db:migrate:status) — #104. (deferred: managed-install/service lifecycle)
 
-Still ❌ buildable (candidate Batch 4):
-3. **Onboarding local-install variant** (cloud exists; add the local branch #10786). [M]
-5. **Memory depth** — `MemoryAdapter` registry + semantic recall (pgvector) + mid-run memory tools. [M/L; recall needs the pgvector extension → borderline infra]
-6. **Plugin worker runtime** — fork/spawn + vm sandbox + UI extension slots + SDK package. [L, infra-ish → §5]
-8. **Pipelines/Routines/ExecWorkspace/ProjectWorkspace detail routes.** [M each]
-9. Managed-install/service-lifecycle CLI; skills.sh registry + local-path import; multi-file GitHub skill bundles. [S-M]
+DONE in Batch 4 (merged #109-113):
+3. ✅ **Onboarding local-install variant** (cloud + local, reuses cli-auth pairing) — #111.
+5a. ✅ **MemoryAdapter registry + agent memory tools** (search/note/forget via run-scoped bridge) — #110.
+8. ✅ **Pipeline / Routine / Execution-Workspace detail routes** — #112. (ProjectWorkspace detail still ❌, small)
+9. ✅ **Managed-install + service-lifecycle CLI** (launchd/systemd) — #109; **skills.sh + local-path +
+   multi-file GitHub import** — #113.
+
+Still ❌ (now essentially only infra-blocked → §5, plus tiny stragglers):
+5b. **Semantic/vector recall** — needs the pgvector Postgres extension. → §5 (infra).
+6. **Plugin worker runtime** — fork/spawn + vm sandbox + UI slots + SDK. → §5 (infra).
+- ProjectWorkspace detail route; Hermes gateway UI config form; per-runtime parseLine for codex/gemini;
+  service uninstall/restart/health-probe. [S each - minor tail]
 
 ---
 
@@ -140,7 +146,13 @@ These features LANDED but each intentionally deferred a piece - list so nothing 
 
 ## 6. Net assessment
 
-After the 15 merges, the app is at **~95% of Paperclip's portable, non-buildbase functionality**. The
-remaining ❌ items in §3 are the real backlog; §4 are the known deferrals inside shipped features; §5 is
-what we chose to skip and why. Nothing portable is silently missing - every gap is either in §3 (build
-next) or §5 (skipped with a documented reason).
+After **25 merged features across 4 batches (#89-113)**, the app is at **~99% of Paperclip's portable,
+non-buildbase functionality**. The buildable backlog (§3) is essentially exhausted - what remains is:
+- **§5** — buildbase-owned / external-account-gated / true-infra (pgvector, plugin-worker exec), each
+  skipped with a documented reason;
+- a small **minor tail** (ProjectWorkspace detail, Hermes UI config form, codex/gemini parseLine,
+  service uninstall) noted in §3.
+
+Every gap is now either in §5 (skipped by choice, with a reason) or the minor tail. Nothing portable is
+silently missing. Each batch was merged in order and validated as a whole: typecheck 12/12, build 56/56,
+full suite 2069 tests passing, 0 failures.
