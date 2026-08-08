@@ -64,3 +64,45 @@ export function redactSensitiveVerbose(input: string): RedactionResult {
 export function redactSensitive(input: string): string {
   return redactSensitiveVerbose(input).text;
 }
+
+// ---------------------------------------------------------------------------
+// Resolved-run-secret redaction (parity: run-secret-redaction). Unlike the
+// pattern matcher above, this masks a KNOWN set of exact secret values — the
+// vault secrets a run resolved into its environment (LLM keys, GIT_TOKEN, …) —
+// out of captured stdout/stderr, the live status tail, the run summary, and the
+// run->task message before any of them is stored, streamed, or posted. Ported
+// from Paperclip's redactRegisteredSecretValues: build a redactor from the set
+// of resolved values, replace each occurrence with a fixed mask, longest value
+// first so a shorter value that is a substring of a longer one can't leak the
+// tail of the longer one.
+
+/** The mask that replaces a resolved secret value wherever it appears in run output. */
+export const RUN_SECRET_MASK = "***REDACTED***";
+
+// Values shorter than this are skipped: they are almost never real secrets and
+// masking them would over-redact ordinary output (e.g. a 2-char token substring).
+const MIN_REDACTABLE_SECRET_LENGTH = 4;
+
+/**
+ * Mask every occurrence of each resolved secret value in `text`. Pure and I/O-free.
+ *
+ * - Uses `split(value).join(mask)` (not a RegExp) so regex-special characters in a
+ *   secret value are matched literally and there is no catastrophic-backtracking risk.
+ * - Empty / very short values are ignored to avoid over-masking benign text.
+ * - Longer values are applied before shorter ones so overlapping secrets fully mask.
+ */
+export function redactRunSecrets(
+  text: string,
+  secretValues: Iterable<string>,
+  mask: string = RUN_SECRET_MASK,
+): string {
+  if (!text) return text;
+  const values = [...new Set(secretValues)]
+    .filter((value) => typeof value === "string" && value.length >= MIN_REDACTABLE_SECRET_LENGTH)
+    .sort((left, right) => right.length - left.length);
+  let out = text;
+  for (const value of values) {
+    if (out.includes(value)) out = out.split(value).join(mask);
+  }
+  return out;
+}
