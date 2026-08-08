@@ -253,6 +253,6 @@ export { ADAPTER_PLUGINS_QUERY } from "./adapter-plugins";
 export { SMOKE_CASES_QUERY } from "./smoke-lab";
 export { LOCAL_SERVICES_QUERY } from "./local-services";
 export { AGENT_SKILL_SNAPSHOT_QUERY } from "./agent-skills-sync";
-export { SKILL_UPDATE_STATUS_QUERY } from "./skill-lifecycle";
+export { SKILL_UPDATE_STATUS_QUERY, SKILL_CATALOG_PACKAGES_QUERY } from "./skill-lifecycle";
 export { FLAGGED_AGENTS_QUERY } from "./productivity-reviews";
 export { DECISIONS_QUERY } from "./decision-training";
