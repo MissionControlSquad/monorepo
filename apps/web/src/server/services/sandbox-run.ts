@@ -13,6 +13,7 @@ import { GraphQLError } from "graphql";
 import {
   buildAdapterInvocation,
   getAdapter,
+  canonicalAdapterKey,
   deriveAdapterExecutionResult,
   requiresSandboxContainment,
   resolveEffectiveWorkspaceStrategyType,
@@ -20,7 +21,15 @@ import {
   FLAG_KEYS,
   type TrustLevel,
   type AdapterExecutionResult,
+  type AdapterErrorFamily,
+  type AdapterExitReason,
 } from "@agentcenter/utils";
+import {
+  runHermesGateway,
+  HERMES_GATEWAY_ADAPTER_TYPE,
+  type HermesGatewayConfig,
+  type HermesGatewayResult,
+} from "@/server/adapters/hermes-gateway";
 import type { AgentContextBundle } from "@agentcenter/types";
 import { getProfileAgentId } from "@agentcenter/database";
 import { prisma } from "@/server/prisma";
@@ -162,6 +171,32 @@ function shq(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+/**
+ * Map a structured {@link AdapterExecutionResult} to the additive AgentRun columns (PR #99 tail).
+ * Returns an empty object when there is no structured result, so the spawn of a blob-only adapter
+ * writes nothing new. Best-effort: this is observability metadata, never a correctness dependency.
+ */
+function executionColumns(execution: AdapterExecutionResult | undefined): {
+  usageTokensIn?: number;
+  usageTokensOut?: number;
+  usageModel?: string | null;
+  errorFamily?: string | null;
+  exitReason?: string;
+} {
+  if (!execution) return {};
+  return {
+    ...(execution.usage
+      ? {
+          usageTokensIn: execution.usage.tokensIn,
+          usageTokensOut: execution.usage.tokensOut,
+          usageModel: execution.usage.model,
+        }
+      : {}),
+    ...(execution.errorFamily ? { errorFamily: execution.errorFamily } : {}),
+    exitReason: execution.exitReason,
+  };
+}
+
 /** The task prompt written into the sandbox as TASK.md (mirrors the runner's taskMarkdown). */
 function renderPrompt(b: AgentContextBundle): string {
   const t = b.task;
@@ -224,8 +259,8 @@ export interface SandboxRunResult {
   /**
    * Structured run result when the bound adapter owns an `execute()`/`parseLine` (parity slice) — the
    * typed transcript + usage/errorFamily/exitReason derived from the captured stdout. Absent for
-   * blob-only adapters. NOT persisted yet (no schema change in this slice); persistence is deferred to
-   * a follow-up that adds usage/errorFamily/transcript columns to `AgentRun`.
+   * blob-only adapters. The usage/errorFamily/exitReason are persisted onto `AgentRun` (additive
+   * columns); the full typed transcript stays in-memory on this result.
    */
   execution?: AdapterExecutionResult;
 }
@@ -246,6 +281,8 @@ export async function runTaskInSandbox(input: {
   requestedByProfileId?: string | null;
   /** Reuse an already-created (claimed) AgentRun row instead of creating one — the queue worker path. */
   existingRunId?: string;
+  /** DI seam (tests): the fetch used by the Hermes gateway dispatch path. Defaults to global fetch. */
+  fetchImpl?: typeof fetch;
 }): Promise<SandboxRunResult> {
   const agent = await prisma.agent.findFirst({
     where: { id: input.agentId, workspaceId: input.workspaceId },
@@ -287,6 +324,23 @@ export async function runTaskInSandbox(input: {
     model: bundle.runtime?.model ?? agent.runtimeModel ?? null,
   });
   if (invocation.mode !== "spawn") {
+    // Hermes HTTP + SSE gateway (PR #102 tail): the runtime is an already-running remote Hermes server,
+    // not a spawned process — dispatch via the gateway service instead of provisioning a sandbox. Every
+    // other HTTP-adapter runtime still has no in-sandbox execution path.
+    if (canonicalAdapterKey(runtimeKey) === HERMES_GATEWAY_ADAPTER_TYPE) {
+      return dispatchHermesGatewayRun({
+        workspaceId: input.workspaceId,
+        taskId: input.taskId,
+        agent,
+        providerKey,
+        prompt: renderPrompt(bundle),
+        model: bundle.runtime?.model ?? agent.runtimeModel ?? null,
+        requestedByProfileId: input.requestedByProfileId ?? null,
+        existingRunId: input.existingRunId,
+        timeoutMs: input.timeoutMs,
+        fetchImpl: input.fetchImpl,
+      });
+    }
     throw new GraphQLError("HTTP-adapter runtimes cannot run inside a sandbox", {
       extensions: { code: "BAD_USER_INPUT" },
     });
@@ -469,6 +523,23 @@ export async function runTaskInSandbox(input: {
 
     const runStatus = timedOut ? "timeout" : exitCode === 0 ? "done" : "failed";
     setRunPhase(run.id, runStatus);
+
+    // Adapter-owned structured result (parity slice): if the bound adapter owns an `execute()` (or at
+    // least a `parseLine`), derive the typed transcript + usage/errorFamily/exitReason from the captured
+    // stdout. Pure derivation, best-effort — never fail a run over parsing. Derived BEFORE the terminal
+    // update so usage/errorFamily/exitReason persist on AgentRun in the same write.
+    let execution: AdapterExecutionResult | undefined;
+    if (adapter?.execute || adapter?.parseLine) {
+      try {
+        const execInput = { stdout, stderr, exitCode, timedOut };
+        execution = adapter.execute
+          ? adapter.execute(execInput)
+          : deriveAdapterExecutionResult(adapter, execInput);
+      } catch {
+        // ignore parse/derivation failures — the blob result is still returned below
+      }
+    }
+
     await prisma.agentRun.update({
       where: { id: run.id },
       data: {
@@ -479,6 +550,7 @@ export async function runTaskInSandbox(input: {
         stderr,
         finishedAt: new Date(),
         bridgeTokenHash: null, // invalidate the in-sandbox bridge token now the run is over
+        ...executionColumns(execution),
       },
     });
 
@@ -580,22 +652,6 @@ export async function runTaskInSandbox(input: {
       });
     }
 
-    // Adapter-owned structured result (parity slice): if the bound adapter owns an `execute()` (or at
-    // least a `parseLine`), derive the typed transcript + usage/errorFamily/exitReason from the captured
-    // stdout. Pure derivation, best-effort — never fail a run over parsing. Exposed on the run result;
-    // persistence to `AgentRun` is deferred (no schema change here).
-    let execution: AdapterExecutionResult | undefined;
-    if (adapter?.execute || adapter?.parseLine) {
-      try {
-        const execInput = { stdout, stderr, exitCode, timedOut };
-        execution = adapter.execute
-          ? adapter.execute(execInput)
-          : deriveAdapterExecutionResult(adapter, execInput);
-      } catch {
-        // ignore parse/derivation failures — the blob result is still returned below
-      }
-    }
-
     return {
       runId: run.id,
       providerKey,
@@ -628,6 +684,243 @@ export async function runTaskInSandbox(input: {
       })
       .catch(() => {});
     await postRunToTask(agent.id, input.taskId, `Sandbox run (${providerKey}) failed: ${message}`);
+    throw err;
+  }
+}
+
+// ─── Hermes HTTP + SSE gateway dispatch (PR #102 tail) ───────────────────────
+// When an agent's runtime adapter resolves to `hermes-gateway` its invocation is an HTTP call to an
+// already-running Hermes server — there is nothing to spawn. This path runs the same run-ledger
+// lifecycle as the sandbox seam (persist running → stream output through onLog/appendRunLog/the run-log
+// store → derive a terminal status → persist the structured result → post to the task timeline) but
+// reaches Hermes over HTTP+SSE via `runHermesGateway` instead of provisioning a box.
+
+/** The minimal agent shape the gateway dispatch needs (loaded with all scalars in runTaskInSandbox). */
+type GatewayAgent = { id: string; adapterConfig: unknown; runtimeTemplate: string | null };
+
+/** Resolve the per-run session key from the configured strategy (null → no cross-run memory). */
+function hermesSessionKey(
+  strategy: string | undefined,
+  ids: { runId: string; agentId: string; taskId: string },
+): string | null {
+  switch (strategy) {
+    case "run":
+      return `agentcenter:run:${ids.runId}`;
+    case "agent":
+      return `agentcenter:agent:${ids.agentId}`;
+    case "issue":
+      return `agentcenter:issue:${ids.taskId}`;
+    default:
+      return null; // "none" | undefined
+  }
+}
+
+/** Map a Hermes gateway errorCode to the machine-readable {@link AdapterErrorFamily}. */
+function hermesErrorFamily(code: string | undefined): AdapterErrorFamily | undefined {
+  switch (code) {
+    case undefined:
+      return undefined;
+    case "hermes_gateway_auth_failed":
+      return "auth_required";
+    case "hermes_gateway_rate_limited":
+    case "hermes_gateway_upstream_error":
+    case "hermes_gateway_connect_failed":
+      return "transient_upstream";
+    default:
+      return "unknown";
+  }
+}
+
+/** Derive the structured {@link AdapterExecutionResult} from a Hermes gateway result (parity slice). */
+function hermesExecution(
+  result: HermesGatewayResult,
+  model: string | null,
+): AdapterExecutionResult {
+  const ok = result.exitCode === 0;
+  const errorFamily = ok ? undefined : hermesErrorFamily(result.errorCode);
+  const exitReason: AdapterExitReason = ok
+    ? "completed"
+    : errorFamily === "auth_required"
+      ? "auth_required"
+      : "error";
+  const usage = result.usage
+    ? {
+        // cache-creation prompt tokens count as input (mirrors deriveAdapterExecutionResult).
+        tokensIn: result.usage.inputTokens + (result.usage.cachedInputTokens ?? 0),
+        tokensOut: result.usage.outputTokens,
+        model,
+      }
+    : undefined;
+  return {
+    status: ok ? "success" : "error",
+    exitReason,
+    ...(usage ? { usage } : {}),
+    ...(errorFamily ? { errorFamily } : {}),
+    transcript: [],
+  };
+}
+
+/** Resolve a `HermesGatewayConfig` from the agent's `adapterConfig`, resolving the vaulted API key. */
+async function resolveHermesGatewayConfig(
+  workspaceId: string,
+  agent: GatewayAgent,
+  runId: string,
+): Promise<{ config: HermesGatewayConfig; apiKey: string }> {
+  const cfg = (agent.adapterConfig ?? {}) as Record<string, unknown>;
+  const str = (v: unknown): string | undefined =>
+    typeof v === "string" && v.trim() ? v : undefined;
+  // Base URL from adapterConfig, falling back to the agent's runtimeTemplate (the code adapter's slot).
+  const apiBaseUrl = str(cfg.apiBaseUrl) ?? str(agent.runtimeTemplate) ?? "";
+  // The API key is stored ONLY as a vault secret-ref (never inline) — resolve it now (audited).
+  const secretRef = str(cfg.apiKeySecretRef);
+  const apiKey = secretRef
+    ? ((await resolveWorkspaceSecret(workspaceId, secretRef, {
+        actorType: "system",
+        consumerType: "agent",
+        consumerId: agent.id,
+        runId,
+      })) ?? "")
+    : "";
+  const config: HermesGatewayConfig = {
+    apiBaseUrl,
+    apiKey,
+    ...(str(cfg.sessionKeyStrategy)
+      ? { sessionKeyStrategy: cfg.sessionKeyStrategy as HermesGatewayConfig["sessionKeyStrategy"] }
+      : {}),
+    ...(str(cfg.instructions) ? { instructions: cfg.instructions as string } : {}),
+    ...(cfg.headers != null ? { headers: cfg.headers as HermesGatewayConfig["headers"] } : {}),
+    ...(typeof cfg.timeoutSec === "number" ? { timeoutSec: cfg.timeoutSec } : {}),
+    ...(typeof cfg.eventReconnectMs === "number" ? { eventReconnectMs: cfg.eventReconnectMs } : {}),
+    ...(cfg.dangerouslyAllowInsecureRemoteHttp === true
+      ? { dangerouslyAllowInsecureRemoteHttp: true }
+      : {}),
+  };
+  return { config, apiKey };
+}
+
+async function dispatchHermesGatewayRun(input: {
+  workspaceId: string;
+  taskId: string;
+  agent: GatewayAgent;
+  providerKey: string;
+  prompt: string;
+  model: string | null;
+  requestedByProfileId: string | null;
+  existingRunId?: string;
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
+}): Promise<SandboxRunResult> {
+  const { workspaceId, taskId, agent, providerKey } = input;
+  // Persist/claim the run ledger row (kind "gateway"). The queue path passes a claimed row.
+  const run = input.existingRunId
+    ? await prisma.agentRun.update({
+        where: { id: input.existingRunId },
+        data: { status: "running", startedAt: new Date() },
+      })
+    : await prisma.agentRun.create({
+        data: {
+          workspaceId,
+          agentId: agent.id,
+          taskId,
+          kind: "gateway",
+          providerKey,
+          requestedByProfileId: input.requestedByProfileId,
+        },
+      });
+
+  const { config, apiKey } = await resolveHermesGatewayConfig(workspaceId, agent, run.id);
+  // Only the resolved API key is a true secret — scrub it from every output sink (runHermesGateway also
+  // redacts internally; this is defense-in-depth for the persisted/streamed copies).
+  const secretValues = apiKey ? [apiKey] : [];
+  const sessionKey = hermesSessionKey(config.sessionKeyStrategy, {
+    runId: run.id,
+    agentId: agent.id,
+    taskId,
+  });
+
+  // Live status + durable transcript, same seam the sandbox path uses.
+  beginRunStatus(run.id, secretValues);
+  setRunPhase(run.id, "running");
+  const logChunks: { stream: "stdout" | "stderr"; data: string }[] = [];
+
+  try {
+    const controller = input.timeoutMs != null ? AbortSignal.timeout(input.timeoutMs) : undefined;
+    const result = await runHermesGateway({
+      config,
+      ctx: { runId: run.id, prompt: input.prompt, sessionKey, model: input.model },
+      onLog: (chunk) => {
+        appendRunLog(run.id, chunk.data);
+        logChunks.push({ stream: chunk.stream, data: chunk.data });
+      },
+      fetchImpl: input.fetchImpl,
+      signal: controller,
+    });
+
+    // Seal the durable transcript (redaction happens inside append). Best-effort.
+    await persistRunLog(workspaceId, run.id, logChunks);
+
+    const collect = (stream: "stdout" | "stderr") =>
+      redactRunSecrets(
+        logChunks
+          .filter((c) => c.stream === stream)
+          .map((c) => c.data)
+          .join(""),
+        secretValues,
+      ).slice(-MAX_OUTPUT_CHARS);
+    const stdout = collect("stdout");
+    const stderr = collect("stderr");
+    const runStatus = result.exitCode === 0 ? "done" : "failed";
+    const execution = hermesExecution(result, input.model);
+    setRunPhase(run.id, runStatus);
+
+    await prisma.agentRun.update({
+      where: { id: run.id },
+      data: {
+        sandboxId: result.runId ?? HERMES_GATEWAY_ADAPTER_TYPE,
+        status: runStatus,
+        exitCode: result.exitCode,
+        stdout,
+        stderr,
+        ...(result.errorMessage
+          ? { errorMessage: redactRunSecrets(result.errorMessage, secretValues) }
+          : {}),
+        finishedAt: new Date(),
+        ...executionColumns(execution),
+      },
+    });
+
+    await postRunToTask(
+      agent.id,
+      taskId,
+      `Hermes gateway run (${providerKey}) — ${runStatus}, exit ${result.exitCode}\n\n${stdout || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
+    );
+
+    return {
+      runId: run.id,
+      providerKey,
+      sandboxId: result.runId ?? HERMES_GATEWAY_ADAPTER_TYPE,
+      exitCode: result.exitCode,
+      stdout,
+      stderr,
+      status: result.exitCode === 0 ? "review" : "blocked",
+      execution,
+    };
+  } catch (err) {
+    // The gateway service shapes its own failures (never throws), so this only catches an unexpected
+    // error (e.g. the abort timeout) — mark the run failed with a scrubbed message, then re-throw.
+    setRunPhase(run.id, "failed");
+    const message = redactRunSecrets(
+      err instanceof Error ? err.message : String(err),
+      secretValues,
+    );
+    await persistRunLog(workspaceId, run.id, logChunks);
+    await prisma.agentRun
+      .update({
+        where: { id: run.id },
+        data: { status: "failed", errorMessage: message, finishedAt: new Date() },
+      })
+      .catch(() => {});
+    await postRunToTask(agent.id, taskId, `Hermes gateway run (${providerKey}) failed: ${message}`);
     throw err;
   }
 }

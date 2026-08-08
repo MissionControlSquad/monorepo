@@ -24,6 +24,11 @@ export const AGENT_RUNS_QUERY = gql`
       stdout
       stderr
       errorMessage
+      usageTokensIn
+      usageTokensOut
+      usageModel
+      errorFamily
+      exitReason
       reviewState
       reviewedByProfileId
       reviewedAt

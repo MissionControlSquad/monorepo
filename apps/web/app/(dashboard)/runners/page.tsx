@@ -83,6 +83,11 @@ interface AgentRun {
   stdout: string | null;
   stderr: string | null;
   errorMessage: string | null;
+  usageTokensIn: number | null;
+  usageTokensOut: number | null;
+  usageModel: string | null;
+  errorFamily: string | null;
+  exitReason: string | null;
   reviewState: string | null;
   startedAt: string;
   finishedAt: string | null;
@@ -235,6 +240,23 @@ function RunHistory() {
           {open === r.id && (
             <div className="mt-2 space-y-2">
               {(r.status === "running" || r.status === "queued") && <LiveTail runId={r.id} />}
+              {/* Structured adapter execution result (usage/model + machine-readable outcome). */}
+              {(r.exitReason ||
+                r.errorFamily ||
+                r.usageModel ||
+                r.usageTokensIn != null ||
+                r.usageTokensOut != null) && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  {r.exitReason && <Badge variant="gray">{r.exitReason}</Badge>}
+                  {r.errorFamily && <Badge variant="orange">{r.errorFamily}</Badge>}
+                  {r.usageModel && <span className="font-mono">{r.usageModel}</span>}
+                  {(r.usageTokensIn != null || r.usageTokensOut != null) && (
+                    <span>
+                      tokens {r.usageTokensIn ?? 0} in / {r.usageTokensOut ?? 0} out
+                    </span>
+                  )}
+                </div>
+              )}
               {r.stdout && (
                 <pre className="max-h-48 overflow-auto rounded bg-foreground/90 p-2 text-xs text-background">
                   {r.stdout}
@@ -339,7 +361,9 @@ function CommandHistory({ targetKind }: { targetKind: string }) {
 }
 
 export default function RunnersPage() {
-  const [{ data: hostData, fetching: hostsFetching }, refetchHosts] = useQuery<{ runnerHosts: Host[] }>({
+  const [{ data: hostData, fetching: hostsFetching }, refetchHosts] = useQuery<{
+    runnerHosts: Host[];
+  }>({
     query: RUNNER_HOSTS_QUERY,
   });
   const [{ data: agentData }] = useQuery<{ agents: AgentLite[] }>({ query: AGENTS_FOR_TASK_QUERY });
@@ -480,7 +504,9 @@ export default function RunnersPage() {
             <Server className="h-4 w-4 text-muted-foreground" />
             <h2 className="text-sm font-semibold text-foreground">BYO servers (direct SSH)</h2>
           </div>
-          <Button size="sm" onClick={() => setHostOpen(true)}>Add host</Button>
+          <Button size="sm" onClick={() => setHostOpen(true)}>
+            Add host
+          </Button>
         </div>
 
         <RunnerHostDialog
@@ -549,7 +575,9 @@ export default function RunnersPage() {
             <Bot className="h-4 w-4 text-muted-foreground" />
             <h2 className="text-sm font-semibold text-foreground">Agent runners (daemon pull)</h2>
           </div>
-          <Button size="sm" onClick={() => setQueueOpen(true)}>Queue command</Button>
+          <Button size="sm" onClick={() => setQueueOpen(true)}>
+            Queue command
+          </Button>
         </div>
         <p className="-mt-1 text-xs text-muted-foreground">
           Queue a command an agent&apos;s <code>@agentcenter/runner</code> daemon pulls on its next
@@ -571,7 +599,9 @@ export default function RunnersPage() {
             Runtime for the selected agent (overrides the runner default)
           </p>
           <div className="flex flex-wrap items-end gap-2">
-            <Select size="sm" value={rt.adapter}
+            <Select
+              size="sm"
+              value={rt.adapter}
               onChange={(e) => setRt((r) => ({ ...r, adapter: e.target.value }))}
             >
               <option value="">runner default</option>
@@ -583,7 +613,9 @@ export default function RunnersPage() {
             </Select>
             {selectedAdapter?.supportsModel &&
               (selectedAdapter.models.length > 0 ? (
-                <Select size="sm" value={rt.model}
+                <Select
+                  size="sm"
+                  value={rt.model}
                   onChange={(e) => setRt((r) => ({ ...r, model: e.target.value }))}
                 >
                   <option value="">default model</option>
@@ -665,9 +697,7 @@ export default function RunnersPage() {
         <Card className="space-y-2 p-4">
           <p className="text-xs font-medium text-muted-foreground">Sandbox for a selected agent</p>
           <div className="flex flex-wrap items-end gap-2">
-            <Select size="sm" value={agentId}
-              onChange={(e) => setAgentId(e.target.value)}
-            >
+            <Select size="sm" value={agentId} onChange={(e) => setAgentId(e.target.value)}>
               <option value="">Select agent…</option>
               {agents.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -676,7 +706,9 @@ export default function RunnersPage() {
                 </option>
               ))}
             </Select>
-            <Select size="sm" value={sbx.provider}
+            <Select
+              size="sm"
+              value={sbx.provider}
               onChange={(e) => setSbx((s) => ({ ...s, provider: e.target.value }))}
             >
               <option value="">none (run on runner)</option>

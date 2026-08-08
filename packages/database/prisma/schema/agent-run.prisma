@@ -20,6 +20,16 @@ model AgentRun {
   stderr               String?   @db.Text
   errorMessage         String?
   costCents            Int?
+  // Parity slice (PR #99 tail) — the structured adapter execution result, persisted best-effort when
+  // the bound adapter owns an execute()/parseLine (Claude stream-json, Hermes gateway, …). Additive +
+  // nullable: a blob-only adapter (or a derivation failure) simply leaves these null. usageTokensIn
+  // folds cache-creation prompt tokens into input (mirrors the derivation). exitReason/errorFamily are
+  // the machine-readable outcome the control plane can act on without re-parsing stdout.
+  usageTokensIn        Int?
+  usageTokensOut       Int?
+  usageModel           String?
+  errorFamily          String? // transient_upstream | provider_quota | model_refusal | auth_required | model_not_found | unknown
+  exitReason           String? // completed | error | timeout | max_turns | refusal | auth_required | unknown
   // Domain 8 G2 — untrusted-output review gate. A run by a low-trust/untrusted agent (or one whose
   // trust profile requires it) finalizes `needs_review` with a quarantined sourceTrust marker; a board
   // reviewer promotes it. Standard/trusted output is auto-`approved`. LOW_TRUST_REVIEW-gated.
