@@ -27,6 +27,10 @@ builder.prismaObject("RoutineTrigger", {
     id: t.exposeID("id"),
     type: t.exposeString("type"),
     recurrenceConfig: t.expose("recurrenceConfig", { type: "JSON", nullable: true }),
+    // Cron schedule columns already persisted on the model; expose them read-only so a routine detail
+    // view can render the schedule (5-field cron + the IANA tz it is interpreted in). Additive.
+    cronExpression: t.exposeString("cronExpression", { nullable: true }),
+    timezone: t.exposeString("timezone", { nullable: true }),
     nextFireAt: t.expose("nextFireAt", { type: "DateTime", nullable: true }),
     publicId: t.exposeString("publicId", { nullable: true }),
     isEnabled: t.exposeBoolean("isEnabled"),

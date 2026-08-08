@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import { ROUTINES_QUERY, AGENTS_QUERY, GOALS_QUERY } from "@/lib/graphql/queries";
@@ -35,7 +36,9 @@ interface Routine {
 }
 
 export default function RoutinesPage() {
-  const [{ data, fetching }, refetch] = useQuery<{ routines: Routine[] }>({ query: ROUTINES_QUERY });
+  const [{ data, fetching }, refetch] = useQuery<{ routines: Routine[] }>({
+    query: ROUTINES_QUERY,
+  });
   const [{ data: agentsData }] = useQuery<{ agents: { id: string; name: string }[] }>({
     query: AGENTS_QUERY,
   });
@@ -62,7 +65,11 @@ export default function RoutinesPage() {
     try {
       const res = await regenerateTrigger({ triggerId });
       if (res.error) {
-        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to regenerate trigger");
+        toast.error(
+          res.error.graphQLErrors?.[0]?.message ??
+            res.error.message ??
+            "Failed to regenerate trigger",
+        );
         return;
       }
       refetch({ requestPolicy: "network-only" });
@@ -76,7 +83,9 @@ export default function RoutinesPage() {
     try {
       const res = await updateRoutine({ id, isActive });
       if (res.error) {
-        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to update status");
+        toast.error(
+          res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to update status",
+        );
         return;
       }
       refetch({ requestPolicy: "network-only" });
@@ -90,7 +99,9 @@ export default function RoutinesPage() {
     try {
       const res = await triggerNow({ routineId: id });
       if (res.error) {
-        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to trigger routine");
+        toast.error(
+          res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to trigger routine",
+        );
         return;
       }
       const run = res.data?.triggerRoutineNow;
@@ -109,7 +120,9 @@ export default function RoutinesPage() {
     try {
       const res = await addTrigger({ routineId: id, type: "webhook" });
       if (res.error) {
-        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to add webhook");
+        toast.error(
+          res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to add webhook",
+        );
         return;
       }
       refresh();
@@ -124,7 +137,8 @@ export default function RoutinesPage() {
         <div>
           <h1 className="text-lg font-semibold text-foreground">Routines</h1>
           <p className="text-sm text-muted-foreground">
-            Reusable workflows with run history + immutable revisions. Firing a routine generates a task.
+            Reusable workflows with run history + immutable revisions. Firing a routine generates a
+            task.
           </p>
         </div>
         <Button onClick={() => setOpen(true)}>New routine</Button>
@@ -145,7 +159,12 @@ export default function RoutinesPage() {
         <Card key={r.id} className="space-y-2 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium text-foreground">{r.name}</span>
+              <Link
+                href={`/routines/${r.id}`}
+                className="font-medium text-foreground hover:underline"
+              >
+                {r.name}
+              </Link>
               <Badge variant="gray">v{r.currentVersion}</Badge>
               {!r.isActive && <Badge variant="gray">inactive</Badge>}
               {r.priority && <Badge variant="yellow">{r.priority}</Badge>}
