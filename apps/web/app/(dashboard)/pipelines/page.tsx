@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import {
@@ -118,7 +119,12 @@ function PipelineCard({
   return (
     <Card className="space-y-3 p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium text-foreground">{pipeline.name}</span>
+        <Link
+          href={`/pipelines/${pipeline.id}`}
+          className="font-medium text-foreground hover:underline"
+        >
+          {pipeline.name}
+        </Link>
         <label className="flex items-center gap-1 text-xs text-muted-foreground">
           <Checkbox
             checked={pipeline.sequentialOnly}
@@ -157,7 +163,8 @@ function PipelineCard({
               className="text-xs text-destructive"
               onClick={async () => {
                 const res = await deleteStage({ stageId: s.id });
-                if (res.error) toast.error(res.error.graphQLErrors[0]?.message ?? "Cannot delete stage");
+                if (res.error)
+                  toast.error(res.error.graphQLErrors[0]?.message ?? "Cannot delete stage");
                 else onStagesChanged();
               }}
             >
@@ -283,7 +290,9 @@ function PipelineCard({
 }
 
 export default function PipelinesPage() {
-  const [{ data, fetching }, refetch] = useQuery<{ pipelines: Pipeline[] }>({ query: PIPELINES_QUERY });
+  const [{ data, fetching }, refetch] = useQuery<{ pipelines: Pipeline[] }>({
+    query: PIPELINES_QUERY,
+  });
 
   const [open, setOpen] = useState(false);
   const pipelines = data?.pipelines ?? [];
@@ -294,7 +303,8 @@ export default function PipelinesPage() {
         <div>
           <h1 className="text-lg font-semibold text-foreground">Pipelines</h1>
           <p className="text-sm text-muted-foreground">
-            Multi-stage case workflows. Claim a case, advance it forward through stages, or reject it.
+            Multi-stage case workflows. Claim a case, advance it forward through stages, or reject
+            it.
           </p>
         </div>
         <Button onClick={() => setOpen(true)}>New pipeline</Button>

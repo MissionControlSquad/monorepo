@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation } from "urql";
 import {
   ENVIRONMENTS_QUERY,
@@ -128,8 +129,8 @@ export default function EnvironmentsPage() {
           <h1 className="text-lg font-semibold text-foreground">Environments</h1>
           <p className="text-sm text-muted-foreground">
             Define where and how a run executes — a driver (local, SSH, sandbox, or plugin), its
-            config, and env vars. Agents bind to an environment. Secrets are referenced by vault name
-            and never leave the server.
+            config, and env vars. Agents bind to an environment. Secrets are referenced by vault
+            name and never leave the server.
           </p>
         </div>
         <Button onClick={() => setOpen(true)}>New environment</Button>
@@ -350,10 +351,13 @@ function RecentWorkspacesSection() {
         )}
         {rows.map((w) => (
           <div key={w.id} className="flex flex-wrap items-center justify-between gap-2">
-            <span className="flex items-center gap-2 truncate font-mono text-xs text-muted-foreground">
+            <Link
+              href={`/environments/workspaces/${w.id}`}
+              className="flex items-center gap-2 truncate font-mono text-xs text-muted-foreground hover:text-foreground hover:underline"
+            >
               <Badge variant="gray">{w.strategyType}</Badge>
               {w.providerType} · {w.createdAt.slice(0, 19).replace("T", " ")}
-            </span>
+            </Link>
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
               {w.operations.map((o) => (
                 <Badge key={o.id} variant={o.status === "failed" ? "red" : "green"}>

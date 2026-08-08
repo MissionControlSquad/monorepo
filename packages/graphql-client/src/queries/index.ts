@@ -155,8 +155,11 @@ export { SECRET_PROPOSALS_QUERY } from "./secret-proposals";
 
 export {
   ROUTINES_QUERY,
+  ROUTINE_QUERY,
   ROUTINE_RUNS_QUERY,
   PIPELINES_QUERY,
+  PIPELINE_QUERY,
+  PIPELINE_STATS_QUERY,
   CASES_IN_PIPELINE_QUERY,
   REVIEW_CASES_QUERY,
   PIPELINE_HEALTH_QUERY,
@@ -238,6 +241,7 @@ export {
 export {
   PROJECT_WORKSPACES_QUERY,
   EXECUTION_WORKSPACES_QUERY,
+  EXECUTION_WORKSPACES_DETAIL_QUERY,
 } from "./execution-workspaces";
 export { SIDEBAR_BADGES_QUERY } from "./sidebar-badges";
 export { SIDEBAR_PREFERENCE_QUERY } from "./sidebar-preferences";

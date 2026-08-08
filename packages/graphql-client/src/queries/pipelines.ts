@@ -22,6 +22,42 @@ export const ROUTINES_QUERY = gql`
   }
 `;
 
+// Detail read for a single routine — definition, triggers (incl. cron schedule) and revisions.
+export const ROUTINE_QUERY = gql`
+  query Routine($id: String!) {
+    routine(id: $id) {
+      id
+      name
+      description
+      definition
+      isActive
+      timezone
+      currentVersion
+      assigneeAgentId
+      priority
+      goalId
+      projectId
+      createdAt
+      updatedAt
+      triggers {
+        id
+        type
+        cronExpression
+        timezone
+        nextFireAt
+        publicId
+        isEnabled
+        createdAt
+      }
+      revisions {
+        id
+        version
+        createdAt
+      }
+    }
+  }
+`;
+
 export const ROUTINE_RUNS_QUERY = gql`
   query RoutineRuns($routineId: String!, $limit: Int) {
     routineRuns(routineId: $routineId, limit: $limit) {
@@ -49,6 +85,48 @@ export const PIPELINES_QUERY = gql`
         isReviewStage
         requireApproval
         slaMinutes
+      }
+    }
+  }
+`;
+
+// Detail read for a single pipeline — header + its ordered stages.
+export const PIPELINE_QUERY = gql`
+  query Pipeline($id: String!) {
+    pipeline(id: $id) {
+      id
+      name
+      description
+      sequentialOnly
+      isActive
+      projectId
+      createdAt
+      updatedAt
+      stages {
+        id
+        name
+        order
+        isReviewStage
+        requireApproval
+        slaMinutes
+      }
+    }
+  }
+`;
+
+// Aggregate pipeline metrics for the detail header (counts + per-stage distribution).
+export const PIPELINE_STATS_QUERY = gql`
+  query PipelineStats($pipelineId: String!) {
+    pipelineStats(pipelineId: $pipelineId) {
+      activeCount
+      doneCount
+      rejectedCount
+      staleCount
+      completedLast24h
+      byStage {
+        stageId
+        stageName
+        count
       }
     }
   }
