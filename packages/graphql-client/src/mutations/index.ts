@@ -285,6 +285,11 @@ export { SET_SIDEBAR_PREFERENCE } from "./sidebar-preferences";
 export { ADD_PROJECT_DOC_COMMENT, RESOLVE_PROJECT_DOC_COMMENT, DELETE_PROJECT_DOC_COMMENT } from "./project-doc-comments";
 export { SUBMIT_FEEDBACK } from "./feedback";
 export { CREATE_ASSET_UPLOAD_URL, RECORD_ASSET, DELETE_ASSET } from "./assets";
+export {
+  PRESIGN_TASK_ATTACHMENT,
+  CONFIRM_TASK_ATTACHMENT,
+  DELETE_TASK_ATTACHMENT,
+} from "./task-attachments";
 export { UPSERT_EXTERNAL_OBJECT, REFRESH_EXTERNAL_OBJECT, DELETE_EXTERNAL_OBJECT } from "./external-objects";
 export { UPSERT_CLOUD_UPSTREAM, DELETE_CLOUD_UPSTREAM } from "./cloud-upstreams";
 export { SET_INBOX_POLICY, DELETE_INBOX_POLICY } from "./inbox-policies";

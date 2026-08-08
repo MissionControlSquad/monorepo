@@ -12,6 +12,7 @@ import "./work-session";
 import "./status-history";
 import "./agent-action";
 import "./deliverable";
+import "./task-attachment";
 import "./task-template";
 import "./recurring-task";
 import "./project";

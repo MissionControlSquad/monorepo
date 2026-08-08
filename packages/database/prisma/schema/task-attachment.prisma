@@ -1,0 +1,24 @@
+// Task artifact attachments (parity: agent/user attaches a produced file to a task/issue). A file
+// uploaded to a task via the two-step presigned R2 upload: presignTaskAttachment (pending row + a
+// presigned PUT) -> client/agent PUTs the bytes -> confirmTaskAttachment (status=uploaded). Content
+// lives in R2 under the shared `attachments/` prefix (no new bucket); this row is the metadata +
+// pointer, reusing the same storage as Asset/Deliverable. D5: workspaceId no FK, TEXT status.
+// The agent-facing path is the run-scoped in-sandbox bridge (least-privilege), not workspace creds.
+model TaskAttachment {
+  id                  String   @id @default(cuid())
+  workspaceId         String // no FK (D5)
+  taskId              String
+  storageKey          String // R2 object key (attachments/ prefix)
+  fileName            String
+  contentType         String
+  byteSize            Int      @default(0)
+  status              String   @default("pending") // pending | uploaded
+  uploadedByProfileId String? // human Profile id or agent Profile id; null = unknown
+  createdAt           DateTime @default(now())
+
+  task Task @relation("TaskAttachments", fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([taskId, createdAt])
+  @@map("task_attachments")
+}

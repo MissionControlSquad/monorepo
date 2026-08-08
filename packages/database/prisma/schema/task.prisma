@@ -66,6 +66,7 @@ model Task {
   relationsFrom     TaskRelation[]     @relation("TaskRelationSource")
   relationsTo       TaskRelation[]     @relation("TaskRelationTarget")
   externalLinks     ExternalLink[]     @relation("TaskExternalLinks")
+  attachments       TaskAttachment[]   @relation("TaskAttachments")
 
   // Epic #8: lease-based atomic checkout + autonomy hardening.
   checkedOutByProfileId  String?
