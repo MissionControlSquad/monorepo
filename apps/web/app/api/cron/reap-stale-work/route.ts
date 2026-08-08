@@ -17,6 +17,8 @@
  *  - scanSilentRuns — record output-silence verdicts for running runs gone quiet (Domain 9 #10).
  *  - reconcileActiveSubtreeWatchdogs — wake a verify agent when a stopped subtree's fingerprint changes (Domain 9 #9).
  *  - pruneTelemetry — retention-prune first-party telemetry events by class (Domain 12 E).
+ *  - drainMemoryJobs — run one lease-protected batch of async memory-capture jobs (MEMORY-gated).
+ *  - refreshDueExternalObjects — re-fetch stale cached PR/issue snapshots (EXTERNAL_OBJECTS-gated).
  *
  * Registered in vercel.json to run every 5 minutes.
  */
@@ -36,6 +38,10 @@ import { tickDueTaskMonitors } from "@/server/services/task-monitors";
 import { scanSilentRuns } from "@/server/services/run-silence-watchdog";
 import { reconcileActiveSubtreeWatchdogs } from "@/server/services/subtree-watchdog";
 import { pruneTelemetry } from "@/server/services/telemetry-sink";
+import { drainMemoryJobs } from "@/server/services/memory-jobs";
+import { refreshDueExternalObjects } from "@/server/services/external-objects";
+import { isFeatureEnabled } from "@/server/feature-flags";
+import { FLAG_KEYS } from "@agentcenter/utils";
 
 export async function GET(request: Request) {
   try {
@@ -61,6 +67,8 @@ export async function GET(request: Request) {
       silentRuns,
       subtreeWake,
       telemetryPruned,
+      memoryJobs,
+      externalObjects,
     ] = await Promise.all([
       sweepExpiredCheckouts(now),
       reapStuckRunnerCommands(now),
@@ -76,6 +84,16 @@ export async function GET(request: Request) {
       scanSilentRuns(undefined, { now: now.getTime() }).catch(() => []),
       reconcileActiveSubtreeWatchdogs().catch(() => ({ checked: 0, toWake: 0 })),
       pruneTelemetry().catch(() => 0),
+      // Async memory-capture drain (Paperclip memory-jobs port). Self-gated behind the MEMORY flag; runs
+      // one lease-protected batch of queued capture jobs through the existing capture path. Best-effort.
+      drainMemoryJobs(now).catch(() => ({ claimed: 0, completed: 0, failed: 0 })),
+      // External-object background poller: re-fetch stale cached PR/issue snapshots. EXTERNAL_OBJECTS-
+      // gated (mirrors the on-demand mutation); reuses the same provider fetch. Best-effort.
+      isFeatureEnabled(FLAG_KEYS.EXTERNAL_OBJECTS)
+        .then((on) =>
+          on ? refreshDueExternalObjects({ now }) : { due: 0, refreshed: 0, failed: 0 },
+        )
+        .catch(() => ({ due: 0, refreshed: 0, failed: 0 })),
     ]);
     // Stranded-work reconciliation runs AFTER retry promotion so a run that just earned a retry (now
     // queued) is not mistaken for stranded. Owner-preserving re-dispatch → escalate-to-blocked ladder.
@@ -98,6 +116,9 @@ export async function GET(request: Request) {
       silentRunsFlagged: silentRuns.length,
       subtreeWatchdogsWoken: subtreeWake.toWake,
       telemetryPruned,
+      memoryJobsDrained: memoryJobs.completed,
+      memoryJobsFailed: memoryJobs.failed,
+      externalObjectsRefreshed: externalObjects.refreshed,
       at: now.toISOString(),
     });
   } catch (err) {
