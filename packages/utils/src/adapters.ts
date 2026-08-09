@@ -728,6 +728,20 @@ export function deriveAdapterExecutionResult(
   };
 }
 
+/**
+ * Render a typed transcript into readable text for a task message. When a runtime is driven in
+ * stream-json mode its raw stdout is machine JSONL - this turns it back into the agent's assistant
+ * turns (plus brief tool-call markers) so the timeline shows human-readable output, not JSONL.
+ */
+export function renderAdapterTranscript(events: AdapterTranscriptEvent[]): string {
+  const parts: string[] = [];
+  for (const e of events) {
+    if (e.kind === "assistant" && e.text) parts.push(e.text);
+    else if (e.kind === "tool_call" && e.tool) parts.push(`→ ${e.tool}`);
+  }
+  return parts.join("\n\n").trim();
+}
+
 // ─── Built-in adapters ──────────────────────────────────────────────────────
 
 const openclawAdapter: Adapter = {
@@ -756,7 +770,9 @@ const codexAdapter: Adapter = {
   installCommand: "npm install -g @openai/codex",
   binName: "codex",
   build: (ctx) => ({
-    argv: ["codex", "exec", ...(ctx.model ? ["-m", ctx.model] : []), brief(ctx)],
+    // `exec --json` so codex streams its JSONL protocol (item.started/item.completed) that
+    // codexParseLine consumes into a typed transcript + usage.
+    argv: ["codex", "exec", "--json", ...(ctx.model ? ["-m", ctx.model] : []), brief(ctx)],
     mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
@@ -780,7 +796,18 @@ const claudeAdapter: Adapter = {
   installCommand: "npm install -g @anthropic-ai/claude-code",
   binName: "claude",
   build: (ctx) => ({
-    argv: ["claude", "--print", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    // stream-json (with --verbose, which Claude requires alongside --print) so the run emits the JSONL
+    // that claudeParseLine turns into a typed transcript + usage. Without this the CLI prints plain text
+    // and the structured-result path never activates.
+    argv: [
+      "claude",
+      "--print",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      ...(ctx.model ? ["--model", ctx.model] : []),
+      brief(ctx),
+    ],
     mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
@@ -803,7 +830,15 @@ const geminiAdapter: Adapter = {
   installCommand: "npm install -g @google/gemini-cli",
   binName: "gemini",
   build: (ctx) => ({
-    argv: ["gemini", ...(ctx.model ? ["-m", ctx.model] : []), "-p", brief(ctx)],
+    // `-o stream-json` so gemini emits the JSONL assistant/result stream geminiParseLine consumes.
+    argv: [
+      "gemini",
+      ...(ctx.model ? ["-m", ctx.model] : []),
+      "-o",
+      "stream-json",
+      "-p",
+      brief(ctx),
+    ],
     mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,

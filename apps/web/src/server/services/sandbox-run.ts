@@ -18,6 +18,7 @@ import {
   requiresSandboxContainment,
   resolveEffectiveWorkspaceStrategyType,
   redactRunSecrets,
+  renderAdapterTranscript,
   FLAG_KEYS,
   type TrustLevel,
   type AdapterExecutionResult,
@@ -541,6 +542,15 @@ export async function runTaskInSandbox(input: {
       }
     }
 
+    // When the runtime was driven in stream-json mode its stdout is machine JSONL - show the PARSED
+    // assistant transcript on the task timeline (and in the memory summary) instead of raw JSONL. Blob
+    // adapters (no transcript) fall back to the raw captured stdout unchanged.
+    const parsedOutput =
+      execution?.transcript && execution.transcript.length
+        ? renderAdapterTranscript(execution.transcript)
+        : "";
+    const displayOutput = parsedOutput || stdout;
+
     await prisma.agentRun.update({
       where: { id: run.id },
       data: {
@@ -593,7 +603,7 @@ export async function runTaskInSandbox(input: {
     await postRunToTask(
       agent.id,
       input.taskId,
-      `Sandbox run (${providerKey}) — ${runStatus}${exitCode != null ? `, exit ${exitCode}` : ""}\n\n${stdout || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
+      `Sandbox run (${providerKey}) - ${runStatus}${exitCode != null ? `, exit ${exitCode}` : ""}\n\n${displayOutput || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
     );
 
     // Post-run memory auto-capture (Domain 4 GAP-B): persist run residue when the agent's effective
@@ -602,7 +612,7 @@ export async function runTaskInSandbox(input: {
     // ENQUEUES a job and the reap cron drains it, so capture survives process loss. With the flag off
     // we fall back to the original inline capture so nothing regresses.
     const memorySummary =
-      `Run ${runStatus} (${providerKey}${exitCode != null ? `, exit ${exitCode}` : ""}).\n${stdout || ""}`.trim();
+      `Run ${runStatus} (${providerKey}${exitCode != null ? `, exit ${exitCode}` : ""}).\n${displayOutput || ""}`.trim();
     if (await isFeatureEnabled(FLAG_KEYS.MEMORY)) {
       await enqueueMemoryJob({
         workspaceId: input.workspaceId,

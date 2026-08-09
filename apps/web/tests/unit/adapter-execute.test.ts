@@ -166,6 +166,20 @@ describe("execute() — structured result derivation", () => {
     expect(result.usage?.tokensOut).toBe(45);
   });
 
+  it("renderAdapterTranscript turns a parsed transcript into readable task text (not JSONL)", async () => {
+    const { renderAdapterTranscript } = await import("@agentcenter/utils");
+    const result = claude.execute!({
+      stdout: CLAUDE_STDOUT,
+      stderr: "",
+      exitCode: 0,
+      timedOut: false,
+    });
+    const text = renderAdapterTranscript(result.transcript ?? []);
+    expect(text).toContain("hello"); // the assistant turn
+    expect(text).not.toContain("{"); // no raw JSON
+    expect(renderAdapterTranscript([])).toBe("");
+  });
+
   it("a rate-limit that actually FAILS the run keeps errorFamily transient_upstream", () => {
     const result = claude.execute!({
       stdout: JSON.stringify({ type: "result", subtype: "error", is_error: true }),
