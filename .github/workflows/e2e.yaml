@@ -106,6 +106,10 @@ jobs:
         run: cd apps/web && npx tsx scripts/seed-enterprise.ts
         env:
           SEED_FAST: "1"
+          # Enable the RUNNERS flag for the served app so the agent-lifecycle spec can reach the
+          # RUNNERS-gated cloud skill+config endpoint (/api/agents/me/context). Runs before the app
+          # boots; the app's create-only flag startup-migration then leaves this row untouched.
+          SEED_ENABLE_RUNNERS: "1"
 
       - name: Build web app
         run: npx turbo run build --filter=@agentcenter/web
