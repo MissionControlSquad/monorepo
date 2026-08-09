@@ -24,15 +24,16 @@ describe("runtime-templates", () => {
     expect(r.layout.instructionsFile).toBe("AGENTS.md");
   });
 
-  it("codex passes the prompt to `codex exec`", () => {
+  it("codex passes the prompt to `codex exec --json`", () => {
     const r = renderRuntimeCommand("codex", { ...base, prompt: "do the thing" });
-    expect(r.argv).toEqual(["codex", "exec", "do the thing"]);
+    // `--json` makes codex stream its JSONL protocol that codexParseLine consumes; the prompt is last.
+    expect(r.argv).toEqual(["codex", "exec", "--json", "do the thing"]);
     expect(r.useShell).toBe(false);
   });
 
   it("codex falls back to the title when no prompt is given", () => {
     const r = renderRuntimeCommand("codex", base);
-    expect(r.argv[2]).toBe("Fix nav");
+    expect(r.argv.at(-1)).toBe("Fix nav");
   });
 
   it("custom substitutes tokens into the argv template", () => {

@@ -80,6 +80,7 @@ describe("adapter registry", () => {
     expect(argvOf(buildAdapterInvocation("codex_local", { ...base, model: "o4" }))).toEqual([
       "codex",
       "exec",
+      "--json",
       "-m",
       "o4",
       "the brief",
@@ -107,9 +108,11 @@ describe("adapter registry", () => {
   });
 
   it("codex / claude / gemini pass the brief + model in their own flag style", () => {
+    // Each drives the CLI in stream-json mode so its per-runtime parseLine activates on real runs.
     expect(argvOf(buildAdapterInvocation("codex", { ...base, model: "o4" }))).toEqual([
       "codex",
       "exec",
+      "--json",
       "-m",
       "o4",
       "the brief",
@@ -117,12 +120,17 @@ describe("adapter registry", () => {
     expect(argvOf(buildAdapterInvocation("claude", base))).toEqual([
       "claude",
       "--print",
+      "--output-format",
+      "stream-json",
+      "--verbose",
       "the brief",
     ]);
     expect(argvOf(buildAdapterInvocation("gemini", { ...base, model: "gemini-2" }))).toEqual([
       "gemini",
       "-m",
       "gemini-2",
+      "-o",
+      "stream-json",
       "-p",
       "the brief",
     ]);

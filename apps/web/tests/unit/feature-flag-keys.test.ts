@@ -41,10 +41,11 @@ describe("FLAG_KEYS", () => {
     // Tier D
     expect(FLAG_KEYS.RUNNERS).toBe("runners");
     expect(FLAG_KEYS.MEMORY).toBe("memory");
+    expect(FLAG_KEYS.AI_TOOLS).toBe("ai_tools");
   });
 
-  it("has 60 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(60);
+  it("has 61 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(61);
   });
 
   it("every flag key has a matching default (FLAG_KEYS ⊇ FLAG_DEFAULTS in sync)", () => {
