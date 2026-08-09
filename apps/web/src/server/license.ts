@@ -47,9 +47,14 @@ export interface LicenseInfo {
 const IS_TEST = !!process.env.VITEST;
 // Local-dev escape hatch for manual testing without a signed license. A dedicated flag (NOT VITEST) so
 // it can't affect the test suite — the license tests run under VITEST and must still see real statuses.
-// Hard-guarded on NODE_ENV so it can never take effect in production; set LICENSE_DEV_BYPASS=1 in a dev .env.
+// Guarded so it can't take effect on a real production server: requires the explicit LICENSE_DEV_BYPASS=1
+// opt-in AND either a non-production build or a CI run. The e2e job runs a production `next start` build
+// (NODE_ENV=production) under CI, so without the CI escape hatch getLicenseStatus() returns NONE, the
+// login page redirects to /activate, and every spec fails at the auth step. A real production deployment
+// has CI unset (and must not set LICENSE_DEV_BYPASS at all), so it stays fully gated.
 const DEV_LICENSE_BYPASS =
-  process.env.LICENSE_DEV_BYPASS === "1" && process.env.NODE_ENV !== "production";
+  process.env.LICENSE_DEV_BYPASS === "1" &&
+  (process.env.NODE_ENV !== "production" || process.env.CI === "true");
 const LICENSE_SERVER_URL = process.env.LICENSE_SERVER_URL || "https://admin.app.agentcenter.cloud";
 const IS_SELF_HOSTED = !process.env.LICENSE_REFRESH_TOKEN; // hosted clients have this env injected
 const REFRESH_INTERVAL_MS = IS_SELF_HOSTED
