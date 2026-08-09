@@ -691,12 +691,20 @@ export function deriveAdapterExecutionResult(
   }
 
   const { usage, isError, subtype } = extractOutcome(input.stdout);
-  const combined = `${input.stdout}\n${input.stderr ?? ""}`;
-  const errorFamily = classifyErrorFamily(combined) ?? undefined;
   const timedOut = Boolean(input.timedOut);
   const maxTurns = subtype === "error_max_turns";
+  const combined = `${input.stdout}\n${input.stderr ?? ""}`;
+  const family = classifyErrorFamily(combined) ?? undefined;
+  // `transient_upstream` (rate-limit / overload) is frequently BENIGN telemetry that a runtime emits on
+  // a successful run (e.g. Claude's `rate_limit_event`), so it must not by itself flip a success to a
+  // failure - it only counts when the run otherwise failed (non-zero exit, etc.). A terminal family
+  // (model_refusal / auth_required / model_not_found / provider_quota) is a real failure even on a clean
+  // exit. The authoritative signals (exit code, is_error, timeout, max-turns) always decide too.
+  const terminalFamily = family && family !== "transient_upstream" ? family : undefined;
   const failed =
-    timedOut || (input.exitCode ?? 0) !== 0 || isError || maxTurns || Boolean(errorFamily);
+    timedOut || (input.exitCode ?? 0) !== 0 || isError || maxTurns || Boolean(terminalFamily);
+  // Only attach errorFamily when the run actually failed - never label a success with a transient note.
+  const errorFamily = failed ? family : undefined;
 
   const status: AdapterExecutionStatus = timedOut ? "timeout" : failed ? "error" : "success";
   const exitReason: AdapterExitReason = timedOut
