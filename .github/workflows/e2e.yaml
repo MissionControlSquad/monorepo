@@ -79,6 +79,9 @@ jobs:
           AUTH_SECRET="ci-e2e-secret-not-for-production"
           SYSTEM_SECRET="ci-e2e-system-secret"
           CRON_SECRET="ci-cron-secret"
+          # Secrets-vault master key (AES-256-GCM). env.ts requires >=32 chars at production runtime,
+          # which `next start` is — without it every request 500s and login never redirects. CI-only value.
+          SECRET_ENCRYPTION_KEY="ci-e2e-secret-encryption-key-not-for-production-0"
           LICENSE_DEV_BYPASS="1"
           NEXT_PUBLIC_MC_URL="http://localhost:3000"
           EOF
