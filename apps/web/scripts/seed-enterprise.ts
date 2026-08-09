@@ -18,6 +18,12 @@ import { POST as createTaskHandler } from "../app/api/tasks/route";
 import { POST as createMessage } from "../app/api/tasks/[id]/messages/route";
 import { POST as createDeliverable } from "../app/api/tasks/[id]/deliverables/route";
 
+// This seed drives the in-process API route handlers in a tight loop (thousands of tasks/messages),
+// which would otherwise trip the per-IP rate limiter (~120/60s) and abort with `Create task failed: 429`.
+// checkRateLimit() reads this flag at call-time, so setting it here (before any handler runs) bypasses
+// the limiter for this seed process only — the served app is a separate process and stays rate-limited.
+process.env.SEED_BYPASS_RATE_LIMIT = "1";
+
 const isFast = process.env.SEED_FAST === "1" || process.env.SEED_FAST === "true";
 
 const CONFIG = {

@@ -40,7 +40,17 @@ export async function checkRateLimit(
   // suite and trip non-deterministically — surfacing as whole files failing with 429 (a body of
   // `{error}` not `{errors}`, so tests that assert `!errors` then read `data` see undefined). Real
   // requests still get rate limited in dev/prod.
-  if (process.env.VITEST || process.env.NODE_ENV === "test") return null;
+  //
+  // Also disabled for the bulk seed (scripts/seed-enterprise.ts), which drives these same in-process
+  // route handlers in a tight loop to create thousands of tasks/messages — it would otherwise trip the
+  // per-IP limiter (~120/60s) partway through and abort with `Create task failed: 429`. The flag is only
+  // ever set by that seed process, so real dev/prod servers are unaffected.
+  if (
+    process.env.VITEST ||
+    process.env.NODE_ENV === "test" ||
+    process.env.SEED_BYPASS_RATE_LIMIT === "1"
+  )
+    return null;
 
   const ip = getClientIp(request.headers);
   const check = await limiter.checkAsync(ip);
