@@ -59,6 +59,11 @@ jobs:
       ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'securepass123' }}
       # In CI, boot a production server (fast + stable) rather than the dev server.
       PW_WEB_COMMAND: "npm run start --workspace @agentcenter/web"
+      # Disable per-IP rate limiting for the served app: Playwright drives it from several parallel
+      # workers behind one shared IP, so the per-IP limiters trip non-deterministically (429 pages +
+      # aborted GraphQL loads). CI-only; the middleware reads this at build time, so it must also be
+      # in the app .env written below (present at `next build` time).
+      E2E_RATE_LIMIT_DISABLED: "1"
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7
@@ -84,6 +89,9 @@ jobs:
           SECRET_ENCRYPTION_KEY="ci-e2e-secret-encryption-key-not-for-production-0"
           LICENSE_DEV_BYPASS="1"
           NEXT_PUBLIC_MC_URL="http://localhost:3000"
+          # Bypass per-IP rate limiting under the parallel Playwright run (see job env above). Read by
+          # both the Edge middleware (inlined at `next build`) and the per-route limiters at runtime.
+          E2E_RATE_LIMIT_DISABLED="1"
           EOF
 
       - name: Apply DB migrations
