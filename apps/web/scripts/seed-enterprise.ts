@@ -264,6 +264,12 @@ async function run() {
 run()
   .catch((e) => {
     console.error(e);
-    process.exit(1);
+    process.exitCode = 1;
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    // Force-exit after seeding. In CI (REDIS_URL set) the module-level, Redis-backed API rate limiters
+    // imported via the route handlers hold an open Redis connection that keeps the event loop alive, so
+    // the process would otherwise hang until the job timeout even though `run()` already finished.
+    await prisma.$disconnect();
+    process.exit(process.exitCode ?? 0);
+  });
