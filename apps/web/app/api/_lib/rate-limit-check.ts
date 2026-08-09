@@ -45,10 +45,15 @@ export async function checkRateLimit(
   // route handlers in a tight loop to create thousands of tasks/messages — it would otherwise trip the
   // per-IP limiter (~120/60s) partway through and abort with `Create task failed: 429`. The flag is only
   // ever set by that seed process, so real dev/prod servers are unaffected.
+  //
+  // And disabled for the Playwright e2e run (E2E_RATE_LIMIT_DISABLED, set only in the e2e workflow's
+  // app env): several parallel workers hit the served app from one shared IP, so these module-level
+  // limiters trip non-deterministically — the same reason the global middleware limiter is bypassed.
   if (
     process.env.VITEST ||
     process.env.NODE_ENV === "test" ||
-    process.env.SEED_BYPASS_RATE_LIMIT === "1"
+    process.env.SEED_BYPASS_RATE_LIMIT === "1" ||
+    process.env.E2E_RATE_LIMIT_DISABLED === "1"
   )
     return null;
 
