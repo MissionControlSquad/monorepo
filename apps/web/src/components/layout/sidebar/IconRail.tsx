@@ -46,6 +46,7 @@ import {
   GanttChart,
   Gauge,
   Cpu,
+  Wrench,
   Container,
   Gavel,
   Building2,
@@ -121,60 +122,259 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/timeline", icon: GanttChart, label: "Timeline", group: "Overview" },
 
   // ── Inbox ──
-  { href: "/attention", icon: Inbox, label: "Attention", flag: FLAG_KEYS.ATTENTION, group: "Inbox" },
-  { href: "/review", icon: ClipboardCheck, label: "Needs my review", flag: FLAG_KEYS.GOVERNANCE, group: "Inbox" },
-  { href: "/approvals", icon: Gavel, label: "Approvals", flag: FLAG_KEYS.GOVERNANCE, group: "Inbox" },
+  {
+    href: "/attention",
+    icon: Inbox,
+    label: "Attention",
+    flag: FLAG_KEYS.ATTENTION,
+    group: "Inbox",
+  },
+  {
+    href: "/review",
+    icon: ClipboardCheck,
+    label: "Needs my review",
+    flag: FLAG_KEYS.GOVERNANCE,
+    group: "Inbox",
+  },
+  {
+    href: "/approvals",
+    icon: Gavel,
+    label: "Approvals",
+    flag: FLAG_KEYS.GOVERNANCE,
+    group: "Inbox",
+  },
 
   // ── Agents ──
   { href: "/agents", icon: Bot, label: "Agents", group: "Agents" },
   { href: "/skills", icon: Puzzle, label: "Skills", flag: FLAG_KEYS.SKILLS_TEAMS, group: "Agents" },
   { href: "/teams", icon: Users, label: "Teams", flag: FLAG_KEYS.SKILLS_TEAMS, group: "Agents" },
-  { href: "/instructions", icon: FileText, label: "Instructions", flag: FLAG_KEYS.AGENT_INSTRUCTIONS, group: "Agents" },
-  { href: "/adapters", icon: Boxes, label: "Adapters", flag: FLAG_KEYS.MULTI_PROVIDER_ADAPTERS, group: "Agents" },
+  {
+    href: "/instructions",
+    icon: FileText,
+    label: "Instructions",
+    flag: FLAG_KEYS.AGENT_INSTRUCTIONS,
+    group: "Agents",
+  },
+  {
+    href: "/adapters",
+    icon: Boxes,
+    label: "Adapters",
+    flag: FLAG_KEYS.MULTI_PROVIDER_ADAPTERS,
+    group: "Agents",
+  },
   { href: "/adapter-plugins", icon: Puzzle, label: "Adapter plugins", group: "Agents" },
-  { href: "/org-chart", icon: Network, label: "Org chart", flag: FLAG_KEYS.ORG_CHART, group: "Agents" },
-  { href: "/companies", icon: Building2, label: "Companies", flag: FLAG_KEYS.AGENT_COMPANIES, group: "Agents" },
-  { href: "/agent-authz", icon: Lock, label: "Agent access", flag: FLAG_KEYS.AGENT_AUTHZ, group: "Agents" },
-  { href: "/agent-insights", icon: Activity, label: "Agent insights", flag: FLAG_KEYS.PRODUCTIVITY_REVIEW, group: "Agents" },
+  {
+    href: "/org-chart",
+    icon: Network,
+    label: "Org chart",
+    flag: FLAG_KEYS.ORG_CHART,
+    group: "Agents",
+  },
+  {
+    href: "/companies",
+    icon: Building2,
+    label: "Companies",
+    flag: FLAG_KEYS.AGENT_COMPANIES,
+    group: "Agents",
+  },
+  {
+    href: "/agent-authz",
+    icon: Lock,
+    label: "Agent access",
+    flag: FLAG_KEYS.AGENT_AUTHZ,
+    group: "Agents",
+  },
+  {
+    href: "/agent-insights",
+    icon: Activity,
+    label: "Agent insights",
+    flag: FLAG_KEYS.PRODUCTIVITY_REVIEW,
+    group: "Agents",
+  },
   { href: "/memory", icon: Brain, label: "Agent memory", flag: FLAG_KEYS.MEMORY, group: "Agents" },
 
   // ── Work ──
   { href: "/projects", icon: FolderKanban, label: "Projects", group: "Work" },
   { href: "/goals", icon: Target, label: "Goals", flag: FLAG_KEYS.GOALS, group: "Work" },
   { href: "/cases", icon: Ticket, label: "Cases", flag: FLAG_KEYS.CASES, group: "Work" },
-  { href: "/routines", icon: Repeat, label: "Routines", flag: FLAG_KEYS.PIPELINES_ROUTINES, group: "Work" },
-  { href: "/pipelines", icon: Workflow, label: "Pipelines", flag: FLAG_KEYS.PIPELINES_ROUTINES, group: "Work" },
-  { href: "/reliability", icon: ShieldCheck, label: "Reliability", flag: FLAG_KEYS.TASK_AUTONOMY, group: "Work" },
+  {
+    href: "/routines",
+    icon: Repeat,
+    label: "Routines",
+    flag: FLAG_KEYS.PIPELINES_ROUTINES,
+    group: "Work",
+  },
+  {
+    href: "/pipelines",
+    icon: Workflow,
+    label: "Pipelines",
+    flag: FLAG_KEYS.PIPELINES_ROUTINES,
+    group: "Work",
+  },
+  {
+    href: "/reliability",
+    icon: ShieldCheck,
+    label: "Reliability",
+    flag: FLAG_KEYS.TASK_AUTONOMY,
+    group: "Work",
+  },
   { href: "/monitors", icon: Gauge, label: "Monitors", flag: FLAG_KEYS.MONITORS, group: "Work" },
 
   // ── Communication ──
-  { href: "/channels", icon: MessageSquare, label: "Channels", flag: FLAG_KEYS.CHANNELS, group: "Communication" },
-  { href: "/boardroom", icon: Landmark, label: "Boardroom", flag: FLAG_KEYS.BOARD_CHAT, group: "Communication" },
-  { href: "/inbox-policies", icon: MailCheck, label: "Inbox policies", flag: FLAG_KEYS.INBOX_POLICY, group: "Communication" },
+  {
+    href: "/channels",
+    icon: MessageSquare,
+    label: "Channels",
+    flag: FLAG_KEYS.CHANNELS,
+    group: "Communication",
+  },
+  {
+    href: "/boardroom",
+    icon: Landmark,
+    label: "Boardroom",
+    flag: FLAG_KEYS.BOARD_CHAT,
+    group: "Communication",
+  },
+  {
+    href: "/inbox-policies",
+    icon: MailCheck,
+    label: "Inbox policies",
+    flag: FLAG_KEYS.INBOX_POLICY,
+    group: "Communication",
+  },
 
   // ── Infrastructure ──
-  { href: "/environments", icon: Container, label: "Environments", flag: FLAG_KEYS.ENVIRONMENTS, group: "Infrastructure" },
-  { href: "/runners", icon: Cpu, label: "Runners", flag: FLAG_KEYS.RUNNERS, group: "Infrastructure" },
-  { href: "/terminals", icon: SquareTerminal, label: "Terminals", flag: FLAG_KEYS.TERMINALS, group: "Infrastructure" },
-  { href: "/local-services", icon: ServerCog, label: "Local services", flag: FLAG_KEYS.LOCAL_SERVICES, group: "Infrastructure" },
-  { href: "/live-gateway", icon: Zap, label: "Live Gateway", flag: FLAG_KEYS.LIVE_GATEWAY, group: "Infrastructure" },
-  { href: "/cloud-upstreams", icon: GitBranch, label: "Cloud upstreams", flag: FLAG_KEYS.CLOUD_UPSTREAMS, group: "Infrastructure" },
-  { href: "/provider-auth", icon: KeyRound, label: "Provider auth", flag: FLAG_KEYS.PROVIDER_AUTH, group: "Infrastructure" },
-  { href: "/smoke-lab", icon: FlaskConical, label: "Smoke lab", flag: FLAG_KEYS.SMOKE_LAB, group: "Infrastructure" },
+  {
+    href: "/environments",
+    icon: Container,
+    label: "Environments",
+    flag: FLAG_KEYS.ENVIRONMENTS,
+    group: "Infrastructure",
+  },
+  {
+    href: "/runners",
+    icon: Cpu,
+    label: "Runners",
+    flag: FLAG_KEYS.RUNNERS,
+    group: "Infrastructure",
+  },
+  {
+    href: "/ai-tools",
+    icon: Wrench,
+    label: "AI Tools",
+    flag: FLAG_KEYS.AI_TOOLS,
+    group: "Infrastructure",
+  },
+  {
+    href: "/terminals",
+    icon: SquareTerminal,
+    label: "Terminals",
+    flag: FLAG_KEYS.TERMINALS,
+    group: "Infrastructure",
+  },
+  {
+    href: "/local-services",
+    icon: ServerCog,
+    label: "Local services",
+    flag: FLAG_KEYS.LOCAL_SERVICES,
+    group: "Infrastructure",
+  },
+  {
+    href: "/live-gateway",
+    icon: Zap,
+    label: "Live Gateway",
+    flag: FLAG_KEYS.LIVE_GATEWAY,
+    group: "Infrastructure",
+  },
+  {
+    href: "/cloud-upstreams",
+    icon: GitBranch,
+    label: "Cloud upstreams",
+    flag: FLAG_KEYS.CLOUD_UPSTREAMS,
+    group: "Infrastructure",
+  },
+  {
+    href: "/provider-auth",
+    icon: KeyRound,
+    label: "Provider auth",
+    flag: FLAG_KEYS.PROVIDER_AUTH,
+    group: "Infrastructure",
+  },
+  {
+    href: "/smoke-lab",
+    icon: FlaskConical,
+    label: "Smoke lab",
+    flag: FLAG_KEYS.SMOKE_LAB,
+    group: "Infrastructure",
+  },
 
   // ── Finance & insights ──
-  { href: "/finance", icon: CreditCard, label: "Finance", flag: FLAG_KEYS.BUDGETS, group: "Finance & insights" },
-  { href: "/ledger", icon: Receipt, label: "Ledger", flag: FLAG_KEYS.LEDGER, group: "Finance & insights" },
-  { href: "/analytics", icon: BarChart3, label: "Analytics", flag: FLAG_KEYS.ANALYTICS, group: "Finance & insights" },
-  { href: "/observability", icon: Activity, label: "Observability", flag: FLAG_KEYS.OBSERVABILITY, group: "Finance & insights" },
+  {
+    href: "/finance",
+    icon: CreditCard,
+    label: "Finance",
+    flag: FLAG_KEYS.BUDGETS,
+    group: "Finance & insights",
+  },
+  {
+    href: "/ledger",
+    icon: Receipt,
+    label: "Ledger",
+    flag: FLAG_KEYS.LEDGER,
+    group: "Finance & insights",
+  },
+  {
+    href: "/analytics",
+    icon: BarChart3,
+    label: "Analytics",
+    flag: FLAG_KEYS.ANALYTICS,
+    group: "Finance & insights",
+  },
+  {
+    href: "/observability",
+    icon: Activity,
+    label: "Observability",
+    flag: FLAG_KEYS.OBSERVABILITY,
+    group: "Finance & insights",
+  },
 
   // ── Content & platform ──
   { href: "/artifacts", icon: Images, label: "Artifacts", group: "Content & platform" },
-  { href: "/assets", icon: FileBox, label: "Assets", flag: FLAG_KEYS.ASSETS, group: "Content & platform" },
-  { href: "/portability", icon: PackageOpen, label: "Portability", flag: FLAG_KEYS.WORKSPACE_PORTABILITY, group: "Content & platform" },
-  { href: "/secrets", icon: KeyRound, label: "Secrets", flag: FLAG_KEYS.SECRETS_VAULT, group: "Content & platform" },
-  { href: "/plugins", icon: Plug, label: "Plugins", flag: FLAG_KEYS.PLUGIN_SDK, group: "Content & platform" },
-  { href: "/api-keys", icon: Terminal, label: "API keys", flag: FLAG_KEYS.API_KEYS, group: "Content & platform" },
+  {
+    href: "/assets",
+    icon: FileBox,
+    label: "Assets",
+    flag: FLAG_KEYS.ASSETS,
+    group: "Content & platform",
+  },
+  {
+    href: "/portability",
+    icon: PackageOpen,
+    label: "Portability",
+    flag: FLAG_KEYS.WORKSPACE_PORTABILITY,
+    group: "Content & platform",
+  },
+  {
+    href: "/secrets",
+    icon: KeyRound,
+    label: "Secrets",
+    flag: FLAG_KEYS.SECRETS_VAULT,
+    group: "Content & platform",
+  },
+  {
+    href: "/plugins",
+    icon: Plug,
+    label: "Plugins",
+    flag: FLAG_KEYS.PLUGIN_SDK,
+    group: "Content & platform",
+  },
+  {
+    href: "/api-keys",
+    icon: Terminal,
+    label: "API keys",
+    flag: FLAG_KEYS.API_KEYS,
+    group: "Content & platform",
+  },
 ];
 
 /**
@@ -283,7 +483,11 @@ export function IconRail({ onCreateTask }: IconRailProps) {
     <div className="flex h-full shrink-0">
       {/* ── Rail: brand + section icons + actions ── */}
       <div className="flex h-full w-[72px] shrink-0 flex-col items-center border-r border-border bg-background py-3">
-        <Link href="/" className="mb-3 flex h-9 w-9 items-center justify-center" title="AgentCenter">
+        <Link
+          href="/"
+          className="mb-3 flex h-9 w-9 items-center justify-center"
+          title="AgentCenter"
+        >
           <Image src="/logo.png" alt="AgentCenter" width={28} height={28} className="rounded-md" />
         </Link>
 
@@ -336,7 +540,11 @@ export function IconRail({ onCreateTask }: IconRailProps) {
             aria-label="Toggle theme"
             className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
           >
-            {isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+            {isDark ? (
+              <Sun className="h-[18px] w-[18px]" />
+            ) : (
+              <Moon className="h-[18px] w-[18px]" />
+            )}
           </button>
           <SupportMenu />
 
