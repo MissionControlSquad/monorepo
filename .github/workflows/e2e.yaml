@@ -88,8 +88,13 @@ jobs:
 
       # Seed an admin + a small squad (the lifecycle spec needs an admin login + a squad-lead agent
       # to review). Extend this as more specs need more fixtures.
+      # SEED_FAST keeps this to ~20 agents / ~100 tasks: the full enterprise seed (10k tasks, 200 agents)
+      # takes 30+ min and blows the job timeout mid-seed, so specs never run. Fast mode finishes in seconds
+      # and still provisions the admin + squad-lead the specs need.
       - name: Seed
         run: cd apps/web && npx tsx scripts/seed-enterprise.ts
+        env:
+          SEED_FAST: "1"
 
       - name: Build web app
         run: npx turbo run build --filter=@agentcenter/web
