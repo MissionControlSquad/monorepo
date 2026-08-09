@@ -146,6 +146,50 @@ describe("execute() — structured result derivation", () => {
     expect(result.errorFamily).toBe("model_refusal");
     expect(result.exitReason).toBe("refusal");
   });
+
+  it("a SUCCESSFUL run with a benign rate_limit_event telemetry line stays success (real-CLI regression)", () => {
+    // Claude emits a `rate_limit_event` line on a normal, successful run - it is telemetry, NOT a
+    // failure. Verified against real `claude --print --output-format stream-json` output.
+    const rateLimit = JSON.stringify({
+      type: "rate_limit_event",
+      rate_limit: { status: "allowed", resetsAt: "2026-08-09T00:00:00Z" },
+    });
+    const result = claude.execute!({
+      stdout: [CLAUDE_INIT, CLAUDE_ASSISTANT, rateLimit, CLAUDE_RESULT].join("\n"),
+      stderr: "",
+      exitCode: 0,
+      timedOut: false,
+    });
+    expect(result.status).toBe("success");
+    expect(result.exitReason).toBe("completed");
+    expect(result.errorFamily).toBeUndefined();
+    expect(result.usage?.tokensOut).toBe(45);
+  });
+
+  it("renderAdapterTranscript turns a parsed transcript into readable task text (not JSONL)", async () => {
+    const { renderAdapterTranscript } = await import("@agentcenter/utils");
+    const result = claude.execute!({
+      stdout: CLAUDE_STDOUT,
+      stderr: "",
+      exitCode: 0,
+      timedOut: false,
+    });
+    const text = renderAdapterTranscript(result.transcript ?? []);
+    expect(text).toContain("hello"); // the assistant turn
+    expect(text).not.toContain("{"); // no raw JSON
+    expect(renderAdapterTranscript([])).toBe("");
+  });
+
+  it("a rate-limit that actually FAILS the run keeps errorFamily transient_upstream", () => {
+    const result = claude.execute!({
+      stdout: JSON.stringify({ type: "result", subtype: "error", is_error: true }),
+      stderr: "Error: 429 rate limit exceeded, please try again later",
+      exitCode: 1,
+      timedOut: false,
+    });
+    expect(result.status).toBe("error");
+    expect(result.errorFamily).toBe("transient_upstream");
+  });
 });
 
 describe("defaultLineParser (fallback for adapters without parseLine)", () => {

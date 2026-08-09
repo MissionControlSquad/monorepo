@@ -691,12 +691,20 @@ export function deriveAdapterExecutionResult(
   }
 
   const { usage, isError, subtype } = extractOutcome(input.stdout);
-  const combined = `${input.stdout}\n${input.stderr ?? ""}`;
-  const errorFamily = classifyErrorFamily(combined) ?? undefined;
   const timedOut = Boolean(input.timedOut);
   const maxTurns = subtype === "error_max_turns";
+  const combined = `${input.stdout}\n${input.stderr ?? ""}`;
+  const family = classifyErrorFamily(combined) ?? undefined;
+  // `transient_upstream` (rate-limit / overload) is frequently BENIGN telemetry that a runtime emits on
+  // a successful run (e.g. Claude's `rate_limit_event`), so it must not by itself flip a success to a
+  // failure - it only counts when the run otherwise failed (non-zero exit, etc.). A terminal family
+  // (model_refusal / auth_required / model_not_found / provider_quota) is a real failure even on a clean
+  // exit. The authoritative signals (exit code, is_error, timeout, max-turns) always decide too.
+  const terminalFamily = family && family !== "transient_upstream" ? family : undefined;
   const failed =
-    timedOut || (input.exitCode ?? 0) !== 0 || isError || maxTurns || Boolean(errorFamily);
+    timedOut || (input.exitCode ?? 0) !== 0 || isError || maxTurns || Boolean(terminalFamily);
+  // Only attach errorFamily when the run actually failed - never label a success with a transient note.
+  const errorFamily = failed ? family : undefined;
 
   const status: AdapterExecutionStatus = timedOut ? "timeout" : failed ? "error" : "success";
   const exitReason: AdapterExitReason = timedOut
@@ -718,6 +726,20 @@ export function deriveAdapterExecutionResult(
     ...(errorFamily ? { errorFamily } : {}),
     transcript,
   };
+}
+
+/**
+ * Render a typed transcript into readable text for a task message. When a runtime is driven in
+ * stream-json mode its raw stdout is machine JSONL - this turns it back into the agent's assistant
+ * turns (plus brief tool-call markers) so the timeline shows human-readable output, not JSONL.
+ */
+export function renderAdapterTranscript(events: AdapterTranscriptEvent[]): string {
+  const parts: string[] = [];
+  for (const e of events) {
+    if (e.kind === "assistant" && e.text) parts.push(e.text);
+    else if (e.kind === "tool_call" && e.tool) parts.push(`→ ${e.tool}`);
+  }
+  return parts.join("\n\n").trim();
 }
 
 // ─── Built-in adapters ──────────────────────────────────────────────────────
@@ -748,7 +770,9 @@ const codexAdapter: Adapter = {
   installCommand: "npm install -g @openai/codex",
   binName: "codex",
   build: (ctx) => ({
-    argv: ["codex", "exec", ...(ctx.model ? ["-m", ctx.model] : []), brief(ctx)],
+    // `exec --json` so codex streams its JSONL protocol (item.started/item.completed) that
+    // codexParseLine consumes into a typed transcript + usage.
+    argv: ["codex", "exec", "--json", ...(ctx.model ? ["-m", ctx.model] : []), brief(ctx)],
     mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
@@ -772,7 +796,18 @@ const claudeAdapter: Adapter = {
   installCommand: "npm install -g @anthropic-ai/claude-code",
   binName: "claude",
   build: (ctx) => ({
-    argv: ["claude", "--print", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    // stream-json (with --verbose, which Claude requires alongside --print) so the run emits the JSONL
+    // that claudeParseLine turns into a typed transcript + usage. Without this the CLI prints plain text
+    // and the structured-result path never activates.
+    argv: [
+      "claude",
+      "--print",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      ...(ctx.model ? ["--model", ctx.model] : []),
+      brief(ctx),
+    ],
     mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
@@ -795,7 +830,15 @@ const geminiAdapter: Adapter = {
   installCommand: "npm install -g @google/gemini-cli",
   binName: "gemini",
   build: (ctx) => ({
-    argv: ["gemini", ...(ctx.model ? ["-m", ctx.model] : []), "-p", brief(ctx)],
+    // `-o stream-json` so gemini emits the JSONL assistant/result stream geminiParseLine consumes.
+    argv: [
+      "gemini",
+      ...(ctx.model ? ["-m", ctx.model] : []),
+      "-o",
+      "stream-json",
+      "-p",
+      brief(ctx),
+    ],
     mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
