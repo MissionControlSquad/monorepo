@@ -306,3 +306,4 @@ export {
   IMPORT_SKILL_FROM_CATALOG,
 } from "./skill-lifecycle";
 export { CREATE_FOLDER, RENAME_FOLDER, MOVE_FOLDER, DELETE_FOLDER, ADD_FOLDER_ITEM, REMOVE_FOLDER_ITEM } from "./folders";
+export { INSTALL_RUNTIME_TOOL_VIA_RUNNER } from "./ai-runtime";

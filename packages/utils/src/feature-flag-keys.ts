@@ -60,6 +60,7 @@ export const FLAG_KEYS = {
   LOCAL_SERVICES: "local_services",
   SMOKE_LAB: "smoke_lab",
   TELEMETRY: "telemetry",
+  AI_TOOLS: "ai_tools",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -134,4 +135,6 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.LOCAL_SERVICES]: false,
   [FLAG_KEYS.SMOKE_LAB]: false,
   [FLAG_KEYS.TELEMETRY]: false,
+  // AI Tools setup/doctor — detect installed AI CLIs + per-OS install help. Read-only helper; on by default.
+  [FLAG_KEYS.AI_TOOLS]: true,
 };

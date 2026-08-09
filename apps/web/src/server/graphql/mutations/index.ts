@@ -49,6 +49,7 @@ import "./deliverable-votes";
 import "./monitors";
 import "./runner-commands";
 import "./runner-hosts";
+import "./ai-runtime";
 import "./agent-runtime";
 import "./sandbox-run";
 import "./environments";

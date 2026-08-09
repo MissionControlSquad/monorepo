@@ -60,6 +60,7 @@ import "./finance-events";
 import "./work-products";
 import "./provider-quota";
 import "./runner-hosts";
+import "./ai-runtime";
 import "./runtime-adapters";
 import "./sandbox-providers";
 import "./environments";

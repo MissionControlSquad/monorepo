@@ -1,0 +1,22 @@
+// ─── Runner tool inventory (AI Tools doctor) ──────────────────────
+// The latest AI-CLI detection a REMOTE runner reported about ITS OWN machine, so the control plane can
+// render a remote host's installed/missing tools next to the local (server) inventory. A runner posts
+// its probe results (the RuntimeInventory shape) to POST /api/runner/ai-tools authenticated with its
+// agent Bearer key; we keep only the latest per runner (upsert on workspaceId + runnerId). The payload
+// is opaque JSON produced by the pure catalog on the runner side - no secrets, no code. AI_TOOLS-gated.
+
+model RunnerToolInventory {
+  id          String   @id @default(cuid())
+  workspaceId String // buildbase workspace _id; no FK (D5)
+  runnerId    String // the reporting agent/runner id (targetId of an agent runner)
+  runnerName  String? // human label for the machine, if the runner sent one
+  os          String // "macos" | "linux" | "windows"
+  payload     Json // the full RuntimeInventory the runner detected on its own host
+  reportedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, runnerId])
+  @@index([workspaceId])
+  @@map("runner_tool_inventories")
+}

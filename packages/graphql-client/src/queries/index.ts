@@ -266,3 +266,7 @@ export { AGENT_SKILL_SNAPSHOT_QUERY } from "./agent-skills-sync";
 export { SKILL_UPDATE_STATUS_QUERY, SKILL_CATALOG_PACKAGES_QUERY } from "./skill-lifecycle";
 export { FLAGGED_AGENTS_QUERY } from "./productivity-reviews";
 export { DECISIONS_QUERY } from "./decision-training";
+export {
+  AI_RUNTIME_INVENTORY_QUERY,
+  REPORTED_RUNTIME_INVENTORIES_QUERY,
+} from "./ai-runtime";
