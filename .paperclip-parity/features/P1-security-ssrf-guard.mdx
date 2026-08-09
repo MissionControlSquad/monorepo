@@ -1,0 +1,31 @@
+---
+feature: Remote HTTP endpoint guard (SSRF protection)
+priority: P1
+status: Present
+gate: done
+---
+
+# Remote HTTP endpoint guard (SSRF) · P1 · ✅ Present (security)
+
+> **Built** (`remote-http-endpoint-guard.ts` + `guardedFetch`, 19 tests). On-by-default; env escape
+> hatch `SSRF_ALLOW_PRIVATE_NETWORK`. Applied to the agent webhook `http` adapter (runner) + exe-dev +
+> cloudflare bridges. Only remaining vector: secret-provider endpoints (when the stubs are implemented).
+
+
+**What it is:** Paperclip's `remote-http-endpoint-guard.ts` (161 ln) validates every **outbound** HTTP
+endpoint an agent/plugin/webhook/external-object call would hit — parses the URL, resolves DNS, and
+**blocks private/link-local/loopback IP ranges** (SSRF defense) before the request is made.
+
+**Status in our monorepo (verified):** **Missing.** `grep` for `endpointGuard`/`ssrf`/`assertPublicUrl`
+found nothing. The monorepo makes outbound calls (github-fetch analog, webhooks, sandbox provider REST,
+routine webhook triggers, cloudflare/exe-dev bridges) **without a central SSRF guard.**
+
+**What's required (buildable-now):** a pure `assertPublicHttpEndpoint(url)` util (parse → DNS lookup →
+reject RFC-1918 / 127/8 / 169.254/16 / ::1 / metadata IPs) + a fetch wrapper, applied at every
+outbound call site (webhook triggers, external fetches, provider bridges). No infra needed.
+
+**Priority rationale:** **Security-critical.** An autonomous-agent platform that fetches URLs / fires
+webhooks / resolves external objects is an SSRF target; a compromised or misconfigured agent could pivot
+to internal services (cloud metadata, internal DBs). This is a genuine P1 gap I missed in the first pass.
+
+**Depends on:** nothing — pure Node (dns + net). Should gate all outbound HTTP.

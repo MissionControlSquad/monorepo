@@ -1,0 +1,721 @@
+# Paperclip → Monorepo parity — master tracker
+
+**Purpose:** local (gitignored) working cache so we never lose track of what Paperclip has that our
+monorepo is missing, and the production-readiness work to close each gap. NOT pushed to git.
+
+**Repos**
+- Paperclip (reference): `/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/paperclip`
+- Monorepo (ours): `/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo`
+
+**Boundary (do NOT port):** human auth, billing, human orgs/workspaces/RBAC — provided by `@buildbase/sdk`.
+Those are marked "buildbase-owned", not gaps.
+
+**Status legend:** ✅ Present · 🟡 Partial · ❌ Missing · 🚫 buildbase-owned (skip)
+
+## Domain docs (each written by an exploration pass)
+
+| # | Domain | Doc | Headline |
+|---|--------|-----|--------|
+| 1 | Environments & execution | `01-environments-execution.mdx` | ✅4/🟡14/❌16 — keystone: Environment model; quick wins: allowlist+low-trust ports |
+| 2 | Adapters & runtimes | `02-adapters-runtimes.mdx` | two disconnected registries, neither runs a real runtime; missing cursor/grok/opencode/pi/hermes/ACP |
+| 3 | Sandbox depth | `03-sandbox-depth.mdx` | narrowing was right; real work = prod-readiness (H3 persist→H1 runtime-install+H2 repo-auth+secrets-in-box) |
+| 4 | Memory | `04-memory.mdx` | post-run capture is DEAD CODE; no audit/hooks/cost/inspect UI |
+| 5 | Skills & knowledge | `05-skills-knowledge.mdx` | authoring at parity; gaps: catalog/import/update-audit/runtime-sync/studio/policy |
+| 6 | Plugins & MCP | `06-plugins-mcp.mdx` | **MCP = ZERO (largest epic)**; plugin runtime deferred |
+| 7 | Secrets & governance | `07-secrets.mdx` | ~40% subset; audit-on-resolve enum defined-but-never-written; no ext providers |
+| 8 | Work items | `08-work-items.mdx` | no TaskRun; work-product taxonomy; requireUntrustedPrReview is a DEAD TOGGLE |
+| 9 | Heartbeat / scheduling | `09-heartbeat-scheduling.mdx` | at parity on lease/redelivery; ❌ central scheduler, retries, stranded-work reconcile; auto-sleep cron unregistered |
+| 10 | Connectivity | `10-connectivity.mdx` | match/beat on WS; ❌ hermes/cursor_cloud, inbound MCP gateway, device pairing |
+| 11 | UI | `11-ui.mdx` | broad but thin; unblocker: JsonSchemaForm; ❌ environments/apps-MCP/plugin config UIs |
+| 12 | Cost / observability | `12-cost-observability.mdx` | near-parity; gaps: FinanceEvent ledger, quota polling, telemetry, OTel, log redaction |
+| 13 | Deployment / CLI | `13-deployment-cli.mdx` | ❌ deploy modes, operator CLI; 🟡 trust presets (no runtime fail-closed admission) |
+| 14 | Teams / governance | `14-teams-governance.mdx` | at parity; ❌ Agent-Companies package model; hire_agent approval unwired |
+
+## KEYSTONES (converge across many domains — build these FIRST)
+
+1. **`AgentRun` model (run persistence)** — referenced by sandbox(H3), heartbeat(run ledger), work-items(G3 TaskRun),
+   environments(leases keyed by run), cost(per-run attribution), memory(provenance→run). One table: every agent
+   execution (agentId, taskId, environment/provider, status, started/finished, exitCode, log ref, cost, provenance).
+   **Unblocks the most; build first.** Applied to sandbox = closes the "results returned but never stored" gap.
+2. **`Environment` model + CRUD** — unifies where/how a run executes (local|ssh|sandbox|host) + config + probe.
+   Ties runTaskInSandbox + RunnerHost + adapters into one selectable thing. UI needs (3).
+3. **`JsonSchemaForm` UI primitive** — gates every rich config screen (environments, adapters, plugins).
+   ✅ DONE — pure model `packages/utils/src/json-schema-form.ts` (parseJsonSchema + validateJsonSchemaForm
+   + applyJsonSchemaDefaults, with numeric/length/pattern constraints + `{secretRef:{name}}` vault-pointer
+   support) + reusable `apps/web/src/components/common/JsonSchemaForm.tsx`; dogfooded into
+   AgentAdapterConfigCard (replaced inline field rendering). Unit tests json-schema-form.test.ts (12/12
+   w/ adapter-config). Typecheck 12/12, web build ✓. NOTE: this is also when the fresh-machine test DB was
+   first stood up (brew postgresql@16 + apps/web/.env.test → agentcenter_test).
+
+## PHASED BACKLOG (dependency-ordered; value × cost)
+
+### Phase 1 — foundation + cheap security wire-ups (IN PROGRESS)
+- [x] **AgentRun model** (keystone #1) DONE (decbe4d) — agent_runs + runTaskInSandbox persists running→done/failed/timeout.
+- [x] **AgentRun surfaced** DONE (a7c142c) — AgentRun GraphQL type + agentRuns query (RUNNERS/member) + client + Run-history UI on /runners.
+- [x] **auto-sleep cron** registered in vercel.json (a7c142c).
+- [~] DEAD-toggle sweep — CORRECTIONS after verification:
+      • memory `appendAgentMemory` is NOT dead — wired via POST /api/agents/me/memory (runner path). The real gap is the
+        SANDBOX-run path doesn't capture MEMORY.md back (future, tie to run→memory-provenance).
+      • `requireUntrustedPrReview` is set/defined but ENFORCEMENT needs the PR-review flow (work-items G2, L) — not a cheap win.
+      • `hire_agent` approval — no hit in apps/web/src grep; re-check under a different name before wiring.
+- [ ] Secrets **audit-on-resolve** — DEFERRED w/ note: resolveWorkspaceSecret is shared by the presence-check (listing) AND
+      the real-access (provision) paths, so blind auditing spams events. Correct fix = audit at the USE site (defineCloudProvider
+      resolving required creds for a real provision, w/ secretId + runId). [S–M, do in Phase 2 with run context]
+- [ ] run→task-message (post sandbox output to the task timeline) — needs messageModel author/pipeline. [M]
+- [x] **Fail-closed low-trust sandbox admission** DONE (b901fd9) — SandboxProvider.isolating (local=false, cloud=true) +
+      utils.requiresSandboxContainment + runTaskInSandbox denies contained agents on non-isolating providers.
+      STILL TODO in this vein: execution allowlist enforcement (evaluateTrust "command" kind) on the runtime command;
+      surface `isolating` in the sandboxProviders query so the UI warns.
+
+### Phase 2 — sandbox production-readiness (IN PROGRESS)
+See 03-sandbox-depth.mdx.
+- [x] **H1 runtime-binary install + secrets-into-box** DONE (8dc7845) — Adapter.installCommand+binName (real Paperclip
+      commands) → idempotent `command -v||install` guard in the box; resolveEnvForAgent exports the agent's bound vault
+      secrets (LLM keys) into the run. Pure composeSandboxScript + unit tests.
+- [x] **H2 private-repo clone auth** DONE (fdf0882) — BYO GIT_TOKEN/GITHUB_TOKEN from vault → git credential helper
+      (`$PC_GIT_TOKEN`, never in URL/args/remote). Tests + docs.
+- [x] **run→task-message** DONE (1d5fc15) — runTaskInSandbox posts the outcome (status/exit/output) to the task
+      timeline as the agent, best-effort. (NOTE: the runTaskInSandbox docstring still says "does not write to the
+      task timeline" — stale, fix on next edit.)
+- [x] **Surface isolating** DONE (13aa44a) — query+client+UI expose provider isolation; low-trust UX visible.
+- [ ] Cancellation + retain-on-failure — BLOCKED on a decision: needs ASYNC runs (cancellation) and provider
+      reconnect-to-destroy (retain, else a billed box leaks). Do NOT ship leaky. Decide async-runs infra first.
+- [ ] Cloudflare bridge Worker artifact + deploy docs — large UNVERIFIABLE artifact (needs a CF account to test);
+      defer until CF is actually chosen for use.
+- [ ] Live-key verification — BLOCKED on the user handing over ONE real provider key (e.g. e2b).
+
+### RESOLVED decisions
+1. **Async runs — DONE (72dbb27).** enqueueSandboxRun (queued, non-blocking) → drainSandboxRunQueue worker
+   (atomic claim, /api/cron/run-sandbox-queue */1 + in-process-capable) → cancelAgentRun. GraphQL enqueue+cancel.
+   Caveat: on Vercel a run > function limit only completes on the persistent-server deploy.
+2. **MCP → 🚫 buildbase-boundary.** User: buildbase SDK provides MCP. Current @buildbase/sdk has no MCP module yet,
+   but per the user it's coming → DO NOT build MCP ourselves (removed from backlog; wait for the SDK). 06-plugins-mcp.mdx
+   MCP section is now advisory-only.
+
+### STILL OPEN (Phase 2 tail + next)
+- [x] Auto-dispatch: enqueue a sandbox run automatically when a task is assigned to a sandbox-bound agent — DONE (2dee1b5).
+      `autoDispatchSandboxForAssignment` on TASK_ASSIGNEES_CHANGED (events/handlers/auto-dispatch-sandbox.ts), RUNNERS-gated,
+      deduped vs queued/running, human/non-sandbox skipped. Tests: enqueue+dedup, no-provider no-op (16/16).
+- [x] Persistent-server in-process drain loop (server.ts) so long runs complete off-Vercel — DONE (bc02691).
+      sandbox-drain-loop.ts: RUNNERS-gated, non-overlapping, error-swallowing, unref'd; cadence/batch via env. Tests 3/3.
+- [x] Enqueue/cancel + queued/canceled states in the Runs UI — DONE (a4c5fe2). Enqueue button, Cancel on queued rows,
+      queued badge, 4s polling while in-flight. Client mutations ENQUEUE_TASK_IN_SANDBOX + CANCEL_AGENT_RUN (shared → web+mobile).
+- [ ] Live-key verification — needs a real key from the user.
+- [ ] Cloudflare bridge Worker — deferred (needs a CF account to verify).
+
+### Phase 3 — Environments (01-environments-execution.mdx)
+- [x] **PLAN 1 — Environment model + CRUD** — DONE (b220096). Prisma Environment (+Agent.environmentId), driver/status TEXT,
+      config secret-refs (masked configPublic) + zod per-driver validation, partial-unique (one local/one managed-sandbox) w/ app guard,
+      blast-radius delete guard, capabilities matrix. GraphQL (member reads / admin writes, ENVIRONMENTS-gated) + shared client + /environments UI + nav. Tests 10/10.
+- [x] **PLAN 1 wiring — Environment drives the run seam** — DONE (3e3c3a5). resolveEnvironmentExecution + shared resolveAndAdmitTarget
+      (run + enqueue can't diverge); env envVars merged into run env; auto-dispatch fires for env-bound agents; setAgentEnvironment mutation
+      + Agent.environmentId exposed + "Agent bindings" UI. ssh/plugin drivers rejected (need Plan 6). Tests: sandbox-run 22/22.
+- [x] PLAN 4 — probe + execution policy/allowlist — DONE (e387228). Pure evaluateExecutionAllowlist (kubernetes-forces-k8s),
+      WorkspaceExecutionPolicy model + EXECUTION_POLICY flag, wired fail-closed into runTaskInSandbox + enqueueSandboxRun admission,
+      probeEnvironment (local/sandbox/ssh), GraphQL + client + UI (Probe button + policy toggle). Tests 9/9.
+      Still open from Plan 4: low-trust-containment assertions (requiresSandboxContainment already enforces the sandbox case) + pre-dispatch config gate.
+- [x] **PLAN 2 — lease lifecycle + reuse/retain/reaper** — DONE (baa2296). EnvironmentLease model, provider resume/destroyById (local),
+      acquireLease (atomic reuse claim) / releaseLease (ephemeral destroy · reuse keep · retain-on-failure) / reapStaleLeases (CAS, in reap cron) /
+      destroyLeaseNow; wired into runTaskInSandbox; GraphQL + client + UI (policy picker + Leases table). Tests 6/6 (reuse/ephemeral/retain/reaper/concurrent/manual).
+- [x] **PLAN 3 — execution workspaces + project setup commands** — DONE (8b88582). Pure workspace-policy resolver (@agentcenter/utils),
+      ProjectWorkspace/ExecutionWorkspace/WorkspaceOperation models, composeSandboxScript setupCommand, per-run recording in runTaskInSandbox
+      (EXECUTION_WORKSPACES-gated), GraphQL + client + UI (Recent execution workspaces panel). Tests: resolver 9/9 + integration 6/6.
+      Deferred sub-items: git-worktree host-side realization, branch reconciliation, ProjectWorkspace settings UI (needs project routing), WorkspaceRuntimeService.
+- [x] **PLAN 6 — streaming + in-sandbox bridge + transport resolver** — DONE (a1a2b4c + 770aadf + 196ce7f). (1) onLog + run-runtime-status
+      (redacted, 90s TTL) + agentRunLiveStatus GraphQL/UI live tail; (2) run-scoped in-sandbox API bridge (bridgeTokenHash, rbt_ token, verify-only-while-running,
+      POST /api/runner/bridge/message least-privilege); (3) pure execution-target/transport resolver (19) → Environment.transport label in UI. Tests: status 6/6, bridge 6/6, target 8/8.
+      Deferred (optional, refactor risk / marginal): unified runtime-driver interface merging ssh+local under one seam (22/23) — SandboxProvider already unifies the sandbox case.
+- [x] **PLAN 5 — custom-image capture (core)** — DONE (17fb059). Pure fingerprint + classifyConfigChange (none/relinkable/breaking),
+      SandboxProvider.snapshot (local stub), EnvironmentCustomImageTemplate (one-active partial-unique + supersede chain), captureCustomImage/
+      rollback/disable/resolveActiveImageRef/classifyActiveTemplateDrift, active-image overlay wired into acquireLease→runTaskInSandbox, GraphQL + client + per-card UI. Tests: policy 5/5 + service 6/6.
+      Deferred (infra-dependent): interactive setup-terminal capture flow (live SSH PTY into a setup box) + real cloud-provider snapshot() impls (e2b/daytona/k8s).
+
+### Phase 2 — sandbox production-readiness (the original ask)
+- [x] **Runtime binary install in sandbox** (H1) — DONE. `installGuard` via getAdapter installCommand/binName in composeSandboxScript (idempotent `command -v || install`).
+- [x] **Private-repo clone auth** (H2) + **secrets injected into the box** — DONE. git credential helper reading $PC_GIT_TOKEN (never in URL) + resolveEnvForAgent exports.
+- [x] `timedOut`/`signal` in exec result + timeout tree-kill — DONE (8435159). detached process-group kill (no hang/orphans),
+      run status derived from explicit timedOut flag. Queued-run cancel done (cancelAgentRun). Still open: in-flight cancel of a RUNNING run; retain-on-failure.
+- [ ] Cloudflare **bridge Worker** artifact + deploy docs. [M]
+- [ ] Live-key verification harness (needs a real key from user) — 1 provider at a time. [—]
+
+### Phase 3 — Environment model + config UI
+- [ ] Environment model + CRUD + probe + GraphQL + `JsonSchemaForm` + Environments UI. [L]
+- [ ] Unify the two adapter registries (Tier A DB metadata ↔ Tier D code registry); fix `openclaw-gateway`/`openclaw` key mismatch. [M]
+
+### Phase 4 — big epics (schedule explicitly; each multi-session)
+- [ ] **MCP** (largest): client core → gateway (catalog/policy/approval/audit/run-scoped tokens) → endpoint server → admin UI. [XL]
+- [ ] Plugin **runtime** (out-of-process worker + capabilities + SDK). [L]
+- [ ] Missing **adapters**: cursor(_cloud), grok, opencode, pi, hermes(_gateway), ACP; real openclaw_gateway NAT-pull. [M×n]
+- [ ] **Agent-Companies** package model (COMPANY/TEAM/AGENTS.md + GitHub import + org-chart export). [L]
+- [ ] Skills: catalog pkg, external import, update/audit/reset, runtime-sync, Skill Studio execution, policy engine. [L]
+- [ ] Secrets: external providers (AWS/GCP/Vault), richer binding targets (tool_connection for MCP). [L]
+- [~] **Memory (Domain 4)** — GAP-A/-B/-C DONE. See "Phase 4 progress" below. Remaining: GAP-D inspect UI,
+      GAP-E adapter interface, GAP-F agent tools+search, GAP-G cost linkage, GAP-H eval suite.
+- [ ] Heartbeat: central agent-wake scheduler, scheduled retries+backoff, stranded-work reconciliation. [L]
+- [ ] Cost/obs: FinanceEvent ledger, provider quota polling, telemetry pipeline, OTel, pino+redaction+log store. [L]
+- [ ] Work-items: work-product taxonomy (PR/branch/commit/preview), artifact upload pipeline, document annotation depth. [L]
+- [ ] Deployment: operator CLI (doctor/env/db:backup), untrusted-PR-review container, deploy modes. [M–L]
+- [ ] Rich config UIs: apps/MCP, plugins, agent-detail unification, secrets tabs. [L]
+
+## Phase 4 progress (autonomous continuation — fresh machine, test DB stood up)
+- [x] **Keystone #3 — JsonSchemaForm** DONE (f4ebf8e). Pure parse/validate/defaults in @agentcenter/utils +
+      reusable React component; dogfooded into AgentAdapterConfigCard. Unblocks env/adapter/plugin/secret config UIs.
+- [x] **Memory Domain 4 — GAP-A + GAP-B + GAP-C** DONE (this commit). GAP-A: MemoryOperation audit table +
+      recordMemoryOperation (logged on query/capture, provenance+scope+outcome fields) + AgentMemory.sourceKind/
+      sourceRefId. GAP-B: captureRunMemory post-run hook wired into runTaskInSandbox finalization — the dead
+      appendAgentMemory now fires after a run for `db` agents (best-effort, no-op for none/markdown). GAP-C:
+      WorkspaceMemorySetting company default + resolveMemoryProvider (agent override→company default→none) +
+      resolveEffectiveMemoryProvider used by the pre-run hydrate path. GraphQL: memoryOperations / agentMemoryEntries /
+      companyMemoryDefault queries + setCompanyMemoryProvider mutation (+ MemoryOperation/AgentMemory pothos types)
+      + shared client ops. Migration 20260719160000_add_memory_operations. Tests: agent-memory 10/10, sandbox+context
+      32/32 unaffected. Typecheck 12/12, web build ✓. Remaining Memory: GAP-D inspect UI, GAP-E adapter iface,
+      GAP-F tools/search, GAP-G cost linkage, GAP-H evals.
+
+- [x] **Adapters Domain 2 — gap 4.8 + 4.0 (partial)** DONE (next commit). Ported 5 missing local runtimes to the
+      Tier-D code registry (cursor/grok/opencode/pi/hermes) with build() + idempotent install guards
+      (cursor→cursor.com/install script, grok→@vibe-kit/grok-cli, opencode→opencode-ai, pi→@mariozechner/
+      pi-coding-agent, hermes→probe-only pending pkg). Fixed the openclaw-gateway↔openclaw key mismatch via
+      canonicalAdapterKey + an alias table (also *_local spellings) wired into getAdapter/isAdapterKey/
+      buildAdapterInvocation. Invocations are best-effort mirrors of Paperclip's per-runtime adapters (never
+      executed for real yet — reconfirm vs a live CLI when a key lands). Tests: adapters 18/18. Typecheck 12/12,
+      web build ✓. Remaining Domain 2: 4.1 adapter-owned execute+structured result, 4.2 testEnvironment, 4.3 model
+      discovery wiring, 4.4 streaming/transcript parse, 4.6 ssh target, 4.7 real openclaw/hermes gateway, 4.9-4.12.
+
+- [x] **Secrets Domain 7 — P1 audit-on-resolve** DONE (next commit). Widened SecretAccessEvent with consumerType/
+      consumerId/configPath/outcome/errorCode/runId (migration 20260719170000). recordSecretAccess carries the new
+      provenance; resolveEnvForAgent(ws, agentId, consumer?) now writes one `injected` event per bound secret AT THE
+      USE SITE (sandbox-run run injection passes {actorType:agent, consumerId, runId}) — respecting the Phase-1 note
+      (audit at the USE site, NOT the presence-check/listing path, which passes no context → no audit → no ledger spam).
+      Closes the "read/injected actions defined-but-never-written" enum gap. GraphQL SecretAccessEvent type + client
+      query expose the new fields. Tests: secrets 43/43 (incl. injected-with-context / none-without). Typecheck 12/12,
+      web build ✓. Remaining Domain 7: P2 external providers (aws/gcp/vault), P3 rich bindings, P4 user secrets, P5 MCP gov.
+
+- [x] **Heartbeat Domain 9 — #12 routine cron scanner + parser** DONE (next commit). Pure 5-field cron parser
+      packages/utils/src/cron.ts (parseCron/isValidCron/nextCronTick, Vixie dom-or-dow rule, IANA-timezone-aware via
+      Intl, time-bounded ~4yr search). Consolidated the weaker regex isValidCron from plugins.ts into it (plugins now
+      import). RoutineTrigger gains cronExpression/timezone (migration 20260719180000); addRoutineTrigger validates +
+      computes first nextFireAt; tickRoutineTriggers scans due cron triggers, optimistically claims the exact due-time
+      (updateMany WHERE nextFireAt=observed → no double-fire under concurrent crons), advances to next tick, fires via
+      triggerRoutineNow — wired into the reap-stale-work cron. Inactive routine → schedule still advances (self-heal).
+      GraphQL addRoutineTrigger gains cronExpression/timezone args. Tests: cron 7 unit + routines 3 integration (21 total
+      in pipelines.test). Typecheck 12/12, web build ✓. Remaining Domain 9: #1/#2 wake queue+tick, #6 retries+backoff,
+      #8 stranded-work reconcile, #10 silent-run watchdog, #11 issue monitors, #9 subtree watchdog.
+
+- [x] **Work-items Domain 8 — G2 (make requireUntrustedPrReview real)** DONE (next commit). Pure source-trust helpers
+      packages/utils/src/source-trust.ts (runRequiresReview/resolveRunReviewState/buildRunSourceTrust/buildPromotedSourceTrust/
+      isQuarantined) — finally CONSUME the dead requireUntrustedPrReview toggle. AgentRun gains reviewState/sourceTrust/
+      reviewedByProfileId/reviewedAt (migration 20260719190000). run-review.ts: stampRunReview at run finalization (a
+      low-trust/untrusted agent, or one whose profile requires it → needs_review + quarantined sourceTrust; standard/
+      trusted → approved) wired into runTaskInSandbox behind the new LOW_TRUST_REVIEW flag (default off); promoteAgentRunReview
+      (admin) is the ONLY path out of needs_review. GraphQL: reviewState/sourceTrust on AgentRun + promoteAgentRunReview
+      mutation + shared client op + AGENT_RUNS_QUERY fields. Tests: source-trust 4 unit + 3 sandbox-run integration.
+      Typecheck 12/12, web build ✓. NOTE: reviewState currently lives on AgentRun (the run entity we already have) rather
+      than a full WorkProduct taxonomy — G1 work-product types + G3 richer TaskRun + G2 read-path redaction remain.
+
+- [x] **Cost/observability Domain 12 — GAP-1 non-inference finance ledger** DONE (next commit). New FinanceEvent model
+      (migration 20260719200000) — account-level provider money (credit purchase/refund/expiry, platform/BYOK fee, gateway
+      overhead, training/storage/bandwidth charge, subscription fee, tax/discount, manual adjustment), distinct from CostEvent
+      (inference) and LedgerEvent (human P&L). Pure constants + summarizer in @agentcenter/utils (finance-events.ts:
+      FINANCE_EVENT_KINDS/DIRECTIONS/UNITS + signedFinanceAmount + summarizeFinanceEvents). Service finance-events.ts:
+      recordFinanceEvent (validated, idempotent, workspace-scoped, cost-event FK check), financeSummary (debit/credit/net/
+      estimated), financeByBiller/byKind, listFinanceEvents. GraphQL: FinanceEvent type + financeEventSummary/ByBiller/ByKind/
+      financeEvents queries (member) + ingestFinanceEvent mutation (admin) + shared client ops. Tests: 4 unit + 4 integration
+      (ingest RBAC, net debit−credit, group-by, idempotency dedup, workspace isolation). Typecheck 12/12, web build ✓.
+      Remaining Domain 12: GAP-2 provider quota polling, GAP-3 telemetry, GAP-4 OTel, GAP-5 pino/run-log, GAP-6 rollups.
+
+- [x] **Teams Domain 14 — #3 wire hire_agent** DONE (next commit). The hire_agent approval subject type was defined
+      but never DID anything; now approving a hire_agent approval actually CREATES the agent. Approval gains a payload
+      Json (migration 20260719210000) carrying the hire spec. Service: requestAgentHire (validates name/role + manager
+      in-workspace, creates a pending hire_agent Approval with payload) + decideApproval fulfilment (on approve, creates
+      the Agent from payload inside the txn, records hiredAgentId back on payload; reject creates nothing). GraphQL:
+      requestAgentHire mutation (member+ proposes, GOVERNANCE-gated) + payload on Approval type + shared client op.
+      Tests: hire→approve creates agent (governance test 8/8, +2). Typecheck 12/12, web build ✓. Remaining Domain 14:
+      #10/#11/#12 Agent-Companies package model (L), #13 delegation presets, #14 quorum, #15 policy engine.
+
+- [x] **Heartbeat Domain 9 — #6 scheduled retries + backoff** DONE (next commit). AgentRun gains retryCount/
+      scheduledRetryAt/retryReason/retryOfRunId (migration 20260719220000). Pure backoff in @agentcenter/utils
+      (run-retry.ts: RETRY_BACKOFF_MS 30s/2m/5m/15m, isTransientRunStatus [timeout only], shouldRetryRun cap, nextRetryAt).
+      Service run-retry.ts: scheduleRunRetryIfTransient (stamps scheduledRetryAt at finalize for a transient timeout under
+      cap; wired into runTaskInSandbox behind RUNNERS) + promoteDueRunRetries (reap cron re-dispatches due runs as a fresh
+      queued AgentRun, owner-preserving, retryOfRunId lineage, retryCount+1, optimistic-claim → no double-promote). A clean
+      failed / exhausted budget → no retry. Tests: 4 unit + 2 integration. Typecheck 12/12, web build ✓. Remaining Domain 9:
+      #1/#2 wake queue+tick, #8 stranded-work reconcile, #10 silent-run watchdog, #11 issue monitors, #9 subtree watchdog.
+
+- [x] **Skills Domain 5 — GAP-A skill frontmatter + richer lint + file-kind classification** DONE (next commit). Pure
+      skill-frontmatter.ts in @agentcenter/utils: parseSkillFrontmatter (minimal YAML-subset — scalars/inline+block lists/
+      bool coercion, no dep) + splitFrontmatter + classifySkillFile (skill|markdown|reference|script|asset|other) +
+      deriveSkillTrustLevel (markdown_only/assets/scripts_executables ladder). skill-lint.ts extended: opt-in
+      requireFrontmatter (name/description required, slug pattern), unsafe-path (traversal/absolute) errors, per-file
+      100KB cap. Schema: Skill.frontmatter Json + SkillFile.kind (migration 20260719230000); createSkill/updateSkill parse
+      + store frontmatter, upsertSkillFile classifies kind. GraphQL: frontmatter on Skill + kind on SkillFile. Tests:
+      skill-frontmatter 11 unit + 1 integration (35 in skills-teams). Typecheck 12/12, web build ✓. Remaining Domain 5:
+      GAP-B catalog package, GAP-C import, GAP-D update/audit/reset, GAP-E runtime sync, GAP-F policy engine, GAP-G studio.
+
+- [x] **Skills Domain 5 — GAP-F skill governance policy engine** DONE (next commit). Pure evaluator skill-policy.ts in
+      @agentcenter/utils: SKILL_ACTIONS (create/import/install/edit/update/test/reset/remove) × subjects (all_agents/
+      agents/roles) × resource selectors (skillIds/skillKeys/sourceTypes) → priority-ordered rule eval → {allowed,effect,
+      matchedRuleId,reason,remediation}; default allow; + credential-scrub helpers (normalizeSkillPolicySourceLocator/
+      isSafeSourceLocator). SkillPolicy model per workspace (migration 20260719240000, revision = optimistic concurrency).
+      Service skill-policy.ts: getSkillPolicy/replaceSkillPolicy (admin, expectedRevision conflict)/evaluateSkillAction/
+      assertSkillAction guard wired into createSkill/updateSkill/deleteSkill/forkSkill/installCatalogSkill. GraphQL:
+      skillPolicy + evaluateSkillPolicy queries + replaceSkillPolicy mutation. Tests: 8 unit + 3 integration (deny-rule
+      enforcement, admin-only+optimistic-concurrency, evaluate-explains). Typecheck 12/12, web build ✓. Remaining Domain 5:
+      GAP-B catalog package, GAP-C import, GAP-D update/audit/reset, GAP-E runtime sync, GAP-G studio.
+
+- [x] **Heartbeat Domain 9 — #8 stranded-work reconciliation** DONE (next commit). The #1-priority "don't let remote
+      work sit dead forever" ladder. Service stranded-work.ts: reconcileStrandedWork(now) — a task whose latest sandbox
+      AgentRun is failed/timeout with NO queued/running run and NO pending scheduled retry, an actionable status
+      (assigned/in_progress), no live checkout, and a sandbox-capable assignee, is STRANDED. First detection → re-dispatch
+      once owner-preserving (enqueueSandboxRun) + TaskRecoveryAction(attempting); a second failure → escalate task to
+      blocked + TaskRecoveryAction(failed, escalated_to_blocked). Bounded (MAX_RECOVERY_ATTEMPTS=1) + idempotent (an
+      in-flight queued run removes it from the candidate set; a blocked task drops out). Runs AFTER promoteDueRunRetries in
+      reap-stale-work so a just-promoted retry isn't mistaken for stranded. TaskRecoveryAction.attemptCount added (migration
+      20260719250000). Tests: 3 integration (redispatch→escalate ladder, ignore pending-retry, ignore non-sandbox agent).
+      Typecheck 12/12, web build ✓. Remaining Domain 9: #1/#2 wake queue+tick, #10 silent-run watchdog, #11 issue monitors, #9 subtree watchdog.
+
+- [x] **Heartbeat Domain 9 — #11 issue monitors (one-shot deferred wake)** DONE (next commit). Agent-armed "check back
+      later" — Task gains monitorNextCheckAt/monitorNotes/monitorAttemptCount/monitorMaxAttempts (migration 20260719260000).
+      Service task-monitors.ts: armTaskMonitor / clearTaskMonitor + tickDueTaskMonitors (reap cron, RUNNERS-gated): finds
+      due monitors, optimistic-claims the one-shot schedule (clear guarded by observed → no double-fire), re-dispatches
+      each sandbox-bound assignee (enqueueSandboxRun, dedup vs in-flight), bumps attempt, stops at maxAttempts. Distinct
+      from workspace-health Monitor + retry/stranded ladders. GraphQL: monitor fields on Task + armTaskMonitor/
+      clearTaskMonitor mutations (member, TASK_AUTONOMY) + shared client ops. Tests: 2 integration (arm→due→fire→one-shot
+      clear, maxAttempts disarm). Typecheck 12/12, web build ✓. Heartbeat scheduling now: #6 retries + #8 stranded + #11
+      monitors + #12 cron all in the reap cron. Remaining Domain 9: #1/#2 central wake queue+tick, #10 silent-run watchdog, #9 subtree watchdog.
+
+- [x] **Work-items Domain 8 — G1 work-product taxonomy** DONE (next commit). Deliverable extended into a governed work
+      product: DeliverableKind gains pull_request/branch/commit/preview_url/runtime_service output types; new columns
+      provider/externalId/reviewState/outputStatus/healthStatus/isPrimary/createdByRunId (migration 20260719270000, D5 TEXT
+      + enum-add). Pure helpers work-products.ts in @agentcenter/utils (WORK_PRODUCT_KINDS/REVIEW_STATES/STATUSES,
+      canTransitionWorkProductStatus DAG, initialWorkProductGate ties to G2 source-trust). Service work-products.ts:
+      createWorkProduct (demotes prior primary of same (task,kind) in a txn → one canonical), setWorkProductReviewState
+      (board-only approve/changes, agent-cannot-self-approve, transition-guarded), setWorkProductStatus (legal transitions).
+      New WORK_PRODUCTS flag. GraphQL: fields on Deliverable + createWorkProduct/setWorkProductReviewState/setWorkProductStatus
+      mutations + workProductsByTask query + shared client ops. Tests: 5 unit + 4 integration (create+gate, single-primary,
+      board-only approval, illegal-transition). Typecheck 12/12, web build ✓. Remaining Domain 8: G3 TaskRun depth, G4 upload
+      pipeline, G5 doc annotations, G6 lifecycle refinements.
+
+- [x] **Cost/observability Domain 12 — GAP-2 provider quota-windows polling** DONE (next commit). New optional adapter hook
+      getQuotaWindows() + ProviderQuotaWindow/ProviderQuotaResult types in @agentcenter/utils. Service provider-quota.ts:
+      fetchAllProviderQuota — fans out over adapters implementing the hook, per-provider timeout-guarded, Promise.allSettled,
+      failures SHAPED to {ok:false, errorFamily: timeout|provider_error|unsupported} not thrown (one slow provider never
+      blocks others); unsupported adapters omitted. GraphQL providerQuotaWindows query (admin, new PROVIDER_QUOTA flag,
+      default off until a real adapter implements the hook). Tests: 4 unit with mock adapters (fan-out filter, error shaping,
+      timeout isolation, empty). Typecheck 12/12, web build ✓. Remaining Domain 12: GAP-3 telemetry, GAP-4 OTel, GAP-5 pino/
+      run-log, GAP-6 rollups (A10 window spend / A12 issue-tree / A14 billingType).
+
+- [x] **Cost/observability Domain 12 — GAP-6 A10 rolling window spend** DONE (next commit). Pure cost-windows.ts in
+      @agentcenter/utils: COST_WINDOWS (5h/24h/7d) + summarizeCostWindows (folds CostEvent rows into per-provider×window
+      totals from a passed `now`; null provider→unknown; excludes too-old + future rows). GraphQL costWindowSpend query
+      (BUDGETS, member) fetches rows within the longest window + aggregates. Shared client op. Tests: 4 unit + 1 integration.
+      Typecheck 12/12, web build ✓. Remaining Domain 12: GAP-3 telemetry, GAP-4 OTel, GAP-5 pino/run-log, GAP-6 A12 issue-tree
+      rollup + A13 unpriced + A14 billingType split.
+
+- [x] **Cost/observability Domain 12 — GAP-6 A12 issue-tree cost+runtime rollup** DONE (next commit). Service cost-rollup.ts:
+      costByTaskTree(workspaceId, rootTaskId, excludeRoot) — recursive CTE over Task.parentTaskId → sums CostEvent spend +
+      event count and AgentRun wall-clock (SUM EPOCH(finishedAt-startedAt)) + run count over the subtree, workspace-scoped
+      (unrelated trees excluded). excludeRoot counts descendants only. GraphQL costByTaskTree query (BUDGETS, member) + shared
+      client op. Tests: 1 integration (3-level tree rollup, sibling-tree isolation, excludeRoot). Typecheck 12/12, web build ✓.
+      Remaining Domain 12: GAP-3 telemetry, GAP-4 OTel, GAP-5 pino/run-log, GAP-6 A13 unpriced + A14 billingType split.
+
+- [x] **Teams Domain 14 — #16 org-chart SVG render** DONE (next commit). Pure org-chart-svg.ts in @agentcenter/utils:
+      renderOrgChartSvg(nodes) renders computeOrgLayout into a standalone, deterministic, theme-aware (light/dark) SVG with
+      one card per agent + orthogonal elbow connectors; XML-escapes all text (name injection-safe). GraphQL orgChartSvg query
+      (ORG_CHART, member) + shared client op — server-rendered chart for sharing/embedding + the future company-export README
+      diagram. Tests: 4 unit (structure/edges, XML-escape, determinism+empty, styled:false). Typecheck 12/12, web build ✓.
+      Remaining Domain 14: #10-12 Agent-Companies package model (L), #13 delegation, #14 quorum, #15 policy engine.
+
+- [x] **Cost/observability Domain 12 — GAP-4 OpenTelemetry opt-in tracing** DONE (next commit). Pure resolveOtelConfig(env)
+      in @agentcenter/utils: resolves the OTLP exporter (grpc/http-protobuf/http-json) + endpoint + serviceName from env
+      WITHOUT importing any @opentelemetry package; enabled only when OTEL_EXPORTER_OTLP_ENDPOINT is set; unknown protocol →
+      grpc + one warning. otel-bootstrap.ts startOtel() (called from instrumentation.register()) dynamically imports the SDK +
+      protocol exporter ONLY when enabled — zero import/overhead when off; missing optional packages log one diagnostic and
+      the server stays up. Tests: 5 unit (disabled-by-default, protocol→exporter selection, unknown-protocol fallback, service
+      name). Typecheck 12/12, web build ✓ (optional deps correctly unresolved at build). Remaining Domain 12: GAP-3 telemetry,
+      GAP-5 pino/run-log, GAP-6 A13 unpriced + A14 billingType split.
+
+- [x] **Cost/observability Domain 12 — GAP-6 A14 billingType widen + split reporting** DONE (next commit). Pure
+      billing-types.ts in @agentcenter/utils: BILLING_TYPES (metered_api/subscription_included/subscription_overage/credits/
+      fixed + legacy api/subscription aliases), normalizeBillingType (legacy+unknown→metered_api), billingFamily (metered/
+      subscription/other — overage counts as metered), splitByBillingFamily. recordCostEvent now normalizes on write.
+      GraphQL costBillingSplit query (BUDGETS, member) splits spend metered-vs-subscription-vs-other + shared client op.
+      (Behavior change: default/"api" store as metered_api — updated the pre-existing costBreakdown billingType test.)
+      Tests: 4 unit + 1 integration. Typecheck 12/12, web build ✓. Remaining Domain 12: GAP-3 telemetry, GAP-5 pino/run-log,
+      GAP-6 A13 unpriced cost state.
+
+- [x] **Cost/observability Domain 12 — GAP-6 A13 unpriced cost state + reprice** DONE (next commit). CostEvent.costStatus
+      (reported|unpriced, migration 20260719280000). recordCostEvent accepts costStatus; repriceCostEvent(ws, id, amount)
+      sets the real amount + marks reported + adjusts the running QuotaWindow budgets by the DELTA (new−old) so budgets stay
+      correct whether the event was unpriced (0) or an estimate. GraphQL: costStatus on CostEvent + ingest arg +
+      repriceCostEvent mutation (BUDGETS, member) + shared client op. Tests: 1 integration (unpriced 0 → reprice 400 →
+      QuotaWindow tracks the delta). Typecheck 12/12, web build ✓. **Domain 12 cost is now largely complete** (GAP-1 finance
+      ledger, GAP-2 quota, GAP-4 OTel, GAP-6 A10/A12/A13/A14). Remaining: GAP-3 telemetry (XL epic), GAP-5 pino/run-log.
+
+- [x] **Work-items Domain 8 — G6.1 blocker diagnostics** DONE (next commit). Pure blocker-diagnostics.ts in
+      @agentcenter/utils: computeBlockerDiagnostics(blockers) → {readiness ready|blocked, unresolvedCount, blockers[], human
+      reasons}; a blocker resolves only when its task is `done`; dedupes a blocker seen via both edges (prefers blocked_by).
+      GraphQL blockerDiagnostics(taskId) query (TASK_RELATIONS) collects blockers from the direct blockedByTaskId edge + typed
+      `blocks` relations, loads their statuses, computes readiness + shared client op. Tests: 5 unit + 3 integration.
+      Typecheck 12/12, web build ✓. Remaining Domain 8 G6: dependency-resolved wakeups, G6.2 rich comments, G6.3 external-object
+      sync, G6.4 origin/idempotency, G6.5 thread interactions, G6.6 subtree cancel/restore, G6.7 status enum.
+
+- [x] **Work-items Domain 8 — G6.5 typed thread interactions** DONE (next commit). TaskThreadInteraction model (migration
+      20260719290000) — a structured ask an agent posts on a task thread. Pure vocabulary thread-interactions.ts in
+      @agentcenter/utils (KINDS suggest_tasks/ask_user_questions/request_confirmation, STATUSES pending/resolved/dismissed,
+      canResolveThreadInteraction transition, resolutionWakesRun). Service create/list/resolve (only pending can transition).
+      GraphQL: TaskThreadInteraction type + threadInteractions query + createThreadInteraction/resolveThreadInteraction
+      mutations (member, new THREAD_INTERACTIONS flag) + shared client ops. Tests: 3 unit + 2 integration (create→list→resolve→
+      re-resolve-rejected, unknown-kind). Typecheck 12/12, web build ✓. Remaining Domain 8 G6: G6.2 rich comments, G6.3
+      external-object sync, G6.4 origin/idempotency, G6.6 subtree cancel/restore, G6.7 status enum; dependency-resolved wakeups.
+
+- [x] **Skills Domain 5 — GAP-D (audit) static skill security audit** DONE (next commit). Pure skill-audit.ts in
+      @agentcenter/utils: auditSkill(markdown, files) statically scans for hardcoded secrets (AWS key ids, ghp_/sk-/xox
+      tokens → critical), curl|bash pipe-to-shell (critical), rm -rf / eval|exec / path-traversal (warning) → verdict
+      pass|warning|fail with coded per-file findings; auditHardStops (fail blocks update/reset). GraphQL auditSkill(skillId)
+      query (SKILLS_TEAMS, member) + shared client op. Tests: 4 unit + 2 integration (fail on curl|bash+rm, clean→pass).
+      Typecheck 12/12, web build ✓. (GAP-D update/reset paths still need GAP-B catalog provenance.) Remaining Domain 5:
+      GAP-B catalog package, GAP-C external import, GAP-D update/reset, GAP-E runtime sync, GAP-G studio.
+
+- [x] **Work-items Domain 8 — G6.7 cancelled task status** DONE (next commit). TaskStatus gains `cancelled` (terminal,
+      distinct from done) + Task.cancelledAt (migration 20260719300000 — ALTER TYPE ADD VALUE + column). TaskStatus const
+      +CANCELLED. GraphQL cancelTask(taskId) mutation (member+, refuses a done/already-cancelled task) + cancelledAt on Task
+      type + shared client op. Tests: 2 integration (cancel active, refuse done). Typecheck 12/12, web build ✓. Remaining
+      Domain 8 G6: G6.2 rich comments, G6.3 external-object sync, G6.4 origin/idempotency, G6.6 subtree cancel/restore verbs.
+
+- [x] **Secrets Domain 7 — P2 provider modules + health checks** DONE (next commit). Pure secret-providers.ts in
+      @agentcenter/utils: SecretProviderModule registry (env implemented + always healthy; aws/vault stubs that validateConfig
+      required keys [aws:region, vault:address/path] + report `coming_soon` health until a real resolver lands) +
+      validateSecretProviderConfig / checkSecretProviderConfigHealth. Service checkSecretProviderHealth(ws, id) runs the module
+      health check and PERSISTS healthy/lastCheckedAt/lastError — fields the model always had but NOTHING ever wrote (closes the
+      A2 "never written" gap). GraphQL checkSecretProviderHealth mutation (admin, SECRETS_VAULT) + shared client op. Tests: 3 unit
+      + 1 integration (env healthy, unconfigured vault coming_soon, member denied). Typecheck 12/12, web build ✓. Remaining
+      Domain 7: P2 real AWS/GCP/Vault resolvers (infra), P3 rich bindings, P4 user secrets, P5 MCP governance.
+
+- [x] **Memory Domain 4 — GAP-F search + forget** DONE (next commit). Real recall replacing the crude newest-20 bulk inject:
+      searchAgentMemory(ws, agentId, query, limit) — case-insensitive ILIKE (`contains`, mode insensitive) over content,
+      newest-first, records a `query` op; forgetAgentMemory(ws, agentId, id) — workspace+agent-scoped deleteMany (one agent
+      can't delete another's), records a `forget` op. GraphQL searchAgentMemory query (member) + forgetAgentMemory mutation
+      (admin) + shared client ops. Tests: 2 integration (ILIKE recall + query-op recorded, forget deletes + forget-op +
+      no-op on missing; GraphQL member-reads/admin-forgets). Typecheck 12/12, web build ✓. Remaining Domain 4: GAP-D inspect
+      UI, GAP-E adapter interface, GAP-G cost linkage, GAP-H evals (memory.note = existing appendAgentMemory).
+
+- [x] **Teams Domain 14 — #9 agent goal level** DONE (next commit). GoalLevel gains `agent` (company → team → agent → task
+      alignment, migration 20260719310000 ALTER TYPE ADD VALUE) + GOAL_LEVEL.AGENT in @agentcenter/utils; createGoal already
+      validates via isGoalLevel so no resolver change. Tests: 1 integration (full 4-level hierarchy). Typecheck 12/12, web
+      build ✓. Remaining Domain 14: #10-12 Agent-Companies package model (L), #13 delegation presets, #14 quorum, #15 policy.
+
+- [x] **Work-items Domain 8 — G6.6 subtree cancel/restore verbs** DONE (next commit). subtree-control.ts:
+      cancelSubtree(rootTaskId) recursive-CTE walks root+descendants → moves non-terminal (not done/cancelled) tasks to
+      cancelled+cancelledAt; restoreSubtree un-cancels cancelled tasks → assigned (never resurrects a done one). Builds on the
+      G6.7 cancelled status. GraphQL cancelSubtree/restoreSubtree mutations (admin, TASK_AUTONOMY) + shared client ops. Tests:
+      1 integration (cancel 2 skip 1 done, restore). Typecheck 12/12, web build ✓. Remaining Domain 8 G6: G6.2 rich comments,
+      G6.3 external-object sync, G6.4 origin/idempotency; dependency-resolved wakeups.
+
+- [x] **Teams Domain 14 — #18 token salary budgeting** DONE (next commit). BudgetPolicy.isSalary (migration 20260719320000)
+      marks an agent's periodic token allowance. Service setAgentSalary(ws, agentId, monthlyCents) upserts THE single
+      isSalary=true / scope=agent / window=monthly / hardStop policy per agent (0 removes it); getAgentSalary reads it.
+      GraphQL setAgentSalary mutation (admin) + agentSalary query (member) + isSalary on BudgetPolicy type + shared client ops.
+      Reuses the existing budget/quota/incident enforcement (salary breach auto-pauses like any budget). Tests: 1 integration
+      (create→one policy, update→still one, query, 0-removes, member denied). Typecheck 12/12, web build ✓. Remaining Domain 14:
+      #10-12 Agent-Companies package model (L), #13 delegation, #14 quorum, #15 policy engine.
+
+- [x] **Teams Domain 14 — #10 Agent-Companies foundation** DONE (next commit). The defining structural gap's keystone entity.
+      New AgentCompany model (migration 20260720000000) — the first-order org object of Paperclip's agentcompanies/v1 (slug,
+      name, description, goals[], schemaVersion default agentcompanies/v1, license, authors, sourceRef provenance) + Agent.companyId
+      soft link. Service agent-companies.ts: createCompany (slug + collision guard) / list / get / updateCompany / deleteCompany
+      (clears member agents' companyId, doesn't delete them) / setAgentCompany (bind/unbind, both in workspace). New AGENT_COMPANIES
+      flag. GraphQL: AgentCompany type + agentCompanies/agentCompany queries + create/update/delete/setAgentCompany mutations
+      (admin) + companyId on Agent + shared client ops. Tests: 4 integration (create+slug+collision+RBAC, list, bind→delete-clears,
+      update goals). Typecheck 12/12, web build ✓. **Remaining #11/#12: the markdown COMPANY.md/TEAM.md/AGENTS.md package
+      parser/emitter + import-graph + README/Mermaid export build on this entity (multi-session L×2).**
+
+- [x] **Teams Domain 14 — #11/#12 company markdown package + export** DONE (next commit). Pure company-package.ts in
+      @agentcenter/utils: emitCompanyMarkdown / parseCompanyMarkdown (agentcompanies/v1 COMPANY.md — frontmatter + goals,
+      round-trips via the GAP-A frontmatter parser), emitAgentMarkdown (AGENTS.md w/ role + reportsTo slug), renderOrgChartMermaid
+      (graph TD of the reporting hierarchy). Service exportCompanyPackage(ws, id) → path→content file map: COMPANY.md +
+      agents/<slug>/AGENTS.md per member + README.md with the Mermaid org chart (secrets/keys never emitted). GraphQL
+      exportCompanyPackage query (member) + shared client op. Tests: 4 unit (emit/parse round-trip, no-frontmatter null, agent
+      md, Mermaid edges) + 1 integration (full package export). Typecheck 12/12, web build ✓. Remaining #11/#12: import-graph
+      resolver (pinned GitHub refs + sha256 verify + collision) — the read/verify half of round-trip portability.
+
+- [x] **Teams Domain 14 — #12 company package import (round-trip)** DONE (next commit). Completes portable companies. Pure
+      parseCompanyPackageFiles(files) in @agentcenter/utils → {company, agents[], warnings}: reads COMPANY.md + every
+      agents/<slug>/AGENTS.md, skips path-unsafe entries + warns, parseAgentMarkdown for members. Service importCompanyPackage
+      creates the AgentCompany (renaming slug on collision), one Agent per AGENTS.md, wires reportsTo by package slug, records
+      sourceRef provenance, never imports secrets. GraphQL importCompanyPackage mutation (admin, JSON files) + shared client op.
+      Tests: 2 unit (parse plan, missing-COMPANY/unsafe-path warnings) + 1 integration (export→import ROUND-TRIP: slug renamed
+      on collision, 2 agents recreated, reporting edge re-wired by slug, provenance recorded). Typecheck 12/12, web build ✓.
+      **Domain 14 Agent-Companies (#10/#11/#12) now has entity + markdown emit/parse + export + import round-trip.** Remaining:
+      GitHub-pinned remote import (+sha256 verify — infra), #13 delegation presets, #14 quorum, #15 policy engine.
+
+- [x] **Teams Domain 14 — #14 board quorum (multi-approver)** DONE (next commit). Approval.requiredApprovals (default 1,
+      migration 20260720010000) + ApprovalVote model (one vote per voter, unique). Service castApprovalVote: a reject
+      finalizes immediately (decideApproval reject); distinct approve votes reaching requiredApprovals finalize via
+      decideApproval approve (same side effects — hire fulfilment, task transition). Single-decider flow unchanged when
+      requiredApprovals=1. GraphQL createApproval gains requiredApprovals arg + castApprovalVote mutation (admin=board) +
+      requiredApprovals on Approval type + shared client op. Tests: 2 unit (2-of-N finalizes on 2nd distinct approve; single
+      reject finalizes). Typecheck 12/12, web build ✓. Remaining Domain 14: #13 delegation presets, #15 per-agent approval-policy engine.
+
+- [x] **UI wiring — board-quorum voting (Domain 14 #14, front-end)** DONE (next commit). First UI slice of the
+      backlog: wires the previously backend-only `castApprovalVote` + `requiredApprovals` into the existing
+      Approvals surface. APPROVALS_QUERY / APPROVAL_QUERY now select `requiredApprovals`; the list page and
+      ApprovalDetailPage render a "board · needs N" badge and, for quorum approvals (requiredApprovals>1), swap
+      the direct Approve/Reject (which would finalize immediately, bypassing the board) for Vote approve / Vote
+      reject buttons that call castApprovalVote and toast the running tally. Also added the orphaned /approvals
+      page to the sidebar NAV_ITEMS (Gavel icon, GOVERNANCE-gated) — it was previously only reachable via
+      Attention. Typecheck (web+client) ✓, web build ✓. NOTE: remaining new client ops (agent-companies, work
+      products, thread interactions, agent-hire) are still backend/GraphQL/client-op only — no UI yet.
+
+- [x] **UI wiring — Agent Companies screen (Domain 14 #10/#12, front-end)** DONE (next commit). Net-new page
+      `/companies` (route wraps FeatureGate on AGENT_COMPANIES; view `AgentCompaniesPage.tsx`) wiring the
+      previously backend-only agent-companies ops: list (AGENT_COMPANIES_QUERY), create (name/description/goals),
+      delete, **export** (imperative EXPORT_COMPANY_PACKAGE_QUERY → downloads the package as a path→content JSON
+      bundle — the exact shape import expects), and **import** (file-picker → IMPORT_COMPANY_PACKAGE, toasts
+      created-agent count + warnings). Clean export→import round-trip. Added to sidebar NAV_ITEMS (Building2 icon).
+      Verified every field resolves server-side (agentCompanies/exportCompanyPackage/create/delete/importCompanyPackage
+      all present). Typecheck ✓, build ✓ (/companies route emitted). Backend covered by existing agent-companies
+      integration tests. Still UI-less: work products, thread interactions, agent-hire proposal form.
+
+- [x] **UI + config — experimental-flags panel & flag backfill (11-ui §12, front-end + startup)** DONE (next
+      commit). Two coupled fixes. (1) Added a FeatureFlagsCard to SettingsPage: a per-flag toggle grid over
+      FEATURE_FLAGS_QUERY / UPDATE_FEATURE_FLAG; user-managed flags toggle, system-managed shown but locked
+      (server already rejects toggling them). (2) Found+fixed a reachability gap: newer flags (AGENT_COMPANIES,
+      WORK_PRODUCTS, PROVIDER_QUOTA, THREAD_INTERACTIONS, LOW_TRUST_REVIEW, and every other non-curated FLAG_KEYS)
+      had NO DB row, so getAllFlags() (DB-only) couldn't list them AND their client FeatureGate fell back to
+      FLAG_DEFAULTS=false — the feature was both hidden and impossible to enable. ensureFeatureFlags() now
+      backfills every remaining FLAG_KEYS as managedBy:"user" at its FLAG_DEFAULTS value (non-destructive upsert —
+      never touches a curated system flag or an admin's toggle). This makes the /companies page (and all
+      default-off features) reachable: flip the flag in the panel → the gate opens. Tests: 3 new integration
+      (every FLAG_KEYS seeded; AGENT_COMPANIES user-managed at default; idempotent, preserves toggles). Full
+      integration 64 files/465 green, flag-keys unit 12/12, web build ✓.
+
+- [x] **UI wiring — propose-a-hire form (Domain 14 #3, front-end)** DONE (next commit). Closes the governance
+      loop end-to-end on one screen: a "Propose a hire" disclosure on the Approvals page (name/role/level) calls
+      the previously backend-only REQUEST_AGENT_HIRE → creates a pending hire_agent approval that appears in the
+      list below → approving it (or reaching board quorum via the quorum UI) actually creates the agent. Typecheck
+      ✓, web build ✓. NOTE: broader zero-UI ops remain (work-products, thread-interactions, finance-events,
+      cost-windows, agent-salary, blocker-diagnostics, memory-inspect) — these are the 11-ui.mdx §12 "lower-priority
+      UI depth" backlog and several are intentionally agent/API-only (memory has no human UI even in Paperclip).
+
+- [x] **UI wiring — agent salary control (Domain 14/finance, front-end)** DONE (next commit). New
+      AgentSalaryCard component (follows the profile's per-section component decomposition) rendered in the agent
+      profile top section: AGENT_SALARY_QUERY shows the current monthly salary; SET_AGENT_SALARY sets/updates it
+      (a budget policy flagged isSalary; admin server-side). No new route — reuses Card/Button/Input. Typecheck ✓,
+      build ✓.
+
+- [x] **UI wiring — finance events + cost windows + billing split (Domain 12 GAP-1/6, front-end)** DONE (next
+      commit). New FinanceEventsSection component appended to the existing finance page (per explorer map — NOT a
+      new route, NOT the ledger page which is a different domain). Wires the previously backend-only ops:
+      financeEventSummary (net/debits/credits/estimated tiles), costBillingSplit (metered/subscription/other),
+      costWindowSpend (rolling 5h/24h/7d per-provider grid — reuses COST_WINDOWS from utils), financeEvents feed,
+      and ingestFinanceEvent (admin record form — reuses FINANCE_EVENT_KINDS from utils). These are account-level
+      provider money, distinct from the per-inference cost breakdown already on the page. De-dup: extracted the
+      thrice-copied money(cents) formatter into a single @agentcenter/utils formatCents (superset — handles
+      negatives) and refactored finance/ledger pages + the salary card to import it. Deferred: repriceCostEvent
+      (needs a cost-event drill-down list that doesn't exist — no dangling control). Typecheck ✓, build ✓, finance
+      tests 9/9.
+
+- [x] **UI wiring — task-detail cards: work products, thread interactions, cost rollup, blocker diagnostics
+      (Domains 8/12, front-end)** DONE (next commit). Four self-contained cards (following the TaskRelationsCard
+      pattern) slotted into TaskDetailModal COL 2 — NOT new routes, NOT duplicating the Deliverables list:
+      • TaskWorkProductsCard — workProductsByTask (the code-output subset of deliverables) with review governance:
+        reviewState/outputStatus badges + Approve/Request-changes (setWorkProductReviewState) + a server-guarded
+        status select (setWorkProductStatus). Reuses WORK_PRODUCT_STATUSES from utils.
+      • TaskThreadInteractionsCard — pending agent→human interactions (threadInteractions) with Resolve/Dismiss
+        (resolveThreadInteraction). Renders only when pending ones exist.
+      • TaskCostRollupCard — costByTaskTree subtree cost + runtime rollup (read-only; reuses formatCents).
+      • TaskBlockerDiagnosticsCard — blockerDiagnostics "why blocked" readiness (read-only; hidden when ready).
+      Each renders nothing when empty (no clutter on clean tasks). Typecheck ✓, build ✓.
+
+- [x] **UI wiring — promote agent-run review on the runners page (Domain 7 low-trust review, front-end)** DONE
+      (next commit). RunHistory now surfaces each run's reviewState (needs review / approved / changes requested
+      badges) and, for a run quarantined in needs_review, Approve / Request-changes actions calling the previously
+      backend-only promoteAgentRunReview — the only path out of quarantine (approving flips its source-trust to
+      trusted). AGENT_RUNS_QUERY already selected reviewState; added it to the interface + controls. No new route.
+      Typecheck ✓, build ✓. This closes the last of the six §12 human-facing zero-UI surfaces the explorer mapped.
+
+- [x] **UI — unified "Needs my review" inbox (front-end)** DONE (next commit). New `/review` page (nav entry
+      ClipboardCheck, GOVERNANCE-gated) — the first surface that aggregates the workspace-wide agent-work review
+      queues with the primary decision wired INLINE, reusing existing shared mutations (no duplication of the
+      specialized pages): Approvals & hires (approve/reject, or vote for quorum), Plan decompositions (Approve &
+      apply = reviewDecomposition→applyDecomposition, or reject), Budget incidents (resolve + raise&resume
+      deep-link). Each section self-hides when empty or its flag is off, shows a count, and deep-links to its full
+      page (/approvals, /reliability, /finance). A footer routes to the remaining per-task/per-run review surfaces
+      (attention, runners, task work-products/questions). Backed the artifact inventory of all 58 agent-work
+      concepts (41 has-UI / 10 partial / 7 gap). Typecheck ✓, build ✓ (/review emitted). Verified every field
+      resolves server-side. Documented gaps (no UI): human task-review inbox (dead code), agent queue items,
+      agent-memory inspection, agent-authored documents, cost reprice / provider-quota drill-in.
+
+- [x] **Human task-review path — the #1 inventory gap (Domain 8, full slice)** DONE (next commit). The existing
+      approveTask/rejectTask require a Squad-Lead AGENT reviewer (agentModel + role check) — there was NO human
+      path; the task-detail Approve/Reject dialogs were dead code. Added: service reviewTaskByHuman (in review.ts,
+      reusing taskModel/messageModel/emitStatusChanged — approve→done, request_changes→assigned, comment authored
+      by the human's Profile, only acts on a task in `review`); GraphQL mutation reviewTask (admin, REVIEWS-gated,
+      reviewerProfileId=tenancy.userId); client op REVIEW_TASK (barrel-registered); wired a "Tasks awaiting review"
+      section (first) into the /review inbox using the workspace-wide tasksByStatus(status:"review") + REVIEW_TASK
+      with Approve / Request-changes. Tasks aren't workspace-scoped in this codebase (no workspaceId column) so no
+      isolation needed. Tests: 3 integration (approve→done+comment; request_changes→assigned; non-review guard).
+      Typecheck 4/4, web build ✓. Flips the inventory's biggest Gap → Has-UI.
+
+- [x] **UI — agent memory inspection + work-queue on the profile (Domains 4/5, front-end)** DONE (next commit).
+      Two inventory gaps closed, both agent-profile cards reusing existing ops (no backend). AgentMemoryCard:
+      agentMemoryEntries + searchAgentMemory (recall search) + forgetAgentMemory (per-entry Forget) — MEMORY-gated,
+      self-hides when off. AgentQueueCard: agentQueueActive (the agent's self-generated follow-up/breakdown queue)
+      with Done/Skip (updateQueueItemStatus) + Remove (deleteQueueItem), auto-generated badge, related-task link —
+      AGENT_QUEUE-gated, self-hides when empty. Typecheck ✓, build ✓. Inventory gaps 6 → 4.
+
+- [x] **UI — agent documents viewer + provider-quota drill-in (Domains 11/12, front-end)** DONE (next commit).
+      TaskDocumentsCard: agent-authored docs on a task (documentsByTask) — read-only, expandable content,
+      author+time; slotted into task-detail COL 2; self-hides when none. Provider quota: new client op
+      PROVIDER_QUOTA_WINDOWS_QUERY (server field already existed) + a ProviderQuotaSection on the finance page —
+      live per-provider rate-limit windows with a used-% bar; errors (bad/absent creds) shown, self-hides when off.
+      Typecheck 4/4, build ✓. Remaining true gaps (need backend): cost-event reprice (no cost-event list query
+      exists) and the memory-operations audit / memory-provider settings surfaces.
+
+- [x] **Cost-event reprice — the must-have financial-correctness gap (Domain 12 A13, full slice)** DONE (next
+      commit). repriceCostEvent existed but had no drill-down to reach it. Added: server query unpricedCostEvents
+      (BUDGETS-gated, member+, workspace-scoped, costStatus="unpriced") + client op UNPRICED_COST_EVENTS_QUERY +
+      an "Unpriced costs" section on the finance page listing agent-reported runs with no final price, each with an
+      inline amount field → REPRICE_COST_EVENT (corrects spend + re-accrues budget windows; flips status→reported
+      so it leaves the list). Tests: 2 integration (unpriced listed then repriced out; cross-workspace reprice
+      refused). Typecheck 4/4, web build ✓. Inventory gaps 3 → 2 (remaining: memory-operations audit,
+      memory-provider settings).
+
+- [x] **UI — agent memory-operations audit (Domain 4, front-end)** DONE (next commit). Folded a collapsible
+      "memory activity" log into the AgentMemoryCard using the existing MEMORY_OPERATIONS_QUERY: every
+      capture/query/forget with opType, provider, hit count, latency, cost (formatCents) and errors. Collapsed by
+      default (query paused until opened). Typecheck ✓, build ✓. Inventory gaps 2 → 1 (only memory-provider
+      settings left).
+
+- [x] **UI — agent memory backend setting (Domain 4, front-end)** DONE (next commit). Closes the last inventory
+      gap. Added a MemoryDefaultCard to Settings (companyMemoryDefault + setCompanyMemoryProvider, MEMORY_PROVIDERS
+      none/markdown/db from utils) — the workspace-default memory backend agents inherit; MEMORY-gated, self-hides
+      when off. Typecheck ✓, build ✓. **All 7 original agent-work inventory gaps now closed** (per-agent provider
+      override remains a minor future enhancement — the primary company-default knob is wired).
+
+- [x] **UI — per-agent memory-backend override (Domain 4, front-end)** DONE (next commit). The last deferred
+      nicety. Added `memoryProvider` to AGENT_QUERY (already exposed on the Agent type) and a per-agent backend
+      selector to the AgentMemoryCard header (setAgentMemoryProvider, none/markdown/db), seeded from the agent's
+      current value. Completes the memory surface end-to-end: inspection + recall search + forget + ops audit +
+      company default (Settings) + per-agent override. Typecheck 4/4, build ✓. Agent-work inventory: 0 gaps, and
+      no deferred UI items remain.
+
+- [x] **UI depth — Secrets vaults health-check (11-ui §11, front-end)** DONE (next commit). Wired the
+      previously-unused CHECK_SECRET_PROVIDER_HEALTH into the /secrets providers list — a per-provider "Check"
+      button that pings the vault and updates the health badge (healthy/unhealthy/unchecked + lastError). The page
+      already covered My-Secrets (personal toggle + badge) and bulk import, so §11's backend-ready gap is now
+      closed. Deferred (need new backend): secretReferences usage drill-down + discoverVaultCandidates AWS
+      discovery. Typecheck ✓, build ✓.
+
+- [x] **UI depth — plugin settings via JsonSchemaForm (11-ui §10, front-end)** DONE (next commit). The
+      PluginDetailPage was already fleshed out in earlier work (manifest, capabilities, tools/jobs, config form,
+      error surface, enable/disable/clear/uninstall) — the §10 "6-line stub" gap was closed. Remaining backend-ready
+      item: its config form hand-rolled field rendering with the old adapterConfigFields; refactored it to the
+      shared JsonSchemaForm primitive (keystone #3) — the dogfooding §10's impl plan called for (dedup + validation
+      + secret masking), removing ~55 lines of duplicated field rendering. Deferred (need plugin runtime backend):
+      the Status runtime dashboard (pluginRuntimeStatus/job-runs/logs). Typecheck ✓, build ✓.
+
+- [x] **UI depth — Skill Studio Audit + Versions panels (11-ui §12, front-end)** DONE (next commit). Added two
+      per-skill expandable panels to /skills, mirroring the existing Files/Test panels: **Audit** (wires the
+      previously-unwired AUDIT_SKILL_QUERY — static security audit with verdict + severity-coded findings) and
+      **Versions** (new SKILL_VERSIONS_QUERY client op over the existing server skillVersions field — revision
+      history). Deferred (need backend): the runSkillTest interactive test harness and the folder-tree editor.
+      Typecheck 4/4, build ✓.
+
+- [x] **UI depth — Adapter Manager install/remove (11-ui §9, full slice)** DONE (next commit). Added the
+      record-level install path (the §9 gap): backend mutations installAdapter (register an external adapter as a
+      registry row — admin, MULTI_PROVIDER_ADAPTERS-gated, kebab-type validated, transport/authKind enum-checked,
+      starts disabled) + removeAdapter (deletes a non-builtIn row; refuses the builtIn openclaw). Wired an "Install
+      adapter" form + per-row "Remove" into /adapters (inline gql, matching the page's style). Tests: 3 integration
+      (install→row then remove→gone; duplicate + non-admin rejected; builtIn un-removable). Deferred (need runtime
+      hot-load, doc 02): reloadAdapter/reinstallAdapter (live npm/local module swap). Typecheck ✓, build ✓.
+      **All four 11-ui depth screens now have their backend-ready parts shipped.**
+
+- [x] **Hardening — task-detail review bar wired to reviewTask (Domain 8, front-end)** DONE (next commit). The
+      TaskDetailModal review bar showed a dead "Squad Leader will review via comments" message for review-status
+      tasks. Replaced it with live Approve / Request-changes buttons calling the human reviewTask mutation (admin
+      enforced server-side; approve→done, request_changes→assigned, then close so the board reflects it). Human task
+      review is now reachable both from the /review inbox and in-context on the task. Typecheck ✓, build ✓.
+
+- [x] **UI depth — Execution Workspaces on the project (11-ui §7, front-end)** DONE (next commit). §7 was ❌ (no
+      UI) but the backend CRUD already existed (projectWorkspaces + create/update/delete). New ProjectWorkspacesCard
+      on the project detail page: lists a project's execution workspaces (repo/ref/setup/strategy/primary), creates
+      them (name + strategy from WORKSPACE_STRATEGIES + repo/setup + isPrimary), makes-primary (update), and
+      deletes. EXECUTION_WORKSPACES-gated, self-hides when off. Deferred (need backend): provision/teardown
+      lifecycle (provisionWorkspace) + the services/ports runtime-config editor. Typecheck ✓, build ✓.
+
+- [x] **Hardening — unit tests for the untested pure utils I introduced** DONE (next commit). Audited util test
+      coverage: most (json-schema-form, company-package, cost-windows, finance-events, work-products, billing-types,
+      source-trust, execution-workspace-policy) already have tests; the two I added/used without coverage did not.
+      Added currency.test.ts (formatCents — whole/fractional/negative/grouping) and memory-providers.test.ts
+      (isMemoryProvider + resolveMemoryProvider agent→company→none resolution). 8 tests, all green. Fits the repo's
+      pure-util unit-test convention.
+
+## Deep parity from the real Paperclip source (/Users/dharmendra/Projects/Agent-Center-Cloud/paperclip)
+
+- [x] **Sidebar nav badges (port of paperclip server/src/services/sidebar-badges.ts)** DONE (next commit). Paperclip
+      badges the sidebar with actionable counts (SidebarBadges {inbox,approvals,failedRuns,joinRequests}). Ported a
+      monorepo-shaped equivalent: new sidebarBadges query (member+, plain counts — approvals pending [ws-scoped],
+      tasks-in-review + decompositions + open-incidents for the /review total, blocked-tasks for attention) + client
+      op SIDEBAR_BADGES_QUERY + count badges rendered on the IconRail nav (Attention / Needs-my-review / Approvals).
+      Tests: 2 integration (ws-scoped pending-approval count exact + review superset; unauth denied). Typecheck 4/4,
+      web build ✓.
+
+- [x] **Sidebar preferences — reorder + hide nav (port of paperclip sidebar-preferences service)** DONE (next
+      commit). Full-stack: new UserSidebarPreference model (workspaceId+userId unique, orderedIds/hiddenIds JSON;
+      migration 20260721000000) + service (get/upsert + normalizeIds dedup/trim, mirroring Paperclip) + GraphQL
+      sidebarPreference query + setSidebarPreference mutation (own-user) + client ops + UI: IconRail applies the
+      order/hide (pure orderNavItems helper) and a SidebarCustomizeCard on Settings reorders (up/down) + hides
+      (eye toggle) nav items, with Reset. Tests: 3 integration (normalizeIds; empty default; upsert round-trip).
+      Typecheck ✓, build ✓.
+
+- [x] **Attention snooze (port of paperclip inbox-dismissals snooze)** DONE (next commit). The monorepo's attention
+      dismissal was permanent; Paperclip's inbox-dismissals support snoozedUntil. Added snoozedUntil to
+      AttentionDismissal (migration 20260721010000); dismissAttentionItem takes an optional snoozedUntil and the feed
+      only hides an item while its dismissal is permanent (null) or still snoozed (future) — an expired snooze
+      re-surfaces the item. GraphQL dismissAttentionItem gains a snoozeHours arg; the /attention page gains a
+      "Snooze 1d" button beside Dismiss. Tests: 1 integration (surfaces → snoozed-hidden → expired-resurfaces →
+      permanent-hidden). Typecheck ✓, build ✓.
+
+- [x] **Command palette / Cmd-K quick switcher (port of paperclip ui CommandPalette.tsx)** DONE (next commit).
+      Paperclip has a cmdk-based Cmd/Ctrl-K palette; the monorepo had none (only a search box). Built a lightweight
+      version (no cmdk dep): a global Cmd/Ctrl-K listener opens a Dialog with a filtered, keyboard-navigable list
+      (↑/↓/Enter/Esc) grouped into Actions (New task), Go-to (all enabled nav pages, reusing NAV_ITEMS), Agents
+      (AGENTS_QUERY → /agents/[id]) and Projects (PROJECTS_QUERY → /projects/[id]). Mounted once in AppShell
+      (skipped during onboarding); agent/project queries paused until opened. Typecheck ✓, build ✓.
+
+- [x] **Notification preferences UI (Paperclip parity)** DONE (next commit). The UserNotificationPreference model
+      + REST route (/api/user-notifications/preferences GET/PUT) already existed but had no settings surface. Added
+      a NotificationPreferencesCard to Settings: channel toggles (in-app/push/email) + 11 per-type toggles (task
+      assigned/needs-review/clarification/approved/rejected/done, deliverable submitted, document added, mentions,
+      new comment, team updates), reading/saving via the existing REST route (no new backend). Typecheck ✓, build ✓.
+
+- [x] **Project-doc review comments (port of paperclip document-annotations, simplified)** DONE (next commit).
+      Paperclip's document-annotations is a heavy anchored-thread system; ported the spirit at the monorepo's
+      DeliverableAnnotation shape. Full-stack: new ProjectDocComment model (docId FK, body, optional quote,
+      resolved; migration 20260721020000) + ProjectDocComment GraphQL type + service (add/list/resolve/delete with
+      trim/validation) + projectDocComments query + add/resolve/delete mutations (DOCUMENTS-gated, member+) + client
+      ops + a ProjectDocCommentsThread slotted into the project-doc viewer (comment, resolve/reopen, delete, quote
+      anchor). Tests: 2 integration (add→list→resolve→delete; empty-body + unknown-doc rejected). Typecheck ✓,
+      build ✓. (Paperclip's anchor-snapshot reanchoring intentionally not ported.)
+
+## Cross-domain recurring themes (the "loopholes")
+- **Dead code / unwired features**: ~~memory capture~~ (FIXED — GAP-B wires post-run capture), requireUntrustedPrReview,
+  ~~hire_agent approval~~ (FIXED — Domain 14 #3, now creates the agent), auto-sleep cron, ~~secret audit-on-resolve~~
+  (FIXED — P1), ~~adapter Tier-A↔Tier-D disconnect~~ (FIXED — canonicalAdapterKey aliases), ~~requireUntrustedPrReview~~
+  (FIXED — Domain 8 G2, consumed at run finalize). → Phase 1 sweeps these. (Remaining loophole: auto-sleep cron IS
+  registered per INDEX line 51 — verify; memory capture FIXED in GAP-B.)
+- **No run persistence** anywhere (sandbox/heartbeat/work-items all point at it). → keystone #1.
+- **Low-trust containment is declared but not enforced at runtime** (sandbox admission, PR review, execution allowlist). → Phase 1/2.
+- **MCP entirely absent** — the single biggest capability gap for a tool-using agent platform.
+
+## Sandbox production-readiness (known, from prior work)
+
+- [x] Runtime binary now installed in sandbox via installGuard (idempotent) — DONE
+- [ ] Never run against a real provider key (all SDK-mocked) — **critical** (needs user key)
+- [x] runTaskInSandbox result posted to task timeline (postRunToTask) + review/blocked status — DONE
+- [x] Auto-dispatch on assignment — DONE (2dee1b5)
+- [ ] Cloudflare bridge Worker not built/deployed
+- [x] Private-repo clone auth wired (git credential helper, token never in URL) — DONE
+- [x] Run persistence (AgentRun ledger) + queued-run cancellation — DONE; cost tracking / in-flight kill / rate-limit still open
+- [ ] Sandbox UI web-only (not mobile)

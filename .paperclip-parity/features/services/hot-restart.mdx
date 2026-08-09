@@ -1,0 +1,12 @@
+---
+service: hot-restart
+kind: service
+status: Missing
+priority: P3
+gate: infra-gated
+---
+# hot-restart · ❌ Missing
+**What it is:** hot-restart the server without dropping in-flight state.
+**Monorepo:** none (serverless/Vercel model; in-proc drain loop on long-lived server).
+**Required:** a hot-restart coordinator — only relevant for the long-lived server. Infra-gated.
+**Covers:** features/P3-additional-differences.mdx · SERVICE-AUDIT #73.

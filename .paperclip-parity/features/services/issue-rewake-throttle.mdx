@@ -1,0 +1,12 @@
+---
+service: issue-rewake-throttle
+kind: service
+status: Missing
+priority: P2
+gate: buildable-now
+---
+# issue-rewake-throttle · ❌ Missing
+**What it is:** throttle repeated wake attempts on the same task (avoid wake storms).
+**Monorepo:** none (task monitors have attempts caps; no general rewake throttle).
+**Required:** a throttle keyed on task+reason. Buildable-now — pairs with dependency-wakeups.
+**Covers:** features/P2-additional-differences.mdx · SERVICE-AUDIT #88.

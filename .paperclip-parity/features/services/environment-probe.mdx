@@ -1,0 +1,12 @@
+---
+service: environment-probe
+kind: service
+status: Present
+priority: P1
+gate: done (cloud/ssh gated)
+---
+# environment-probe · ✅ Present
+**What it is:** connectivity probe for an environment.
+**Monorepo:** `probeEnvironment` (local trivial; sandbox real provision+echo; ssh test).
+**Required:** cloud/ssh probe needs real creds/host.
+**Covers:** features/P1-environments-leases.mdx · SERVICE-AUDIT #51.

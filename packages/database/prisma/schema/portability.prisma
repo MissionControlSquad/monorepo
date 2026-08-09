@@ -1,0 +1,20 @@
+// ─── Workspace Export / Import (Epic #14) ─────────────────────────
+// Portability: export a workspace's agents/projects/skills to a versioned JSON bundle; import a
+// bundle with a collision strategy. The bundle itself is data (not a table) — only the import audit
+// is persisted. Reuses the CollisionStrategy enum from Epic #10. workspaceId-scoped (D5, no FK).
+
+model WorkspaceImport {
+  id                  String            @id @default(cuid())
+  workspaceId         String
+  bundleVersion       Int
+  collisionStrategy   CollisionStrategy @default(rename)
+  createdAgentIds     String[]          @default([])
+  createdProjectIds   String[]          @default([])
+  createdSkillIds     String[]          @default([])
+  summary             Json
+  importedByProfileId String?
+  createdAt           DateTime          @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@map("workspace_imports")
+}

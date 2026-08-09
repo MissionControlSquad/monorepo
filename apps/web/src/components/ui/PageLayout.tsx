@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 interface PageLayoutProps {
   children: React.ReactNode;
-  maxWidth?: "narrow" | "medium" | "default" | "wide";
+  maxWidth?: "narrow" | "medium" | "default" | "wide" | "full";
   className?: string;
 }
 
@@ -13,6 +13,7 @@ const MAX_WIDTH_CLASSES = {
   medium: "max-w-4xl",
   default: "max-w-5xl",
   wide: "max-w-7xl",
+  full: "max-w-none",
 };
 
 export function PageLayout({ children, maxWidth = "default", className }: PageLayoutProps) {

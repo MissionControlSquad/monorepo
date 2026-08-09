@@ -1,0 +1,42 @@
+// ─── Plugin SDK registry (Epic #6) ────────────────────────────────
+// Install-time contract for plugins: a workspace-scoped registry of installed plugins keyed by their
+// manifest id. v1 is registry + manifest validation only — a registered plugin is inert metadata; the
+// runtime (loader/sandbox/workers) is deferred (spec D2). Declared capabilities are recorded, not
+// granted. workspaceId-scoped (Epic #1, D5; no FK).
+
+enum PluginCategory {
+  connector
+  workspace
+  automation
+  ui
+}
+
+enum PluginStatus {
+  installed
+  disabled
+  error
+}
+
+model Plugin {
+  id                   String         @id @default(cuid())
+  workspaceId          String
+  pluginId             String // the manifest id (slug), unique per workspace
+  name                 String
+  version              String
+  displayName          String
+  description          String?
+  category             PluginCategory
+  capabilities         String[]       @default([])
+  manifest             Json
+  config               Json? // per-workspace config values, validated against manifest.configSchema
+  status               PluginStatus   @default(installed)
+  lastError            String? // last error surfaced to the operator (status = error)
+  enabled              Boolean        @default(true)
+  installedByProfileId String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@unique([workspaceId, pluginId])
+  @@index([workspaceId, status])
+  @@map("plugins")
+}

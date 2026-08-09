@@ -1,0 +1,12 @@
+---
+service: execution-workspace-policy
+kind: service
+status: Present
+priority: P1
+gate: done
+---
+# execution-workspace-policy · ✅ Present
+**What it is:** resolve the effective workspace strategy (worktree/clone/…).
+**Monorepo:** `execution-workspace-policy.ts` (`resolveEffectiveWorkspaceStrategyType`).
+**Required:** — (but the strategy is recorded, not realized — see workspace-realization).
+**Covers:** features/P1-execution-workspaces.mdx · SERVICE-AUDIT #57.

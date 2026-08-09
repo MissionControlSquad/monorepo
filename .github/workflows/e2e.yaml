@@ -1,0 +1,130 @@
+name: E2E (Playwright)
+
+# Browser E2E for the agent-lifecycle and other UI-critical flows. Runs the same specs a developer
+# runs locally with `npm run e2e`. Kept separate from the main CI so PR feedback stays fast; trigger
+# it on demand or on pushes to main. Scaffold - extend the seed + secrets as more specs land.
+on:
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: "Tag/name filter, e.g. @smoke"
+        required: false
+        default: ""
+  push:
+    branches: [main, implement-new-functionalities]
+    paths:
+      - "e2e/**"
+      - "apps/web/**"
+      - ".github/workflows/e2e.yaml"
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright (chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: clawd
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      POSTGRES_PRISMA_URL: "postgresql://postgres:postgres@localhost:5432/clawd"
+      POSTGRES_URL_NON_POOLING: "postgresql://postgres:postgres@localhost:5432/clawd"
+      REDIS_URL: "redis://localhost:6379"
+      AUTH_SECRET: "ci-e2e-secret-not-for-production"
+      SYSTEM_SECRET: "ci-e2e-system-secret"
+      CRON_SECRET: "ci-cron-secret"
+      LICENSE_DEV_BYPASS: "1"
+      NEXT_PUBLIC_MC_URL: "http://localhost:3000"
+      BASE_URL: "http://localhost:3000"
+      ADMIN_USER: "admin"
+      # The seed provisions admin / securepass123 (CI-only, ephemeral DB). Set the E2E_ADMIN_PASSWORD
+      # repo secret to override - and change the seed to match if you do.
+      ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'securepass123' }}
+      # In CI, boot a production server (fast + stable) rather than the dev server.
+      PW_WEB_COMMAND: "npm run start --workspace @agentcenter/web"
+      # Disable per-IP rate limiting for the served app: Playwright drives it from several parallel
+      # workers behind one shared IP, so the per-IP limiters trip non-deterministically (429 pages +
+      # aborted GraphQL loads). CI-only; the middleware reads this at build time, so it must also be
+      # in the app .env written below (present at `next build` time).
+      E2E_RATE_LIMIT_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.22.1"
+          cache: "npm"
+      - run: npm ci
+      - name: Generate Prisma Client
+        run: cd packages/database && npx prisma generate
+
+      # Runtime env for `next start` (mirrors the job env above).
+      - name: Write app env
+        run: |
+          cat > apps/web/.env <<'EOF'
+          POSTGRES_PRISMA_URL="postgresql://postgres:postgres@localhost:5432/clawd"
+          POSTGRES_URL_NON_POOLING="postgresql://postgres:postgres@localhost:5432/clawd"
+          REDIS_URL="redis://localhost:6379"
+          AUTH_SECRET="ci-e2e-secret-not-for-production"
+          SYSTEM_SECRET="ci-e2e-system-secret"
+          CRON_SECRET="ci-cron-secret"
+          # Secrets-vault master key (AES-256-GCM). env.ts requires >=32 chars at production runtime,
+          # which `next start` is — without it every request 500s and login never redirects. CI-only value.
+          SECRET_ENCRYPTION_KEY="ci-e2e-secret-encryption-key-not-for-production-0"
+          LICENSE_DEV_BYPASS="1"
+          NEXT_PUBLIC_MC_URL="http://localhost:3000"
+          # Bypass per-IP rate limiting under the parallel Playwright run (see job env above). Read by
+          # both the Edge middleware (inlined at `next build`) and the per-route limiters at runtime.
+          E2E_RATE_LIMIT_DISABLED="1"
+          EOF
+
+      - name: Apply DB migrations
+        run: npm run db:migrate:deploy
+
+      # Seed an admin + a small squad (the lifecycle spec needs an admin login + a squad-lead agent
+      # to review). Extend this as more specs need more fixtures.
+      # SEED_FAST keeps this to ~20 agents / ~100 tasks: the full enterprise seed (10k tasks, 200 agents)
+      # takes 30+ min and blows the job timeout mid-seed, so specs never run. Fast mode finishes in seconds
+      # and still provisions the admin + squad-lead the specs need.
+      - name: Seed
+        run: cd apps/web && npx tsx scripts/seed-enterprise.ts
+        env:
+          SEED_FAST: "1"
+          # Enable the RUNNERS flag for the served app so the agent-lifecycle spec can reach the
+          # RUNNERS-gated cloud skill+config endpoint (/api/agents/me/context). Runs before the app
+          # boots; the app's create-only flag startup-migration then leaves this row untouched.
+          SEED_ENABLE_RUNNERS: "1"
+
+      - name: Build web app
+        run: npx turbo run build --filter=@agentcenter/web
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E
+        run: npx playwright test --config=e2e/playwright.config.ts ${{ github.event.inputs.grep && format('--grep {0}', github.event.inputs.grep) || '' }}
+        env:
+          CI: "true"
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

@@ -1,0 +1,35 @@
+---
+feature: Additional P3 differences (cloud-upstreams, decision-training, folders, assets, run internals, ops)
+priority: P3
+status: Missing / Partial
+gate: infra-gated / buildbase-owned / buildable-now
+---
+
+# Additional P3 differences · P3 · found in second-pass diff
+
+The remaining distinct Paperclip services my first pass didn't surface. Lower priority (deferred,
+niche, or infra/buildbase).
+
+| Feature | Paperclip | What it is | Status | Gate |
+|---|---|---|---|---|
+| **Cloud upstreams** | `cloud-upstreams.ts` (1309 ln) | Sync runs/state from a cloud upstream instance (fork/pull topology, sealed credentials, startup reconcile) | Missing | infra-gated (multi-instance topology) |
+| **Decision training** | `decision-training.ts` (403 ln) | Capture human approve/reject decisions as training snapshots to feed future auto-decisioning | Missing | buildable-now (capture) / needs-ML (use) |
+| **Folders** | `folders.ts` (619 ln) | Folder hierarchy (slugs) to organize entities | Missing | buildable-now |
+| **Assets / company-artifacts** | `assets.ts`, `company-artifacts.ts` | First-class asset/artifact store beyond task deliverables | Missing | infra-gated (storage) |
+| **Workspace file resources** | `workspace-file-resources.ts` | Managed workspace file resources | Missing | buildable-now |
+| **Run scratch / handoff / config-fingerprints** | `run-scratch.ts`, `successful-run-handoff-state.ts` | Ephemeral run scratch space + run→run handoff continuity. (`effective-run-config-fingerprints` IS present in the monorepo, inside `environment-custom-images.ts`) | Missing (scratch/handoff) / Present (fingerprints) | infra-gated |
+| **Codex auth reconciliation** | `codex-auth-reconciliation.ts` | Reconcile Codex CLI subscription auth state | Missing | needs-provider-key |
+| **Database backup health** | `database-backup-health.ts` | Monitor backup freshness/health | Missing | buildable-now (fits the operator CLI, P3 #24) |
+| **Hot restart / local-service-supervisor** | `hot-restart.ts`, `local-service-supervisor.ts` | Server hot-restart + supervise local helper processes | Missing | infra-gated (long-lived host) |
+| **Inbox agent policy** | `inbox-agent-policy.ts` | Per-agent inbox routing policy | Missing | buildable-now |
+| **Resource memberships / access / authorization / board-auth / invite-grants** | `resource-memberships.ts`, `access.ts`, `authorization.ts`, `board-auth.ts`, `invite-*` | Resource-level ACL, principal access, invites | Missing | **buildbase-owned** (human RBAC/membership) |
+| **Live events** | `live-events.ts` | Server-wide live event stream | Partial | the monorepo uses GraphQL subscriptions + an event bus instead |
+| **Change-consent-gate** | `change-consent-gate.ts` | Agent asks consent before changing its own name/role/capabilities | Partial | present-ish in `approvals.ts` + `agent-authz.ts` (simplified) |
+
+**What's required:** most are niche/infra/buildbase. The **buildable-now** ones worth noting: folders,
+decision-training capture, workspace-file-resources, database-backup-health (→ operator CLI),
+inbox-agent-policy. Cloud-upstreams + assets + hot-restart need infra; access/authorization/invites are
+buildbase-owned.
+
+**Priority rationale:** None affects the core loop; each is either advanced/niche, infra-gated, or the
+buildbase boundary.

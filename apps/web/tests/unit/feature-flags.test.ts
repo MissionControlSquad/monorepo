@@ -22,12 +22,15 @@ import {
 
 const sampleFlags = [
   { key: "channels", enabled: true, managedBy: "system" as const, description: "Channels" },
-  { key: "cloud_vms", enabled: false, managedBy: "system" as const, description: "Cloud VMs" },
+  { key: "terminals", enabled: false, managedBy: "system" as const, description: "Terminals" },
   { key: "agent_queue", enabled: true, managedBy: "user" as const, description: "Agent Queue" },
 ];
 
 describe("feature-flags server module", () => {
   beforeEach(() => {
+    // This suite asserts the 60s cache behavior, so it must opt out of the test-wide fresh-read flag
+    // (.env.test sets DISABLE_FLAG_CACHE=1 to avoid cross-file flag-cache flakiness elsewhere).
+    delete process.env.DISABLE_FLAG_CACHE;
     vi.useFakeTimers();
     invalidateFlagCache();
     mockListAllFeatureFlags.mockReset();
@@ -44,7 +47,7 @@ describe("feature-flags server module", () => {
       expect(mockListAllFeatureFlags).toHaveBeenCalledOnce();
       expect(flags.size).toBe(3);
       expect(flags.get("channels")?.enabled).toBe(true);
-      expect(flags.get("cloud_vms")?.enabled).toBe(false);
+      expect(flags.get("terminals")?.enabled).toBe(false);
     });
 
     it("returns cached flags on subsequent calls within TTL", async () => {
@@ -71,7 +74,7 @@ describe("feature-flags server module", () => {
     });
 
     it("returns false for disabled flag", async () => {
-      expect(await isFeatureEnabled("cloud_vms")).toBe(false);
+      expect(await isFeatureEnabled("terminals")).toBe(false);
     });
 
     it("defaults to true for unknown flag", async () => {
@@ -83,7 +86,7 @@ describe("feature-flags server module", () => {
     it("returns all flags as an array", async () => {
       const flags = await getAllFlags();
       expect(flags).toHaveLength(3);
-      expect(flags.map((f) => f.key).sort()).toEqual(["agent_queue", "channels", "cloud_vms"]);
+      expect(flags.map((f) => f.key).sort()).toEqual(["agent_queue", "channels", "terminals"]);
     });
 
     it("includes managedBy field", async () => {

@@ -1,0 +1,18 @@
+// Continuation summaries (parity #142/#156/#157). A "summary slot" holds a rolling compacted context
+// summary for an agent, finalized at run end and carried into the agent's next (continuation) run.
+// D5: workspaceId no FK; status is TEXT. One active draft per (agentId, slotKey); finalized rows are
+// history. The agent runtime writes/reads these; storage + service are here.
+model SummarySlot {
+  id          String   @id @default(cuid())
+  workspaceId String
+  agentId     String
+  slotKey     String   @default("context") // named slot (context | goals | …)
+  content     String   @db.Text
+  status      String   @default("draft") // draft | finalized
+  runId       String? // the run that produced/finalized this summary
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId, agentId, slotKey, status])
+  @@map("summary_slots")
+}

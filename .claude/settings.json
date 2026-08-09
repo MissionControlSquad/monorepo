@@ -1,5 +1,11 @@
 {
   "enabledPlugins": {
-    "expo@expo-plugins": true
+    "expo@expo-plugins": true,
+    "playwright@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "ralph-loop@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "chrome-devtools-mcp@claude-plugins-official": true,
+    "plugin-dev@claude-plugins-official": true
   }
 }

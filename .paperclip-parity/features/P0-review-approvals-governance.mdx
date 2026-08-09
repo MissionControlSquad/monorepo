@@ -1,0 +1,32 @@
+---
+feature: Review, approvals & governance
+priority: P0
+status: Present
+gate: buildable-now
+---
+
+# Review, approvals & governance · P0 · ✅ Present (trust-edit unwired)
+
+**What it is:** the human/agent oversight layer — task review (Squad-Lead agent + human paths),
+polymorphic approvals with N-of-M quorum, hire approvals, trust profiles, per-agent capability grants
++ deny audit, run low-trust review/promotion, and the unified `/review` inbox.
+
+**Present in our monorepo (verified):**
+- Task review — agent path: `approveTask`/`rejectTask`/`requestClarification` (require Squad-Lead reviewer), `services/review.ts:performApproveTask/...`.
+- Task review — human path: `reviewTask` (admin, REVIEWS-gated) → `reviewTaskByHuman`, REST `/api/tasks/[id]/{approve,reject,request-clarification}`, `views/ReviewInboxPage.tsx`, route `/review`, and the in-context TaskDetailModal review bar.
+- Approvals: `Approval` + full lifecycle (`createApproval`, decide, request-changes, resubmit, cancel, comment), `ApprovalDetailPage`.
+- Quorum + hire: `requiredApprovals`/`ApprovalVote`, `castApprovalVote`, `requestAgentHire`; UI on Approvals + `/review`.
+- Agent-authz: `AgentCapabilityGrant` + `AgentAuthzEvent` (deny log), grant/revoke, route `/agent-authz`.
+- Governance settings: `setAgentGovernance` (`requireAgentApproval`), `SettingsPage` AgentGovernanceCard.
+- Run review: `run-review.ts` (`computeRunReview`/`promoteAgentRunReview`), surfaced in `/review` + runners.
+- Sidebar badges + `/review` aggregate the pending queues.
+
+**Gaps / pending:**
+- **UNWIRED:** `setAgentTrustProfile` + `agentTrustProfile` (server + `services/trust.ts`) have **no client op and no editor UI** — trust is set programmatically; the UI only reads the denormalized `trustLevel`. → add client ops + a trust-profile editor (buildable-now).
+- Run review/promotion for *real* runs depends on Tier-D execution (P1).
+
+**What's required:** A trust-profile editor UI + client ops (small, buildable-now).
+
+**Priority rationale:** Governance is how humans stay in control of autonomous agents. Foundational.
+
+**Depends on:** buildbase for human RBAC (role gates); nothing else.

@@ -1,0 +1,16 @@
+// Feedback (parity #60/#61/#62). Lightweight thumbs-up/down + optional comment on a task, deliverable,
+// agent, or the product in general. Comments are redacted of secrets/PII on capture (#61). D5:
+// workspaceId has no FK; targetType/rating are TEXT (app-validated), not enums.
+model Feedback {
+  id                   String   @id @default(cuid())
+  workspaceId          String // no FK (D5)
+  targetType           String // task | deliverable | agent | general
+  targetId             String? // null for general product feedback
+  rating               String // up | down
+  comment              String? // redacted on capture
+  submittedByProfileId String?
+  createdAt            DateTime @default(now())
+
+  @@index([workspaceId, targetType, createdAt])
+  @@map("feedback")
+}

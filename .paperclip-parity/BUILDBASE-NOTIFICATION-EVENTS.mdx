@@ -1,0 +1,60 @@
+---
+title: Buildbase custom notification events to create
+purpose: dashboard checklist — one row per event the delivery adapter sends
+---
+# Buildbase notification events — create these in the dashboard
+
+The delivery adapter (`notification-buildbase.ts`) calls
+`bb.notification.send(workspaceId, <slug>, userId, { title, message, url, channels })`. The
+**slug MUST match exactly** — it is our `UserNotificationType` enum value, passed straight through
+as the event. Create each event below (Notifications → Custom → Create Notification Event), then
+edit its auto-created email template.
+
+**Set "User can toggle this in workspace settings" = ON for all** — these are all user-facing, and
+buildbase's per-user preference then governs delivery (our own prefs remain the fallback path's gate).
+
+All eleven are **wired and firing** (events/handlers/user-notification.ts), each with `workspaceId`
+resolved — so once provisioned + created here, delivery routes for every one.
+
+| Slug (exact) | Name | Description | Category | Fires on |
+|---|---|---|---|---|
+| `new_comment` | New Comment | Someone commented or sent you a message | Messages | channel message / task comment |
+| `mention` | Mention | Someone mentioned you | Messages | @mention in a message |
+| `task_assigned` | Task Assigned | A task was assigned to you | Tasks | task created / assignees changed |
+| `task_needs_review` | Task Needs Review | A task is ready for your review | Tasks | status → review |
+| `task_clarification_requested` | Clarification Requested | An agent asked for clarification on a task | Tasks | clarification requested |
+| `task_approved` | Task Approved | Your task was approved | Tasks | review approve |
+| `task_rejected` | Task Rejected | Your task was rejected | Tasks | review reject |
+| `task_done` | Task Done | A task you're involved in was completed | Tasks | status → done |
+| `deliverable_submitted` | Deliverable Submitted | A deliverable was submitted for review | Deliverables | deliverable submitted |
+| `document_added` | Document Added | A document was added | Documents | document created on task |
+| `team_update` | Team Update | An update from your team | Team | project member added/removed |
+
+## Email template merge tags
+
+Each event's auto-created email template can use buildbase merge tags. The adapter populates:
+
+- `{{message}}` — the notification body
+- `{{url}}` — click-through URL (also the push click target)
+- `{{name}}`, `{{email}}`, `{{workspaceName}}` — recipient/workspace (buildbase-provided)
+
+The push `title` = our notification title; push `body` = `{{message}}`.
+
+## Runtime env to activate delivery (server-private)
+
+```
+NEXT_PUBLIC_SAAS_ORG_ID=…         # already used by the client provider
+NEXT_PUBLIC_SAAS_SERVER_URL=…     # already used by the client provider
+BUILDBASE_SERVICE_SESSION_ID=…    # server-to-server session for org-level notification.send
+```
+
+With those set **and** the events above created, push/email route through buildbase; otherwise the
+adapter returns "skip" and the home-grown `sendPushToUser`/`sendEmail` path runs. Both fail-safe.
+
+## Code wiring status
+
+- [x] Adapter sends `record.type` as the event slug (`notification-buildbase.ts`).
+- [x] `workspaceId` threaded into notifications: `NotifyParams.workspaceId` → metadata → adapter.
+- [x] `dm-notify` (channel `new_comment`) passes `channel.workspaceId`.
+- [x] **All 11 event handlers pass `workspaceId`** (`getTaskWorkspaceId` via task→project,
+      `getProjectWorkspaceId`) — every type routes to buildbase once provisioned.

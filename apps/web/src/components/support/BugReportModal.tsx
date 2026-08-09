@@ -198,6 +198,7 @@ export function BugReportModal({ isOpen, onClose }: BugReportModalProps) {
         </DialogHeader>
 
         <Form {...form}>
+          {/* eslint-disable-next-line react-hooks/refs -- react-hook-form's handleSubmit is stable; react-hooks/refs false positive */}
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
             {/* Title */}
             <FormField

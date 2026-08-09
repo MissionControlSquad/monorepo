@@ -1,0 +1,12 @@
+---
+service: run-log-store
+kind: service
+status: Partial
+priority: P2
+gate: buildable-now
+---
+# run-log-store · 🟡 Partial
+**What it is:** durable per-run log store (retrievable after the run ends).
+**Monorepo:** ephemeral run status only; no durable log persistence.
+**Required:** a run_log table + append/read. Buildable-now.
+**Covers:** features/P2-observability-portability.mdx · SERVICE-AUDIT #144.

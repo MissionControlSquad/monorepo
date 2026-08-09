@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guardedFetch } from "@agentcenter/utils/remote-http-endpoint-guard";
 import { errorResponse } from "../_lib/json-response";
 
 /**
@@ -73,17 +74,32 @@ export async function GET(request: Request) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "bot (AgentCenter link preview)",
-        Accept: "text/html",
-      },
-      signal: controller.signal,
-      redirect: "follow",
-    });
+    // SSRF-hardened: guardedFetch resolves DNS and blocks private/loopback/CGNAT/metadata targets before
+    // egress; redirect:"manual" so a public host can't 302 us into internal ranges — we re-validate each
+    // hop through guardedFetch (bounded to 3), which re-resolves the redirect target.
+    let current = url;
+    let res: Response | null = null;
+    for (let hop = 0; hop < 4; hop++) {
+      const r = await guardedFetch(current, {
+        headers: { "User-Agent": "bot (AgentCenter link preview)", Accept: "text/html" },
+        signal: controller.signal,
+        redirect: "manual",
+      });
+      if (r.status >= 300 && r.status < 400) {
+        const loc = r.headers.get("location");
+        if (!loc) {
+          res = r;
+          break;
+        }
+        current = new URL(loc, current).toString(); // guardedFetch re-validates on the next iteration
+        continue;
+      }
+      res = r;
+      break;
+    }
     clearTimeout(timeout);
 
-    if (!res.ok || !res.headers.get("content-type")?.includes("text/html")) {
+    if (!res || !res.ok || !res.headers.get("content-type")?.includes("text/html")) {
       return errorResponse("Not an HTML page", 422);
     }
 

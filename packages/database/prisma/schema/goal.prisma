@@ -1,0 +1,39 @@
+// ─── Goals / OKRs (Epic #11) ──────────────────────────────────────
+// Hierarchical goal tree (company → team → task levels), each optionally owned by an agent, with a
+// "default company goal" fallback. workspaceId-scoped (Epic #1, D5; no FK). Ports Paperclip goals.
+
+enum GoalLevel {
+  company
+  team
+  agent // Domain 14 #9 — company → team → agent → task alignment
+  task
+}
+
+enum GoalStatus {
+  planned
+  active
+  completed
+  archived
+}
+
+model Goal {
+  id                 String     @id @default(cuid())
+  workspaceId        String
+  title              String
+  description        String?
+  level              GoalLevel  @default(task)
+  status             GoalStatus @default(planned)
+  parentId           String?
+  parent             Goal?      @relation("GoalTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children           Goal[]     @relation("GoalTree")
+  ownerAgentId       String?
+  ownerAgent         Agent?     @relation("AgentGoals", fields: [ownerAgentId], references: [id], onDelete: SetNull)
+  tasks              Task[]     @relation("GoalTasks") // Epic #11b
+  defaultForProjects Project[]  @relation("ProjectDefaultGoal") // Epic #11b
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@index([workspaceId, level, status])
+  @@index([workspaceId, parentId])
+  @@map("goals")
+}

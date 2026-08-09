@@ -1,0 +1,15 @@
+---
+service: remote-http-endpoint-guard
+kind: service
+status: Present
+priority: P1
+gate: done
+---
+# remote-http-endpoint-guard · ✅ Present
+**What it is:** SSRF guard — block private/loopback/link-local targets on all agent-driven outbound HTTP.
+**Monorepo:** `@agentcenter/utils/remote-http-endpoint-guard` (shared subpath) — `parseRemoteHttpEndpoint`
++ `assertPublicRemoteHttpEndpoint` (DNS-resolve → block private/CGNAT/metadata/reserved IPv4+IPv6) +
+`guardedFetch`. On-by-default; env escape hatch `SSRF_ALLOW_PRIVATE_NETWORK`. 19 unit tests.
+Applied to: the **agent webhook `http` adapter** (`packages/runner/src/executor.ts`) + exe-dev + cloudflare bridges.
+**Required:** only remaining vector — secret-provider endpoints (when the AWS/Vault stubs are implemented).
+**Covers:** features/P1-security-ssrf-guard.mdx · SERVICE-AUDIT #138.

@@ -86,6 +86,7 @@ export const UPDATE_AGENT_PROFILE = gql`
     $role: String
     $personality: String
     $identityEmoji: String
+    $llmModel: String
   ) {
     updateAgentProfile(
       id: $id
@@ -93,12 +94,14 @@ export const UPDATE_AGENT_PROFILE = gql`
       role: $role
       personality: $personality
       identityEmoji: $identityEmoji
+      llmModel: $llmModel
     ) {
       id
       name
       role
       personality
       identityEmoji
+      llmModel
     }
   }
 `;

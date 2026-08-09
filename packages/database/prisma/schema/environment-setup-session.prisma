@@ -1,0 +1,24 @@
+// Custom-image setup session (parity #47/#48). Binds an interactive setup terminal to image capture:
+// open a terminal into a base sandbox, configure it, then snapshot into a reusable custom image. Ports
+// Paperclip's EnvironmentCustomImageSetupSession. The TerminalSession (SSH/PTY) and provider.snapshot()
+// are the infra seams; this row is the lifecycle + short-TTL binding + connection summary. D5:
+// workspaceId no FK; status is TEXT (app-validated via the pure setup-session state machine). CUSTOM_IMAGES-gated.
+model EnvironmentCustomImageSetupSession {
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  environmentId      String
+  baseTemplateId     String? // image being configured from (null = environment base)
+  terminalSessionId  String? // the bound TerminalSession issuing the SSH PTY (#48 broker)
+  status             String   @default("active") // active | capturing | captured | failed | aborted | expired
+  resultTemplateId   String? // the captured EnvironmentCustomImageTemplate on success
+  connectionSummary  Json? // host/user/port summary (secrets stored as vault refs, not inline)
+  lastError          String?
+  expiresAt          DateTime // short TTL — reaped if not captured in time
+  createdByProfileId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([workspaceId, environmentId, status])
+  @@index([workspaceId, status, expiresAt])
+  @@map("environment_custom_image_setup_sessions")
+}

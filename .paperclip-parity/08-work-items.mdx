@@ -1,0 +1,301 @@
+# 08 — Work items (issues / tasks / comments / documents / artifacts / runs)
+
+**Domain:** the full work lifecycle — create → assign → checkout/run → comment → produce artifact/deliverable → review → PR/merge.
+**Status legend:** ✅ Present · 🟡 Partial · ❌ Missing · 🚫 buildbase-owned (skip)
+**Sizes:** S ≈ ≤2d · M ≈ ~1wk · L ≈ multi-week.
+
+> **Scope note.** The heartbeat *engine / scheduling / watchdog cron* lives in domain `09-heartbeat-scheduling.mdx`. This doc covers the **work-item-facing** slices of runs: the run record as a first-class execution history on a task, run→artifact linkage, run→comment, run logs, and run-gated review. Where they overlap it is flagged `→09`.
+
+> **Stack reality.** Paperclip DB = **Drizzle/Postgres** (`packages/db/src/schema/*.ts`), no Prisma. Its work item is called an **issue** (`issues` table), not "task". Its "review.ts" / "task-checkout.ts" etc. do **not** exist under those names — functionality is mapped below. Our monorepo = Prisma (`packages/database/prisma/schema`), GraphQL Pothos, Next app router.
+
+---
+
+## 0. Executive summary
+
+We have a **strong flat task core** (status/priority/assignees, checkout lease, tree-hold, watchdog, relations, templates, recurring, plan-decomposition, approvals, deliverables + annotations/votes, messages, mention-auto-assign). Paperclip's work-item domain is **deeper on the execution/output/trust axis**. The parity gaps cluster into six themes:
+
+| # | Gap theme | Impact | Size |
+|---|-----------|--------|------|
+| G1 | **Work-product taxonomy + PR-from-run** — we have only `Deliverable{markdown,code,file,link}`; Paperclip has `issue_work_products` with 7 types (pull_request/branch/commit/preview_url/runtime_service/artifact/document), a `reviewState` gate, `isPrimary`, `healthStatus`, provider, and `createdByRunId`. | High | L |
+| G2 | **Untrusted-input containment (`low_trust_review`) + source-trust quarantine** — our `requireUntrustedPrReview` is a **dead toggle** (never consumed). Paperclip has a full preset/boundary/quarantine/promotion model. | High | L |
+| G3 | **Per-task execution run record (`heartbeat_runs`)** — we have no run entity on a task: no run history, logs, liveness, retry/continuation, run→comment, run→artifact. (`→09` for the cron side.) | High | L |
+| G4 | **Artifact upload pipeline (attachment → asset → work-product)** + agent upload skill — we store bytes inline on `Deliverable.storageKey` (R2) but have no asset/attachment separation, no agent-facing upload helper, no video/binary artifact story. | Med | M |
+| G5 | **Document depth: text-anchored annotations w/ cross-revision re-anchoring + cooperative locks + comment-stream mirroring** — our deliverable annotations are quote-based & don't re-anchor; docs have no annotations, no locks. | Med | M/L |
+| G6 | **Blocker diagnostics + dependency-resolved wakeups + typed thread interactions + rich comment presentation + external-object PR sync** — a cluster of smaller lifecycle refinements. | Med | S–M each |
+
+---
+
+## 1. Paperclip work-item model & lifecycle (reference)
+
+**Core table `issues`** — `paperclip: packages/db/src/schema/issues.ts:22-168`.
+- Status (flat, 7): `backlog, todo, in_progress, in_review, done, blocked, cancelled` — `packages/shared/src/constants.ts:193`.
+- Priority (4): `critical, high, medium, low` — `constants.ts:214`. WorkMode: `standard, ask, planning, skill_test` — `:216`.
+- Single assignee: `assigneeAgentId` / `assigneeUserId` (mutually exclusive).
+- **Checkout/lease/execution lock:** `checkoutRunId`, `executionRunId`, `executionAgentNameKey`, `executionLockedAt` (`issues.ts:39-42`) — leases point at a **run**.
+- **Provenance/autonomy:** `originKind` (`manual, routine_execution, stale_active_run_evaluation, harness_liveness_escalation, issue_productivity_review, stranded_issue_recovery, task_watchdog, plugin:*` — `constants.ts:279`), `originId`, `originRunId`, `originFingerprint`, `requestDepth` (cap 1024). Partial-unique indexes enforce **idempotency per origin** (`issues.ts:110-159`).
+- **Autonomy policy:** `executionPolicy` jsonb (`normal|auto`), `executionState`, monitor fields, `sourceTrust` jsonb.
+- Lifecycle timestamps: `startedAt/completedAt/cancelledAt/hiddenAt`.
+
+**Lifecycle (implemented):** create (`backlog`, auto→`todo` if assignee) → assign (`PATCH`) → `POST /checkout` leases to a run, sets `in_progress`+`startedAt`, **refuses if unresolved blockers or an active pause-hold** (`services/issues.ts:6640,6623`) → status flows `in_progress→in_review→done`, side-branches `blocked/cancelled` → blocker resolves → dependency-wakeup fires. Related tables: `issue_relations` (only `blocks`), `issue_tree_holds`(+members), `issue_watchdogs`, `issue_recovery_actions`, `issue_comments`, `issue_documents`, `issue_work_products`, `issue_attachments`, `issue_approvals`, `issue_thread_interactions`, `issue_plan_decompositions`, `issue_labels`, `issue_reference_mentions`.
+
+---
+
+## 2. Feature-by-feature parity table
+
+Refs: `pc:` = Paperclip, `mc:` = our monorepo.
+
+### 2.1 Core task/issue CRUD & fields
+
+| Feature | pc file:line | Status | mc refs |
+|---|---|---|---|
+| Task entity + number + soft-delete | `issues.ts:22`,`:46`,`:71` | ✅ | `Task` `task.prisma:19`, `taskNumber :31`, `deletedAt` |
+| Status enum | `constants.ts:193` (7) | ✅ (6) | `TaskStatus task.prisma:3` = inbox/assigned/in_progress/review/done/blocked. **No `cancelled`/`backlog` split** 🟡 |
+| Priority | `constants.ts:214` (4) | ✅ | `Priority task.prisma:12` low/med/high/urgent |
+| WorkMode (standard/ask/planning/skill_test) | `constants.ts:216` | ❌ | none — see G3 note |
+| Single assignee (agent xor user) | `issues.ts:37-38` | ✅ (multi) | `TaskAssignee task.prisma:146` — we allow **many** assignees (superset) |
+| Sub-tasks / parent | `issues.ts:30` | ✅ | `parentTaskId task.prisma:32` |
+| Labels/tags | `issue_labels` | ✅ | `Task.tags[]` |
+| Origin/provenance + idempotency per origin | `issues.ts:48-52,110-159` | 🟡 | `Task.recurringTaskId` only; autonomy has `PlanDecomposition.generatedByAgentId`. **No `originKind`/`originRunId`/idempotency indexes** — see G6.4 |
+| Due date / goal link / project link | `issues.ts:29`,`:57` | ✅ | `dueDate`,`goalId`,`projectId` `task.prisma:34` |
+
+### 2.2 Checkout / lease / tree-hold / watchdog / relations
+
+| Feature | pc file:line | Status | mc refs |
+|---|---|---|---|
+| Checkout lease (conditional UPDATE + fencing) | `services/issues.ts:6613 checkout`,`6954 release`,`7006 adminForceRelease` | ✅ | `task-checkout.ts:35/63/81/98/112`, lease cols `task.prisma:78-81` |
+| Sweep expired checkouts (cron self-heal) | adopt/steal `issues.ts:6696` | ✅ | `sweepExpiredCheckouts task-checkout.ts:98` |
+| Subtree pause/hold gating checkout | `issue-tree-control.ts:411`; gate `issues.ts:6623` | ✅ | `task-tree-hold.ts:33/43/56`, `TaskTreeHold task-autonomy.prisma:120` |
+| Tree control modes pause/resume/cancel/restore | `constants.ts:346` | 🟡 | we have hold/release only; **no cancel/restore subtree verbs** |
+| Watchdog (opt-in, 1/issue, fingerprint) | `task-watchdogs.ts:667/1563`, `task-watchdog-scope.ts` | ✅ | `task-watchdog.ts:18/86`, `TaskWatchdog task-autonomy.prisma:50`, conditions `:15` |
+| Watchdog server-side scope authority | `task-watchdog-scope.ts:51,124,151` | 🟡 | we have watchdog eval but **not the "watchdog agent may only mutate its watched subtree" authority enforcement** — verify in domain 14 |
+| Task relations graph | `issue_relations` (`blocks` only) | ✅ (superset) | `TaskRelation task.prisma:106` = blocks/relates_to/duplicates + single `blockedByTaskId :35` |
+| Blocker prevents checkout | `issues.ts:6640` | 🟡 | we store blockers but **verify checkout refuses on unresolved blocker** in `task-checkout.ts` |
+| **Blocker diagnostics endpoint** (readiness reasons) | `routes/issues.ts:5194 /diagnostics/blockers`,`:5225 /wakes`,`:5270 /subtree`; `services/issues.ts:5031 getBlockerDiagnostics` | ❌ | none — **G6.1** |
+| **Dependency-resolved wakeup** (blocker done → wake dependent) | `issue-dependency-wakeups.ts:4/14/25` | ❌ | none — **G6.1** |
+| Recovery/reaping actions | `issue-recovery-actions.ts:99`; routes `issues.ts:5481/5497` | ✅ | `TaskRecoveryAction task-autonomy.prisma:84` |
+
+### 2.3 Runs (per-task execution history)
+
+| Feature | pc file:line | Status | mc refs |
+|---|---|---|---|
+| **Run record on a task** (`heartbeat_runs`) | `packages/db/src/schema/heartbeat_runs.ts:6-92` | ❌ | closest: `RoutineRun pipeline.prisma:90`, `RunnerCommand`, `sandbox-run.ts` return type — **no per-task run** — **G3** |
+| Run status machine (8) | `constants.ts:824` queued/scheduled_retry/running/succeeded/interrupted/failed/cancelled/timed_out | ❌ | `RoutineRunStatus` (5) only |
+| Run event/log stream + durable log store (S3 mirror) | `heartbeat_run_events.ts`; `run-log-store.ts:32` | ❌ | none — **G3** |
+| Run liveness classification | `run-liveness.ts:305 classifyRunLiveness`; states `constants.ts:836` | ❌ | none (`→09`) |
+| Retry / continuation runs | `heartbeat.ts:8378`; `recovery/run-liveness-continuations.ts` | ❌ | none (`→09`) |
+| Run → issue comment (result summary) | `heartbeat-run-summary.ts:96 buildHeartbeatRunIssueComment` | ❌ | none — **G3** |
+| Run → work-product linkage | `issue_work_products.createdByRunId` `schema:41` | ❌ | none — **G1/G3** |
+| Workspace validation guard (projectless git-worktree fails) | `heartbeat.ts:342,1502,1527` | ❌ | none (`→09`, execution domain) |
+
+### 2.4 Deliverables / artifacts / work-products
+
+| Feature | pc file:line | Status | mc refs |
+|---|---|---|---|
+| Deliverable/work-product entity | `issue_work_products.ts:18` | ✅ (narrower) | `Deliverable deliverable.prisma:10` |
+| **Type taxonomy** | 7: `pull_request/branch/commit/preview_url/runtime_service/artifact/document` `work-product.ts:1` | 🟡 | `DeliverableKind` = markdown/code/file/link only — **G1** |
+| **Review-state gate on output** | `IssueWorkProductReviewState none/needs_board_review/approved/changes_requested` `work-product.ts:28` | ❌ | none (review is task-status only) — **G1/G2** |
+| Output status machine (9) | `work-product.ts:17` active…merged/closed/draft | ❌ | none — **G1** |
+| `isPrimary` (one canonical per type) | `work-products.ts:54` | ❌ | none — **G1** |
+| `healthStatus` (preview/service liveness) | `issue_work_products.ts` | ❌ | none — **G1** |
+| Provider field (paperclip/github/vercel/s3) | `work-product.ts:10` | ❌ | none (only `DeliverableKind.link` + display-only `ExternalLink`) — **G1** |
+| Version history | `DeliverableVersion` | ✅ | `document_revisions` analog; `DeliverableVersion deliverable.prisma:78` |
+| Annotations (review thread on output) | `document_annotation_*` | ✅ (deliverable-only) | `DeliverableAnnotation deliverable.prisma:44` (quote-anchored, `resolved`) |
+| Quality votes | — (Paperclip: `feedback-votes` route `issues.ts:10154`) | ✅ | `DeliverableVote deliverable.prisma:63` |
+| **Attachment→asset→work-product upload pipeline** | `routes/issues.ts:10258` attach, `:6388` work-product; `AGENT-ARTIFACTS.md` | 🟡 | inline `Deliverable.storageKey` (R2) — no asset/attachment split, no upload skill — **G4** |
+| **Agent upload helper skill** | `skills/paperclip/scripts/paperclip-upload-artifact.sh` | ❌ | none — **G4** |
+| Video/binary artifacts (mp4/webm/pdf) | `AGENT-ARTIFACTS.md:89` | 🟡 | `Deliverable.mimeType/fileSize` exist; no first-class video UX — **G4** |
+| Workspace-file resourceRef (points into a checkout) | `AGENT-ARTIFACTS.md:43-62` | ❌ | none — **G4** |
+| **External-object PR/status sync** (poll GitHub, chips) | `github-external-object-provider.ts:387/433`; `external_objects.ts:19` | ❌ | `ExternalLink task.prisma:131` explicitly **no sync** — **G6.3** |
+
+### 2.5 Documents
+
+| Feature | pc file:line | Status | mc refs |
+|---|---|---|---|
+| Document entity + format + head body | `documents.ts:6` | ✅ | `Document document.prisma:11`, `ProjectDoc project.prisma:82` |
+| Doc types | markdown/format free | ✅ | `DocumentType` deliverable/research/protocol/note/file `document.prisma:3` |
+| Revisioned | `document_revisions.ts:7` + `createdByRunId` | ✅ (no run link) | `ProjectDocRevision project.prisma:101` |
+| Owner-keyed join (issue/routine/case, unique key) | `issue_documents.ts:6` | 🟡 | `Document.taskId/projectId` direct FK; no keyed slot/`key` uniqueness |
+| **Cooperative edit locks** | lock/unlock `issues.ts:6104/6148`; cols on `documents` | ❌ | none — **G5** |
+| **Text-anchored annotation threads** (prefix/suffix/offsets, confidence) | `document_annotation_threads.ts:17`; svc `document-annotations.ts:411` | ❌ | none on documents — **G5** |
+| **Re-anchor annotations across revisions** | `remapOpenThreadsForDocument document-annotations.ts:957` | ❌ | none — **G5** |
+| **Annotation ↔ comment-stream mirroring** | `document_annotation_comments.issueCommentId`; cleanup `:786` | ❌ | none — **G5** |
+| Trigram search on doc title/body | GIN idx `documents.ts:30` | 🟡 | verify search index coverage |
+
+### 2.6 Comments / messages / mentions / interactions
+
+| Feature | pc file:line | Status | mc refs |
+|---|---|---|---|
+| Task-scoped comment thread | `issue_comments.ts:14` | ✅ | `Message message.prisma:3` (taskId) |
+| Attachments / reactions / mentions on comment | `issue_attachments.issueCommentId`; mentions | ✅ | `MessageAttachment/Reaction/Mention message.prisma:28/40/52` |
+| **Run attribution on comment** (`createdByRunId` + derived attribution) | `issue_comments.ts:24-30` | ❌ | none — needs G3 |
+| **Rich presentation/metadata** (typed sections, collapsible cards, run_link/agent_link) | `issue.ts:912-936` | ❌ | plain `Message.body` — **G6.2** |
+| Soft-delete tombstone | `issue_comments.ts:34-38` | 🟡 | verify Message delete semantics |
+| Wake assignee on comment | `issues.ts:8484` | 🟡 | we notify; verify "wake/act" vs notify-only |
+| @mention → auto-assign vs wake | `issues.ts:8513`; **wakes only** | ✅ (stronger) | `mention-auto-assign.ts:43` — **Squad Lead mention actually assigns** (Paperclip only wakes). Superset. |
+| **Typed thread interactions** (suggest_tasks / ask_user_questions / request_confirmation) | `issue_thread_interactions.ts:12`; routes `issues.ts:8879/8898` | ❌ | none — **G6.5** |
+
+### 2.7 Review / approval / PR review
+
+| Feature | pc file:line | Status | mc refs |
+|---|---|---|---|
+| Task review status + approve/reject/clarify | `productivity-review.ts`; status `in_review` | ✅ | `review.ts:29/139/201`, GraphQL `approveTask/rejectTask/requestClarification`, `tasksPendingReview` |
+| Governance approval gate | `approvals.ts`,`issue_approvals.ts:7` | ✅ | `Approval governance.prisma:27`, `approvals.ts:25-158`, full mutation set |
+| Productivity/idle review watchdog | `productivity-review.ts:204` (no-comment streak, long-active, churn) | ❌ | none — candidate (`→09`/G3 dependent) |
+| Plan-review context bundle | `plan-review-context.ts:133` | 🟡 | `PlanDecomposition` review exists; no dedicated review-context builder |
+| **Output/PR review gate** (`reviewState` on work-product) | `work-product.ts:28`; promotion `issues.ts:6434` | ❌ | **G1/G2** |
+| **Untrusted-PR containment preset** (`low_trust_review`) | `trust-policy.ts:1`; `source-trust.ts:29/33/43/60/97`; `LOW-TRUST-PRESETS.md` | ❌ | `AgentTrustProfile.requireUntrustedPrReview governance.prisma:78` is a **dead toggle** — **G2** |
+| Manual hostile-PR Docker sandbox | `doc/UNTRUSTED-PR-REVIEW.md`; `docker/untrusted-review/bin/review-checkout-pr` | 🚫 (ops tooling, not app) | out of app scope; note only |
+| Trust levels (untrusted…trusted) | `TrustLevel` | ✅ | `TrustLevel governance.prisma:20`, `AgentTrustProfile` |
+
+---
+
+## 3. Gap deep-dives + implementation plans
+
+### G1 — Work-product taxonomy + PR/preview/branch output types + review-state gate — **L**
+
+**Why:** Today an agent run's output is only a `Deliverable{markdown|code|file|link}`. Paperclip treats output as a governed `issue_work_product` with a type taxonomy (PR/branch/commit/preview_url/runtime_service/artifact/document), a review-state machine, a single canonical primary per type, health, provider, and a link back to the run that made it. This is the backbone for PR review, deploy previews, and trust promotion (G2).
+
+**Prisma** (`packages/database/prisma/schema/deliverable.prisma` or new `work-product.prisma`):
+- Extend `DeliverableKind` → add `pull_request, branch, commit, preview_url, runtime_service`. Or (cleaner) introduce `WorkProduct` model to avoid overloading Deliverable; keep `Deliverable` as the `artifact/document/markdown/code` subset and add `WorkProduct` for execution outputs. Recommend **extend Deliverable** (less churn) with new fields:
+  - `provider String?` (`paperclip|github|vercel|s3|custom`), `externalId String?`, `url String?` (exist), `reviewState WorkProductReviewState @default(none)`, `outputStatus WorkProductStatus?`, `isPrimary Boolean @default(false)`, `healthStatus String @default("unknown")`, `createdByRunId String?` (→ G3 `TaskRun`), `sourceTrust Json?` (→ G2).
+  - New enums `WorkProductReviewState {none, needs_review, approved, changes_requested}`, `WorkProductStatus {active, ready_for_review, approved, changes_requested, merged, closed, failed, archived, draft}`.
+  - Index `@@index([taskId, kind])`, partial-unique for `isPrimary` per (taskId, kind) — enforce in service (Prisma lacks partial unique on boolean cleanly; do it transactionally like `work-products.ts:54`).
+- Migration + backfill existing rows `reviewState=none, isPrimary=true` for the latest per task/kind.
+
+**Server service** `apps/web/src/server/services/work-products.ts` (mirror pc `work-products.ts:34`): `listForTask`, `getById`, `createForTask` (demote prior primary of same kind in a txn), `update` (flip reviewState/status; guard transitions), `remove`, `setReviewState`. Enforce transition legality (draft→ready_for_review→approved/changes_requested→merged/closed).
+
+**API/GraphQL** (`src/server/graphql/mutations|queries`): `createWorkProduct`, `updateWorkProduct`, `setWorkProductReviewState`, `promoteWorkProduct`; queries `workProductsByTask`, `workProduct`, `workspaceWorkProducts` (extend existing deliverable resolvers).
+
+**UI** (`apps/web/src/views` + `components/task`): extend `TaskDeliverables`/`DeliverableCard` to render type chips (PR/preview/branch), a **review-state badge + approve/request-changes buttons** for board reviewers, `isPrimary` star, health dot for preview/service. New `WorkProductReviewPanel` in `TaskDetailModal`/`TaskFullPage`. Extend `ArtifactsPage` filters by type + reviewState.
+
+**Security:** review-state mutations gated to board/reviewer role; agents may create outputs but not self-approve (mirror `assertDeliverableMutationAllowedByRunContext`); low-trust outputs land `needs_review` (G2).
+
+**Tests:** primary-demotion txn, illegal transition rejection, agent-cannot-self-approve, list-by-type. Size **L** (schema + service + UI + review flow).
+
+---
+
+### G2 — `low_trust_review` preset + source-trust quarantine/promotion (make `requireUntrustedPrReview` real) — **L**
+
+**Why:** Our `AgentTrustProfile.requireUntrustedPrReview` (`governance.prisma:78`) is referenced only in schema/`trust.ts`/the mutation arg — **no code consumes it**. Paperclip's `low_trust_review` is the in-product containment for hostile/prompt-injected input (untrusted PRs, external tickets, dependency diffs): raw output is **quarantined**, not auto-promoted into higher-trust context, and a PR output sits at `needs_board_review` until a board user promotes it.
+
+**Prisma:**
+- `AgentTrustProfile`: add `trustPreset String @default("standard")` (`standard|low_trust_review`), keep `requireUntrustedPrReview` but **wire it**. Add `SourceTrustMetadata`-shaped `sourceTrust Json?` columns to `Deliverable`/`WorkProduct` (G1), `Message`, `Document`, `DocumentRevision` (mirrors pc `sourceTrust` everywhere).
+- New `LowTrustBoundary` model (optional, phase 2): scope = company/project/rootTask/task/agent/toolClass + `outputPromotionTarget`.
+
+**Server** `apps/web/src/server/services/source-trust.ts` (port pc `source-trust.ts`): `buildLowTrustSourceTrust(runId, agentId)`, `buildPromotedSourceTrust(...)`, `isLowTrustQuarantined(row)`, `redactQuarantinedBodyForHigherTrust`, `sanitizeQuarantinedCommentForHigherTrust`, `resolveActorSourceTrustForTask`. `low-trust-runtime-containment.ts` for tool-class gating (`git.read|github.pr.read|tests.local`), **fail-closed, narrower-wins** boundary resolution (`LOW-TRUST-PRESETS.md:15-27`).
+
+**Wire points:** when a run/agent flagged low-trust writes a comment/work-product/document → stamp `sourceTrust={preset, disposition:'quarantined', sourceRunId, sourceAgentId}`; on read into a higher-trust actor's context → redact body to placeholder. A `pull_request` work-product from a low-trust run auto-sets `reviewState=needs_review` (ties to G1). Add `POST /tasks/:id/low-trust/promotions` (pc `issues.ts:6434`) → board promotes, stamps `buildPromotedSourceTrust`.
+
+**UI:** quarantine banner on low-trust comments/outputs; "Promote" button (board only); trust-preset selector on agent settings (extend `setAgentTrustProfile`).
+
+**Security:** this **is** the security feature — promotion is the only path out of quarantine, board-gated, audited; redaction must be applied at every higher-trust read path (comment render, run context assembly, plan-review context).
+
+**Tests:** red-team route tests (mirror pc `low-trust-red-team-routes.test.ts`): quarantined body never leaks to a higher-trust reader; promotion requires board; fail-closed on ambiguous boundary. Size **L**.
+
+---
+
+### G3 — Per-task execution run record (`TaskRun`) w/ logs, liveness, run→comment, run→artifact — **L** (coordinate w/ `→09`)
+
+**Why:** We have no first-class run on a task. Checkout leases (G2.2) already conceptually point at "a run" but we have no row. Without it there's no run history, no durable logs, no run-scoped attribution on comments/artifacts (blocks G1 `createdByRunId`, G6.2), no liveness/continuation, no productivity review.
+
+**Prisma** new `run.prisma`:
+- `TaskRun`: `id, taskId, agentId, workspaceId?, invocationSource (on_demand|scheduled|wakeup|continuation), status (queued|scheduled_retry|running|succeeded|interrupted|failed|cancelled|timed_out), startedAt/finishedAt, exitCode?, errorCode?, usageJson?, resultJson?, retryOfRunId?, scheduledRetryAt?, livenessState?, livenessReason?, continuationAttempt, logStore?, logRef?, logBytes?, logSha256?, stdoutExcerpt?, stderrExcerpt?, createdAt/updatedAt`. Relations back to `Task`, `Agent`.
+- `TaskRunEvent`: `runId, seq, eventType, stream, level, message, payload` (ordered log stream).
+- Add `Task.checkoutRunId/executionRunId` FK → `TaskRun` (make the lease reference concrete).
+
+**Server:** `services/task-runs.ts` — `createRun`, `setRunStatus(id,status,patch)` (publish live event, clear runtime status on terminal — pc `heartbeat.ts:7503`), `setRunStatusIfRunning` guarded transition, `appendEvent`. `run-log-store.ts` (port pc `run-log-store.ts:32`: `begin/append/finalize/read`, local file + optional S3 mirror). `run-liveness.ts` classify (`→09`). `buildRunTaskComment` (pc `heartbeat-run-summary.ts:96`) — post a formatted result comment (needs G6.2 presentation).
+
+**API/GraphQL:** `runsByTask`, `run`, `runEvents` (paginated); live subscription `task.run.status/log`. Mutations mostly internal (created by execution engine, domain 09) — expose cancel/retry.
+
+**UI:** run history panel in `TaskDetailModal` (status timeline, log viewer with excerpt→full, retry/continuation chain), run badge on `TaskCard`.
+
+**Security:** run rows are agent-created via API-key context; only the leasing agent/run may append; board may cancel. Log read gated by task ACL + low-trust redaction (G2).
+
+**Tests:** status transition guards, terminal clears runtime, log store round-trip + S3 mirror, run→comment attribution. Size **L**. Heavy overlap with domain 09 — build the **model + log store here**, the cron/heartbeat driver there.
+
+---
+
+### G4 — Artifact upload pipeline (asset ↔ attachment ↔ work-product) + agent upload skill + video/binary — **M**
+
+**Why:** We store deliverable bytes inline (`Deliverable.storageKey` → R2). Paperclip separates **`assets`** (immutable byte record: objectKey/sha256/contentType/byteSize) → **`issue_attachments`** (asset bound to an issue, optionally to a comment) → **work-product** (the deliverable referencing the attachment). This enables reuse, comment-inline images, video/pdf artifacts, and an agent-facing upload helper that cloud reviewers can reach.
+
+**Prisma:**
+- New `Asset`: `id, workspaceId, provider, objectKey, contentType, byteSize, sha256, originalFilename, createdByAgentId?/createdByProfileId?`. Unique `(workspaceId, objectKey)`.
+- New `TaskAttachment`: `taskId, assetId (unique), messageId? (bind to a comment), createdAt`.
+- Point artifact-type `Deliverable`/`WorkProduct` metadata at `assetId` (canonicalized `{contentType, byteSize, contentPath, openPath, downloadPath, originalFilename}` — pc `AttachmentArtifactWorkProductMetadata work-product.ts:58`).
+
+**Server/API:** `POST /tasks/:id/attachments` (multer single-file, size cap, `storage.putFile` namespace `tasks/{id}`, create Asset+Attachment, optional `messageId`); `GET /attachments/:id/content?download=1`; `DELETE`. Reuse existing R2/storage provider registry. Add agent upload skill script analog to `paperclip-upload-artifact.sh` (two-step: attach → create work-product; print markdown links) — lives in the agent skills pack, uses run env (`API_URL/API_KEY/TASK_ID/RUN_ID`).
+
+**UI:** drag-drop upload in `TaskComments`/`TaskDeliverables`; inline image render; video player for mp4/webm/mov; download button. Extend `ArtifactsPage`.
+
+**Security:** MIME allowlist + size cap; same-origin content route (no host-absolute paths — pc `AGENT-ARTIFACTS.md:43`); asset ACL = task/workspace membership; low-trust artifacts quarantined (G2).
+
+**Tests:** upload→asset→attachment→work-product chain, size-cap rejection, comment-linked attachment, download disposition. Size **M**.
+
+*(Optional sub-feature, S: `workspace_file` resourceRef — a deliverable that points into a live checkout with relativePath/line/col, resolved against execution/project workspace. Defer until G3 workspaces land.)*
+
+---
+
+### G5 — Document depth: text-anchored annotations + cross-revision re-anchoring + cooperative locks + comment mirroring — **M/L**
+
+**Why:** Our annotations are quote-anchored on **deliverables** and don't survive edits; documents have no annotation/lock story. Paperclip has Google-Docs-style threads anchored by prefix/suffix/normalized/markdown offsets + `anchorConfidence`, that **re-anchor across revisions** (`remapOpenThreadsForDocument`), **mirror into the task comment stream** (`issueCommentId`), and cooperative **edit locks**.
+
+**Prisma:**
+- `DocumentAnnotationThread`: `documentId, documentKey?, ownerTaskId?/ownerProjectId? (one-of check), status (open|resolved), anchorState (active|orphaned), originalRevisionId/Number, currentRevisionId/Number, selectedText, prefixText, suffixText, normalizedStart/End, markdownStart/End, anchorConfidence (exact|fuzzy|orphan), anchorSelector Json, createdBy*, resolvedAt/resolvedBy*`.
+- `DocumentAnnotationComment`: `threadId (cascade), ownerTaskId?, documentId, body, authorType, authorAgentId?/authorProfileId?, createdByRunId?, messageId? (mirror into task thread), sourceTrust Json?`.
+- Add lock cols to `Document`: `lockedAt, lockedByAgentId?, lockedByProfileId?`.
+
+**Server:** `services/document-annotations.ts` (port pc `document-annotations.ts`): `listThreadsForDocument`, `createThread` (insert + mirrored `Message`), `addComment`, `updateThread` (resolve), `remapOpenThreadsForDocument` (re-anchor on each new revision using prefix/suffix + offset fuzzing → set `anchorConfidence`/`anchorState`), `cleanupForMessageDeletion`. Lock/unlock service methods (cooperative, TTL optional).
+
+**API/GraphQL:** `documentAnnotations(documentId)`, `createDocumentAnnotation`, `resolveDocumentAnnotation`, `addAnnotationComment`, `lockDocument`/`unlockDocument`. Hook `remap` into the doc-revision write path (`updateDocument`/`createProjectDoc`).
+
+**UI:** annotation gutter/highlight layer over the markdown viewer; thread popover; resolve toggle; orphaned-anchor indicator; lock banner + "take over" (board). Reuse `DeliverableAnnotations` patterns.
+
+**Security:** annotation write gated to task/project members; low-trust bodies quarantined (G2); lock respects role (board can force-unlock).
+
+**Tests:** re-anchor across an edit keeps thread attached / marks orphan when text deleted; comment mirror + cascade delete cleanup; lock prevents concurrent write. Size **M/L** (re-anchoring algorithm is the hard part).
+
+---
+
+### G6 — Lifecycle refinements cluster
+
+**G6.1 — Blocker diagnostics + dependency-resolved wakeups — M.**
+- Server: `getBlockerDiagnostics(taskId)` returning `{blockers[], readiness, omittedUnauthorizedCount, truncated}` with human readiness reasons (pending-finalize / cancelled-blocker / unresolved / all-resolved) — pc `services/issues.ts:5031`, `routes/issues.ts:897`. `getWakeDiagnostics`, `getSubtreeDiagnostics`.
+- API: `GET /tasks/:id/diagnostics/blockers|wakes|subtree` (read-only, actor-filtered like pc).
+- Dependency wakeup: on blocker→done, enqueue an idempotent "blockers resolved" wake to the dependent's assignee (pc `issue-dependency-wakeups.ts`). Needs G3 wake plumbing.
+- UI: "Why is this blocked?" panel on `TaskDetailModal` reading diagnostics. Tests: readiness reason matrix, unauthorized-blocker omission count. **M.**
+
+**G6.2 — Rich comment presentation/metadata — M.**
+- Prisma: add `Message.presentation Json?` (`{kind,tone,title,detailsDefaultOpen}`) + `metadata Json?` (versioned `sections[]` of typed rows: text/code/key_value/task_link/agent_link/run_link) — pc `issue.ts:912-936`.
+- Server/UI: renderer for collapsible formatted comment cards (agents post structured result cards; run-link chips need G3). Backward-compatible with plain-body messages. Tests: renders each section type, defaults-open behavior. **M.**
+
+**G6.3 — External-object PR/status sync — M.**
+- Today `ExternalLink` is display-only ("no live sync", `task.prisma:124`). Port a poller: `ExternalObject` model (provider/objectId/status/health/data Json/refreshAt) + `github-external-object-provider.ts` analog (fetch PR/issue via GitHub API, normalize snapshot, resolve status open/merged/closed) + `external_object_mentions` linking to tasks/comments/docs. UI: live PR status chips on `TaskExternalLinksCard`/work-products. Security: token scoping, rate-limit, low-trust for external bodies. Tests: snapshot normalize, refresh scheduling. **M.** (Overlaps connectivity domain 10 — confirm ownership.)
+
+**G6.4 — Origin/provenance + idempotency on autonomy-created tasks — M.**
+- Prisma: add `Task.originKind` (`manual|routine_execution|watchdog|productivity_review|recovery|plugin:*`), `originId`, `originRunId`, `originFingerprint`, `requestDepth` + partial-unique idempotency indexes per origin kind (pc `issues.ts:110-159`). Prevents duplicate watchdog/recovery/routine tasks. Server: thread origin through routine/watchdog/decomposition task creation. Tests: duplicate-origin insert is a no-op. **M.**
+
+**G6.5 — Typed thread interactions — M.**
+- Prisma: `TaskThreadInteraction{taskId, kind (suggest_tasks|ask_user_questions|request_confirmation|...), status (pending|resolved), continuationPolicy (wake_assignee), sourceMessageId?, sourceRunId?, payload Json, result Json?, createdBy*, resolvedBy*}` — pc `issue_thread_interactions.ts`. Server + API: create/list/resolve; resolving a `request_confirmation` may unblock the run (needs G3). UI: inline interaction cards in `TaskComments` with action buttons. Tests: resolve transitions, continuation wake. **M.**
+
+**G6.6 — Subtree cancel/restore verbs — S.** Extend tree-hold service with `cancel`/`restore` modes (pc `ISSUE_TREE_CONTROL_MODES constants.ts:346`) beyond hold/release. **S.**
+
+**G6.7 — Status enum parity — S.** Add `cancelled` (and consider `backlog` vs `inbox`) to `TaskStatus` + `cancelledAt`; migrate. Small but touches many switch statements. **S.**
+
+---
+
+## 4. Prioritized backlog
+
+1. **G3 TaskRun model + log store** (L) — unblocks run→comment, run→artifact, attribution, review, productivity review. Foundational. Coordinate with `→09`.
+2. **G1 Work-product taxonomy + review-state** (L) — the PR/preview/output review flow; depends on G3 `createdByRunId`.
+3. **G2 low_trust_review + source-trust** (L) — makes `requireUntrustedPrReview` real; the untrusted-PR security story; depends on G1 reviewState + G3 runs.
+4. **G4 Artifact upload pipeline** (M) — asset/attachment split + agent upload skill + video.
+5. **G5 Document annotations + re-anchor + locks** (M/L).
+6. **G6.1 Blocker diagnostics + dep wakeups** (M), **G6.4 origin/idempotency** (M), **G6.5 thread interactions** (M), **G6.2 rich comments** (M), **G6.3 external-object sync** (M).
+7. **G6.6 subtree cancel/restore** (S), **G6.7 status enum parity** (S).
+
+**Feature flags to add** (`packages/utils/src/feature-flag-keys.ts`): `WORK_PRODUCTS`, `TASK_RUNS`, `LOW_TRUST_REVIEW`, `DOCUMENT_ANNOTATIONS`, `THREAD_INTERACTIONS`, `EXTERNAL_OBJECT_SYNC`, `BLOCKER_DIAGNOSTICS`.
+
+**Out of scope / not gaps:** `doc/UNTRUSTED-PR-REVIEW.md` Docker sandbox = **ops tooling** (human runs a disposable container to review a hostile PR), not an app feature — 🚫. Human auth/orgs/billing on issues = buildbase-owned 🚫.
+
+**Notable places we're already ahead:** multi-assignee (vs pc single), 3 relation types (vs pc `blocks`-only), Squad-Lead mention **auto-assign** (pc only wakes), deliverable votes, task templates.

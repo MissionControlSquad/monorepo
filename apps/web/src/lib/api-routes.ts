@@ -15,8 +15,9 @@ export const API_ROUTES = {
   channels: {
     attachments: "/api/channels/attachments",
   },
-  cloudVms: {
-    list: "/api/cloud-vms",
+  cliAuth: {
+    start: "/api/cli-auth/start",
+    poll: "/api/cli-auth/poll",
   },
   license: {
     get: "/api/license",
@@ -30,10 +31,6 @@ export const API_ROUTES = {
   },
   profile: {
     avatar: "/api/profile/avatar",
-  },
-  userNotifications: {
-    preferences: "/api/user-notifications/preferences",
-    subscribe: "/api/user-notifications/subscribe",
   },
   support: {
     bugReport: "/api/support/bug-report",

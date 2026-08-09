@@ -1,0 +1,237 @@
+# 10 — Connectivity / Gateways (openclaw, hermes, cursor_cloud, remote connections)
+
+**Scope:** how remote agent runtimes dial in / are reached, the wire protocols, device/token
+auth, and the inbound MCP tool-gateway. Boundary: human auth is `@buildbase/sdk`-owned and out of
+scope; these gateways authenticate **machines/runtimes**, not people.
+
+**Repos**
+- Paperclip (ref): `/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/paperclip`
+- Monorepo (ours): `/Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo`
+
+**Status legend:** ✅ Present · 🟡 Partial · ❌ Missing · 🚫 buildbase-owned
+
+---
+
+## 0. The load-bearing architectural difference (read first)
+
+Paperclip and our monorepo both connect an **OpenClaw runtime** to a control plane, but the
+**connection direction is opposite**, and that shapes everything else:
+
+| | Paperclip `openclaw_gateway` | Our Live Gateway |
+|---|---|---|
+| Who dials whom | **Control plane → runtime** (Paperclip opens an outbound WS *to* the OpenClaw gateway server) | **Runtime → control plane** (the OpenClaw plugin dials *out* to our cloud WS) |
+| NAT posture | Runtime must be reachable (LAN/tailnet/reverse-proxy/HTTPS) | **NAT-safe** — runtime needs only outbound egress |
+| Device auth | Ed25519 signed challenge-response + auto device-pairing | Install-token → per-machine permanent token + nonce anti-replay |
+| Reach model | Paperclip is a WS *client*; also HTTP/SSE (hermes) and cloud SDK (cursor) | We are the WS *server* (fan-in); plus outbound HTTP-poll runner |
+
+Net: **our NAT-pull bridge is a real differentiator** (documented in memory), but Paperclip covers
+a *much wider matrix of ways to reach a runtime*: outbound WS w/ crypto device pairing (openclaw),
+outbound HTTP+SSE (hermes), and cloud-SDK background agents (cursor). We implement exactly one
+transport shape (WS fan-in) plus an outbound HTTP-poll runner and a browser SSH-PTY relay. We have
+**no hermes, no cursor_cloud, no inbound MCP tool-gateway, no cryptographic device pairing.**
+
+Everything is flag-gated in our repo (`packages/utils/src/feature-flag-keys.ts`): `LIVE_GATEWAY`
+(`live_gateway`, default false, L10/L51), `RUNNERS` (`runners`, L36/L79), `TERMINALS`
+(`terminals`, L26/L68), `MULTI_PROVIDER_ADAPTERS` (`multi_provider_adapters`, L14/L56).
+
+---
+
+## 1. Feature inventory
+
+### A. OpenClaw connectivity (real-time agent reach)
+
+| # | Feature | Paperclip (file:line) | Monorepo status |
+|---|---------|----------------------|-----------------|
+| A1 | OpenClaw over WebSocket gateway protocol | `packages/adapters/openclaw-gateway/src/server/execute.ts` (whole file, 1491 L); `src/index.ts:1` (`type="openclaw_gateway"`) | 🟡 We have a WS gateway but **inverse direction** — `apps/web/src/server/services/live-gateway-handler.ts:519`; path `/live-gateway` wired in `apps/web/server.ts:94-129` |
+| A2 | Wire frames: `req`/`res`/`event` JSON, protocol v4 | `execute.ts:40-63` (frame types), `PROTOCOL_VERSION=4` `:89` | 🟡 Different protocol — `vm.*`/`mc.*` union in `packages/types/src/live-gateway-protocol.ts:38-194` |
+| A3 | RPC methods `connect`/`agent`/`agent.wait` | `execute.ts:699,1289,1318` | 🟡 We use `mc.deliver_task`+ack instead of RPC — protocol L149,L181 |
+| A4 | Streaming events (`event agent` → assistant/error/lifecycle) | `execute.ts:1168-1214` | ✅ `vm.agent_message`/`vm.agent_status`/`vm.task_done` streamed upstream (protocol L67-108) |
+| A5 | Ed25519 signed device auth (challenge-response) | `signDevicePayload` `execute.ts:553-557`; payload v3 `buildDeviceAuthPayloadV3` `:559-588`; `connect.challenge` nonce `:767-775`; device params `:1260-1280` | ❌ No crypto device signing. Nearest = install-token→permanent-token + nonce, `live-gateway-handler.ts:95-241` |
+| A6 | Auto device-pairing (`device.pair.list`/`approve`, retry once) | `autoApproveDevicePairing` `execute.ts:815-902`; retry `:1414-1448` | ❌ None |
+| A7 | Shared-token / bearer / password / deviceToken auth | `resolveAuthToken` `execute.ts:236-251`; `x-openclaw-token`/`x-openclaw-auth` | 🟡 Bearer-style install token only (bcrypt), `findValidInstallToken` `:85-91` |
+| A8 | Nonce anti-replay | (gateway-supplied nonce, `execute.ts:696`) | ✅ `consumeNonce` against `UsedNonce`, `:110-126` (32-hex, atomic) |
+| A9 | Session-key routing (issue/fixed/run) | `resolveSessionKey` `execute.ts:142-157` | 🟡 Task/agent-slug routing via `LiveAgentRoute` (not session-key strategy) |
+| A10 | Heartbeat / liveness | per-request timeouts only (no app heartbeat) `execute.ts:729` | ✅ **Better** — `vm.ping`/`mc.pong` 30s + 90s eviction loop, `live-gateway-handler.ts:653-670`; `PLUGIN_PING_INTERVAL_MS` protocol L212 |
+| A11 | Durable/offline delivery + ack + dead-letter | (not in adapter; Paperclip-side queue) | ✅ **Ours is richer** — `LivePendingDelivery` (24h TTL, idempotencyKey, attempts, dead-letter), `live-gateway.prisma:68-89`; drain on hello `:569` |
+| A12 | OpenClaw bridge plugin (runtime side) | (OpenClaw invite prompt `POST /api/companies/:id/openclaw/invite-prompt`, `doc/OPENCLAW_ONBOARDING.md:28-32`) | ✅ `packages/mc-bridge-plugin` — OpenClaw plugin, `openclaw.plugin.json`, `src/ws-client.ts` (`MCBridgeWsClient`) |
+| A13 | Onboarding: invite → approve → claim one-time key | `doc/OPENCLAW_ONBOARDING.md`; join/claim in `HERMES_GATEWAY_ONBOARDING.md:114-134` | 🟡 "Live Gateway wizard" issues install token; no one-time agent-key claim ceremony |
+
+### B. Hermes gateway (HTTP + SSE runtime reach) — **entirely missing**
+
+| # | Feature | Paperclip (file:line) | Monorepo status |
+|---|---------|----------------------|-----------------|
+| B1 | `hermes_gateway` adapter (HTTP REST + SSE) | `packages/adapters/hermes/src/gateway/index.ts:59-73`; shim `packages/adapters/hermes-gateway/src/index.ts:1-8` | ❌ Only an enum slot reserved — `packages/database/prisma/schema/adapter.prisma:13-17` |
+| B2 | Endpoints `POST /v1/runs`, `GET /v1/runs/:id/events` (SSE), `GET /v1/runs/:id`, `POST /v1/runs/:id/stop` | `hermes/src/gateway/server/execute.ts:519,551,700,841` | ❌ |
+| B3 | SSE frame parse + `message.delta`/`run.<status>` events | `execute.ts:380-488`; `TERMINAL_STATUSES` `:76-84` | ❌ (we use SSE only browser-side: `app/api/channels/stream/route.ts`) |
+| B4 | Bearer `apiKey` auth + critical-header lock | `buildHeaders` `execute.ts:247-263`; `CRITICAL_HEADERS` `:61-67` | ❌ |
+| B5 | Non-loopback plain-HTTP hard deny + escape hatch | `hermes/src/gateway/server/transport-security.ts:12-29` | ❌ |
+| B6 | SSE reconnect + status-poll race + stop-grace | `execute.ts:506-596,692-734`; `STOP_GRACE_MS=10000` | ❌ |
+| B7 | Native session resume (`X-Hermes-Session-Key`, `session_id`) | `gateway/index.ts:9-18`; `sessionCodec` `server/index.ts:11-45` | ❌ |
+| B8 | Local variant `hermes_local` (child process) | `packages/adapters/hermes/src/server/execute.ts` | ❌ (covered by domain 02 adapters) |
+
+### C. Cursor Cloud (hosted background agents) — **entirely missing**
+
+| # | Feature | Paperclip (file:line) | Monorepo status |
+|---|---------|----------------------|-----------------|
+| C1 | `cursor_cloud` adapter via official `@cursor/sdk` | `packages/adapters/cursor-cloud/src/index.ts:1` (`type="cursor_cloud"`); `src/server/execute.ts:1-48` | ❌ Only an enum slot — `adapter.prisma:13-17` (`cloud /* cursor-cloud */`) |
+| C2 | Durable cloud agent reused across heartbeats; each beat = one Cursor run | `src/index.ts:29-33`; session codec `src/server/session.ts:31-61` (`cursorAgentId`,`latestRunId`,`runtime:"cloud"`) | ❌ |
+| C3 | Env targets cloud \| pool \| machine; repo/PR binding; auto-PR | `src/index.ts:14-27` (`runtimeEnvType`,`repoUrl`,`autoCreatePR`) | ❌ |
+| C4 | Cloud event stream (`cursor_cloud.init/status/message/result`) via SDK `Agent.create`/`resume`/`send`/`run.wait`/`run.stream` — no poll loop | `src/server/execute.ts:36-48,254-301,493-511` | ❌ |
+| C5 | Auth via `CURSOR_API_KEY` env; PAPERCLIP_* injected into cloud shell | `src/index.ts:26,32` | ❌ |
+
+### D. Inbound MCP tool-gateway (agents/external clients call *into* the control plane)
+
+| # | Feature | Paperclip (file:line) | Monorepo status |
+|---|---------|----------------------|-----------------|
+| D1 | Named MCP gateway endpoint (`streamable_http` JSON-RPC 2.0, MCP `2025-03-26`) bound to a governance profile | `server/src/routes/tool-gateway.ts:163,170` (`GET/POST /mcp/gateways/:gatewayPublicId`); `handleMcpGatewayProtocol` `:58`; tables `tool_mcp_gateways` + `tool_mcp_gateway_tokens` `0159`; contract expansion `0160` (`gateway_public_id gw_…`, `auth_config`, `header_policy`, `metadata_policy`) | ❌ No MCP gateway (grep: no `mcp-gateway`/`tool-gateway`/`modelcontextprotocol` server) |
+| D2 | Run-scoped gateway sessions (SHA-256-hashed, TTL 15min default / 60min max) — token `pcgt_<uuid>.<32B>`; named-client bearer `pcgw_…` bound to a live `heartbeat_run` | routes `:387` (`POST /tool-gateway/sessions`), `:432` revoke; `services/tool-gateway.ts:324-344,1241,4742`; table `0151_tool_gateway_sessions.sql` (`token_hash`,`expires_at`,`run_id`) | ❌ |
+| D3 | Tool discovery + brokered call w/ policy/approval | routes `:469` tools, `:483` call, `:517`/`:542` action-request approve/decline | ❌ |
+| D4 | Per-company fixed-window protocol rate-limit counters (4 buckets: authFailures 20/5min, gatewayRequests 300/60s, tokenRequests 120/60s, sessionSetup 30/60s) | `services/tool-gateway.ts:93-107,781` (`consumeProtocolRateLimit` UPSERT); `0169_tool_gateway_protocol_rate_limit_counters.sql` (`counter_key`,`window_ms`,`limit`,`reset_at`) | ❌ |
+| D5 | Short-lived brokered connection-token issuance (exchange/oauth/static, ttl≤900s, audited) | `0165_connection_token_issuances.sql` | ❌ |
+| D6 | Connection installs (company/agent scope) | `0168_tool_connection_installs.sql` | ❌ (adjacent to domains 06/07) |
+| D7 | Runtime slots (stop/restart) + gateway audit | routes `:567-636` | ❌ |
+
+> Note: D is the "Apps v2 / Connections" substrate (`doc/connections/README.md`,
+> `SECURITY-THREAT-MODEL.md`). Its **outbound provider** side (OAuth broker, `company_secrets`,
+> catalog, profiles/policies) overlaps domains **06 (plugins/MCP)** and **07 (secrets)** — track the
+> credential/governance depth there. This doc claims only the **gateway transport + inbound
+> tokening + rate-limit** surface.
+
+### E. Other transports (context)
+
+| Feature | Paperclip | Monorepo |
+|---|---|---|
+| Outbound HTTP-poll runner daemon (NAT-safe) | (Paperclip has ssh/sandbox exec adapters — domain 01/03) | ✅ `@agentcenter/runner` — `packages/runner/src/runner.ts:257` poll loop, Bearer key, 5s, no sockets; `RunnerCommand`/`RunnerHost` models |
+| Browser↔SSH PTY relay | (workspace/terminal — domain 01/11) | ✅ `apps/web/src/server/services/terminal-pty-handler.ts:31`, path `/api/terminals/pty`, flag `TERMINALS` |
+| GraphQL subscriptions over WS | — | ✅ `graphql-ws` at `/api/graphql`, `server.ts:66-78,99-104` |
+
+---
+
+## 2. Gap deep-dives + implementation plans
+
+### GAP-1 — Cryptographic device pairing for the Live Gateway (A5/A6/A13) · **size M**
+
+**Why:** our install-token→permanent-token model authenticates the *machine token* but not a
+*device keypair*; a leaked install token lets any host register. Paperclip signs an Ed25519 device
+payload against a server nonce and supports operator-approved pairing. Closing this raises trust to
+Paperclip's bar without changing our NAT-pull direction.
+
+- **Prisma** (`packages/database/prisma/schema/live-gateway.prisma`): add `LiveGatewayDevice`
+  { `id`, `machineFingerprint @unique`, `publicKeyRaw` (base64url Ed25519), `deviceId`
+  (sha256(pubkey)), `status` pending|approved|revoked, `approvedByUserId?`, `approvedAt?`,
+  `lastNonce?`, timestamps }. Keep `LiveGatewayConnection` for session/token; reference device.
+- **Protocol** (`packages/types/src/live-gateway-protocol.ts`): add `mc.challenge` (server→plugin
+  nonce, sent before accepting hello) and extend `MsgHello` with
+  `device:{ id, publicKey, signature, signedAt, nonce }`. Bump a `protocolVersion` field.
+- **Server** (`live-gateway-handler.ts:handleHello`): after nonce check, `crypto.verify(null,
+  payloadBytes, publicKey, sigBytes)`; on unknown fingerprint create device `status=pending` and
+  reject with a new `VMErrorCode` `device_pending`; expose an approve endpoint
+  (`POST /api/live-gateway/devices/:id/approve`, board-only) mirroring Paperclip
+  `device.pair.approve`. Reuse `consumeNonce`.
+- **Plugin** (`packages/mc-bridge-plugin/src/ws-client.ts`): generate+persist an Ed25519 keypair
+  (`~/.agentcenter/device-key.pem`), sign `v1|deviceId|fingerprint|signedAt|nonce`, retry once on
+  `device_pending` after operator approval (mirror `autoPairOnFirstConnect`).
+- **UI:** device list + approve in the Live Gateway settings wizard (pending badge).
+- **Security/tests:** unit — bad signature, replayed nonce, fingerprint/pubkey mismatch, revoked
+  device fail-closed; e2e — pair→approve→reconnect. Model on Paperclip
+  `execute.ts:553-588,815-902`.
+
+### GAP-2 — Hermes gateway adapter (HTTP + SSE) (Section B) · **size M**
+
+**Why:** lets any Hermes API server (`hermes gateway run`) be reached as an agent runtime without a
+persistent socket or our plugin — a second, simpler reach path. Pure outbound HTTP(S)+SSE.
+
+- **Adapter registry:** seed an `AgentAdapter` row `type="hermes-gateway"`,
+  `transport=gateway`, `authKind=apiKey`, `configSchema` = { `apiBaseUrl` (req), `apiKey`
+  (req, secret), `sessionKeyStrategy`, `timeoutSec`, `eventReconnectMs`,
+  `dangerouslyAllowInsecureRemoteHttp` }. Gate behind `MULTI_PROVIDER_ADAPTERS`.
+- **Service module** (`packages/utils` adapter invocation, or a new `apps/web` service):
+  `POST {apiBaseUrl}/v1/runs` → read `run_id`; open `GET /v1/runs/:id/events`
+  (`Accept: text/event-stream`), parse `message.delta` + `run.<status>` (port
+  `execute.ts:380-488`); poll `GET /v1/runs/:id` as fallback; `POST /v1/runs/:id/stop` on timeout
+  with 10s grace. Bearer `apiKey`; lock critical headers; **hard-deny non-loopback `http://`**
+  unless escape flag (port `transport-security.ts:12-29`).
+- **Session resume:** persist `{ hermesSessionId, sessionKey }`; send `X-Hermes-Session-Key` +
+  body `session_id`.
+- **Secrets:** `apiKey` in the secret vault (domain 07), never in logs — reuse redactor pattern.
+- **Tests:** SSE frame parse, terminal-status mapping, plain-HTTP guard, reconnect, stop-grace,
+  auth-fail (401/403) classification. Mirror `hermes-gateway-e2e.sh`.
+
+### GAP-3 — Cursor Cloud adapter (Section C) · **size M**
+
+**Why:** offloads execution to Cursor's hosted background agents (no runtime to host at all) with
+durable cross-heartbeat sessions and native PR flows.
+
+- **Dependency:** add `@cursor/sdk`. **Adapter:** `type="cursor_cloud"`, `transport=cloud`,
+  `authKind=apiKey` (`CURSOR_API_KEY`). Config: `repoUrl`(req), `repoStartingRef`,
+  `repoPullRequestUrl`, `runtimeEnvType` (cloud|pool|machine), `autoCreatePR`, `model`,
+  `instructionsFilePath`, `promptTemplate`.
+- **Server:** create a durable Cursor agent, persist `{ cursorAgentId, latestRunId, runtime,
+  repos }` (port `session.ts:31-61`); reuse agent across heartbeats when repo/runtime identity
+  matches; each beat = one Cursor run; inject `PAPERCLIP_*`/`AGENTCENTER_*` env into cloud shell;
+  stream `cursor_cloud.*` events into the task timeline.
+- **Tests:** session-codec normalize/reuse, run mapping, env injection, PR-URL binding. Mirror
+  `cursor-cloud/src/server/session.test.ts`, `execute.test.ts`.
+
+### GAP-4 — Inbound MCP tool-gateway + run-scoped tokening + rate limits (Section D) · **size L**
+
+**Why:** today agents that need governed tool access have no brokered inbound endpoint; Paperclip
+exposes a named MCP endpoint bound to a profile with run-scoped, expiring tokens, per-company rate
+limits, action-request approvals, and full audit. This is the biggest single gap and the security
+spine for agent tool use.
+
+- **Prisma (gateway-owned):** port `mcp_gateways`(+profile FK, `gateway_public_id`, `auth_config`,
+  `header_policy`, `metadata_policy`), `mcp_gateway_tokens` (`token_prefix`, `subject_type`,
+  `allowed_actions`), `tool_gateway_sessions` (`token_hash`,`expires_at`,`run_id`/`issue_id`/
+  `project_id`), and `tool_gateway_rate_limit_counters` (`counter_key`,`window_ms`,`limit`,
+  `reset_at`). Source SQL: `0159`+`0160`,`0151`,`0169` under
+  `paperclip/packages/db/src/migrations/`. (The credential-vault tables —
+  `connection_token_issuances` `0165` ttl≤900s, `tool_connection_installs` `0168`, `tool_*` catalog
+  `0148` — are written by `server/src/services/tool-access.ts`, i.e. **domains 06/07**; coordinate,
+  don't duplicate.)
+- **API/WS:** MCP protocol handler `GET/POST /api/mcp/gateways/:publicId` (auth via
+  `x-paperclip-tool-gateway-token`-equivalent or Bearer, port `tool-gateway.ts:39-70`); session
+  create/revoke; tools discovery + call; action-request approve/decline; runtime-slot stop/restart;
+  audit read. Enforce complete-mediation checks at call time
+  (`doc/connections/SECURITY-THREAT-MODEL.md:142-157`).
+- **Governance:** depends on the profiles/policies/catalog model (**coordinate with domains 06/07**
+  — do not fork a parallel connection framework; see `doc/connections/README.md` D1).
+- **Security/tests:** cross-company isolation, deny-by-default, revocation fail-closed, rate-limit
+  window enforcement, redaction — port the negative-test matrix
+  (`SECURITY-THREAT-MODEL.md:207-257`).
+- **Sequencing:** land the token/session/rate-limit substrate first (M), then the MCP protocol
+  surface (M) once 06/07 governance exists.
+
+### GAP-5 — One-time agent-key claim ceremony for gateway onboarding (A13) · **size S**
+
+**Why:** Paperclip separates the *gateway auth key* (control-plane→runtime) from a *claimed
+one-time Paperclip agent key* (runtime→control-plane), so the runtime never holds a durable
+board-scoped credential (`HERMES_GATEWAY_ONBOARDING.md:24-38,114-134`). Our install token doubles
+as both, which is weaker.
+
+- **Server:** on Live-Gateway/runner approval, mint a one-time `claimSecret`; add
+  `POST /api/join/:requestId/claim-key` that returns a scoped agent key once, then burns the
+  secret. Store only a hash.
+- **Plugin/runner:** claim on first connect, persist the agent key separately from the install
+  token; use it as the `Authorization: Bearer` for callbacks.
+- **Tests:** double-claim rejected, claimed key is agent-scoped (not board), install token cannot
+  call agent APIs.
+
+---
+
+## 3. What we lack, at a glance
+
+- **Gateways/protocols absent:** `hermes_gateway` (HTTP+SSE), `hermes_local`, `cursor_cloud`
+  (`@cursor/sdk`), and the **inbound MCP tool-gateway** — only enum slots reserved in
+  `adapter.prisma:13-17`.
+- **Auth depth absent:** Ed25519 device signing + operator device-pairing; run-scoped/short-TTL
+  brokered token issuance; per-company protocol rate-limit counters; one-time agent-key claim.
+- **Direction/reach absent:** we cannot *dial out to* a runtime (WS or HTTP) — we only accept
+  fan-in or poll. No control-plane-initiated reach to a listening runtime.
+- **What we already match or beat:** WS real-time OpenClaw reach (inverse, NAT-safe ✅), ping/pong +
+  eviction heartbeat (beats Paperclip's timeout-only openclaw path ✅), durable at-least-once task
+  delivery with acks + dead-letter ✅, nonce anti-replay ✅, an outbound HTTP-poll runner ✅, and a
+  browser SSH-PTY relay ✅.
+
+**Priority:** GAP-1 (M, hardens the one thing we ship) → GAP-4 substrate (L, security spine, gated
+on 06/07) → GAP-2 (M) → GAP-3 (M) → GAP-5 (S).

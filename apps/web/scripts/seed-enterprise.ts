@@ -9,6 +9,7 @@
 
 import { prisma } from "../src/server/prisma";
 import { SetupStatus, DeliverableKind, Priority } from "../src/server/constants";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { agentCache, agentListCache, memberCache, projectIdsCache } from "../src/server/cache";
 import { adminSetup, adminLogin, buildRequest, callRoute } from "../tests/helpers";
 
@@ -17,6 +18,12 @@ import { POST as createProject } from "../app/api/projects/route";
 import { POST as createTaskHandler } from "../app/api/tasks/route";
 import { POST as createMessage } from "../app/api/tasks/[id]/messages/route";
 import { POST as createDeliverable } from "../app/api/tasks/[id]/deliverables/route";
+
+// This seed drives the in-process API route handlers in a tight loop (thousands of tasks/messages),
+// which would otherwise trip the per-IP rate limiter (~120/60s) and abort with `Create task failed: 429`.
+// checkRateLimit() reads this flag at call-time, so setting it here (before any handler runs) bypasses
+// the limiter for this seed process only — the served app is a separate process and stays rate-limited.
+process.env.SEED_BYPASS_RATE_LIMIT = "1";
 
 const isFast = process.env.SEED_FAST === "1" || process.env.SEED_FAST === "true";
 
@@ -92,6 +99,27 @@ async function run() {
   const loginRes = await adminLogin("admin", "securepass123", "10.0.0.2");
   if (loginRes.status !== 200) throw new Error("Admin login failed");
   console.log("✅ Admin ready");
+
+  // The agent-lifecycle e2e exercises the RUNNERS-tier "load skill+config from cloud" step
+  // (GET /api/agents/me/context), which is gated behind the RUNNERS feature flag. That flag defaults
+  // OFF (FLAG_DEFAULTS) and the served app's startup-migrations seeds it disabled, so the endpoint
+  // 403s and the spec sees `ctx.skills === undefined`. Enable it here for the e2e environment.
+  // Gated on SEED_ENABLE_RUNNERS (set only in the e2e workflow) so a normal local seed leaves this
+  // opt-in operator surface at its default. This runs before the served app boots; startup-migrations'
+  // ensureFeatureFlagExists is create-only, so it will not override the row we write here.
+  if (process.env.SEED_ENABLE_RUNNERS === "1") {
+    await prisma.featureFlag.upsert({
+      where: { key: FLAG_KEYS.RUNNERS },
+      update: { enabled: true },
+      create: {
+        key: FLAG_KEYS.RUNNERS,
+        enabled: true,
+        managedBy: "system",
+        description: "Runner / cloud skill+config serving (enabled for e2e)",
+      },
+    });
+    console.log("✅ RUNNERS feature flag enabled (e2e)");
+  }
 
   // Squad Lead
   let squadLeadCred: AgentCred;
@@ -258,6 +286,12 @@ async function run() {
 run()
   .catch((e) => {
     console.error(e);
-    process.exit(1);
+    process.exitCode = 1;
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    // Force-exit after seeding. In CI (REDIS_URL set) the module-level, Redis-backed API rate limiters
+    // imported via the route handlers hold an open Redis connection that keeps the event loop alive, so
+    // the process would otherwise hang until the job timeout even though `run()` already finished.
+    await prisma.$disconnect();
+    process.exit(process.exitCode ?? 0);
+  });

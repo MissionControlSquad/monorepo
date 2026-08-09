@@ -1,6 +1,11 @@
 export async function register() {
   // Only run on the Node.js server runtime, not on Edge or during build
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // OpenTelemetry (Domain 12 GAP-4): starts ONLY when OTEL_EXPORTER_OTLP_ENDPOINT is set; imports
+    // nothing otherwise. Best-effort — never blocks server startup.
+    const { startOtel } = await import("./src/server/otel-bootstrap");
+    await startOtel().catch(() => {});
+
     const { runStartupMigrations } = await import("./src/server/startup-migrations");
     await runStartupMigrations();
 
@@ -8,22 +13,20 @@ export async function register() {
     const { initLicense, stopTokenRefresh } = await import("./src/server/license");
     await initLicense();
 
-    const { startRetryProcessor, stopRetryProcessor } =
-      await import("./src/server/services/notification-retry");
-    startRetryProcessor();
+    // Note: notification retry processor removed — buildbase owns push/email delivery + its own
+    // retry; the in-app feed is written synchronously and never needs redelivery.
 
-    // Graceful shutdown: stop heartbeat + retry processor before exiting
+    // Graceful shutdown: stop the license heartbeat before exiting
     const shutdown = () => {
       console.info(
         JSON.stringify({
           timestamp: new Date().toISOString(),
           level: "info",
           tag: "instrumentation",
-          message: "Shutting down — stopping license refresh and retry processor",
+          message: "Shutting down — stopping license refresh",
         }),
       );
       stopTokenRefresh();
-      stopRetryProcessor();
       process.exit(0);
     };
     process.once("SIGTERM", shutdown);

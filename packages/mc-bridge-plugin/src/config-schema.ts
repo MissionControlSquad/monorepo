@@ -20,10 +20,24 @@ export interface MCBridgeConfig {
    */
   fingerprint?: string;
 
+  /**
+   * Optional base64-encoded PKCS8 DER Ed25519 device private key. When set, the plugin signs the
+   * handshake nonce with it and presents the derived public key on vm.hello, enabling device pairing:
+   * MC pins the key by fingerprint and an admin must approve the device before it can connect. Leave
+   * unset to use only the install/connection token (legacy path).
+   */
+  devicePrivateKey?: string;
+
   /** Reconnect backoff base interval (ms). Default: 2000 */
   reconnectBaseMs?: number;
 
   /** Maximum reconnect backoff (ms). Default: 30000 */
   reconnectMaxMs?: number;
 
+  /**
+   * Optional path to persist recently-handled deliveryIds across restarts. When set, a task the
+   * plugin already ran won't run again after a restart + reconnect re-delivery. Leave unset for
+   * in-memory-only dedup (a plugin restart can then re-run an un-acked task once).
+   */
+  dedupStatePath?: string;
 }

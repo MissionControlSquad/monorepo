@@ -1,0 +1,12 @@
+---
+service: adapter-registry-bootstrap
+kind: service
+status: Partial
+priority: P1
+gate: buildable-now
+---
+# adapter-registry-bootstrap · 🟡 Partial
+**What it is:** seed/reconcile the adapter registry on startup (DB rows ↔ code modules).
+**Monorepo:** only `openclaw-gateway` is DB-seeded; Tier-D code modules (cursor/grok/opencode/pi/hermes) have no DB row.
+**Required:** seed Tier-D `BUILTIN_ADAPTERS` as DB rows + reconcile on boot. Buildable-now.
+**Covers:** features/P1-adapters-runtime-registry.mdx · SERVICE-AUDIT #6.

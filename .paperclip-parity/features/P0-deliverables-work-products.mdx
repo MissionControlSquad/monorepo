@@ -1,0 +1,30 @@
+---
+feature: Deliverables & work products
+priority: P0
+status: Present
+gate: buildable-now
+---
+
+# Deliverables & work products · P0 · ✅ Present (one dead mutation)
+
+**What it is:** the outputs agents produce — deliverables (markdown/code/file/link) with versions,
+annotations, votes; the code-output "work product" review lifecycle (PR/branch/preview); the artifacts
+gallery; and the R2 upload pipeline.
+
+**Present in our monorepo (verified):**
+- Deliverables: `submitDeliverable`, `deleteDeliverable`, `deliverable.prisma` (+ `DeliverableVersion`), UI `TaskDeliverables`/`DeliverableCard`/`DeliverableFullView`, routes `deliverable/[id]` + `@modal`.
+- Annotations + votes: `DeliverableAnnotation`/`DeliverableVote`, add/resolve/delete + `castDeliverableVote`, `DeliverableAnnotations`/`DeliverableVotes`.
+- Work products: extend `Deliverable` (kind/provider/reviewState/outputStatus/healthStatus/isPrimary/createdByRunId), `services/work-products.ts` (state machine, single primary, no self-approve), `workProductsByTask` + `TaskWorkProductsCard`.
+- Artifacts gallery: `views/ArtifactsPage.tsx` (`workspaceDeliverables`), route `/artifacts`.
+- Upload: `app/api/storage/upload` (presigned PUT) + `app/api/storage/[...key]`, `deliverable.storageKey`.
+- Project-doc review comments (Paperclip document-annotations, simplified): `ProjectDocComment` + `ProjectDocCommentsThread`.
+
+**Gaps / pending:**
+- **DEAD:** GraphQL `reviseDeliverable` (`mutations/deliverables.ts:76`) has **no client op and no UI** — revise goes through REST `PATCH /api/tasks/[id]/deliverables/[deliverableId]`. Wire a client op or retire the mutation.
+- Upload needs R2 creds/bucket (infra); work-product *creation from real runs* needs Tier-D execution (P1).
+
+**What's required:** Trivial cleanup of the dead `reviseDeliverable` mutation (buildable-now).
+
+**Priority rationale:** Deliverables are the agent's output — the point of the loop.
+
+**Depends on:** R2 storage for file uploads; sandbox execution for run-generated products (P1).

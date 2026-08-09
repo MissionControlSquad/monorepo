@@ -1,0 +1,12 @@
+---
+service: environment-run-orchestrator
+kind: service
+status: Partial
+priority: P1
+gate: needs-provider-key
+---
+# environment-run-orchestrator · 🟡 Partial
+**What it is:** orchestrate a run within an environment (acquire → run → release).
+**Monorepo:** `sandbox-run.ts` orchestrates lease→run→release; env-run split thinner than Paperclip's.
+**Required:** exercise per provider — needs a real key.
+**Covers:** features/P1-sandbox-execution.mdx · SERVICE-AUDIT #52.

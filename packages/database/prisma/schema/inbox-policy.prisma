@@ -1,0 +1,20 @@
+// Inbox-agent policy (parity #74). Per-workspace (optionally per-agent) rules that decide, for an
+// inbox item of a given kind, whether an agent may auto-handle it, must route it to a human, or ignore
+// it. The inbox/queue processor consults resolveInboxAction() at dispatch time. D5: workspaceId/agentId
+// have no FK; itemKind/action are TEXT (app-validated), not enums. Agent-specific rules win over
+// workspace-wide; ties broken by higher priority.
+model InboxPolicy {
+  id          String   @id @default(cuid())
+  workspaceId String // no FK (D5)
+  agentId     String? // null = applies to every agent in the workspace
+  itemKind    String // mention | task_review | clarification | handoff | approval
+  action      String // auto_handle | route_to_human | ignore
+  priority    Int      @default(0) // higher wins among matching rules
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId, itemKind, enabled])
+  @@index([workspaceId, agentId])
+  @@map("inbox_policies")
+}

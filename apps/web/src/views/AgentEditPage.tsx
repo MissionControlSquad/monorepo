@@ -9,6 +9,8 @@ import Link from "next/link";
 import { AGENT_QUERY } from "../lib/graphql/queries";
 import { UPDATE_AGENT_PROFILE } from "../lib/graphql/mutations/agents";
 import { Breadcrumbs, Button, Card, PageLayout } from "../components/ui";
+import { AgentAdapterConfigCard } from "../components/agent/AgentAdapterConfigCard";
+import { AgentSkillsCard } from "../components/agent/AgentSkillsCard";
 import { Input } from "@/components/ui/shadcn/input";
 import { ProfileAvatar } from "../components/ui/ProfileAvatar";
 import { MentionTextArea } from "../components/common/MentionTextArea";
@@ -36,7 +38,15 @@ const agentEditSchema = z.object({
 
 type AgentEditValues = z.infer<typeof agentEditSchema>;
 
-export function AgentEditPage({ agentId }: { agentId: string }) {
+export function AgentEditPage({
+  agentId,
+  embedded = false,
+}: {
+  agentId: string;
+  // When rendered inside the Agent Detail "Settings" tab, drop the standalone-page chrome
+  // (breadcrumbs + page layout) so it nests cleanly under the shared detail header.
+  embedded?: boolean;
+}) {
   const router = useRouter();
   const [{ data, fetching }] = useQuery({ query: AGENT_QUERY, variables: { id: agentId } });
   const [{ fetching: saving }, updateProfile] = useMutation(UPDATE_AGENT_PROFILE);
@@ -101,20 +111,32 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
     );
   }
 
-  return (
-    <PageLayout maxWidth="narrow">
-      <Breadcrumbs
-        items={[
-          { label: "Home", href: "/" },
-          { label: "Agents", href: "/agents" },
-          { label: agent.name || "Edit Agent" },
-        ]}
-      />
+  const body = (
+    <>
+      {!embedded && (
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Agents", href: "/agents" },
+            { label: agent.name || "Edit Agent" },
+          ]}
+        />
+      )}
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-sm px-5 py-4 text-white">
-        <div className="flex items-center gap-3">
-          <ProfileAvatar agentId={agentId} size="lg" className="ring-2 ring-white/30" />
-          <h1 className="text-xl font-bold">Edit Agent</h1>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <ProfileAvatar agentId={agentId} size="lg" className="ring-2 ring-white/30" />
+            <h1 className="text-xl font-bold">Edit Agent</h1>
+          </div>
+          {agent.profile?.id && (
+            <Link
+              href={`/profile/${agent.profile.id}`}
+              className="rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium hover:bg-white/25"
+            >
+              View analytics
+            </Link>
+          )}
         </div>
       </div>
 
@@ -216,7 +238,7 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
             <div className="flex items-center justify-between pt-4 border-t border-border">
               <Link
                 href={`/agents?id=${agentId}`}
-                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-gray-800 transition"
+                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition"
               >
                 Cancel
               </Link>
@@ -227,6 +249,21 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
           </form>
         </Form>
       </Card>
-    </PageLayout>
+
+      <AgentAdapterConfigCard
+        agentId={agentId}
+        adapterType={agent.adapterType ?? null}
+        adapterConfig={(agent.adapterConfig as Record<string, unknown> | null) ?? null}
+        llmModel={agent.llmModel ?? null}
+      />
+
+      <AgentSkillsCard agentId={agentId} />
+    </>
+  );
+
+  return embedded ? (
+    <div className="space-y-6">{body}</div>
+  ) : (
+    <PageLayout maxWidth="narrow">{body}</PageLayout>
   );
 }

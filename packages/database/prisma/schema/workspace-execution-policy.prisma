@@ -1,0 +1,17 @@
+// ─── Workspace execution policy (Tier D / Phase 3 — Plan 4) ────────
+// A per-workspace security guard over WHERE runs may execute (ported from Paperclip's execution
+// allowlist). `executionMode = kubernetes` forces every run onto an isolating k8s sandbox and DENIES
+// local/ssh/plugin/non-k8s targets — the containment story for untrusted tenants. `any` = no restriction.
+// One row per workspace. EXECUTION_POLICY-flag-gated, admin-only writes.
+
+model WorkspaceExecutionPolicy {
+  id                       String   @id @default(cuid())
+  workspaceId              String   @unique // buildbase workspace _id; no FK (D5)
+  executionMode            String   @default("any") // any | kubernetes
+  enableIsolatedWorkspaces Boolean  @default(false)
+  updatedByProfileId       String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@map("workspace_execution_policies")
+}

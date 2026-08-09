@@ -1,0 +1,36 @@
+// ─── Agent authorization — capability grants (Epic #21) ───────────
+// Grantable, scoped, provenance-tracked agent capabilities — the agent analog of a human role (humans
+// use buildbase; agents are never buildbase principals). Unifies the flat AgentTrustProfile.
+// executionAllowlist into a real grant model. Default-open (non-breaking); enforced only when an agent
+// is restricted (trust changeConsentRequired). Scoped to the agent (which carries workspaceId).
+
+enum AgentAuthzDecision {
+  allow
+  deny
+}
+
+model AgentCapabilityGrant {
+  id                 String   @id @default(cuid())
+  agentId            String
+  agent              Agent    @relation("AgentGrants", fields: [agentId], references: [id], onDelete: Cascade)
+  capability         String
+  projectScope       String? // null = workspace-wide; else a project id
+  grantedByProfileId String?
+  createdAt          DateTime @default(now())
+
+  @@index([agentId, capability])
+  @@map("agent_capability_grants")
+}
+
+model AgentAuthzEvent {
+  id           String             @id @default(cuid())
+  agentId      String
+  capability   String
+  decision     AgentAuthzDecision
+  projectScope String?
+  reason       String?
+  createdAt    DateTime           @default(now())
+
+  @@index([agentId, createdAt])
+  @@map("agent_authz_events")
+}

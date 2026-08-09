@@ -1,0 +1,70 @@
+// ─── Business Finance Ledger (Epic #16) ───────────────────────────
+// The workspace's own P&L bookkeeping: HUMANS record revenue and expense events (invoices they
+// raised, bills they paid). Human-owned, workspace-scoped (no FK, D5), GraphQL-only (no agent
+// path, no REST).
+//
+// This is NOT Epic #4 (finance.prisma): that tracks AGENT LLM/run COST + budgets + auto-pause,
+// fed by agents. This ledger is the CUSTOMER's business money, fed only by human admins. Different
+// tables, different actors — never conflated, joined, or auto-populated from one another.
+//
+// Named `Ledger*` (not `Finance*`) because Epic #4 already occupies the `finance*`/`Finance*`
+// GraphQL namespace + the /finance route; this keeps the two domains collision-free.
+
+enum LedgerKind {
+  revenue
+  expense
+}
+
+enum LedgerSource {
+  manual
+  import
+  api
+}
+
+model LedgerEvent {
+  id          String       @id @default(cuid())
+  workspaceId String // buildbase workspace _id; no FK (D5)
+  kind        LedgerKind
+  category    String // label snapshot, always set
+  categoryId  String?
+  biller      String?
+  amountCents Int // integer cents, > 0 (sign carried by kind); never floats
+  currency    String       @default("USD")
+  description String?
+  projectId   String?
+  source      LedgerSource @default(manual)
+  createdBy   String // buildbase userId (never an Agent.id, D1)
+  occurredAt  DateTime
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  categoryRef LedgerCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  project     Project?        @relation("ProjectLedgerEvents", fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([workspaceId, occurredAt])
+  @@index([workspaceId, kind, occurredAt])
+  @@index([workspaceId, biller, occurredAt])
+  @@index([workspaceId, category, occurredAt])
+  @@index([workspaceId, projectId])
+  @@index([categoryId])
+  @@map("ledger_events")
+}
+
+model LedgerCategory {
+  id          String     @id @default(cuid())
+  workspaceId String
+  kind        LedgerKind
+  name        String
+  archived    Boolean    @default(false)
+  createdBy   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  events LedgerEvent[]
+
+  @@unique([workspaceId, kind, name])
+  @@index([workspaceId])
+  @@index([workspaceId, kind, archived])
+  @@map("ledger_categories")
+}

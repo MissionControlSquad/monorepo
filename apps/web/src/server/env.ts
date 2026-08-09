@@ -32,22 +32,23 @@ const serverSchema = z.object({
   CRON_SECRET: z.string().min(1, "CRON_SECRET is required"),
 
   // ── Cloud Deployments (optional — only needed for Deploy to Cloud) ──
-  HETZNER_API_TOKEN: z.string().optional(),
-  HETZNER_SSH_KEY_ID: z.string().optional(),
+  // ── Sandbox + host providers (Tier D) ──
+  // BYO: Hetzner host provisioning reads the workspace's own HETZNER_API_TOKEN from the secrets
+  // vault (not deployment env), same as the cloud sandbox providers. No operator infra credentials.
+  // BYO: every cloud sandbox provider reads its credentials from the WORKSPACE secrets vault (by
+  // secret name — e.g. E2B_API_KEY, MODAL_TOKEN_ID/SECRET, CLOUDFLARE_SANDBOX_BRIDGE_URL/TOKEN,
+  // KUBECONFIG, EXE_DEV_API_KEY), NOT from deployment env. So there are intentionally no sandbox
+  // provider env vars here.
   DEPLOYMENT_WEBHOOK_BASE_URL: z
     .union([z.string().url(), z.literal("")])
     .optional()
     .transform((v) => v || undefined),
   SSH_KEY_ENCRYPTION_SECRET: z.string().optional(),
+  // Master key for the Epic #5 secrets vault (AES-256-GCM). Required (>=32 chars) in production;
+  // dev/test fall back to an insecure default in secrets-crypto.ts.
+  SECRET_ENCRYPTION_KEY: z.string().optional(),
 
-  // ── Web Push (optional — only needed for push notifications) ──
-  VAPID_PUBLIC_KEY: z
-    .string()
-    .default(
-      "BEAGuNNkK6E6ijU7Q8PrUwQB5E6yxVGGiPZtYd7jrLJlt19ge_9pYT76yrWgLr7WH4zrN33oWk-T_UEBoerEBus",
-    ),
-  VAPID_PRIVATE_KEY: z.string().optional(),
-  VAPID_SUBJECT: z.string().default("mailto:dharmendra@agentcenter.cloud"),
+  // Web Push removed — buildbase owns push delivery (its own service worker + subscription).
 
   // ── Email via Resend (optional — only needed for email notifications) ──
   RESEND_API_KEY: z.string().optional(),
@@ -115,7 +116,14 @@ function validateEnv(): ServerEnv {
 
   // In production runtime, use strict schema and fail hard
   if (process.env.NODE_ENV === "production") {
-    return serverSchema.parse(process.env);
+    const prod = serverSchema.parse(process.env);
+    // Fail fast at BOOT (not at first secret op) if the vault master key is missing/weak — otherwise the
+    // secrets vault would run on the dev insecure default. secrets-crypto also throws at use time; this
+    // surfaces it during startup. (Kept out of the zod schema so lenientSchema.extend() still works.)
+    if ((prod.SECRET_ENCRYPTION_KEY ?? "").length < 32) {
+      throw new Error("SECRET_ENCRYPTION_KEY must be set (>=32 chars) in production");
+    }
+    return prod;
   }
 
   // In development/test, try strict first and warn, then fall back to lenient

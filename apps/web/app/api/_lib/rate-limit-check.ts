@@ -17,8 +17,6 @@ export const apiLimiters = {
   messages: createRateLimiter({ max: 60, windowSec: 60, prefix: "rl:msgs" }),
   /** Channel operations */
   channels: createRateLimiter({ max: 60, windowSec: 60, prefix: "rl:chan" }),
-  /** Cloud VM operations — expensive, tight limit */
-  cloudVms: createRateLimiter({ max: 20, windowSec: 60, prefix: "rl:vms" }),
   /** Live gateway install token management — very sensitive, strict limit */
   liveGatewayTokens: createRateLimiter({ max: 10, windowSec: 60, prefix: "rl:lgtok" }),
   /** Live gateway connections list — polled by sidebar + page every 15-30s */
@@ -37,6 +35,28 @@ export async function checkRateLimit(
   limiter: ReturnType<typeof createRateLimiter>,
   request: Request,
 ): Promise<Response | null> {
+  // Disabled under test. The limiters are module-level (and Redis-backed when REDIS_URL is set),
+  // keyed by a single shared client IP, so their counters accumulate across every test file in the
+  // suite and trip non-deterministically — surfacing as whole files failing with 429 (a body of
+  // `{error}` not `{errors}`, so tests that assert `!errors` then read `data` see undefined). Real
+  // requests still get rate limited in dev/prod.
+  //
+  // Also disabled for the bulk seed (scripts/seed-enterprise.ts), which drives these same in-process
+  // route handlers in a tight loop to create thousands of tasks/messages — it would otherwise trip the
+  // per-IP limiter (~120/60s) partway through and abort with `Create task failed: 429`. The flag is only
+  // ever set by that seed process, so real dev/prod servers are unaffected.
+  //
+  // And disabled for the Playwright e2e run (E2E_RATE_LIMIT_DISABLED, set only in the e2e workflow's
+  // app env): several parallel workers hit the served app from one shared IP, so these module-level
+  // limiters trip non-deterministically — the same reason the global middleware limiter is bypassed.
+  if (
+    process.env.VITEST ||
+    process.env.NODE_ENV === "test" ||
+    process.env.SEED_BYPASS_RATE_LIMIT === "1" ||
+    process.env.E2E_RATE_LIMIT_DISABLED === "1"
+  )
+    return null;
+
   const ip = getClientIp(request.headers);
   const check = await limiter.checkAsync(ip);
   if (!check.allowed) {

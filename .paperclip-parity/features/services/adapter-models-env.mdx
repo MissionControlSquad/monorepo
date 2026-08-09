@@ -1,0 +1,12 @@
+---
+service: adapter-models-env
+kind: service
+status: Partial
+priority: P1
+gate: needs-provider-key
+---
+# adapter-models-env · 🟡 Partial
+**What it is:** derive an adapter's available models from env/CLI.
+**Monorepo:** `AdapterModelProfile` rows (static curated list); no dynamic env/CLI model detection.
+**Required:** implement `detectModels()` on an adapter against a live CLI — needs a real provider key.
+**Covers:** features/P1-adapters-runtime-registry.mdx · SERVICE-AUDIT #4.

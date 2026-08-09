@@ -1,0 +1,26 @@
+// Cloud upstreams (parity #24). Config for a project's cloud fork/sync relationship with a remote git
+// repo, plus the last observed sync state. The actual fetch/merge/push is the infra-gated git op; this
+// stores the relationship + drift state that planUpstreamSync classifies. D5: workspaceId no FK;
+// syncState is TEXT. CLOUD_UPSTREAMS-flag-gated.
+model CloudUpstream {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  projectId          String
+  name               String
+  remoteUrl          String
+  remoteRef          String    @default("main")
+  localSha           String?
+  remoteSha          String?
+  ahead              Int       @default(0)
+  behind             Int       @default(0)
+  syncState          String    @default("unknown") // up_to_date | behind | ahead | diverged | unknown
+  lastError          String?
+  lastSyncedAt       DateTime?
+  createdByProfileId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([workspaceId, projectId, name])
+  @@index([workspaceId, syncState])
+  @@map("cloud_upstreams")
+}

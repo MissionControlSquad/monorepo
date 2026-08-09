@@ -1,6 +1,8 @@
 import { DeliverableKind } from "@agentcenter/database";
 import { builder } from "../builder";
-import { runDeliverableRevisionTransaction } from "@agentcenter/database";
+// reviseDeliverable mutation retired — deliverable revision is agent-facing via the REST PATCH
+// /api/tasks/[id]/deliverables/[deliverableId] path (same snapshot+version-increment). The GraphQL
+// mutation was unwired (no client op, no caller) and duplicated that logic.
 import { taskModel, agentModel, deliverableModel } from "../../models";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 
@@ -66,69 +68,6 @@ builder.mutationField("submitDeliverable", (t) =>
         taskTitle: task?.title ?? "",
         agentName: agent?.name ?? "",
         agentId: args.agentId,
-      });
-
-      return deliverable;
-    },
-  }),
-);
-
-builder.mutationField("reviseDeliverable", (t) =>
-  t.prismaField({
-    type: "Deliverable",
-    args: {
-      id: t.arg.string({ required: true }),
-      agentId: t.arg.string({ required: true }),
-      title: t.arg.string(),
-      content: t.arg.string(),
-      language: t.arg.string(),
-      storageKey: t.arg.string(),
-      fileName: t.arg.string(),
-      mimeType: t.arg.string(),
-      fileSize: t.arg.int(),
-      url: t.arg.string(),
-    },
-    resolve: async (query, _root, args) => {
-      const current = await deliverableModel.delegate.findUniqueOrThrow({
-        where: { id: args.id },
-      });
-
-      const editedByProfileId = await getOrCreateAgentProfileId(args.agentId);
-
-      // Snapshot + update in a single transaction to prevent version corruption
-      const deliverable = await runDeliverableRevisionTransaction(
-        current,
-        editedByProfileId,
-        {
-          title: args.title ?? undefined,
-          content: args.content ?? undefined,
-          language: args.language ?? undefined,
-          storageKey: args.storageKey ?? undefined,
-          fileName: args.fileName ?? undefined,
-          mimeType: args.mimeType ?? undefined,
-          fileSize: args.fileSize ?? undefined,
-          url: args.url ?? undefined,
-        },
-        query,
-      );
-
-      const [task, agent] = await Promise.all([
-        taskModel.findByIdSelect(current.taskId, {
-          title: true,
-          taskNumber: true,
-        }),
-        agentModel.findById(args.agentId, {
-          select: { name: true },
-        }),
-      ]);
-
-      await deliverableModel.emitSubmitted(deliverable, {
-        taskNumber: task?.taskNumber,
-        taskTitle: task?.title ?? "",
-        agentName: agent?.name ?? "",
-        agentId: args.agentId,
-        version: deliverable.version,
-        isRevision: true,
       });
 
       return deliverable;

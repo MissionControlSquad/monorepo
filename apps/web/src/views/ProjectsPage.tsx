@@ -32,7 +32,7 @@ export function ProjectsPage() {
   });
 
   return (
-    <PageLayout>
+    <PageLayout maxWidth="wide">
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Projects" }]} />
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">

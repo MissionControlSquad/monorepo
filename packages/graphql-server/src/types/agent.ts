@@ -7,6 +7,8 @@ builder.prismaObject("Agent", {
     name: t.exposeString("name"),
     role: t.exposeString("role"),
     status: t.exposeString("status"),
+    reportsToAgentId: t.exposeString("reportsToAgentId", { nullable: true }), // Epic #19
+    companyId: t.exposeString("companyId", { nullable: true }), // Domain 14 #10
     detailedStatus: t.exposeString("detailedStatus", { nullable: true }),
     statusMessage: t.exposeString("statusMessage", { nullable: true }),
     currentTaskId: t.exposeString("currentTaskId", { nullable: true }),
@@ -39,11 +41,21 @@ builder.prismaObject("Agent", {
     }),
 
     hostingType: t.exposeString("hostingType"),
-    cloudVmId: t.exposeString("cloudVmId", { nullable: true }),
+
+    // Epic #2: pluggable provider adapter.
+    adapterType: t.exposeString("adapterType", { nullable: true }),
+    adapterConfig: t.expose("adapterConfig", { type: "JSON", nullable: true }),
+    llmModel: t.exposeString("llmModel", { nullable: true }), // per-agent model override
+    runtimeAdapter: t.exposeString("runtimeAdapter", { nullable: true }), // Tier D per-agent runtime
+    sandboxProvider: t.exposeString("sandboxProvider", { nullable: true }), // Tier D sandbox binding
+    environmentId: t.exposeString("environmentId", { nullable: true }), // Tier D / Phase 3 environment binding
+    runtimeModel: t.exposeString("runtimeModel", { nullable: true }),
+    runtimeTemplate: t.exposeString("runtimeTemplate", { nullable: true }),
+    memoryProvider: t.exposeString("memoryProvider"), // Tier D memory binding
 
     // Relations
     profile: t.relation("profile", { nullable: true }),
-    cloudVm: t.relation("cloudVm", { nullable: true }),
+    adapter: t.relation("adapter", { nullable: true }),
     currentTaskRef: t.relation("currentTaskRef", { nullable: true }),
     queueItems: t.relation("queueItems"),
     statusHistory: t.relation("statusHistory"),

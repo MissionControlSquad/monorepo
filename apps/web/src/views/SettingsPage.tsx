@@ -3,13 +3,25 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
-import { ShieldOff, Lock, KeyRound } from "lucide-react";
+import { ShieldOff, Lock, KeyRound, FlaskConical, Brain } from "lucide-react";
 import {
   SET_SYSTEM_SHUTDOWN,
   SYSTEM_SETTINGS_QUERY,
   CHANGE_PASSWORD,
 } from "../lib/graphql/mutations/system";
-import { Breadcrumbs, Card, Button, ConfirmDialog, PageLayout } from "../components/ui";
+import {
+  AGENT_GOVERNANCE_QUERY,
+  FEATURE_FLAGS_QUERY,
+  COMPANY_MEMORY_DEFAULT_QUERY,
+} from "@/lib/graphql/queries";
+import {
+  SET_AGENT_GOVERNANCE,
+  UPDATE_FEATURE_FLAG,
+  SET_COMPANY_MEMORY_PROVIDER,
+} from "@/lib/graphql/mutations";
+import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
+import { MEMORY_PROVIDERS, FLAG_KEYS } from "@agentcenter/utils";
+import { Breadcrumbs, Card, Button, ConfirmDialog, PageLayout, Select, Checkbox } from "../components/ui";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -24,6 +36,9 @@ import {
 import { Input } from "@/components/ui/shadcn/input";
 import { LicenseStatusCode } from "@/server/constants";
 import { API_ROUTES } from "@/lib/api-routes";
+import { SidebarCustomizeCard } from "@/components/layout/sidebar/SidebarCustomizeCard";
+import { AppearanceCard } from "@/components/settings/AppearanceCard";
+import { BuildbaseAccountCard } from "@/components/settings/BuildbaseAccountCard";
 
 const changePasswordSchema = z
   .object({
@@ -110,12 +125,15 @@ export function SettingsPage() {
   };
 
   return (
-    <PageLayout maxWidth="narrow">
+    <PageLayout maxWidth="wide">
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Settings" }]} />
       <div>
         <h1 className="text-xl font-semibold text-foreground">Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">System-wide configuration</p>
       </div>
+
+      {/* Buildbase user-layer account/billing — opens inbuilt SDK screens (renders only when configured) */}
+      <BuildbaseAccountCard />
 
       {/* Change Password */}
       <Card padding="lg" className="space-y-4">
@@ -178,6 +196,24 @@ export function SettingsPage() {
           </form>
         </Form>
       </Card>
+
+      {/* Agent Governance */}
+      <AgentGovernanceCard />
+
+      {/* Agent memory backend */}
+      <MemoryDefaultCard />
+
+      {/* Notification preferences now live in buildbase — see BuildbaseAccountCard →
+          openWorkspaceSettings('notifications'). */}
+
+      {/* Appearance / theme */}
+      <AppearanceCard />
+
+      {/* Sidebar customization */}
+      <SidebarCustomizeCard />
+
+      {/* Experimental feature flags */}
+      <FeatureFlagsCard />
 
       {/* License */}
       {licenseInfo && licenseInfo.status !== LicenseStatusCode.NONE && (
@@ -312,5 +348,209 @@ export function SettingsPage() {
         />
       </div>
     </PageLayout>
+  );
+}
+
+/**
+ * Epic A.4: workspace agent governance. The one enforceable knob — requireAgentApproval — makes
+ * newly provisioned agents (team install / import) start pending_setup so they can't be assigned
+ * work until an admin activates them.
+ */
+function AgentGovernanceCard() {
+  const [{ data }, refetch] = useQuery({ query: AGENT_GOVERNANCE_QUERY });
+  const [, setGovernance] = useMutation(SET_AGENT_GOVERNANCE);
+  const requireApproval: boolean = data?.agentGovernance?.requireAgentApproval ?? false;
+  const [saving, setSaving] = useState(false);
+
+  async function toggle(next: boolean) {
+    setSaving(true);
+    try {
+      const res = await setGovernance({ requireAgentApproval: next });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors[0]?.message ?? "Failed to update governance");
+      } else {
+        toast.success(next ? "New agents now require approval" : "Agent approval requirement off");
+        refetch({ requestPolicy: "network-only" });
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card padding="lg" className="space-y-4">
+      <div className="flex items-start gap-4">
+        <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-muted">
+          <ShieldOff className="w-5 h-5 text-muted-foreground" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-base font-semibold text-foreground">Agent Governance</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Require admin approval for new agents. When on, agents added by installing a team or
+            importing a workspace start deactivated and cannot be assigned work until an admin
+            activates them.
+          </p>
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-sm text-foreground">
+        <Checkbox
+          checked={requireApproval}
+          disabled={saving}
+          onChange={(e) => toggle(e.target.checked)}
+        />
+        Require approval before new agents can work
+      </label>
+    </Card>
+  );
+}
+
+/**
+ * Domain 4: the workspace-default memory backend for agents (none / markdown / db). Individual agents
+ * can override it; this sets the default they inherit. MEMORY-gated — self-hides when the flag is off.
+ */
+function MemoryDefaultCard() {
+  const enabled = useFeatureFlag(FLAG_KEYS.MEMORY);
+  const [{ data }, refetch] = useQuery<{ companyMemoryDefault: string | null }>({
+    query: COMPANY_MEMORY_DEFAULT_QUERY,
+    pause: !enabled,
+  });
+  const [, setProvider] = useMutation(SET_COMPANY_MEMORY_PROVIDER);
+  const [saving, setSaving] = useState(false);
+
+  if (!enabled) return null;
+  const current = data?.companyMemoryDefault ?? "none";
+
+  async function onChange(provider: string) {
+    setSaving(true);
+    try {
+      const res = await setProvider({ provider });
+      if (res.error) toast.error(res.error.graphQLErrors[0]?.message ?? "Failed to update");
+      else {
+        toast.success(`Memory backend set to ${provider}`);
+        refetch({ requestPolicy: "network-only" });
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card padding="lg" className="space-y-4">
+      <div className="flex items-start gap-4">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
+          <Brain className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-semibold text-foreground">Agent memory</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The default memory backend new agents use. Individual agents can override it.
+          </p>
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-sm text-foreground">
+        Default backend
+        <Select
+          size="sm"
+          className="px-3 py-1.5"
+          value={current}
+          disabled={saving}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {MEMORY_PROVIDERS.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </Select>
+      </label>
+    </Card>
+  );
+}
+
+interface FeatureFlag {
+  key: string;
+  enabled: boolean;
+  managedBy: string;
+  description?: string | null;
+}
+
+/**
+ * Experimental feature flags — a per-flag toggle grid so an admin can turn optional features on/off
+ * without a DB round-trip. Only user-managed flags are toggleable; system-managed ones are shown but
+ * locked (the server rejects toggling them). Mirrors Paperclip's InstanceExperimentalSettings.
+ */
+function FeatureFlagsCard() {
+  const [{ data, fetching }, refetch] = useQuery<{ featureFlags: FeatureFlag[] }>({
+    query: FEATURE_FLAGS_QUERY,
+  });
+  const [, updateFlag] = useMutation(UPDATE_FEATURE_FLAG);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const flags = [...(data?.featureFlags ?? [])].sort((a, b) => a.key.localeCompare(b.key));
+
+  async function toggle(key: string, next: boolean) {
+    setBusy(key);
+    try {
+      const res = await updateFlag({ key, enabled: next });
+      if (res.error) {
+        toast.error(res.error.graphQLErrors[0]?.message ?? "Failed to update flag");
+      } else {
+        toast.success(`${key} ${next ? "enabled" : "disabled"}`);
+        refetch({ requestPolicy: "network-only" });
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card padding="lg" className="space-y-4">
+      <div className="flex items-start gap-4">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
+          <FlaskConical className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-semibold text-foreground">Experimental Features</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Turn optional features on or off for this workspace. System-managed flags are shown but
+            can only be changed by your administrator.
+          </p>
+        </div>
+      </div>
+
+      {fetching && flags.length === 0 && (
+        <p className="text-sm text-muted-foreground">Loading flags…</p>
+      )}
+
+      <ul className="divide-y divide-border">
+        {flags.map((f) => {
+          const locked = f.managedBy !== "user";
+          return (
+            <li key={f.key} className="flex items-center justify-between gap-4 py-2.5">
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 font-mono text-sm text-foreground">
+                  {f.key}
+                  {locked && (
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                      system
+                    </span>
+                  )}
+                </p>
+                {f.description && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">{f.description}</p>
+                )}
+              </div>
+              <label className="inline-flex shrink-0 cursor-pointer items-center">
+                <Checkbox
+                  checked={f.enabled}
+                  disabled={locked || busy === f.key}
+                  onChange={(e) => toggle(f.key, e.target.checked)}
+                />
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }

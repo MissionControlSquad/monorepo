@@ -1,0 +1,12 @@
+---
+service: execution-allowlist
+kind: service
+status: Present
+priority: P1
+gate: done
+---
+# execution-allowlist · ✅ Present
+**What it is:** allowlist of what an agent may execute.
+**Monorepo:** `execution-policy.ts` (`evaluateExecutionAllowlist`/`assertExecutionAllowed`, fail-closed).
+**Required:** —
+**Covers:** features/P1-environments-leases.mdx · SERVICE-AUDIT #55.

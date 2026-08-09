@@ -1,0 +1,28 @@
+---
+feature: Observability & portability
+priority: P2
+status: Present
+gate: buildable-now
+---
+
+# Observability & portability · P2 · ✅ Present (observability read-only)
+
+**What it is:** operational visibility (activity feed, timeline, workspace rollup, analytics, monitors)
+and moving a workspace in/out (export/import bundle).
+
+**Present in our monorepo (verified):**
+- Activity + timeline: `activity/page.tsx` (ActivityFeed), `timeline/page.tsx` (WorkTimelinePage), agent action/status feeds, `subscriptions/activityCreated.ts`.
+- Analytics: `analytics/page.tsx` (`AnalyticsPage`) — task/cycle/completion/productivity/heatmap/trend queries.
+- Observability rollup: `observability/page.tsx` — `getWorkspaceSummary` (agents/tasks/spend/pendingApprovals/openIncidents).
+- Monitors: `monitor.prisma`, `createMonitor`/`updateMonitor`/`deleteMonitor`, on-demand `evaluateMonitors`, route `/monitors`.
+- Portability: `portability/page.tsx` — `EXPORT_WORKSPACE_BUNDLE`/`IMPORT_WORKSPACE_BUNDLE` + `WORKSPACE_IMPORTS` audit + collision strategies.
+
+**Gaps / pending:**
+- **Observability page is read-only** — bare pending-approval/incident counts with **no drill-in action** (buildable-now to link to /review, /finance).
+- **Monitors auto-firing scheduler deferred** — definitions + manual evaluation work; background auto-eval/alert needs a scheduler (infra).
+
+**What's required:** make the observability counters actionable (buildable-now); a scheduler for monitor auto-fire.
+
+**Priority rationale:** Visibility into a running fleet + workspace portability are important operational features.
+
+**Depends on:** cron/scheduler for monitor auto-fire.

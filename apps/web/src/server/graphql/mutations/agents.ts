@@ -5,11 +5,8 @@ import { Roles, SetupStatus, AgentStatus } from "../../constants";
 import { applyAgentStatusUpdate } from "../../agent-status";
 import { ensureAgentProfile } from "../../agent-profile";
 import { pubsub, PubSubEvent } from "../../pubsub";
-import { findCloudVMForSSH, findProfileForAgentId } from "@agentcenter/database";
-import { getAgentSlug } from "@agentcenter/utils";
-import { getVMSSHConfig, computeAgentCronIndex } from "../../services/cloud-vm-utils";
-import { removeAgentCrons, ensureHeartbeatCron } from "../../services/cloud-vm-cron";
-import { computeCronSchedule } from "../../agent-config-generator";
+import { findProfileForAgentId } from "@agentcenter/database";
+import { requireRole } from "@/server/tenancy";
 
 /**
  * Resolve an agent by apiKey argument.
@@ -33,9 +30,11 @@ builder.mutationField("updateAgentStatus", (t) =>
       currentTaskId: t.arg.string(),
       currentTask: t.arg.string(),
     },
-    resolve: async (query, _root, args) => {
-      const agent = await agentModel.delegate.findUnique({
-        where: { id: args.id },
+    resolve: async (query, _root, args, ctx) => {
+      // Tenancy: scope the agent to the caller's workspace so one workspace can't mutate another's agent.
+      const tenancy = requireRole(ctx, "member");
+      const agent = await agentModel.delegate.findFirst({
+        where: { id: args.id, workspaceId: tenancy.workspaceId },
       });
       if (!agent) throw new Error(`Agent not found: ${args.id}`);
 
@@ -131,12 +130,16 @@ builder.mutationField("updateAgentProfile", (t) =>
       role: t.arg.string(),
       personality: t.arg.string(),
       identityEmoji: t.arg.string(),
+      llmModel: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
-      // Require authenticated admin session for profile updates
-      if (!ctx.session?.profileId) {
-        throw new Error("Authentication required");
-      }
+      // Tenancy: require a workspace member and confirm the agent belongs to that workspace.
+      const tenancy = requireRole(ctx, "member");
+      const owned = await agentModel.delegate.findFirst({
+        where: { id: args.id, workspaceId: tenancy.workspaceId },
+        select: { id: true },
+      });
+      if (!owned) throw new Error(`Agent not found: ${args.id}`);
 
       const data: Record<string, unknown> = {};
       if (args.name !== undefined && args.name !== null) data.name = args.name;
@@ -155,6 +158,8 @@ builder.mutationField("updateAgentProfile", (t) =>
       }
       if (args.personality !== undefined) data.personality = args.personality ?? null;
       if (args.identityEmoji !== undefined) data.identityEmoji = args.identityEmoji ?? null;
+      // Epic #2: per-agent LLM model override (empty string clears it → VM/adapter default).
+      if (args.llmModel !== undefined) data.llmModel = args.llmModel ? args.llmModel : null;
 
       const updated = await agentModel.update(args.id, {
         ...query,
@@ -173,7 +178,14 @@ builder.mutationField("setAgentActivation", (t) =>
       id: t.arg.string({ required: true }),
       deactivated: t.arg.boolean({ required: true }),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
+      // Tenancy: activation/deactivation is workspace-scoped, admin-gated.
+      const tenancy = requireRole(ctx, "admin");
+      const owned = await agentModel.delegate.findFirst({
+        where: { id: args.id, workspaceId: tenancy.workspaceId },
+        select: { id: true },
+      });
+      if (!owned) throw new Error(`Agent not found: ${args.id}`);
       if (args.deactivated) {
         const agent = await agentModel.delegate.findUnique({
           where: { id: args.id },
@@ -262,7 +274,7 @@ builder.mutationField("setAgentVacation", (t) =>
     resolve: async (query, _root, args, ctx) => {
       const agent = await agentModel.delegate.findUnique({
         where: { id: args.id },
-        select: { name: true, username: true, cloudVmId: true },
+        select: { name: true, username: true },
       });
       if (!agent) throw new Error(`Agent not found: ${args.id}`);
 
@@ -276,42 +288,10 @@ builder.mutationField("setAgentVacation", (t) =>
           detailedStatus: null,
           statusMessage: null,
         });
-
-        // Remove heartbeat cron on cloud VMs (non-fatal)
-        if (agent.cloudVmId) {
-          try {
-            const vm = await findCloudVMForSSH(agent.cloudVmId);
-            if (vm) {
-              const sshConfig = getVMSSHConfig(vm);
-              const agentSlug = getAgentSlug(agent);
-              const removed = await removeAgentCrons(sshConfig, agentSlug);
-              console.log(`[vacation] Removed ${removed} cron(s) for ${agentSlug}`);
-            }
-          } catch (err) {
-            console.error(`[vacation] Failed to remove crons for agent ${args.id}:`, err);
-          }
-        }
       } else {
         await applyAgentStatusUpdate(args.id, {
           isOnVacation: false,
         });
-
-        // Re-add heartbeat cron on cloud VMs (non-fatal)
-        if (agent.cloudVmId) {
-          try {
-            const vm = await findCloudVMForSSH(agent.cloudVmId);
-            if (vm) {
-              const sshConfig = getVMSSHConfig(vm);
-              const agentSlug = getAgentSlug(agent);
-              const cronIndex = await computeAgentCronIndex(agent.cloudVmId, agentSlug);
-              const cronSchedule = computeCronSchedule(cronIndex);
-              const result = await ensureHeartbeatCron(sshConfig, agentSlug, cronSchedule);
-              console.log(`[vacation] Cron restore for ${agentSlug}: ${result.message}`);
-            }
-          } catch (err) {
-            console.error(`[vacation] Failed to restore crons for agent ${args.id}:`, err);
-          }
-        }
       }
 
       pubsub.publish(PubSubEvent.AGENT.STATUS_CHANGED, { agentId: args.id });
@@ -322,15 +302,10 @@ builder.mutationField("setAgentVacation", (t) =>
         ? ((await findProfileForAgentId(profileId))?.displayName ?? "Someone")
         : "Someone";
       const action = args.onVacation ? "put on vacation" : "returned from vacation";
-      const cronNote = agent.cloudVmId
-        ? args.onVacation
-          ? " (cron removed)"
-          : " (cron restored)"
-        : "";
       const activity = await activityModel.create({
         data: {
           type: "agent_status_changed",
-          message: `${agent.name} ${action} by ${who}${cronNote}`,
+          message: `${agent.name} ${action} by ${who}`,
           profileId: profileId ?? undefined,
           metadata: { vacation: args.onVacation },
         },

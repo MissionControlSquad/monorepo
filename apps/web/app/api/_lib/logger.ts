@@ -1,3 +1,4 @@
+import { redactSensitive } from "@agentcenter/utils";
 import { getClientIp } from "./client-ip";
 
 function getIp(request?: Request): string | undefined {
@@ -28,7 +29,7 @@ function emit(level: LogLevel, tag: string, message: string, request?: Request):
     ...getRequestMeta(request),
   };
 
-  const json = JSON.stringify(entry);
+  const json = redactSensitive(JSON.stringify(entry));
 
   switch (level) {
     case "warn":

@@ -1,0 +1,21 @@
+// Plugin host services + environment drivers (parity #110 / #107). A plugin can declare long-running
+// host services (a local HTTP endpoint, a webhook receiver) and/or environment drivers (a way to run
+// agents in an environment the plugin provides). This is the registry + status the host reads; actually
+// spawning/supervising the service process is the infra-gated worker-manager's job. Workspace-scoped.
+model PluginHostService {
+  id          String   @id @default(cuid())
+  workspaceId String
+  pluginId    String
+  serviceKey  String // stable key within the plugin (also the driverKey when kind=environment_driver)
+  kind        String // service | environment_driver | webhook
+  status      String   @default("declared") // declared | starting | running | stopped | error
+  endpoint    String? // resolved endpoint when running (e.g. http://127.0.0.1:PORT)
+  config      Json?
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, pluginId, serviceKey])
+  @@index([workspaceId, kind, status])
+  @@map("plugin_host_services")
+}

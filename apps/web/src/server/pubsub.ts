@@ -12,5 +12,6 @@ export {
   activityProjectTopic,
   agentActionAgentTopic,
   agentActionProjectTopic,
+  budgetIncidentTopic,
 } from "@agentcenter/graphql-server";
 export type { PubSubEvents } from "@agentcenter/graphql-server";

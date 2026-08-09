@@ -1,0 +1,17 @@
+// ─── Sidebar preferences (Paperclip parity: user_sidebar_preferences) ───────────
+// Per-user nav customization — preferred order + hidden items. Keyed by (workspaceId, userId); no FK
+// (D5). orderedIds/hiddenIds are nav hrefs; anything not listed keeps its default position/visibility.
+
+model UserSidebarPreference {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String // Profile id
+  orderedIds  Json     @default("[]")
+  hiddenIds   Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@map("user_sidebar_preferences")
+}

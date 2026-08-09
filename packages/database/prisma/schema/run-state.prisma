@@ -1,0 +1,53 @@
+// Per-run runtime state (parity #145 run-scratch / #146 runtime-skill-selections / #155
+// successful-run-handoff-state). Scratch, skill selections, and the handoff a successful run leaves for
+// its continuation. All keyed by runId (AgentRun.id) + workspaceId-scoped, no FK (D5).
+
+// A run's scratch KV — ephemeral working state the runtime keeps across steps within one run (#145).
+model RunScratch {
+  id          String   @id @default(cuid())
+  workspaceId String
+  runId       String
+  key         String
+  value       Json
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([runId, key])
+  @@index([workspaceId, runId])
+  @@map("run_scratch")
+}
+
+// Which skills the runtime selected for a run, and why (#146). Lets the UI show "skills used" and a
+// continuation reuse the same selection.
+model RunSkillSelection {
+  id          String   @id @default(cuid())
+  workspaceId String
+  runId       String
+  skillId     String
+  skillSlug   String?
+  source      String   @default("auto") // auto | pinned | inherited
+  score       Float? // relevance score when auto-selected
+  createdAt   DateTime @default(now())
+
+  @@unique([runId, skillId])
+  @@index([workspaceId, runId])
+  @@map("run_skill_selections")
+}
+
+// The handoff a successful run leaves for its continuation (#155): a compact summary + next steps +
+// carried artifact refs. One per run (the terminal snapshot).
+model RunHandoffState {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  runId        String   @unique
+  agentId      String?
+  taskId       String?
+  outcome      String // success | partial
+  summary      String   @db.Text
+  nextSteps    String[] @default([])
+  artifactRefs Json? // e.g. workspace_file refs / deliverable ids to carry forward
+  createdAt    DateTime @default(now())
+
+  @@index([workspaceId, taskId])
+  @@map("run_handoff_states")
+}

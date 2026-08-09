@@ -1,0 +1,94 @@
+---
+title: "Notes — gotchas, operational warnings, and strategic context"
+note: "Distilled from this machine's local Claude auto-memory (which does NOT transfer via git) + this session's hard-won gotchas. Read alongside HANDOFF.mdx + INDEX.mdx."
+updated: "2026-07-19"
+---
+
+# Notes for whoever continues this
+
+Everything here was learned the hard way or lived only in the original machine's local Claude memory
+(`~/.claude/projects/.../memory/`, which git does NOT carry). Keep it with the repo.
+
+## A. Testing & build gotchas (will bite you otherwise)
+
+1. **GraphQL errors are masked over the wire.** graphql-yoga masks resolver errors to a generic
+   `"Unexpected error."` (dual `graphql` instance → `instanceof` mismatch). So you CANNOT assert a
+   specific error message through a GraphQL call. Pattern used throughout: assert happy-paths + "an error
+   occurred" via GraphQL, but assert the *specific* message by calling the **service function directly**
+   (see `environments.test.ts`, `sandbox-run.test.ts`).
+2. **Flaky global setup hook.** `apps/web/tests/setup.ts` has a `beforeAll` that reads flags from the DB
+   and flakily times out at the default 10s under load. Always run vitest with **`--hookTimeout=40000`**.
+   A "6 skipped, hook timed out" result is this, not your test — just re-run.
+3. **Secrets in tests must use the service, not raw prisma.** Create/bind a vault secret via
+   `createSecret()` + `bindSecret()` (real AES-GCM encryption). A hand-written `secret.create({...})` row
+   will not decrypt and the run won't see the env var.
+4. **A project-scoped task needs the agent to be a `ProjectMember`.** `assembleContextBundle` scopes a
+   task to the agent's projects OR unscoped (`projectId: null`) tasks. If a test uses a task with a
+   `projectId`, create a `projectMember { projectId, profileId, status:"active" }` for the agent's profile
+   (`getOrCreateAgentProfileId(agentId)`), else you get `Task not found or not accessible to this agent`.
+5. **`prisma db push` ≠ migrations.** Tests apply the schema via `db push`, which does NOT run the raw
+   SQL in `migration.sql` files — so **partial-unique indexes** (one-local-env, one-active-image, etc.)
+   are absent in the test DB. That's why those constraints are ALSO enforced in app code. Before a real
+   deploy, run the migrations through `prisma migrate` against staging and verify the partial indexes.
+6. Clear stale Next types if typecheck reports phantom errors: `rm -rf apps/web/.next/types`.
+7. `lint-staged` runs prettier + eslint on commit and may reflow your code — expected.
+
+## B. Operational warnings (production-safety, don't skip)
+
+1. **Leased/retained CLOUD sandbox boxes cost real money.** `reuse_by_environment` and
+   `retain_on_failure` leases keep the provider machine ALIVE. The ONLY thing that tears them down on a
+   timer is `reapStaleLeases()`, wired into the **`/api/cron/reap-stale-work`** cron (every 5 min). If
+   that cron is not configured on a deployment, kept boxes leak and bill forever. Verify the cron runs.
+2. **The in-sandbox bridge only activates when `NEXT_PUBLIC_MC_URL` is set** — that's the base URL
+   injected as `AGENTCENTER_API_URL`. No URL → no bridge token minted (safe no-op).
+3. **All Phase-3 env features are flag-OFF by default.** To exercise them you must enable
+   `ENVIRONMENTS` / `EXECUTION_POLICY` / `EXECUTION_WORKSPACES` / `CUSTOM_IMAGES` (+ `RUNNERS`) in the
+   `feature_flags` table for the workspace. Nothing shows up in the UI until you do.
+4. **Nothing has ever run against a real cloud provider key** — all 7 cloud SDKs are wired but
+   SDK-mocked in tests. `local` is the only provider verified end-to-end. A real E2B/Daytona/etc. key is
+   needed to confirm a real cloud sandbox boots.
+
+## C. Design conventions worth knowing
+
+- **"D5" Prisma convention**: workspace-scoped models use `workspaceId String` with **no FK** (the
+  workspace is buildbase-owned). Status/kind/driver fields are **TEXT with app-level validation**, NOT
+  Prisma enums — deliberately, to avoid fragile Postgres enum-recreate migrations.
+- The **`local` sandbox provider's `id` IS its temp-dir path** — that's how `resume()` / `destroyById()`
+  / `snapshot()` re-attach to or tear down a box by id. Cloud providers use their own sandbox id.
+- Local `snapshot()` is a **STUB** (returns `local-image:<dir>`); real capture is a cloud-provider
+  capability not yet implemented.
+
+## D. Strategic ground-truth (corrects an earlier mischaracterization — important)
+
+An adversarial audit of the real Paperclip repo corrected a wrong belief that had been baked into early
+plans. **Do not repeat the wrong version.**
+
+- **WRONG:** "Paperclip is local — the runtime binds to the user's machine; no hosted runner / control plane."
+- **RIGHT:** Paperclip **IS a control plane** ("it doesn't run agents, it orchestrates them; agents run
+  wherever and phone home"). It is runtime-agnostic and MORE mature than us on breadth: **10+ per-runtime
+  adapters** (claude/codex/cursor(+cursor_cloud)/gemini/grok/opencode/pi/acpx/hermes(+gateway)/
+  openclaw_gateway) + a generic `process` adapter + `http` adapter + file-backed adapter plugins; **7
+  cloud sandbox providers**; execution targets = `local | remote+ssh | remote+sandbox`.
+- **Honest parity:** we are NOT at parity in breadth. We have a solid, verified foundation (Domains 1 & 3
+  done end-to-end) with ONE genuine differentiator Paperclip lacks: a **NAT-safe OUTBOUND daemon that
+  PULLS tasks** (`@agentcenter/runner` — the agent's machine dials us; no inbound/SSH server needed).
+- **Strategic direction if the goal is true parity/superiority:** lean into the **adapter registry**
+  (`packages/utils/src/adapters.ts` — already started: openclaw/codex/claude/gemini/process/shell +
+  http + plugin loader) and add the missing adapters (cursor/grok/opencode/pi/hermes/ACP), rather than
+  the narrower runtime-template set. See `02-adapters-runtimes.mdx`.
+
+## E. History note — Hetzner / CloudVM is GONE (don't resurrect it)
+
+Operator-managed Hetzner provisioning and the whole managed **CloudVM** subsystem were **fully removed**
+(destructive migration `20260716150000_retire_cloud_vm`, ~9.8k lines). Policy: **we never provision
+infra on anyone's behalf** — hosts are **pure BYO registration only** (`RunnerHost`: the user stands up
+their own machine + SSH key and registers it). If you find a stray `cloud_vm` reference it's a retained
+enum *value* (dropping a PG enum value needs a fragile recreate) — not a live feature. Don't rebuild it.
+
+## F. What the local auto-memory had that this file distills
+
+The original machine's `~/.claude/.../memory/` held: `paperclip-execution-ground-truth.md` (§D above),
+`remote-exec-robustness-backlog.md` (the reaper/liveness/redelivery hardening — mostly DONE; the still-
+gated items were all CloudVM, now moot since CloudVM was removed), `buildbase-boundary.md` (§ boundary in
+HANDOFF), and `paperclip-port-depth-backlog.md` (superseded by INDEX.mdx). Nothing else material is
+missing — INDEX.mdx + HANDOFF.mdx + this file are the complete portable memory.

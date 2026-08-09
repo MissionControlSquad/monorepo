@@ -48,6 +48,45 @@ docker pull ghcr.io/missioncontrolsquad/agentcenter:latest
 
 Available for `linux/amd64` and `linux/arm64`.
 
+## Operator CLI
+
+`npm run operator <command>` is a small admin surface for running and diagnosing a deployment. Each
+command is a thin wrapper over the tool that already owns the work (it does not reimplement backup or
+migration logic), and its exit code is propagated so it can gate a deploy in CI.
+
+```bash
+npm run operator doctor              # environment + DB connectivity + migration status (read-only)
+npm run operator env:check           # validate required env vars are set (POSTGRES_*, AUTH_SECRET, CRON_SECRET)
+npm run operator db:backup -- --gzip # pg_dump the database to ./backups (flags pass through to scripts/db-backup.mjs)
+npm run operator db:migrate:status   # show applied / pending Prisma migrations
+npm run operator help                # list commands
+```
+
+It also manages the standalone runner daemon (`@agentcenter/runner`) - installing it, running it as
+a login service, and updating it. `install` / `update` only print copy-pasteable steps, and
+`service:install` prints the unit by default and `service:uninstall` refuses without `--force`;
+nothing privileged or destructive runs without an explicit flag.
+
+```bash
+npm run operator install                  # print managed-install steps (npm i -g / npx) + login hint
+npm run operator update                   # print the self-update hint (npm update -g)
+npm run operator service:install          # render the launchd (macOS) / systemd (Linux) unit
+npm run operator service:install -- --write  # write the unit to the user path (the only fs write)
+npm run operator service:start            # launchctl load / systemctl --user start
+npm run operator service:stop             # launchctl unload / systemctl --user stop
+npm run operator service:restart          # stop then start (launchctl reload / systemctl --user restart)
+npm run operator service:status           # launchctl list / systemctl --user status
+npm run operator service:health           # probe active state (launchctl list / systemctl is-active)
+npm run operator service:logs -- --lines 200 --follow  # tail journalctl / the plist StandardOut/Err logs
+npm run operator service:uninstall -- --force  # stop + remove the unit file (refuses without --force)
+```
+
+The platform is auto-detected: macOS gets a `~/Library/LaunchAgents` plist driven by `launchctl`,
+Linux gets a `~/.config/systemd/user` unit driven by `systemctl --user`.
+
+Wraps `scripts/doctor.mjs`, `scripts/db-backup.mjs`, and `prisma migrate status`. Pass args to the
+underlying script after ` -- ` (e.g. `db:backup -- --out /backups --keep 7`).
+
 ## Documentation
 
 - [Self-Hosted Setup Guide](apps/web/self-hosted/SETUP.md) — full installation, HTTPS, backups, troubleshooting

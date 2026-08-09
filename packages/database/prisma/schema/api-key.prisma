@@ -1,0 +1,44 @@
+// ─── CLI / programmatic access — API keys (Epic #12) ──────────────
+// Workspace-scoped personal access tokens for CLI/programmatic access. The plaintext key is shown
+// once at mint; only keyHash (sha256) + keyPrefix (display) are stored. Revoke tombstones (never
+// hard-deletes) for audit. workspaceId-scoped (Epic #1, D5; no FK). The CLI binary + device-auth
+// challenge flow + middleware wiring are deferred (spec D2/D4).
+
+model ApiKey {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  name               String
+  keyHash            String    @unique
+  keyPrefix          String
+  createdByProfileId String?
+  lastUsedAt         DateTime?
+  revokedAt          DateTime?
+  expiresAt          DateTime?
+  createdAt          DateTime  @default(now())
+
+  @@index([workspaceId, revokedAt])
+  @@map("api_keys")
+}
+
+// Device-authorization flow: a CLI without a browser session starts a challenge, shows the user a
+// short userCode, the user approves it in an authenticated browser page, and the CLI polls with its
+// deviceCode to collect the minted key. The plaintext key is stored transiently on the row only
+// between approval and the CLI's next poll, then cleared — device flow inherently requires delivering
+// the secret to the polling device. Challenges are short-lived (expiresAt).
+model CliAuthChallenge {
+  id                  String   @id @default(cuid())
+  deviceCode          String   @unique // secret the CLI holds + polls with
+  userCode            String   @unique // short human-typed code shown to the user
+  status              String   @default("pending") // pending | approved | denied | expired
+  keyName             String   @default("CLI") // name for the minted ApiKey
+  workspaceId         String? // set on approval (the approver's workspace)
+  approvedByProfileId String?
+  apiKeyId            String? // the minted ApiKey id
+  plainKey            String? // transient — delivered once to the polling CLI, then nulled
+  expiresAt           DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userCode])
+  @@map("cli_auth_challenges")
+}

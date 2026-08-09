@@ -1,0 +1,45 @@
+---
+feature: Adapters & runtime registry
+priority: P1
+status: Present
+gate: done
+---
+
+# Adapters & runtime registry · P1 · ✅ Unified (ACP deferred — needs a real launch spec)
+
+> **Done:** registries are key-consistent (hyphen-alias bug fixed + drift-guard test) AND
+> `ensureBuiltinAdapters` now drives the DB rows from the Tier-D code registry at startup
+> (idempotent, create-if-absent, 3 tests). A new code provider auto-seeds — no manual migration.
+> Only net-new provider **ACP** remains (needs a confirmed launch spec/CLI).
+
+
+**What it is:** the catalog of agent runtimes (claude/codex/cursor/grok/…), their launch config, model
+profiles, install/enable/remove, and JSON-Schema config UI.
+
+**Present in our monorepo (verified):**
+- Tier-A DB registry: `agent_adapters` table (`adapter.prisma`), `installAdapter`/`setAdapterEnabled`/`removeAdapter`/`setAgentAdapter`, Ajv config validation (`adapters/registry.ts`), `JsonSchemaForm` + `AgentAdapterConfigCard`, route `/adapters`.
+- Tier-D code registry: `packages/utils/src/adapters.ts` — built-in runtime adapters (openclaw, codex, claude, gemini, cursor, grok, opencode, pi, hermes, process, shell, http), `buildAdapterInvocation` (launch argv + installCommand).
+- Declarative adapter-plugin loader (data-only): `adapterFromPluginSpec`/`loadAdapterPlugins`.
+
+**Gaps / pending:**
+- ✅ **FIXED — alias hyphen/underscore bug:** the DB seeds `*-local` rows with **hyphens**, but the alias
+  table only had underscore forms → `canonicalAdapterKey("claude-local")` returned identity and those
+  rows failed to resolve their runtime module at launch. Added hyphen aliases for all seeded rows +
+  a co-validation test (every seeded DB type resolves to a code module). (commit on parity branch.)
+- ✅ **Every seeded DB adapter now resolves** to a Tier-D module (verified by test). Correction: `hermes`
+  IS seeded (as a **bare** `hermes` row, matching the code key directly — the earlier "no DB row" note
+  was wrong). All 9 seeded types (openclaw-gateway + 7×`*-local` + hermes) resolve.
+- **Remaining (lower value):** (a) **ACP adapter** — absent; needs a confirmed launch spec/CLI before
+  seeding (deferred, not buildable without the real runtime). (b) *Optional* — relocate the migration
+  seed into an idempotent `ensureBuiltinAdapters()` startup sync so future code adapters auto-seed
+  (maintainability nicety; the correctness gap is already closed). `installAdapter` still allows a DB
+  row with no code module — acceptable (custom/plugin adapters register their module separately).
+- cursor/grok/opencode/pi/hermes launch specs are "best-effort mirrors, unconfirmed against a live CLI."
+- `detectModels()`/`getQuotaWindows()` are optional hooks no built-in implements.
+- **ACP** adapter absent.
+
+**What's required (buildable-now):** seed Tier-D `BUILTIN_ADAPTERS` as DB rows (or drive Tier-D from DB), co-validate a DB row against a runtime module, add the ACP row. Live model/quota detection + confirming launch specs → **needs a real provider key**.
+
+**Priority rationale:** Adapters decide *what runtime* an agent runs on — production needs the right providers selectable and the two registries consistent.
+
+**Depends on:** a real provider key to confirm launch/detect; nothing else for unification.

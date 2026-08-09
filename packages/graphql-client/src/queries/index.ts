@@ -66,7 +66,9 @@ export {
   DELIVERABLE_WITH_CONTEXT_QUERY,
   DELIVERABLES_BY_CHILD_TASKS_QUERY,
   DELIVERABLE_VERSIONS_QUERY,
+  WORKSPACE_DELIVERABLES_QUERY,
 } from "./deliverables";
+export { WORK_PRODUCTS_BY_TASK_QUERY } from "./work-products";
 
 export { AGENT_ACTIONS_BY_AGENT_QUERY } from "./agent-actions";
 
@@ -111,6 +113,160 @@ export {
   ACTIVITY_TREND_QUERY,
 } from "./analytics";
 
-export { GLOBAL_SEARCH_QUERY } from "./search";
+export { GLOBAL_SEARCH_QUERY, SEARCH_ALL_QUERY } from "./search";
 
 export { FEATURE_FLAGS_QUERY } from "./feature-flags";
+
+export { LIVE_GATEWAY_DEVICES_QUERY, AGENT_KEY_CLAIMS_QUERY } from "./live-gateway-devices";
+
+export { APPROVALS_QUERY, APPROVAL_QUERY } from "./approvals";
+
+export {
+  FINANCE_SUMMARY_QUERY,
+  BUDGET_POLICIES_QUERY,
+  BUDGET_INCIDENTS_QUERY,
+  COST_BREAKDOWN_QUERY,
+  COST_TREND_QUERY,
+  FINANCE_EVENT_SUMMARY_QUERY,
+  FINANCE_EVENTS_BY_BILLER_QUERY,
+  FINANCE_EVENTS_BY_KIND_QUERY,
+  FINANCE_EVENTS_QUERY,
+  COST_WINDOW_SPEND_QUERY,
+  COST_BY_TASK_TREE_QUERY,
+  COST_BILLING_SPLIT_QUERY,
+  AGENT_SALARY_QUERY,
+  PROVIDER_QUOTA_WINDOWS_QUERY,
+  UNPRICED_COST_EVENTS_QUERY,
+} from "./finance";
+
+export {
+  LEDGER_SUMMARY_QUERY,
+  LEDGER_BY_CATEGORY_QUERY,
+  LEDGER_BY_BILLER_QUERY,
+  LEDGER_BY_PROJECT_QUERY,
+  LEDGER_TIMELINE_QUERY,
+  LEDGER_EVENTS_QUERY,
+  LEDGER_CATEGORIES_QUERY,
+} from "./ledger";
+
+export { SECRETS_QUERY, SECRET_PROVIDERS_QUERY, SECRET_ACCESS_EVENTS_QUERY } from "./secrets";
+
+export { SECRET_PROPOSALS_QUERY } from "./secret-proposals";
+
+export {
+  ROUTINES_QUERY,
+  ROUTINE_QUERY,
+  ROUTINE_RUNS_QUERY,
+  PIPELINES_QUERY,
+  PIPELINE_QUERY,
+  PIPELINE_STATS_QUERY,
+  CASES_IN_PIPELINE_QUERY,
+  REVIEW_CASES_QUERY,
+  PIPELINE_HEALTH_QUERY,
+  STALE_CLAIMS_QUERY,
+  PIPELINE_CASE_EVENTS_QUERY,
+} from "./pipelines";
+
+export {
+  PENDING_DECOMPOSITIONS_QUERY,
+  TASK_TREE_HOLDS_QUERY,
+  TASK_RECOVERY_ACTIONS_QUERY,
+  THREAD_INTERACTIONS_QUERY,
+} from "./task-autonomy";
+
+export { CASES_QUERY, CASE_QUERY, LABELS_QUERY, CASE_EVENTS_QUERY } from "./cases";
+
+export {
+  SKILLS_QUERY,
+  SKILL_FILES_QUERY,
+  SKILL_CATALOG_QUERY,
+  LINT_SKILL_QUERY,
+  AUDIT_SKILL_QUERY,
+  SKILL_VERSIONS_QUERY,
+  AGENT_SKILLS_QUERY,
+  TEAMS_QUERY,
+  PREVIEW_TEAM_INSTALL_QUERY,
+} from "./skills";
+export { EXPORT_WORKSPACE_BUNDLE, WORKSPACE_IMPORTS } from "./portability";
+export { GOALS_QUERY, GOAL_QUERY, DEFAULT_GOAL_QUERY } from "./goals";
+export { WORKSPACE_SUMMARY_QUERY } from "./observability";
+export { BOARD_THREAD_QUERY } from "./boardroom";
+export { PLUGINS_QUERY, PLUGIN_QUERY } from "./plugins";
+export { API_KEYS_QUERY } from "./api-keys";
+export { TERMINAL_SESSIONS_QUERY } from "./terminals";
+export { AGENT_INSTRUCTIONS_QUERY } from "./agent-instructions";
+export { ORG_CHART_QUERY, ORG_CHART_SVG_QUERY } from "./org-chart";
+export { ATTENTION_FEED_QUERY } from "./attention";
+export { AGENT_CAPABILITY_GRANTS_QUERY, AGENT_AUTHZ_EVENTS_QUERY } from "./agent-authz";
+export { PROFILE_ANALYTICS_QUERY } from "./profile-analytics";
+
+export { CLI_AUTH_CHALLENGE_QUERY } from "./cli-auth";
+
+export { WORK_TIMELINE_QUERY } from "./timeline";
+
+export { AGENT_GOVERNANCE_QUERY } from "./agent-governance";
+export { AGENT_TRUST_PROFILE_QUERY } from "./agent-trust";
+
+export { TASK_RELATIONS_QUERY, BLOCKER_DIAGNOSTICS_QUERY } from "./task-relations";
+
+export { TASK_EXTERNAL_LINKS_QUERY } from "./external-links";
+
+export { DELIVERABLE_ANNOTATIONS_QUERY } from "./deliverable-annotations";
+
+export { DELIVERABLE_VOTES_QUERY } from "./deliverable-votes";
+
+export { MONITORS_QUERY } from "./monitors";
+export { RUNNER_COMMANDS_QUERY } from "./runner-commands";
+export { RUNNER_HOSTS_QUERY } from "./runner-hosts";
+export { RUNTIME_ADAPTERS_QUERY } from "./runtime-adapters";
+export { SANDBOX_PROVIDERS_QUERY } from "./sandbox-providers";
+export { AGENT_RUNS_QUERY, AGENT_RUN_LIVE_STATUS_QUERY, RUN_LOG_QUERY } from "./agent-runs";
+export { AGENT_TOOL_ACCESS_POLICIES_QUERY } from "./tool-access";
+export { AGENT_COMPANIES_QUERY, AGENT_COMPANY_QUERY, EXPORT_COMPANY_PACKAGE_QUERY } from "./agent-companies";
+export {
+  MEMORY_OPERATIONS_QUERY,
+  AGENT_MEMORY_ENTRIES_QUERY,
+  COMPANY_MEMORY_DEFAULT_QUERY,
+  SEARCH_AGENT_MEMORY_QUERY,
+} from "./memory";
+export {
+  ENVIRONMENTS_QUERY,
+  ENVIRONMENT_CAPABILITIES_QUERY,
+  ENVIRONMENT_DELETE_BLAST_RADIUS_QUERY,
+  AGENT_ENVIRONMENT_BINDINGS_QUERY,
+  ENVIRONMENT_LEASES_QUERY,
+  ENVIRONMENT_CUSTOM_IMAGES_QUERY,
+  WORKSPACE_EXECUTION_POLICY_QUERY,
+} from "./environments";
+export {
+  PROJECT_WORKSPACES_QUERY,
+  PROJECT_WORKSPACE_DETAIL_QUERY,
+  EXECUTION_WORKSPACES_QUERY,
+  EXECUTION_WORKSPACES_DETAIL_QUERY,
+} from "./execution-workspaces";
+export { SIDEBAR_BADGES_QUERY } from "./sidebar-badges";
+export { SIDEBAR_PREFERENCE_QUERY } from "./sidebar-preferences";
+export { PROJECT_DOC_COMMENTS_QUERY } from "./project-doc-comments";
+export { FOLDERS_QUERY, FOLDER_ITEMS_QUERY } from "./folders";
+export { ASSETS_QUERY, ASSET_DOWNLOAD_URL_QUERY } from "./assets";
+export {
+  TASK_ATTACHMENTS_QUERY,
+  TASK_ATTACHMENT_DOWNLOAD_URL_QUERY,
+} from "./task-attachments";
+export { EXTERNAL_OBJECTS_QUERY } from "./external-objects";
+export { CLOUD_UPSTREAMS_QUERY, CLOUD_UPSTREAM_PLAN_QUERY } from "./cloud-upstreams";
+export { INBOX_POLICIES_QUERY } from "./inbox-policies";
+export { SKILL_COMMENTS_QUERY } from "./skill-comments";
+export { ANNOTATION_THREADS_QUERY } from "./document-annotations";
+export { PROVIDER_AUTH_STATES_QUERY } from "./provider-auth";
+export { ADAPTER_PLUGINS_QUERY } from "./adapter-plugins";
+export { SMOKE_CASES_QUERY } from "./smoke-lab";
+export { LOCAL_SERVICES_QUERY } from "./local-services";
+export { AGENT_SKILL_SNAPSHOT_QUERY } from "./agent-skills-sync";
+export { SKILL_UPDATE_STATUS_QUERY, SKILL_CATALOG_PACKAGES_QUERY } from "./skill-lifecycle";
+export { FLAGGED_AGENTS_QUERY } from "./productivity-reviews";
+export { DECISIONS_QUERY } from "./decision-training";
+export {
+  AI_RUNTIME_INVENTORY_QUERY,
+  REPORTED_RUNTIME_INVENTORIES_QUERY,
+} from "./ai-runtime";

@@ -20,16 +20,12 @@ import {
   Bot,
   Eye,
   EyeOff,
-  Cloud,
-  Server,
   MonitorDown,
 } from "lucide-react";
 import { AGENTS_QUERY } from "../lib/graphql/queries";
-import { Roles, SetupStatus, AgentLevel, CloudVmStatus, Priority } from "@/server/constants";
+import { Roles, SetupStatus, AgentLevel, Priority } from "@/server/constants";
 import { CREATE_TASK_FROM_DASHBOARD } from "../lib/graphql/mutations/tasks";
 import { Button, Badge } from "../components/ui";
-import { useFeatureFlag } from "../components/context/FeatureFlagContext";
-import { FLAG_KEYS, truncateId } from "@agentcenter/utils";
 import { API_ROUTES } from "@/lib/api-routes";
 import { CopyButton } from "../components/common/CopyButton";
 import { useForm } from "react-hook-form";
@@ -146,7 +142,6 @@ export function NewAgentWizard() {
         a.role === Roles.SQUAD_LEAD && a.setupStatus !== SetupStatus.DEACTIVATED,
     ) ?? [];
   const hasSquadLead = squadLeads.length > 0;
-  const cloudVmsEnabled = useFeatureFlag(FLAG_KEYS.CLOUD_VMS);
   const isDesktopApp = useIsElectron();
 
   // Auto-switch to the Desktop App tab once isDesktopApp resolves after hydration.
@@ -163,22 +158,6 @@ export function NewAgentWizard() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [delegateStatus, setDelegateStatus] = useState<"idle" | "creating" | "created">("idle");
   const [delegateTaskNumber, setDelegateTaskNumber] = useState<number | null>(null);
-  const [cloudDeploying, setCloudDeploying] = useState(false);
-  const [cloudVmId, setCloudVmId] = useState<string | null>(null);
-  const [existingVMs, setExistingVMs] = useState<
-    Array<{
-      id: string;
-      name?: string | null;
-      serverName?: string | null;
-      status: string;
-      ipv4?: string | null;
-      region: string;
-      serverType: string;
-      llmConfigured?: boolean;
-    }>
-  >([]);
-  const [selectedVmId, setSelectedVmId] = useState<string>("");
-  const [vmListLoading, setVmListLoading] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<Template>(TEMPLATES[0]);
   const [, createTask] = useMutation(CREATE_TASK_FROM_DASHBOARD);
   const mentionSuggestionSources = useMentionSuggestions();
@@ -710,44 +689,6 @@ export function NewAgentWizard() {
                   Delegate to Lead
                 </button>
               )}
-              {cloudVmsEnabled && (
-                <button
-                  onClick={async () => {
-                    setSetupMode("cloud");
-                    if (existingVMs.length === 0) {
-                      setVmListLoading(true);
-                      try {
-                        const res = await fetch(API_ROUTES.cloudVms.list);
-                        if (res.ok) {
-                          const data = await res.json();
-                          setExistingVMs(
-                            (data.vms || []).filter(
-                              (vm: {
-                                id: string;
-                                status: string;
-                                llmConfigured: boolean;
-                                name?: string;
-                              }) => vm.status === CloudVmStatus.RUNNING && vm.llmConfigured,
-                            ),
-                          );
-                        }
-                      } catch {
-                        /* ignore */
-                      } finally {
-                        setVmListLoading(false);
-                      }
-                    }
-                  }}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition ${
-                    setupMode === "cloud"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Cloud className="w-4 h-4" />
-                  Deploy to Cloud
-                </button>
-              )}
             </div>
 
             {/* ==================== DESKTOP APP TAB ==================== */}
@@ -1145,122 +1086,6 @@ export function NewAgentWizard() {
                     >
                       {delegateStatus === "creating" ? "Creating Task..." : "Create Setup Task"}
                     </Button>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* ==================== CLOUD MODE ==================== */}
-            {setupMode === "cloud" && (
-              <>
-                <div className="border border-purple-200 bg-purple-50 rounded-xl p-5">
-                  <div className="flex items-start gap-3">
-                    <Cloud className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-purple-800 mb-1">Host on Cloud VM</h3>
-                      <p className="text-sm text-purple-700">
-                        Deploy this agent to one of your cloud VMs. The VM will automatically set up
-                        and start the agent. You&apos;ll know it&apos;s working when it sends its
-                        first heartbeat.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {!cloudVmId && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">
-                        Select a VM
-                      </label>
-                      {vmListLoading ? (
-                        <div className="flex items-center gap-2 py-3 text-muted-foreground">
-                          <Server className="w-4 h-4 animate-pulse" />
-                          <span className="text-sm">Loading VMs...</span>
-                        </div>
-                      ) : existingVMs.length === 0 && !vmListLoading ? (
-                        <div className="border border-border rounded-lg p-4 text-center">
-                          <Server className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                          <p className="text-sm text-muted-foreground mb-2">
-                            No running VMs with LLM configured
-                          </p>
-                          <a
-                            href="/cloud"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-                          >
-                            Create and configure a VM on the Cloud page first
-                          </a>
-                        </div>
-                      ) : (
-                        <select
-                          value={selectedVmId}
-                          onChange={(e) => setSelectedVmId(e.target.value)}
-                          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-background"
-                        >
-                          <option value="">Choose a VM...</option>
-                          {existingVMs.map((vm) => (
-                            <option key={vm.id} value={vm.id}>
-                              {vm.name || vm.serverName || truncateId(vm.id)} — {vm.serverType} /{" "}
-                              {vm.region}
-                              {vm.ipv4 ? ` (${vm.ipv4})` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-
-                    {selectedVmId && (
-                      <div className="flex justify-center pt-2">
-                        <Button
-                          size="lg"
-                          loading={cloudDeploying}
-                          icon={<Cloud />}
-                          onClick={async () => {
-                            if (!result || !selectedVmId) return;
-                            setCloudDeploying(true);
-                            try {
-                              const res = await fetch(`/api/cloud-vms/${selectedVmId}/agents`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ agentId: result.agent.id }),
-                              });
-                              if (!res.ok) {
-                                const data = await res.json();
-                                toast.error(data.error || "Failed to deploy agent");
-                                return;
-                              }
-                              setCloudVmId(selectedVmId);
-                              toast.success(
-                                "Agent deployed! It will start automatically and send its first heartbeat shortly.",
-                              );
-                            } catch {
-                              toast.error("Failed to deploy agent");
-                            } finally {
-                              setCloudDeploying(false);
-                            }
-                          }}
-                        >
-                          {cloudDeploying ? "Deploying..." : "Deploy to VM"}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {cloudVmId && (
-                  <div className="border border-success/30 bg-success-muted rounded-xl p-5">
-                    <div className="flex items-center gap-3">
-                      <Check className="w-5 h-5 text-success" />
-                      <div>
-                        <h3 className="font-semibold text-success">Agent deployed</h3>
-                        <p className="text-sm text-success mt-0.5">
-                          The VM is setting up your agent. Once it sends its first heartbeat,
-                          you&apos;ll see it come online in the sidebar.
-                        </p>
-                      </div>
-                    </div>
                   </div>
                 )}
               </>

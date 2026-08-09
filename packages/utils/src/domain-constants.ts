@@ -18,6 +18,7 @@ export const TaskStatus = {
   REVIEW: "review",
   DONE: "done",
   BLOCKED: "blocked",
+  CANCELLED: "cancelled",
 } as const;
 
 export type TaskStatusValue = (typeof TaskStatus)[keyof typeof TaskStatus];
@@ -69,6 +70,8 @@ export const EventTypes = {
   /** Emitted from central agent-status when a direct update changes status (for history/activity only; agentState does not listen) */
   AGENT_STATUS_APPLIED: "agent.status_applied",
   AGENT_JOINED: "agent.joined",
+  /** Emitted by the wake-queue drainer when a coalesced agent wake is delivered (proactive wake substrate) */
+  AGENT_WAKE_DELIVERED: "agent.wake_delivered",
 
   // Task
   TASK_CREATED: "task.created",
@@ -95,6 +98,11 @@ export const EventTypes = {
   PROJECT_CREATED: "project.created",
   PROJECT_MEMBER_ADDED: "project.member_added",
   PROJECT_MEMBER_REMOVED: "project.member_removed",
+
+  // Budgets / cost (Epic #4)
+  COST_EVENT_RECORDED: "cost.event_recorded",
+  BUDGET_INCIDENT_OPENED: "budget.incident_opened",
+  BUDGET_INCIDENT_RESOLVED: "budget.incident_resolved",
 } as const;
 
 export type EventTypeValue = (typeof EventTypes)[keyof typeof EventTypes];
@@ -116,23 +124,6 @@ export const ProjectStatus = {
 } as const;
 
 export type ProjectStatusValue = (typeof ProjectStatus)[keyof typeof ProjectStatus];
-
-// ─── Cloud VM Statuses ───────────────────────────────────
-export const CloudVmStatus = {
-  PROVISIONING: "provisioning",
-  WAITING_FOR_SSH: "waiting_for_ssh",
-  INSTALLING_DEPS: "installing_deps",
-  INSTALLING_OPENCLAW: "installing_openclaw",
-  CONFIGURING: "configuring",
-  STARTING_SERVICE: "starting_service",
-  RUNNING: "running",
-  STOPPED: "stopped",
-  ERROR: "error",
-  DESTROYING: "destroying",
-  DESTROYED: "destroyed",
-} as const;
-
-export type CloudVmStatusValue = (typeof CloudVmStatus)[keyof typeof CloudVmStatus];
 
 // ─── Notification Kinds ──────────────────────────────────
 // Mirror of the Prisma UserNotificationType enum — values must stay in sync.
@@ -195,7 +186,12 @@ export const DeliverableKind = {
   LINK: "link",
 } as const;
 
+export const DELIVERABLE_KINDS = Object.values(DeliverableKind);
 export type DeliverableKindValue = (typeof DeliverableKind)[keyof typeof DeliverableKind];
+
+export function isDeliverableKind(v: string): v is DeliverableKindValue {
+  return (DELIVERABLE_KINDS as readonly string[]).includes(v);
+}
 
 // ─── Project Member Statuses ──────────────────────────────
 export const ProjectMemberStatus = {
@@ -251,6 +247,80 @@ export const StoragePrefix = {
   DELIVERABLES: "deliverables",
   ATTACHMENTS: "attachments",
   AVATARS: "avatars",
+  ASSETS: "assets",
 } as const;
 
 export type StoragePrefixValue = (typeof StoragePrefix)[keyof typeof StoragePrefix];
+
+// ─── Case States (Epic #17) ──────────────────────────────
+export const CaseState = {
+  DRAFT: "draft",
+  IN_PROGRESS: "in_progress",
+  IN_REVIEW: "in_review",
+  APPROVED: "approved",
+  DONE: "done",
+  CANCELLED: "cancelled",
+} as const;
+export const CASE_STATES = Object.values(CaseState);
+export type CaseStateValue = (typeof CASE_STATES)[number];
+
+// ─── Budget Windows (Epic #4) ────────────────────────────
+export const BudgetWindow = {
+  HOURLY: "hourly",
+  DAILY: "daily",
+  WEEKLY: "weekly",
+  MONTHLY: "monthly",
+} as const;
+export const BUDGET_WINDOWS = Object.values(BudgetWindow);
+export type BudgetWindowValue = (typeof BUDGET_WINDOWS)[number];
+
+// ─── Budget Incident threshold + status (Epic #4) ────────
+export const IncidentThreshold = { SOFT: "soft", HARD: "hard" } as const;
+export type IncidentThresholdValue = (typeof IncidentThreshold)[keyof typeof IncidentThreshold];
+
+export const IncidentStatus = { OPEN: "open", RESOLVED: "resolved" } as const;
+export type IncidentStatusValue = (typeof IncidentStatus)[keyof typeof IncidentStatus];
+
+// ─── Approvals (Epic #3) ─────────────────────────────────
+export const ApprovalStatus = {
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  NEEDS_CHANGES: "needs_changes",
+  CANCELLED: "cancelled",
+} as const;
+export type ApprovalStatusValue = (typeof ApprovalStatus)[keyof typeof ApprovalStatus];
+
+export const ApprovalSubjectType = {
+  TASK: "task",
+  DELIVERABLE: "deliverable",
+  HIRE_AGENT: "hire_agent",
+  BUDGET_OVERRIDE: "budget_override",
+} as const;
+export type ApprovalSubjectTypeValue =
+  (typeof ApprovalSubjectType)[keyof typeof ApprovalSubjectType];
+
+// Secret lifecycle status (Epic #5). Only `active` secrets resolve into an agent's env.
+export const SecretStatus = {
+  ACTIVE: "active",
+  DISABLED: "disabled",
+  ARCHIVED: "archived",
+} as const;
+export const SECRET_STATUSES = Object.values(SecretStatus);
+export type SecretStatusValue = (typeof SecretStatus)[keyof typeof SecretStatus];
+
+export function isSecretStatus(v: string): v is SecretStatusValue {
+  return (SECRET_STATUSES as readonly string[]).includes(v);
+}
+
+// Cost billing type (Epic #4). Splits metered API spend from flat subscription spend in reports.
+export const CostBillingType = {
+  API: "api",
+  SUBSCRIPTION: "subscription",
+} as const;
+export const COST_BILLING_TYPES = Object.values(CostBillingType);
+export type CostBillingTypeValue = (typeof CostBillingType)[keyof typeof CostBillingType];
+
+export function isCostBillingType(v: string): v is CostBillingTypeValue {
+  return (COST_BILLING_TYPES as readonly string[]).includes(v);
+}

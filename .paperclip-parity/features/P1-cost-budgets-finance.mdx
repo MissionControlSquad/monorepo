@@ -1,0 +1,34 @@
+---
+feature: Cost, budgets & finance
+priority: P1
+status: Present
+gate: buildable-now
+---
+
+# Cost, budgets & finance · P1 · ✅ Present
+
+**What it is:** spend control — per-run cost events, budget policies (soft/hard/salary), quota windows,
+auto-pause incidents with approval-gated resume, reprice, the non-inference FinanceEvent ledger, the
+human P&L LedgerEvent ledger, cost rollups, and provider-quota polling.
+
+**Present in our monorepo (verified):**
+- CostEvent ingest: `recordCostEvent` (insert + atomic quota increment + emit; idempotent), `billingType` normalized.
+- Budgets: `BudgetPolicy` (soft warn + hard breach), `warnPercent`/`hardStop`; salary = `isSalary` one-per-agent policy.
+- Quota windows: `QuotaWindow` race-safe upsert-increment.
+- Incidents: `openHardIncident` cancels in-flight + blocks agent + creates a `budget_override` Approval; breach eval off the event bus (not the hot write path).
+- Reprice: `repriceCostEvent` (unpriced→reported, delta-adjust windows).
+- FinanceEvent ledger: `FinanceEvent` + record/summarize/groupBy (biller/kind), idempotent.
+- Business ledger: `LedgerEvent`/`LedgerCategory`, timeline math.
+- Rollups: `costByTaskTree` (recursive CTE), cost windows/billing-split.
+- Provider quota: `fetchAllProviderQuota` fan-out (timeout-guarded).
+- UI: `finance/page.tsx` (budgets/incidents/breakdown/trend + FinanceEventsSection + unpriced-cost reprice + provider-quota), `ledger/page.tsx`, agent salary card, observability rollup.
+
+**Gaps / pending:**
+- **Provider-quota polling returns nothing** — the fan-out engine is complete but **no adapter implements `getQuotaWindows()`**; needs a real provider adapter (needs-provider-key). PROVIDER_QUOTA flag default-off.
+- Real cost events come from real runs (Tier-D execution); the ledger/enforcement half is fully live now.
+
+**What's required:** an adapter implementing `getQuotaWindows()` (needs-provider-key) to fill the quota section; otherwise complete.
+
+**Priority rationale:** Autonomous agents spend money — budget enforcement + auto-pause is production-critical.
+
+**Depends on:** provider key for live quota polling; nothing else.

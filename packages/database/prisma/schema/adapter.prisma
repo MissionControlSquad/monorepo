@@ -1,0 +1,63 @@
+// ─── Multi-provider Agent Adapters (Epic #2) ──────────────────────
+// Makes the agent's provider adapter explicit + pluggable. The existing OpenClaw bridge becomes
+// exactly ONE registered adapter ("openclaw-gateway", builtIn) so nothing running breaks. A new
+// provider plugs in via a seed row + a service module — no schema migration per provider (that's
+// why `type` is a stable string key, not a Prisma enum).
+//
+// These are GLOBAL platform tables (install-wide capability config), NOT tenant data — so they
+// carry no workspaceId. Enabling/installing an adapter is an instance-admin action; ASSIGNING an
+// adapter to an agent is workspace-scoped via the agent. Gated by the buildbase feature
+// `multi_provider_adapters` — EXCEPT `openclaw-gateway` (builtIn) which is always resolvable so
+// existing agents keep running when the feature is off.
+
+enum AdapterTransport {
+  local // spawns a local CLI/process: claude-local, codex-local, …
+  gateway // persistent WS gateway: openclaw-gateway, hermes-gateway
+  cloud // provider-hosted: cursor-cloud
+}
+
+enum AdapterAuthKind {
+  none
+  apiKey
+  subscription // Claude/Codex subscription auth
+  secretBinding // resolves creds from #5 secret bindings
+}
+
+model AgentAdapter {
+  id           String           @id @default(cuid())
+  type         String           @unique // stable key; a new provider adds a row, no migration
+  displayName  String
+  transport    AdapterTransport @default(local)
+  authKind     AdapterAuthKind  @default(apiKey)
+  configSchema Json // JSON Schema (draft-07) validating Agent.adapterConfig
+  version      String           @default("1.0.0")
+  enabled      Boolean          @default(true)
+  builtIn      Boolean          @default(false) // openclaw-gateway: cannot be deleted/disabled
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  modelProfiles  AdapterModelProfile[]
+  agents         Agent[]               @relation("AgentAdapterType")
+  secretBindings SecretBinding[] // Epic #5
+
+  @@index([enabled])
+  @@map("agent_adapters")
+}
+
+model AdapterModelProfile {
+  id            String   @id @default(cuid())
+  adapterType   String
+  modelId       String // "claude-sonnet-4-5", "gpt-5-codex", …
+  displayName   String
+  contextWindow Int?
+  isDefault     Boolean  @default(false)
+  detected      Boolean  @default(false) // detected per-install vs statically seeded
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  adapter AgentAdapter @relation(fields: [adapterType], references: [type], onDelete: Cascade)
+
+  @@unique([adapterType, modelId])
+  @@index([adapterType])
+  @@map("adapter_model_profiles")
+}

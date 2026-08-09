@@ -1,0 +1,12 @@
+---
+service: github-fetch
+kind: service
+status: Missing
+priority: P2
+gate: needs-github-token
+---
+# github-fetch · ❌ Missing
+**What it is:** authenticated GitHub API fetch helper.
+**Monorepo:** none (git clone happens in the sandbox script via a credential helper, not an API client).
+**Required:** a GitHub API client — needs a token + SSRF guard.
+**Covers:** features/P2-external-objects-github.mdx · SERVICE-AUDIT #66.

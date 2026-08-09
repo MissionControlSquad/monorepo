@@ -1,0 +1,19 @@
+// Decision training capture (parity #40). Records notable agent decisions (with the context, the
+// choice made, and later the observed outcome) so they can be exported to train/evaluate decision
+// quality. Capture-only here; the training/eval pipeline is downstream. D5: workspaceId no FK.
+model DecisionRecord {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  agentId      String?
+  taskId       String?
+  decisionType String // e.g. tool_choice | route | approve | escalate
+  context      String   @db.Text // the situation the decision was made in (redacted upstream)
+  choice       String // the option chosen
+  rationale    String?  @db.Text
+  outcome      String? // success | failure | mixed | unknown (backfilled when observed)
+  createdAt    DateTime @default(now())
+
+  @@index([workspaceId, decisionType, createdAt])
+  @@index([workspaceId, agentId, createdAt])
+  @@map("decision_records")
+}

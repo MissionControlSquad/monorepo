@@ -1,0 +1,267 @@
+---
+title: "Parity Gap Analysis — Adapters & Runtimes"
+domain: adapters-runtimes
+paperclip_root: /Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/paperclip
+monorepo_root: /Users/dharmendrajagodana/Dharmendra/Projects/CMS Jagodana/MissionControlSquad-monorepo
+status: draft
+generated: 2026-07-17
+---
+
+# Adapters & Runtimes — Parity Gap Analysis
+
+## TL;DR
+
+Paperclip's adapter layer is a **full agent-runtime SDK**: 13 live adapters (14 with the
+`acpx_local` tombstone), each a `ServerAdapterModule` that not only *builds* a launch command but
+**executes** the run, streams+parses the runtime's native output into a structured transcript,
+detects/lists/refreshes models, tests the environment (locally *and* inside ssh/sandbox targets),
+syncs skills, resumes+compacts sessions, reports live provider quota, and self-installs into fresh
+remote runtimes. It routes every run through a provider-neutral `AdapterExecutionTarget`
+(local | ssh | sandbox) and supports an ACP engine, hot-loadable external plugins with a signed
+config-schema + UI-parser contract, and gateway adapters (openclaw/hermes) for NAT-pull agents.
+
+Our monorepo has **two disconnected halves, neither of which executes a real runtime**:
+
+- **Tier A "provider adapters"** (`AgentAdapter` DB table, Epic #2, `multi_provider_adapters` flag) —
+  a *data-only* metadata + JSON-Schema-config + model-profile registry with an admin enable/disable
+  UI. No `execute`, no `testEnvironment`, no skills/quota/session, no output parsing. Only
+  `openclaw-gateway` is builtIn and it's a stub row (no code module behind it).
+- **Tier D "runtime adapters"** (`packages/utils/src/adapters.ts`, `RUNNERS` flag) — a *code* registry
+  of 7 built-ins (`openclaw, codex, claude, gemini, process, shell, http`) whose only job is `build()`
+  → an argv/http invocation the `@agentcenter/runner` daemon spawns and blob-captures. No model
+  detection wired, no streaming, no session, no skills, no execution-target routing beyond local
+  spawn + one in-process sandbox seam.
+
+These two are not unified: an `Agent` carries **both** `adapterType`/`adapterConfig` (Tier A) **and**
+`runtimeAdapter`/`runtimeModel`/`runtimeTemplate` (Tier D), and the keys don't even match
+(`openclaw-gateway` vs `openclaw`). Closing this domain means (1) unifying the two registries behind
+one module contract, (2) giving adapters a real `execute`, (3) adding output parsing/streaming, and
+(4) porting the missing runtimes.
+
+Legend: ✅ have parity · 🟡 partial · ❌ missing · 🚫 out of scope (buildbase-owned).
+
+---
+
+## 1. Adapter inventory — which runtimes we have vs lack
+
+Paperclip registry: `paperclip/server/src/adapters/registry.ts:290` (`registerBuiltInAdapters`).
+
+| Adapter (Paperclip `type`) | Transport | Paperclip pkg | Monorepo Tier D key | Monorepo Tier A row | Status |
+|---|---|---|---|---|---|
+| `claude_local` | local CLI / ACP | `packages/adapters/claude-local` | `claude` (spawn `claude --print`) | ❌ | 🟡 launch-only |
+| `codex_local` | local CLI / ACP | `packages/adapters/codex-local` | `codex` (spawn `codex exec`) | ❌ | 🟡 launch-only |
+| `gemini_local` | local CLI / ACP | `packages/adapters/gemini-local` | `gemini` (spawn `gemini -p`) | ❌ | 🟡 launch-only |
+| `cursor` (cursor-local) | local CLI | `packages/adapters/cursor-local` | ❌ | ❌ | ❌ |
+| `cursor_cloud` | cloud API | `packages/adapters/cursor-cloud` | ❌ | ❌ | ❌ |
+| `grok_local` | local CLI | `packages/adapters/grok-local` | ❌ | ❌ | ❌ |
+| `opencode_local` | local CLI | `packages/adapters/opencode-local` | ❌ | ❌ | ❌ |
+| `pi_local` | local CLI | `packages/adapters/pi-local` | ❌ | ❌ | ❌ |
+| `hermes_local` | local CLI | `packages/adapters/hermes` | ❌ | ❌ | ❌ |
+| `hermes_gateway` | WS gateway | `packages/adapters/hermes` + `hermes-gateway` | ❌ | ❌ | ❌ |
+| `openclaw_gateway` | WS gateway (NAT-pull) | `packages/adapters/openclaw-gateway` | `openclaw` (spawn `openclaw run`) | `openclaw-gateway` (stub) | 🟡 wrong shape |
+| `process` | local spawn | `server/src/adapters/process` | `process` (argv) | ❌ | ✅ |
+| `http` | webhook | `server/src/adapters/http` | `http` (webhook) | ❌ | ✅ |
+| `acpx_local` (retired) | — | tombstone in `registry.ts:159` | n/a | n/a | 🚫 n/a |
+| — | — | — | `shell` (extra, ours) | ❌ | ✅ ours-only |
+
+**Runtimes we entirely lack:** `cursor` (local), `cursor_cloud`, `grok_local`, `opencode_local`,
+`pi_local`, `hermes_local`, `hermes_gateway`, and a *real* `openclaw_gateway` (ours is a naive
+`openclaw run` local spawn — Paperclip's is a persistent WS gateway that pulls tasks to a NAT'd
+agent; see §4.7). We also lack the **ACP engine** (`engine:"acp"` on claude/codex/gemini).
+
+---
+
+## 2. Framework capability matrix
+
+Contract: `paperclip/packages/adapter-utils/src/types.ts` — `ServerAdapterModule` (line ~330).
+
+| # | Capability | Paperclip (file:line) | Monorepo status | Our ref |
+|---|---|---|---|---|
+| F1 | **`execute(ctx)` — actually run + capture** | `types.ts:335`; per-adapter e.g. `claude-local/src/server/execute.ts` | 🟡 We only `build()` an invocation; `runner/src/executor.ts:execPlan` spawns+blob-captures. No adapter-owned execute, no structured `AdapterExecutionResult` (usage/cost/session/errorFamily). | `packages/utils/src/adapters.ts:29`, `packages/runner/src/executor.ts` |
+| F2 | **`testEnvironment(ctx)` — preflight probe** | `types.ts:336`; e.g. `claude-local/src/server/test.ts` | ❌ No env probe at all; JSON-Schema config validation only. | `apps/web/src/server/adapters/registry.ts:validateAdapterConfig` |
+| F3 | **Model list (`models`/`listModels`/`refreshModels`)** | `types.ts:339-347`; `server/src/adapters/codex-models.ts`, `cursor-models.ts` | 🟡 static `models[]` per adapter; `detectModels()` hook exists but **unused/unwired**. No `refreshModels`. Tier A has `AdapterModelProfile` table but no discovery. | `adapters.ts:67` (`detectModels` defined, never called by server/runner) |
+| F4 | **Model detection from local config (`detectModel`)** | `types.ts:359`; `hermes/src/server/detect-model.ts`; route `agents.ts:1742` | ❌ none | — |
+| F5 | **Config schema (declarative UI) (`getConfigSchema`)** | `types.ts:367`; `claude-local/src/server/config-schema.ts`; route `adapters.ts:643` | 🟡 Tier A stores draft-07 `configSchema` JSON per adapter + Ajv validation; but it's DB-seeded data, not adapter-produced, and no dynamic/hydrated options. Tier D has none. | `adapter.prisma:AgentAdapter.configSchema`, `registry.ts:validateAdapterConfig` |
+| F6 | **Output streaming + structured transcript parse** | UI `parse.ts` per adapter (`claude-local/src/ui`), `StdoutLineParser`/`TranscriptEntry` (`types.ts:730`), CLI `format-event.ts`, `onLog/onEvent/onRuntimeProgress` (`types.ts:311`) | ❌ Runner returns one stdout/stderr blob (64 KB cap). No per-runtime parsing to assistant/thinking/tool_call/tool_result/diff. Agent-action SSE exists but not fed by runtime output. | `runner/src/executor.ts`, `apps/web/src/server/graphql/subscriptions/agentActionLogged.ts` |
+| F7 | **Execution-target routing (local / ssh / sandbox)** | `packages/adapter-utils/src/execution-target.ts`, `ssh.ts`, `sandbox-*` | 🟡 `local` spawn (runner) + one in-process `sandbox-run.ts` seam (provision→clone→run→destroy). No ssh transport, no provider-neutral `AdapterExecutionTarget`, no workspace round-trip (`prepareWorkspaceForSshExecution`). | `apps/web/src/server/services/sandbox-run.ts` |
+| F8 | **Runtime command spec / self-install (`getRuntimeCommandSpec`)** | `types.ts:377`; `registry.ts:buildNpmRuntimeCommandSpec` (`detectCommand`+idempotent `installCommand`) | ❌ argv only; no detect-before-launch, no self-install into fresh sandbox. | `adapters.ts:build()` |
+| F9 | **Session codec + resume + compaction** | `AdapterSessionCodec` (`types.ts:216`), `session-compaction.ts` (`AdapterSessionManagement`, per-adapter policy) | ❌ Stateless; each run is fresh. No session id persistence, resume, or threshold compaction. | — |
+| F10 | **Skills sync (`listSkills`/`syncSkills`)** | `types.ts:337-338`; per-adapter `skills.ts`; `AdapterSkillSnapshot` | ❌ We materialise a static skills dir in the bundle (`AdapterLayout.skillsDir`) but no adapter-driven install/state diff (available/installed/stale/missing). | `adapters.ts:AdapterLayout` |
+| F11 | **Provider quota windows (`getQuotaWindows`)** | `types.ts:353`; `claude-local/src/server/quota.ts`, `cli/quota-probe.ts` | ❌ none | — |
+| F12 | **ACP engine (`acp` descriptor + fallback)** | `AcpTargetDescriptor` (`types.ts:322`); `adapter-utils/src/acpx-engine/*`; per-adapter `acp.ts` | ❌ none | — |
+| F13 | **Instructions bundle (`supportsInstructionsBundle`)** | `types.ts:373`; `instructionsPathKey` | 🟡 We always write `AdapterLayout.instructionsFile` (AGENTS.md); no per-adapter opt-in/path key, no bundle editor UI. | `adapters.ts:AdapterLayout.instructionsFile` |
+| F14 | **Hot-loadable external plugins (code)** | `server/src/adapters/plugin-loader.ts`; `adapter-plugin-store`; register/unregister/override/pause; UI-parser contract (`paperclip.adapterUiParser`) | 🟡 In-process `registerAdapter()` + **declarative** data-only `AdapterPluginSpec` (`adapters.ts:adapterFromPluginSpec`) — zero-code-exec, no install-from-npm, no override/pause, no UI-parser. | `adapters.ts:registerAdapter/loadAdapterPlugins` |
+| F15 | **Model-profiles / "cheap" model (`modelProfiles`)** | `types.ts:341`; `AdapterModelProfileDefinition` | 🟡 `AdapterModelProfile` DB table exists (Tier A) but no `cheap`-profile resolution at run time. | `adapter.prisma:AdapterModelProfile` |
+| F16 | **Runtime services report (`runtimeServices`)** | `AdapterRuntimeServiceReport` (`types.ts:44`) | ❌ none (adapters can't declare sidecar services) | — |
+| F17 | **Hire-approval hook (`onHireApproved`)** | `types.ts:349`; gateway onboarding (openclaw) | ❌ none | — |
+| F18 | **Error taxonomy (`errorFamily`, `retryNotBefore`)** | `AdapterExecutionErrorFamily` (`types.ts:97`) | 🟡 runner returns `timeout`/`failed`/`done` only; no quota/refusal/refresh-token families driving retry. | `runner/src/runner.ts` |
+| F19 | **Local-agent JWT (`supportsLocalAgentJwt`)** | `types.ts:338`; injects agent auth token into runtime | 🟡 partial — runner has an API token; no per-run scoped agent JWT injected into the runtime env. | `packages/runner/src/config.ts` |
+| F20 | **Auth/billing/orgs** | (buildbase) | 🚫 | @buildbase/sdk |
+
+---
+
+## 3. What the monorepo already has (keep, don't rebuild)
+
+- **Two registries + extensibility seam.** Tier A `AgentAdapter` (DB, JSON-Schema config, model
+  profiles, enable/disable admin UI at `apps/web/app/(dashboard)/adapters/page.tsx`, gated by
+  `multi_provider_adapters`). Tier D code registry with `registerAdapter`/`listAdapters`/
+  `buildAdapterInvocation` (`packages/utils/src/adapters.ts`) + declarative `AdapterPluginSpec`.
+- **process / http / shell parity** (F1 build-side): our `process`, `http` match Paperclip's built-ins;
+  `shell` is an extra we have.
+- **Runner daemon** (`packages/runner`): pulls queued commands, spawns argv, bounded capture
+  (1 MB in-mem, 64 KB stored), timeout+SIGKILL, webhook mode — a clean `execPlan` seam to hang a real
+  adapter-execute off of.
+- **In-process sandbox execution seam** (`apps/web/src/server/services/sandbox-run.ts`): provision →
+  clone → materialise TASK.md → run → capture → destroy; provider-agnostic; BYO creds from the
+  Secrets Vault. This is the beachhead for F7.
+- **GraphQL surface**: `runtimeAdapters` query (Tier D list), `agentAdapters`/`adapterModelProfiles`
+  queries, `setAgentAdapter`/`setAdapterEnabled` mutations, `agent-runtime` mutations.
+- **Secrets Vault (Epic #5)** with `SecretBinding` FK on `AgentAdapter` — the credential seam
+  Paperclip resolves per-adapter.
+
+---
+
+## 4. Gaps + concrete implementation plans
+
+### 4.0 (M) Unify the two registries behind one module contract — **do this first**
+**Problem:** Tier A (data) and Tier D (code) are disjoint; `Agent` carries both field sets with
+mismatched keys. Paperclip has exactly one `ServerAdapterModule` per `type` that owns *both* metadata
+and behavior.
+**Plan:**
+- **Data model:** deprecate the split. Make `AgentAdapter.type` the single key; give each row an
+  optional `runtimeModuleKey` linking to a Tier D code module (`getAdapter(key)`). Backfill
+  `openclaw-gateway`↔`openclaw`. Keep `runtimeAdapter`/`runtimeModel`/`runtimeTemplate` on `Agent` as
+  the resolved snapshot but source them from `adapterType`+`adapterConfig`.
+- **Server:** one resolver `resolveAgentAdapterModule(agent)` returning `{ meta: AgentAdapter, module:
+  Adapter }`. `buildAdapterInvocation` reads `adapterConfig` (schema-validated) instead of a bare
+  `runtimeTemplate` string.
+- **Contract:** widen the Tier D `Adapter` interface (`adapters.ts:52`) toward `ServerAdapterModule`:
+  add optional `execute?`, `testEnvironment?`, `detectModel?`, `getConfigSchema?`, `parseLine?`,
+  `sessionCodec?` — all optional so built-ins stay light.
+- **Tests:** migration backfill test; `resolveAgentAdapterModule` maps every seeded Tier A row to a
+  code module or the `process`/`http` generic.
+- **Security:** admin-only writes already enforced (`requireRole "admin"`), keep Ajv
+  `additionalProperties:false`.
+
+### 4.1 (L) Adapter-owned `execute` + structured result (F1, F18)
+**Plan:**
+- **Contract:** `execute(ctx: AdapterExecutionContext): Promise<AdapterExecutionResult>` mirroring
+  `adapter-utils/src/types.ts` (subset: `exitCode, timedOut, usage, model, provider, costUsd,
+  sessionParams, errorFamily, retryNotBefore, summary`).
+- **Server/runner:** move the spawn from `runner/src/executor.ts` behind a default `execute` that
+  every generic adapter inherits; specialized adapters (claude/codex/…) override to parse usage/cost
+  from the runtime's `--output-format json`. Feed `errorFamily` into the runner's retry/backoff.
+- **DB:** extend the run/`WorkSession` record with `usageInputTokens/usageOutputTokens/costUsd/
+  provider/model/errorFamily/sessionId`.
+- **Tests:** golden `AdapterExecutionResult` per adapter from a captured stdout fixture.
+- **Size L** (touches runner, control-plane run recorder, and every code adapter).
+
+### 4.2 (M) `testEnvironment` preflight (F2)
+- Add `testEnvironment?(ctx): AdapterEnvironmentTestResult` → checks: command resolvable
+  (`command -v`), auth present (config file / env / secret binding), model reachable. Return
+  `pass|warn|fail` + `AdapterEnvironmentCheck[]`.
+- **API:** GraphQL `testAgentAdapterEnvironment(agentId)` (member+) running the probe on the target
+  runner/sandbox via a runner command; **UI:** a "Test environment" button on the agent adapter form.
+- Reuse `execShell` for probes; run inside the execution target when one is selected (see 4.6).
+- **Tests:** fake exec returns/absent binary → fail check.
+
+### 4.3 (S→M) Model discovery: `detectModels` wiring + `detectModel` + `refreshModels` (F3, F4)
+- Wire the **already-defined-but-unused** `Adapter.detectModels()` (`adapters.ts:67`) into a runner
+  command (`<cli> --list-models` style) surfaced via `resolveAdapterModels`; persist results into
+  `AdapterModelProfile` with `detected:true`.
+- Add `detectModel()` (read local config, e.g. `~/.codex/config`, `hermes` detect-model) → GraphQL
+  `detectAgentAdapterModel(adapterType)` + a "Detect" affordance in the model picker.
+- Add `refreshModels()` bypass for cache. **Start S** (claude/codex curated + one live detect), grow M.
+
+### 4.4 (L) Output streaming + per-runtime transcript parse (F6)
+- **Contract:** `parseLine(line, ts): TranscriptEntry[]` per adapter (port Paperclip UI `parse.ts` for
+  claude/codex/gemini/opencode/cursor). Runner streams lines → posts `TranscriptEntry[]` deltas to the
+  control plane instead of one blob.
+- **API/transport:** reuse the existing agent-action GraphQL subscription
+  (`subscriptions/agentActionLogged.ts`) as the live channel; add a `RunTranscriptEntry` type.
+- **UI:** a transcript viewer (assistant/thinking/tool_call/tool_result/diff) in the run detail view.
+- **Security:** apply `redactHomePathUserSegments`/`redactCommandText` (port from
+  `adapter-utils/log-redaction.ts`) before persist.
+- **Size L**; do after 4.1.
+
+### 4.5 (M) Runtime command spec + self-install (F8)
+- Add `getRuntimeCommandSpec(config): { command, detectCommand, installCommand }`. Port
+  `buildNpmRuntimeCommandSpec` (idempotent `command -v || npm i -g <pkg>`). Runner probes
+  `detectCommand` before launch; sandbox provisioning (`sandbox-run.ts`) runs `installCommand` first.
+- **Tests:** claude→`@anthropic-ai/claude-code`, codex→`@openai/codex`, gemini→`@google/gemini-cli`,
+  opencode→`opencode-ai`, pi→`@mariozechner/pi-coding-agent`.
+
+### 4.6 (L) Execution-target routing: ssh transport + provider-neutral target (F7)
+- Introduce `AdapterExecutionTarget = local | { transport:"ssh", spec } | { transport:"sandbox" }`
+  (port `execution-target.ts` shape, drop lease/plugin-worker RPC). We already have a
+  `runner-host.prisma` with encrypted SSH keys — wire an ssh transport that bundles the cwd to the
+  remote, runs, and restores changes back (port `prepareWorkspaceForSshExecution`/
+  `restoreWorkspaceFromSshExecution`, honoring the **no-remote-git contract**,
+  `paperclip/packages/adapters/AUTHORING.md`).
+- **Security:** SSH key stays server-side/encrypted (matches existing `runner-host` boundary);
+  sanitize remote env (`remote-execution-env.ts`).
+- **Size L**; sandbox half already exists, ssh half is net-new.
+
+### 4.7 (L) Real gateway adapters — `openclaw_gateway` + `hermes_gateway` (missing runtimes)
+**Problem:** our `openclaw` is a local `openclaw run` spawn; Paperclip's `openclaw_gateway` is a
+persistent **WS gateway** where a NAT'd agent *pulls* tasks (device-auth pairing, `devicePrivateKeyPem`,
+session-key strategy) — this is the memory-noted NAT-pull differentiator.
+- **Data model:** gateway config fields (`url`, `authToken`, `agentId`, `sessionKeyStrategy`,
+  `disableDeviceAuth`, `devicePrivateKeyPem`, `role`, `scopes`) → the `openclaw-gateway`
+  `configSchema`. Add `AdapterTransport.gateway` handling.
+- **Server:** a WS gateway service (port `openclaw-gateway/src/server/execute.ts`) that dispatches a
+  task over the socket and awaits the agent's result; `onHireApproved` hook (F17) to emit the invite
+  prompt (port `OPENCLAW_ONBOARDING.md` `invite-prompt` endpoint semantics).
+- **Security:** device-auth pairing + token length checks per the onboarding checklist; token never
+  logged.
+- **Tests:** fake WS peer round-trips a task→result; pairing handshake unit test.
+- Hermes gateway is the same shape (`hermes-gateway` pkg) — do openclaw first, hermes as a follow-on.
+
+### 4.8 (M each) Port the missing local runtimes as code modules
+`cursor` (cursor-local), `grok_local`, `opencode_local`, `pi_local`, `hermes_local`, `cursor_cloud`.
+Each is a thin `Adapter` with `build()` + (once 4.1 lands) `execute`/`parseLine`/`detectModels`/
+`getRuntimeCommandSpec`. `cursor_cloud` is cloud-transport (API, no local spawn) — model list empty,
+config = API creds via secret binding. **Size M each; batchable** once the contract (4.0/4.1) exists.
+
+### 4.9 (M) Sessions: codec + resume + compaction (F9)
+- `sessionCodec` (serialize/deserialize/getDisplayId) + persist `sessionParams` on the run;
+  `AdapterSessionManagement` policy (port `session-compaction.ts`) so sessioned adapters resume and
+  rotate on run/token/age thresholds. DB: `Agent`/`WorkSession` session columns.
+
+### 4.10 (M) Skills sync + quota (F10, F11)
+- `listSkills/syncSkills` → `AdapterSkillSnapshot` (available/installed/stale/missing diff), surfaced
+  as a per-agent skills panel; runner materialises desired skills before launch.
+- `getQuotaWindows()` → aggregate provider quota into a dashboard tile (port `claude-local/quota.ts`).
+
+### 4.11 (M) Hot code-plugin loader parity (F14)
+- Extend the declarative `AdapterPluginSpec` toward an **installed-package** loader: an
+  `adapter_plugins` store + `install/reload/override/pause` mutations (port `plugin-loader.ts` +
+  `routes/adapters.ts` endpoints), plus a UI-parser contract (`paperclip.adapterUiParser`) so plugins
+  can ship a transcript parser. **Gate on `PLUGIN_SDK` flag.** Security: sandbox/validate the loaded
+  module; keep the zero-code declarative path as the default.
+
+### 4.12 (S) ACP engine descriptor (F12)
+- Add optional `acp?: AcpTargetDescriptor` to claude/codex/gemini modules + an `engine:"auto|cli|acp"`
+  config field. Full ACP execution engine (port `acpx-engine/*`) is a larger follow-on; start by
+  recording the descriptor + config so the schema/UI is forward-compatible.
+
+---
+
+## 5. Suggested ordering & sizing
+
+| Order | Item | Size | Rationale |
+|---|---|---|---|
+| 1 | 4.0 Unify registries behind one module contract | M | Everything else hangs off one `Adapter` per `type`. |
+| 2 | 4.1 Adapter-owned `execute` + structured result | L | Turns "launch" into "run+measure"; unblocks streaming/session/errors. |
+| 3 | 4.5 Runtime command spec + self-install | M | Cheap, makes remote/sandbox runs reliable. |
+| 4 | 4.3 Model discovery wiring | S→M | `detectModels` already stubbed; fast win. |
+| 5 | 4.2 `testEnvironment` preflight | M | High UX value; reuses runner exec. |
+| 6 | 4.4 Streaming + transcript parse | L | Biggest visible parity jump. |
+| 7 | 4.8 Port missing local runtimes (cursor/grok/opencode/pi/hermes) | M×5 | Batchable once contract exists. |
+| 8 | 4.6 SSH execution-target | L | Extends the sandbox seam to remote hosts. |
+| 9 | 4.7 Real openclaw/hermes gateway (NAT-pull) | L | Our differentiator; needs WS + device-auth. |
+| 10 | 4.9 Sessions, 4.10 skills+quota, 4.11 plugin loader, 4.12 ACP | M/S | Depth polish, independent. |
+
+**Out of scope (🚫 buildbase):** human auth, billing/metering of the *human* subscription, org
+membership. Adapter-level provider billing *classification* (`AdapterBillingType`, `costUsd`) is
+in-scope telemetry, not billing enforcement.

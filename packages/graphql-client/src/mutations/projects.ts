@@ -43,6 +43,30 @@ export const UPDATE_PROJECT = gql`
   }
 `;
 
+export const SET_PROJECT_SOURCE = gql`
+  mutation SetProjectSource(
+    $projectId: String!
+    $sourceType: String
+    $repoUrl: String
+    $repoRef: String
+    $visibility: String
+  ) {
+    setProjectSource(
+      projectId: $projectId
+      sourceType: $sourceType
+      repoUrl: $repoUrl
+      repoRef: $repoRef
+      visibility: $visibility
+    ) {
+      id
+      sourceType
+      repoUrl
+      repoRef
+      visibility
+    }
+  }
+`;
+
 export const ARCHIVE_PROJECT = gql`
   mutation ArchiveProject($id: String!) {
     archiveProject(id: $id) {

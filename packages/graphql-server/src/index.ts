@@ -2,7 +2,7 @@
 import "./types";
 
 export { builder } from "./builder";
-export type { GraphQLContext, SessionPayload } from "./builder";
+export type { GraphQLContext, SessionPayload, TenancyContext, WorkspaceRole } from "./builder";
 export { CURRENT_CONFIG_VERSION } from "./config-version";
 
 // Connection refs used by server-side resolvers
@@ -25,6 +25,7 @@ export {
   activityProjectTopic,
   agentActionAgentTopic,
   agentActionProjectTopic,
+  budgetIncidentTopic,
 } from "./pubsub";
 export type { PubSubEvents } from "./pubsub";
 

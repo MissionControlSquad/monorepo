@@ -6,6 +6,11 @@ import { AGENT_QUERY } from "../lib/graphql/queries";
 import { AgentProfileHeader } from "../components/profile/AgentProfileHeader";
 import { AgentProfileStats } from "../components/profile/AgentProfileStats";
 import { CurrentWorkSection } from "../components/profile/CurrentWorkSection";
+import { AgentSalaryCard } from "../components/profile/AgentSalaryCard";
+import { AgentMemoryCard } from "../components/profile/AgentMemoryCard";
+import { AgentTrustCard } from "../components/profile/AgentTrustCard";
+import { AgentQueueCard } from "../components/profile/AgentQueueCard";
+import { AgentRunsCard } from "../components/profile/AgentRunsCard";
 import { AssignedTasksList } from "../components/profile/AssignedTasksList";
 import { RecentDeliverablesList } from "../components/profile/RecentDeliverablesList";
 import { AgentActivityTimeline } from "../components/profile/AgentActivityTimeline";
@@ -20,12 +25,8 @@ import {
   Download,
   Wrench,
   Palmtree,
-  Cloud,
-  Server,
 } from "lucide-react";
 import { Breadcrumbs, Button } from "@/components/ui";
-import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
-import { FLAG_KEYS, truncateId } from "@agentcenter/utils";
 import Link from "next/link";
 import { useMutation } from "urql";
 import { SET_AGENT_ACTIVATION, SET_AGENT_VACATION } from "../lib/graphql/mutations/agents";
@@ -54,7 +55,6 @@ export function AgentProfilePage({ agentId }: AgentProfilePageProps) {
   const { projectId } = useCurrentProject();
   const [, executeSetActivation] = useMutation(SET_AGENT_ACTIVATION);
   const [, executeSetVacation] = useMutation(SET_AGENT_VACATION);
-  const cloudVmsEnabled = useFeatureFlag(FLAG_KEYS.CLOUD_VMS);
   const [agentResult, reexecuteAgentQuery] = useQuery({
     query: AGENT_QUERY,
     variables: { id: agentId },
@@ -334,23 +334,12 @@ export function AgentProfilePage({ agentId }: AgentProfilePageProps) {
           </div>
         )}
         <AgentProfileHeader agent={agent} />
-        {cloudVmsEnabled && agent.hostingType === "cloudVM" && agent.cloudVm && (
-          <Link
-            href={`/cloud/${agent.cloudVm.id}`}
-            className="flex items-center gap-3 px-4 py-3 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition"
-          >
-            <Server className="w-5 h-5 text-purple-600 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-purple-800">Cloud VM</p>
-              <p className="text-xs text-purple-600">
-                Running on {agent.cloudVm.name || truncateId(agent.cloudVm.id)}
-                {agent.cloudVm.ipv4 && ` (${agent.cloudVm.ipv4})`}
-              </p>
-            </div>
-            <Cloud className="w-4 h-4 text-purple-400" />
-          </Link>
-        )}
         <AgentProfileStats agentId={agent.id} projectId={projectId ?? undefined} />
+        <AgentSalaryCard agentId={agent.id} />
+        <AgentQueueCard agentId={agent.id} />
+        <AgentRunsCard agentId={agent.id} />
+        <AgentMemoryCard agentId={agent.id} currentProvider={agent.memoryProvider} />
+        <AgentTrustCard agentId={agent.id} />
         <CurrentWorkSection agent={agent} />
       </div>
 

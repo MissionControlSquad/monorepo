@@ -24,8 +24,8 @@ describe("requireFeature", () => {
   it("throws GraphQLError when feature is disabled", async () => {
     mockIsEnabled.mockResolvedValue(false);
 
-    await expect(requireFeature("cloud_vms")).rejects.toThrow(GraphQLError);
-    await expect(requireFeature("cloud_vms")).rejects.toThrow("not available on your current plan");
+    await expect(requireFeature("terminals")).rejects.toThrow(GraphQLError);
+    await expect(requireFeature("terminals")).rejects.toThrow("not available on your current plan");
   });
 
   it("includes FEATURE_DISABLED code in error extensions", async () => {

@@ -1,0 +1,43 @@
+{
+  "name": "@agentcenter/runner",
+  "version": "0.1.0",
+  "description": "Standalone, stateless AgentCenter runner daemon. Outbound-only: polls AgentCenter Cloud for commands/tasks, runs them on any machine (behind NAT, no SSH server), and reports results. Runtime-agnostic.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "agentcenter-runner": "./dist/index.js"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agentcenter",
+    "runner",
+    "daemon",
+    "agent",
+    "poll",
+    "nat-safe"
+  ],
+  "author": "AgentCenter Cloud",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MissionControlSquad/monorepo",
+    "directory": "packages/runner"
+  },
+  "files": [
+    "dist/",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --banner:js='#!/usr/bin/env node' --log-level=info",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@agentcenter/types": "*",
+    "@agentcenter/utils": "*",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.9"
+  }
+}

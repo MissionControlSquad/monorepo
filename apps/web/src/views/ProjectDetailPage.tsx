@@ -54,6 +54,9 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { ProjectMemberEditor } from "../components/project/ProjectMemberEditor";
+import { ProjectSourceCard } from "../components/project/ProjectSourceCard";
+import { ProjectWorkspacesCard } from "../components/project/ProjectWorkspacesCard";
+import { ProjectDocCommentsThread } from "../components/project/ProjectDocCommentsThread";
 import {
   Breadcrumbs,
   Button,
@@ -429,7 +432,7 @@ function DocRow({
         <FileText className="w-4 h-4 text-muted-foreground group-hover:text-blue-500 transition-colors" />
       </div>
       <div className="flex-1 min-w-0">
-        <span className="text-sm font-medium text-gray-800">{doc.title}</span>
+        <span className="text-sm font-medium text-foreground">{doc.title}</span>
         {doc.summary && (
           <p className="text-xs text-muted-foreground truncate mt-0.5">{doc.summary}</p>
         )}
@@ -530,6 +533,12 @@ function DocViewDialog({
                 {showHistory && docId && (
                   <div className="mt-5 pt-4 border-t border-border">
                     <RevisionHistory docId={docId} />
+                  </div>
+                )}
+
+                {docId && (
+                  <div className="mt-5 pt-4 border-t border-border">
+                    <ProjectDocCommentsThread docId={docId} />
                   </div>
                 )}
               </div>
@@ -720,6 +729,10 @@ function ProjectDetailPanel({
     status?: string;
     shutdownActive?: boolean;
     description?: string;
+    sourceType?: string | null;
+    repoUrl?: string | null;
+    repoRef?: string | null;
+    visibility?: string;
     members?: {
       profileId: string;
       id?: string;
@@ -974,6 +987,16 @@ function ProjectDetailPanel({
           </div>
         )}
       </Card>
+
+      {/* Source configuration */}
+      <ProjectSourceCard
+        project={project}
+        readOnly={isArchived}
+        onSaved={() => reexecuteProject({ requestPolicy: "network-only" })}
+      />
+
+      {/* Execution workspaces */}
+      <ProjectWorkspacesCard projectId={project.id} />
 
       {/* Docs */}
       <WhenFeatureEnabled flag={FLAG_KEYS.DOCUMENTS}>

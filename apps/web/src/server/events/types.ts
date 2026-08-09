@@ -52,6 +52,17 @@ export type AgentJoinedEvent = {
   agentName: string;
 };
 
+/** Fired by the wake-queue drainer when a coalesced agent wake is delivered (proactive wake substrate). */
+export type AgentWakeDeliveredEvent = {
+  type: typeof EventTypes.AGENT_WAKE_DELIVERED;
+  wakeupId: string;
+  agentId: string;
+  reason: string;
+  /** How many requests coalesced onto this wake (>= 1). */
+  coalescedCount: number;
+  workspaceId?: string | null;
+};
+
 // Task domain events
 export type TaskCreatedEvent = {
   type: typeof EventTypes.TASK_CREATED;
@@ -250,6 +261,38 @@ export type ProjectMemberRemovedEvent = {
   agentName: string;
 };
 
+// Budget / cost domain events (Epic #4)
+export type CostEventRecordedEvent = {
+  type: typeof EventTypes.COST_EVENT_RECORDED;
+  costEventId: string;
+  workspaceId: string;
+  agentId?: string;
+  amountCents: number;
+  /** Policy ids whose current window was incremented by this cost — the set to evaluate for breach. */
+  affectedPolicyIds: string[];
+  occurredAt: string;
+};
+
+export type BudgetIncidentOpenedEvent = {
+  type: typeof EventTypes.BUDGET_INCIDENT_OPENED;
+  incidentId: string;
+  workspaceId: string;
+  policyId: string;
+  agentId?: string;
+  thresholdType: "soft" | "hard";
+  spendCents: number;
+  limitCents: number;
+  autoPaused: boolean;
+};
+
+export type BudgetIncidentResolvedEvent = {
+  type: typeof EventTypes.BUDGET_INCIDENT_RESOLVED;
+  incidentId: string;
+  workspaceId: string;
+  policyId: string;
+  resolvedById: string;
+};
+
 // Discriminated union of all events
 export type SystemEvent =
   | AgentWokeUpEvent
@@ -257,6 +300,7 @@ export type SystemEvent =
   | AgentStatusChangedEvent
   | AgentStatusAppliedEvent
   | AgentJoinedEvent
+  | AgentWakeDeliveredEvent
   | TaskCreatedEvent
   | TaskStatusChangedEvent
   | TaskAssigneesChangedEvent
@@ -272,6 +316,9 @@ export type SystemEvent =
   | DeliverableSubmittedEvent
   | ProjectCreatedEvent
   | ProjectMemberAddedEvent
-  | ProjectMemberRemovedEvent;
+  | ProjectMemberRemovedEvent
+  | CostEventRecordedEvent
+  | BudgetIncidentOpenedEvent
+  | BudgetIncidentResolvedEvent;
 
 export type EventType = SystemEvent["type"];

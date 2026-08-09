@@ -18,12 +18,15 @@ import { execute, subscribe, type ExecutionArgs } from "graphql";
 import { schema } from "./src/server/graphql/schema";
 import { prisma } from "./src/server/prisma";
 import { verifySessionToken, COOKIE_NAME } from "./src/server/admin-auth";
+import { resolveTenancy } from "./src/server/tenancy";
 import { isFeatureEnabled } from "./src/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import {
   handlePluginConnection,
   startEvictionLoop,
 } from "./src/server/services/live-gateway-handler";
+import { handleTerminalConnection } from "./src/server/services/terminal-pty-handler";
+import { startSandboxDrainLoop } from "./src/server/services/sandbox-drain-loop";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
@@ -56,6 +59,11 @@ const wss = new WebSocketServer({ noServer: true });
 // running unused WebSocket infrastructure when the feature is off).
 let liveGatewayWss: WebSocketServer | null = null;
 
+// ── WebSocket server for browser Cloud-Shell PTY (Tier D) ─────────────
+// Created at startup only if the TERMINALS feature flag is enabled. Relays a browser terminal to an
+// interactive SSH shell, authenticated by the one-time terminal connect token.
+let terminalPtyWss: WebSocketServer | null = null;
+
 setupGraphQLWS(
   {
     schema,
@@ -63,7 +71,8 @@ setupGraphQLWS(
     subscribe: subscribe as (args: ExecutionArgs) => any,
     context: async (ctx) => {
       const session = await sessionFromRequest(ctx.extra.request);
-      return { prisma, session };
+      const cookieHeader = ctx.extra.request.headers.cookie ?? null;
+      return { prisma, session, tenancy: await resolveTenancy(session, cookieHeader) };
     },
   },
   wss,
@@ -105,6 +114,17 @@ const originalEmit = server.emit.bind(server);
       });
       return true;
     }
+    if (pathname === "/api/terminals/pty") {
+      if (!terminalPtyWss) {
+        socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+        socket.destroy();
+        return true;
+      }
+      terminalPtyWss.handleUpgrade(req, socket, head, (ws: WebSocket) => {
+        terminalPtyWss!.emit("connection", ws, req);
+      });
+      return true;
+    }
   }
   return originalEmit(event, ...args);
 };
@@ -124,15 +144,34 @@ app.prepare().then(async () => {
     startEvictionLoop();
   }
 
+  // TERMINALS flag gates the browser Cloud-Shell PTY relay (checked once at startup).
+  const terminalsEnabled = await isFeatureEnabled(FLAG_KEYS.TERMINALS);
+  if (terminalsEnabled) {
+    terminalPtyWss = new WebSocketServer({ noServer: true });
+    terminalPtyWss.on("connection", handleTerminalConnection);
+  }
+
+  // RUNNERS flag gates the in-process sandbox queue drain — on this persistent server a run can
+  // execute for as long as the process lives (unlike the Vercel cron, capped at the function limit).
+  const runnersEnabled = await isFeatureEnabled(FLAG_KEYS.RUNNERS);
+  if (runnersEnabled) startSandboxDrainLoop();
+
   server.on("request", async (req, res) => {
     const parsedUrl = parse(req.url!, true);
     await handle(req, res, parsedUrl);
   });
 
   server.listen(port, hostname, () => {
-    const ws = ["graphql-ws", liveGatewayEnabled ? "live-gateway" : null]
+    const ws = [
+      "graphql-ws",
+      liveGatewayEnabled ? "live-gateway" : null,
+      terminalsEnabled ? "terminal-pty" : null,
+    ]
       .filter(Boolean)
       .join(", ");
-    console.log(`> Ready on http://${hostname}:${port} (ws: ${ws})`);
+    const loops = [runnersEnabled ? "sandbox-drain" : null].filter(Boolean).join(", ");
+    console.log(
+      `> Ready on http://${hostname}:${port} (ws: ${ws}${loops ? `; loops: ${loops}` : ""})`,
+    );
   });
 });

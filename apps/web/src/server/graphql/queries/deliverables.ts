@@ -1,6 +1,36 @@
+import { GraphQLError } from "graphql";
 import { builder } from "../builder";
 import { deliverableModel, deliverableVersionModel, taskModel } from "../../models";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
+import { requireRole } from "@/server/tenancy";
+import { isDeliverableKind } from "@agentcenter/utils";
+import type { DeliverableKind } from "@agentcenter/database";
+
+// Company-wide artifacts gallery: every deliverable in the workspace (scoped via its task's project),
+// optionally filtered by kind. member-visible. Separate from the per-task/per-agent reads above.
+builder.queryField("workspaceDeliverables", (t) =>
+  t.prismaField({
+    type: ["Deliverable"],
+    args: { kind: t.arg.string(), limit: t.arg.int({ defaultValue: 60 }) },
+    resolve: async (query, _root, args, ctx) => {
+      const tenancy = requireRole(ctx, "member");
+      const take = Math.min(Math.max(args.limit ?? 60, 1), 200);
+      if (args.kind && !isDeliverableKind(args.kind))
+        throw new GraphQLError(`Invalid kind '${args.kind}'`, {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      return ctx.prisma.deliverable.findMany({
+        ...query,
+        where: {
+          task: { project: { workspaceId: tenancy.workspaceId } },
+          ...(args.kind ? { kind: args.kind as DeliverableKind } : {}),
+        },
+        take,
+        orderBy: { createdAt: "desc" },
+      });
+    },
+  }),
+);
 
 builder.queryField("deliverablesByTask", (t) =>
   t.prismaField({

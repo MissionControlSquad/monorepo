@@ -1,0 +1,121 @@
+---
+title: Self-Hosting & Billing Model (buildbase tenancy)
+status: decided — reference when implementing the self-host onboarding bridge
+updated: 2026-07-11
+related:
+  - ../gap-plans/01-buildbase-tenancy.md
+  - ../../.claude/skills/buildbase/SKILL.md
+  - ../../apps/web/self-hosted/docker-compose.buildbase.yml
+---
+
+# Self-Hosting & Billing Model
+
+> Knowledge capture from the Epic #1 tenancy design. **Not yet fully implemented** — the app + the
+> self-host compose overlay exist; the *onboarding/licensing bridge* below is the remaining work,
+> to build when we productize self-host. Read this first at that point.
+
+## Decision: buildbase everywhere, two deployment shapes
+
+AgentCenter uses **buildbase** for human tenancy (identity, workspaces, roles, billing) in **both**
+tiers. There is **one tenancy code path** (the `ctx.tenancy` seam); only *where buildbase runs* differs.
+
+| | **agentcenter.cloud** | **Self-host** |
+|---|---|---|
+| AgentCenter app + its Postgres/Redis | your cloud | **customer's VPS** |
+| buildbase | **your one cloud org** (`api.console.buildbase.app`), workspace-per-customer | **a vendor-provisioned local buildbase Installation** on the customer's VPS |
+| Human/org data | your cloud | **customer's box (local MongoDB)** — never leaves |
+| Who the customer pays | buildbase subscription (per workspace) | **your AgentCenter License** (direct) |
+| buildbase bills | you, per workspace/seat | **you, per Installation** |
+
+### Why not the "obvious" alternatives
+- **Self-host pointing at buildbase cloud** → the customer's user/org data would live in buildbase's
+  cloud DB → *defeats the purpose of self-hosting.* Rejected for self-host.
+- **Customer buys their own buildbase Installation** → double cost for the customer. Rejected.
+- **Sharing your cloud org's client secret with self-host boxes** → that secret is org-wide (can read
+  every customer's users/emails) → catastrophic leak. Never do this.
+
+## How self-host actually works (the model that satisfies all constraints)
+
+**You** create an **Installation** from **your** buildbase account (dashboard → Self-Hosted Setup):
+> "An Installation is a self-hosted server instance — one Docker Compose stack running on your
+> infrastructure. Each installation gets a unique API key and can serve multiple organizations."
+> → use **"Dedicated per org"** (one Installation per self-host customer) for isolation.
+
+Two credential layers — this is the key:
+1. **Installation credentials** (`INSTALLATION_ID` + `INSTALLATION_API_KEY`) — issued to **you** from
+   **your** buildbase account. Used by the customer's tenant server to authenticate to buildbase's
+   Central Server for **licensing only**. Bundled into the customer's deployment. *(The customer never
+   buys buildbase — you own the Installation.)*
+2. **Org `clientId` / `clientSecret`** — **generated locally in the customer's own buildbase MongoDB**
+   when their org is created. *Not provisioned by buildbase, never sent to Central, isolated to that
+   box.* AgentCenter (self-host) uses these local creds against the local tenant server. *(No leak of
+   your cloud org — these only touch the customer's own local data.)*
+
+Result, per buildbase's docs: *"The central server holds licensing and keys, never application data."*
+- ✅ **Data residency:** users/orgs/agents/tasks all live on the customer's VPS. Only a licensing
+  heartbeat (+ admin OAuth/JWT validation) reaches buildbase Central — never data.
+- ✅ **No customer buildbase purchase:** you provision + own the Installation, bundled with the license.
+- ✅ **No secret leak:** Installation key = licensing only; org creds are local & isolated.
+- ✅ **Unlimited local users/teams** (subject to the license tier you sell).
+
+### The self-host bundle (already scaffolded)
+`apps/web/self-hosted/docker-compose.buildbase.yml` runs the customer's box:
+AgentCenter (app + Postgres + Redis) **+** buildbase (tenant-server:4101 + client:4100 + auth:4103 +
+MongoDB + Redis). AgentCenter points `SAAS_SERVER_URL` at `http://bb-tenant-server:4101`.
+
+## Billing model
+
+Self-host is **subscription/tier-based, not usage-metered** — you can't (and shouldn't) meter the
+customer's box.
+
+- **Cloud tier:** buildbase subscriptions bill the end customer (per workspace, Stripe via buildbase).
+- **Self-host tier:** **you invoice the customer directly** (annual license / contract, your own
+  Stripe/invoicing). buildbase bills **you** per Installation. **Your margin = license price − per-
+  Installation cost.**
+- **The one number to get from buildbase:** the **per-Installation price** — it sets your self-host
+  price floor. Also ask whether Installations can be created via **API** (the dashboard is a manual
+  wizard) for onboarding at scale.
+
+### Access tiers — you do NOT have to give unlimited
+Enforced **locally**, two layers, driven by the tier you sell:
+1. **AgentCenter `License`** (already in the schema): `maxAgents`, `maxProjects`, `maxSeats`,
+   `features[]`, `expiresAt` (`-1` = unlimited). Gated by `isLicenseActive`.
+2. **buildbase Installation tier:** *"org limits are baked into the Installation's license tier; the
+   tenant server enforces limits locally."*
+
+Set both to match the sold tier (e.g. 25 users / 50 agents / Pro features), or `-1` for an "unlimited"
+top tier. Sell tiers and upsell, or sell unlimited as premium — your choice.
+
+**Tamper note (inherent to all on-prem):** the customer has root. **Cryptographically sign the License**
+so limits can't be forged; rely on the buildbase heartbeat + contract terms. This stops casual bypass;
+a determined root-level attacker is a risk every self-host vendor covers **legally**, not just technically.
+
+## Data security = the customer's (and that's good)
+Self-host means the customer owns data custody, backups, compliance. Implications:
+- **Your liability drops** — you're not the data processor for that customer; you don't hold their PII.
+- **It's a selling point** — sovereignty/compliance buyers self-host precisely for this.
+- **Your job:** ship hardened, patched images; publish a hardening + backup guide (extend
+  `apps/web/self-hosted/SETUP.md`); honor support/SLA. You secure the **software + license**, not their
+  running data.
+
+## Self-host lifecycle
+```
+Sell tier
+ → create an Installation (that tier) in YOUR buildbase dashboard  → { INSTALLATION_ID, INSTALLATION_API_KEY }
+ → issue a matching SIGNED AgentCenter License (maxAgents/maxSeats/features/expiry)
+ → deliver the bundle { Installation key + compose overlay + License }
+ → customer runs `docker compose -f docker-compose.yml -f docker-compose.buildbase.yml up -d`
+ → you invoice annually.
+Renew → keep Installation active + reissue License.   Churn → revoke Installation + let License expire.
+```
+
+## Build status (what's done vs. left)
+- **Done:** `ctx.tenancy` seam, `workspaceId` scoping, buildbase SDK + auth + server factory + the
+  self-host compose overlay (Epic #1 slices 1–6). `License` already has the tier fields + activation gate.
+- **Left (the onboarding/licensing bridge — build when productizing self-host):**
+  1. License activation delivers `{ INSTALLATION_ID, INSTALLATION_API_KEY, local orgId/clientId/clientSecret }`
+     into the self-host bundle so it comes up licensed + wired — customer just runs it.
+  2. Sign the License cryptographically; enforce tier limits from it locally.
+  3. `SETUP.md` self-host operator section (sizing, hardening, backups).
+- **Confirm with buildbase (commercial/API):** per-Installation price; Installation-provisioning API;
+  offline-licensing story for air-gapped buyers.

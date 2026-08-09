@@ -1,0 +1,183 @@
+// ─── Agent Budgets / Cost (Epic #4) ───────────────────────────────
+// Agent LLM/run cost + budget policies + auto-pause. Workspace-scoped (no FK, D5).
+// This is the AGENT AI-WORK QUOTA: how much an individual agent (or the workspace's agents)
+// may spend before it is warned (soft) and then paused (hard). It mirrors Paperclip's
+// per-agent budget guardrail (soft warn + hard stop + cancel + approval-gated resume).
+//
+// It is NOT:
+//   - the WORKSPACE/HUMAN PLAN QUOTA (max agents, projects, docs, tasks a customer may
+//     provision) — that is a buildbase subscription entitlement (human plane, D1), enforced
+//     when a HUMAN creates a resource, and is deliberately not modeled here.
+//   - the customer's business bookkeeping (double-entry ledger) — that is Epic #16.
+
+enum BudgetScope {
+  workspace
+  agent
+}
+
+enum BudgetWindow {
+  hourly
+  daily
+  weekly
+  monthly
+}
+
+enum IncidentStatus {
+  open
+  resolved
+}
+
+// Paperclip parity: an incident is either a soft warning (notify only) or a hard breach (pause).
+enum IncidentThreshold {
+  soft
+  hard
+}
+
+model CostEvent {
+  id             String   @id @default(cuid())
+  workspaceId    String // buildbase workspace _id; no FK (D5)
+  agentId        String?
+  model          String? // e.g. "claude-opus-4-8"
+  provider       String? // "anthropic" | "openai" | "hetzner"
+  taskId         String?
+  projectId      String?
+  billerId       String?
+  issueId        String?
+  tokensIn       Int      @default(0)
+  tokensOut      Int      @default(0)
+  amountCents    Int      @default(0) // integer cents, no floats
+  billingType    String   @default("api") // metered_api | subscription_included | subscription_overage | credits | fixed (D12 A14; legacy api/subscription normalized on write)
+  costStatus     String   @default("reported") // reported | unpriced (D12 A13 — provider cost pending repricing)
+  source         String   @default("agent") // "agent" | "cloud_vm" | "manual"
+  idempotencyKey String?
+  occurredAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  agent   Agent?   @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId])
+  @@index([workspaceId, occurredAt])
+  @@index([agentId, occurredAt])
+  @@index([provider, model])
+  @@index([projectId])
+  @@index([taskId])
+  @@index([billerId])
+  @@index([issueId])
+  @@map("cost_events")
+}
+
+// ─── Non-inference finance ledger (Domain 12 GAP-1) ──────────────────────────────────────────────
+// Account-level provider money that is NOT per-inference cost (CostEvent) and NOT human P&L
+// (LedgerEvent): credit purchases/refunds/expiry, platform + BYOK fees, gateway overhead, training/
+// storage/bandwidth charges, subscription fees, tax/discount, manual adjustments. eventKind/direction/
+// unit are TEXT with app-level validation (D5, no PG enums). Integer cents only. BUDGETS-gated, admin.
+model FinanceEvent {
+  id                String   @id @default(cuid())
+  workspaceId       String // buildbase workspace _id; no FK (D5)
+  agentId           String?
+  taskId            String?
+  projectId         String?
+  issueId           String?
+  costEventId       String? // optional link to the inference CostEvent this charge relates to
+  eventKind         String // credit_purchase | platform_fee | byok_fee | … (see FINANCE_EVENT_KINDS)
+  direction         String   @default("debit") // debit (money out) | credit (money in)
+  biller            String? // who is charging (provider/vendor/platform)
+  provider          String?
+  billingCode       String?
+  description       String?
+  quantity          Float?
+  unit              String   @default("flat") // flat | credits | gb_month | gpu_hour | …
+  amountCents       Int      @default(0)
+  currency          String   @default("USD")
+  estimated         Boolean  @default(false)
+  externalInvoiceId String?
+  idempotencyKey    String?
+  metadataJson      Json?
+  occurredAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, occurredAt])
+  @@index([workspaceId, biller, occurredAt])
+  @@index([workspaceId, eventKind, occurredAt])
+  @@index([workspaceId, direction, occurredAt])
+  @@index([costEventId])
+  @@map("finance_events")
+}
+
+model BudgetPolicy {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  scope         BudgetScope
+  agentId       String? // required when scope=agent
+  name          String
+  limitCents    Int
+  window        BudgetWindow @default(monthly)
+  hardStop      Boolean      @default(false) // true = auto-pause on hard breach
+  warnPercent   Int          @default(80) // soft-warn threshold as % of limit (Paperclip parity)
+  notifyEnabled Boolean      @default(true) // emit notification on incident open
+  isSalary      Boolean      @default(false) // Domain 14 #18 — the agent's periodic token "salary" allowance
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  agent     Agent?           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  windows   QuotaWindow[]
+  incidents BudgetIncident[]
+
+  @@unique([workspaceId, scope, agentId, window])
+  @@index([workspaceId])
+  @@index([workspaceId, isActive])
+  @@index([agentId])
+  @@map("budget_policies")
+}
+
+model QuotaWindow {
+  id          String   @id @default(cuid())
+  workspaceId String
+  policyId    String
+  windowStart DateTime
+  windowEnd   DateTime
+  spendCents  Int      @default(0)
+  warned      Boolean  @default(false) // soft-warn incident already opened for this window
+  breached    Boolean  @default(false) // hard breach incident already opened for this window
+  updatedAt   DateTime @updatedAt
+
+  policy BudgetPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, windowStart]) // upsert target — race-safe increment
+  @@index([workspaceId])
+  @@index([policyId, windowEnd])
+  @@index([breached])
+  @@map("quota_windows")
+}
+
+model BudgetIncident {
+  id            String            @id @default(cuid())
+  workspaceId   String
+  policyId      String
+  quotaWindowId String?
+  agentId       String?
+  status        IncidentStatus    @default(open)
+  thresholdType IncidentThreshold @default(hard) // soft = warn only; hard = breach/pause
+  spendCents    Int
+  limitCents    Int
+  autoPaused    Boolean           @default(false)
+  approvalId    String? // Paperclip parity: budget_override approval gating resume (no FK)
+  detail        String?
+  resolvedById  String?
+  resolvedAt    DateTime?
+  createdAt     DateTime          @default(now())
+
+  policy BudgetPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  agent  Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([policyId, status])
+  @@index([status, createdAt])
+  @@index([agentId])
+  @@map("budget_incidents")
+}

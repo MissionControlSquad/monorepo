@@ -17,6 +17,18 @@ builder.prismaObject("ProjectDoc", {
   }),
 });
 
+builder.prismaObject("ProjectDocComment", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    docId: t.exposeString("docId"),
+    body: t.exposeString("body"),
+    quote: t.exposeString("quote", { nullable: true }),
+    resolved: t.exposeBoolean("resolved"),
+    authorProfileId: t.exposeString("authorProfileId", { nullable: true }),
+    createdAt: t.expose("createdAt", { type: "DateTime" }),
+  }),
+});
+
 builder.prismaObject("ProjectDocRevision", {
   fields: (t) => ({
     id: t.exposeID("id"),

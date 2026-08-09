@@ -12,8 +12,9 @@ import { log } from "../../../_lib/logger";
 import { assertProjectMember, squadLeadRequired } from "../../../_lib/project-access";
 import { isSystemShutdown } from "@/server/system-settings";
 import { isFeatureEnabled } from "@/server/feature-flags";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { FLAG_KEYS, AGENT_CAPABILITY } from "@agentcenter/utils";
 import { performRequestClarification } from "@/server/services/review";
+import { requireAgentCapability } from "@/server/services/agent-authz";
 import type { RouteContext } from "../../../_lib/route-context";
 
 export async function POST(request: Request, ctx: RouteContext) {
@@ -22,6 +23,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (v.error) return v.error;
     const body = v.data;
     const reviewer = await resolveAgent(request);
+    // Requesting clarification is an agent communication action (parity #9/#10).
+    await requireAgentCapability(reviewer, AGENT_CAPABILITY.MESSAGES_SEND);
     const { id: taskId } = await ctx.params;
 
     if (!(await isFeatureEnabled(FLAG_KEYS.REVIEWS))) {

@@ -1,0 +1,20 @@
+// Plugin local folders (parity #116). A dev-mode registry of local filesystem folders that hold plugin
+// source, loaded in addition to installed plugins. This is the registry (paths + enabled state); the
+// filesystem watching that hot-reloads them is the infra-gated dev-watcher (#106). D5: workspaceId no
+// FK. PLUGIN_RUNTIME-flag-gated.
+model PluginLocalFolder {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  path               String // portable folder path
+  label              String?
+  enabled            Boolean   @default(true)
+  lastLoadedAt       DateTime?
+  lastError          String?
+  createdByProfileId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([workspaceId, path])
+  @@index([workspaceId, enabled])
+  @@map("plugin_local_folders")
+}

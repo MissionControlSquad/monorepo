@@ -1,0 +1,28 @@
+---
+feature: Operator CLI
+priority: P3
+status: Missing
+gate: buildable-now
+---
+
+# Operator CLI · P3 · ❌ Missing (buildable-now)
+
+**What it is:** a self-host operator CLI — `doctor` (env/config/DB health checks), `env` (validate
+required env vars), `db:backup`, and deploy helpers.
+
+**Status in our monorepo (verified):** **no CLI package.** `packages/` has graphql-client/config,
+runner, etc., but no `*cli*`/`*doctor*`. DB ops are turbo scripts only (`db:migrate`, `db:migrate:deploy`,
+`db:generate`); app-level scripts live in `apps/web/scripts/` (backfills, seeds, `baseline-migrations.sh`)
+— but there is **no `db:backup` and no doctor**.
+
+**What's required (buildable-now):**
+- A new `packages/cli` (or `apps/cli`) exposing:
+  - `doctor` — check required env vars, DB connectivity, migration status, storage/crypto secrets present.
+  - `env` — validate/print the required env surface (from a schema).
+  - `db:backup` — `pg_dump` wrapper with rotation.
+- No infra needed — pure Node CLI over the existing Prisma client + env.
+
+**Priority rationale:** Purely operational quality-of-life for self-hosting; not required for the app to run,
+but the cleanest genuinely-buildable-now item left. Referenced in the original backlog (Deployment/CLI).
+
+**Depends on:** nothing external.

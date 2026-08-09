@@ -5,15 +5,20 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./zip": "./src/zip.ts"
+    "./zip": "./src/zip.ts",
+    "./remote-http-endpoint-guard": "./src/remote-http-endpoint-guard.ts"
   },
-  "files": ["src", "dist"],
+  "files": [
+    "src",
+    "dist"
+  ],
   "scripts": {
     "build": "tsc --build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@agentcenter/types": "*"
+    "@agentcenter/types": "*",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

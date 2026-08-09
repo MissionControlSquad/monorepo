@@ -1,0 +1,272 @@
+# 03 — Sandbox provider depth (parity)
+
+**Domain:** cloud sandbox providers + the plugin-worker environment RPC contract.
+**Reference:** `…/paperclip/packages/plugins/sandbox-providers/*` + `…/paperclip/packages/plugins/sdk/src/protocol.ts` + `…/paperclip/server/src/services/environment-runtime.ts`
+**Ours:** `…/MissionControlSquad-monorepo/apps/web/src/server/services/sandbox/*.ts` + `sandbox-run.ts` + `graphql/mutations/sandbox-run.ts`
+
+**Status legend:** ✅ Present · 🟡 Partial · ❌ Missing · 🎯 intentionally-simpler (deliberate boundary, not a bug)
+
+---
+
+## TL;DR verdict
+
+Paperclip's sandbox layer is a **stateful lease engine**: an out-of-process plugin worker exposes a
+14-method environment RPC (`acquire → resume → realize → execute → release/destroy` + interactive
+setup + template capture), backed by a DB `environment_leases` table with fingerprint-keyed reuse,
+pause/resume, retain-on-failure, per-run secret provisioning, custom-image/snapshot capture, named
+sessions, and (for cloudflare) live SSE log streaming.
+
+Ours is a **stateless per-run function**: `provision() → exec(oneShotScript) → destroy()`, in-process,
+no lease row, no reuse, no sessions, no streaming, no persistence. The seven cloud providers faithfully
+port the *core SDK calls* only. That narrowing is mostly the **right** call for our control-plane —
+but a handful of the "depth" features are actually production-blocking for us, and several cheap ones
+are worth porting. See the two tables below.
+
+Our own header says it out loud (`sandbox/types.ts:1-22`): *"deliberately narrower … we intentionally
+DO NOT port lease-reuse / pause / named-session / provenance / tenant-RBAC machinery."* This doc's job
+is to confirm which of those "DO NOT port" calls hold and which are hiding real gaps.
+
+---
+
+## Part A — The plugin-worker RPC contract
+
+Paperclip runs each provider as an **out-of-process plugin worker**; the server calls it over a typed
+RPC. We have **no worker boundary at all** — providers are in-process TS modules behind a
+`SandboxProvider` interface. Not a gap to close (the worker isolation is Paperclip's plugin-sandbox
+security model, a whole separate domain — see `06-plugins-mcp`), but the *method shape* is the useful
+contrast.
+
+| RPC method | Paperclip contract (`protocol.ts`) | Our equivalent | Status |
+|---|---|---|---|
+| `environmentAcquireLease` | `AcquireLeaseParams{runId,workspaceMode,requestedCwd,agentId,executionWorkspaceId,adapterType}` → `PluginEnvironmentLease{providerLeaseId,metadata,expiresAt}` — `protocol.ts:592-605,843-846` | `provider.provision(ctx,spec)` → `SandboxHandle{id,exec,destroy}` (`types.ts:60`) | 🟡 collapsed into provision; no lease id/expiry/metadata |
+| `environmentResumeLease` | `{providerLeaseId,leaseMetadata}` → lease — `protocol.ts:607-610,847-850` | — | ❌ |
+| `environmentRealizeWorkspace` | `{lease,workspace{localPath,remotePath,mode,metadata}}` → `{cwd,metadata}` — `protocol.ts:619-632,859-862` | inlined into the exec script (`sandbox-run.ts:118-121` builds `mkdir workspace`) | 🟡 folded into the run script |
+| `environmentExecute` | `{lease,command,args,cwd,env,stdin,timeoutMs}` → `{exitCode,signal,timedOut,stdout,stderr,metadata}` — `protocol.ts:634-651,863-866` | `handle.exec(cmd,{cwd,timeoutMs})` → `{exitCode,stdout,stderr}` (`types.ts:40`) | 🟡 no signal/timedOut/env/stdin/args |
+| `environmentReleaseLease` | `{providerLeaseId,leaseMetadata}` → void — `protocol.ts:612-615,851-854` | (no reuse → nothing to release) | 🎯 n/a |
+| `environmentDestroyLease` | extends Release — `protocol.ts:617,855-858` | `handle.destroy()` (`types.ts:41`) | ✅ (always destroys) |
+| `environmentValidateConfig` / `environmentProbe` | `protocol.ts:565-584,835-842` | none (config validated at call site) | ❌ (cheap, see A-plan) |
+| `environmentStartInteractiveSetup` / `Get` / `Cancel` | SSH-based custom-image authoring — `protocol.ts:701-742,867-882` | — | 🎯 skip |
+| `environmentCaptureTemplate` / `DeleteTemplate` | snapshot capture — `protocol.ts:716-749,875-886` | — | ❌ (daytona-only; see F) |
+
+**Required vs optional:** only `initialize/health/shutdown` are required; **all environment methods are
+optional** (`protocol.ts:893-926`) — a provider opts into as much of the lease lifecycle as it supports.
+Our flat `SandboxProvider` has no such capability negotiation.
+
+**Contract shape worth stealing (small):** our `SandboxExecResult` (`types.ts:31-35`) drops `signal`
+and `timedOut`. Today a SIGKILL-on-timeout returns `exitCode: null` (see `types.ts` local runner /
+`exe-dev.ts:91`) which the caller can't distinguish from a spawn error. Adding `timedOut: boolean` +
+`signal: string|null` to `SandboxExecResult` is a **size S** correctness fix (see production-readiness
+§ cancellation).
+
+---
+
+## Part B — The lease model (reuse / pause / resume / fingerprint / retain)
+
+This is the single biggest divergence. Paperclip has a real **`EnvironmentLease`** DB entity and a
+fingerprint-keyed reuse engine in `server/src/services/environment-runtime.ts`.
+
+- **Lease record** — `packages/shared/src/types/environment.ts:108-128`: `{id, companyId, environmentId,
+  executionWorkspaceId, issueId, heartbeatRunId, status, leasePolicy, provider, providerLeaseId,
+  acquiredAt, lastUsedAt, expiresAt, releasedAt, failureReason, cleanupStatus, metadata}`.
+- **Status enum** — `active | released | expired | failed | retained | pending_cleanup`
+  (`shared/src/constants.ts:498`).
+- **Lease policy enum** — `ephemeral | reuse_by_environment | reuse_by_execution_workspace |
+  retain_on_failure` (`shared/src/constants.ts:501-507`).
+- **Reusable-lease fingerprinting** — `environment-runtime.ts`:
+  - `reusableRuntimeFingerprint({provider,adapterType,config})` = SHA-256 over stable-stringified inputs
+    (`:254-262`).
+  - `buildReusableSandboxLeaseFingerprint(...)` = richer fingerprint adding company, env id+driver,
+    executionWorkspaceId, agentId, provider plugin id/pkg/version, providerConfig, **and resolved secret
+    versions** (`:364-402`, secret metadata `:280-362`) — so **rotating a secret expires the lease**.
+  - `reusableSandboxLeaseScopeMatches(...)` reuse gate (`:443-482`); `reusableLeaseCanBeResumed`
+    (`:484-490`); acquire wiring only when `supportsReusableLeases && reuseLease && heartbeatRunId &&
+    executionWorkspaceId && agentId` (`:768-843`).
+  - Daytona additionally writes an **in-sandbox sentinel** `.paperclip-runtime/reusable-sandbox-lease.json`
+    and verifies it on resume (`daytona/src/plugin.ts:80,323-424`) so a resumed box that drifted is
+    treated as expired.
+- **Pause/resume mechanics differ per provider** (see F): e2b `pause()`/reconnect, novita `betaPause()`,
+  daytona `stop()`/`start()`+archive, modal `detach()`/`fromId()`, cloudflare bridge `resumeLease`+keepAlive,
+  exe-dev keep-alive only (no suspend), k8s not restartable (fresh acquire on terminal pod).
+- **retain-on-failure** — on release, `leasePolicy==="retain_on_failure" && status==="failed"` →
+  mark `retained` with `releasedAt=null` (keep the box alive for inspection) —
+  `environment-runtime.ts:1143-1149,1278-1285`, `environments.ts:643,654`.
+
+**Ours:** none of this. `sandbox-run.ts:128-139` provisions, execs once, and **always** destroys in a
+`finally`. Agent binding is a single string column `agent.sandboxProvider` (`agent.prisma:116`). No lease
+table exists in `packages/database/prisma/schema/*`.
+
+### Verdict on the lease engine
+
+| Feature | Worth porting? | Why |
+|---|---|---|
+| Lease **reuse** (`reuse_by_environment`) | 🎯 **No, for now** | Our model is one ephemeral box per task run. Reuse only pays off with long-lived per-agent/per-workspace warm boxes; that's a product decision we haven't made. Porting the fingerprint+secret-version machinery is size L for latency savings we can't yet bank. |
+| Fingerprinting | 🎯 No (follows from reuse) | Only meaningful once you keep boxes around to match against. |
+| **Pause/resume** | 🎯 No | Same — only useful with reuse. |
+| **retain-on-failure** | 🟡 **Maybe (S–M)** | This one is *cheap and independently valuable*: on a failed run, keep the box alive + surface an SSH/exec handle for a human to inspect. Doesn't need the full lease table — could be a per-run `retainedSandboxId` + TTL reaper. See B-plan. |
+| Lease DB table | ❌ only if we adopt reuse **or** retain | A `SandboxRun` persistence row (see production-readiness) is the higher-value cousin and we need it regardless. |
+
+**B-plan (retain-on-failure, if adopted, size M):** add `SandboxRun` model (below) with
+`retainUntil DateTime?` + `providerSandboxId`; in `runTaskInSandbox`, when `exitCode !== 0` and the
+agent/provider opts into retain, **skip `handle.destroy()`**, persist `providerSandboxId`+`retainUntil`,
+and add a scheduled reaper (heartbeat job) that destroys expired retained boxes. Security: retain is
+admin-gated (already `requireRole("admin")` in the mutation) and TTL-bounded to cap cost. Test: failing
+run leaves a row with `retainUntil` set and does not call destroy; reaper destroys after TTL.
+
+---
+
+## Part C — provisionCommand / realizeWorkspace / repo clone
+
+In Paperclip these are **three separate concerns living in different layers**:
+- **realizeWorkspace RPC is thin** — just materializes + returns `cwd` (k8s `plugin.ts:418-435`, daytona
+  `plugin.ts:1012-1035`).
+- **provisionCommand + git clone/checkout** live in the **server** workspace runtime, not the provider:
+  `server/src/services/workspace-runtime.ts:2551-2591` runs `strategy.provisionCommand`; clone/checkout
+  logic `:1360-1936`.
+- **Secret mounting** happens at **acquireLease** (k8s `createPerRunSecret` → per-run k8s Secret owned by
+  the Job/CR for cascade delete, `kubernetes/src/plugin.ts:256,283-335`, `secret-manager.ts:15-52`).
+
+**Ours** collapses all three into one heredoc script (`sandbox-run.ts:108-121`): `mkdir workspace`,
+`git clone --depth 1 <repoUrl> repo`, write `TASK.md`, run the runtime command. There is **no
+provisionCommand** hook (no per-repo `npm ci` / `bootstrap.sh` step) and secrets are **not injected into
+the sandbox** at all (only used host-side to resolve the provider credential).
+
+| Feature | Paperclip | Ours | Status |
+|---|---|---|---|
+| Working-dir realize | `realizeWorkspace` RPC | inline `mkdir workspace` | ✅ (simpler is fine) |
+| Repo clone | server workspace-runtime | inline `git clone` (`sandbox-run.ts:110`) | 🟡 **public-repo-only, no auth** (see prod §) |
+| provisionCommand (per-repo setup) | `workspace-runtime.ts:2551-2591` | — | ❌ **M, worth it** |
+| Secrets into the sandbox env | per-run Secret (k8s) / env injection | — | ❌ **M, worth it** (agent needs `ANTHROPIC_API_KEY` etc. inside the box) |
+
+**C-plan (size M, high value):** thread a `provisionCommand?: string` (from project/agent config) and a
+map of **runtime secrets** into `runTaskInSandbox`. Inject secrets via `exec` env (extend
+`SandboxExecResult` call to pass `env`, mirroring `PluginEnvironmentExecuteParams.env`) or a written
+`.env` sourced by the login shell; run `provisionCommand` after clone, before the runtime command.
+Security: secrets resolved from the workspace vault (already `resolveWorkspaceSecret`), never logged,
+truncated out of captured output. Without this, **any agent runtime that needs an API key cannot run in
+a sandbox** — a production blocker adjacent to the "runtime binary not installed" one.
+
+---
+
+## Part D — Provider manifests / config schemas / secret-ref
+
+**Paperclip:** every provider ships a `manifest.ts` declaring an **inline JSON-Schema** `configSchema`
+under `environmentDrivers[].configSchema`, with rich per-field config, capability flags
+(`supportsReusableLeases`, `supportsTemplateCapture`, `templateRefKind`, `supportsInteractiveSetup`…),
+and secret fields marked `format: "secret-ref"`. Examples: daytona `manifest.ts:26-120` (8+ resource
+fields + all capability flags), k8s `manifest.ts:26-116` (`imageAllowList`, `egressMode`,
+`runtimeClassName`, `backend` enum), cloudflare has a dedicated `config.ts:26-84` validator (HTTPS-unless-
+localhost, `reuseLease`⇒`keepAlive`). Runtime config parse/validate is hand-rolled per provider.
+
+**Ours:** no manifest, no config schema, no capability flags. A provider is
+`{key, displayName, requiresApiKey, credentialKeys[], provision}` (`types.ts:53-61`). Config is just an
+optional `SandboxSpec{image?, region?}` (`types.ts:24-29`) plus a few ad-hoc `resolveSecret("K8S_NAMESPACE")`
+lookups inside providers (e.g. `kubernetes.ts:120-121`, `exe-dev.ts:111,139`).
+
+| Feature | Paperclip | Ours | Status |
+|---|---|---|---|
+| Declarative config schema per provider | JSON-Schema in `manifest.ts` | `SandboxSpec{image,region}` + ad-hoc secret reads | 🟡 much thinner |
+| Capability flags | `supportsReusableLeases` etc. | — | ❌ (only needed if we add reuse) |
+| **secret-ref** credential resolution | `format:"secret-ref"` → vault | `credentialKeys[]` resolved from workspace vault (`types.ts:110-141`, `defineCloudProvider`) | ✅ **we have this, done well** — BYO per-workspace vault, clear "not configured" errors |
+
+**Verdict:** the secret-ref/BYO-credential story is 🎯 **at parity in spirit** and arguably cleaner
+(no operator credential tier). A per-provider JSON-Schema config surface is 🎯 nice-to-have only when we
+add a settings UI for provider config — **not worth porting now**. The one real ad-hoc smell: k8s/exe-dev
+pull config via `resolveSecret("K8S_NAMESPACE")` etc., mixing config and secrets — a **size S** cleanup
+to give those providers a typed `SandboxSpec` extension, but low priority.
+
+---
+
+## Part E — Streaming run logs
+
+**Paperclip:** only **cloudflare** live-streams (SSE from its bridge Worker →
+`consumeExecuteEventStream`/`parseSseChunk` → `pluginLogger`, `cloudflare/src/bridge-client.ts:190-269`,
+`plugin.ts:111-129`). All other providers return **fully-buffered** stdout/stderr (e2b `plugin.ts:452`,
+daytona `:753`, novita `:257`, modal `:292`, k8s job `streamLogs` is buffered `:834`). So even Paperclip
+is mostly non-streaming.
+
+**Ours:** fully buffered everywhere; captured tail-truncated to `MAX_OUTPUT_CHARS = 45_000`
+(`sandbox-run.ts:20,135-136`). The local/k8s runners already read `stdout`/`stderr` as data events
+(`kubernetes.ts:80-81`) but coalesce to strings.
+
+| Status | 🟡 buffered-only, no live stream |
+|---|---|
+
+**Verdict + E-plan:** live streaming *to the task timeline* is genuinely valuable for long agent runs
+(user watching progress) but is **size M–L** because it needs a transport (subscription/SSE) and a
+persistence sink. Recommend **deferring** until `SandboxRun` persistence exists — then stream stdout
+lines into `SandboxRun` chunks and expose a GraphQL subscription. Marked 🟡/❌; **do the persistence
+first** (production-readiness below).
+
+---
+
+## Part F — Custom images / snapshots (per-provider)
+
+| Provider | Custom image | Snapshot/template capture | Reuse mechanism | Our port status |
+|---|---|---|---|---|
+| e2b | template (`spec.image ?? "base"`) | ❌ | native `pause()`/reconnect | ✅ image; ❌ reuse (`e2b.ts:44`) |
+| daytona | image **+** snapshot | ✅ `_experimental_createSnapshot` (`plugin.ts:1131-1145`) | `stop()`/`start()`+archive | ✅ image; ❌ snapshot capture; ❌ reuse (`daytona.ts:60`) |
+| modal | registry image | ❌ | `detach()`/`fromId()` | ✅ image (`modal.ts:67`) |
+| novita | template | ❌ | native `betaPause()` | ✅ image (`novita.ts:54`) |
+| cloudflare | via bridge Worker | ❌ | bridge `resumeLease`+keepAlive | ✅ (bridge-token model) |
+| exe-dev | `image` + `setupScript` | ❌ | keep-alive only (no suspend) | ✅ image + default setup script (`exe-dev.ts:22`) |
+| kubernetes | `imageAllowList`+registry rewrite | ❌ | sandbox-cr long-lived pod / job ephemeral | 🟡 plain image, **no allowlist** (`kubernetes.ts:121`) |
+
+**Custom base image** is ✅ ported for every provider (via `SandboxSpec.image`). What's missing:
+- **Snapshot capture** (daytona `environmentCaptureTemplate` + interactive SSH setup): 🎯 **skip** — it's a
+  one-provider power feature for authoring golden images; our BYO model lets the customer bake their own
+  image and pass it as `spec.image`.
+- **k8s `imageAllowList` / registry rewrite** (`kubernetes/src/image-allowlist.ts:31-46`): 🟡 a real
+  **security** gap if we ever let non-admins pass an arbitrary image to the k8s provider. Currently the
+  run mutation is `requireRole("admin")` so it's acceptable, but note it. Size S to add a glob allowlist
+  check if image selection is ever delegated.
+- k8s multi-tenant machinery (per-tenant namespace/RBAC/NetworkPolicy/Cilium-FQDN-egress/per-run Secret/
+  Sandbox-CR vs Job orchestrators/`upload-interceptor`): 🎯 **correctly skipped** — our header
+  (`kubernetes.ts:1-9`) says so explicitly; that's Paperclip's multi-tenant lease model, not our
+  provision→exec→destroy contract.
+
+---
+
+## Part G — Named sessions
+
+**Paperclip:** only **cloudflare** implements named sessions (`bridge-template/src/sessions.ts:4-84`,
+strategy `named|default`, get-or-create by id). e2b/daytona use one-shot execution (daytona explicitly
+avoids the session API because it hangs with login-shell wrappers, `plugin.ts:709-774`).
+
+**Ours:** every `exec` is one-shot; `sandbox-run.ts` runs a single self-contained script. Status: ❌,
+verdict 🎯 **skip** — named sessions only matter for interactive multi-command REPL-style flows that our
+single-script run model doesn't have. Not worth porting.
+
+---
+
+## Part H — Production-readiness gaps (the ones that actually block shipping)
+
+These are independent of the lease depth and are the highest-leverage work.
+
+| # | Gap | Evidence (ours) | Severity | Size | Plan |
+|---|---|---|---|---|---|
+| H1 | **Runtime binary not installed in the image** | `sandbox-run.ts:114-121` runs bare `claude`/`codex`/`openclaw` argv (`packages/utils/src/adapters.ts:118,133,149`); no install step. Only `exe-dev.ts:22` installs Node — nothing installs the agent CLI. Default images (`"base"`, `python:3.13`, `ubuntu:22.04`) don't have it. | **Critical** — every non-`shell` adapter fails `command not found` | M | Bake agent-runtime images per adapter (publish `agentcenter/sandbox-<adapter>` images) **or** prepend an install/bootstrap step to the script (npm i -g the CLI). Prefer baked images for cold-start. Tie to `SandboxSpec.image` default per `runtimeAdapter`. |
+| H2 | **Private-repo clone auth** | `sandbox-run.ts:110` `git clone <repoUrl>` with no token; runner has same issue (`packages/runner/src/index.ts:62`). Fresh box has no git creds. | **Critical** for private repos | M | Resolve a GitHub install/PAT token from the workspace vault, inject as `x-access-token@` in the clone URL or `GIT_ASKPASS`/`.git-credentials`; scrub from captured output. Pairs with C-plan (secrets-into-sandbox). |
+| H3 | **Run persistence** | `runTaskInSandbox` only **returns** the result (`sandbox-run.ts:142-149`); the GraphQL mutation returns it to the caller (`mutations/sandbox-run.ts:53-77`); nothing writes it to the DB/task timeline. No `SandboxRun` model in `packages/database/prisma/schema/*`. | High — results are lost, no audit/history | M | Add `SandboxRun` model `{id, workspaceId, taskId, agentId, providerKey, providerSandboxId, status, exitCode, stdout, stderr, startedAt, finishedAt, retainUntil?, costMicros?}`; write it in `runTaskInSandbox`; surface on the task timeline. This model is the keystone for H4/H5/E/B. |
+| H4 | **Cost tracking** | No sandbox rows in `ledger.prisma`; `grep` for sandbox cost → nothing. | Medium | S–M (after H3) | Record provider + wall-clock (start/finish already needed for H3) → `costMicros` estimate per provider rate card; optionally post to the ledger. |
+| H5 | **Cancellation** | Only a `timeoutMs` SIGKILL (`sandbox-run.ts:133`, local runner / `exe-dev.ts:91`); no user-initiated cancel, and a timeout returns `exitCode:null` indistinguishable from error (no `timedOut`/`signal`). | Medium | M | Thread an `AbortSignal` from a `cancelSandboxRun(runId)` mutation into `exec` (kill the child / call provider `kill`), destroy the box, mark the run `cancelled`. Also add `timedOut`+`signal` to `SandboxExecResult` (size S, see Part A). |
+| H6 | **Streaming output** | buffered + tail-truncated 45k (`sandbox-run.ts:20,135`). | Medium | M–L | See Part E — defer behind H3. |
+
+---
+
+## Recommended sequencing
+
+1. **H3 `SandboxRun` persistence** (keystone — unblocks H4/H5/H6/B).
+2. **H1 runtime image** + **H2 private-repo auth** + **C secrets-into-sandbox** (the three that make a
+   real agent run actually work end-to-end in a cloud box — do them together).
+3. **H5 cancellation** + the `timedOut`/`signal` result fields (Part A, size S).
+4. **B retain-on-failure** (cheap debugging win once `SandboxRun` exists).
+5. **H6 streaming** (nice-to-have, deferred).
+6. 🎯 **Deliberately skip:** full lease-reuse/fingerprint/pause-resume engine, named sessions, snapshot
+   capture + interactive setup, k8s multi-tenant RBAC/network-policy/CR-orchestration. These are
+   Paperclip's long-lived-lease + multi-tenant model; our ephemeral provision→exec→destroy contract is
+   the right altitude for the control plane.
+
+**Net:** of Paperclip's depth, ~2 features are genuinely worth porting (retain-on-failure; a thin
+capability/`timedOut` result shape), the custom-image path is already ✅, and the real work is the six
+production-readiness items (esp. H1/H2/H3/C) — most of which Paperclip solves in its **server workspace
+runtime**, not its provider plugins.

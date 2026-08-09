@@ -1,0 +1,83 @@
+---
+title: Buildbase SDK — boundary + integration status
+sdk: "@buildbase/sdk"
+latest: 0.0.57
+installed: 0.0.44
+checked: 2026-07-21
+---
+# Buildbase boundary & integration status
+
+`@buildbase/sdk` is the multi-tenant SaaS platform layer. Everything we classified
+**buildbase-owned** in [`SERVICE-AUDIT.mdx`](./SERVICE-AUDIT.mdx) is genuinely provided by
+this SDK — the audit's "do NOT build" calls are confirmed correct against the real package.
+
+## What the SDK owns (v0.0.57, pulled from npm)
+
+Two entry points: `@buildbase/sdk` (server, zero-React `BuildBase()` factory) and
+`@buildbase/sdk/react` (providers/hooks/gates). Plus `/mcp`, `/data`, `/css`.
+
+| Capability | SDK surface |
+|---|---|
+| **Auth** (human sign-in/out, sessions, passkeys, devices) | `SaaSOSProvider`, `useSaaSAuth`, `<Devices/>`, `<Sessions/>`, `auth` server API |
+| **Workspaces** (multi-tenant CRUD, switcher, members, invites, personal/platform modes) | `WorkspaceSwitcher`, `useSaaSWorkspaces`, `workspace`/`users` server API |
+| **RBAC** (roles, permissions) | `Permission` enum, `hasPermission`, `WhenPermission`, `permissions.check/resolve` |
+| **Billing / subscriptions** (Stripe, plans, checkout, invoices, trials, seats, multi-currency) | `useSubscription*`, `PricingPage`, `subscription`/`plans`/`invoices` API, `When{Subscription,Trialing}` |
+| **Quotas / usage + credits** (metered billing) | `useRecordUsage`, `useCreditBalance`, `usage`/`credits` API, `WhenQuota*`/`WhenCredits*` |
+| **Feature flags** (workspace + user) | `useUserFeatures`, `WhenWorkspaceFeatureEnabled`, `features` API |
+| **Notifications** (email + push, 4-layer gating) | `notification.send()`, `usePushNotifications` |
+| **MCP server** (Streamable-HTTP, 42 built-in tools, OAuth2 app-bridge, RFC 9728/8707) | `@buildbase/sdk/mcp` — `createMcpHandler`, `defineMcpTool`, `createAgentStack`, `buildbaseAuth` |
+| **Agent discovery** (`llms.txt`, `.well-known/*`, A2A card, protected-resource metadata) | `resolveAgentPath`, `buildLlmsTxt`, agent-readiness helpers |
+| **Connected agents** (authorize/revoke AI agents to a user account) | `<ConnectedAgents/>`, `useConnectedAgents` |
+| **i18n** (8 locales, ICU, RTL) | `useTranslation`, `SUPPORTED_LOCALES` |
+
+## What the monorepo actually wires today
+
+**Installed 0.0.44 — 13 releases behind latest 0.0.57.** Integration is intentionally thin
+(gated on `BUILDBASE_ORG_ID`; falls back to the existing admin auth when unset).
+
+**✅ Wired (auth + tenancy only):**
+- `SaaSOSProvider` via `apps/web/src/components/providers/BuildbaseProvider.tsx` (renders only
+  when `ORG_ID` is set — SDK throws on empty orgId).
+- Auth callbacks → `/api/auth/buildbase/{token,session,logout,workspace-token}`.
+- `WorkspaceSwitcher`, `useSaaSAuth`, `consumeAuthIntent`.
+- Workspace switch mints a workspace-scoped JWT (`bb-workspace-token` cookie) →
+  GraphQL `ctx.tenancy` = `{ userId, workspaceId, userRole, email }`; **48 services scope by
+  `workspaceId`** off that. This is the load-bearing integration.
+
+**❌ Available in the SDK but NOT wired:**
+- **Billing / subscription / quota / credits** — no hooks/gates used (monorepo has its own
+  finance/budget domain instead; see `features/P1-cost-budgets-finance.mdx`).
+- **SDK feature flags** — monorepo uses its own `FLAG_KEYS` system, not `useUserFeatures`.
+- **SDK notifications** — monorepo has its own attention/notifications domain.
+- **RBAC `Permission`/`hasPermission`** — monorepo does its own admin-gating on mutations.
+- **MCP server (`@buildbase/sdk/mcp`)** — **not mounted.** This is the single most consequential gap (see below).
+- **Connected agents, devices/sessions screens, OAuth2 app-bridge, agent-readiness discovery.**
+
+## Parity implication — the MCP/tools reframe
+
+Our audit deferred the whole **tool subsystem** (`tool-gateway`, `tool-registry`,
+`tool-dispatcher`, `mcp-http`, `plugin-tool-*`) as *infra-gated, P3, build-later*. The SDK
+changes that calculus: **`@buildbase/sdk/mcp` already IS a production MCP server** — 42
+built-in tools over the full workspace surface, OAuth2 app-bridge, per-tool scope gating, every
+tool running under the user's real permissions. We don't build a tool gateway; we **mount one**.
+
+- `createAgentStack({...})` → `export const { GET, POST, DELETE, OPTIONS } = agent.routes` at
+  `/api/mcp` gives agents a spec-compliant tool endpoint with zero new infra.
+- Custom monorepo tools (issues, deliverables, budgets) are added via `defineMcpTool` with a
+  `context(auth, req)` that injects our services — they run under the switched workspace session.
+- This satisfies the "agents can call tools / MCP" boundary **without** the Paperclip
+  plugin-worker runtime, and stays inside the buildbase-owned line (the SDK owns MCP; we own the
+  tool definitions).
+
+**Net:** reclassify `mcp-http` / `tool-gateway` from ❌ *infra-gated* to 🟡 *SDK-provided, wire it*.
+Still **P3** unless agent-tool-calling is prioritized.
+
+## Recommendations (not yet done — analysis only)
+
+1. **Bump `@buildbase/sdk` 0.0.44 → 0.0.57** (13 versions; changelog review first). Low risk given
+   the thin integration, but it's a real dependency change — do it as its own commit.
+2. **Decide on MCP**: if agent-tool-calling matters, mount `@buildbase/sdk/mcp` at `/api/mcp`
+   (flag-gated) rather than building the Paperclip tool subsystem. This is the highest-leverage
+   buildbase item.
+3. **Leave billing/quota/RBAC/notifications as-is** — the monorepo's own domains are the source of
+   truth there by design; wiring the SDK's parallel systems would duplicate, not add.

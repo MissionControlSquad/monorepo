@@ -1,0 +1,564 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useQuery, useMutation } from "urql";
+import {
+  ENVIRONMENTS_QUERY,
+  AGENT_ENVIRONMENT_BINDINGS_QUERY,
+  ENVIRONMENT_LEASES_QUERY,
+  EXECUTION_WORKSPACES_QUERY,
+  ENVIRONMENT_CUSTOM_IMAGES_QUERY,
+  WORKSPACE_EXECUTION_POLICY_QUERY,
+} from "@/lib/graphql/queries";
+import {
+  UPDATE_ENVIRONMENT,
+  ARCHIVE_ENVIRONMENT,
+  DELETE_ENVIRONMENT,
+  PROBE_ENVIRONMENT,
+  SET_AGENT_ENVIRONMENT,
+  DESTROY_ENVIRONMENT_LEASE,
+  CAPTURE_CUSTOM_IMAGE,
+  ROLLBACK_CUSTOM_IMAGE,
+  DISABLE_CUSTOM_IMAGE,
+  SET_WORKSPACE_EXECUTION_MODE,
+} from "@/lib/graphql/mutations";
+import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
+import { FLAG_KEYS } from "@agentcenter/utils";
+import { Button, Card, Badge, Spinner, Select } from "@/components/ui";
+import { EnvironmentDialog } from "@/components/dialogs/EnvironmentDialog";
+import { ShieldCheck, Bot, Boxes, GitBranch } from "lucide-react";
+
+// Tier D / Phase 3: Environments dashboard — the first-class "where/how a run executes" model.
+// ENVIRONMENTS-gated in nav; every mutation re-checks the flag + admin server-side. Config secrets are
+// referenced by vault name ({secretRef}); the masked `configPublic` is all the client ever sees.
+
+const DRIVER_VARIANT: Record<string, "green" | "yellow" | "gray" | "red"> = {
+  local: "gray",
+  ssh: "yellow",
+  sandbox: "green",
+  plugin: "red",
+};
+
+interface Environment {
+  id: string;
+  name: string;
+  description: string | null;
+  driver: string;
+  status: string;
+  transport: string;
+  configPublic: Record<string, unknown>;
+  envVars: Record<string, string>;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+export default function EnvironmentsPage() {
+  const [{ data, fetching }, refetch] = useQuery<{ environments: Environment[] }>({
+    query: ENVIRONMENTS_QUERY,
+  });
+  const [, archiveEnv] = useMutation(ARCHIVE_ENVIRONMENT);
+  const [, deleteEnv] = useMutation(DELETE_ENVIRONMENT);
+  const [, updateEnv] = useMutation(UPDATE_ENVIRONMENT);
+  const [, probeEnvMut] = useMutation(PROBE_ENVIRONMENT);
+
+  const { isEnabled } = useFeatureFlags();
+  const policyEnabled = isEnabled(FLAG_KEYS.EXECUTION_POLICY);
+  const workspacesEnabled = isEnabled(FLAG_KEYS.EXECUTION_WORKSPACES);
+  const imagesEnabled = isEnabled(FLAG_KEYS.CUSTOM_IMAGES);
+
+  const envs = data?.environments ?? [];
+
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [probe, setProbe] = useState<
+    Record<string, { ok: boolean; summary: string; details?: string | null }>
+  >({});
+  const [open, setOpen] = useState(false);
+
+  const refresh = () => refetch({ requestPolicy: "network-only" });
+
+  async function onArchive(id: string) {
+    setBusy(id);
+    try {
+      await archiveEnv({ id });
+      refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onDelete(id: string) {
+    setError(null);
+    setBusy(id);
+    try {
+      const res = await deleteEnv({ id });
+      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Delete blocked");
+      refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onReactivate(id: string) {
+    setBusy(id);
+    try {
+      await updateEnv({ id });
+      refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onProbe(id: string) {
+    setError(null);
+    setBusy(`probe-${id}`);
+    try {
+      const res = await probeEnvMut({ id });
+      if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Probe failed");
+      const r = res.data.probeEnvironment;
+      setProbe((p) => ({ ...p, [id]: { ok: r.ok, summary: r.summary, details: r.details } }));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="mx-auto space-y-8 p-4 sm:p-6">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Environments</h1>
+          <p className="text-sm text-muted-foreground">
+            Define where and how a run executes — a driver (local, SSH, sandbox, or plugin), its
+            config, and env vars. Agents bind to an environment. Secrets are referenced by vault
+            name and never leave the server.
+          </p>
+        </div>
+        <Button onClick={() => setOpen(true)}>New environment</Button>
+      </div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <EnvironmentDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
+
+      {/* ── List ───────────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">Environments</h2>
+        {fetching && envs.length === 0 && (
+          <div className="flex justify-center p-8">
+            <Spinner />
+          </div>
+        )}
+        {envs.length === 0 && !fetching && (
+          <p className="text-sm text-muted-foreground">No environments yet.</p>
+        )}
+        {envs.map((env) => (
+          <Card key={env.id} className="space-y-2 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">{env.name}</span>
+                <Badge variant={DRIVER_VARIANT[env.driver] ?? "gray"}>{env.driver}</Badge>
+                <span className="font-mono text-xs text-muted-foreground">{env.transport}</span>
+                {env.status === "archived" && <Badge variant="gray">archived</Badge>}
+              </div>
+              <span className="flex items-center gap-3">
+                <button
+                  onClick={() => onProbe(env.id)}
+                  disabled={busy === `probe-${env.id}`}
+                  className="text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+                >
+                  {busy === `probe-${env.id}` ? "Probing…" : "Probe"}
+                </button>
+                {env.status === "active" ? (
+                  <button
+                    onClick={() => onArchive(env.id)}
+                    disabled={busy === env.id}
+                    className="text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+                  >
+                    Archive
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onReactivate(env.id)}
+                    disabled={busy === env.id}
+                    className="text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+                  >
+                    Reactivate
+                  </button>
+                )}
+                <button
+                  onClick={() => onDelete(env.id)}
+                  disabled={busy === env.id}
+                  className="text-xs text-destructive transition hover:underline disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              </span>
+            </div>
+            {env.description && <p className="text-xs text-muted-foreground">{env.description}</p>}
+            {Object.keys(env.configPublic ?? {}).length > 0 && (
+              <pre className="max-h-32 overflow-auto rounded bg-muted/50 p-2 text-xs text-muted-foreground">
+                {JSON.stringify(env.configPublic, null, 2)}
+              </pre>
+            )}
+            {probe[env.id] && (
+              <p className={`text-xs ${probe[env.id].ok ? "text-success" : "text-destructive"}`}>
+                {probe[env.id].ok ? "✓ " : "✗ "}
+                {probe[env.id].summary}
+                {probe[env.id].details ? ` — ${probe[env.id].details}` : ""}
+              </p>
+            )}
+            {imagesEnabled && env.driver === "sandbox" && env.status === "active" && (
+              <CustomImageControl environmentId={env.id} />
+            )}
+          </Card>
+        ))}
+      </section>
+
+      <AgentBindingsSection envs={envs} />
+
+      <LeasesSection />
+
+      {workspacesEnabled && <RecentWorkspacesSection />}
+
+      {policyEnabled && <ExecutionPolicySection />}
+    </div>
+  );
+}
+
+// ── Custom image capture (Plan 5) — snapshot a sandbox env into a reusable image ──
+interface CImgTemplate {
+  id: string;
+  templateRef: string;
+  status: string;
+  capturedAt: string;
+}
+function CustomImageControl({ environmentId }: { environmentId: string }) {
+  const [{ data }, refetch] = useQuery<{
+    environmentCustomImages: { hasActive: boolean; drift: string; templates: CImgTemplate[] };
+  }>({ query: ENVIRONMENT_CUSTOM_IMAGES_QUERY, variables: { environmentId } });
+  const [, capture] = useMutation(CAPTURE_CUSTOM_IMAGE);
+  const [, rollback] = useMutation(ROLLBACK_CUSTOM_IMAGE);
+  const [, disable] = useMutation(DISABLE_CUSTOM_IMAGE);
+  const [busy, setBusy] = useState(false);
+  const ov = data?.environmentCustomImages;
+  const refresh = () => refetch({ requestPolicy: "network-only" });
+
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true);
+    try {
+      await fn();
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1 border-t border-border pt-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          Custom image
+          {ov?.hasActive ? (
+            <>
+              {" · active"}
+              {ov.drift !== "none" && (
+                <Badge variant={ov.drift === "breaking" ? "red" : "yellow"}>{ov.drift}</Badge>
+              )}
+            </>
+          ) : (
+            " · none"
+          )}
+        </span>
+        <button
+          onClick={() => run(() => capture({ environmentId }))}
+          disabled={busy}
+          className="text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+        >
+          {busy ? "Capturing…" : "Capture image"}
+        </button>
+      </div>
+      {(ov?.templates ?? []).slice(0, 4).map((tpl) => (
+        <div key={tpl.id} className="flex items-center justify-between gap-2">
+          <span className="truncate font-mono text-xs text-muted-foreground">
+            <Badge variant={tpl.status === "active" ? "green" : "gray"}>{tpl.status}</Badge>{" "}
+            {tpl.templateRef}
+          </span>
+          <span className="flex items-center gap-2">
+            {tpl.status !== "active" && (
+              <button
+                onClick={() => run(() => rollback({ templateId: tpl.id }))}
+                disabled={busy}
+                className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+              >
+                Rollback
+              </button>
+            )}
+            <button
+              onClick={() => run(() => disable({ templateId: tpl.id }))}
+              disabled={busy}
+              className="text-xs text-destructive hover:underline disabled:opacity-50"
+            >
+              Disable
+            </button>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Recent execution workspaces — the realized workspace + phase log per run ──
+interface WsOp {
+  id: string;
+  phase: string;
+  exitCode: number | null;
+  status: string;
+}
+interface ExecWorkspace {
+  id: string;
+  runId: string | null;
+  strategyType: string;
+  providerType: string;
+  status: string;
+  createdAt: string;
+  operations: WsOp[];
+}
+function RecentWorkspacesSection() {
+  const [{ data }, refetch] = useQuery<{ executionWorkspaces: ExecWorkspace[] }>({
+    query: EXECUTION_WORKSPACES_QUERY,
+  });
+  const rows = (data?.executionWorkspaces ?? []).slice(0, 15);
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <GitBranch className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold text-foreground">Recent execution workspaces</h2>
+        </div>
+        <button
+          onClick={() => refetch({ requestPolicy: "network-only" })}
+          className="text-xs text-muted-foreground transition hover:text-foreground"
+        >
+          Refresh
+        </button>
+      </div>
+      <Card className="space-y-2 p-4">
+        <p className="text-sm text-muted-foreground">
+          Each run records its realized workspace (strategy + provider) and a phase log
+          (clone/setup/run) for observability.
+        </p>
+        {rows.length === 0 && (
+          <p className="text-sm text-muted-foreground">No runs recorded yet.</p>
+        )}
+        {rows.map((w) => (
+          <div key={w.id} className="flex flex-wrap items-center justify-between gap-2">
+            <Link
+              href={`/environments/workspaces/${w.id}`}
+              className="flex items-center gap-2 truncate font-mono text-xs text-muted-foreground hover:text-foreground hover:underline"
+            >
+              <Badge variant="gray">{w.strategyType}</Badge>
+              {w.providerType} · {w.createdAt.slice(0, 19).replace("T", " ")}
+            </Link>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              {w.operations.map((o) => (
+                <Badge key={o.id} variant={o.status === "failed" ? "red" : "green"}>
+                  {o.phase}
+                  {o.exitCode != null ? `:${o.exitCode}` : ""}
+                </Badge>
+              ))}
+            </span>
+          </div>
+        ))}
+      </Card>
+    </section>
+  );
+}
+
+// ── Leases — live provider machines held by reuse/retain environments ──
+const LEASE_STATUS_VARIANT: Record<string, "green" | "yellow" | "gray" | "red"> = {
+  active: "yellow",
+  released: "green",
+  retained: "yellow",
+  expired: "gray",
+  pending_cleanup: "gray",
+  failed: "red",
+};
+interface Lease {
+  id: string;
+  environmentId: string;
+  status: string;
+  leasePolicy: string;
+  provider: string | null;
+  providerLeaseId: string | null;
+  acquiredAt: string;
+  expiresAt: string | null;
+}
+function LeasesSection() {
+  const [{ data }, refetch] = useQuery<{ environmentLeases: Lease[] }>({
+    query: ENVIRONMENT_LEASES_QUERY,
+  });
+  const [, destroyLease] = useMutation(DESTROY_ENVIRONMENT_LEASE);
+  const [busy, setBusy] = useState<string | null>(null);
+  // Only surface leases that still hold (or held) a machine — hide fully-expired noise.
+  const leases = (data?.environmentLeases ?? []).filter((l) => l.status !== "expired");
+
+  async function destroy(leaseId: string) {
+    setBusy(leaseId);
+    try {
+      await destroyLease({ leaseId });
+      refetch({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Boxes className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold text-foreground">Leases</h2>
+        </div>
+        <button
+          onClick={() => refetch({ requestPolicy: "network-only" })}
+          className="text-xs text-muted-foreground transition hover:text-foreground"
+        >
+          Refresh
+        </button>
+      </div>
+      <Card className="space-y-2 p-4">
+        <p className="text-sm text-muted-foreground">
+          Machines held by reuse/retain environments. Ephemeral runs never appear here. Idle
+          machines are reaped automatically; destroy one now to free it immediately.
+        </p>
+        {leases.length === 0 && <p className="text-sm text-muted-foreground">No held machines.</p>}
+        {leases.map((l) => (
+          <div key={l.id} className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-2 truncate font-mono text-xs text-muted-foreground">
+              <Badge variant={LEASE_STATUS_VARIANT[l.status] ?? "gray"}>{l.status}</Badge>
+              {l.provider}·{l.leasePolicy}
+            </span>
+            <button
+              onClick={() => destroy(l.id)}
+              disabled={busy === l.id}
+              className="text-xs text-destructive transition hover:underline disabled:opacity-50"
+            >
+              Destroy
+            </button>
+          </div>
+        ))}
+      </Card>
+    </section>
+  );
+}
+
+// ── Agent bindings — pick which environment each agent runs in ──
+interface BindAgent {
+  id: string;
+  name: string;
+  identityEmoji: string | null;
+  environmentId: string | null;
+}
+function AgentBindingsSection({ envs }: { envs: Environment[] }) {
+  const [{ data }, refetch] = useQuery<{ agents: BindAgent[] }>({
+    query: AGENT_ENVIRONMENT_BINDINGS_QUERY,
+  });
+  const [, setAgentEnv] = useMutation(SET_AGENT_ENVIRONMENT);
+  const [busy, setBusy] = useState<string | null>(null);
+  const agents = data?.agents ?? [];
+  const active = envs.filter((e) => e.status === "active");
+
+  async function bind(agentId: string, environmentId: string | null) {
+    setBusy(agentId);
+    try {
+      await setAgentEnv({ agentId, environmentId });
+      refetch({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Bot className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-sm font-semibold text-foreground">Agent bindings</h2>
+      </div>
+      <Card className="space-y-2 p-4">
+        <p className="text-sm text-muted-foreground">
+          Choose which environment each agent runs in. Unbound agents fall back to their ad-hoc
+          sandbox provider.
+        </p>
+        {agents.length === 0 && <p className="text-sm text-muted-foreground">No agents.</p>}
+        {agents.map((a) => (
+          <div key={a.id} className="flex items-center justify-between gap-2">
+            <span className="truncate text-sm text-foreground">
+              {a.identityEmoji ? `${a.identityEmoji} ` : ""}
+              {a.name}
+            </span>
+            <Select
+              size="sm"
+              value={a.environmentId ?? ""}
+              disabled={busy === a.id}
+              onChange={(e) => bind(a.id, e.target.value || null)}
+            >
+              <option value="">— none —</option>
+              {active.map((env) => (
+                <option key={env.id} value={env.id}>
+                  {env.name} ({env.driver})
+                </option>
+              ))}
+            </Select>
+          </div>
+        ))}
+      </Card>
+    </section>
+  );
+}
+
+// ── Execution policy (Plan 4) — force runs onto isolated kubernetes, or allow any target ──
+function ExecutionPolicySection() {
+  const [{ data }, refetch] = useQuery<{
+    workspaceExecutionPolicy: { executionMode: string; enableIsolatedWorkspaces: boolean };
+  }>({ query: WORKSPACE_EXECUTION_POLICY_QUERY });
+  const [, setMode] = useMutation(SET_WORKSPACE_EXECUTION_MODE);
+  const [busy, setBusy] = useState(false);
+  const policy = data?.workspaceExecutionPolicy;
+  const mode = policy?.executionMode ?? "any";
+
+  async function apply(executionMode: string) {
+    setBusy(true);
+    try {
+      await setMode({ executionMode });
+      refetch({ requestPolicy: "network-only" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-sm font-semibold text-foreground">Execution policy</h2>
+      </div>
+      <Card className="space-y-2 p-4">
+        <p className="text-sm text-muted-foreground">
+          Force every run onto an isolated kubernetes sandbox, or allow any target. Enforced
+          fail-closed before a sandbox is provisioned.
+        </p>
+        <div className="flex items-center gap-2">
+          <Badge variant={mode === "kubernetes" ? "green" : "gray"}>{mode}</Badge>
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={busy}
+            disabled={busy}
+            onClick={() => apply(mode === "kubernetes" ? "any" : "kubernetes")}
+          >
+            {mode === "kubernetes" ? "Allow any target" : "Force kubernetes only"}
+          </Button>
+        </div>
+      </Card>
+    </section>
+  );
+}

@@ -3,6 +3,7 @@ import { schema } from "@/server/graphql/schema";
 import { prisma } from "@/server/prisma";
 import type { GraphQLContext } from "@/server/graphql/builder";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
+import { resolveTenancy } from "@/server/tenancy";
 import { isLicenseActive } from "@/server/license";
 import { apiLimiters, checkRateLimit } from "../_lib/rate-limit-check";
 
@@ -35,7 +36,15 @@ const yoga = createYoga<GraphQLContext>({
         };
       }
     }
-    return { prisma, session };
+    return {
+      prisma,
+      session,
+      tenancy: await resolveTenancy(
+        session,
+        request.headers.get("cookie"),
+        request.headers.get("authorization"),
+      ),
+    };
   },
   graphqlEndpoint: "/api/graphql",
   fetchAPI: { Response },

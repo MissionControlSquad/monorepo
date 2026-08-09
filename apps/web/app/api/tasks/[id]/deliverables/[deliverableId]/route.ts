@@ -1,6 +1,8 @@
 import { taskModel } from "@/server/models/task";
 import { deliverableModel, deliverableVersionModel } from "@/server/models";
 import { resolveAgent } from "../../../../_lib/resolve-agent";
+import { requireAgentCapability } from "@/server/services/agent-authz";
+import { AGENT_CAPABILITY } from "@agentcenter/utils";
 import {
   successResponse,
   errorResponse,
@@ -21,6 +23,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const v = await validateBody(request, updateDeliverableSchema);
     if (v.error) return v.error;
     const agent = await resolveAgent(request);
+    // Enforce the same capability as submitting a deliverable — revising is a deliverable write
+    // (parity #9/#10: the sibling POST checks TASKS_COMPLETE; this PATCH previously did not).
+    await requireAgentCapability(agent, AGENT_CAPABILITY.TASKS_COMPLETE);
 
     if (await isSystemShutdown()) {
       return errorResponse("System is in shutdown mode. No deliverable revisions allowed.", 503);

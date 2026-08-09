@@ -1,0 +1,21 @@
+// ─── Agent memory (Tier D — two-layer, Paperclip-style) ───────────
+// LAYER 1 (control plane, here): the binding — which provider is in effect per agent — plus
+// provenance (which task produced each entry). LAYER 2 (provider): extraction/storage.
+//   • provider "none"     → stateless default (no storage; the runner holds nothing).
+//   • provider "markdown" → local files on the runner (para-memory-files analog); NOT stored here.
+//   • provider "db"       → entries stored control-plane-side (this table) + injected into context.
+// Opt-in over the stateless default; MEMORY-flag gated at the edge.
+
+model AgentMemory {
+  id           String   @id @default(cuid())
+  workspaceId  String // buildbase workspace _id; no FK (D5)
+  agentId      String
+  content      String   @db.Text
+  sourceTaskId String? // provenance: the task run that produced this entry
+  sourceKind   String? // provenance kind: run | issue_comment | issue_document | manual_note | ... (default run)
+  sourceRefId  String? // provenance ref: the specific comment/doc/activity id when sourceKind isn't a task
+  createdAt    DateTime @default(now())
+
+  @@index([workspaceId, agentId, createdAt])
+  @@map("agent_memories")
+}

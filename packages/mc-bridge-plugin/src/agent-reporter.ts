@@ -57,7 +57,8 @@ export class AgentReporter {
 
     this.unsubscribers.push(
       onTaskDone((event) => {
-        this.client.send({
+        // Reliable send: buffered until MC acks, resent on reconnect/tick if the frame is dropped.
+        this.client.sendTaskDone({
           type: "vm.task_done",
           slug: event.slug,
           taskId: event.taskId,

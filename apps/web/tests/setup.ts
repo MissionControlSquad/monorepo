@@ -31,6 +31,65 @@ async function truncateAll() {
   clearCaches();
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      -- feature_flags + licenses must be cleared per file: the DB is shared across test files. Many
+      -- files toggle a flag off to exercise the disabled path; the row lingers because it was never
+      -- truncated, so a later file that expects the feature on (e.g. goals, secrets) intermittently
+      -- reads the stale disabled row and its requireFeature() gate throws. Truncating here makes every
+      -- file start from all-flags-default-enabled; files that need an opt-in flag seed it in their own
+      -- beforeAll/beforeEach (which run after this). (In-process caches reset per isolated fork.)
+      feature_flags,
+      licenses,
+      -- newer tables (added by later features) that must also reset per file so their rows do not
+      -- leak across shared-DB test files (e.g. memory_jobs enqueued by run-completion in one file
+      -- otherwise crowd another file's claim batch).
+      memory_jobs,
+      agent_wakeups,
+      run_log_chunks,
+      run_log_meta,
+      secret_proposals,
+      external_objects,
+      agent_runs,
+      attention_dismissals,
+      agent_capability_grants,
+      agent_authz_events,
+      agent_instructions,
+      terminal_sessions,
+      api_keys,
+      plugins,
+      board_threads,
+      goals,
+      workspace_imports,
+      team_installs,
+      team_members,
+      teams,
+      agent_skills,
+      skill_stars,
+      skill_versions,
+      skills,
+      case_labels,
+      case_documents,
+      case_events,
+      case_task_links,
+      cases,
+      labels,
+      pipeline_case_events,
+      pipeline_cases,
+      pipeline_stages,
+      pipelines,
+      routine_runs,
+      routine_revisions,
+      routine_triggers,
+      routines,
+      secret_access_events,
+      secret_bindings,
+      secret_versions,
+      secrets,
+      ledger_events,
+      ledger_categories,
+      budget_incidents,
+      quota_windows,
+      budget_policies,
+      cost_events,
       deliverable_versions,
       deliverables,
       message_reactions,
@@ -59,14 +118,26 @@ async function truncateAll() {
 }
 
 beforeAll(async () => {
-  // Push schema to test database
-  execSync(
-    "npx prisma db push --skip-generate --accept-data-loss --schema ../../packages/database/prisma/schema",
-    {
-      stdio: "inherit",
-      env: { ...process.env },
-    },
-  );
+  // Read feature flags fresh from the DB on every check (bypass the 60s cache). Integration tests
+  // toggle flags constantly and share a reused worker process, so a live cache goes stale relative to
+  // the DB and causes order-dependent flaky failures. This MUST be set per file (not once at module
+  // load): the feature-flags cache unit test deletes this env var in its own beforeEach, and because a
+  // worker is reused across files, a module-level assignment would stay deleted for every later file
+  // in that worker — reviving the cache and bleeding flag state. Setting it in this per-file beforeAll
+  // re-asserts it for each file. cacheTtl() reads it at call time.
+  process.env.DISABLE_FLAG_CACHE = "1";
+
+  // Bring the test database up to the migrated schema. We run the real migration chain
+  // (`migrate deploy`) rather than `db push` so the test DB is prod-faithful: raw-SQL migration
+  // artifacts (seed rows like the built-in adapters, partial/expression indexes, backfills) are
+  // present, closing the long-standing "db push != migrate" gap. After the first run this is a fast
+  // no-op ("No pending migrations"). AI_AGENT/CLAUDECODE are stripped so Prisma's agent guardrail
+  // doesn't block the non-interactive deploy; harmless no-op for normal/CI runs where they're unset.
+  const { AI_AGENT: _ai, CLAUDECODE: _cc, ...cleanEnv } = process.env;
+  execSync("npx prisma migrate deploy --config ../../packages/database/prisma.config.ts", {
+    stdio: "inherit",
+    env: cleanEnv,
+  });
 
   // Start with a clean database
   await truncateAll();

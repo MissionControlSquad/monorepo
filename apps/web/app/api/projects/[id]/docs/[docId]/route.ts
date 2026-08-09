@@ -1,6 +1,8 @@
 import { projectDocModel, projectDocRevisionModel } from "@/server/models";
 import { invalidateProjectContext } from "@/server/cache";
 import { resolveAgent } from "../../../../_lib/resolve-agent";
+import { requireAgentCapability } from "@/server/services/agent-authz";
+import { AGENT_CAPABILITY } from "@agentcenter/utils";
 import { successResponse, handleError } from "../../../../_lib/json-response";
 import { ERR } from "../../../../_lib/error-messages";
 import { validateBody, updateProjectDocSchema } from "../../../../_lib/validation";
@@ -35,6 +37,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
   try {
     const agent = await resolveAgent(request);
     const { id: projectId, docId } = await ctx.params;
+    await requireAgentCapability(agent, AGENT_CAPABILITY.DOCS_WRITE, { projectId });
 
     const current = await projectDocModel.findById(docId);
     assertDocVisible(current, projectId);
@@ -76,6 +79,7 @@ export async function DELETE(request: Request, ctx: RouteContext) {
   try {
     const agent = await resolveAgent(request);
     const { id: projectId, docId } = await ctx.params;
+    await requireAgentCapability(agent, AGENT_CAPABILITY.DOCS_WRITE, { projectId });
 
     const doc = await projectDocModel.findById(docId);
     assertDocVisible(doc, projectId);

@@ -1,0 +1,19 @@
+// Skill comments (parity #F12, skills). Threaded discussion on a skill in the library — a comment may
+// reply to another (parentCommentId) and is soft-deleted (deletedAt) to keep thread structure. Author
+// is an agent or a human profile. D5: workspaceId no FK. SKILLS_TEAMS-gated.
+model SkillComment {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  skillId         String
+  parentCommentId String?
+  authorAgentId   String?
+  authorProfileId String?
+  body            String    @db.Text
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([workspaceId, skillId, createdAt])
+  @@index([parentCommentId])
+  @@map("skill_comments")
+}

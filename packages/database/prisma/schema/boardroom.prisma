@@ -1,0 +1,37 @@
+// ─── Boardroom / board concierge chat (Epic #15) ──────────────────
+// A standing conversation where a human operator talks to a board-level assistant. One thread per
+// workspace ("Board Operations"). The LLM relay is a deferred runtime seam (spec D2); this schema is
+// just the durable conversation. workspaceId-scoped (Epic #1, D5; no FK).
+
+enum BoardRole {
+  user
+  assistant
+}
+
+model BoardThread {
+  id          String         @id @default(cuid())
+  workspaceId String
+  title       String         @default("Board Operations")
+  messages    BoardMessage[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([workspaceId]) // one standing thread per workspace
+  @@map("board_threads")
+}
+
+model BoardMessage {
+  id             String      @id @default(cuid())
+  threadId       String
+  thread         BoardThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role           BoardRole
+  body           String
+  authorId       String? // profile id for a user turn; null for an assistant turn
+  // Operator feedback on an assistant turn: +1 up, -1 down, null none (Paperclip feedback votes).
+  feedbackScore  Int?
+  feedbackReason String?
+  createdAt      DateTime    @default(now())
+
+  @@index([threadId, createdAt])
+  @@map("board_messages")
+}

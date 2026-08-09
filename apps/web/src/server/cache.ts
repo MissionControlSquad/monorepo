@@ -67,6 +67,30 @@ export const heatmapCache = new TTLCache<any>(10 * 60); // 10 min — agent acti
 export const transitionIdsCache = new TTLCache<{ id: string }[]>(5 * 60); // 5 min — DISTINCT ON scan
 export const projectsListCache = new TTLCache<any>(5 * 60); // 5 min — projects with nested members
 
+// Epic #4 budgets — short TTL: spend dashboards tolerate ~1 min staleness; breach
+// enforcement is real-time via QuotaWindow rows, not these read caches.
+export const costBreakdownCache = new TTLCache<any>(60); // 1 min — grouped spend aggregate
+export const costTrendCache = new TTLCache<any>(60); // 1 min — daily spend trend
+export const financeSummaryCache = new TTLCache<any>(60); // 1 min — totals + utilization
+
+// Epic #16 business ledger — short TTL; invalidated per-workspace on every mutation.
+export const ledgerSummaryCache = new TTLCache<any>(60);
+export const ledgerByKindCache = new TTLCache<any>(60);
+export const ledgerByBillerCache = new TTLCache<any>(60);
+export const ledgerByCategoryCache = new TTLCache<any>(60);
+export const ledgerByProjectCache = new TTLCache<any>(60);
+export const ledgerTimelineCache = new TTLCache<any>(60);
+
+/** Clear all ledger aggregate caches (called after any ledger mutation; low write volume). */
+export function invalidateLedger(): void {
+  ledgerSummaryCache.clear();
+  ledgerByKindCache.clear();
+  ledgerByBillerCache.clear();
+  ledgerByCategoryCache.clear();
+  ledgerByProjectCache.clear();
+  ledgerTimelineCache.clear();
+}
+
 // --- Invalidation helpers ---
 
 export function invalidateAgentCache(apiKeyHash: string) {

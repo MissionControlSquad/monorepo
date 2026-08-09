@@ -32,6 +32,10 @@ export const PROJECT_QUERY = gql`
       description
       status
       shutdownActive
+      sourceType
+      repoUrl
+      repoRef
+      visibility
       createdAt
       updatedAt
       members {

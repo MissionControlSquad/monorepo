@@ -49,6 +49,18 @@ export interface MsgHello {
   meta: VMMeta;
   /** Agent slugs (username) this plugin manages — used to build LiveAgentRoute records. */
   agents?: string[];
+  /**
+   * Raw base64 Ed25519 device public key (32 bytes). Present when the machine pairs by device
+   * identity - MC pins the key by fingerprint and requires board approval. Optional: when absent the
+   * legacy bcrypt install/connection-token path is used unchanged.
+   */
+  publicKey?: string;
+  /**
+   * Base64 Ed25519 signature over the `nonce` string, produced with the device private key. Verified
+   * against the pinned device key before the connection is accepted. Required whenever `publicKey`
+   * is present.
+   */
+  signature?: string;
 }
 
 /** Periodic heartbeat — sent every 30 s by plugin. */
@@ -173,6 +185,17 @@ export interface MsgNotify {
   fromHandle?: string;
 }
 
+/**
+ * MC acknowledges a vm.task_done it durably persisted. The plugin buffers unacked task_done frames
+ * and resends them (on reconnect / periodically) until this ack arrives, so a completion isn't lost
+ * if the frame is dropped on a half-open socket. handleTaskDone is idempotent, so a resend is safe.
+ */
+export interface MsgTaskDoneAck {
+  type: "mc.task_done_ack";
+  taskId: string;
+  slug: string;
+}
+
 /** Authentication / protocol error — connection will be closed after this. */
 export interface MsgError {
   type: "mc.error";
@@ -185,6 +208,7 @@ export type MCToPlugin =
   | MsgPong
   | MsgDeliverTask
   | MsgNotify
+  | MsgTaskDoneAck
   | MsgError;
 
 // ── Protocol constants ────────────────────────────────────────────────────────

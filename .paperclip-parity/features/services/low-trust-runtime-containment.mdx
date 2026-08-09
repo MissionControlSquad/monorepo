@@ -1,0 +1,12 @@
+---
+service: low-trust-runtime-containment
+kind: service
+status: Present
+priority: P1
+gate: done
+---
+# low-trust-runtime-containment · ✅ Present
+**What it is:** contain low-trust agents (force isolation, quarantine output).
+**Monorepo:** `trust.ts` (lowTrustContainment) + `source-trust.ts` + non-isolating providers barred.
+**Required:** —
+**Covers:** features/P1-sandbox-execution.mdx · SERVICE-AUDIT #96.

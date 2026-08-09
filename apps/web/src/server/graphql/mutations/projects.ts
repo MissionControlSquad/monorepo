@@ -1,3 +1,4 @@
+import { GraphQLError } from "graphql";
 import { builder } from "../builder";
 import { agentModel, projectModel, projectMemberModel } from "../../models";
 import { invalidateProjectsList } from "../../cache";
@@ -5,6 +6,8 @@ import { Roles, ProjectStatus, ProjectMemberStatus } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 import { findProfilesWithAgentIdsByIds, findProfileAgentId } from "@agentcenter/database";
 import { checkLicenseLimit } from "../../license";
+import { requireRole, scoped } from "@/server/tenancy";
+import { isProjectSourceType, isProjectVisibility, sourceTypeUsesRepo } from "@agentcenter/utils";
 
 builder.mutationField("createProject", (t) =>
   t.prismaField({
@@ -126,6 +129,55 @@ builder.mutationField("restoreProject", (t) =>
       const result = await projectModel.update(args.id, {
         ...query,
         data: { status: ProjectStatus.ACTIVE },
+      });
+      invalidateProjectsList();
+      return result;
+    },
+  }),
+);
+
+// Project source configuration (Paperclip Project Workspace parity). Portable metadata; workspace-
+// scoped. repoUrl/repoRef only apply to a remote_repo source — for any other source they're cleared
+// so the record stays coherent.
+builder.mutationField("setProjectSource", (t) =>
+  t.prismaField({
+    type: "Project",
+    args: {
+      projectId: t.arg.string({ required: true }),
+      sourceType: t.arg.string(),
+      repoUrl: t.arg.string(),
+      repoRef: t.arg.string(),
+      visibility: t.arg.string(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, "member");
+      const project = await ctx.prisma.project.findFirst({
+        where: scoped(ctx, { id: args.projectId }),
+        select: { id: true },
+      });
+      if (!project)
+        throw new GraphQLError("Project not found", { extensions: { code: "NOT_FOUND" } });
+
+      if (args.sourceType != null && !isProjectSourceType(args.sourceType))
+        throw new GraphQLError(`Invalid sourceType '${args.sourceType}'`, {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      if (args.visibility != null && !isProjectVisibility(args.visibility))
+        throw new GraphQLError(`Invalid visibility '${args.visibility}'`, {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+
+      const usesRepo = sourceTypeUsesRepo(args.sourceType);
+      const result = await ctx.prisma.project.update({
+        ...query,
+        where: { id: project.id },
+        data: {
+          ...(args.sourceType !== undefined ? { sourceType: args.sourceType } : {}),
+          ...(args.visibility != null ? { visibility: args.visibility } : {}),
+          // Repo fields are only meaningful for remote_repo; otherwise force them null.
+          repoUrl: usesRepo ? (args.repoUrl ?? null) : null,
+          repoRef: usesRepo ? (args.repoRef ?? null) : null,
+        },
       });
       invalidateProjectsList();
       return result;

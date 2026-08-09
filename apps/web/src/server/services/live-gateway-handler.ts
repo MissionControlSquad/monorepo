@@ -23,8 +23,8 @@ import {
   markConnectionDisconnected,
   refreshConnectionToken,
   syncAgentRoutes,
-  clearAgentRoutes,
   drainPendingDeliveries,
+  markDeliveriesAttempted,
   markDeliveryReceived,
   findPendingDeliveryConnection,
   resolveAgentBySlugOrId,
@@ -33,10 +33,10 @@ import {
   isAgentAssignedToTask,
   updateTaskStatus,
   findTaskByIdSelect,
-  findCloudVMIdByServerName,
-  logCloudVMEvent,
 } from "@agentcenter/database";
 import { connectionRegistry } from "./live-connection-registry";
+import { registerDevice, verifyDeviceAuth } from "./live-gateway-devices";
+import { DEFAULT_WORKSPACE_ID } from "@/server/tenancy";
 import { pubsub, PubSubEvent } from "@agentcenter/graphql-server";
 import type {
   PluginToMC,
@@ -71,21 +71,15 @@ function stripHtml(str: string): string {
 // ─── VM event logging ─────────────────────────────────────────────────────────
 
 /**
- * Silently log an event to the CloudVM logs if the machineName maps to a
- * managed CloudVM. No-ops for self-hosted / user VPS machines.
+ * Activity-log hook for gateway events. The managed CloudVM log sink has been
+ * retired, so this is now a no-op retained to keep the call sites intact.
  */
 async function logVMActivity(
-  machineName: string | null | undefined,
-  message: string,
-  level: "info" | "warn" | "error" = "info",
+  _machineName: string | null | undefined,
+  _message: string,
+  _level: "info" | "warn" | "error" = "info",
 ): Promise<void> {
-  if (!machineName) return;
-  try {
-    const vmId = await findCloudVMIdByServerName(machineName);
-    if (vmId) await logCloudVMEvent(vmId, message, level);
-  } catch {
-    // Never throw — logging is best-effort
-  }
+  // No-op: CloudVM event logging removed (BYO RunnerHost only).
 }
 
 // ─── Install token lookup ─────────────────────────────────────────────────────
@@ -96,6 +90,80 @@ async function findValidInstallToken(rawToken: string) {
     if (await bcrypt.compare(rawToken, t.tokenHash)) return t;
   }
   return null;
+}
+
+// ─── Ed25519 device pairing gate ────────────────────────────────────────────────
+
+/**
+ * Additive device-identity gate (parity Domain-10 A5/A6 / GAP-1). When a plugin presents an Ed25519
+ * device public key + a signature over the nonce, the machine must be a board-approved, key-pinned
+ * device before the connection is accepted - layered on top of the existing bcrypt token check.
+ *
+ * Returns true to allow the handshake to continue, false if it was rejected (an error was already
+ * sent to the socket). When no `publicKey` is presented this is a no-op passthrough (returns true) so
+ * the legacy install/connection-token path keeps working unchanged.
+ *
+ * A first-contact device (unknown fingerprint) is auto-registered as `pending` and rejected until an
+ * admin approves it via the Devices UI.
+ */
+async function verifyDeviceHandshake(
+  ws: WebSocket,
+  msg: MsgHello,
+  hostname: string,
+): Promise<boolean> {
+  if (!msg.publicKey) return true; // legacy path - bcrypt token gate handles auth
+
+  if (!msg.signature) {
+    sendError(ws, "auth_failed", "Device signature required");
+    logVMActivity(
+      hostname,
+      `Auth rejected: device public key without signature from ${hostname}`,
+      "warn",
+    ).catch(() => undefined);
+    return false;
+  }
+
+  const result = await verifyDeviceAuth({
+    machineFingerprint: msg.fingerprint,
+    nonce: msg.nonce,
+    signatureB64: msg.signature,
+  });
+
+  if (result.ok) return true;
+
+  if (result.reason === "unknown_device") {
+    // First contact: pin the presented key as a pending device for admin approval, then reject.
+    await registerDevice({
+      workspaceId: DEFAULT_WORKSPACE_ID,
+      machineFingerprint: msg.fingerprint,
+      publicKeyRaw: msg.publicKey,
+      label: hostname,
+    }).catch((err) =>
+      console.error(
+        `[live-gateway] Failed to auto-register pending device ${msg.fingerprint}:`,
+        err,
+      ),
+    );
+    sendError(ws, "auth_failed", "Device not yet approved - awaiting admin approval");
+    logVMActivity(
+      hostname,
+      `Auth rejected: new device ${hostname} registered as pending - awaiting board approval`,
+      "warn",
+    ).catch(() => undefined);
+    return false;
+  }
+
+  const message =
+    result.reason === "device_pending"
+      ? "Device not yet approved - awaiting admin approval"
+      : result.reason === "device_revoked"
+        ? "Device access revoked"
+        : "Device signature verification failed";
+  sendError(ws, "auth_failed", message);
+  logVMActivity(hostname, `Auth rejected: device ${hostname} - ${result.reason}`, "warn").catch(
+    () => undefined,
+  );
+  return false;
 }
 
 // ─── vm.hello handler ─────────────────────────────────────────────────────────
@@ -132,6 +200,9 @@ async function handleHello(ws: WebSocket, msg: MsgHello): Promise<string | null>
     ).catch(() => undefined);
     return null;
   }
+
+  // 2.5. Ed25519 device-identity gate (additive). No-op when the plugin presents no device key.
+  if (!(await verifyDeviceHandshake(ws, msg, hostname))) return null;
 
   // 3. Check if fingerprint already registered (reconnect path)
   const existing = await findConnectionByFingerprint(msg.fingerprint);
@@ -406,10 +477,22 @@ async function handleTaskDone(
       machineName,
       `@${msg.slug} reported task #${task.taskNumber} done (already done — idempotent)`,
     ).catch(() => undefined);
+    // Still ack so the plugin stops resending this (already-durable) completion.
+    connectionRegistry.send(connectionId, {
+      type: "mc.task_done_ack",
+      taskId: msg.taskId,
+      slug: msg.slug,
+    });
     return;
   }
 
   await updateTaskStatus(msg.taskId, TaskStatus.DONE);
+  // Ack now that it's durably persisted — the plugin can drop it from its resend buffer.
+  connectionRegistry.send(connectionId, {
+    type: "mc.task_done_ack",
+    taskId: msg.taskId,
+    slug: msg.slug,
+  });
   logVMActivity(machineName, `@${msg.slug} completed task #${task.taskNumber}`).catch(
     () => undefined,
   );
@@ -505,6 +588,9 @@ async function drainAndDeliver(
       `Task delivered to agent @${task.agentSlug} (task: ${task.taskId})`,
     ).catch(() => undefined);
   }
+  // Count this push against each delivery's attempt budget; the reap cron dead-letters any that
+  // keep failing to ack so we stop re-draining them forever.
+  await markDeliveriesAttempted(pending.map((p) => p.id)).catch(() => undefined);
 }
 
 // ─── Connection entry point ───────────────────────────────────────────────────
@@ -622,7 +708,12 @@ export function handlePluginConnection(ws: WebSocket, _req: IncomingMessage): vo
     if (connectionId) {
       connectionRegistry.remove(connectionId);
       await markConnectionDisconnected(connectionId).catch(() => undefined);
-      await clearAgentRoutes(connectionId).catch(() => undefined);
+      // Intentionally do NOT clear agent routes here. The connection record is stable per machine
+      // (machineFingerprint @unique) and syncAgentRoutes reconciles routes on every reconnect, so
+      // keeping them lets a task assigned during the brief disconnect window still be enqueued
+      // against this connection (findConnectionByAgentSlug resolves it) and drained on reconnect —
+      // instead of being lost from the live path. Liveness for an actual push is decided by the
+      // in-memory connection registry, not by route presence.
       logVMActivity(machineName, `Plugin disconnected (${machineName ?? "unknown host"})`).catch(
         () => undefined,
       );

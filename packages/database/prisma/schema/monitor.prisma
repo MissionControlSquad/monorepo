@@ -1,0 +1,35 @@
+// ─── Monitors (Tier C) ────────────────────────────────────────────
+// Workspace-scoped health monitors: a named threshold over a computed metric. Evaluated ON DEMAND
+// (a query counts the current value and compares) — the runtime-free half. The DEFERRED half is a
+// background scheduler that auto-evaluates + fires alerts, which needs the excluded execution engine
+// (Tier D). Definitions + on-demand evaluation are fully usable without it.
+
+enum MonitorMetric {
+  open_budget_incidents // BudgetIncident (workspace) with status=open
+  open_pipeline_cases // PipelineCase not done/rejected
+  active_agents // Agent with setupStatus=active
+  disabled_secrets // Secret with status=disabled
+}
+
+enum MonitorComparator {
+  gt
+  gte
+  lt
+  lte
+}
+
+model Monitor {
+  id          String            @id @default(cuid())
+  workspaceId String // buildbase workspace _id; no FK (D5)
+  name        String
+  metric      MonitorMetric
+  comparator  MonitorComparator @default(gt)
+  threshold   Int               @default(0)
+  isActive    Boolean           @default(true)
+  createdBy   String? // buildbase userId
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([workspaceId])
+  @@map("monitors")
+}

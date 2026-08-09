@@ -1,0 +1,12 @@
+---
+service: attention
+kind: service
+status: Present
+priority: P0
+gate: done
+---
+# attention · ✅ Present
+**What it is:** computed "what needs me" feed + dismiss/snooze.
+**Monorepo:** `attention.ts:getAttentionFeed` + `AttentionDismissal` (snoozedUntil) + route `/attention`.
+**Required:** —
+**Covers:** features/P0-attention-notifications.mdx · SERVICE-AUDIT #16.

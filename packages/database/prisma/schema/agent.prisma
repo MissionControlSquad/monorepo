@@ -105,10 +105,17 @@ model Agent {
   apiKeyCreatedAt DateTime?
   isOnVacation    Boolean         @default(false)
   templateId      String?
-  configVersion   String?         // Reported by agent on sync_identity; used for "upgrade available"
+  configVersion   String? // Reported by agent on sync_identity; used for "upgrade available"
   hostingType     HostingType     @default(selfHosted)
-  cloudVmId       String?
-  llmModel        String?         // Per-agent LLM model override; null = use VM default
+  llmModel        String? // Per-agent LLM model override; null = use VM default
+  // Tier D: per-agent runtime adapter selection (the control plane dictates how the runner launches
+  // this agent). null = use the runner's own configured default.
+  runtimeAdapter  String? // adapter key: openclaw|codex|claude|gemini|process|shell|http|<plugin>
+  runtimeModel    String? // model override passed to the adapter
+  runtimeTemplate String? // command/argv/URL template for process/shell/http adapters
+  sandboxProvider String? // Tier D: run this agent's tasks inside a provisioned sandbox (provider key). null = local/runner
+  environmentId   String? // Tier D / Phase 3: the Environment (where/how) this agent runs in. null = ad-hoc sandboxProvider
+  memoryProvider  String          @default("none") // Tier D memory binding: none | markdown | db
   createdBy       String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -124,10 +131,37 @@ model Agent {
   projectDocsAdded    ProjectDoc[]         @relation("ProjectDocAddedBy")
   projectDocRevisions ProjectDocRevision[] @relation("ProjectDocRevisionEditedBy")
   profile             Profile?
-  cloudVm             CloudVM?             @relation(fields: [cloudVmId], references: [id], onDelete: SetNull)
+
+  workspaceId String? // buildbase workspace _id (Epic #1, D5); no FK; backfilled to default workspace
+
+  trustLevel   TrustLevel? // Epic #3: denormalized cache of AgentTrustProfile.trustLevel
+  trustProfile AgentTrustProfile?
+
+  costEvents      CostEvent[] // Epic #4
+  budgetPolicies  BudgetPolicy[]
+  budgetIncidents BudgetIncident[]
+
+  adapterType   String? // Epic #2: FK → AgentAdapter.type; nullable during rollout, backfilled "openclaw-gateway"
+  adapterConfig Json? // per-agent config, validated vs AgentAdapter.configSchema
+  adapter       AgentAdapter? @relation("AgentAdapterType", fields: [adapterType], references: [type], onDelete: Restrict)
+
+  secretBindings   SecretBinding[] // Epic #5
+  agentSkills      AgentSkill[] // Epic #10
+  goals            Goal[]             @relation("AgentGoals") // Epic #11
+  terminalSessions TerminalSession[]  @relation("AgentTerminals") // Epic #9
+  instructions     AgentInstruction[] @relation("AgentInstructions") // Epic #18
+
+  reportsToAgentId String? // Epic #19: manager edge (org chart); self-FK, SetNull
+  reportsTo        Agent?  @relation("AgentOrg", fields: [reportsToAgentId], references: [id], onDelete: SetNull)
+  companyId        String? // Domain 14 #10: the AgentCompany this agent belongs to (no FK — soft link)
+  reports          Agent[] @relation("AgentOrg")
+
+  capabilityGrants AgentCapabilityGrant[] @relation("AgentGrants") // Epic #21
 
   @@index([username])
-  @@index([cloudVmId])
+  @@index([workspaceId])
+  @@index([adapterType])
+  @@index([workspaceId, reportsToAgentId])
   @@map("agents")
 }
 
@@ -156,7 +190,7 @@ model WorkSession {
   projectId String?
   startedAt DateTime             @default(now())
   endedAt   DateTime?
-  duration  Int?                 // milliseconds
+  duration  Int? // milliseconds
   eventType WorkSessionEventType
 
   task    Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)

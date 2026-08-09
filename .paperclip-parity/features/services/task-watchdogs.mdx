@@ -1,0 +1,12 @@
+---
+service: task-watchdogs
+kind: service
+status: Present
+priority: P1
+gate: done (some conditions inert)
+---
+# task-watchdogs · ✅ Present
+**What it is:** watchdogs that detect stuck/stalled/over-budget/abandoned tasks.
+**Monorepo:** P1-heartbeat — 2 of 4 conditions live; 2 inert pending realization signals.
+**Required:** wire the remaining 2 conditions once workspace realization lands.
+**Covers:** features/P1-heartbeat-scheduling-recovery.mdx · SERVICE-AUDIT #159.

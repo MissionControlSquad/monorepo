@@ -1,6 +1,8 @@
 import { projectDocModel, projectDocRevisionModel } from "@/server/models";
 import { invalidateProjectContext } from "@/server/cache";
 import { resolveAgent } from "../../../_lib/resolve-agent";
+import { requireAgentCapability } from "@/server/services/agent-authz";
+import { AGENT_CAPABILITY } from "@agentcenter/utils";
 import { successResponse, handleError } from "../../../_lib/json-response";
 import { validateBody, createProjectDocSchema } from "../../../_lib/validation";
 import { assertProjectMember } from "../../../_lib/project-access";
@@ -36,6 +38,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     const agent = await resolveAgent(request);
     const { id: projectId } = await ctx.params;
     await assertProjectMember(agent.id, projectId);
+    // Epic #21: enforce the agent's docs.write capability (no-op for open agents; blocks a restricted
+    // agent lacking the grant, with an audit row).
+    await requireAgentCapability(agent, AGENT_CAPABILITY.DOCS_WRITE, { projectId });
 
     const v = await validateBody(request, createProjectDocSchema);
     if (v.error) return v.error;

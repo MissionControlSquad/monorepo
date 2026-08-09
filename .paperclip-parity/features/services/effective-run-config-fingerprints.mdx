@@ -1,0 +1,12 @@
+---
+service: effective-run-config-fingerprints
+kind: service
+status: Present
+priority: P1
+gate: done
+---
+# effective-run-config-fingerprints · ✅ Present
+**What it is:** hash the effective run config to detect drift / cache image builds.
+**Monorepo:** computed in `environment-custom-images.ts`.
+**Required:** —
+**Covers:** features/P1-environments-leases.mdx · SERVICE-AUDIT #44.

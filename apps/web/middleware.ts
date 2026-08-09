@@ -19,6 +19,14 @@ function getSecret() {
 const RATE_LIMIT_WINDOW_MS = 60_000; // 60 seconds
 const RATE_LIMIT_MAX = 300; // requests per window per IP (safety net — per-route limiters are tighter)
 
+// E2E/CI escape hatch. Under Playwright, several parallel workers drive the served app from a single
+// shared client IP, and each page load fans out into many requests (SSR + GraphQL + polling). That
+// trips this per-IP safety net non-deterministically, surfacing as full-page "Too Many Requests"
+// responses and aborted GraphQL loads (a body of `{error}` not `{data}`). Gated on a flag set ONLY in
+// the e2e workflow's app env (.github/workflows/e2e.yaml) — never in dev/prod, so real traffic stays
+// limited. Mirrors SEED_BYPASS_RATE_LIMIT / NODE_ENV=test in app/api/_lib/rate-limit-check.ts.
+const RATE_LIMIT_DISABLED = process.env.E2E_RATE_LIMIT_DISABLED === "1";
+
 interface RateLimitEntry {
   count: number;
   resetAt: number;
@@ -106,6 +114,7 @@ const AGENT_BEARER_PREFIXES = [
   "/api/queue",
   "/api/storage",
   "/api/channels",
+  "/api/cost-events", // Epic #4: agents report inference cost via Bearer key (resolveAgent in handler)
 ];
 
 /** Admin-only routes under /api/agents/[id]/ that require session auth. */
@@ -152,7 +161,7 @@ export async function middleware(request: NextRequest) {
   requestHeaders.set("x-request-id", requestId);
 
   // --- Global Rate Limiting ---
-  if (!isRateLimitExempt(pathname)) {
+  if (!RATE_LIMIT_DISABLED && !isRateLimitExempt(pathname)) {
     const ip = getClientIp(request.headers);
     const { limited, retryAfter } = checkGlobalRateLimit(ip);
 

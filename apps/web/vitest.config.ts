@@ -10,10 +10,16 @@ export default defineConfig({
     globals: true,
     environment: "node",
     testTimeout: 15000,
-    // E2E tests share DB state so they run sequentially with their own setup
-    // Unit tests are isolated and can run in parallel
+    // Integration files share the DB + process.env, so each runs in its own isolated worker (default
+    // isolate:true) with no cross-file file parallelism. See tests/setup.ts for the per-file DB
+    // truncation + DISABLE_FLAG_CACHE that keep cross-file state clean.
     fileParallelism: false,
     setupFiles: ["./tests/setup.ts"],
+    // Read feature flags fresh from the DB on every check (bypass the 60s cache). Integration tests
+    // toggle flags constantly and share one worker process, so a live cache goes stale relative to
+    // the DB and causes order-dependent flaky failures. Set here (committed) so CI gets it too; the
+    // feature-flags cache unit test opts back out. Prod keeps the cache.
+    env: { DISABLE_FLAG_CACHE: "1" },
     // Allow running subsets: `npm run test:unit` / `npm run test:e2e`
     include: ["tests/**/*.test.ts"],
   },

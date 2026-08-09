@@ -19,12 +19,12 @@ export const AGENTS_QUERY = gql`
       lastHeartbeat
       setupStatus
       isOnVacation
+      memoryProvider
       apiKeyPrefix
       configVersion
       currentConfigVersion
       upgradeAvailable
       hostingType
-      cloudVmId
       createdBy
       createdAt
       updatedAt
@@ -55,18 +55,15 @@ export const AGENT_QUERY = gql`
       lastHeartbeat
       setupStatus
       isOnVacation
+      memoryProvider
       apiKeyPrefix
       configVersion
       currentConfigVersion
       upgradeAvailable
       hostingType
-      cloudVmId
-      cloudVm {
-        id
-        name
-        status
-        ipv4
-      }
+      adapterType
+      adapterConfig
+      llmModel
       createdBy
       createdAt
       updatedAt
@@ -75,6 +72,9 @@ export const AGENT_QUERY = gql`
         title
         taskNumber
         status
+      }
+      profile {
+        id
       }
     }
   }

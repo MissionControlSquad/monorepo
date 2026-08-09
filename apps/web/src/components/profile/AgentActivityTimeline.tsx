@@ -49,10 +49,10 @@ export function AgentActivityTimeline({ agentId, projectId }: AgentActivityTimel
 
   return (
     <Card className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-3 py-2.5 @xl:px-5 @xl:py-3 border-b border-gray-100 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700">Activity</h3>
+      <div className="flex-shrink-0 px-3 py-2.5 @xl:px-5 @xl:py-3 border-b border-border flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-foreground">Activity</h3>
         {activities.length > 0 && (
-          <span className="text-xs text-gray-400 font-medium">{activities.length} events</span>
+          <span className="text-xs text-muted-foreground font-medium">{activities.length} events</span>
         )}
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto">
@@ -62,10 +62,10 @@ export function AgentActivityTimeline({ agentId, projectId }: AgentActivityTimel
           </div>
         ) : activities.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-2">
+            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
               <Coffee className="w-5 h-5 text-gray-300" />
             </div>
-            <p className="text-sm text-gray-400">No activity yet</p>
+            <p className="text-sm text-muted-foreground">No activity yet</p>
             <p className="text-xs text-gray-300 mt-0.5">
               Activity will appear as the agent works on tasks
             </p>
