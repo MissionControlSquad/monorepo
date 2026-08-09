@@ -79,15 +79,20 @@ test("agent lifecycle: create in UI, load skill+config from cloud, work, deliver
 
   // ---- 7. the parent (squad lead) requests REWORK, then the agent resubmits, then APPROVES ------
   const leads = await gql(request, "query{ agents{ id role } }");
-  const leadId: string = leads.data.agents.find((a: { role: string }) => /lead/i.test(a.role || ""))?.id;
+  // The reviewer must be the Squad Lead specifically: both /reject and /approve gate on
+  // role === "Squad Lead" (squadLeadRequired). Match the role exactly — a loose /lead/i also matches
+  // the seed's plain "Lead" specialist, which fails that guard (the reject 403 then slips by unnoticed
+  // and only the asserted approve surfaces it).
+  const leadId: string = leads.data.agents.find((a: { role: string }) => a.role === "Squad Lead")?.id;
   expect(leadId, "a squad-lead agent should exist to review").toBeTruthy();
   const leadKey: string = (await request.post(`/api/agents/${leadId}/regenerate-key`).then((r) => r.json())).apiKey;
   const lead = bearer(request, leadKey);
 
-  await lead.post(`/api/tasks/${taskId}/reject`, {
+  const rej = await lead.post(`/api/tasks/${taskId}/reject`, {
     rejectionReason: "Add a max-height guard for very small screens.",
     changesNeeded: ["Cap max-height at 60vh on <360px"],
   });
+  expect(rej.ok(), "squad lead can reject for rework").toBeTruthy();
   await page.reload();
   await expect(page.getByText(/rejected|changes/i).first()).toBeVisible();
 
