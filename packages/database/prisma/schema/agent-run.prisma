@@ -11,6 +11,13 @@ model AgentRun {
   providerKey          String?
   sandboxId            String? // the ephemeral sandbox/host id this run used
   status               String    @default("running") // running | done | failed | timeout | canceled
+  // §3 #2 cancellation — a human-readable reason set when a run is canceled (queued-cancel or an
+  // in-flight abort). Pairs with exitReason="canceled". Null for non-canceled runs.
+  cancelReason         String?
+  // §3 #2 cost — pricing status of costCents: "reported" (priced from the rate card) | "unpriced"
+  // (unknown model → costCents 0, repriceable later). Mirrors CostEvent.costStatus. Null = no cost
+  // computed (a blob-only run with no captured usage).
+  costStatus           String?
   // Domain 9 #10 — product silence-watchdog signals. The runner stamps lastOutputAt when output arrives;
   // the watchdog classifies a running run silent past thresholds. watchdogSnoozedUntil suppresses it.
   lastOutputAt         DateTime?

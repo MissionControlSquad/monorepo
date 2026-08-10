@@ -19,6 +19,7 @@ import {
   resolveEffectiveWorkspaceStrategyType,
   redactRunSecrets,
   renderAdapterTranscript,
+  estimateRunCostCents,
   FLAG_KEYS,
   type TrustLevel,
   type AdapterExecutionResult,
@@ -56,6 +57,14 @@ import { beginRunStatus, setRunPhase, appendRunLog } from "./run-runtime-status"
 import { appendRunLog as appendRunLogChunk, finalizeRunLog } from "./run-log-store";
 import { attachRunBridgeToken } from "./run-bridge";
 import { resolveActiveImageRef } from "./environment-custom-images";
+import { recordCostEvent } from "./cost";
+import {
+  registerRunAbort,
+  unregisterRunAbort,
+  requestRunCancellation,
+  isRunActive,
+  cancelReasonFromSignal,
+} from "./run-cancellation";
 import { env as env_ } from "../env";
 import type { SandboxProvider, SandboxHandle } from "./sandbox/types";
 import type { AgentTrustProfile, EnvironmentLease } from "@agentcenter/database";
@@ -208,6 +217,58 @@ function executionColumns(execution: AdapterExecutionResult | undefined): {
     ...(execution.errorFamily ? { errorFamily: execution.errorFamily } : {}),
     exitReason: execution.exitReason,
   };
+}
+
+/**
+ * Cost half (§3 #2): price a finished run from its captured token usage + model against the curated
+ * rate-card, PERSIST it onto the AgentRun (`costCents` + `costStatus`), and emit a `CostEvent`
+ * attributing the spend to the agent/model/task/run (the CostEvent funnel fans it into every budget
+ * policy). No-op when the run captured no usage (a blob-only adapter with no token counts) so we never
+ * write a bogus $0. An UNKNOWN model prices at 0 with `priced:false` → persisted + emitted as
+ * `unpriced` (never silently billed as the real cost; repriceable later via repriceCostEvent).
+ *
+ * HOW COST IS COMPUTED: cents = round(tokensIn/1e6 * $in/Mtok + tokensOut/1e6 * $out/Mtok). Example —
+ * a claude-opus-4-8 run with 100 in / 50 out → ~$0.0053 → 1 cent (priced). An unknown model → 0 cents,
+ * costStatus "unpriced". Best-effort: cost accounting must NEVER fail a run, so this returns the columns
+ * to fold into the terminal write and swallows any CostEvent error.
+ *
+ * Returns the AgentRun cost columns to merge into the terminal update (empty when there is no usage).
+ */
+async function persistRunCost(input: {
+  workspaceId: string;
+  agentId: string;
+  taskId: string | null;
+  projectId?: string | null;
+  runId: string;
+  execution: AdapterExecutionResult | undefined;
+}): Promise<{ costCents?: number; costStatus?: string }> {
+  const usage = input.execution?.usage;
+  if (!usage) return {}; // no captured token usage → nothing to price
+  const cost = estimateRunCostCents({
+    model: usage.model,
+    tokensIn: usage.tokensIn,
+    tokensOut: usage.tokensOut,
+  });
+  const costStatus = cost.priced ? "reported" : "unpriced";
+  try {
+    await recordCostEvent({
+      workspaceId: input.workspaceId,
+      agentId: input.agentId,
+      model: usage.model ?? null,
+      taskId: input.taskId,
+      projectId: input.projectId ?? null,
+      tokensIn: usage.tokensIn,
+      tokensOut: usage.tokensOut,
+      amountCents: cost.cents,
+      costStatus,
+      source: "run",
+      // Attribute to THIS run + make the emission idempotent (a re-run of the finalizer won't double-bill).
+      idempotencyKey: `run:${input.runId}`,
+    });
+  } catch {
+    // best-effort — cost accounting must never fail a run
+  }
+  return { costCents: cost.cents, costStatus };
 }
 
 /** The task prompt written into the sandbox as TASK.md (mirrors the runner's taskMarkdown). */
@@ -472,6 +533,11 @@ export async function runTaskInSandbox(input: {
   // Secret VALUES (env + git token) are scrubbed from every streamed chunk.
   beginRunStatus(run.id, secretValues);
 
+  // In-flight cancellation (§3 #2): register an AbortController keyed by this run id BEFORE exec so
+  // `cancelAgentRun` can abort the running exec. Its signal is threaded into handle.exec below; the
+  // finalizer reads `signal.aborted` to mark the run `canceled`. Always unregistered in the finally.
+  const abortController = registerRunAbort(run.id);
+
   let handle: SandboxHandle | undefined;
   let lease: EnvironmentLease | null = null;
   try {
@@ -495,6 +561,7 @@ export async function runTaskInSandbox(input: {
     let stdout: string;
     let stderr: string;
     let timedOut = false;
+    let canceled = false;
     // Durable transcript capture: buffer every streamed chunk (in order, with its stream) so we can
     // persist the FULL redacted transcript to the run-log store after exec. Kept separate from the
     // synchronous live tail above; ordering is guaranteed by persisting sequentially post-exec.
@@ -502,6 +569,7 @@ export async function runTaskInSandbox(input: {
     try {
       const result = await handle.exec(script, {
         timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        signal: abortController.signal,
         onLog: (chunk) => {
           appendRunLog(run.id, chunk.data);
           logChunks.push({ stream: chunk.stream, data: chunk.data });
@@ -514,6 +582,9 @@ export async function runTaskInSandbox(input: {
       stdout = redactRunSecrets(result.stdout, secretValues).slice(-MAX_OUTPUT_CHARS);
       stderr = redactRunSecrets(result.stderr, secretValues).slice(-MAX_OUTPUT_CHARS);
       timedOut = result.timedOut ?? false;
+      // The exec was terminated by a cancel request (its AbortSignal fired) — the provider killed the
+      // child. Distinct from a timeout kill; drives the terminal `canceled` status below.
+      canceled = result.aborted === true || abortController.signal.aborted;
     } catch (execErr) {
       // exec itself blew up - persist whatever transcript we captured (best-effort), then release as a
       // failure (retain_on_failure keeps the box) and re-throw.
@@ -534,7 +605,13 @@ export async function runTaskInSandbox(input: {
       outcome: exitCode === 0 && !timedOut ? "success" : "failure",
     });
 
-    const runStatus = timedOut ? "timeout" : exitCode === 0 ? "done" : "failed";
+    const runStatus = canceled
+      ? "canceled"
+      : timedOut
+        ? "timeout"
+        : exitCode === 0
+          ? "done"
+          : "failed";
     setRunPhase(run.id, runStatus);
 
     // Adapter-owned structured result (parity slice): if the bound adapter owns an `execute()` (or at
@@ -562,6 +639,17 @@ export async function runTaskInSandbox(input: {
         : "";
     const displayOutput = parsedOutput || stdout;
 
+    // Cost half (§3 #2): price the run from its captured usage, emit the CostEvent, and fold the
+    // costCents/costStatus columns into the terminal write. Empty for a no-usage (blob) run.
+    const costColumns = await persistRunCost({
+      workspaceId: input.workspaceId,
+      agentId: agent.id,
+      taskId: input.taskId,
+      projectId,
+      runId: run.id,
+      execution,
+    });
+
     await prisma.agentRun.update({
       where: { id: run.id },
       data: {
@@ -573,6 +661,11 @@ export async function runTaskInSandbox(input: {
         finishedAt: new Date(),
         bridgeTokenHash: null, // invalidate the in-sandbox bridge token now the run is over
         ...executionColumns(execution),
+        ...costColumns,
+        // Cancellation (§3 #2): a canceled run overrides the derived exitReason and records the reason.
+        ...(canceled
+          ? { exitReason: "canceled", cancelReason: cancelReasonFromSignal(abortController.signal) }
+          : {}),
       },
     });
 
@@ -686,8 +779,11 @@ export async function runTaskInSandbox(input: {
       ...(execution ? { execution } : {}),
     };
   } catch (err) {
+    // A cancel that landed DURING provisioning (before/at exec) surfaces here — mark the run canceled
+    // (not failed) with its reason, rather than treating the abort as a provisioning failure.
+    const wasCanceled = abortController.signal.aborted;
     // Provision/exec threw before we could record a result — mark the run failed, then re-throw.
-    setRunPhase(run.id, "failed");
+    setRunPhase(run.id, wasCanceled ? "canceled" : "failed");
     // A provision/exec error message can echo a resolved secret (e.g. a git error printing the token in
     // the remote URL), so scrub it before it is persisted or posted to the task timeline.
     const message = redactRunSecrets(
@@ -698,21 +794,32 @@ export async function runTaskInSandbox(input: {
       .update({
         where: { id: run.id },
         data: {
-          status: "failed",
+          status: wasCanceled ? "canceled" : "failed",
           errorMessage: message,
           finishedAt: new Date(),
           bridgeTokenHash: null, // invalidate the in-sandbox bridge token
           ...(handle ? { sandboxId: handle.id } : {}),
+          ...(wasCanceled
+            ? {
+                exitReason: "canceled",
+                cancelReason: cancelReasonFromSignal(abortController.signal),
+              }
+            : {}),
         },
       })
       .catch(() => {});
     await postRunToTask(
       agent.id,
       input.taskId,
-      `Sandbox run (${providerKey}) failed: ${message}`,
+      wasCanceled
+        ? `Sandbox run (${providerKey}) canceled: ${cancelReasonFromSignal(abortController.signal)}`
+        : `Sandbox run (${providerKey}) failed: ${message}`,
       run?.id,
     );
     throw err;
+  } finally {
+    // Always release the in-process cancellation controller once this run is done executing.
+    unregisterRunAbort(run.id);
   }
 }
 
@@ -903,6 +1010,15 @@ async function dispatchHermesGatewayRun(input: {
     const execution = hermesExecution(result, input.model);
     setRunPhase(run.id, runStatus);
 
+    // Cost half (§3 #2): the gateway path also captures usage — price it + emit the CostEvent.
+    const costColumns = await persistRunCost({
+      workspaceId,
+      agentId: agent.id,
+      taskId,
+      runId: run.id,
+      execution,
+    });
+
     await prisma.agentRun.update({
       where: { id: run.id },
       data: {
@@ -916,6 +1032,7 @@ async function dispatchHermesGatewayRun(input: {
           : {}),
         finishedAt: new Date(),
         ...executionColumns(execution),
+        ...costColumns,
       },
     });
 
@@ -1056,13 +1173,44 @@ export async function drainSandboxRunQueue(limit = 5): Promise<number> {
 }
 
 /**
- * Cancel a QUEUED sandbox run (queued→canceled, so the worker never picks it up). A run already
- * executing cannot be cleanly killed in this model — only queued runs are cancellable.
+ * Cancel an agent run (§3 #2). Two cases, workspace-scoped:
+ *   1. RUNNING in THIS process — abort the in-flight exec via the in-process cancellation registry. The
+ *      provider kills the child process; the run finalizer marks the row `canceled` + records the
+ *      reason. Returns true (cancellation requested; the terminal write follows asynchronously).
+ *   2. QUEUED (or a run we can't reach) — mark the row `canceled` in the DB so the worker never picks
+ *      it up (the original queued-cancel behavior), stamping exitReason + cancelReason.
+ *
+ * LIMITATION (see run-cancellation.ts): the registry is IN-PROCESS. A RUNNING run executing on a
+ * DIFFERENT instance/invocation than the one handling this request is not reachable — `isRunActive`
+ * is false there, so it falls through to the queued-cancel updateMany, which no-ops on a running row
+ * and returns false. Killing such a run cross-process needs a durable cancel flag (deferred).
  */
-export async function cancelAgentRun(workspaceId: string, runId: string): Promise<boolean> {
+export async function cancelAgentRun(
+  workspaceId: string,
+  runId: string,
+  reason = "canceled by operator",
+): Promise<boolean> {
+  // Scope-check first: never signal/cancel a run outside the caller's workspace.
+  const run = await prisma.agentRun.findFirst({
+    where: { id: runId, workspaceId },
+    select: { status: true },
+  });
+  if (!run) return false;
+
+  // RUNNING here → abort the live exec; the run's finalizer writes the terminal canceled row + reason.
+  if (run.status === "running" && isRunActive(runId)) {
+    return requestRunCancellation(runId, reason);
+  }
+
+  // QUEUED (or unreachable running) → best-effort DB cancel so the worker never claims it.
   const res = await prisma.agentRun.updateMany({
     where: { id: runId, workspaceId, status: "queued" },
-    data: { status: "canceled", finishedAt: new Date() },
+    data: {
+      status: "canceled",
+      finishedAt: new Date(),
+      exitReason: "canceled",
+      cancelReason: reason,
+    },
   });
   return res.count > 0;
 }

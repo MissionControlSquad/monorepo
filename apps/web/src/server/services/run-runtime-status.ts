@@ -10,7 +10,8 @@ import { redactRunSecrets } from "@agentcenter/utils";
 const TTL_MS = 90_000;
 const MAX_TAIL = 8_000;
 
-export type RunPhase = "queued" | "provisioning" | "running" | "done" | "failed" | "timeout";
+export type RunPhase =
+  "queued" | "provisioning" | "running" | "done" | "failed" | "timeout" | "canceled";
 
 interface RunStatus {
   runId: string;

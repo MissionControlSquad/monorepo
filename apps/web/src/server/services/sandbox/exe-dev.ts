@@ -73,7 +73,7 @@ function runSsh(
   user: string,
   sshDest: string,
   remoteCommand: string,
-  opts?: { timeoutMs?: number },
+  opts?: { timeoutMs?: number; signal?: AbortSignal },
 ): Promise<SandboxExecResult> {
   return new Promise((resolve) => {
     const args = [
@@ -90,18 +90,33 @@ function runSsh(
     const child = spawn("ssh", args);
     let stdout = "";
     let stderr = "";
+    let aborted = false;
     const timer = opts?.timeoutMs
       ? setTimeout(() => child.kill("SIGKILL"), opts.timeoutMs)
       : undefined;
+    // In-flight cancellation (§3 #2): abort kills the ssh subprocess (which closes the remote command's
+    // channel). Best-effort — the remote process may briefly outlive the channel, but the run is freed.
+    const onAbort = () => {
+      aborted = true;
+      child.kill("SIGKILL");
+    };
+    if (opts?.signal) {
+      if (opts.signal.aborted) queueMicrotask(onAbort);
+      else opts.signal.addEventListener("abort", onAbort, { once: true });
+    }
+    const cleanup = () => {
+      if (timer) clearTimeout(timer);
+      if (opts?.signal) opts.signal.removeEventListener("abort", onAbort);
+    };
     child.stdout.on("data", (d: Buffer) => (stdout += d.toString()));
     child.stderr.on("data", (d: Buffer) => (stderr += d.toString()));
     child.on("error", (err) => {
-      if (timer) clearTimeout(timer);
-      resolve({ exitCode: null, stdout, stderr: stderr + String(err) });
+      cleanup();
+      resolve({ exitCode: null, stdout, stderr: stderr + String(err), aborted });
     });
     child.on("close", (code) => {
-      if (timer) clearTimeout(timer);
-      resolve({ exitCode: code, stdout, stderr });
+      cleanup();
+      resolve({ exitCode: code, stdout, stderr, aborted });
     });
   });
 }
@@ -153,6 +168,7 @@ export const exeDevProvider = defineCloudProvider({
         const script = loginShellCommand(command, opts?.cwd);
         return runSsh(keyFile, sshUser, record.sshDest, `sh -c ${shellQuote(script)}`, {
           timeoutMs: opts?.timeoutMs,
+          signal: opts?.signal,
         });
       },
       destroy: async () => {
