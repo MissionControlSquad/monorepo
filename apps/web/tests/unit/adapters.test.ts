@@ -59,6 +59,8 @@ describe("adapter registry", () => {
     expect(argvOf(buildAdapterInvocation("opencode", { ...base, model: "gpt-x" }))).toEqual([
       "opencode",
       "run",
+      "--format",
+      "json",
       "--model",
       "gpt-x",
       "the brief",
@@ -66,6 +68,9 @@ describe("adapter registry", () => {
     expect(argvOf(buildAdapterInvocation("cursor", base))).toEqual([
       "cursor-agent",
       "-p",
+      "--output-format",
+      "stream-json",
+      "--force",
       "the brief",
     ]);
   });
