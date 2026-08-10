@@ -1,0 +1,51 @@
+// ─── Workspace runtime services (Tier D / Phase 3 — long-lived dev/preview processes) ─────────────
+// A WorkspaceRuntimeService is a long-lived process started INSIDE an execution workspace — e.g.
+// `npm run dev`, a Vite/Next preview server, a mock API — kept alive across runs rather than spawned
+// per-command. It is tracked by port/health/reuseKey/stopPolicy so it can be reused across runs,
+// health-checked, and reaped. Ported from Paperclip's WorkspaceRuntimeService.
+//
+// This is the CONTROL PLANE model: it records the lifecycle + exposes the control surface. The actual
+// OS-process spawn/kill/health-probe is a documented runner seam (a local driver would exec `command`,
+// bind `port`, probe `healthCheckUrl`, then call setWorkspaceRuntimeServiceHealth back). See the header
+// of apps/web/src/server/services/workspace-runtime-services.ts.
+//
+//   status:     stopped | starting | running | unhealthy | stopped_failed
+//   stopPolicy: on_idle    → reaped when the workspace goes idle past a TTL (reapIdleRuntimeServices)
+//               on_run_end → stopped when the run that started it ends
+//               manual     → only ever stopped by an explicit operator action
+//   healthStatus: unknown | healthy | unhealthy (set by the runner/bridge health callback)
+//
+// D5: workspaceId is the buildbase workspace _id (no FK). All status/policy are TEXT. LOCAL_SERVICES-
+// flag-gated (this IS the "local services" runtime surface). reuseKey is the stable dedupe key: only one
+// LIVE service per (executionWorkspaceId, reuseKey) — enforced by a partial-unique index in the
+// migration (stopped rows do not conflict, so a key can be re-used over time).
+
+model WorkspaceRuntimeService {
+  id                   String             @id @default(cuid())
+  workspaceId          String // buildbase workspace _id; no FK (D5)
+  executionWorkspaceId String
+  executionWorkspace   ExecutionWorkspace @relation(fields: [executionWorkspaceId], references: [id], onDelete: Cascade)
+  name                 String
+  command              String // launch command the runner would exec (e.g. "npm run dev")
+  port                 Int? // bound TCP port once running (nullable until known)
+  reuseKey             String // stable dedupe key — reuse a live service instead of starting a duplicate
+  status               String             @default("stopped")
+  healthCheckUrl       String? // URL a runner probes for liveness (e.g. http://localhost:5173/health)
+  healthStatus         String? // unknown | healthy | unhealthy
+  lastHealthAt         DateTime? // when the health callback last reported
+  stopPolicy           String             @default("on_run_end") // on_idle | on_run_end | manual
+  pid                  Int? // OS pid once spawned (runner-reported; nullable)
+  providerRef          String? // provider/runner handle id (nullable)
+  lastUsedAt           DateTime           @default(now()) // bumped on start/reuse/health — drives idle reaping
+  startedAt            DateTime?
+  stoppedAt            DateTime?
+  stopReason           String? // manual | run_end | idle | failed
+  metadata             Json?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([executionWorkspaceId, status])
+  @@index([stopPolicy, status, lastUsedAt])
+  @@map("workspace_runtime_services")
+}

@@ -51,6 +51,7 @@ import "./feedback";
 import "./asset";
 import "./document-annotation";
 import "./local-service";
+import "./workspace-runtime-service";
 import "./smoke-case";
 import "./adapter-plugin";
 import "./provider-auth-state";
