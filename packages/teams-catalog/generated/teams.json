@@ -1,0 +1,1294 @@
+{
+  "catalogRef": {
+    "//": "Pinned upstream ref for future remote teams-catalog updates. Remote fetch is deferred; today the catalog ships in-repo and this record is stamped into generated/teams.json for provenance/audit. The per-team `sourceRef` (github:owner/repo@commit#sha256:<hex>) carries the integrity hash checked on import.",
+    "commit": null,
+    "fetchedAt": null,
+    "ref": "bundled",
+    "repo": "MissionControlSquad/agentcenter-teams-catalog"
+  },
+  "packageName": "@agentcenter/teams-catalog",
+  "packageVersion": "0.1.0",
+  "schemaVersion": 1,
+  "teams": [
+    {
+      "author": "AgentCenter",
+      "contentHash": "d812d7cc76756cb9c1439802a20e7ba7e31beea803e4b79d014fe2e44c562048",
+      "description": "A ready-to-install academic team of 5 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Academic\"\nslug: \"academic\"\ndescription: \"A ready-to-install academic team of 5 specialist roles, migrated from the built-in agent templates.\"\nicon: \"🎓\"\ntagline: \"5 Academic roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"academic\"]\n---\n# Academic\n\nA ready-to-install academic team of 5 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Cultural Anthropologist — Cultural Anthropologist\n- Geographer — Physical & Human Geographer\n- Historian — Research Historian\n- Narratologist — Narrative Theorist\n- Psychologist — Clinical & Research Psychologist\n",
+          "path": "TEAM.md",
+          "sha256": "13505be19dc0b3e8a562f05e39cee78f0d1a47b30f30204605964dee717740e9"
+        }
+      ],
+      "icon": "🎓",
+      "id": "team_academic",
+      "key": "academic",
+      "name": "Academic",
+      "roles": [
+        {
+          "name": "Cultural Anthropologist",
+          "role": "Cultural Anthropologist"
+        },
+        {
+          "name": "Geographer",
+          "role": "Physical & Human Geographer"
+        },
+        {
+          "name": "Historian",
+          "role": "Research Historian"
+        },
+        {
+          "name": "Narratologist",
+          "role": "Narrative Theorist"
+        },
+        {
+          "name": "Psychologist",
+          "role": "Clinical & Research Psychologist"
+        }
+      ],
+      "slug": "academic",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:d812d7cc76756cb9c1439802a20e7ba7e31beea803e4b79d014fe2e44c562048",
+      "tagline": "5 Academic roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "academic"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "7d790eaaee5b7ed5af428b18f04416cf092f3e429b16d937d1865f5b2d30046c",
+      "description": "A ready-to-install content studio team of 2 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Content Studio\"\nslug: \"content\"\ndescription: \"A ready-to-install content studio team of 2 specialist roles, migrated from the built-in agent templates.\"\nicon: \"✍️\"\ntagline: \"2 Content Studio roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"content\"]\n---\n# Content Studio\n\nA ready-to-install content studio team of 2 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Content & Copywriting — Content Writer\n- Documentation — Documentation Specialist\n",
+          "path": "TEAM.md",
+          "sha256": "574b7d93d91dbf2168f2c3b756d009bf789b315e4fe2a13967c3f85f220bdbb3"
+        }
+      ],
+      "icon": "✍️",
+      "id": "team_content",
+      "key": "content",
+      "name": "Content Studio",
+      "roles": [
+        {
+          "name": "Content & Copywriting",
+          "role": "Content Writer"
+        },
+        {
+          "name": "Documentation",
+          "role": "Documentation Specialist"
+        }
+      ],
+      "slug": "content",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:7d790eaaee5b7ed5af428b18f04416cf092f3e429b16d937d1865f5b2d30046c",
+      "tagline": "2 Content Studio roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "content"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "8c3848b676ecb20af18f284ec748e8c46bc723e63b918937060d45e9667bcdff",
+      "description": "A ready-to-install custom team of 1 specialist role, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Custom\"\nslug: \"custom\"\ndescription: \"A ready-to-install custom team of 1 specialist role, migrated from the built-in agent templates.\"\nicon: \"✨\"\ntagline: \"1 Custom role you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"custom\"]\n---\n# Custom\n\nA ready-to-install custom team of 1 specialist role, migrated from the built-in agent templates.\n\n## Roles\n\n- Custom Agent — Custom Agent\n",
+          "path": "TEAM.md",
+          "sha256": "c67c9e442c6ac7cb43e99a4c74896036fedaa60841e50bf7ca6433e5530ccfaa"
+        }
+      ],
+      "icon": "✨",
+      "id": "team_custom",
+      "key": "custom",
+      "name": "Custom",
+      "roles": [
+        {
+          "name": "Custom Agent",
+          "role": "Custom Agent"
+        }
+      ],
+      "slug": "custom",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:8c3848b676ecb20af18f284ec748e8c46bc723e63b918937060d45e9667bcdff",
+      "tagline": "1 Custom role you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "custom"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "6886fa63d1a3bed2a07b07c88ac39adce0ff8a299bf8fe1832831b969709be5b",
+      "description": "A ready-to-install design team of 9 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Design\"\nslug: \"design\"\ndescription: \"A ready-to-install design team of 9 specialist roles, migrated from the built-in agent templates.\"\nicon: \"🎨\"\ntagline: \"9 Design roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"design\"]\n---\n# Design\n\nA ready-to-install design team of 9 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- UI/UX Design — UX Designer\n- UI Designer — UI Designer\n- UX Researcher — UX Researcher\n- Brand Guardian — Brand Guardian\n- Image Prompt Engineer — Image Prompt Engineer\n- Inclusive Visuals Specialist — Inclusive Visuals Specialist\n- Visual Storyteller — Visual Storyteller\n- Whimsy Injector — Whimsy Injector\n- UX Architect — UX Architect\n",
+          "path": "TEAM.md",
+          "sha256": "346c03a7de9c2a662b823510425538d0cfb51cd77737fe9c1895630591581a24"
+        }
+      ],
+      "icon": "🎨",
+      "id": "team_design",
+      "key": "design",
+      "name": "Design",
+      "roles": [
+        {
+          "name": "UI/UX Design",
+          "role": "UX Designer"
+        },
+        {
+          "name": "UI Designer",
+          "role": "UI Designer"
+        },
+        {
+          "name": "UX Researcher",
+          "role": "UX Researcher"
+        },
+        {
+          "name": "Brand Guardian",
+          "role": "Brand Guardian"
+        },
+        {
+          "name": "Image Prompt Engineer",
+          "role": "Image Prompt Engineer"
+        },
+        {
+          "name": "Inclusive Visuals Specialist",
+          "role": "Inclusive Visuals Specialist"
+        },
+        {
+          "name": "Visual Storyteller",
+          "role": "Visual Storyteller"
+        },
+        {
+          "name": "Whimsy Injector",
+          "role": "Whimsy Injector"
+        },
+        {
+          "name": "UX Architect",
+          "role": "UX Architect"
+        }
+      ],
+      "slug": "design",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:6886fa63d1a3bed2a07b07c88ac39adce0ff8a299bf8fe1832831b969709be5b",
+      "tagline": "9 Design roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "design"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "c3741b69af175b86407017074c5f1095850e80a8c75a085520cc3f76994d3c6d",
+      "description": "A ready-to-install engineering team of 25 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Engineering\"\nslug: \"engineering\"\ndescription: \"A ready-to-install engineering team of 25 specialist roles, migrated from the built-in agent templates.\"\nicon: \"🔧\"\ntagline: \"25 Engineering roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"engineering\"]\n---\n# Engineering\n\nA ready-to-install engineering team of 25 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Frontend Development — Frontend Developer\n- Backend Development — Backend Developer\n- DevOps & Infrastructure — DevOps Engineer\n- AI Engineer — AI Engineer\n- Security Engineer — Security Engineer\n- Mobile App Builder — Mobile App Builder\n- Data Engineer — Data Engineer\n- Backend Architect — Backend Architect\n- Code Reviewer — Code Reviewer\n- Database Optimizer — Database Optimizer\n- Embedded Firmware Engineer — Embedded Firmware Engineer\n- Feishu Integration Developer — Feishu Integration Developer\n- Git Workflow Master — Git Workflow Master\n- Incident Response Commander — Incident Response Commander\n- Rapid Prototyper — Rapid Prototyper\n- Senior Developer — Senior Developer\n- Software Architect — Software Architect\n- Solidity Smart Contract Engineer — Solidity Smart Contract Engineer\n- Site Reliability Engineer — Site Reliability Engineer\n- Technical Writer — Technical Writer\n- Threat Detection Engineer — Threat Detection Engineer\n- WeChat Mini Program Developer — WeChat Mini Program Developer\n- AI Data Remediation Engineer — AI Data Remediation Engineer\n- Autonomous Optimization Architect — Autonomous Optimization Architect\n- Infrastructure Maintainer — Infrastructure Maintainer\n",
+          "path": "TEAM.md",
+          "sha256": "5220a37d5246461828639743f85fba66f2519b0d7a6c7f3a6a729a15eb8bc1a2"
+        }
+      ],
+      "icon": "🔧",
+      "id": "team_engineering",
+      "key": "engineering",
+      "name": "Engineering",
+      "roles": [
+        {
+          "name": "Frontend Development",
+          "role": "Frontend Developer"
+        },
+        {
+          "name": "Backend Development",
+          "role": "Backend Developer"
+        },
+        {
+          "name": "DevOps & Infrastructure",
+          "role": "DevOps Engineer"
+        },
+        {
+          "name": "AI Engineer",
+          "role": "AI Engineer"
+        },
+        {
+          "name": "Security Engineer",
+          "role": "Security Engineer"
+        },
+        {
+          "name": "Mobile App Builder",
+          "role": "Mobile App Builder"
+        },
+        {
+          "name": "Data Engineer",
+          "role": "Data Engineer"
+        },
+        {
+          "name": "Backend Architect",
+          "role": "Backend Architect"
+        },
+        {
+          "name": "Code Reviewer",
+          "role": "Code Reviewer"
+        },
+        {
+          "name": "Database Optimizer",
+          "role": "Database Optimizer"
+        },
+        {
+          "name": "Embedded Firmware Engineer",
+          "role": "Embedded Firmware Engineer"
+        },
+        {
+          "name": "Feishu Integration Developer",
+          "role": "Feishu Integration Developer"
+        },
+        {
+          "name": "Git Workflow Master",
+          "role": "Git Workflow Master"
+        },
+        {
+          "name": "Incident Response Commander",
+          "role": "Incident Response Commander"
+        },
+        {
+          "name": "Rapid Prototyper",
+          "role": "Rapid Prototyper"
+        },
+        {
+          "name": "Senior Developer",
+          "role": "Senior Developer"
+        },
+        {
+          "name": "Software Architect",
+          "role": "Software Architect"
+        },
+        {
+          "name": "Solidity Smart Contract Engineer",
+          "role": "Solidity Smart Contract Engineer"
+        },
+        {
+          "name": "Site Reliability Engineer",
+          "role": "Site Reliability Engineer"
+        },
+        {
+          "name": "Technical Writer",
+          "role": "Technical Writer"
+        },
+        {
+          "name": "Threat Detection Engineer",
+          "role": "Threat Detection Engineer"
+        },
+        {
+          "name": "WeChat Mini Program Developer",
+          "role": "WeChat Mini Program Developer"
+        },
+        {
+          "name": "AI Data Remediation Engineer",
+          "role": "AI Data Remediation Engineer"
+        },
+        {
+          "name": "Autonomous Optimization Architect",
+          "role": "Autonomous Optimization Architect"
+        },
+        {
+          "name": "Infrastructure Maintainer",
+          "role": "Infrastructure Maintainer"
+        }
+      ],
+      "slug": "engineering",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:c3741b69af175b86407017074c5f1095850e80a8c75a085520cc3f76994d3c6d",
+      "tagline": "25 Engineering roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "engineering"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "7fcc23922aad785e4869d297c910d11bf743c034761f3592d719bf03c03b6465",
+      "description": "A ready-to-install finance team of 3 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Finance\"\nslug: \"finance\"\ndescription: \"A ready-to-install finance team of 3 specialist roles, migrated from the built-in agent templates.\"\nicon: \"🧮\"\ntagline: \"3 Finance roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"finance\"]\n---\n# Finance\n\nA ready-to-install finance team of 3 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Bookkeeping — Bookkeeper\n- Accounts Payable Agent — Accounts Payable Agent\n- Finance Tracker — Finance Tracker\n",
+          "path": "TEAM.md",
+          "sha256": "c5ef8d18e9aaa5a87a93fc6094289d367e35d5601a386c9b805f3f25e30d48b0"
+        }
+      ],
+      "icon": "🧮",
+      "id": "team_finance",
+      "key": "finance",
+      "name": "Finance",
+      "roles": [
+        {
+          "name": "Bookkeeping",
+          "role": "Bookkeeper"
+        },
+        {
+          "name": "Accounts Payable Agent",
+          "role": "Accounts Payable Agent"
+        },
+        {
+          "name": "Finance Tracker",
+          "role": "Finance Tracker"
+        }
+      ],
+      "slug": "finance",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:7fcc23922aad785e4869d297c910d11bf743c034761f3592d719bf03c03b6465",
+      "tagline": "3 Finance roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "finance"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "6720ddc696efacc3b241f3a8844308fd08be93df092cc67ee82d3e1475148516",
+      "description": "A ready-to-install game development team of 20 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Game Development\"\nslug: \"game-development\"\ndescription: \"A ready-to-install game development team of 20 specialist roles, migrated from the built-in agent templates.\"\nicon: \"🎮\"\ntagline: \"20 Game Development roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"game-development\"]\n---\n# Game Development\n\nA ready-to-install game development team of 20 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Game Audio Engineer — Game Audio Engineer\n- Game Designer — Game Designer\n- Level Designer — Level Designer\n- Narrative Designer — Narrative Designer\n- Technical Artist — Technical Artist\n- Blender Add-on Engineer — Blender Add-on Engineer\n- Godot Gameplay Scripter — Godot Gameplay Scripter\n- Godot Multiplayer Engineer — Godot Multiplayer Engineer\n- Godot Shader Developer — Godot Shader Developer\n- Roblox Avatar Creator — Roblox Avatar Creator\n- Roblox Experience Designer — Roblox Experience Designer\n- Roblox Systems Scripter — Roblox Systems Scripter\n- Unity Architect — Unity Architect\n- Unity Editor Tool Developer — Unity Editor Tool Developer\n- Unity Multiplayer Engineer — Unity Multiplayer Engineer\n- Unity Shader Graph Artist — Unity Shader Graph Artist\n- Unreal Multiplayer Architect — Unreal Multiplayer Architect\n- Unreal Systems Engineer — Unreal Systems Engineer\n- Unreal Technical Artist — Unreal Technical Artist\n- Unreal World Builder — Unreal World Builder\n",
+          "path": "TEAM.md",
+          "sha256": "ca143c96328d09ce7e55db941c6cbff1ac897ead04be565f7f3baa5a895b87a0"
+        }
+      ],
+      "icon": "🎮",
+      "id": "team_game_development",
+      "key": "game-development",
+      "name": "Game Development",
+      "roles": [
+        {
+          "name": "Game Audio Engineer",
+          "role": "Game Audio Engineer"
+        },
+        {
+          "name": "Game Designer",
+          "role": "Game Designer"
+        },
+        {
+          "name": "Level Designer",
+          "role": "Level Designer"
+        },
+        {
+          "name": "Narrative Designer",
+          "role": "Narrative Designer"
+        },
+        {
+          "name": "Technical Artist",
+          "role": "Technical Artist"
+        },
+        {
+          "name": "Blender Add-on Engineer",
+          "role": "Blender Add-on Engineer"
+        },
+        {
+          "name": "Godot Gameplay Scripter",
+          "role": "Godot Gameplay Scripter"
+        },
+        {
+          "name": "Godot Multiplayer Engineer",
+          "role": "Godot Multiplayer Engineer"
+        },
+        {
+          "name": "Godot Shader Developer",
+          "role": "Godot Shader Developer"
+        },
+        {
+          "name": "Roblox Avatar Creator",
+          "role": "Roblox Avatar Creator"
+        },
+        {
+          "name": "Roblox Experience Designer",
+          "role": "Roblox Experience Designer"
+        },
+        {
+          "name": "Roblox Systems Scripter",
+          "role": "Roblox Systems Scripter"
+        },
+        {
+          "name": "Unity Architect",
+          "role": "Unity Architect"
+        },
+        {
+          "name": "Unity Editor Tool Developer",
+          "role": "Unity Editor Tool Developer"
+        },
+        {
+          "name": "Unity Multiplayer Engineer",
+          "role": "Unity Multiplayer Engineer"
+        },
+        {
+          "name": "Unity Shader Graph Artist",
+          "role": "Unity Shader Graph Artist"
+        },
+        {
+          "name": "Unreal Multiplayer Architect",
+          "role": "Unreal Multiplayer Architect"
+        },
+        {
+          "name": "Unreal Systems Engineer",
+          "role": "Unreal Systems Engineer"
+        },
+        {
+          "name": "Unreal Technical Artist",
+          "role": "Unreal Technical Artist"
+        },
+        {
+          "name": "Unreal World Builder",
+          "role": "Unreal World Builder"
+        }
+      ],
+      "slug": "game-development",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:6720ddc696efacc3b241f3a8844308fd08be93df092cc67ee82d3e1475148516",
+      "tagline": "20 Game Development roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "game-development"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "b50c8dddaef2bfca9090311c36076c01ead683947a3eede40f0540204895e8c2",
+      "description": "A demand-generation pod: growth experiments, SEO, lifecycle email, analytics, and social — wired to move activation and retention.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Growth Pod\"\nslug: \"growth-pod\"\ndescription: \"A demand-generation pod: growth experiments, SEO, lifecycle email, analytics, and social — wired to move activation and retention.\"\nicon: \"📈\"\ntagline: \"A full-stack growth team in one install\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"cross-functional\", \"growth\"]\n---\n# Growth Pod\n\nA demand-generation pod: growth experiments, SEO, lifecycle email, analytics, and social — wired to move activation and retention.\n\n## Roles\n\n- Growth Hacker — Growth Hacker\n- SEO Strategy — SEO Strategist\n- Email Marketing — Email Marketer\n- Data Analysis — Data Analyst\n- Social Media Management — Social Media Manager\n",
+          "path": "TEAM.md",
+          "sha256": "12851343af8010e8972fd6f92fa449a41aa0b73ab372a34c0914b26cd7b3914b"
+        }
+      ],
+      "icon": "📈",
+      "id": "team_growth_pod",
+      "key": "growth-pod",
+      "name": "Growth Pod",
+      "roles": [
+        {
+          "name": "Growth Hacker",
+          "role": "Growth Hacker"
+        },
+        {
+          "name": "SEO Strategy",
+          "role": "SEO Strategist"
+        },
+        {
+          "name": "Email Marketing",
+          "role": "Email Marketer"
+        },
+        {
+          "name": "Data Analysis",
+          "role": "Data Analyst"
+        },
+        {
+          "name": "Social Media Management",
+          "role": "Social Media Manager"
+        }
+      ],
+      "slug": "growth-pod",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:b50c8dddaef2bfca9090311c36076c01ead683947a3eede40f0540204895e8c2",
+      "tagline": "A full-stack growth team in one install",
+      "tags": [
+        "catalog",
+        "cross-functional",
+        "growth"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "4bb77d1d5201d1b9021ca76d9bdaffdc49a4ec2d97a4cf733e876f82e8f4b9b8",
+      "description": "A cross-functional squad to take a product from zero to launch: coordination, engineering, design, QA, and launch content.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Product Launch Squad\"\nslug: \"launch-squad\"\ndescription: \"A cross-functional squad to take a product from zero to launch: coordination, engineering, design, QA, and launch content.\"\nicon: \"🚀\"\ntagline: \"Ship a product end-to-end with one install\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"cross-functional\", \"launch\"]\n---\n# Product Launch Squad\n\nA cross-functional squad to take a product from zero to launch: coordination, engineering, design, QA, and launch content.\n\n## Roles\n\n- Team Coordination — Squad Lead\n- Frontend Development — Frontend Developer\n- Backend Development — Backend Developer\n- UI/UX Design — UX Designer\n- QA & Testing — QA Engineer\n- Content & Copywriting — Content Writer\n",
+          "path": "TEAM.md",
+          "sha256": "6728793678a04d05fd3ebb0e3fbda01ccc6330525b7f1b5ff5d731279d0fab0f"
+        }
+      ],
+      "icon": "🚀",
+      "id": "team_launch_squad",
+      "key": "launch-squad",
+      "name": "Product Launch Squad",
+      "roles": [
+        {
+          "name": "Team Coordination",
+          "role": "Squad Lead"
+        },
+        {
+          "name": "Frontend Development",
+          "role": "Frontend Developer"
+        },
+        {
+          "name": "Backend Development",
+          "role": "Backend Developer"
+        },
+        {
+          "name": "UI/UX Design",
+          "role": "UX Designer"
+        },
+        {
+          "name": "QA & Testing",
+          "role": "QA Engineer"
+        },
+        {
+          "name": "Content & Copywriting",
+          "role": "Content Writer"
+        }
+      ],
+      "slug": "launch-squad",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:4bb77d1d5201d1b9021ca76d9bdaffdc49a4ec2d97a4cf733e876f82e8f4b9b8",
+      "tagline": "Ship a product end-to-end with one install",
+      "tags": [
+        "catalog",
+        "cross-functional",
+        "launch"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "daa30348d136d5e283aa2662b350b7b97f02e24453e61859ca2864f9ab3a4a01",
+      "description": "A ready-to-install management team of 2 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Management\"\nslug: \"management\"\ndescription: \"A ready-to-install management team of 2 specialist roles, migrated from the built-in agent templates.\"\nicon: \"📋\"\ntagline: \"2 Management roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"management\"]\n---\n# Management\n\nA ready-to-install management team of 2 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Team Coordination — Squad Lead\n- Studio Producer — Studio Producer\n",
+          "path": "TEAM.md",
+          "sha256": "3e30a850445406e04029f16ddc62035b6b6d23c6ef969be7eda41910040e7640"
+        }
+      ],
+      "icon": "📋",
+      "id": "team_management",
+      "key": "management",
+      "name": "Management",
+      "roles": [
+        {
+          "name": "Team Coordination",
+          "role": "Squad Lead"
+        },
+        {
+          "name": "Studio Producer",
+          "role": "Studio Producer"
+        }
+      ],
+      "slug": "management",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:daa30348d136d5e283aa2662b350b7b97f02e24453e61859ca2864f9ab3a4a01",
+      "tagline": "2 Management roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "management"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "b553eb885e7e7dbcac757bddb87a6e2189cae98d0d734d2f991b31e4adcf4599",
+      "description": "A ready-to-install marketing team of 29 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Marketing\"\nslug: \"marketing\"\ndescription: \"A ready-to-install marketing team of 29 specialist roles, migrated from the built-in agent templates.\"\nicon: \"📣\"\ntagline: \"29 Marketing roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"marketing\"]\n---\n# Marketing\n\nA ready-to-install marketing team of 29 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Social Media Management — Social Media Manager\n- SEO Strategy — SEO Strategist\n- Email Marketing — Email Marketer\n- Ad Copywriting — Ad Copywriter\n- App Store Optimizer — App Store Optimizer\n- Baidu SEO Specialist — Baidu SEO Specialist\n- Bilibili Content Strategist — Bilibili Content Strategist\n- Carousel Growth Engine — Carousel Growth Engine\n- China E-Commerce Operator — China E-Commerce Operator\n- Content Creator — Content Creator\n- Growth Hacker — Growth Hacker\n- Instagram Curator — Instagram Curator\n- Kuaishou Strategist — Kuaishou Strategist\n- Reddit Community Builder — Reddit Community Builder\n- TikTok Strategist — TikTok Strategist\n- Twitter Engager — Twitter Engager\n- WeChat Official Account Manager — WeChat Official Account Manager\n- Xiaohongshu Specialist — Xiaohongshu Specialist\n- Zhihu Strategist — Zhihu Strategist\n- AI Citation Strategist — AI Citation Strategist\n- Book Co-Author — Book Co-Author\n- Cross-Border E-Commerce Specialist — Cross-Border E-Commerce Specialist\n- Douyin Strategist — Douyin Strategist\n- LinkedIn Content Creator — LinkedIn Content Creator\n- Livestream Commerce Coach — Livestream Commerce Coach\n- Podcast Strategist — Podcast Strategist\n- Private Domain Operator — Private Domain Operator\n- Short-Video Editing Coach — Short-Video Editing Coach\n- Weibo Strategist — Weibo Strategist\n",
+          "path": "TEAM.md",
+          "sha256": "9165031e31088b6fb463e4a41f531322939f9f0db418e1ba1a5bdcd35e19aaf0"
+        }
+      ],
+      "icon": "📣",
+      "id": "team_marketing",
+      "key": "marketing",
+      "name": "Marketing",
+      "roles": [
+        {
+          "name": "Social Media Management",
+          "role": "Social Media Manager"
+        },
+        {
+          "name": "SEO Strategy",
+          "role": "SEO Strategist"
+        },
+        {
+          "name": "Email Marketing",
+          "role": "Email Marketer"
+        },
+        {
+          "name": "Ad Copywriting",
+          "role": "Ad Copywriter"
+        },
+        {
+          "name": "App Store Optimizer",
+          "role": "App Store Optimizer"
+        },
+        {
+          "name": "Baidu SEO Specialist",
+          "role": "Baidu SEO Specialist"
+        },
+        {
+          "name": "Bilibili Content Strategist",
+          "role": "Bilibili Content Strategist"
+        },
+        {
+          "name": "Carousel Growth Engine",
+          "role": "Carousel Growth Engine"
+        },
+        {
+          "name": "China E-Commerce Operator",
+          "role": "China E-Commerce Operator"
+        },
+        {
+          "name": "Content Creator",
+          "role": "Content Creator"
+        },
+        {
+          "name": "Growth Hacker",
+          "role": "Growth Hacker"
+        },
+        {
+          "name": "Instagram Curator",
+          "role": "Instagram Curator"
+        },
+        {
+          "name": "Kuaishou Strategist",
+          "role": "Kuaishou Strategist"
+        },
+        {
+          "name": "Reddit Community Builder",
+          "role": "Reddit Community Builder"
+        },
+        {
+          "name": "TikTok Strategist",
+          "role": "TikTok Strategist"
+        },
+        {
+          "name": "Twitter Engager",
+          "role": "Twitter Engager"
+        },
+        {
+          "name": "WeChat Official Account Manager",
+          "role": "WeChat Official Account Manager"
+        },
+        {
+          "name": "Xiaohongshu Specialist",
+          "role": "Xiaohongshu Specialist"
+        },
+        {
+          "name": "Zhihu Strategist",
+          "role": "Zhihu Strategist"
+        },
+        {
+          "name": "AI Citation Strategist",
+          "role": "AI Citation Strategist"
+        },
+        {
+          "name": "Book Co-Author",
+          "role": "Book Co-Author"
+        },
+        {
+          "name": "Cross-Border E-Commerce Specialist",
+          "role": "Cross-Border E-Commerce Specialist"
+        },
+        {
+          "name": "Douyin Strategist",
+          "role": "Douyin Strategist"
+        },
+        {
+          "name": "LinkedIn Content Creator",
+          "role": "LinkedIn Content Creator"
+        },
+        {
+          "name": "Livestream Commerce Coach",
+          "role": "Livestream Commerce Coach"
+        },
+        {
+          "name": "Podcast Strategist",
+          "role": "Podcast Strategist"
+        },
+        {
+          "name": "Private Domain Operator",
+          "role": "Private Domain Operator"
+        },
+        {
+          "name": "Short-Video Editing Coach",
+          "role": "Short-Video Editing Coach"
+        },
+        {
+          "name": "Weibo Strategist",
+          "role": "Weibo Strategist"
+        }
+      ],
+      "slug": "marketing",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:b553eb885e7e7dbcac757bddb87a6e2189cae98d0d734d2f991b31e4adcf4599",
+      "tagline": "29 Marketing roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "marketing"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "5cd414cfc65acddb140bf78074db26c87f4f7e6a57bfd79a33ce8e9d54f8ede0",
+      "description": "A ready-to-install operations team of 10 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Operations\"\nslug: \"operations\"\ndescription: \"A ready-to-install operations team of 10 specialist roles, migrated from the built-in agent templates.\"\nicon: \"⚙️\"\ntagline: \"10 Operations roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"operations\"]\n---\n# Operations\n\nA ready-to-install operations team of 10 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Customer Support — Customer Support Specialist\n- Legal Operations — Legal Operations Specialist\n- Recruiting — Recruiter\n- Compliance Monitoring — Compliance Monitor\n- Executive Assistant — Executive Assistant\n- Operations Automation — Operations Automation Specialist\n- Support Responder — Support Responder\n- Analytics Reporter — Analytics Reporter\n- Executive Summary Generator — Executive Summary Generator\n- Studio Operations — Studio Operations Manager\n",
+          "path": "TEAM.md",
+          "sha256": "61df2a139335cff4d89161a203c3eeca13a38969c3f47781e0a9cd89cacfeb0a"
+        }
+      ],
+      "icon": "⚙️",
+      "id": "team_operations",
+      "key": "operations",
+      "name": "Operations",
+      "roles": [
+        {
+          "name": "Customer Support",
+          "role": "Customer Support Specialist"
+        },
+        {
+          "name": "Legal Operations",
+          "role": "Legal Operations Specialist"
+        },
+        {
+          "name": "Recruiting",
+          "role": "Recruiter"
+        },
+        {
+          "name": "Compliance Monitoring",
+          "role": "Compliance Monitor"
+        },
+        {
+          "name": "Executive Assistant",
+          "role": "Executive Assistant"
+        },
+        {
+          "name": "Operations Automation",
+          "role": "Operations Automation Specialist"
+        },
+        {
+          "name": "Support Responder",
+          "role": "Support Responder"
+        },
+        {
+          "name": "Analytics Reporter",
+          "role": "Analytics Reporter"
+        },
+        {
+          "name": "Executive Summary Generator",
+          "role": "Executive Summary Generator"
+        },
+        {
+          "name": "Studio Operations",
+          "role": "Studio Operations Manager"
+        }
+      ],
+      "slug": "operations",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:5cd414cfc65acddb140bf78074db26c87f4f7e6a57bfd79a33ce8e9d54f8ede0",
+      "tagline": "10 Operations roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "operations"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "f6f978068f0e162891ba95f18b899811e0ad30db19202b818e86921d27141eab",
+      "description": "A ready-to-install paid media team of 7 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Paid Media\"\nslug: \"paid-media\"\ndescription: \"A ready-to-install paid media team of 7 specialist roles, migrated from the built-in agent templates.\"\nicon: \"🎯\"\ntagline: \"7 Paid Media roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"paid-media\"]\n---\n# Paid Media\n\nA ready-to-install paid media team of 7 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- PPC Campaign Strategist — PPC Campaign Strategist\n- Tracking & Measurement Specialist — Tracking Specialist\n- Paid Social Strategist — Paid Social Strategist\n- Paid Media Auditor — Paid Media Auditor\n- Search Query Analyst — Search Query Analyst\n- Ad Creative Strategist — Ad Creative Strategist\n- Programmatic & Display Buyer — Programmatic & Display Buyer\n",
+          "path": "TEAM.md",
+          "sha256": "8b82382d7dbc2554aa8bb8ad133d3a6cb8c34d3a01d2f6bb64e2695d277b9523"
+        }
+      ],
+      "icon": "🎯",
+      "id": "team_paid_media",
+      "key": "paid-media",
+      "name": "Paid Media",
+      "roles": [
+        {
+          "name": "PPC Campaign Strategist",
+          "role": "PPC Campaign Strategist"
+        },
+        {
+          "name": "Tracking & Measurement Specialist",
+          "role": "Tracking Specialist"
+        },
+        {
+          "name": "Paid Social Strategist",
+          "role": "Paid Social Strategist"
+        },
+        {
+          "name": "Paid Media Auditor",
+          "role": "Paid Media Auditor"
+        },
+        {
+          "name": "Search Query Analyst",
+          "role": "Search Query Analyst"
+        },
+        {
+          "name": "Ad Creative Strategist",
+          "role": "Ad Creative Strategist"
+        },
+        {
+          "name": "Programmatic & Display Buyer",
+          "role": "Programmatic & Display Buyer"
+        }
+      ],
+      "slug": "paid-media",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:f6f978068f0e162891ba95f18b899811e0ad30db19202b818e86921d27141eab",
+      "tagline": "7 Paid Media roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "paid-media"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "e439d2ad5306d01ea572ec65edbbfe6666d0a293ecdd8c6dcf8aa6e92cabadae",
+      "description": "A ready-to-install product team of 5 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Product\"\nslug: \"product\"\ndescription: \"A ready-to-install product team of 5 specialist roles, migrated from the built-in agent templates.\"\nicon: \"🧭\"\ntagline: \"5 Product roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"product\"]\n---\n# Product\n\nA ready-to-install product team of 5 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Experiment Tracker — Experiment Tracker\n- Product Manager — Product Manager\n- Behavioral Nudge Engine — Behavioral Nudge Engine\n- Feedback Synthesizer — Feedback Synthesizer\n- Sprint Prioritizer — Sprint Prioritizer\n",
+          "path": "TEAM.md",
+          "sha256": "05f78455712254c4db879c9c27e08cae9950968fa52e334c765f3c6e9bc218b5"
+        }
+      ],
+      "icon": "🧭",
+      "id": "team_product",
+      "key": "product",
+      "name": "Product",
+      "roles": [
+        {
+          "name": "Experiment Tracker",
+          "role": "Experiment Tracker"
+        },
+        {
+          "name": "Product Manager",
+          "role": "Product Manager"
+        },
+        {
+          "name": "Behavioral Nudge Engine",
+          "role": "Behavioral Nudge Engine"
+        },
+        {
+          "name": "Feedback Synthesizer",
+          "role": "Feedback Synthesizer"
+        },
+        {
+          "name": "Sprint Prioritizer",
+          "role": "Sprint Prioritizer"
+        }
+      ],
+      "slug": "product",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:e439d2ad5306d01ea572ec65edbbfe6666d0a293ecdd8c6dcf8aa6e92cabadae",
+      "tagline": "5 Product roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "product"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "e9fc6c301c2b6d781d23f170f7f8ef62d7272183b2490bdef4cc7927ee370cc8",
+      "description": "A ready-to-install project management team of 3 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Project Management\"\nslug: \"project-management\"\ndescription: \"A ready-to-install project management team of 3 specialist roles, migrated from the built-in agent templates.\"\nicon: \"📊\"\ntagline: \"3 Project Management roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"project-management\"]\n---\n# Project Management\n\nA ready-to-install project management team of 3 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Senior Project Manager — Senior Project Manager\n- Jira Workflow Steward — Jira Workflow Steward\n- Project Shepherd — Project Shepherd\n",
+          "path": "TEAM.md",
+          "sha256": "37edb02fc3eedd9c17ecf6bdde6d985c4616b622abad8f6d211fae155daad54e"
+        }
+      ],
+      "icon": "📊",
+      "id": "team_project_management",
+      "key": "project-management",
+      "name": "Project Management",
+      "roles": [
+        {
+          "name": "Senior Project Manager",
+          "role": "Senior Project Manager"
+        },
+        {
+          "name": "Jira Workflow Steward",
+          "role": "Jira Workflow Steward"
+        },
+        {
+          "name": "Project Shepherd",
+          "role": "Project Shepherd"
+        }
+      ],
+      "slug": "project-management",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:e9fc6c301c2b6d781d23f170f7f8ef62d7272183b2490bdef4cc7927ee370cc8",
+      "tagline": "3 Project Management roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "project-management"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "6650977eea96e8827d1e654aaf3928b42eea80384332b23814c0157a13e436f2",
+      "description": "A ready-to-install research & insights team of 3 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Research & Insights\"\nslug: \"research\"\ndescription: \"A ready-to-install research & insights team of 3 specialist roles, migrated from the built-in agent templates.\"\nicon: \"🔍\"\ntagline: \"3 Research & Insights roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"research\"]\n---\n# Research & Insights\n\nA ready-to-install research & insights team of 3 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Research & Analysis — Research Specialist\n- Data Analysis — Data Analyst\n- Trend Researcher — Trend Researcher\n",
+          "path": "TEAM.md",
+          "sha256": "2f316b9107b365c39a166aeaf6c39057d9bec8e0c9db6b3ed64a8c92a8798ba1"
+        }
+      ],
+      "icon": "🔍",
+      "id": "team_research",
+      "key": "research",
+      "name": "Research & Insights",
+      "roles": [
+        {
+          "name": "Research & Analysis",
+          "role": "Research Specialist"
+        },
+        {
+          "name": "Data Analysis",
+          "role": "Data Analyst"
+        },
+        {
+          "name": "Trend Researcher",
+          "role": "Trend Researcher"
+        }
+      ],
+      "slug": "research",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:6650977eea96e8827d1e654aaf3928b42eea80384332b23814c0157a13e436f2",
+      "tagline": "3 Research & Insights roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "research"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "b0b631d4b4f3f0c102237db84d13253f42a8518e472ebca523ae8241e24c08d7",
+      "description": "A ready-to-install sales team of 9 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Sales\"\nslug: \"sales\"\ndescription: \"A ready-to-install sales team of 9 specialist roles, migrated from the built-in agent templates.\"\nicon: \"🤝\"\ntagline: \"9 Sales roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"sales\"]\n---\n# Sales\n\nA ready-to-install sales team of 9 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Sales Development — Sales Development Representative\n- Account Strategist — Account Strategist\n- Sales Coach — Sales Coach\n- Deal Strategist — Deal Strategist\n- Outbound Strategist — Outbound Strategist\n- Pipeline Analyst — Pipeline Analyst\n- Proposal Strategist — Proposal Strategist\n- Discovery Coach — Discovery Coach\n- Sales Engineer — Sales Engineer\n",
+          "path": "TEAM.md",
+          "sha256": "53bb94bdef8d77ff07ed1919e73650514befc113df37462df062c72af2b49ed9"
+        }
+      ],
+      "icon": "🤝",
+      "id": "team_sales",
+      "key": "sales",
+      "name": "Sales",
+      "roles": [
+        {
+          "name": "Sales Development",
+          "role": "Sales Development Representative"
+        },
+        {
+          "name": "Account Strategist",
+          "role": "Account Strategist"
+        },
+        {
+          "name": "Sales Coach",
+          "role": "Sales Coach"
+        },
+        {
+          "name": "Deal Strategist",
+          "role": "Deal Strategist"
+        },
+        {
+          "name": "Outbound Strategist",
+          "role": "Outbound Strategist"
+        },
+        {
+          "name": "Pipeline Analyst",
+          "role": "Pipeline Analyst"
+        },
+        {
+          "name": "Proposal Strategist",
+          "role": "Proposal Strategist"
+        },
+        {
+          "name": "Discovery Coach",
+          "role": "Discovery Coach"
+        },
+        {
+          "name": "Sales Engineer",
+          "role": "Sales Engineer"
+        }
+      ],
+      "slug": "sales",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:b0b631d4b4f3f0c102237db84d13253f42a8518e472ebca523ae8241e24c08d7",
+      "tagline": "9 Sales roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "sales"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "d383530b9c20512c83fbb7d8cc4ce9083d2831b77c104251887f4911da4fe81d",
+      "description": "A ready-to-install spatial computing team of 6 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Spatial Computing\"\nslug: \"spatial-computing\"\ndescription: \"A ready-to-install spatial computing team of 6 specialist roles, migrated from the built-in agent templates.\"\nicon: \"🥽\"\ntagline: \"6 Spatial Computing roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"spatial-computing\"]\n---\n# Spatial Computing\n\nA ready-to-install spatial computing team of 6 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- visionOS Spatial Engineer — visionOS Spatial Engineer\n- XR Immersive Developer — XR Immersive Developer\n- XR Interface Architect — XR Interface Architect\n- XR Cockpit Specialist — XR Cockpit Interaction Specialist\n- macOS/Metal Engineer — macOS Spatial/Metal Engineer\n- Terminal Integration Specialist — Terminal Integration Specialist\n",
+          "path": "TEAM.md",
+          "sha256": "a45f67658a62d32bd41b4b5d4c2441e0616fc56864c630af760ce1dc9a382540"
+        }
+      ],
+      "icon": "🥽",
+      "id": "team_spatial_computing",
+      "key": "spatial-computing",
+      "name": "Spatial Computing",
+      "roles": [
+        {
+          "name": "visionOS Spatial Engineer",
+          "role": "visionOS Spatial Engineer"
+        },
+        {
+          "name": "XR Immersive Developer",
+          "role": "XR Immersive Developer"
+        },
+        {
+          "name": "XR Interface Architect",
+          "role": "XR Interface Architect"
+        },
+        {
+          "name": "XR Cockpit Specialist",
+          "role": "XR Cockpit Interaction Specialist"
+        },
+        {
+          "name": "macOS/Metal Engineer",
+          "role": "macOS Spatial/Metal Engineer"
+        },
+        {
+          "name": "Terminal Integration Specialist",
+          "role": "Terminal Integration Specialist"
+        }
+      ],
+      "slug": "spatial-computing",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:d383530b9c20512c83fbb7d8cc4ce9083d2831b77c104251887f4911da4fe81d",
+      "tagline": "6 Spatial Computing roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "spatial-computing"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "c9655c65badeb857c86be5b3281167ba0011feccc673c3fda5da8b969bb889a8",
+      "description": "A ready-to-install specialized team of 26 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Specialized\"\nslug: \"specialized\"\ndescription: \"A ready-to-install specialized team of 26 specialist roles, migrated from the built-in agent templates.\"\nicon: \"🧩\"\ntagline: \"26 Specialized roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"specialized\"]\n---\n# Specialized\n\nA ready-to-install specialized team of 26 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- Agents Orchestrator — Agents Orchestrator\n- Compliance Auditor — Compliance Auditor\n- Developer Advocate — Developer Advocate\n- Agentic Identity & Trust Architect — Agentic Identity & Trust Architect\n- Automation Governance Architect — Automation Governance Architect\n- Blockchain Security Auditor — Blockchain Security Auditor\n- Corporate Training Designer — Corporate Training Designer\n- Cultural Intelligence Strategist — Cultural Intelligence Strategist\n- Data Consolidation Agent — Data Consolidation Agent\n- Document Generator — Document Generator\n- French Consulting Market Navigator — French Consulting Market Navigator\n- Government Digital Presales Consultant — Government Digital Presales Consultant\n- Healthcare Marketing Compliance Specialist — Healthcare Marketing Compliance Specialist\n- Identity Graph Operator — Identity Graph Operator\n- Korean Business Navigator — Korean Business Navigator\n- LSP/Index Engineer — LSP/Index Engineer\n- MCP Builder — MCP Builder\n- Model QA Specialist — Model QA Specialist\n- Report Distribution Agent — Report Distribution Agent\n- Salesforce Architect — Salesforce Architect\n- Sales Data Extraction Agent — Sales Data Extraction Agent\n- Study Abroad Advisor — Study Abroad Advisor\n- Supply Chain Strategist — Supply Chain Strategist\n- Workflow Architect — Workflow Architect\n- ZK Steward — ZK Steward\n- Legal Compliance Checker — Legal Compliance Checker\n",
+          "path": "TEAM.md",
+          "sha256": "f110fc1421f963453ba247ede54462e492c60f3578479919b1f5714e566fda87"
+        }
+      ],
+      "icon": "🧩",
+      "id": "team_specialized",
+      "key": "specialized",
+      "name": "Specialized",
+      "roles": [
+        {
+          "name": "Agents Orchestrator",
+          "role": "Agents Orchestrator"
+        },
+        {
+          "name": "Compliance Auditor",
+          "role": "Compliance Auditor"
+        },
+        {
+          "name": "Developer Advocate",
+          "role": "Developer Advocate"
+        },
+        {
+          "name": "Agentic Identity & Trust Architect",
+          "role": "Agentic Identity & Trust Architect"
+        },
+        {
+          "name": "Automation Governance Architect",
+          "role": "Automation Governance Architect"
+        },
+        {
+          "name": "Blockchain Security Auditor",
+          "role": "Blockchain Security Auditor"
+        },
+        {
+          "name": "Corporate Training Designer",
+          "role": "Corporate Training Designer"
+        },
+        {
+          "name": "Cultural Intelligence Strategist",
+          "role": "Cultural Intelligence Strategist"
+        },
+        {
+          "name": "Data Consolidation Agent",
+          "role": "Data Consolidation Agent"
+        },
+        {
+          "name": "Document Generator",
+          "role": "Document Generator"
+        },
+        {
+          "name": "French Consulting Market Navigator",
+          "role": "French Consulting Market Navigator"
+        },
+        {
+          "name": "Government Digital Presales Consultant",
+          "role": "Government Digital Presales Consultant"
+        },
+        {
+          "name": "Healthcare Marketing Compliance Specialist",
+          "role": "Healthcare Marketing Compliance Specialist"
+        },
+        {
+          "name": "Identity Graph Operator",
+          "role": "Identity Graph Operator"
+        },
+        {
+          "name": "Korean Business Navigator",
+          "role": "Korean Business Navigator"
+        },
+        {
+          "name": "LSP/Index Engineer",
+          "role": "LSP/Index Engineer"
+        },
+        {
+          "name": "MCP Builder",
+          "role": "MCP Builder"
+        },
+        {
+          "name": "Model QA Specialist",
+          "role": "Model QA Specialist"
+        },
+        {
+          "name": "Report Distribution Agent",
+          "role": "Report Distribution Agent"
+        },
+        {
+          "name": "Salesforce Architect",
+          "role": "Salesforce Architect"
+        },
+        {
+          "name": "Sales Data Extraction Agent",
+          "role": "Sales Data Extraction Agent"
+        },
+        {
+          "name": "Study Abroad Advisor",
+          "role": "Study Abroad Advisor"
+        },
+        {
+          "name": "Supply Chain Strategist",
+          "role": "Supply Chain Strategist"
+        },
+        {
+          "name": "Workflow Architect",
+          "role": "Workflow Architect"
+        },
+        {
+          "name": "ZK Steward",
+          "role": "ZK Steward"
+        },
+        {
+          "name": "Legal Compliance Checker",
+          "role": "Legal Compliance Checker"
+        }
+      ],
+      "slug": "specialized",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:c9655c65badeb857c86be5b3281167ba0011feccc673c3fda5da8b969bb889a8",
+      "tagline": "26 Specialized roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "specialized"
+      ],
+      "trustLevel": "markdown_only"
+    },
+    {
+      "author": "AgentCenter",
+      "contentHash": "f80577bbb97a81c876f833ce2382d00d0406e55dd706c6b847869a03c4617757",
+      "description": "A ready-to-install quality & testing team of 9 specialist roles, migrated from the built-in agent templates.",
+      "files": [
+        {
+          "content": "---\nschema: agentcompanies/v1\nkind: team\nname: \"Quality & Testing\"\nslug: \"testing\"\ndescription: \"A ready-to-install quality & testing team of 9 specialist roles, migrated from the built-in agent templates.\"\nicon: \"🧪\"\ntagline: \"9 Quality & Testing roles you can install as one team\"\nauthor: \"AgentCenter\"\ntags: [\"catalog\", \"migrated\", \"testing\"]\n---\n# Quality & Testing\n\nA ready-to-install quality & testing team of 9 specialist roles, migrated from the built-in agent templates.\n\n## Roles\n\n- QA & Testing — QA Engineer\n- Accessibility Auditor — Accessibility Auditor\n- API Tester — API Tester\n- Performance Benchmarker — Performance Benchmarker\n- Evidence Collector — Evidence Collector\n- Reality Checker — Reality Checker\n- Test Results Analyzer — Test Results Analyzer\n- Tool Evaluator — Tool Evaluator\n- Workflow Optimizer — Workflow Optimizer\n",
+          "path": "TEAM.md",
+          "sha256": "9a4873c1abd7a1724f1ca6fb10412b42ce222c5ec76dcab3fa4ed08bc4347a5e"
+        }
+      ],
+      "icon": "🧪",
+      "id": "team_testing",
+      "key": "testing",
+      "name": "Quality & Testing",
+      "roles": [
+        {
+          "name": "QA & Testing",
+          "role": "QA Engineer"
+        },
+        {
+          "name": "Accessibility Auditor",
+          "role": "Accessibility Auditor"
+        },
+        {
+          "name": "API Tester",
+          "role": "API Tester"
+        },
+        {
+          "name": "Performance Benchmarker",
+          "role": "Performance Benchmarker"
+        },
+        {
+          "name": "Evidence Collector",
+          "role": "Evidence Collector"
+        },
+        {
+          "name": "Reality Checker",
+          "role": "Reality Checker"
+        },
+        {
+          "name": "Test Results Analyzer",
+          "role": "Test Results Analyzer"
+        },
+        {
+          "name": "Tool Evaluator",
+          "role": "Tool Evaluator"
+        },
+        {
+          "name": "Workflow Optimizer",
+          "role": "Workflow Optimizer"
+        }
+      ],
+      "slug": "testing",
+      "sourceRef": "github:MissionControlSquad/agentcenter-teams-catalog@bundled#sha256:f80577bbb97a81c876f833ce2382d00d0406e55dd706c6b847869a03c4617757",
+      "tagline": "9 Quality & Testing roles you can install as one team",
+      "tags": [
+        "catalog",
+        "migrated",
+        "testing"
+      ],
+      "trustLevel": "markdown_only"
+    }
+  ]
+}

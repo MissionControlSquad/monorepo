@@ -212,6 +212,7 @@ export {
   CREATE_TEAM,
   ADD_TEAM_MEMBER,
   INSTALL_TEAM,
+  INSTALL_TEAM_FROM_CATALOG,
 } from "./skills";
 
 export { IMPORT_WORKSPACE_BUNDLE } from "./portability";

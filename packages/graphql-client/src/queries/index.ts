@@ -189,6 +189,7 @@ export {
   AGENT_SKILLS_QUERY,
   TEAMS_QUERY,
   PREVIEW_TEAM_INSTALL_QUERY,
+  TEAM_CATALOG_QUERY,
 } from "./skills";
 export { EXPORT_WORKSPACE_BUNDLE, WORKSPACE_IMPORTS } from "./portability";
 export { GOALS_QUERY, GOAL_QUERY, DEFAULT_GOAL_QUERY } from "./goals";

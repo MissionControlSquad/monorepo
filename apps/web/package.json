@@ -29,6 +29,7 @@
     "@agentcenter/hooks": "*",
     "@agentcenter/skills-catalog": "*",
     "@agentcenter/tailwind-config": "*",
+    "@agentcenter/teams-catalog": "*",
     "@agentcenter/types": "*",
     "@agentcenter/utils": "*",
     "@aws-sdk/client-s3": "^3.986.0",

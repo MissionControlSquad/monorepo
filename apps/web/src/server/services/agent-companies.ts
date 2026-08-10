@@ -9,11 +9,13 @@ import {
   slugify as coreSlugify,
   emitCompanyMarkdown,
   emitAgentMarkdown,
+  emitTeamMarkdown,
   renderOrgChartMermaid,
   parseCompanyPackageFiles,
 } from "@agentcenter/utils";
 import type { AgentCompany } from "@agentcenter/database";
 import { provisionSetupStatus } from "./agent-governance";
+import { createTeam, addTeamMember } from "./teams";
 import { badRequest } from "./service-errors";
 
 export interface CreateCompanyInput {
@@ -238,6 +240,23 @@ export async function exportCompanyPackage(
     });
   }
 
+  // Multi-kind: emit a TEAM.md that groups the company's agents as installable roles. Demonstrates the
+  // extended package format and round-trips back into a Team on import.
+  if (agents.length > 0) {
+    files.push({
+      path: `teams/${company.slug}/TEAM.md`,
+      content: emitTeamMarkdown({
+        name: `${company.name} Team`,
+        slug: coreSlugify(`${company.slug}-team`, 64, "team"),
+        description: company.description,
+        tagline: `Every role in ${company.name}`,
+        author: null,
+        tags: ["company"],
+        members: agents.map((a) => ({ name: a.name, role: a.role })),
+      }),
+    });
+  }
+
   const mermaid = renderOrgChartMermaid(
     agents.map((a) => ({
       slug: idToSlug.get(a.id)!,
@@ -257,6 +276,7 @@ export interface ImportCompanyResult {
   companyId: string;
   slug: string;
   createdAgentIds: string[];
+  createdTeamIds: string[];
   warnings: string[];
 }
 
@@ -335,5 +355,56 @@ export async function importCompanyPackage(input: {
     }
   }
 
-  return { companyId: company.id, slug, createdAgentIds, warnings: parsed.warnings };
+  // Multi-kind: materialize any TEAM.md in the package as a workspace Team (+ its role members). Keys
+  // collide-safely per company so re-importing the same package doesn't clash with an existing team.
+  const createdTeamIds: string[] = [];
+  for (const team of parsed.teams) {
+    const key = coreSlugify(`${team.slug || team.name}-${company.slug}`, 64, "team");
+    const exists = await prisma.team.findFirst({
+      where: { workspaceId: input.workspaceId, key },
+      select: { id: true },
+    });
+    if (exists) {
+      parsed.warnings.push(`team "${team.name}" skipped — key "${key}" already exists`);
+      continue;
+    }
+    const created = await createTeam({
+      workspaceId: input.workspaceId,
+      key,
+      name: team.name,
+      description: team.description ?? null,
+      icon: team.icon ?? null,
+      tagline: team.tagline ?? null,
+      author: team.author ?? null,
+      tags: team.tags ?? null,
+      sourceRef: team.sourceRef ?? input.sourceRef ?? null,
+      createdByProfileId: input.createdByProfileId ?? null,
+    });
+    let order = 0;
+    for (const m of team.members) {
+      await addTeamMember(input.workspaceId, created.id, {
+        name: m.name,
+        role: m.role,
+        order: order++,
+      });
+    }
+    createdTeamIds.push(created.id);
+  }
+
+  // Other kinds are parsed but not yet persisted as first-class rows — surface their counts so the
+  // importer knows they were recognized (PROJECT/TASK/SKILL persistence is deferred).
+  if (parsed.projects.length)
+    parsed.warnings.push(`${parsed.projects.length} PROJECT.md parsed (not persisted yet)`);
+  if (parsed.tasks.length)
+    parsed.warnings.push(`${parsed.tasks.length} TASK.md parsed (not persisted yet)`);
+  if (parsed.skills.length)
+    parsed.warnings.push(`${parsed.skills.length} SKILL.md parsed (not persisted yet)`);
+
+  return {
+    companyId: company.id,
+    slug,
+    createdAgentIds,
+    createdTeamIds,
+    warnings: parsed.warnings,
+  };
 }

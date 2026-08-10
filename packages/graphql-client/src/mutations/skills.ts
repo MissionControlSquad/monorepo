@@ -140,3 +140,17 @@ export const INSTALL_TEAM = gql`
     }
   }
 `;
+
+// Domain 14: install a team from the app-shipped markdown catalog (sha256-verified on the server).
+export const INSTALL_TEAM_FROM_CATALOG = gql`
+  mutation InstallTeamFromCatalog($ref: String!) {
+    installTeamFromCatalog(ref: $ref) {
+      id
+      name
+      key
+      members {
+        id
+      }
+    }
+  }
+`;

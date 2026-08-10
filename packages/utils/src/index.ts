@@ -63,6 +63,7 @@ export * from "./skill-policy";
 export * from "./skill-audit";
 export * from "./secret-providers";
 export * from "./company-package";
+export * from "./package-integrity";
 export * from "./work-products";
 export * from "./cost-windows";
 export * from "./run-cost";
