@@ -44,6 +44,13 @@ export interface AwsSecretsClient {
   getSecretValue(input: {
     SecretId: string;
   }): Promise<{ SecretString?: string; SecretBinary?: Uint8Array }>;
+  // Write side (Domain 7 P2, managed lifecycle). Optional so a read-only client stays valid; the
+  // default factory always provides them. rotate → PutSecretValue; create → CreateSecret.
+  putSecretValue?(input: {
+    SecretId: string;
+    SecretString: string;
+  }): Promise<{ VersionId?: string }>;
+  createSecret?(input: { Name: string; SecretString: string }): Promise<{ ARN?: string }>;
 }
 
 export type AwsClientFactory = (
@@ -56,8 +63,12 @@ async function defaultAwsClientFactory(
   config: NormalizedAwsConfig,
   credentials?: AwsStaticCredentials,
 ): Promise<AwsSecretsClient> {
-  const { SecretsManagerClient, GetSecretValueCommand } =
-    await import("@aws-sdk/client-secrets-manager");
+  const {
+    SecretsManagerClient,
+    GetSecretValueCommand,
+    PutSecretValueCommand,
+    CreateSecretCommand,
+  } = await import("@aws-sdk/client-secrets-manager");
   const client = new SecretsManagerClient({
     region: config.region,
     ...(config.endpoint ? { endpoint: config.endpoint } : {}),
@@ -66,6 +77,8 @@ async function defaultAwsClientFactory(
   });
   return {
     getSecretValue: (input) => client.send(new GetSecretValueCommand(input)),
+    putSecretValue: (input) => client.send(new PutSecretValueCommand(input)),
+    createSecret: (input) => client.send(new CreateSecretCommand(input)),
   };
 }
 
@@ -241,4 +254,160 @@ export async function resolveExternalSecret(
 ): Promise<ExternalResolveResult> {
   if (kind === "aws") return resolveAwsSecret(opts);
   return resolveVaultSecret(opts);
+}
+
+// ─── Write-side managed lifecycle (Domain 7 P2 — rotate/create the REMOTE secret) ────────────────
+// Mirror of the resolve path but WRITING the new value to the external store:
+//   - aws   → PutSecretValue (rotate) / CreateSecret (create)
+//   - vault → KV v2 write (POST .../data/<path>) — same op for rotate + create
+// Same rules: credentials are secret-refs (never inline); every failure is a SHAPED result, never a
+// raw throw; the client/fetch is injectable so the request mapping is unit-testable with no network.
+export type ExternalWriteResult =
+  { ok: true; version?: string } | { ok: false; code: ExternalErrorCode; error: string };
+
+export type WriteMode = "rotate" | "create";
+
+export async function writeAwsSecret(opts: {
+  config: Record<string, unknown>;
+  secretName: string;
+  value: string;
+  mode: WriteMode;
+  resolveSecret: ResolveSecretFn;
+  clientFactory?: AwsClientFactory;
+}): Promise<ExternalWriteResult> {
+  const parsed = normalizeAwsSecretConfig(opts.config);
+  if (!parsed.ok) return { ok: false, code: "config_invalid", error: parsed.error };
+  const config = parsed.value;
+
+  let credentials: AwsStaticCredentials | undefined;
+  if (config.accessKeyIdRef && config.secretAccessKeyRef) {
+    const accessKeyId = await opts.resolveSecret(config.accessKeyIdRef);
+    const secretAccessKey = await opts.resolveSecret(config.secretAccessKeyRef);
+    if (!accessKeyId || !secretAccessKey) {
+      return {
+        ok: false,
+        code: "missing_credentials",
+        error: `AWS credential secret-refs did not resolve (${config.accessKeyIdRef}/${config.secretAccessKeyRef})`,
+      };
+    }
+    const sessionToken = config.sessionTokenRef
+      ? ((await opts.resolveSecret(config.sessionTokenRef)) ?? undefined)
+      : undefined;
+    credentials = { accessKeyId, secretAccessKey, sessionToken };
+  }
+
+  const secretId = awsSecretIdFor(config, opts.secretName);
+  try {
+    const client = await (opts.clientFactory ?? defaultAwsClientFactory)(config, credentials);
+    if (opts.mode === "create") {
+      if (!client.createSecret)
+        return { ok: false, code: "provider_error", error: "AWS client lacks createSecret" };
+      const out = await client.createSecret({ Name: secretId, SecretString: opts.value });
+      return { ok: true, version: out.ARN };
+    }
+    if (!client.putSecretValue)
+      return { ok: false, code: "provider_error", error: "AWS client lacks putSecretValue" };
+    const out = await client.putSecretValue({ SecretId: secretId, SecretString: opts.value });
+    return { ok: true, version: out.VersionId };
+  } catch (error) {
+    const shaped = classifyAwsError(secretId, error);
+    return shaped as ExternalWriteResult; // classify returns a {ok:false,...} of the same code union
+  }
+}
+
+export async function writeVaultSecret(opts: {
+  config: Record<string, unknown>;
+  secretName: string;
+  value: string;
+  resolveSecret: ResolveSecretFn;
+  fetchImpl?: FetchImpl;
+  env?: Record<string, string | undefined>;
+}): Promise<ExternalWriteResult> {
+  const parsed = normalizeVaultSecretConfig(opts.config);
+  if (!parsed.ok) return { ok: false, code: "config_invalid", error: parsed.error };
+  const config = parsed.value;
+
+  const env = opts.env ?? process.env;
+  const token = config.tokenRef
+    ? await opts.resolveSecret(config.tokenRef)
+    : (env.VAULT_TOKEN ?? null);
+  if (!token) {
+    return {
+      ok: false,
+      code: "missing_credentials",
+      error: config.tokenRef
+        ? `Vault token secret-ref did not resolve (${config.tokenRef})`
+        : "Vault token missing: set config.token secret-ref or VAULT_TOKEN",
+    };
+  }
+
+  const field = config.field ?? opts.secretName;
+  const url = vaultKvDataUrl(config);
+  const headers: Record<string, string> = {
+    "X-Vault-Token": token,
+    "Content-Type": "application/json",
+  };
+  if (config.namespace) headers["X-Vault-Namespace"] = config.namespace;
+
+  const doFetch: FetchImpl = opts.fetchImpl ?? (globalThis.fetch as unknown as FetchImpl);
+  let res: Awaited<ReturnType<FetchImpl>>;
+  try {
+    // KV v2 write: POST { data: { <field>: <value> } } — creates the item or a new version.
+    res = await doFetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ data: { [field]: opts.value } }),
+    } as never);
+  } catch {
+    return { ok: false, code: "provider_unavailable", error: "Vault is unreachable" };
+  }
+
+  if (!res.ok) {
+    if (res.status === 403)
+      return { ok: false, code: "access_denied", error: "Vault denied the write (permission)" };
+    if (res.status >= 500)
+      return { ok: false, code: "provider_unavailable", error: `Vault error (HTTP ${res.status})` };
+    return { ok: false, code: "provider_error", error: `Vault write failed (HTTP ${res.status})` };
+  }
+
+  // KV v2 write returns { data: { version: N, ... } }.
+  let version: string | undefined;
+  try {
+    const body = (await res.json()) as { data?: { version?: number } };
+    if (typeof body?.data?.version === "number") version = String(body.data.version);
+  } catch {
+    // A successful write with an unparseable body is still a success — version is best-effort.
+  }
+  return { ok: true, version };
+}
+
+/** Dispatch a write to the correct external provider. `env` never writes here (local envelope). */
+export async function writeExternalSecret(
+  kind: "aws" | "vault",
+  opts: {
+    config: Record<string, unknown>;
+    secretName: string;
+    value: string;
+    mode: WriteMode;
+    resolveSecret: ResolveSecretFn;
+    clientFactory?: AwsClientFactory;
+    fetchImpl?: FetchImpl;
+  },
+): Promise<ExternalWriteResult> {
+  if (kind === "aws")
+    return writeAwsSecret({
+      config: opts.config,
+      secretName: opts.secretName,
+      value: opts.value,
+      mode: opts.mode,
+      resolveSecret: opts.resolveSecret,
+      clientFactory: opts.clientFactory,
+    });
+  return writeVaultSecret({
+    config: opts.config,
+    secretName: opts.secretName,
+    value: opts.value,
+    resolveSecret: opts.resolveSecret,
+    fetchImpl: opts.fetchImpl,
+  });
 }
