@@ -13,6 +13,7 @@
 enum BudgetScope {
   workspace
   agent
+  project
 }
 
 enum BudgetWindow {
@@ -20,6 +21,7 @@ enum BudgetWindow {
   daily
   weekly
   monthly
+  lifetime
 }
 
 enum IncidentStatus {
@@ -113,6 +115,7 @@ model BudgetPolicy {
   workspaceId   String
   scope         BudgetScope
   agentId       String? // required when scope=agent
+  projectId     String? // required when scope=project
   name          String
   limitCents    Int
   window        BudgetWindow @default(monthly)
@@ -125,13 +128,15 @@ model BudgetPolicy {
   updatedAt     DateTime     @updatedAt
 
   agent     Agent?           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  project   Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   windows   QuotaWindow[]
   incidents BudgetIncident[]
 
-  @@unique([workspaceId, scope, agentId, window])
+  @@unique([workspaceId, scope, agentId, projectId, window])
   @@index([workspaceId])
   @@index([workspaceId, isActive])
   @@index([agentId])
+  @@index([projectId])
   @@map("budget_policies")
 }
 

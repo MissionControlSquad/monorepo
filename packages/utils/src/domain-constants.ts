@@ -218,7 +218,8 @@ export const ProjectMemberStatus = {
   DEACTIVATED: "deactivated",
 } as const;
 
-export type ProjectMemberStatusValue = (typeof ProjectMemberStatus)[keyof typeof ProjectMemberStatus];
+export type ProjectMemberStatusValue =
+  (typeof ProjectMemberStatus)[keyof typeof ProjectMemberStatus];
 
 // ─── License Status Codes ─────────────────────────────────
 export const LicenseStatusCode = {
@@ -237,7 +238,8 @@ export const QueueItemGeneratedFrom = {
   REVIEW_REJECTION: "review_rejection",
 } as const;
 
-export type QueueItemGeneratedFromValue = (typeof QueueItemGeneratedFrom)[keyof typeof QueueItemGeneratedFrom];
+export type QueueItemGeneratedFromValue =
+  (typeof QueueItemGeneratedFrom)[keyof typeof QueueItemGeneratedFrom];
 
 // ─── Agent Levels ─────────────────────────────────────────
 export const AgentLevel = {
@@ -259,7 +261,8 @@ export const MessageReactionEmoji = {
   THINK: "think",
 } as const;
 
-export type MessageReactionEmojiValue = (typeof MessageReactionEmoji)[keyof typeof MessageReactionEmoji];
+export type MessageReactionEmojiValue =
+  (typeof MessageReactionEmoji)[keyof typeof MessageReactionEmoji];
 
 // ─── Storage Prefixes ─────────────────────────────────────
 export const StoragePrefix = {
@@ -283,12 +286,23 @@ export const CaseState = {
 export const CASE_STATES = Object.values(CaseState);
 export type CaseStateValue = (typeof CASE_STATES)[number];
 
+// ─── Budget Scopes (Epic #4) ─────────────────────────────
+export const BudgetScope = {
+  WORKSPACE: "workspace",
+  AGENT: "agent",
+  PROJECT: "project",
+} as const;
+export const BUDGET_SCOPES = Object.values(BudgetScope);
+export type BudgetScopeValue = (typeof BUDGET_SCOPES)[number];
+
 // ─── Budget Windows (Epic #4) ────────────────────────────
+// `lifetime` is a single perpetual window — spend accrues forever and never rolls over.
 export const BudgetWindow = {
   HOURLY: "hourly",
   DAILY: "daily",
   WEEKLY: "weekly",
   MONTHLY: "monthly",
+  LIFETIME: "lifetime",
 } as const;
 export const BUDGET_WINDOWS = Object.values(BudgetWindow);
 export type BudgetWindowValue = (typeof BUDGET_WINDOWS)[number];

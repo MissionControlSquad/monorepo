@@ -52,3 +52,6 @@ e2e/.results/
 e2e/blob-report/
 playwright-report/
 test-results/
+
+# Generated telemetry proposed-events manifest (scripts/extract-proposed-events.mjs)
+telemetry-proposed-events.json

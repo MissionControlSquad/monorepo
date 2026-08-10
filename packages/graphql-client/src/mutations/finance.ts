@@ -5,6 +5,7 @@ export const CREATE_BUDGET_POLICY = gql`
   mutation CreateBudgetPolicy(
     $scope: String!
     $agentId: String
+    $projectId: String
     $name: String!
     $limitCents: Int!
     $window: String!
@@ -14,6 +15,7 @@ export const CREATE_BUDGET_POLICY = gql`
     createBudgetPolicy(
       scope: $scope
       agentId: $agentId
+      projectId: $projectId
       name: $name
       limitCents: $limitCents
       window: $window

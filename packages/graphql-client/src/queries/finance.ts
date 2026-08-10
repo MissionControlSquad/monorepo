@@ -18,6 +18,7 @@ export const BUDGET_POLICIES_QUERY = gql`
       id
       scope
       agentId
+      projectId
       name
       limitCents
       window

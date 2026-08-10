@@ -52,7 +52,8 @@ model Project {
   repoRef    String? // branch / tag / ref
   visibility String  @default("private")
 
-  costEvents   CostEvent[] // Epic #4
+  costEvents     CostEvent[] // Epic #4
+  budgetPolicies BudgetPolicy[] // Epic #4 — project-scoped budgets
   ledgerEvents LedgerEvent[] @relation("ProjectLedgerEvents") // Epic #16
   routines     Routine[] // Epic #7
   pipelines    Pipeline[]
