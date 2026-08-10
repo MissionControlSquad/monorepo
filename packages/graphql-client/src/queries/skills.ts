@@ -109,6 +109,29 @@ export const PREVIEW_TEAM_INSTALL_QUERY = gql`
   }
 `;
 
+// Domain 14: browse the app-shipped markdown teams catalog.
+export const TEAM_CATALOG_QUERY = gql`
+  query TeamCatalog {
+    teamCatalog {
+      id
+      slug
+      key
+      name
+      description
+      tagline
+      icon
+      author
+      tags
+      roleCount
+      roles {
+        name
+        role
+      }
+      sourceRef
+    }
+  }
+`;
+
 // Domain 5 GAP-D: static security audit of a skill bundle.
 export const AUDIT_SKILL_QUERY = gql`
   query AuditSkill($skillId: String!) {

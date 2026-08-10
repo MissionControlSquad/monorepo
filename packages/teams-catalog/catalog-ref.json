@@ -1,0 +1,7 @@
+{
+  "//": "Pinned upstream ref for future remote teams-catalog updates. Remote fetch is deferred; today the catalog ships in-repo and this record is stamped into generated/teams.json for provenance/audit. The per-team `sourceRef` (github:owner/repo@commit#sha256:<hex>) carries the integrity hash checked on import.",
+  "repo": "MissionControlSquad/agentcenter-teams-catalog",
+  "ref": "bundled",
+  "commit": null,
+  "fetchedAt": null
+}

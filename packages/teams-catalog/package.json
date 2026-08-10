@@ -1,0 +1,25 @@
+{
+  "name": "@agentcenter/teams-catalog",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./teams.json": "./generated/teams.json"
+  },
+  "files": [
+    "src",
+    "catalog",
+    "generated",
+    "catalog-ref.json",
+    "dist"
+  ],
+  "scripts": {
+    "catalog:build": "node scripts/build-catalog.mjs",
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

@@ -22,7 +22,12 @@ import {
   deleteSkillFile,
   installCatalogSkill,
 } from "@/server/services/skills";
-import { createTeam, addTeamMember, installTeam } from "@/server/services/teams";
+import {
+  createTeam,
+  addTeamMember,
+  installTeam,
+  installTeamFromCatalog,
+} from "@/server/services/teams";
 import { assertSkillAction, replaceSkillPolicy } from "@/server/services/skill-policy";
 
 // Epic #10: skills + teams mutations. Skill authoring/assign is member; team install is admin
@@ -316,6 +321,25 @@ builder.mutationField("addTeamMember", (t) =>
         order: args.order ?? null,
       });
       return ctx.prisma.teamMember.findUniqueOrThrow({ ...query, where: { id: m.id } });
+    },
+  }),
+);
+
+// Install a team from the app-shipped markdown catalog (admin): sha256-verify the pinned package, then
+// create the workspace Team + its role members. Agents are provisioned afterwards via installTeam.
+builder.mutationField("installTeamFromCatalog", (t) =>
+  t.prismaField({
+    type: "Team",
+    args: { ref: t.arg.string({ required: true }) },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tenancy = requireRole(ctx, "admin");
+      const team = await installTeamFromCatalog({
+        workspaceId: tenancy.workspaceId,
+        ref: args.ref,
+        createdByProfileId: tenancy.userId,
+      });
+      return ctx.prisma.team.findUniqueOrThrow({ ...query, where: { id: team.id } });
     },
   }),
 );

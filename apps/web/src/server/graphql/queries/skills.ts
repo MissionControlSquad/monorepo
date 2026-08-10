@@ -9,7 +9,7 @@ import {
 } from "@agentcenter/utils";
 import type { CollisionStrategy } from "@agentcenter/utils";
 import { requireRole, scoped } from "@/server/tenancy";
-import { previewTeamInstall } from "@/server/services/teams";
+import { previewTeamInstall, listTeamCatalog } from "@/server/services/teams";
 import { getSkillPolicy, evaluateSkillAction } from "@/server/services/skill-policy";
 
 const SkillLintFinding = builder.simpleObject("SkillLintFinding", {
@@ -25,6 +25,28 @@ const TeamInstallPlanItemType = builder.simpleObject("TeamInstallPlanItem", {
     member: t.string(),
     action: t.string(),
     agentName: t.string(),
+  }),
+});
+
+// Shipped markdown teams catalog (Domain 14 — teams-catalog parity). Read-only entries the UI browses
+// then installs via `installTeamFromCatalog`.
+const CatalogTeamRoleType = builder.simpleObject("CatalogTeamRole", {
+  fields: (t) => ({ name: t.string(), role: t.string() }),
+});
+const CatalogTeamType = builder.simpleObject("CatalogTeam", {
+  fields: (t) => ({
+    id: t.string(),
+    slug: t.string(),
+    key: t.string(),
+    name: t.string(),
+    description: t.string(),
+    tagline: t.string(),
+    icon: t.string({ nullable: true }),
+    author: t.string({ nullable: true }),
+    tags: t.stringList(),
+    roleCount: t.int(),
+    roles: t.field({ type: [CatalogTeamRoleType] }),
+    sourceRef: t.string(),
   }),
 });
 
@@ -195,6 +217,18 @@ builder.queryField("previewTeamInstall", (t) =>
         teamId: args.teamId,
         collisionStrategy: strategy,
       });
+    },
+  }),
+);
+
+// Browse the app-shipped markdown teams catalog (SKILLS_TEAMS-gated, member+). In-memory, not scoped.
+builder.queryField("teamCatalog", (t) =>
+  t.field({
+    type: [CatalogTeamType],
+    resolve: async (_root, _args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      requireRole(ctx, "member");
+      return listTeamCatalog();
     },
   }),
 );

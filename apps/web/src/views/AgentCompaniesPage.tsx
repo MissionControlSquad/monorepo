@@ -10,12 +10,40 @@ import {
   DELETE_AGENT_COMPANY,
   IMPORT_COMPANY_PACKAGE,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Textarea } from "@/components/ui";
+import { Button, Card, Textarea, Tooltip } from "@/components/ui";
 import { Input } from "@/components/ui/shadcn/input";
 
 // Domain 14 #10/#12: Agent-Companies — the portable "company package" surface. Lets an admin create
 // companies, delete them, export a company as a markdown package (downloaded as a path→content JSON
-// bundle), and import such a bundle back (round-trip). AGENT_COMPANIES-gated + admin server-side.
+// bundle, with a file-tree preview of every kind), and import such a bundle back (round-trip) after a
+// confirmation that lists exactly what will be created. AGENT_COMPANIES-gated + admin server-side.
+
+// The multi-kind package format (Domain 14): COMPANY.md + agents/<slug>/AGENTS.md, plus TEAM.md /
+// PROJECT.md / TASK.md / SKILL.md. Classify a file by name for the import/export file tree + tooltips.
+type PackageKind = "company" | "agent" | "team" | "project" | "task" | "skill" | "readme" | "other";
+
+const KIND_TOOLTIP: Record<PackageKind, string> = {
+  company: "COMPANY.md — the org itself: name, goals, license, provenance (agentcompanies/v1).",
+  agent: "AGENTS.md — one agent persona: role + who it reports to. One per member agent.",
+  team: "TEAM.md — a named group of agent roles you can install as a team.",
+  project: "PROJECT.md — a project inside the company: description, status, goals.",
+  task: "TASK.md — a single work item: title, status, assignee.",
+  skill: "SKILL.md — a reusable capability module (frontmatter + instructions).",
+  readme: "README.md — human-readable overview incl. the Mermaid org chart. Ignored on import.",
+  other: "Supporting file — carried in the package but not a first-class kind.",
+};
+
+function classifyPackageFile(path: string): PackageKind {
+  const p = path.trim();
+  if (p === "COMPANY.md") return "company";
+  if (/(^|\/)AGENTS\.md$/i.test(p)) return "agent";
+  if (/(^|\/)TEAM\.md$/i.test(p)) return "team";
+  if (/(^|\/)PROJECT\.md$/i.test(p)) return "project";
+  if (/(^|\/)TASK\.md$/i.test(p)) return "task";
+  if (/(^|\/)SKILL\.md$/i.test(p)) return "skill";
+  if (/(^|\/)README\.md$/i.test(p)) return "readme";
+  return "other";
+}
 
 interface Company {
   id: string;
@@ -44,6 +72,16 @@ export function AgentCompaniesPage() {
 
   const [form, setForm] = useState({ name: "", description: "", goals: "" });
   const [busy, setBusy] = useState<string | null>(null);
+  // Staged import: parsed file map awaiting a confirmation that lists what will be created.
+  const [pendingImport, setPendingImport] = useState<{
+    files: Record<string, string>;
+    name: string;
+  } | null>(null);
+  // Export preview: the emitted file tree shown before the user downloads it.
+  const [exportPreview, setExportPreview] = useState<{
+    slug: string;
+    files: ExportFile[];
+  } | null>(null);
   const companies = data?.agentCompanies ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
@@ -87,8 +125,9 @@ export function AgentCompaniesPage() {
     }
   }
 
-  // Export runs the query imperatively, then downloads the package as a path→content JSON bundle —
-  // exactly the shape importCompanyPackage(files) expects, so a company round-trips cleanly.
+  // Export runs the query imperatively, then shows a file-tree preview of the emitted package (every
+  // kind) before the user downloads it as a path→content JSON bundle — exactly the shape
+  // importCompanyPackage(files) expects, so a company round-trips cleanly.
   async function onExport(company: Company) {
     setBusy(company.id);
     try {
@@ -101,33 +140,55 @@ export function AgentCompaniesPage() {
         toast.error(String(res.error?.message ?? "Export failed").replace("[GraphQL] ", ""));
         return;
       }
-      const files: Record<string, string> = {};
-      for (const f of res.data.exportCompanyPackage) files[f.path] = f.content;
-      const blob = new Blob([JSON.stringify(files, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${company.slug}-company-package.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Package downloaded");
+      setExportPreview({ slug: company.slug, files: res.data.exportCompanyPackage });
     } finally {
       setBusy(null);
     }
   }
 
+  function downloadExport() {
+    if (!exportPreview) return;
+    const files: Record<string, string> = {};
+    for (const f of exportPreview.files) files[f.path] = f.content;
+    const blob = new Blob([JSON.stringify(files, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${exportPreview.slug}-company-package.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Package downloaded");
+    setExportPreview(null);
+  }
+
+  // Import stages the parsed file map for a confirmation (below) rather than importing immediately.
   async function onImportFile(file: File) {
+    const text = await file.text();
+    let files: Record<string, string>;
+    try {
+      files = JSON.parse(text);
+      if (!files || typeof files !== "object" || Array.isArray(files)) throw new Error("bad");
+    } catch {
+      toast.error("Not a valid package JSON file");
+      return;
+    }
+    if (!Object.keys(files).some((p) => classifyPackageFile(p) === "company")) {
+      toast.error("Package has no COMPANY.md");
+      return;
+    }
+    setPendingImport({ files, name: file.name });
+  }
+
+  async function confirmImport() {
+    if (!pendingImport) return;
     setBusy("import");
     try {
-      const text = await file.text();
-      let files: Record<string, string>;
-      try {
-        files = JSON.parse(text);
-      } catch {
-        toast.error("Not a valid package JSON file");
-        return;
-      }
-      const res = await importPackage({ files, sourceRef: file.name });
+      // The wire shape is an array of { path, content } (the shape exportCompanyPackage returns).
+      const files = Object.entries(pendingImport.files).map(([path, content]) => ({
+        path,
+        content,
+      }));
+      const res = await importPackage({ files, sourceRef: pendingImport.name });
       if (res.error) {
         toast.error(String(res.error.message).replace("[GraphQL] ", ""));
         return;
@@ -138,6 +199,7 @@ export function AgentCompaniesPage() {
         `Imported ${r?.slug ?? "company"} — ${r?.createdAgentIds?.length ?? 0} agent(s)` +
           (r?.warnings?.length ? `, ${r.warnings.length} warning(s)` : ""),
       );
+      setPendingImport(null);
       refresh();
     } finally {
       setBusy(null);
@@ -191,6 +253,55 @@ export function AgentCompaniesPage() {
           </Button>
         </div>
       </Card>
+
+      {/* Import confirmation: the file tree of what will be created (per kind, with tooltips). */}
+      {pendingImport && (
+        <Card className="space-y-3 border-primary/40 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-foreground">
+              Import “{pendingImport.name}”?
+            </h2>
+            <span className="text-xs text-muted-foreground">
+              {Object.keys(pendingImport.files).length} file(s)
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            This will create the company and everything below. Nothing is created until you confirm.
+          </p>
+          <PackageFileTree paths={Object.keys(pendingImport.files)} />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setPendingImport(null)}>
+              Cancel
+            </Button>
+            <Button size="sm" disabled={busy === "import"} onClick={confirmImport}>
+              {busy === "import" ? "Importing…" : "Confirm import"}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Export preview: the emitted package's file tree before download. */}
+      {exportPreview && (
+        <Card className="space-y-3 border-primary/40 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-foreground">
+              Export package — {exportPreview.slug}
+            </h2>
+            <span className="text-xs text-muted-foreground">
+              {exportPreview.files.length} file(s)
+            </span>
+          </div>
+          <PackageFileTree paths={exportPreview.files.map((f) => f.path)} />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setExportPreview(null)}>
+              Close
+            </Button>
+            <Button size="sm" onClick={downloadExport}>
+              Download JSON
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {fetching && <p className="text-sm text-muted-foreground">Loading companies…</p>}
       {error && <p className="text-sm text-destructive">Failed to load companies.</p>}
@@ -249,6 +360,58 @@ export function AgentCompaniesPage() {
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
+
+const KIND_LABEL: Record<PackageKind, string> = {
+  company: "Company",
+  agent: "Agent",
+  team: "Team",
+  project: "Project",
+  task: "Task",
+  skill: "Skill",
+  readme: "Readme",
+  other: "Other",
+};
+
+// Renders a package's files grouped by kind, each with a per-kind tooltip. Shared by import + export.
+function PackageFileTree({ paths }: { paths: string[] }) {
+  const groups = new Map<PackageKind, string[]>();
+  for (const p of [...paths].sort()) {
+    const kind = classifyPackageFile(p);
+    if (!groups.has(kind)) groups.set(kind, []);
+    groups.get(kind)!.push(p);
+  }
+  const order: PackageKind[] = [
+    "company",
+    "agent",
+    "team",
+    "project",
+    "task",
+    "skill",
+    "readme",
+    "other",
+  ];
+  const kinds = order.filter((k) => groups.has(k));
+  if (kinds.length === 0)
+    return <p className="text-xs text-muted-foreground">No files in this package.</p>;
+  return (
+    <div className="space-y-2 rounded border border-dashed border-border p-3">
+      {kinds.map((kind) => (
+        <div key={kind}>
+          <Tooltip content={KIND_TOOLTIP[kind]}>
+            <span className="cursor-help text-xs font-semibold text-foreground underline decoration-dotted">
+              {KIND_LABEL[kind]} ({groups.get(kind)!.length})
+            </span>
+          </Tooltip>
+          <ul className="mt-1 list-inside list-disc pl-2 font-mono text-[11px] text-muted-foreground">
+            {groups.get(kind)!.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }

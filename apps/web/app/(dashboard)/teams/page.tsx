@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useClient } from "urql";
-import { Users } from "lucide-react";
-import { TEAMS_QUERY, PREVIEW_TEAM_INSTALL_QUERY } from "@/lib/graphql/queries";
-import { INSTALL_TEAM } from "@/lib/graphql/mutations";
+import { Users, Package } from "lucide-react";
+import { TEAMS_QUERY, PREVIEW_TEAM_INSTALL_QUERY, TEAM_CATALOG_QUERY } from "@/lib/graphql/queries";
+import { INSTALL_TEAM, INSTALL_TEAM_FROM_CATALOG } from "@/lib/graphql/mutations";
+import { toast } from "sonner";
 import { COLLISION_STRATEGIES } from "@agentcenter/utils";
 import { Button, Card, Badge, EmptyState, Select, Tooltip } from "@/components/ui";
 import { TeamDialog } from "@/components/dialogs/TeamDialog";
@@ -33,6 +34,23 @@ interface PlanItem {
   action: string;
   agentName: string;
 }
+interface CatalogRole {
+  name: string;
+  role: string;
+}
+interface CatalogTeam {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  tagline: string;
+  icon: string | null;
+  author: string | null;
+  tags: string[];
+  roleCount: number;
+  roles: CatalogRole[];
+  sourceRef: string;
+}
 
 const STRATEGIES = COLLISION_STRATEGIES;
 
@@ -45,8 +63,15 @@ function actionVariant(action: string): "green" | "yellow" | "gray" | "red" {
 
 export default function TeamsPage() {
   const [{ data }, refetch] = useQuery<{ teams: Team[] }>({ query: TEAMS_QUERY });
+  const [{ data: catalogData, fetching: catalogFetching, error: catalogError }] = useQuery<{
+    teamCatalog: CatalogTeam[];
+  }>({ query: TEAM_CATALOG_QUERY });
   const [, installTeam] = useMutation(INSTALL_TEAM);
+  const [, installFromCatalog] = useMutation(INSTALL_TEAM_FROM_CATALOG);
   const client = useClient();
+
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [pendingCatalog, setPendingCatalog] = useState<CatalogTeam | null>(null);
 
   const [busy, setBusy] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
@@ -76,6 +101,24 @@ export default function TeamsPage() {
     }
   }
 
+  async function confirmCatalogInstall() {
+    if (!pendingCatalog) return;
+    const ref = pendingCatalog.slug;
+    setBusy(`catalog:${ref}`);
+    try {
+      const res = await installFromCatalog({ ref });
+      if (res.error) {
+        toast.error(String(res.error.message).replace("[GraphQL] ", ""));
+        return;
+      }
+      toast.success(`Installed “${pendingCatalog.name}” — ${pendingCatalog.roleCount} role(s)`);
+      setPendingCatalog(null);
+      refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="mx-auto space-y-6 p-4 sm:p-6">
       <div className="flex items-start justify-between gap-2">
@@ -85,8 +128,97 @@ export default function TeamsPage() {
             Installable bundles of agent roles. Installing creates one agent per member.
           </p>
         </div>
-        <Button onClick={() => setTeamOpen(true)}>New team</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowCatalog((v) => !v)}>
+            <Package className="mr-1.5 h-4 w-4" />
+            {showCatalog ? "Hide catalog" : "Browse teams catalog"}
+          </Button>
+          <Button onClick={() => setTeamOpen(true)}>New team</Button>
+        </div>
       </div>
+
+      {/* Shipped markdown teams catalog (Domain 14). Install verifies the package sha256 server-side. */}
+      {showCatalog && (
+        <Card className="space-y-3 p-4">
+          <div className="flex items-center gap-2">
+            <Package className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-foreground">Teams catalog</h2>
+            <span className="text-xs text-muted-foreground">
+              Shipped teams you can install into this workspace.
+            </span>
+          </div>
+          {catalogFetching && <p className="text-sm text-muted-foreground">Loading catalog…</p>}
+          {catalogError && (
+            <p className="text-sm text-destructive">Failed to load the teams catalog.</p>
+          )}
+          {!catalogFetching && !catalogError && (catalogData?.teamCatalog ?? []).length === 0 && (
+            <EmptyState
+              icon={<Package className="h-8 w-8" />}
+              title="Catalog is empty"
+              description="No shipped teams are available."
+            />
+          )}
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(catalogData?.teamCatalog ?? []).map((ct) => (
+              <div
+                key={ct.id}
+                className="flex items-start justify-between gap-2 rounded border border-border p-3"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    {ct.icon && <span>{ct.icon}</span>}
+                    <span className="truncate font-medium text-foreground">{ct.name}</span>
+                    <Badge variant="gray">{ct.roleCount} roles</Badge>
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{ct.tagline}</p>
+                </div>
+                <Tooltip content="Create this team (and its role members) in your workspace. The package's sha256 is verified before anything is created.">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy === `catalog:${ct.slug}`}
+                    onClick={() => setPendingCatalog(ct)}
+                  >
+                    Install
+                  </Button>
+                </Tooltip>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Confirm-on-install: list exactly which roles will be created. */}
+      {pendingCatalog && (
+        <Card className="space-y-3 border-primary/40 p-4">
+          <h2 className="text-sm font-semibold text-foreground">
+            Install “{pendingCatalog.name}”?
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            This creates a team named “{pendingCatalog.name}” with {pendingCatalog.roleCount}{" "}
+            role(s):
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {pendingCatalog.roles.map((r, i) => (
+              <Badge key={i} variant="blue">
+                {r.name} · {r.role}
+              </Badge>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setPendingCatalog(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={busy === `catalog:${pendingCatalog.slug}`}
+              onClick={confirmCatalogInstall}
+            >
+              {busy === `catalog:${pendingCatalog.slug}` ? "Installing…" : "Confirm install"}
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <TeamDialog open={teamOpen} onOpenChange={setTeamOpen} onSaved={refresh} />
       <TeamMemberDialog
