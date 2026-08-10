@@ -162,7 +162,13 @@ export const NAV_ITEMS: NavItem[] = [
     flag: FLAG_KEYS.MULTI_PROVIDER_ADAPTERS,
     group: "Agents",
   },
-  { href: "/adapter-plugins", icon: Puzzle, label: "Adapter plugins", group: "Agents" },
+  {
+    href: "/adapter-plugins",
+    icon: Puzzle,
+    label: "Adapter plugins",
+    flag: FLAG_KEYS.ADAPTER_PLUGINS,
+    group: "Agents",
+  },
   {
     href: "/org-chart",
     icon: Network,
@@ -339,7 +345,13 @@ export const NAV_ITEMS: NavItem[] = [
   },
 
   // ── Content & platform ──
-  { href: "/artifacts", icon: Images, label: "Artifacts", group: "Content & platform" },
+  {
+    href: "/artifacts",
+    icon: Images,
+    label: "Artifacts",
+    flag: FLAG_KEYS.ARTIFACTS,
+    group: "Content & platform",
+  },
   {
     href: "/assets",
     icon: FileBox,

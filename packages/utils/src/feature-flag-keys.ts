@@ -61,6 +61,8 @@ export const FLAG_KEYS = {
   SMOKE_LAB: "smoke_lab",
   TELEMETRY: "telemetry",
   AI_TOOLS: "ai_tools",
+  ADAPTER_PLUGINS: "adapter_plugins",
+  ARTIFACTS: "artifacts",
 } as const;
 
 export type FlagKey = (typeof FLAG_KEYS)[keyof typeof FLAG_KEYS];
@@ -137,4 +139,8 @@ export const FLAG_DEFAULTS: Record<FlagKey, boolean> = {
   [FLAG_KEYS.TELEMETRY]: false,
   // AI Tools setup/doctor — detect installed AI CLIs + per-OS install help. Read-only helper; on by default.
   [FLAG_KEYS.AI_TOOLS]: true,
+  // Declarative adapter-plugin store (admin). Opt-in operator surface — extends provider adapters.
+  [FLAG_KEYS.ADAPTER_PLUGINS]: false,
+  // Workspace-wide artifacts gallery (view over deliverables). Opt-in content surface.
+  [FLAG_KEYS.ARTIFACTS]: false,
 };
