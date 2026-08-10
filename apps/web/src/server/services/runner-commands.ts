@@ -12,10 +12,7 @@ import { prisma } from "@/server/prisma";
 import type { RunnerCommand } from "@agentcenter/database";
 import { sshExec, type SSHConfig } from "./ssh";
 import { resolveHostSSHConfig } from "./runner-hosts";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 function notFound(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "NOT_FOUND" } });

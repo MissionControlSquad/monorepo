@@ -1,7 +1,7 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Asset } from "@agentcenter/database";
 import { generateUploadUrl, generateDownloadUrl, deleteFile } from "@/server/storage/r2";
+import { badRequest } from "./service-errors";
 
 // Asset store (parity #15 / #27). Metadata + R2-pointer for uploaded workspace assets. Two-step upload:
 // createAssetUploadUrl (presigned PUT) → client uploads → recordAsset (persist the row). Company
@@ -10,10 +10,6 @@ import { generateUploadUrl, generateDownloadUrl, deleteFile } from "@/server/sto
 
 const KINDS = new Set(["image", "document", "archive", "binary", "other"]);
 const OWNER_TYPES = new Set(["company", "agent", "project", "task"]);
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 /** Presigned direct-to-R2 upload target under the assets/ prefix. Client PUTs, then calls recordAsset. */
 export function createAssetUploadUrl(

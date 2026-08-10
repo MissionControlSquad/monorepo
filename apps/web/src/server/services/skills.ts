@@ -3,7 +3,6 @@
  * immutable versions, fork lineage, stars, and queryable agent assignment. Counters
  * (currentVersion / starCount / installCount / forkCount) are maintained next to the writes.
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import {
   slugify as coreSlugify,
@@ -21,13 +20,7 @@ import type {
 } from "@agentcenter/database";
 import { resolveSkillSource } from "@/server/services/skill-import-sources";
 import { getCatalogEntry } from "@/server/skill-catalog/manifest";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
-function notFound(what: string): never {
-  throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
-}
+import { badRequest, notFound } from "./service-errors";
 
 /** Skill slug: the shared core slugify, capped at 64 chars with a "skill" fallback. */
 export function slugify(name: string): string {

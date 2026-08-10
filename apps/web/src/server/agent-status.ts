@@ -41,6 +41,24 @@ const SEMANTIC_STATUS_KEYS = [
   "currentTask",
 ] as const;
 
+/**
+ * Maps a logged agent action type → the inferred `detailedStatus` shown in the UI.
+ * Consumed when an agent logs an action (GraphQL `logAgentAction` and the
+ * `agent.action_logged` event ingest path), so both surfaces stay in lock-step.
+ */
+export const ACTION_TO_DETAILED_STATUS: Record<string, string> = {
+  file_edited: "coding",
+  code_written: "coding",
+  command_executed: "coding",
+  file_opened: "coding",
+  research_done: "researching",
+  thinking: "thinking",
+  reviewing: "reviewing",
+  deploying: "deploying",
+  testing: "testing",
+  writing_docs: "writing",
+};
+
 export type AgentStatusUpdate = {
   status?: AgentStatusValue;
   setupStatus?: SetupStatusValue;

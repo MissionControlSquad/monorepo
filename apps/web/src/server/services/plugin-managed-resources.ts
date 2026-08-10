@@ -1,6 +1,6 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { PluginManagedResource } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // Plugin-managed resources (parity #118 agents / #119 routines / #120 skills). Records which platform
 // entities a plugin owns, so uninstall can clean them up and two plugins can't claim the same resource.
@@ -8,10 +8,6 @@ import type { PluginManagedResource } from "@agentcenter/database";
 // separate; this is the ownership ledger.
 
 const RESOURCE_TYPES = new Set(["agent", "routine", "skill"]);
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 /** Register a resource as managed by a plugin. Rejects a resource already owned by another plugin. */
 export async function registerManagedResource(input: {

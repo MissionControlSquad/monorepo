@@ -1,6 +1,6 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { PluginLog } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // Plugin logs + retention (parity #117). Append-only log lines a plugin emits, with an age/count
 // retention sweep so the table doesn't grow unbounded. Workspace + plugin scoped. The worker writes;
@@ -8,10 +8,6 @@ import type { PluginLog } from "@agentcenter/database";
 
 const LEVELS = new Set(["debug", "info", "warn", "error"]);
 const MAX_MESSAGE = 8_000;
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 export async function recordPluginLog(input: {
   workspaceId: string;

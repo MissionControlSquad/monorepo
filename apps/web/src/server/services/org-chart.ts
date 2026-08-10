@@ -2,10 +2,10 @@
  * Org chart (Epic #19) — DB reads + throwing guards. The pure health/tree/cycle logic is shared in
  * @agentcenter/utils (web/desktop/mobile); this file only does I/O and maps to GraphQLError.
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import { wouldCreateCycle } from "@agentcenter/utils";
 import type { Agent } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // Re-export the shared pure logic for existing importers (attention feed, graphql resolvers).
 export {
@@ -16,10 +16,6 @@ export {
   type OrgChainReason,
   type OrgTreeNode,
 } from "@agentcenter/utils";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 /** Reject a manager assignment that would create a cycle (throwing wrapper over the shared predicate). */
 export function assertNoReportingCycle(

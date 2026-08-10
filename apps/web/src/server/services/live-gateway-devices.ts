@@ -1,7 +1,7 @@
 import { verify as cryptoVerify, createPublicKey } from "node:crypto";
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { LiveGatewayDevice } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // Live Gateway device pairing (parity Domain-10 A5/A6 / GAP-1). A runtime machine proves its identity by
 // signing a server nonce with its Ed25519 device key; the machine is pinned by fingerprint and must be
@@ -11,10 +11,6 @@ import type { LiveGatewayDevice } from "@agentcenter/database";
 // Fixed DER SPKI prefix for an Ed25519 public key (RFC 8410) — lets us build a KeyObject from a raw
 // 32-byte key without external libs.
 const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 /** Pure: verify an Ed25519 signature (base64) over `message` using a raw base64 public key. Never throws. */
 export function verifyEd25519(

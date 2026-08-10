@@ -3,18 +3,14 @@
  * duplicates), complementing the single blockedByTaskId. `blocks` is directional; the others are
  * symmetric in meaning but stored once (source→target). Pure input validation lives in isValidLink.
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { TaskRelation, TaskRelationType } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 const RELATION_TYPES: TaskRelationType[] = ["blocks", "relates_to", "duplicates"];
 
 export function isTaskRelationType(v: string): v is TaskRelationType {
   return (RELATION_TYPES as string[]).includes(v);
-}
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
 }
 
 /** All relations touching a task, in either direction (source or target). */

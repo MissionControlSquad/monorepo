@@ -1,7 +1,7 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { DocumentAnnotationThread, DocumentAnnotationComment } from "@agentcenter/database";
 import { makeAnchor, remapOpenThreadsForDocument, type AnchorSpec } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 // Document annotation threads + cooperative locks (parity Domain-8 §2.5 / G5). Threads anchor to a text
 // span and re-anchor across revisions (pure remap in @agentcenter/utils); the advisory lock lets one
@@ -9,10 +9,6 @@ import { makeAnchor, remapOpenThreadsForDocument, type AnchorSpec } from "@agent
 // the document.
 
 const LOCK_TTL_MS = 5 * 60_000;
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 async function documentContent(documentId: string): Promise<string> {
   const doc = await prisma.document.findUnique({

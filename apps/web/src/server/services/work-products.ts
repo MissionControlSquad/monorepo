@@ -14,10 +14,7 @@ import {
   initialWorkProductGate,
   type WorkProductReviewState,
 } from "@agentcenter/utils";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 export interface CreateWorkProductInput {
   taskId: string;

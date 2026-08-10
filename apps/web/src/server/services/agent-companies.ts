@@ -14,10 +14,7 @@ import {
 } from "@agentcenter/utils";
 import type { AgentCompany } from "@agentcenter/database";
 import { provisionSetupStatus } from "./agent-governance";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 export interface CreateCompanyInput {
   workspaceId: string;

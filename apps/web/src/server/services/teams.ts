@@ -4,25 +4,18 @@
  * clashes, and records a TeamInstall with the affected agent ids.
  */
 import { randomUUID } from "node:crypto";
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Team, TeamMember, TeamKind, TeamTrustLevel } from "@agentcenter/database";
 import { slugify } from "./skills";
 import { provisionSetupStatus } from "./agent-governance";
 import { resolveCollision, planCollisions, COLLISION_ACTION } from "@agentcenter/utils";
 import type { CollisionAction, CollisionStrategy, CollisionPlanItem } from "@agentcenter/utils";
+import { badRequest, notFound } from "./service-errors";
 
 // resolveCollision is a shared pure helper in @agentcenter/utils (reused by skills, teams,
 // portability). Imported for internal use here and re-exported for existing importers.
 export { resolveCollision };
 export type { CollisionAction, CollisionStrategy };
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
-function notFound(what: string): never {
-  throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
-}
 
 export async function createTeam(input: {
   workspaceId: string;

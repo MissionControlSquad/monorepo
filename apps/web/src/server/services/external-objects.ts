@@ -3,15 +3,12 @@ import { prisma } from "@/server/prisma";
 import type { ExternalObject } from "@agentcenter/database";
 import { parseGithubRef, summarizeGithubPayload, GithubRefError } from "@agentcenter/utils";
 import { githubApiFetch, type GithubFetcher } from "@/server/services/github-fetch";
+import { badRequest } from "./service-errors";
 
 // External objects + provider registry (parity #59 / #65). A provider parses a user-supplied reference
 // and fetches a snapshot of display fields; the object is cached + linkable to an internal entity. Only
 // the GitHub provider ships today; the registry is the seam for more. The fetcher is injectable so the
 // resolve path is testable without network. Workspace-scoped.
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 interface ResolvedRef {
   provider: string;

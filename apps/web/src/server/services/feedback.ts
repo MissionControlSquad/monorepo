@@ -1,7 +1,7 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Feedback } from "@agentcenter/database";
 import { redactSensitive } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 // Feedback service (parity #60/#61/#62). Capture thumbs-up/down + an optional comment on a target;
 // comments are REDACTED of secrets/PII before storage (#61). Workspace-scoped.
@@ -9,10 +9,6 @@ import { redactSensitive } from "@agentcenter/utils";
 const TARGET_TYPES = new Set(["task", "deliverable", "agent", "general"]);
 const RATINGS = new Set(["up", "down"]);
 const MAX_COMMENT = 4_000;
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 export async function submitFeedback(input: {
   workspaceId: string;

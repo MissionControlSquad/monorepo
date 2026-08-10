@@ -4,7 +4,6 @@
  * `default-agent-instructions.ts` (`DEFAULT_AGENT_BUNDLE_FILES`). Filesystem sync into a live agent is
  * deferred (spec D2).
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import {
   DEFAULT_AGENTS_MD,
@@ -12,6 +11,7 @@ import {
   isValidInstructionFileName,
 } from "@agentcenter/utils";
 import type { AgentInstruction } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // Default bundles + file-name validation are shared in @agentcenter/utils (web/desktop/mobile).
 export {
@@ -19,10 +19,6 @@ export {
   defaultBundleFor,
   isValidInstructionFileName,
 } from "@agentcenter/utils";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 /** Fetch the agent workspace-scoped, or reject — every op funnels through here. */
 async function requireAgent(

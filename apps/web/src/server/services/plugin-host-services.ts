@@ -1,7 +1,7 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { PluginHostService } from "@agentcenter/database";
 import { isPluginEffective, type PluginLifecycleState } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 // Plugin host services + environment drivers (parity #110 / #107). The registry + status surface for
 // long-running services and environment drivers a plugin provides. The worker-manager (infra-gated)
@@ -10,10 +10,6 @@ import { isPluginEffective, type PluginLifecycleState } from "@agentcenter/utils
 
 const KINDS = new Set(["service", "environment_driver", "webhook"]);
 const STATUSES = new Set(["declared", "starting", "running", "stopped", "error"]);
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 export async function registerHostService(input: {
   workspaceId: string;

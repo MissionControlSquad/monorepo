@@ -18,7 +18,7 @@
  * Content is fetched and stored for display only - never executed (the trust ladder still applies once
  * the bundle lands via `importSkillPackage`).
  */
-import { createHash } from "node:crypto";
+import { sha256Hex as sha256 } from "../hash";
 import { readFile, readdir, realpath, stat } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { getCatalogEntry, type CatalogSkill } from "@/server/skill-catalog/manifest";
@@ -408,10 +408,6 @@ export function planSkillSource(spec: string): SkillSourcePlan {
     `unrecognized skill source "${spec}" (expected a GitHub URL/owner-repo, an http(s) URL, ` +
       `a local path, skillsh:<name>, or catalog:<ref>)`,
   );
-}
-
-function sha256(input: string): string {
-  return createHash("sha256").update(input, "utf8").digest("hex");
 }
 
 /**

@@ -3,7 +3,6 @@
  * to strictly-higher-order stages, and every action appends an immutable PipelineCaseEvent (the
  * StatusHistory convention). Workspace-scoped.
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type {
   Pipeline,
@@ -11,16 +10,7 @@ import type {
   PipelineCase,
   PipelineCaseEventType,
 } from "@agentcenter/database";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
-function notFound(what: string): never {
-  throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
-}
-function conflict(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "CONFLICT" } });
-}
+import { badRequest, notFound, conflict } from "./service-errors";
 
 /** Pure: a case may only move to a strictly higher-order stage. Unit-testable. */
 export function isValidTransition(fromOrder: number, toOrder: number): boolean {

@@ -3,13 +3,9 @@
  * (shared with Cases) via a `TaskLabel` join, so a task carries structured labels beyond `tags[]`.
  * Workspace-scoped: a label and its task must live in the same workspace (D5).
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Label, TaskLabel } from "@agentcenter/database";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 /** List a task's labels (with the underlying label), oldest-attached first. */
 export function listTaskLabels(taskId: string): Promise<(TaskLabel & { label: Label })[]> {

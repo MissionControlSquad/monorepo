@@ -1,4 +1,3 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { AdapterPlugin } from "@agentcenter/database";
 import {
@@ -6,6 +5,7 @@ import {
   loadAdapterPlugins,
   type AdapterPluginSpec,
 } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 // Adapter-plugin store (parity #5). Persist declarative runtime adapters (base + baked template) and
 // load the enabled ones into the in-process adapter registry. Validation reuses adapterFromPluginSpec
@@ -13,10 +13,6 @@ import {
 // edits are admin-gated at the resolver.
 
 const BASES = new Set(["process", "shell", "http"]);
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 function toSpec(row: {
   key: string;
