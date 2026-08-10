@@ -12,6 +12,7 @@ export { Card } from "./Card";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { FormDialog } from "./FormDialog";
 export { EmptyState } from "./EmptyState";
+export { Tooltip } from "./Tooltip";
 export { FormField } from "./FormField";
 export { StatusPill } from "./StatusPill";
 export { PrioritySelect } from "./PrioritySelect";

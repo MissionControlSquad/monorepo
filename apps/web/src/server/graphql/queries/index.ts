@@ -83,3 +83,4 @@ import "./inbox-policies";
 import "./cloud-upstreams";
 import "./external-objects";
 import "./folders";
+import "./adapter-environment";

@@ -6,6 +6,7 @@ import { useQuery, useMutation } from "urql";
 import { Boxes } from "lucide-react";
 import { Card, Badge, Button, Spinner, EmptyState } from "@/components/ui";
 import { AdapterInstallDialog } from "@/components/dialogs/AdapterInstallDialog";
+import { AdapterConnectionTest } from "@/components/agent/AdapterConnectionTest";
 
 // Epic #2 (Adapter Manager): instance-admin view of installed provider adapters. MULTI_PROVIDER_ADAPTERS
 // gated. Lists each adapter with its transport/auth kind + model-profile count and lets an admin
@@ -125,7 +126,8 @@ export default function AdaptersPage() {
       ) : (
         <div className="space-y-2">
           {adapters.map((a) => (
-            <Card key={a.type} className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <Card key={a.type} className="space-y-3 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-foreground">{a.displayName}</span>
@@ -167,6 +169,10 @@ export default function AdaptersPage() {
                     Remove
                   </Button>
                 )}
+              </div>
+              </div>
+              <div className="border-t border-border pt-3">
+                <AdapterConnectionTest adapterKey={a.type} />
               </div>
             </Card>
           ))}
