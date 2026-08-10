@@ -1,15 +1,11 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { PluginLocalFolder } from "@agentcenter/database";
 import { normalizePortable } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 // Plugin local folders (parity #116). Dev-mode registry of local plugin-source folders. The registry +
 // enable/disable live here; the dev-watcher (#106, infra) hot-reloads enabled folders. Workspace-scoped;
 // admin-gated at the resolver (registering a local path is a privileged dev action).
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 export async function registerLocalFolder(input: {
   workspaceId: string;

@@ -2,14 +2,10 @@
  * Tier C: external object links. Attach a task to an external system (GitHub/GitLab/URL). Storage +
  * display only — no live sync. The link kind is auto-classified from the URL host.
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { ExternalLink } from "@agentcenter/database";
 import { parseHttpUrl, classifyExternalLink } from "@agentcenter/utils";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 export function taskExternalLinks(taskId: string): Promise<ExternalLink[]> {
   return prisma.externalLink.findMany({ where: { taskId }, orderBy: { createdAt: "asc" } });

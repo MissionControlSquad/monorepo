@@ -5,16 +5,9 @@
  */
 import { randomUUID } from "node:crypto";
 import { CaseState as CaseStateConst } from "@agentcenter/utils";
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Case, CaseState, CaseEventKind, CaseTaskRole } from "@agentcenter/database";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
-function notFound(what: string): never {
-  throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
-}
+import { badRequest, notFound } from "./service-errors";
 
 /** Pure: the human identifier for a case number. */
 export function caseIdentifier(caseNumber: number): string {

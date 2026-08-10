@@ -2,13 +2,9 @@
  * Human review comments on project docs (Paperclip parity: document-annotations, simplified to the
  * DeliverableAnnotation shape). A comment optionally anchored to a quoted snippet; resolvable.
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { ProjectDocComment } from "@agentcenter/database";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 export function projectDocComments(docId: string): Promise<ProjectDocComment[]> {
   return prisma.projectDocComment.findMany({ where: { docId }, orderBy: { createdAt: "asc" } });

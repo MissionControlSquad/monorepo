@@ -9,10 +9,7 @@ import type { RunnerHost } from "@agentcenter/database";
 import { encryptPrivateKey, decryptPrivateKey } from "./ssh-keys";
 import { env } from "../env";
 import type { SSHConfig } from "./ssh";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 /** A host with the secret stripped — the only shape any read path returns. */
 export type SafeRunnerHost = Omit<RunnerHost, "sshPrivateKey">;

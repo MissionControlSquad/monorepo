@@ -7,7 +7,6 @@
  * least-privilege, idempotent install command we enqueue when a user asks a runner to install a tool -
  * `command -v <bin> || <recommendedInstall>` - reusing the researched catalog commands verbatim.
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { RunnerToolInventory } from "@agentcenter/database";
 import {
@@ -18,10 +17,7 @@ import {
   type RuntimeOs,
 } from "@agentcenter/utils";
 import type { RuntimeInventory } from "./ai-runtime-detect";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 /** Coerce an arbitrary string to a known RuntimeOs, or null. Accepts our enum or a Node platform. */
 export function coerceOs(value: string | null | undefined): RuntimeOs | null {

@@ -16,13 +16,7 @@ import type {
 import { encryptSecret, decryptSecret, CURRENT_KEY_ID } from "./secrets-crypto";
 import { checkSecretProviderConfigHealth, getSecretProviderModule } from "@agentcenter/utils";
 import { resolveExternalSecret } from "./secret-external";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
-function notFound(what: string): never {
-  throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
-}
+import { badRequest, notFound } from "./service-errors";
 
 /** Append a secret access-event (audit). Centralized so no path skips the log. */
 export function recordSecretAccess(input: {

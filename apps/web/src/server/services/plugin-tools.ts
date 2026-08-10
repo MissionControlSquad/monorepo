@@ -1,15 +1,11 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { PluginTool } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // Plugin tool registry + dispatcher (parity #128 / #127). Plugins contribute tools to the gateway; the
 // dispatcher resolves a tool name to its owning plugin at call time. One tool name per workspace (first
 // registrant owns it). The actual invocation of the plugin's tool handler is infra-gated (worker); this
 // is the registry + resolution the dispatcher uses. Workspace-scoped.
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 /** Register (or update) a tool contributed by a plugin. Rejects a name owned by a different plugin. */
 export async function registerPluginTool(input: {

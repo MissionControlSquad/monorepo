@@ -1,14 +1,11 @@
 import { prisma } from "@/server/prisma";
-import { GraphQLError } from "graphql";
 import type { DecisionRecord } from "@agentcenter/database";
 import { redactSensitive } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 // Decision-training capture (parity #40). Record notable agent decisions (context/choice/outcome) for
 // downstream training/eval. Context is redacted of secrets/PII on capture (reuses redactSensitive).
 
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 const OUTCOMES = new Set(["success", "failure", "mixed", "unknown"]);
 
 export async function recordDecision(input: {

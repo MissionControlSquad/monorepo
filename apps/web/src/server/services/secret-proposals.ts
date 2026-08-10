@@ -9,20 +9,10 @@
  * SECURITY: no plaintext secret is ever stored on a proposal. `placeholderValue` is only a non-secret
  * hint (a format/example); the admin supplies the actual secret value at approval time.
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Secret, SecretProposal } from "@agentcenter/database";
 import { createSecret } from "./secrets";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
-function notFound(what: string): never {
-  throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
-}
-function conflict(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "CONFLICT" } });
-}
+import { badRequest, notFound, conflict } from "./service-errors";
 
 export type ProposalScope = "workspace" | "agent";
 export type ProposalStatus = "pending" | "approved" | "denied";
@@ -119,8 +109,7 @@ export async function approveProposal(
   input: ApproveProposalInput,
 ): Promise<{ proposal: SecretProposal; secret: Secret }> {
   const proposal = await findScopedProposal(input.proposalId, input.workspaceId);
-  if (proposal.status !== "pending")
-    conflict(`proposal already ${proposal.status}`);
+  if (proposal.status !== "pending") conflict(`proposal already ${proposal.status}`);
   if (!input.value) badRequest("value is required to approve");
 
   // Reuse the EXISTING secrets service to create the live vault secret (encrypted at rest, audited).
@@ -154,8 +143,7 @@ export interface DenyProposalInput {
 /** Deny a pending proposal with a required reason (surfaced back to the requester). */
 export async function denyProposal(input: DenyProposalInput): Promise<SecretProposal> {
   const proposal = await findScopedProposal(input.proposalId, input.workspaceId);
-  if (proposal.status !== "pending")
-    conflict(`proposal already ${proposal.status}`);
+  if (proposal.status !== "pending") conflict(`proposal already ${proposal.status}`);
   const reason = input.reason.trim();
   if (!reason) badRequest("a reason is required to deny");
 

@@ -2,12 +2,8 @@
  * Tier C: lightweight up/down votes on deliverables — a quality/prioritization signal, one vote per
  * member. Distinct from the formal Approval workflow. A vote of 0 clears the member's vote.
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 export interface VoteSummary {
   score: number; // up − down

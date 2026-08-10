@@ -10,7 +10,7 @@
  * This is deliberately a static, in-process manifest (no build step): the source markdown is read once
  * at module load and hashed. `getCatalogEntry` resolves by id or key.
  */
-import { createHash } from "node:crypto";
+import { sha256Hex as sha256 } from "../hash";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SkillTrustLevel } from "@agentcenter/database";
@@ -92,10 +92,6 @@ const SEEDS: CatalogSeed[] = [
 
 // Mirrors agent-role-skill.ts: the shipped corpus lives under apps/web/src/server/agent-templates/skills.
 const CORPUS_DIR = join(process.cwd(), "src", "server", "agent-templates", "skills");
-
-function sha256(input: string): string {
-  return createHash("sha256").update(input, "utf8").digest("hex");
-}
 
 const LEADING_FRONTMATTER = /^\uFEFF?---[\s\S]*?---\s*/;
 

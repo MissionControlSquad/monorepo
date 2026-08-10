@@ -1,6 +1,6 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { ToolInvocation } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // Tool runtime metrics service (parity #167). Record one row per tool invocation (outcome + latency +
 // error kind) and aggregate it into a per-tool health view: call count, success/error/denied split,
@@ -8,10 +8,6 @@ import type { ToolInvocation } from "@agentcenter/database";
 // Workspace-scoped.
 
 const OUTCOMES = new Set(["success", "error", "denied"]);
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 /** Record a single tool invocation. */
 export async function recordToolInvocation(input: {

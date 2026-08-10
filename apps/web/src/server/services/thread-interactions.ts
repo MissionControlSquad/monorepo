@@ -7,10 +7,7 @@ import { prisma } from "@/server/prisma";
 import { GraphQLError } from "graphql";
 import type { TaskThreadInteraction, Prisma } from "@agentcenter/database";
 import { isThreadInteractionKind, canResolveThreadInteraction } from "@agentcenter/utils";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 export async function createThreadInteraction(input: {
   taskId: string;

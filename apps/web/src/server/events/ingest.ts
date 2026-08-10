@@ -2,7 +2,7 @@ import { z } from "zod";
 import { pubsub, PubSubEvent, agentActionAgentTopic, agentActionProjectTopic } from "../pubsub";
 import { hashApiKey } from "../api-key";
 import { agentModel, agentActionModel, taskModel } from "../models";
-import { applyAgentStatusUpdate } from "../agent-status";
+import { applyAgentStatusUpdate, ACTION_TO_DETAILED_STATUS } from "../agent-status";
 import { ensureAgentProfile } from "../agent-profile";
 import { isSystemShutdown } from "../system-settings";
 import { SetupStatus, AgentStatus, type AgentStatusValue } from "../constants";
@@ -10,19 +10,6 @@ import { trimAndCap, FLAG_KEYS } from "@agentcenter/utils";
 import { isFeatureEnabled } from "../feature-flags";
 import { recordCostEvent } from "../services/cost";
 import { DEFAULT_WORKSPACE_ID } from "../tenancy";
-
-const ACTION_TO_DETAILED_STATUS: Record<string, string> = {
-  file_edited: "coding",
-  code_written: "coding",
-  command_executed: "coding",
-  file_opened: "coding",
-  research_done: "researching",
-  thinking: "thinking",
-  reviewing: "reviewing",
-  deploying: "deploying",
-  testing: "testing",
-  writing_docs: "writing",
-};
 
 // ── Event payload schemas ────────────────────────────────
 

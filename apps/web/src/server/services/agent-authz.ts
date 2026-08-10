@@ -10,13 +10,10 @@ import { prisma } from "@/server/prisma";
 import { isAgentCapability, agentCan, FLAG_KEYS, AGENT_AUTHZ_DECISION } from "@agentcenter/utils";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import type { AgentCapabilityGrant, AgentAuthzEvent } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // Pure authorization logic (agentCan, defaultCapabilitiesForRole) + the capability vocabulary live in
 // @agentcenter/utils so web/desktop/mobile share one source of truth. This file is only DB/IO.
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 async function requireAgent(
   workspaceId: string,

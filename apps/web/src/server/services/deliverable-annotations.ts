@@ -2,13 +2,9 @@
  * Tier C: review annotations on deliverables. A comment optionally anchored to a quoted snippet of
  * the deliverable content; resolvable like a review thread. Display/review only.
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { DeliverableAnnotation } from "@agentcenter/database";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 export function deliverableAnnotations(deliverableId: string): Promise<DeliverableAnnotation[]> {
   return prisma.deliverableAnnotation.findMany({

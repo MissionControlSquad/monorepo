@@ -1,5 +1,4 @@
 import { prisma } from "@/server/prisma";
-import { GraphQLError } from "graphql";
 import type { ToolContentGuard } from "@agentcenter/database";
 import {
   applyContentGuards,
@@ -7,16 +6,13 @@ import {
   type ContentGuardRule,
   type GuardDirection,
 } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 // Tool content-guard service (parity #163). Persists the rules + evaluates tool I/O via the pure
 // evaluator. ENFORCEMENT belongs to the tool runtime (absent) — this is the storage + query half.
 
 const ACTIONS = new Set(["deny", "redact"]);
 const DIRECTIONS = new Set(["input", "output", "both"]);
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 function toRule(row: ToolContentGuard): ContentGuardRule {
   return {

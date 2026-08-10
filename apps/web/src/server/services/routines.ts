@@ -11,10 +11,7 @@ import { isValidCron, nextCronTick, FLAG_KEYS } from "@agentcenter/utils";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { resolveSchedulingSuppression } from "./agent-wakeups";
 import type { Routine, RoutineRun, RoutineTrigger } from "@agentcenter/database";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 // ─── §3 #11 (2) routine scheduling policies ───────────────────────────
 export const CONCURRENCY_POLICIES = ["allow", "skip", "queue"] as const;

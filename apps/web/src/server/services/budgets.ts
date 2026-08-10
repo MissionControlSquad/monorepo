@@ -17,6 +17,7 @@ import { emit } from "@/server/events";
 import { applyAgentStatusUpdate } from "@/server/agent-status";
 import { AUTO_PAUSE_MESSAGE } from "./budget-enforcement";
 import { windowBounds } from "./budget-window";
+import { badRequest } from "./service-errors";
 
 export interface CreateBudgetPolicyInput {
   workspaceId: string;
@@ -38,10 +39,6 @@ export interface UpdateBudgetPolicyInput {
   window?: BudgetWindow | null;
   hardStop?: boolean | null;
   isActive?: boolean | null;
-}
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
 }
 
 export async function createBudgetPolicy(input: CreateBudgetPolicyInput): Promise<BudgetPolicy> {

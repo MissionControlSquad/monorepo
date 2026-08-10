@@ -5,10 +5,7 @@
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { LedgerEvent, LedgerCategory, LedgerKind, LedgerSource } from "@agentcenter/database";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 /** amountCents must be a positive integer (sign is carried by `kind`, never the amount). */
 export function validateAmountCents(n: number): void {

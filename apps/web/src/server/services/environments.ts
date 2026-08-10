@@ -28,13 +28,11 @@ import {
 } from "./sandbox-providers";
 import { resolveWorkspaceSecret } from "./secrets";
 import { sshTestConnection } from "./ssh";
+import { badRequest } from "./service-errors";
 
 export const ENVIRONMENT_DRIVERS = ["local", "ssh", "sandbox", "plugin"] as const;
 export type EnvironmentDriver = (typeof ENVIRONMENT_DRIVERS)[number];
 
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 function notFound(): never {
   throw new GraphQLError("Environment not found", { extensions: { code: "NOT_FOUND" } });
 }

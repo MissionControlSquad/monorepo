@@ -6,12 +6,12 @@
  * `session-workspace-cwd.ts` (`isUnsafeSessionWorkspaceCwd`) verbatim.
  */
 import { randomBytes } from "node:crypto";
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import { hashApiKey } from "@/server/api-key";
 import { parseSshCommand, isUnsafeSessionWorkspaceCwd } from "@agentcenter/utils";
 import type { TerminalSession } from "@agentcenter/database";
 import { getHostSSHConfig } from "./runner-hosts";
+import { badRequest } from "./service-errors";
 
 // The pure SSH parsing, unsafe-cwd guard, and lifecycle-state logic are shared in @agentcenter/utils
 // (web/desktop/mobile). This file mints the token + persists. Re-exported for existing importers.
@@ -31,10 +31,6 @@ function stripToken(s: TerminalSession): SafeTerminalSession {
   const { connectTokenHash: _h, ...safe } = s;
   void _h;
   return safe;
-}
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
 }
 
 export async function openTerminalSession(args: {

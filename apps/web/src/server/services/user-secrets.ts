@@ -19,17 +19,10 @@
  *     (admin-only); a member can only declare/read their OWN coverage (self-scoped).
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { UserSecretDefinition, UserSecretDeclaration } from "@agentcenter/database";
 import { createSecret, rotateSecret, recordSecretAccess } from "./secrets";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
-function notFound(what: string): never {
-  throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
-}
+import { badRequest, notFound } from "./service-errors";
 
 /** UPPER_SNAKE env-var-style keys, matching the vault's envVarName convention. */
 const KEY_RE = /^[A-Z_][A-Z0-9_]*$/;

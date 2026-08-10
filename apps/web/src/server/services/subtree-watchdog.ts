@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import { TaskStatus } from "@/server/constants";
 import type { SubtreeWatchdog } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // Subtree verification watchdog (parity Domain-9 #9). A watchdog agent is assigned to a stopped task
 // subtree; the reap cron wakes it ONLY when the subtree's stop-fingerprint changes, so an unchanged
@@ -10,10 +10,6 @@ import type { SubtreeWatchdog } from "@agentcenter/database";
 // Workspace-scoped. Waking the agent is the runtime seam; this owns the fingerprint + suppression.
 
 const TERMINAL = new Set<string>([TaskStatus.DONE, TaskStatus.CANCELLED]);
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 /** Walk a task subtree (parentTaskId edges) and return the leaves (tasks with no non-deleted children). */
 async function subtreeLeaves(rootTaskId: string): Promise<{ id: string; status: string }[]> {

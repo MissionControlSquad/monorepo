@@ -3,6 +3,7 @@ import { prisma } from "@/server/prisma";
 import type { TaskAttachment } from "@agentcenter/database";
 import { generateUploadUrl, generateDownloadUrl, deleteFile } from "@/server/storage/r2";
 import { StoragePrefix } from "@/server/constants";
+import { badRequest } from "./service-errors";
 
 // Task artifact attachments (parity: agent/user attaches a produced file to a task/issue). Reuses the
 // existing Asset/R2 two-step presigned upload rather than a new bucket: presignTaskAttachment mints a
@@ -10,10 +11,6 @@ import { StoragePrefix } from "@/server/constants";
 // flips the row to `uploaded`. Content lives in R2 under the shared `attachments/` prefix; this row is
 // the metadata + pointer. Every function is workspace-scoped (D5) so a foreign task's attachments are
 // never reachable.
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 export interface PresignTaskAttachmentResult {
   attachment: TaskAttachment;

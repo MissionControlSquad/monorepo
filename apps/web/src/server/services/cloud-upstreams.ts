@@ -1,16 +1,12 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { CloudUpstream } from "@agentcenter/database";
 import { planUpstreamSync, type UpstreamSyncPlan } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 // Cloud upstreams (parity #24). Manage a project's remote fork/sync config and record the drift state a
 // git host reports. planSync classifies the current comparison into an action; performing that action
 // (fetch/merge/push) is the infra-gated git op done elsewhere and reported back via recordSyncResult.
 // Workspace-scoped; mutations admin-gated at the resolver.
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 export async function upsertCloudUpstream(input: {
   workspaceId: string;

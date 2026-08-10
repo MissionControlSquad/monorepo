@@ -8,7 +8,6 @@
 import { prisma } from "@/server/prisma";
 import { Prisma } from "@agentcenter/database";
 import type { FinanceEvent } from "@agentcenter/database";
-import { GraphQLError } from "graphql";
 import {
   isFinanceEventKind,
   isFinanceDirection,
@@ -16,6 +15,7 @@ import {
   summarizeFinanceEvents,
   type FinanceSummary,
 } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 export interface RecordFinanceEventInput {
   workspaceId: string;
@@ -39,10 +39,6 @@ export interface RecordFinanceEventInput {
   idempotencyKey?: string | null;
   metadataJson?: Record<string, unknown> | null;
   occurredAt?: Date;
-}
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
 }
 
 export async function recordFinanceEvent(input: RecordFinanceEventInput): Promise<FinanceEvent> {
