@@ -21,6 +21,7 @@ import { SecretDialog } from "@/components/dialogs/SecretDialog";
 import { SecretProviderDialog } from "@/components/dialogs/SecretProviderDialog";
 import { SecretImportDialog } from "@/components/dialogs/SecretImportDialog";
 import { SecretProposalsPanel } from "@/components/secrets/SecretProposalsPanel";
+import { MySecretsPanel } from "@/components/secrets/MySecretsPanel";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 
 // Epic #5: secrets vault. API-gated by SECRETS_VAULT + buildbase role (admin manages; member views
@@ -90,7 +91,19 @@ export default function SecretsPage() {
   const [openAudit, setOpenAudit] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const proposalsEnabled = useFeatureFlag("secret_proposals");
-  const [tab, setTab] = useState<"secrets" | "proposals">("secrets");
+  const [tab, setTab] = useState<"secrets" | "my-secrets" | "proposals">("secrets");
+  // "My secrets" (user-scoped definitions/coverage) always available under SECRETS_VAULT; proposals
+  // stays opt-in behind its own flag.
+  const tabs: ("secrets" | "my-secrets" | "proposals")[] = [
+    "secrets",
+    "my-secrets",
+    ...(proposalsEnabled ? (["proposals"] as const) : []),
+  ];
+  const TAB_LABEL: Record<string, string> = {
+    secrets: "secrets",
+    "my-secrets": "my secrets",
+    proposals: "proposals",
+  };
 
   const secrets = data?.secrets ?? [];
   const providers = providerData?.secretProviders ?? [];
@@ -174,288 +187,298 @@ export default function SecretsPage() {
         <div>
           <h1 className="text-lg font-semibold text-foreground">Secrets</h1>
           <p className="text-sm text-muted-foreground">
-            Encrypted at rest (AES-256-GCM). Values are write-only — they are never shown again, only
-            rotated. Bind a secret to an agent to inject it as an env var.
+            Encrypted at rest (AES-256-GCM). Values are write-only — they are never shown again,
+            only rotated. Bind a secret to an agent to inject it as an env var.
           </p>
         </div>
         {tab === "secrets" && (
           <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={() => setImportOpen(true)}>Bulk import</Button>
+            <Button variant="secondary" onClick={() => setImportOpen(true)}>
+              Bulk import
+            </Button>
             <Button onClick={() => setOpen(true)}>New secret</Button>
           </div>
         )}
       </div>
 
-      {/* Proposals is an opt-in governance surface (SECRET_PROPOSALS). Tab hidden unless enabled. */}
-      {proposalsEnabled && (
-        <div className="flex gap-1 border-b border-border">
-          {(["secrets", "proposals"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={
-                "-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize transition-colors " +
-                (tab === t
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground")
-              }
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Tabs: workspace secrets, the member's own required secrets, and (opt-in) agent proposals. */}
+      <div className="flex gap-1 border-b border-border">
+        {tabs.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            aria-current={tab === t ? "page" : undefined}
+            className={
+              "-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize transition-colors " +
+              (tab === t
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground")
+            }
+          >
+            {TAB_LABEL[t]}
+          </button>
+        ))}
+      </div>
 
+      {tab === "my-secrets" && <MySecretsPanel />}
       {proposalsEnabled && tab === "proposals" && <SecretProposalsPanel />}
 
       {tab === "secrets" && (
         <>
           {error && (
-            <p className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+            <p
+              className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              role="alert"
+            >
               {error}
             </p>
           )}
 
           <SecretDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
-      {/* Provider configs — point the vault at an external backend (aws/vault) or the local
+          {/* Provider configs — point the vault at an external backend (aws/vault) or the local
           envelope (env). `config` holds only non-secret settings; backend creds are Secrets. */}
-      <Card className="space-y-3 p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Providers</h2>
-          <Button size="sm" variant="ghost" onClick={() => setProviderOpen(true)}>
-            Add provider
-          </Button>
-        </div>
-        <p className="-mt-1 text-xs text-muted-foreground">
-          Where secrets are stored. Default is the local envelope.
-        </p>
-
-        <SecretProviderDialog
-          open={providerOpen}
-          onOpenChange={setProviderOpen}
-          onSaved={refreshProviders}
-        />
-        <div className="space-y-1">
-          {providers.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              No custom providers — secrets use the local AES-256-GCM envelope.
+          <Card className="space-y-3 p-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground">Providers</h2>
+              <Button size="sm" variant="ghost" onClick={() => setProviderOpen(true)}>
+                Add provider
+              </Button>
+            </div>
+            <p className="-mt-1 text-xs text-muted-foreground">
+              Where secrets are stored. Default is the local envelope.
             </p>
-          )}
-          {providers.map((p) => (
-            <div key={p.id} className="flex items-center justify-between gap-2 text-sm">
-              <span className="flex items-center gap-2">
-                <Badge variant="blue">{p.kind}</Badge>
-                <span className="text-foreground">{p.name}</span>
-                <Badge variant={p.healthy ? "green" : p.lastError ? "red" : "gray"}>
-                  {p.healthy ? "healthy" : p.lastError ? "unhealthy" : "unchecked"}
-                </Badge>
-                {p.lastError && <span className="text-xs text-destructive">{p.lastError}</span>}
-              </span>
-              <span className="flex shrink-0 gap-1">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busy === p.id}
-                  onClick={() => onCheckProvider(p.id)}
-                >
-                  Check
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy === p.id}
-                  onClick={() => onDeleteProvider(p.id)}
-                >
-                  Delete
-                </Button>
-              </span>
-            </div>
-          ))}
-        </div>
-      </Card>
 
-      {/* Create */}
-
-      {/* Bulk import — paste a .env (KEY=VALUE lines). Values are encrypted on the way in. */}
-      <SecretImportDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImported={setImportResult}
-        onSaved={refresh}
-      />
-      {importResult && <p className="text-xs text-muted-foreground">{importResult}</p>}
-
-      {secrets.length === 0 && (
-        <Card className="p-8 text-center text-sm text-muted-foreground">No secrets yet.</Card>
-      )}
-
-      {secrets.map((s) => (
-        <Card key={s.id} className="space-y-3 p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-foreground">{s.name}</span>
-            <Badge variant="gray">v{s.currentVersion}</Badge>
-            <Badge variant={STATUS_VARIANT[s.status] ?? "gray"}>{s.status}</Badge>
-            {s.personal && <Badge variant="purple">personal</Badge>}
-            {s.providerId && <Badge variant="blue">{providerName(s.providerId)}</Badge>}
-            {s.description && (
-              <span className="text-sm text-muted-foreground">{s.description}</span>
-            )}
-            <span className="ml-auto flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() =>
-                  setEditing((e) =>
-                    e?.id === s.id
-                      ? null
-                      : { id: s.id, name: s.name, description: s.description ?? "" },
-                  )
-                }
-              >
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setOpenAudit((o) => (o === s.id ? null : s.id))}
-              >
-                Audit
-              </Button>
-              <Select size="sm" className="text-xs" value={s.status}
-                onChange={async (e) => {
-                  await setStatus({ id: s.id, status: e.target.value });
-                  refresh();
-                }}
-              >
-                <option value="active">active</option>
-                <option value="disabled">disabled</option>
-                <option value="archived">archived</option>
-              </Select>
-            </span>
-          </div>
-
-          {/* Inline rename / edit description */}
-          {editing?.id === s.id && (
-            <div className="flex flex-wrap gap-2 rounded border border-dashed border-border p-2">
-              <input
-                className="flex-1 rounded border border-border bg-background px-2 py-1 text-sm"
-                placeholder="Name"
-                value={editing.name}
-                onChange={(e) => setEditing((p) => (p ? { ...p, name: e.target.value } : p))}
-              />
-              <input
-                className="flex-1 rounded border border-border bg-background px-2 py-1 text-sm"
-                placeholder="Description"
-                value={editing.description}
-                onChange={(e) => setEditing((p) => (p ? { ...p, description: e.target.value } : p))}
-              />
-              <Button
-                size="sm"
-                disabled={!editing.name.trim() || busy === s.id}
-                onClick={async () => {
-                  setBusy(s.id);
-                  try {
-                    const res = await updateSecret({
-                      id: s.id,
-                      name: editing.name.trim(),
-                      description: editing.description.trim() || null,
-                    });
-                    if (res.error)
-                      setError(res.error.graphQLErrors[0]?.message ?? "Failed to update");
-                    else {
-                      setEditing(null);
-                      refresh();
-                    }
-                  } finally {
-                    setBusy(null);
-                  }
-                }}
-              >
-                Save
-              </Button>
-            </div>
-          )}
-          {openAudit === s.id && <SecretAuditPanel secretId={s.id} />}
-
-          {/* Bindings */}
-          <div className="space-y-1">
-            {s.bindings.length === 0 && (
-              <p className="text-xs text-muted-foreground">No bindings.</p>
-            )}
-            {s.bindings.map((b) => (
-              <div key={b.id} className="flex items-center justify-between gap-2 text-sm">
-                <span className="flex items-center gap-2">
-                  <Badge variant="blue">{b.envVarName}</Badge>
-                  <span className="text-muted-foreground">
-                    {b.scope === "agent"
-                      ? `agent ${b.agentId?.slice(0, 8)}`
-                      : `adapter ${b.adapterType}`}
-                    {b.pinnedVersion ? ` · pinned v${b.pinnedVersion}` : ""}
+            <SecretProviderDialog
+              open={providerOpen}
+              onOpenChange={setProviderOpen}
+              onSaved={refreshProviders}
+            />
+            <div className="space-y-1">
+              {providers.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No custom providers — secrets use the local AES-256-GCM envelope.
+                </p>
+              )}
+              {providers.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="flex items-center gap-2">
+                    <Badge variant="blue">{p.kind}</Badge>
+                    <span className="text-foreground">{p.name}</span>
+                    <Badge variant={p.healthy ? "green" : p.lastError ? "red" : "gray"}>
+                      {p.healthy ? "healthy" : p.lastError ? "unhealthy" : "unchecked"}
+                    </Badge>
+                    {p.lastError && <span className="text-xs text-destructive">{p.lastError}</span>}
                   </span>
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy === b.id}
-                  onClick={() => onUnbind(b.id)}
-                >
-                  Unbind
-                </Button>
-              </div>
-            ))}
-          </div>
+                  <span className="flex shrink-0 gap-1">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busy === p.id}
+                      onClick={() => onCheckProvider(p.id)}
+                    >
+                      Check
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy === p.id}
+                      onClick={() => onDeleteProvider(p.id)}
+                    >
+                      Delete
+                    </Button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
 
-          {/* Actions: rotate + bind */}
-          <div className="grid grid-cols-1 gap-2 border-t border-border pt-3 sm:grid-cols-2">
-            <div className="flex gap-2">
-              <input
-                className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-                placeholder="New value (rotate)"
-                type="password"
-                value={rotateVal[s.id] ?? ""}
-                onChange={(e) => setRotateVal((m) => ({ ...m, [s.id]: e.target.value }))}
-              />
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={busy === s.id}
-                onClick={() => onRotate(s.id)}
-              >
-                Rotate
-              </Button>
-            </div>
-            <div className="flex gap-2">
-              <input
-                className="w-1/2 rounded border border-border bg-background px-2 py-1.5 text-sm"
-                placeholder="ENV_VAR"
-                value={bindForm[s.id]?.env ?? ""}
-                onChange={(e) =>
-                  setBindForm((m) => ({
-                    ...m,
-                    [s.id]: { env: e.target.value, agentId: m[s.id]?.agentId ?? "" },
-                  }))
-                }
-              />
-              <input
-                className="w-1/2 rounded border border-border bg-background px-2 py-1.5 text-sm"
-                placeholder="agent id"
-                value={bindForm[s.id]?.agentId ?? ""}
-                onChange={(e) =>
-                  setBindForm((m) => ({
-                    ...m,
-                    [s.id]: { env: m[s.id]?.env ?? "", agentId: e.target.value },
-                  }))
-                }
-              />
-              <Button size="sm" disabled={busy === s.id} onClick={() => onBind(s.id)}>
-                Bind
-              </Button>
-            </div>
-          </div>
-        </Card>
-      ))}
+          {/* Create */}
+
+          {/* Bulk import — paste a .env (KEY=VALUE lines). Values are encrypted on the way in. */}
+          <SecretImportDialog
+            open={importOpen}
+            onOpenChange={setImportOpen}
+            onImported={setImportResult}
+            onSaved={refresh}
+          />
+          {importResult && <p className="text-xs text-muted-foreground">{importResult}</p>}
+
+          {secrets.length === 0 && (
+            <Card className="p-8 text-center text-sm text-muted-foreground">No secrets yet.</Card>
+          )}
+
+          {secrets.map((s) => (
+            <Card key={s.id} className="space-y-3 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-foreground">{s.name}</span>
+                <Badge variant="gray">v{s.currentVersion}</Badge>
+                <Badge variant={STATUS_VARIANT[s.status] ?? "gray"}>{s.status}</Badge>
+                {s.personal && <Badge variant="purple">personal</Badge>}
+                {s.providerId && <Badge variant="blue">{providerName(s.providerId)}</Badge>}
+                {s.description && (
+                  <span className="text-sm text-muted-foreground">{s.description}</span>
+                )}
+                <span className="ml-auto flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      setEditing((e) =>
+                        e?.id === s.id
+                          ? null
+                          : { id: s.id, name: s.name, description: s.description ?? "" },
+                      )
+                    }
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setOpenAudit((o) => (o === s.id ? null : s.id))}
+                  >
+                    Audit
+                  </Button>
+                  <Select
+                    size="sm"
+                    className="text-xs"
+                    value={s.status}
+                    onChange={async (e) => {
+                      await setStatus({ id: s.id, status: e.target.value });
+                      refresh();
+                    }}
+                  >
+                    <option value="active">active</option>
+                    <option value="disabled">disabled</option>
+                    <option value="archived">archived</option>
+                  </Select>
+                </span>
+              </div>
+
+              {/* Inline rename / edit description */}
+              {editing?.id === s.id && (
+                <div className="flex flex-wrap gap-2 rounded border border-dashed border-border p-2">
+                  <input
+                    className="flex-1 rounded border border-border bg-background px-2 py-1 text-sm"
+                    placeholder="Name"
+                    value={editing.name}
+                    onChange={(e) => setEditing((p) => (p ? { ...p, name: e.target.value } : p))}
+                  />
+                  <input
+                    className="flex-1 rounded border border-border bg-background px-2 py-1 text-sm"
+                    placeholder="Description"
+                    value={editing.description}
+                    onChange={(e) =>
+                      setEditing((p) => (p ? { ...p, description: e.target.value } : p))
+                    }
+                  />
+                  <Button
+                    size="sm"
+                    disabled={!editing.name.trim() || busy === s.id}
+                    onClick={async () => {
+                      setBusy(s.id);
+                      try {
+                        const res = await updateSecret({
+                          id: s.id,
+                          name: editing.name.trim(),
+                          description: editing.description.trim() || null,
+                        });
+                        if (res.error)
+                          setError(res.error.graphQLErrors[0]?.message ?? "Failed to update");
+                        else {
+                          setEditing(null);
+                          refresh();
+                        }
+                      } finally {
+                        setBusy(null);
+                      }
+                    }}
+                  >
+                    Save
+                  </Button>
+                </div>
+              )}
+              {openAudit === s.id && <SecretAuditPanel secretId={s.id} />}
+
+              {/* Bindings */}
+              <div className="space-y-1">
+                {s.bindings.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No bindings.</p>
+                )}
+                {s.bindings.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="flex items-center gap-2">
+                      <Badge variant="blue">{b.envVarName}</Badge>
+                      <span className="text-muted-foreground">
+                        {b.scope === "agent"
+                          ? `agent ${b.agentId?.slice(0, 8)}`
+                          : `adapter ${b.adapterType}`}
+                        {b.pinnedVersion ? ` · pinned v${b.pinnedVersion}` : ""}
+                      </span>
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy === b.id}
+                      onClick={() => onUnbind(b.id)}
+                    >
+                      Unbind
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Actions: rotate + bind */}
+              <div className="grid grid-cols-1 gap-2 border-t border-border pt-3 sm:grid-cols-2">
+                <div className="flex gap-2">
+                  <input
+                    className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
+                    placeholder="New value (rotate)"
+                    type="password"
+                    value={rotateVal[s.id] ?? ""}
+                    onChange={(e) => setRotateVal((m) => ({ ...m, [s.id]: e.target.value }))}
+                  />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy === s.id}
+                    onClick={() => onRotate(s.id)}
+                  >
+                    Rotate
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    className="w-1/2 rounded border border-border bg-background px-2 py-1.5 text-sm"
+                    placeholder="ENV_VAR"
+                    value={bindForm[s.id]?.env ?? ""}
+                    onChange={(e) =>
+                      setBindForm((m) => ({
+                        ...m,
+                        [s.id]: { env: e.target.value, agentId: m[s.id]?.agentId ?? "" },
+                      }))
+                    }
+                  />
+                  <input
+                    className="w-1/2 rounded border border-border bg-background px-2 py-1.5 text-sm"
+                    placeholder="agent id"
+                    value={bindForm[s.id]?.agentId ?? ""}
+                    onChange={(e) =>
+                      setBindForm((m) => ({
+                        ...m,
+                        [s.id]: { env: m[s.id]?.env ?? "", agentId: e.target.value },
+                      }))
+                    }
+                  />
+                  <Button size="sm" disabled={busy === s.id} onClick={() => onBind(s.id)}>
+                    Bind
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
         </>
       )}
     </div>

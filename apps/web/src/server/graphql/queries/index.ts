@@ -25,6 +25,7 @@ import "./ledger";
 import "./adapters";
 import "./secrets";
 import "./secret-proposals";
+import "./user-secrets";
 import "./pipelines";
 import "./task-autonomy";
 import "./cases";
