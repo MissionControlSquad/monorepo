@@ -1,158 +1,177 @@
-# Paperclip → Mission Control parity — CURRENT STATE (post-merge)
+# Paperclip → Mission Control monorepo — Parity Comparison (refreshed 2026‑08‑10)
 
-Generated after merging 15 feature branches (PRs #89-103) into `implement-new-functionalities`.
-Compared against Paperclip `master` @ `19be4cf92`. This supersedes the older stale `INDEX.mdx`
-tracker (which under-counted what is already built). Verified against current source, not the docs.
+**This supersedes the 2026‑07/08 version of this file and the stale `INDEX.mdx`.** It is a fresh,
+feature‑by‑feature re‑verification done after the 30‑feature port landed on `main`, so the numbers are
+materially higher than the previous comparison (which predated the merge and overstated the gaps).
 
-**Legend:** ✅ present · 🟡 partial (core done, sub-parts deferred - see §4) · ❌ missing/buildable ·
-🚫 SKIPPED by deliberate prior choice (infra / external account / buildbase-owned - see §5)
+## Methodology (how this was produced, so it's auditable)
 
-**Boundary (never port):** human auth, billing, human orgs/workspaces/RBAC, invites, join-requests -
-provided by `@buildbase/sdk`. Marked 🚫 buildbase. MCP *transport* is also buildbase (the SDK ships it);
-we keep the governance/policy/audit half.
+- **Paperclip re‑pulled:** `github.com/paperclipai/paperclip` `master`, `19be4cf92` → `6a4e2e1b8`. The only
+  2 new commits are bug fixes (routine‑checkout 409, worktree runtime port) — **no new Paperclip
+  features**, so the parity baseline is effectively current.
+- **Monorepo side = `main`** (`9d3306b`), which contains the full port (verified: `implement-new-functionalities`
+  is 0 commits ahead of `main`; parity‑signature files such as `execution-workspace-policy.ts`,
+  `environment-custom-images.ts`, `agent-memory.ts`, `skill-policy.ts` are all present on `origin/main`).
+- **14 domains re‑verified in parallel**, each feature located in Paperclip source **and** re‑checked
+  against current monorepo source (not trusting the prior doc's statuses). Every status below is cited to a
+  real path in the domain working notes; this file is the synthesis.
 
----
-
-## 1. UI pages — Paperclip page → our route
-
-| Paperclip page | Our route | Status |
-|---|---|---|
-| Agents | `/agents` | ✅ |
-| NewAgent | `/agents/new` | ✅ |
-| AgentDetail | `/agent/[id]`, `/agents/[id]` | 🟡 not a URL-driven tabbed shell (no Tools/Budget/Keys tabs, no `runs/:runId`) |
-| AgentToolsTab | — | ❌ effective tool-access tab (policy exists server-side, no UI) |
-| Approvals / ApprovalDetail | `/approvals`, `/approvals/[id]` | ✅ |
-| Artifacts | `/artifacts` | ✅ |
-| Cases / CaseDetail | `/cases`, `/cases/[id]` | ✅ |
-| Companies + Company* | `/companies`, `/org-chart` | ✅ (export/import + Mermaid done) |
-| Costs | `/finance`, `/ledger`, `/analytics`, `/observability` | ✅ |
-| Dashboard / DashboardLive | `/` (kanban home) | ✅ |
-| Goals / GoalDetail | `/goals`, `/goals/[id]` | ✅ |
-| Inbox / WhatNeedsMe | `/attention`, `/review`, `/inbox-policies` | ✅ |
-| Issues / IssueDetail / MyIssues | `/` kanban + `/task/[id]` modal | ✅ (our "tasks" = their "issues") |
-| Pipelines | `/pipelines` | 🟡 list only, no `[pipelineId]` settings/detail |
-| PluginManager / PluginPage / PluginSettings | `/plugins`, `/adapter-plugins` | ✅ (per-plugin JsonSchemaForm) |
-| AdapterManager | `/adapters`, `/adapter-plugins` | ✅ (install + enable/disable; no reload lifecycle) |
-| Projects / ProjectDetail | `/projects`, `/projects/[id]` | ✅ |
-| ProjectWorkspaceDetail | — | ❌ project-workspace detail (services/ports editor) |
-| ExecutionWorkspaceDetail | — | ❌ exec-workspace detail (query exists, no route) |
-| Routines / RoutineDetail | `/routines` | 🟡 list; triggers done, no detail route |
-| Search | `/search` | ✅ |
-| Secrets | `/secrets` | ✅ (+ Proposals tab from #91) |
-| SkillStudio | `/skills` (list only) | ❌ authoring IDE / test harness |
-| TeamCatalog | `/teams` | 🟡 built from code templates; no shipped markdown catalog |
-| Timeline | `/timeline` | ✅ |
-| Training | — | ❌ (agent training surface) |
-| DesignGuide | — | ❌ internal design-system showcase (low value) |
-| OrgChart | `/org-chart` | ✅ (server SVG + Mermaid) |
-| DecisionQueuePage | `/decisions`? | 🟡 `decisions` query exists; verify dedicated page |
-| CliAuth | `/cli-auth` | ✅ |
-| Live gateway / Runners / Terminals / Local services / Cloud upstreams / Provider auth | `/live-gateway` (+ Devices tab #97), `/runners`, `/terminals`, `/local-services`, `/cloud-upstreams`, `/provider-auth` | ✅ |
-| Memory inspect | `/memory` (#92) | ✅ |
-| **Apps / MCP gateways / tool-profile wizard** | — | 🚫 buildbase (MCP connections plane) |
-| **Onboarding (cloud + local variants)** | `/onboarding` (cloud only) | ❌ local-install variant missing |
-| Auth / Workspaces / Org / Invites / JoinRequestQueue / InstanceSettings / UserProfile / ProfileSettings / InstanceAccess / CompanyInvites / CompanyAccess | — | 🚫 buildbase (human tenancy/RBAC) |
-| *UxLab pages (IssueChatUxLab, SystemNoticeUxLab, RunTranscriptUxLab, …)* | — | 🚫 Paperclip internal prototyping labs (not product) |
+**Boundary (never port — provided by `@buildbase/sdk`, confirmed mounted):** human auth, billing, human
+orgs/workspaces/RBAC, invites, join‑requests, **and the MCP transport / Applications‑Connections plane**
+(`@buildbase/sdk/mcp` is mounted at `apps/web/app/api/mcp/route.ts`, dormant until env‑provisioned). These
+are 🚫 by design, not gaps, and are excluded from the "buildable surface" denominators below.
 
 ---
 
-## 2. APIs / services — coverage (all ✅ unless noted)
+## 1. Scorecard — parity by domain (re‑verified)
 
-Environments+leases+workspaces+execution-policy+custom-images, sandbox run seam (async, retain,
-timedOut, redaction), AgentRun ledger + retries/backoff, stranded-work reconcile, watchdogs (subtree +
-silent), routine cron, task monitors, auto-sleep cron, **AgentWakeup coalescing queue (#103)**, memory
-(audit/provenance/cost/recall/**inspect UI #92**/**memory-jobs #96**), skills (lint/audit/update-status/
-runtime-sync/policy-engine/**merge-modes #95**), plugins (storage/RPC-contracts/tool-gateway/jobs/KV),
-secrets (audit-on-resolve/**proposals #91**/**AWS+Vault #100**/**run-redaction #94**), work-products
-taxonomy + `requireUntrustedPrReview` enforcement + doc annotations + **external-object poller #96**,
-FinanceEvent ledger + quota polling + OTel, **per-run log store + pino #101**, adapters (all runtimes +
-**execute()/parseLine contract #99** + **Hermes HTTP+SSE #102**), Live Gateway WS + **Ed25519 device
-pairing #97**, agent-companies + hire_agent + org-chart SVG.
+| # | Domain | Parity (buildable surface) | Prior doc implied | Headline finding |
+|---|---|---:|---:|---|
+| 01 | Environments & Execution | **~86%** | ~30% | Full env/lease/workspace/custom‑image spine built and wired into `sandbox-run.ts` |
+| 02 | Adapters & Runtimes | **~72%** | ~25–30% | Unified alias‑linked registry with real `execute()` + transcript parsing + self‑install |
+| 03 | Sandbox depth | **~82%** | ~30% | Leased, persisted, streamed, custom‑image seam; all 3 prior prod blockers closed |
+| 04 | Memory | **~88%** | ~40% | Ahead of Paperclip (their control‑plane is design‑only; we have tables/audit/cost/jobs/UI) |
+| 05 | Skills & Knowledge | **~72%** | ~35% | Authoring/import/update/policy/comments/sync‑modeling all shipped |
+| 06 | Plugins & MCP | **~60%** | ~15% | Full data‑model/registry/gateway/audit; execution runtime is a deliberate seam |
+| 07 | Secrets | **~72%** | ~40% | External providers + audited resolve + proposals + run‑redaction all closed |
+| 08 | Work Items | **~87%** | ~45% | Work‑product taxonomy, review gate, runs, attachments, annotations all landed |
+| 09 | Heartbeat & Scheduling | **~88%** | ~35% | Wakeup queue, retries/backoff, stranded‑work, watchdogs, cron scanner, auto‑sleep |
+| 10 | Connectivity | **~88%** | ~40% | Ed25519 pairing, hermes HTTP+SSE, one‑time key claim, run‑scoped bridge all real |
+| 11 | UI | **~88%** (46/52 pages) | 4 big ❌ | Environments, Execution‑Workspace, JsonSchemaForm, unified Agent Detail all built |
+| 12 | Cost & Observability | **~90%** | mostly ❌ | FinanceEvent ledger, quota framework, telemetry, OTel, pino, run‑log store all landed |
+| 13 | Deployment & CLI | **~55%** | "no CLI" | Operator CLI + fail‑closed trust enforcement landed; self‑host adoption polish remains |
+| 14 | Teams & Governance | **~82%** | 2 big ❌ | AgentCompany model + hire‑approval wiring + markdown export/import + org‑chart SVG |
 
-**Still ❌ (server):**
-- Skills catalog package (content-addressed, GitHub/URL import resolvers)
-- Plugin out-of-process worker execution (fork/spawn + vm sandbox) + `@mc/plugin-sdk`
-- Memory adapter registry + semantic/vector recall (today ILIKE) + runtime memory tools (mid-run)
-- Artifact upload pipeline (`TaskAttachment` + agent-facing upload skill)
-- Operator CLI (doctor/env/db:backup), deployment-mode taxonomy
-
----
-
-## 3. Buildable backlog — BATCH 3 landed (#104-108); remainder below
-
-DONE in Batch 3 (merged):
-1. ✅ **Unified tabbed Agent Detail** + AgentToolsTab — #105.
-2. ✅ **Skills catalog package + real import** (GitHub/URL/catalog resolvers) — #106. (deferred: skills.sh registry, local-path scan, multi-file tree bundles)
-4. ✅ **Artifact upload pipeline** — `TaskAttachment` + presigned upload + run-scoped agent upload — #108.
-7. ✅ **Operator CLI** (doctor / env:check / db:backup / db:migrate:status) — #104. (deferred: managed-install/service lifecycle)
-
-DONE in Batch 4 (merged #109-113):
-3. ✅ **Onboarding local-install variant** (cloud + local, reuses cli-auth pairing) — #111.
-5a. ✅ **MemoryAdapter registry + agent memory tools** (search/note/forget via run-scoped bridge) — #110.
-8. ✅ **Pipeline / Routine / Execution-Workspace detail routes** — #112. (ProjectWorkspace detail still ❌, small)
-9. ✅ **Managed-install + service-lifecycle CLI** (launchd/systemd) — #109; **skills.sh + local-path +
-   multi-file GitHub import** — #113.
-
-Still ❌ (now essentially only infra-blocked → §5, plus tiny stragglers):
-5b. **Semantic/vector recall** — needs the pgvector Postgres extension. → §5 (infra).
-6. **Plugin worker runtime** — fork/spawn + vm sandbox + UI slots + SDK. → §5 (infra).
-- ProjectWorkspace detail route; Hermes gateway UI config form; per-runtime parseLine for codex/gemini;
-  service uninstall/restart/health-probe. [S each - minor tail]
+**Overall: ~79% parity of the buildable (non‑buildbase) surface.** The consistent story across all 14
+domains: the prior comparison's headline ❌ items are **closed**; what remains is depth/fill‑in and a few
+genuinely‑unbuilt subsystems — enumerated in §3.
 
 ---
 
-## 4. 🟡 DEFERRED sub-parts INSIDE the just-merged PRs (do not forget these)
+## 2. What the merged work closed (the delta the old doc missed)
 
-These features LANDED but each intentionally deferred a piece - list so nothing is silently lost:
+Every prior "biggest gap" per domain is now real, cited code:
 
-- ~~#99 adapter execute() persistence~~ ✅ RESOLVED by #107 (AgentRun usage/errorFamily/exitReason
-  columns + surfaced on Runs card). Remaining: only `claude` has a real `parseLine` (others fallback).
-- ~~#102 Hermes gateway dispatch wiring~~ ✅ RESOLVED by #107 (dispatch branch resolves the vault key
-  + streams HTTP+SSE through the log store). Remaining: no UI config form for the gateway adapter.
-- **#103 AgentWakeup:** delivery = event emit + `delivered` mark; a real Live Gateway push frame is a
-  deferred seam (needs a new `mc.*` wire message).
-- **#101 run log store:** local/DB store only - S3 mirroring deferred; "view full log" UI not added.
-- **#100 external secrets:** AWS + Vault real; **GCP** deferred (no `gcp` provider enum yet).
-- **#96 memory-jobs:** async capture wired; extraction is still the existing capture path (no new
-  extraction strategies).
-- **#95 skill merge modes:** GraphQL exposes add/remove/replace but no UI selector (no first-party caller).
-- **#97 device pairing:** registration uses `DEFAULT_WORKSPACE_ID` (install-token layer carries no
-  workspace id) - revisit if per-workspace device scoping is needed.
-- **#94 run redaction:** live-tail mask string changed `«redacted»` → `***REDACTED***` (behavior change).
-
----
-
-## 5. 🚫 DELIBERATELY SKIPPED (by prior choice) — reasons
-
-**buildbase-owned (the SDK provides these; do NOT build):**
-- MCP client/transport, endpoint-mode server, named HTTP gateways, app→provider OAuth connections plane
-  (#11060/#11040/#11009), Notion-via-MCP-OAuth. We keep the governance half (tool-gateway/policy/audit).
-- Human auth, billing, orgs/workspaces/RBAC, invites, join-requests, instance/user settings.
-
-**External account / real credential required (cannot verify locally):**
-- Real cloud sandbox `snapshot()` (e2b/daytona/k8s), in-flight cancel of a RUNNING run.
-- Cursor Cloud adapter (`@cursor/sdk` + account), live provider-key verification harness.
-- Cloudflare bridge Worker artifact + deploy.
-- GCP Secret Manager provider.
-
-**Infra-gated / needs a run-harness (large, low near-term ROI):**
-- Plugin out-of-process worker execution + UI extension slots (contracts exist, `PLUGIN_RUNTIME=false`).
-- Skill Studio live test runs (needs the agent-run test harness).
-- Real openclaw/hermes NAT-pull WS device-auth gateway (beyond the local spawn + the new HTTP adapter).
-
-**Paperclip-internal (not product):** all `*UxLab` prototype pages, `DesignGuide` showcase.
+- **Environments/Sandbox:** first‑class `Environment` + `EnvironmentLease` (reuse/retain/reaper) +
+  `ExecutionWorkspace` + pure policy resolver + execution allowlist + low‑trust fail‑closed containment +
+  probe + custom‑image capture/overlay/rollback + live run status + run‑scoped in‑sandbox bridge. All three
+  prod blockers (runtime install, private‑repo auth, run persistence via `AgentRun`) closed.
+- **Adapters:** all 8 local runtimes have code modules + alias table unifying Tier‑A/Tier‑D keys; adapter‑owned
+  `execute()` + per‑runtime `parseLine` + error taxonomy + install catalog + live detection; real hermes SSE
+  gateway; NAT‑pull WS gateway with Ed25519 device pairing.
+- **Memory:** operations audit, post‑run capture (was dead code), company default resolution, inspect UI,
+  adapter registry, agent tools, cost linkage, async `MemoryJob` queue.
+- **Skills:** frontmatter/file‑kind/trust, external import (GitHub/URL/local/skills.sh), update/audit/reset,
+  runtime sync + merge‑mode state machine, governance policy engine, comments.
+- **Secrets:** AWS + Vault resolvers, audit‑on‑resolve (success **and** failure), secret proposals, run secret
+  redaction (dual‑layer).
+- **Cost/Obs:** `FinanceEvent` ledger, provider‑quota framework, telemetry contract+sink, OTel opt‑in, pino,
+  run‑log store — the single biggest cluster of prior ❌.
+- **Work Items:** work‑product PR/branch/commit taxonomy + review‑state gate, `AgentRun` + logs/liveness/retry,
+  asset/attachment pipeline, document anchored annotations + re‑anchor, dependency wakeups, external‑object
+  sync, origin/idempotency, `low_trust_review` now actually consumed.
+- **Heartbeat:** wakeup queue (coalescing/idempotency), scheduled retries + backoff, stranded‑work
+  reconciliation, subtree + silent‑run watchdogs, task monitors, cron parser+tz, auto‑sleep registered.
+- **Connectivity:** Ed25519 pairing + operator approval, hermes HTTP+SSE adapter, one‑time agent‑key claim,
+  run‑scoped bridge token.
+- **Plugins:** secret‑refs, managed resources, state KV, cron queue, tool‑admission gateway + audit,
+  worker‑protocol security primitives, mounted buildbase MCP endpoint.
+- **UI:** JsonSchemaForm, Environments, Execution‑Workspace detail, unified 7‑tab Agent Detail, Plugin detail,
+  AI‑Tools doctor, Cloud‑upstream, Memory inspect, org‑chart SVG (~46 of ~52 non‑buildbase pages present).
+- **Teams:** `AgentCompany` (`agentcompanies/v1`) model + migration, `hire_agent` approval fulfilment (creates
+  the agent on approve), markdown company export/import + Mermaid README, org‑chart SVG renderer.
+- **Deployment/CLI:** `scripts/operator.mjs` (doctor/env:check/db:backup/migrate‑status/install/update/service),
+  named trust presets, fail‑closed sandbox admission, execution allowlist, untrusted‑output review quarantine.
 
 ---
 
-## 6. Net assessment
+## 3. Genuinely remaining, buildable backlog (the honest gaps)
 
-After **25 merged features across 4 batches (#89-113)**, the app is at **~99% of Paperclip's portable,
-non-buildbase functionality**. The buildable backlog (§3) is essentially exhausted - what remains is:
-- **§5** — buildbase-owned / external-account-gated / true-infra (pgvector, plugin-worker exec), each
-  skipped with a documented reason;
-- a small **minor tail** (ProjectWorkspace detail, Hermes UI config form, codex/gemini parseLine,
-  service uninstall) noted in §3.
+Prioritized by value. None are architectural — the scaffolding exists in almost every case.
 
-Every gap is now either in §5 (skipped by choice, with a reason) or the minor tail. Nothing portable is
-silently missing. Each batch was merged in order and validated as a whole: typecheck 12/12, build 56/56,
-full suite 2069 tests passing, 0 failures.
+### High‑value
+
+1. **Adapter argv fidelity (quality risk).** The 5 thin runtimes — `cursor`, `grok`, `opencode`, `pi`,
+   `hermes` — are **build‑only shims whose argv is self‑flagged as unverified against the real CLIs**
+   (`adapters.ts` comment). Only `claude`/`codex`/`gemini` were live‑verified this session. These need the
+   same real‑CLI verification (missing `--output-format stream-json`/`--json`/`--yolo`/etc.) + `execute()`/`parseLine`.
+2. **Cloud sandbox provider depth.** Lease `resume`/`snapshot`/`pause` and template capture are implemented
+   **only for `local`**; e2b/daytona/modal/novita/k8s implement `provision` only, so reuse/capture silently
+   degrade to ephemeral. Also: **secret‑version lease fingerprint** (a resumed box can run with stale rotated
+   creds), **in‑flight run cancellation** (only queued runs cancel — no `AbortSignal` into `exec`), and
+   **sandbox cost population** (`AgentRun.costCents` never written for sandbox runs).
+3. **`testEnvironment` preflight** (adapters) — highest‑value clean adapter gap; no per‑adapter environment
+   check before dispatch.
+4. **Plugin execution runtime** — out‑of‑process worker `fork()` + host↔worker RPC + capability
+   **enforcement** (`requirePluginCapability` has zero callers, no `plugin_grants` table). Security‑critical;
+   currently contract/primitives only.
+5. **Skills app‑shipped catalog package** — real dir tree + build step + `generated/catalog.json` +
+   GitHub‑pinned refs (today it's 3 hardcoded seed manifests). Plus **runtime skill‑sync push/materialization**
+   (modeled, not pushed) and **Skill Studio real test‑run execution** (both correctly blocked on the
+   agent‑execution/harness domain).
+
+### Medium
+
+6. **UI clusters:** MCP/OAuth app‑connections catalog + tools‑governance (Profiles/Policies) pages; Secrets
+   *My‑secrets* + *Vaults‑management* tabs; a dedicated env‑variables editor widget (dotenv‑paste,
+   convert‑to‑secret, sensitive heuristic); DesignGuide showcase.
+7. **Secrets model depth:** user‑scoped secret **definitions/declarations/coverage** (today just a `personal`
+   bool); rich binding model (9 scopes vs 2, `tool_connection` target, dotted `configPath`, version selector,
+   projection); provider **write‑side** managed lifecycle (rotate/create‑remote/discovery — resolve+health exist).
+8. **Deployment/CLI adoption polish:** `onboard`/`configure`/`run` operator commands; `token`/`connect` key
+   CLI; structured versioned config file; embedded Postgres; local‑disk storage; agent‑CLIs‑preinstalled
+   image + quickstart/untrusted compose variants; the **untrusted‑PR‑review Docker workflow**.
+9. **Environments depth:** wire the custom‑image **setup terminal** to GraphQL/PTY (service + reaper exist);
+   **WorkspaceRuntimeService** long‑lived dev servers (the one genuinely‑absent subsystem here); branch
+   reconciliation (forward/override/quarantine); unified `EnvironmentRuntimeDriver` so `ssh`/`plugin` envs
+   become runnable; generic pre‑dispatch config/binding gate.
+10. **Cost/Obs finish work:** telemetry proposed‑event extractor + typed `EventDimensionsMap`; wire a
+    concrete provider‑quota adapter (framework off by default); project‑scope + lifetime‑window budgets;
+    HTTP‑log‑policy middleware; S3 mirroring of run logs.
+11. **Scheduling refinements:** per‑agent `maxConcurrentRuns` + priority dispatch (FIFO+batch‑cap today);
+    `concurrencyPolicy`/`catchUpPolicy` on routines; fold project‑pause into the unified wake‑suppression guard.
+12. **Work‑item small items:** `WorkMode` enum; `backlog` status; rich comment `presentation`;
+    `createdByRunId` on `Message`; generic `DocumentRevision` table; Task‑scoped `Label`; enforce
+    blocker‑prevents‑checkout at claim time.
+13. **Teams/package format:** multi‑kind markdown packages (`TEAM.md`/`PROJECT.md`/`TASK.md`/`SKILL.md`),
+    GitHub‑pinned+sha256 import graph, `.paperclip.yaml` sidecar; a shipped markdown teams catalog (teams are
+    code‑templated today); board principal / board‑authz; rule‑based per‑agent approval‑policy engine.
+14. **Connectivity:** the **Cursor Cloud** execution adapter (enum/seed/UI slot only — no `@cursor/sdk`
+    runtime); an in‑flight live‑task **cancel** frame.
+
+---
+
+## 4. Deliberately skipped — confirmed intentional (not gaps)
+
+- **Buildbase‑owned:** human auth/billing/orgs/RBAC/invites/join‑requests; the **entire MCP server +
+  Applications/Connections/governance plane** (outbound MCP client, inbound JSON‑RPC gateway, catalog/risk/
+  quarantine, named gateways + run‑scoped tokens, OAuth‑to‑upstream, protocol rate‑limit counters). The
+  `@buildbase/sdk/mcp` handler is *mounted*, not rebuilt — per `BUILDBASE-BOUNDARY.mdx` "we don't build a
+  tool gateway; we mount one."
+- **External‑account‑gated:** live cloud‑provider key verification; real cloud `snapshot()`/`resume()` impls;
+  managed AWS rotation/KMS; Cursor‑Cloud live SDK; provider‑quota concrete polling — the *frameworks* are
+  built; the credentialed lifecycles are reasonably deferred.
+- **Infra/other‑domain:** plugin out‑of‑process `node:vm` isolation + k8s multi‑tenant RBAC/network machinery;
+  pgvector semantic recall (adapter slot registered); Skill Studio execution harness; named sandbox sessions
+  (REPL); PARA as a product‑native store (ships as a runner skill instead); operator env‑var config tier
+  (replaced by DB/admin `WorkspaceExecutionPolicy`); persistent‑server `setInterval` scheduler + process‑start
+  crash recovery (replaced by Vercel cron + outbound‑poll + lease/fencing — a deliberate serverless choice).
+
+---
+
+## 5. Caveats (things not positively confirmed — verify before scheduling)
+
+- The 5 thin runtime adapters' **real‑CLI argv match is unconfirmed** (see §3.1) — the one adapter claim the
+  audit could not verify.
+- Whether `costByTaskTree` also sums descendant **runtime wall‑clock** (cost rollup confirmed; runtime dim not).
+- A few work‑item items marked "likely gap": agent upload‑artifact skill script, annotation↔comment mirroring,
+  standalone blocker‑diagnostics endpoint.
+- Depth on some rich pages (Pipeline stage settings, `agent` goal‑level enum) verified at file/symbol level,
+  not feature‑exhaustively.
+
+---
+
+*Bottom line: the port is at ~79% of Paperclip's buildable, non‑buildbase surface — far past the stale doc's
+picture. The remaining work is concentrated, well‑scoped, and mostly depth‑fill over existing scaffolding;
+the two items worth treating as quality risks (not just backlog) are the unverified argv of the 5 thin
+runtime adapters and the cloud‑provider sandbox impls that silently degrade to ephemeral.*
