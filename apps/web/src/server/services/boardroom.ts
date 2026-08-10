@@ -92,7 +92,14 @@ export async function setBoardMessageFeedback(input: {
  * reply (action-signals stripped). Returns the two new messages.
  */
 export async function sendBoardMessage(
-  args: { workspaceId: string; body: string; authorId?: string | null; skill?: string },
+  args: {
+    workspaceId: string;
+    body: string;
+    authorId?: string | null;
+    // Attribution: set when a board PRINCIPAL (not a human operator) posts the turn.
+    boardPrincipalId?: string | null;
+    skill?: string;
+  },
   relay: BoardRelay = unavailableRelay,
 ): Promise<{ userMessage: BoardMessage; assistantMessage: BoardMessage }> {
   const thread = await getOrCreateBoardThread(args.workspaceId);
@@ -103,6 +110,7 @@ export async function sendBoardMessage(
       role: "user",
       body: args.body,
       authorId: args.authorId ?? null,
+      boardPrincipalId: args.boardPrincipalId ?? null,
     },
   });
 

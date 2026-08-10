@@ -220,6 +220,12 @@ export { IMPORT_WORKSPACE_BUNDLE } from "./portability";
 export { CREATE_GOAL, UPDATE_GOAL, DELETE_GOAL } from "./goals";
 
 export { SEND_BOARD_MESSAGE, SET_BOARD_MESSAGE_FEEDBACK } from "./boardroom";
+export { CREATE_BOARD_PRINCIPAL, REVOKE_BOARD_PRINCIPAL } from "./board-principals";
+export {
+  SET_APPROVAL_POLICY,
+  DELETE_APPROVAL_POLICY,
+  REQUEST_AGENT_ACTION,
+} from "./approval-policies";
 
 export {
   INSTALL_PLUGIN,

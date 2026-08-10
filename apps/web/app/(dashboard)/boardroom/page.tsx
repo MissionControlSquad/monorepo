@@ -8,6 +8,7 @@ import { SEND_BOARD_MESSAGE, SET_BOARD_MESSAGE_FEEDBACK } from "@/lib/graphql/mu
 import { BOARD_ROLE } from "@agentcenter/utils";
 import { Button, Card, Textarea } from "@/components/ui";
 import { MarkdownComment } from "@/components/common/MarkdownComment";
+import { BoardPrincipalsPanel } from "@/components/boardroom/BoardPrincipalsPanel";
 
 // Epic #15: boardroom concierge chat. BOARD_CHAT-gated (experimental, admin). A standing per-workspace
 // conversation; the LLM relay is a deferred seam, so replies come from the default relay for now.
@@ -142,7 +143,8 @@ export default function BoardroomPage() {
       </Card>
 
       <Card className="flex gap-2 p-3">
-        <Textarea className="h-16 resize-none text-sm"
+        <Textarea
+          className="h-16 resize-none text-sm"
           placeholder="Message the board concierge…"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -157,6 +159,9 @@ export default function BoardroomPage() {
           Send
         </Button>
       </Card>
+
+      {/* Board principals — first-class board identities that can act in the boardroom (admin). */}
+      <BoardPrincipalsPanel />
     </div>
   );
 }

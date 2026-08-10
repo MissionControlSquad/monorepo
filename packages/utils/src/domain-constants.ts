@@ -329,6 +329,7 @@ export const ApprovalSubjectType = {
   DELIVERABLE: "deliverable",
   HIRE_AGENT: "hire_agent",
   BUDGET_OVERRIDE: "budget_override",
+  AGENT_ACTION: "agent_action",
 } as const;
 export type ApprovalSubjectTypeValue =
   (typeof ApprovalSubjectType)[keyof typeof ApprovalSubjectType];
