@@ -55,6 +55,28 @@ Notes carried from `env.ts`:
 - `LICENSE_DEV_BYPASS` is a **dev/CI‑only** escape hatch (guarded to non‑prod build or CI). **Never set
   it on a real production server.**
 
+### Guided first run (`onboard`)
+
+For a fresh deployment, `operator onboard` is the fastest path: it checks prerequisites (via `doctor`),
+**generates** strong `AUTH_SECRET` / `CRON_SECRET` / `SECRET_ENCRYPTION_KEY` when absent, collects the
+Postgres URLs, writes them to the deployment `.env` (mode 600), and runs `db:migrate:deploy`. It is
+**idempotent** — safe to re-run; existing non-empty values are never overwritten unless `--force`.
+
+```bash
+# Non-interactive (CI/scripting) — everything via flags:
+npm run operator onboard -- --non-interactive \
+  --pooled-url "$POSTGRES_PRISMA_URL" --direct-url "$POSTGRES_URL_NON_POOLING"
+# Interactive re-run just fills gaps; --force regenerates secrets.
+```
+
+Optionally record a structured, versioned operator config (renders to env; `env.ts` stays the runtime
+source of truth — precedence: `process.env` > deployment `.env` > operator config file):
+
+```bash
+npm run operator configure -- --section database --set pooledUrl=… --set directUrl=…
+npm run operator configure -- --section deployment   # print a section (secrets masked)
+```
+
 Validate before boot:
 
 ```bash
@@ -200,6 +222,12 @@ external scheduler hitting these paths with the `CRON_SECRET`):
 ### Operator CLI
 
 ```bash
+npm run operator onboard             # guided first-run: prereqs + generate/collect env + migrate (idempotent)
+npm run operator run -- --dry-run    # print the bootstrap (env + migrate) + server-exec plan
+npm run operator run                 # bootstrap then exec the app server (npm run start --workspace @agentcenter/web)
+npm run operator token mint -- --name my-runner --workspace <id>   # mint a runner/operator token (shown once)
+npm run operator token list   -- --workspace <id>                  # list tokens (masked)
+npm run operator token revoke -- --id <keyId> --workspace <id>     # revoke (tombstone)
 npm run operator doctor              # env + DB connectivity + migration status (read-only; gates deploy)
 npm run operator env:check           # required-vars checklist
 npm run operator db:backup -- --gzip # pg_dump → ./backups
@@ -207,6 +235,12 @@ npm run operator db:migrate:status   # applied / pending migrations
 npm run operator service:install     # render a launchd/systemd unit for the standalone runner daemon
 npm run operator service:status      # runner service status
 ```
+
+`onboard` / `configure` / `run` are the first-run + bootstrap path (see §1). `run` resolves its start
+command from `PW_WEB_COMMAND` > operator config `deployment.webCommand` > the package.json default.
+`token` reuses the workspace-scoped **ApiKey** model (Epic #12) — the same `mc_…` bearer the runner
+logs in with; the plaintext is printed once at mint, only the sha256 hash + prefix are stored, and
+revoke tombstones. It needs DB access + `apps/web/.env`.
 
 `service:*` manages the standalone `@agentcenter/runner` daemon (login service; macOS launchd / Linux
 systemd). `service:install` prints the unit unless you pass `-- --write`; `service:uninstall` refuses
