@@ -140,6 +140,53 @@ export interface AdapterExecutionResult {
   transcript?: AdapterTranscriptEvent[];
 }
 
+// ─── Environment preflight ("Test connection") contract ─────────────────────
+// Paperclip adapters expose a `testEnvironment` preflight that verifies a runtime is installed +
+// reachable + authenticated BEFORE a run is dispatched. This is the additive, runtime-neutral TYPE +
+// a PURE `summarizePreflight` helper. The actual probe (spawning `<bin> --version` / a cheap auth
+// check) is process-bound, so it lives server-side (apps/web) — nothing here spawns a process.
+
+/** One named check performed during a preflight (e.g. "CLI installed", "Reachable", "Authenticated"). */
+export interface AdapterPreflightCheck {
+  /** Short human label for what was verified. */
+  name: string;
+  /** Whether this individual check passed. */
+  ok: boolean;
+  /** Readable outcome/reason — a friendly explanation, never a raw stack/stderr dump. */
+  detail?: string;
+}
+
+/** The structured result of a runtime preflight — the whole run passes only if every check passes. */
+export interface AdapterPreflightResult {
+  ok: boolean;
+  checks: AdapterPreflightCheck[];
+  /** Machine-readable failure class when a check failed for a classifiable reason (e.g. auth_required). */
+  errorFamily?: AdapterErrorFamily;
+}
+
+/** Context handed to a preflight — an optional model to target, and where the runtime would run. */
+export interface AdapterPreflightContext {
+  model?: string | null;
+  /** Optional cwd the runtime would launch in (informational; a preflight need not use it). */
+  workspaceDir?: string;
+}
+
+/**
+ * PURE preflight summarizer: fold a list of checks into an {@link AdapterPreflightResult}. `ok` is true
+ * iff EVERY check passed. `errorFamily` is passed through only when supplied (a classifiable failure like
+ * `auth_required`). No I/O — fixture-testable and shared by every server-side probe.
+ */
+export function summarizePreflight(
+  checks: AdapterPreflightCheck[],
+  errorFamily?: AdapterErrorFamily,
+): AdapterPreflightResult {
+  return {
+    ok: checks.length > 0 && checks.every((c) => c.ok),
+    checks,
+    ...(errorFamily ? { errorFamily } : {}),
+  };
+}
+
 export interface Adapter {
   /** Stable key used in config / selection (e.g. "openclaw", "codex", "claude", "process"). */
   key: string;
@@ -185,6 +232,14 @@ export interface Adapter {
    * as the shared implementation.
    */
   execute?(input: AdapterExecutionInput): AdapterExecutionResult;
+  /**
+   * OPTIONAL environment preflight ("Test connection") — verify the runtime is installed + reachable +
+   * authenticated BEFORE dispatching a run (Paperclip parity). This IS process-bound (it spawns the CLI
+   * or hits an auth endpoint), so it is normally implemented server-side, not on the pure built-in
+   * adapters here. When an adapter declares one, the server probe delegates to it; otherwise the server
+   * probe runs a generic `<binName> --version` check. Shape results via {@link summarizePreflight}.
+   */
+  testEnvironment?(ctx: AdapterPreflightContext): Promise<AdapterPreflightResult>;
 }
 
 /** Models an adapter offers: live-detected if it supports it (deduped with the curated list), else curated. */
