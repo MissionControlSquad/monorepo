@@ -46,6 +46,7 @@ export * from "./runtime-templates";
 export * from "./adapters";
 export * from "./tool-access-policy";
 export * from "./secret-refs";
+export * from "./secret-ref-discovery";
 export * from "./trust-presets";
 export * from "./redact";
 export * from "./tool-content-guards";

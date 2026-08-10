@@ -9,13 +9,24 @@ import { prisma } from "@/server/prisma";
 import type {
   Secret,
   SecretBinding,
+  SecretBindingScope,
   SecretAccessAction,
   SecretProviderConfig,
   SecretProviderKind,
 } from "@agentcenter/database";
 import { encryptSecret, decryptSecret, CURRENT_KEY_ID } from "./secrets-crypto";
-import { checkSecretProviderConfigHealth, getSecretProviderModule } from "@agentcenter/utils";
-import { resolveExternalSecret } from "./secret-external";
+import {
+  checkSecretProviderConfigHealth,
+  getSecretProviderModule,
+  validateSecretProviderConfig,
+} from "@agentcenter/utils";
+import {
+  resolveExternalSecret,
+  writeExternalSecret,
+  type ExternalWriteResult,
+  type AwsClientFactory,
+  type FetchImpl,
+} from "./secret-external";
 import { badRequest, notFound } from "./service-errors";
 
 /** Append a secret access-event (audit). Centralized so no path skips the log. */
@@ -382,11 +393,16 @@ export async function resolveWorkspaceSecret(
 export async function bindSecret(args: {
   workspaceId: string;
   secretId: string;
-  scope: "agent" | "adapter";
+  scope: SecretBindingScope;
   agentId?: string | null;
   adapterType?: string | null;
+  toolConnectionId?: string | null;
   envVarName: string;
   pinnedVersion?: number | null;
+  // Richer bindings (parity §3 secrets depth) — additive, safe defaults reproduce legacy behavior.
+  configPath?: string | null;
+  versionSelector?: string | null;
+  projectionClass?: string | null;
   createdBy: string;
   actor?: SecretActor;
 }): Promise<SecretBinding> {
@@ -397,6 +413,29 @@ export async function bindSecret(args: {
     badRequest("agentId required for agent-scoped binding");
   if (args.scope === "adapter" && !args.adapterType)
     badRequest("adapterType required for adapter-scoped binding");
+  if (args.scope === "tool_connection" && !args.toolConnectionId)
+    badRequest("toolConnectionId required for tool_connection-scoped binding");
+
+  // Projection class (how the value is projected) + version selector validation. Defaults keep an
+  // existing/omitted binding on the legacy env-var, latest-version path.
+  const projectionClass = args.projectionClass?.trim() || "env";
+  if (!isProjectionClass(projectionClass))
+    badRequest("projectionClass must be one of: env, file, inline_ref");
+  const versionSelector = normalizeVersionSelector(args.versionSelector);
+  // configPath targets WHERE the value lands: a dotted path into the target's config JSON (e.g.
+  // "auth.token", "hooks[].secret") for inline_ref, or a relative file path (e.g. "certs/tls.pem")
+  // for file. Permissive but non-empty and free of whitespace / traversal. Null = flat env.
+  const configPath = args.configPath?.trim() || null;
+  if (
+    configPath &&
+    (!/^[A-Za-z0-9_][A-Za-z0-9_./\-[\]]*$/.test(configPath) || configPath.includes(".."))
+  )
+    badRequest(
+      "configPath must be a dotted path or relative file path (e.g. auth.token, certs/tls.pem)",
+    );
+  // A non-env projection is meaningless without a configPath telling us WHERE to write the value.
+  if (projectionClass !== "env" && !configPath)
+    badRequest(`projectionClass "${projectionClass}" requires a configPath`);
 
   const secret = await prisma.secret.findFirst({
     where: { id: args.secretId, workspaceId: args.workspaceId },
@@ -421,8 +460,12 @@ export async function bindSecret(args: {
       scope: args.scope,
       agentId: args.scope === "agent" ? args.agentId : null,
       adapterType: args.scope === "adapter" ? args.adapterType : null,
+      toolConnectionId: args.scope === "tool_connection" ? args.toolConnectionId : null,
       envVarName,
       pinnedVersion: args.pinnedVersion ?? null,
+      configPath,
+      versionSelector,
+      projectionClass,
       createdBy: args.createdBy,
     },
   });
@@ -432,7 +475,8 @@ export async function bindSecret(args: {
     actorType: "user",
     actorId: args.createdBy,
     agentId: binding.agentId,
-    metadata: { envVarName, scope: args.scope },
+    configPath: configPath ?? `env.${envVarName}`,
+    metadata: { envVarName, scope: args.scope, projectionClass, versionSelector },
   });
   return binding;
 }
@@ -462,32 +506,118 @@ export async function unbindSecret(
   return true;
 }
 
-/** Pure precedence merge: agent-scoped bindings win over adapter-scoped on the same env var. */
+// ─── Richer binding projection (parity §3 secrets depth) ──────────────
+export const PROJECTION_CLASSES = ["env", "file", "inline_ref"] as const;
+export type ProjectionClass = (typeof PROJECTION_CLASSES)[number];
+
+export function isProjectionClass(v: string): v is ProjectionClass {
+  return (PROJECTION_CLASSES as readonly string[]).includes(v);
+}
+
+const BINDING_SCOPES: SecretBindingScope[] = ["agent", "adapter", "tool_connection"];
+export function isSecretBindingScope(v: string): v is SecretBindingScope {
+  return (BINDING_SCOPES as string[]).includes(v);
+}
+
+/**
+ * Normalize a versionSelector: "latest" (default) follows pinnedVersion ?? currentVersion; a positive
+ * integer string pins that exact version. Anything else collapses to "latest" (fail-open to latest).
+ */
+export function normalizeVersionSelector(selector?: string | null): string {
+  const s = selector?.trim();
+  if (!s || s === "latest") return "latest";
+  const n = Number.parseInt(s, 10);
+  return Number.isInteger(n) && n > 0 ? String(n) : "latest";
+}
+
+/**
+ * Pure: the concrete SecretVersion number a binding resolves to. A numeric versionSelector pins
+ * explicitly and supersedes the legacy pinnedVersion; "latest" follows pinnedVersion ?? currentVersion.
+ */
+export function selectBindingVersion(
+  binding: { versionSelector?: string | null; pinnedVersion?: number | null },
+  currentVersion: number,
+): number {
+  const sel = binding.versionSelector?.trim();
+  if (sel && sel !== "latest") {
+    const n = Number.parseInt(sel, 10);
+    if (Number.isInteger(n) && n > 0) return n;
+  }
+  return binding.pinnedVersion ?? currentVersion;
+}
+
+/** One resolved binding: its decrypted value plus how/where to project it. */
+export interface ResolvedBindingValue {
+  envVarName: string;
+  configPath: string | null;
+  projectionClass: ProjectionClass;
+  scope: SecretBindingScope;
+  value: string;
+}
+
+/**
+ * The full projection an agent's bindings produce, split by projectionClass:
+ *   env        → environment variables (envVarName → value),
+ *   files      → a file mounted at configPath with the value as its contents,
+ *   inlineRefs → a value patched into the target config JSON at configPath.
+ */
+export interface AgentSecretProjection {
+  env: Record<string, string>;
+  files: { path: string; value: string }[];
+  inlineRefs: { path: string; value: string }[];
+}
+
+/**
+ * Pure precedence merge: agent-scoped bindings win over adapter/tool-scoped on the same env var.
+ * (Kept for back-compat; `projectResolvedBindings` is the richer superset.)
+ */
 export function mergeEnvBindings(
-  entries: { envVarName: string; value: string; scope: "agent" | "adapter" }[],
+  entries: { envVarName: string; value: string; scope: SecretBindingScope }[],
 ): Record<string, string> {
   const out: Record<string, string> = {};
-  // Apply adapter first, then agent so agent overrides.
-  for (const e of entries.filter((x) => x.scope === "adapter")) out[e.envVarName] = e.value;
+  // Apply non-agent scopes first, then agent so agent overrides.
+  for (const e of entries.filter((x) => x.scope !== "agent")) out[e.envVarName] = e.value;
   for (const e of entries.filter((x) => x.scope === "agent")) out[e.envVarName] = e.value;
   return out;
 }
 
 /**
- * Resolve the decrypted env vars an agent should receive: its own agent-scoped bindings plus the
- * adapter-scoped bindings for its adapterType, honoring each binding's pinnedVersion. Agent-scoped
- * wins on conflict. SERVER-ONLY — consumed by the (deferred) runtime injection path.
+ * Pure: fan resolved bindings out into the three projection classes, honoring configPath. Agent-scoped
+ * bindings win over adapter/tool on a conflicting env var (same precedence as mergeEnvBindings).
  */
-export async function resolveEnvForAgent(
+export function projectResolvedBindings(entries: ResolvedBindingValue[]): AgentSecretProjection {
+  const proj: AgentSecretProjection = { env: {}, files: [], inlineRefs: [] };
+  // agent last so it overrides non-agent env vars on conflict.
+  const ordered = [...entries].sort(
+    (a, b) => Number(a.scope === "agent") - Number(b.scope === "agent"),
+  );
+  for (const e of ordered) {
+    if (e.projectionClass === "file") {
+      proj.files.push({ path: e.configPath ?? e.envVarName, value: e.value });
+    } else if (e.projectionClass === "inline_ref") {
+      proj.inlineRefs.push({ path: e.configPath ?? e.envVarName, value: e.value });
+    } else {
+      proj.env[e.envVarName] = e.value;
+    }
+  }
+  return proj;
+}
+
+/**
+ * Gather an agent's resolved bindings (agent-scoped + adapter-scoped for its adapterType), honoring
+ * each binding's versionSelector/pinnedVersion and writing audit-on-resolve when a consumer is passed.
+ * Shared by resolveEnvForAgent (env-only view) and resolveBindingsForAgent (full projection).
+ */
+async function gatherAgentBindings(
   workspaceId: string,
   agentId: string,
   consumer?: SecretConsumerContext,
-): Promise<Record<string, string>> {
+): Promise<ResolvedBindingValue[]> {
   const agent = await prisma.agent.findFirst({
     where: { id: agentId, workspaceId },
     select: { id: true, adapterType: true },
   });
-  if (!agent) return {};
+  if (!agent) return [];
 
   const bindings = await prisma.secretBinding.findMany({
     where: {
@@ -503,14 +633,14 @@ export async function resolveEnvForAgent(
     include: { secret: { select: { currentVersion: true } } },
   });
 
-  const entries: { envVarName: string; value: string; scope: "agent" | "adapter" }[] = [];
+  const entries: ResolvedBindingValue[] = [];
   for (const b of bindings) {
-    const version = b.pinnedVersion ?? b.secret.currentVersion;
+    const version = selectBindingVersion(b, b.secret.currentVersion);
     const row = await prisma.secretVersion.findUnique({
       where: { secretId_version: { secretId: b.secretId, version } },
     });
     // Audit-on-resolve at the USE site (Domain 7 P1): write one event per binding — `injected` on
-    // success, `missing` when the pinned version row is gone. Best-effort; never block the run.
+    // success, `missing` when the selected version row is gone. Best-effort; never block the run.
     if (consumer) {
       await recordSecretAccess({
         secretId: b.secretId,
@@ -521,20 +651,52 @@ export async function resolveEnvForAgent(
         version,
         consumerType: consumer.consumerType,
         consumerId: consumer.consumerId,
-        configPath: `env.${b.envVarName}`,
+        configPath: b.configPath ?? `env.${b.envVarName}`,
         outcome: row ? "success" : "missing",
         errorCode: row ? null : "version_not_found",
         runId: consumer.runId ?? null,
       }).catch(() => {});
     }
     if (!row) continue;
+    const projectionClass = isProjectionClass(b.projectionClass) ? b.projectionClass : "env";
     entries.push({
       envVarName: b.envVarName,
-      value: decryptSecret(row.ciphertext),
+      configPath: b.configPath,
+      projectionClass,
       scope: b.scope,
+      value: decryptSecret(row.ciphertext),
     });
   }
-  return mergeEnvBindings(entries);
+  return entries;
+}
+
+/**
+ * Resolve the decrypted env vars an agent should receive: its own agent-scoped bindings plus the
+ * adapter-scoped bindings for its adapterType, honoring each binding's versionSelector/pinnedVersion.
+ * Only env-projection bindings appear here (file/inline_ref project elsewhere). Agent-scoped wins on
+ * conflict. SERVER-ONLY — consumed by the runtime injection path.
+ */
+export async function resolveEnvForAgent(
+  workspaceId: string,
+  agentId: string,
+  consumer?: SecretConsumerContext,
+): Promise<Record<string, string>> {
+  const entries = await gatherAgentBindings(workspaceId, agentId, consumer);
+  return projectResolvedBindings(entries).env;
+}
+
+/**
+ * Resolve the FULL projection for an agent — env vars, file mounts, and inline config patches — from
+ * its bindings, honoring configPath/versionSelector/projectionClass. SERVER-ONLY. This is the richer
+ * superset of resolveEnvForAgent (whose result equals the `.env` of this).
+ */
+export async function resolveBindingsForAgent(
+  workspaceId: string,
+  agentId: string,
+  consumer?: SecretConsumerContext,
+): Promise<AgentSecretProjection> {
+  const entries = await gatherAgentBindings(workspaceId, agentId, consumer);
+  return projectResolvedBindings(entries);
 }
 
 // ─── Provider configs ─────────────────────────────────────────────
@@ -597,6 +759,113 @@ export async function checkSecretProviderHealth(
     where: { id: provider.id },
     data: { healthy: health.healthy, lastCheckedAt: new Date(), lastError: health.error },
   });
+}
+
+/**
+ * Provider WRITE-side managed rotation (parity §3 secrets depth). Rotates a provider-backed secret
+ * BY WRITING the new value to the external store (AWS PutSecretValue / Vault KV v2 write), then mirrors
+ * it locally as a new SecretVersion and records a `rotated` audit event. The provider must be an
+ * aws/vault provider whose non-secret config validates (configured) — otherwise this is rejected, so
+ * live remote calls only ever fire against a real, configured backend. `createRemote` uses CreateSecret
+ * instead of PutSecretValue (first-time provisioning). The client/fetch are injectable so tests exercise
+ * the full path against a MOCKED provider (no live cloud call) — see secrets-managed-rotation.test.ts.
+ */
+export async function rotateManagedSecret(args: {
+  workspaceId: string;
+  secretId: string;
+  value: string;
+  createdBy: string;
+  actor?: SecretActor;
+  createRemote?: boolean;
+  // Injected in tests so no real AWS/Vault call is made; undefined in prod → the real SDK/fetch.
+  clientFactory?: AwsClientFactory;
+  fetchImpl?: FetchImpl;
+}): Promise<Secret> {
+  if (!args.value) badRequest("value is required");
+  const secret = await prisma.secret.findFirst({
+    where: { id: args.secretId, workspaceId: args.workspaceId },
+  });
+  if (!secret) throw new GraphQLError("Secret not found", { extensions: { code: "NOT_FOUND" } });
+  if (args.actor && !canManageSecret(secret, args.actor)) forbidden();
+
+  if (!secret.providerId) badRequest("secret is not backed by an external provider");
+  const provider = await prisma.secretProviderConfig.findFirst({
+    where: { id: secret.providerId, workspaceId: args.workspaceId },
+  });
+  if (!provider) badRequest("provider not found in this workspace");
+  if (provider.kind !== "aws" && provider.kind !== "vault")
+    badRequest("managed rotation requires an aws or vault provider");
+  // Only fire remote calls against a CONFIGURED provider (well-formed non-secret config).
+  const valid = validateSecretProviderConfig(
+    provider.kind,
+    (provider.config ?? {}) as Record<string, unknown>,
+  );
+  if (!valid.ok) badRequest(`provider is not configured: ${valid.error}`);
+
+  const write: ExternalWriteResult = await writeExternalSecret(provider.kind, {
+    config: (provider.config ?? {}) as Record<string, unknown>,
+    secretName: secret.name,
+    value: args.value,
+    mode: args.createRemote ? "create" : "rotate",
+    resolveSecret: (name) => resolveWorkspaceSecret(args.workspaceId, name),
+    clientFactory: args.clientFactory,
+    fetchImpl: args.fetchImpl,
+  });
+
+  if (!write.ok) {
+    // Shaped provider failure → audit the attempt and surface a clean error (never a raw provider throw).
+    await recordSecretAccess({
+      secretId: secret.id,
+      action: "rotated",
+      actorType: "user",
+      actorId: args.createdBy,
+      outcome: "provider_error",
+      errorCode: write.code,
+      metadata: { provider: provider.name, kind: provider.kind, error: write.error },
+    }).catch(() => {});
+    throw new GraphQLError(`Provider rotation failed: ${write.error}`, {
+      extensions: { code: "PROVIDER_ERROR", providerCode: write.code },
+    });
+  }
+
+  // Mirror the new value locally as version N+1 (retire the prior) so history + audit stay complete
+  // even for provider-backed secrets, then repoint currentVersion.
+  const nextVersion = secret.currentVersion + 1;
+  const ciphertext = encryptSecret(args.value);
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.secretVersion.updateMany({
+      where: { secretId: secret.id, version: secret.currentVersion, retiredAt: null },
+      data: { retiredAt: new Date() },
+    });
+    await tx.secretVersion.create({
+      data: {
+        secretId: secret.id,
+        version: nextVersion,
+        ciphertext,
+        keyId: CURRENT_KEY_ID,
+        createdBy: args.createdBy,
+      },
+    });
+    return tx.secret.update({
+      where: { id: secret.id },
+      data: { currentVersion: nextVersion },
+    });
+  });
+  await recordSecretAccess({
+    secretId: secret.id,
+    action: "rotated",
+    actorType: "user",
+    actorId: args.createdBy,
+    version: nextVersion,
+    outcome: "success",
+    metadata: {
+      provider: provider.name,
+      kind: provider.kind,
+      mode: args.createRemote ? "create" : "rotate",
+      remoteVersion: write.version ?? null,
+    },
+  });
+  return updated;
 }
 
 /** Delete a provider. Its secrets are NOT deleted — providerId is SetNull, falling back to local. */

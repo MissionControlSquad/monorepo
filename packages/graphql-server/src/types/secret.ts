@@ -41,8 +41,13 @@ builder.prismaObject("SecretBinding", {
     scope: t.exposeString("scope"),
     agentId: t.exposeString("agentId", { nullable: true }),
     adapterType: t.exposeString("adapterType", { nullable: true }),
+    toolConnectionId: t.exposeString("toolConnectionId", { nullable: true }),
     envVarName: t.exposeString("envVarName"),
     pinnedVersion: t.exposeInt("pinnedVersion", { nullable: true }),
+    // Richer bindings (parity §3 secrets depth). Metadata only — never a value.
+    configPath: t.exposeString("configPath", { nullable: true }),
+    versionSelector: t.exposeString("versionSelector"),
+    projectionClass: t.exposeString("projectionClass"),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
   }),
 });

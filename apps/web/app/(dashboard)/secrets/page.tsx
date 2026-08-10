@@ -9,6 +9,7 @@ import {
 } from "@/lib/graphql/queries";
 import {
   ROTATE_SECRET,
+  ROTATE_MANAGED_SECRET,
   BIND_SECRET,
   UNBIND_SECRET,
   UPDATE_SECRET,
@@ -33,8 +34,12 @@ interface Binding {
   scope: string;
   agentId: string | null;
   adapterType: string | null;
+  toolConnectionId: string | null;
   envVarName: string;
   pinnedVersion: number | null;
+  configPath: string | null;
+  versionSelector: string;
+  projectionClass: string;
 }
 interface Version {
   version: number;
@@ -65,12 +70,24 @@ const STATUS_VARIANT: Record<string, "green" | "yellow" | "gray"> = {
   archived: "gray",
 };
 
+/** A fresh richer-binding form: env-var projection, latest version, no config path. */
+function emptyBindForm() {
+  return {
+    env: "",
+    agentId: "",
+    configPath: "",
+    versionSelector: "latest",
+    projectionClass: "env",
+  };
+}
+
 export default function SecretsPage() {
   const [{ data }, refetch] = useQuery<{ secrets: Secret[] }>({ query: SECRETS_QUERY });
   const [{ data: providerData }, refetchProviders] = useQuery<{ secretProviders: Provider[] }>({
     query: SECRET_PROVIDERS_QUERY,
   });
   const [, rotateSecret] = useMutation(ROTATE_SECRET);
+  const [, rotateManaged] = useMutation(ROTATE_MANAGED_SECRET);
   const [, bindSecret] = useMutation(BIND_SECRET);
   const [, unbindSecret] = useMutation(UNBIND_SECRET);
   const [, setStatus] = useMutation(SET_SECRET_STATUS);
@@ -84,7 +101,21 @@ export default function SecretsPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const [rotateVal, setRotateVal] = useState<Record<string, string>>({});
-  const [bindForm, setBindForm] = useState<Record<string, { env: string; agentId: string }>>({});
+  const [bindForm, setBindForm] = useState<
+    Record<
+      string,
+      {
+        env: string;
+        agentId: string;
+        configPath: string;
+        versionSelector: string;
+        projectionClass: string;
+      }
+    >
+  >({});
+  // "Rotate via provider" confirm (managed/provider-backed secrets only).
+  const [confirmManaged, setConfirmManaged] = useState<{ id: string; name: string } | null>(null);
+  const [managedVal, setManagedVal] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<{ id: string; name: string; description: string } | null>(
     null,
   );
@@ -164,6 +195,9 @@ export default function SecretsPage() {
   async function onBind(id: string) {
     const bf = bindForm[id];
     if (!bf?.env || !bf?.agentId) return setError("Env var name and agent id are required to bind");
+    const projectionClass = bf.projectionClass || "env";
+    if (projectionClass !== "env" && !bf.configPath?.trim())
+      return setError(`A "${projectionClass}" projection needs a config path (e.g. auth.token)`);
     setBusy(id);
     try {
       const res = await bindSecret({
@@ -171,9 +205,31 @@ export default function SecretsPage() {
         scope: "agent",
         envVarName: bf.env,
         agentId: bf.agentId,
+        configPath: bf.configPath?.trim() || null,
+        versionSelector: bf.versionSelector?.trim() || "latest",
+        projectionClass,
       });
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to bind");
-      setBindForm((m) => ({ ...m, [id]: { env: "", agentId: "" } }));
+      setBindForm((m) => ({ ...m, [id]: emptyBindForm() }));
+      setError(null);
+      refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Provider WRITE-side rotation: write the new value to the secret's external store (AWS/Vault) and
+  // record a new local version + audit. Only offered for provider-backed (managed) secrets.
+  async function onRotateManaged(id: string) {
+    const value = managedVal[id];
+    if (!value) return setError("Enter the new value to write to the provider");
+    setBusy(id);
+    try {
+      const res = await rotateManaged({ id, value });
+      if (res.error)
+        return setError(res.error.graphQLErrors[0]?.message ?? "Provider rotation failed");
+      setManagedVal((m) => ({ ...m, [id]: "" }));
+      setError(null);
       refresh();
     } finally {
       setBusy(null);
@@ -429,13 +485,23 @@ export default function SecretsPage() {
                 )}
                 {s.bindings.map((b) => (
                   <div key={b.id} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="flex items-center gap-2">
+                    <span className="flex flex-wrap items-center gap-2">
                       <Badge variant="blue">{b.envVarName}</Badge>
+                      {b.projectionClass !== "env" && (
+                        <Badge variant="purple">{b.projectionClass}</Badge>
+                      )}
                       <span className="text-muted-foreground">
                         {b.scope === "agent"
                           ? `agent ${b.agentId?.slice(0, 8)}`
-                          : `adapter ${b.adapterType}`}
-                        {b.pinnedVersion ? ` · pinned v${b.pinnedVersion}` : ""}
+                          : b.scope === "adapter"
+                            ? `adapter ${b.adapterType}`
+                            : `tool ${b.toolConnectionId?.slice(0, 8)}`}
+                        {b.configPath ? ` · ${b.configPath}` : ""}
+                        {b.versionSelector && b.versionSelector !== "latest"
+                          ? ` · v${b.versionSelector}`
+                          : b.pinnedVersion
+                            ? ` · pinned v${b.pinnedVersion}`
+                            : ""}
                       </span>
                     </span>
                     <Tooltip
@@ -455,55 +521,159 @@ export default function SecretsPage() {
                 ))}
               </div>
 
-              {/* Actions: rotate + bind */}
-              <div className="grid grid-cols-1 gap-2 border-t border-border pt-3 sm:grid-cols-2">
-                <div className="flex gap-2">
-                  <input
-                    className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-                    placeholder="New value (rotate)"
-                    type="password"
-                    value={rotateVal[s.id] ?? ""}
-                    onChange={(e) => setRotateVal((m) => ({ ...m, [s.id]: e.target.value }))}
-                  />
+              {/* Actions: rotate + (provider rotate) + richer bind editor */}
+              <div className="space-y-2 border-t border-border pt-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="flex gap-2">
+                    <input
+                      className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
+                      placeholder="New value (rotate)"
+                      type="password"
+                      value={rotateVal[s.id] ?? ""}
+                      onChange={(e) => setRotateVal((m) => ({ ...m, [s.id]: e.target.value }))}
+                    />
+                    <Tooltip
+                      content="Rotate replaces the stored value; every agent bound to this secret uses the new value on its next run."
+                      side="bottom"
+                    >
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy === s.id}
+                        onClick={() => onRotate(s.id)}
+                      >
+                        Rotate
+                      </Button>
+                    </Tooltip>
+                  </div>
+
+                  {/* Provider-backed (managed) secrets: write the new value to the external store. */}
+                  {s.providerId && (
+                    <div className="flex gap-2">
+                      <input
+                        className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
+                        placeholder="New value (write to provider)"
+                        type="password"
+                        value={managedVal[s.id] ?? ""}
+                        onChange={(e) => setManagedVal((m) => ({ ...m, [s.id]: e.target.value }))}
+                      />
+                      <Tooltip
+                        content="Managed rotation: writes the new value to this secret's external provider (AWS/Vault), then records a new version + audit. Existing bindings pick it up on their next run."
+                        side="bottom"
+                      >
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busy === s.id}
+                          onClick={() => {
+                            if (!managedVal[s.id])
+                              return setError("Enter the new value to write to the provider");
+                            setConfirmManaged({ id: s.id, name: s.name });
+                          }}
+                        >
+                          Rotate via provider
+                        </Button>
+                      </Tooltip>
+                    </div>
+                  )}
+                </div>
+
+                {/* Richer bind editor: env var + agent, plus projection / config path / version. */}
+                <div className="grid grid-cols-1 gap-2 rounded border border-dashed border-border p-2 sm:grid-cols-6">
                   <Tooltip
-                    content="Rotate replaces the stored value; every agent bound to this secret uses the new value on its next run."
+                    content="The environment variable (or projected key) the value is exposed as."
                     side="bottom"
                   >
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={busy === s.id}
-                      onClick={() => onRotate(s.id)}
-                    >
-                      Rotate
-                    </Button>
+                    <input
+                      className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+                      placeholder="ENV_VAR"
+                      value={bindForm[s.id]?.env ?? ""}
+                      onChange={(e) =>
+                        setBindForm((m) => ({
+                          ...m,
+                          [s.id]: { ...emptyBindForm(), ...m[s.id], env: e.target.value },
+                        }))
+                      }
+                    />
                   </Tooltip>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    className="w-1/2 rounded border border-border bg-background px-2 py-1.5 text-sm"
-                    placeholder="ENV_VAR"
-                    value={bindForm[s.id]?.env ?? ""}
-                    onChange={(e) =>
-                      setBindForm((m) => ({
-                        ...m,
-                        [s.id]: { env: e.target.value, agentId: m[s.id]?.agentId ?? "" },
-                      }))
-                    }
-                  />
-                  <input
-                    className="w-1/2 rounded border border-border bg-background px-2 py-1.5 text-sm"
-                    placeholder="agent id"
-                    value={bindForm[s.id]?.agentId ?? ""}
-                    onChange={(e) =>
-                      setBindForm((m) => ({
-                        ...m,
-                        [s.id]: { env: m[s.id]?.env ?? "", agentId: e.target.value },
-                      }))
-                    }
-                  />
                   <Tooltip
-                    content="Bind injects this secret into the chosen agent as the named env var at run time."
+                    content="The agent this secret is injected into at run time."
+                    side="bottom"
+                  >
+                    <input
+                      className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+                      placeholder="agent id"
+                      value={bindForm[s.id]?.agentId ?? ""}
+                      onChange={(e) =>
+                        setBindForm((m) => ({
+                          ...m,
+                          [s.id]: { ...emptyBindForm(), ...m[s.id], agentId: e.target.value },
+                        }))
+                      }
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    content="How the value is projected. env = an environment variable; file = a mounted file at the config path; inline_ref = patched into the target's config JSON at the config path."
+                    side="bottom"
+                  >
+                    <Select
+                      size="sm"
+                      className="text-xs"
+                      value={bindForm[s.id]?.projectionClass ?? "env"}
+                      onChange={(e) =>
+                        setBindForm((m) => ({
+                          ...m,
+                          [s.id]: {
+                            ...emptyBindForm(),
+                            ...m[s.id],
+                            projectionClass: e.target.value,
+                          },
+                        }))
+                      }
+                    >
+                      <option value="env">env</option>
+                      <option value="file">file</option>
+                      <option value="inline_ref">inline_ref</option>
+                    </Select>
+                  </Tooltip>
+                  <Tooltip
+                    content="Dotted path into the target's config JSON where the value is written, e.g. auth.token. Required for file / inline_ref projections."
+                    side="bottom"
+                  >
+                    <input
+                      className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+                      placeholder="configPath (auth.token)"
+                      value={bindForm[s.id]?.configPath ?? ""}
+                      onChange={(e) =>
+                        setBindForm((m) => ({
+                          ...m,
+                          [s.id]: { ...emptyBindForm(), ...m[s.id], configPath: e.target.value },
+                        }))
+                      }
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    content='Which version resolves: "latest" follows the current version; enter a number to pin an exact version.'
+                    side="bottom"
+                  >
+                    <input
+                      className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+                      placeholder="version (latest)"
+                      value={bindForm[s.id]?.versionSelector ?? ""}
+                      onChange={(e) =>
+                        setBindForm((m) => ({
+                          ...m,
+                          [s.id]: {
+                            ...emptyBindForm(),
+                            ...m[s.id],
+                            versionSelector: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    content="Bind injects this secret into the chosen agent using the projection above, at run time."
                     side="bottom"
                   >
                     <Button size="sm" disabled={busy === s.id} onClick={() => onBind(s.id)}>
@@ -531,6 +701,24 @@ export default function SecretsPage() {
             description="Any secret stored in this provider can no longer be read, rotated, or injected into agents bound to it. Their next runs will fail to load those values. This does not delete the secrets themselves."
             confirmLabel="Delete provider"
             loading={busy === confirmDeleteProvider?.id}
+          />
+
+          <ConfirmDialog
+            isOpen={confirmManaged !== null}
+            onClose={() => setConfirmManaged(null)}
+            onConfirm={async () => {
+              const m = confirmManaged;
+              setConfirmManaged(null);
+              if (m) await onRotateManaged(m.id);
+            }}
+            title={
+              confirmManaged
+                ? `Rotate "${confirmManaged.name}" via its provider?`
+                : "Rotate via provider?"
+            }
+            description="This writes the new value to the secret's external provider (AWS Secrets Manager / HashiCorp Vault) and records a new version. Agents bound to this secret use the new value on their next run. This cannot be undone from here."
+            confirmLabel="Rotate via provider"
+            loading={busy === confirmManaged?.id}
           />
         </>
       )}

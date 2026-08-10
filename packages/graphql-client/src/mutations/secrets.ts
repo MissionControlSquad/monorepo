@@ -65,7 +65,11 @@ export const BIND_SECRET = gql`
     $envVarName: String!
     $agentId: String
     $adapterType: String
+    $toolConnectionId: String
     $pinnedVersion: Int
+    $configPath: String
+    $versionSelector: String
+    $projectionClass: String
   ) {
     bindSecret(
       secretId: $secretId
@@ -73,9 +77,24 @@ export const BIND_SECRET = gql`
       envVarName: $envVarName
       agentId: $agentId
       adapterType: $adapterType
+      toolConnectionId: $toolConnectionId
       pinnedVersion: $pinnedVersion
+      configPath: $configPath
+      versionSelector: $versionSelector
+      projectionClass: $projectionClass
     ) {
       id
+    }
+  }
+`;
+
+// Provider WRITE-side managed rotation (parity §3 secrets depth): rotate a provider-backed secret in
+// its external store (AWS/Vault), recording a new local version + audit. Admin + SECRETS_VAULT.
+export const ROTATE_MANAGED_SECRET = gql`
+  mutation RotateManagedSecret($id: String!, $value: String!, $createRemote: Boolean) {
+    rotateManagedSecret(id: $id, value: $value, createRemote: $createRemote) {
+      id
+      currentVersion
     }
   }
 `;
