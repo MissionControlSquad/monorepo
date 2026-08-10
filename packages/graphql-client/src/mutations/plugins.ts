@@ -36,6 +36,24 @@ export const SET_PLUGIN_CONFIG = gql`
   }
 `;
 
+// PLUGIN_RUNTIME: grant/revoke a capability to a plugin (admin). Fail-closed — the runtime refuses any
+// capability without a grant.
+export const GRANT_PLUGIN_CAPABILITY = gql`
+  mutation GrantPluginCapability($pluginId: String!, $capability: String!) {
+    grantPluginCapability(pluginId: $pluginId, capability: $capability) {
+      id
+      capability
+      grantedAt
+    }
+  }
+`;
+
+export const REVOKE_PLUGIN_CAPABILITY = gql`
+  mutation RevokePluginCapability($pluginId: String!, $capability: String!) {
+    revokePluginCapability(pluginId: $pluginId, capability: $capability)
+  }
+`;
+
 export const CLEAR_PLUGIN_ERROR = gql`
   mutation ClearPluginError($pluginId: String!) {
     clearPluginError(pluginId: $pluginId) {

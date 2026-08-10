@@ -36,6 +36,7 @@ import "./portability";
 import "./goals";
 import "./boardroom";
 import "./plugins";
+import "./plugin-grants";
 import "./api-keys";
 import "./cli-auth";
 import "./terminals";
