@@ -27,6 +27,7 @@
     "@agentcenter/graphql-client": "*",
     "@agentcenter/graphql-server": "*",
     "@agentcenter/hooks": "*",
+    "@agentcenter/skills-catalog": "*",
     "@agentcenter/tailwind-config": "*",
     "@agentcenter/types": "*",
     "@agentcenter/utils": "*",

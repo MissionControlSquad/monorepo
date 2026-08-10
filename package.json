@@ -21,6 +21,7 @@
     "db:generate": "turbo run db:generate --filter=@agentcenter/database",
     "db:migrate": "turbo run db:migrate --filter=@agentcenter/database",
     "db:migrate:deploy": "turbo run db:migrate:deploy --filter=@agentcenter/database",
+    "catalog:build": "node packages/skills-catalog/scripts/build-catalog.mjs",
     "doctor": "node scripts/doctor.mjs",
     "db:backup": "node scripts/db-backup.mjs",
     "operator": "node scripts/operator.mjs",
