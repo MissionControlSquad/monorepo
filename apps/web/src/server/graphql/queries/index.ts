@@ -67,6 +67,7 @@ import "./runtime-adapters";
 import "./sandbox-providers";
 import "./environments";
 import "./execution-workspaces";
+import "./workspace-runtime-services";
 import "./project-doc-comments";
 import "./feedback";
 import "./assets";

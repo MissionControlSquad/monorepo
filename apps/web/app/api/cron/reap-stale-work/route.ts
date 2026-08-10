@@ -27,6 +27,7 @@ import { successResponse, errorResponse, handleError } from "../../_lib/json-res
 import { env } from "@/server/env";
 import { reapStuckRunnerCommands } from "@/server/services/runner-commands";
 import { reapStaleLeases } from "@/server/services/environment-leases";
+import { reapIdleRuntimeServices } from "@/server/services/workspace-runtime-services";
 import { reapStaleTerminalSessions } from "@/server/services/terminals";
 import { sweepExpiredCheckouts } from "@/server/services/task-checkout";
 import { evaluateWatchdogs } from "@/server/services/task-watchdog";
@@ -71,6 +72,7 @@ export async function GET(request: Request) {
       telemetryPruned,
       memoryJobs,
       externalObjects,
+      runtimeServicesReaped,
     ] = await Promise.all([
       sweepExpiredCheckouts(now),
       reapStuckRunnerCommands(now),
@@ -96,6 +98,11 @@ export async function GET(request: Request) {
           on ? refreshDueExternalObjects({ now }) : { due: 0, refreshed: 0, failed: 0 },
         )
         .catch(() => ({ due: 0, refreshed: 0, failed: 0 })),
+      // Idle-reap long-lived workspace runtime services (dev/preview servers) with stopPolicy on_idle
+      // whose workspace has gone idle past the TTL. LOCAL_SERVICES-gated (mirrors the mutation surface).
+      isFeatureEnabled(FLAG_KEYS.LOCAL_SERVICES)
+        .then((on) => (on ? reapIdleRuntimeServices(now) : 0))
+        .catch(() => 0),
     ]);
     // Stranded-work reconciliation runs AFTER retry promotion so a run that just earned a retry (now
     // queued) is not mistaken for stranded. Owner-preserving re-dispatch → escalate-to-blocked ladder.
@@ -124,6 +131,7 @@ export async function GET(request: Request) {
       memoryJobsDrained: memoryJobs.completed,
       memoryJobsFailed: memoryJobs.failed,
       externalObjectsRefreshed: externalObjects.refreshed,
+      runtimeServicesReaped,
       wakesDelivered: wakes.delivered,
       wakesSuppressed: wakes.suppressed,
       at: now.toISOString(),

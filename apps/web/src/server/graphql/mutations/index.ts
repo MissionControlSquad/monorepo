@@ -56,6 +56,7 @@ import "./agent-runtime";
 import "./sandbox-run";
 import "./environments";
 import "./execution-workspaces";
+import "./workspace-runtime-services";
 import "./agent-memory";
 import "./agent-companies";
 import "./attention";
