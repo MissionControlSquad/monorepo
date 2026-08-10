@@ -23,6 +23,7 @@ builder.mutationField("createBudgetPolicy", (t) =>
     args: {
       scope: t.arg.string({ required: true }),
       agentId: t.arg.string(),
+      projectId: t.arg.string(),
       name: t.arg.string({ required: true }),
       limitCents: t.arg.int({ required: true }),
       window: t.arg.string({ required: true }),
@@ -36,6 +37,7 @@ builder.mutationField("createBudgetPolicy", (t) =>
         workspaceId: tenancy.workspaceId,
         scope: args.scope as BudgetScope,
         agentId: args.agentId ?? null,
+        projectId: args.projectId ?? null,
         name: args.name,
         limitCents: args.limitCents,
         window: args.window as BudgetWindow,

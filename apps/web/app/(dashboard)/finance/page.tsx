@@ -19,6 +19,7 @@ import { IncidentThreshold, formatCents as money } from "@agentcenter/utils";
 import { Button, Card, Badge, Select } from "@/components/ui";
 import { BudgetPolicyDialog } from "@/components/dialogs/BudgetPolicyDialog";
 import { FinanceEventsSection } from "@/components/finance/FinanceEventsSection";
+import { useAppContext } from "@/components/context/AppContext";
 
 // Epic #4: agent budgets / cost dashboard. API-gated by the BUDGETS feature + buildbase role
 // (admin manages policies + resolves incidents; member views). All data is workspace-scoped
@@ -34,6 +35,7 @@ interface Policy {
   id: string;
   scope: string;
   agentId: string | null;
+  projectId: string | null;
   name: string;
   limitCents: number;
   window: string;
@@ -59,7 +61,6 @@ interface Bucket {
   amountCents: number;
   eventCount: number;
 }
-
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
@@ -92,6 +93,10 @@ export default function FinancePage() {
     variables: { days: 30 },
   });
 
+  const { projects } = useAppContext();
+  const projectName = (id: string | null) =>
+    id ? (projects?.find((p) => p.id === id)?.name ?? "project") : null;
+
   const [, deletePolicy] = useMutation(DELETE_BUDGET_POLICY);
   const [, resolveIncident] = useMutation(RESOLVE_BUDGET_INCIDENT);
   const [, raiseAndResume] = useMutation(RAISE_BUDGET_AND_RESUME);
@@ -119,7 +124,9 @@ export default function FinancePage() {
     try {
       const res = await deletePolicy({ id });
       if (res.error) {
-        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to delete");
+        toast.error(
+          res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to delete",
+        );
         return;
       }
       refetchPolicies({ requestPolicy: "network-only" });
@@ -134,7 +141,11 @@ export default function FinancePage() {
     try {
       const res = await resolveIncident({ id });
       if (res.error) {
-        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to resolve incident");
+        toast.error(
+          res.error.graphQLErrors?.[0]?.message ??
+            res.error.message ??
+            "Failed to resolve incident",
+        );
         return;
       }
       refetchIncidents({ requestPolicy: "network-only" });
@@ -184,7 +195,9 @@ export default function FinancePage() {
         <section className="space-y-2">
           <h2 className="text-sm font-semibold text-foreground">Open incidents</h2>
           {raiseError && (
-            <p className="text-sm text-destructive" role="alert">{raiseError}</p>
+            <p className="text-sm text-destructive" role="alert">
+              {raiseError}
+            </p>
           )}
           {incidents.map((inc) => (
             <Card
@@ -269,7 +282,10 @@ export default function FinancePage() {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Spend by {breakdownBy}</h2>
-          <Select size="sm" className="text-xs" value={breakdownBy}
+          <Select
+            size="sm"
+            className="text-xs"
+            value={breakdownBy}
             onChange={(e) => setBreakdownBy(e.target.value)}
           >
             <option value="model">model</option>
@@ -311,7 +327,9 @@ export default function FinancePage() {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Budget policies</h2>
-          <Button size="sm" onClick={() => setOpen(true)}>New budget</Button>
+          <Button size="sm" onClick={() => setOpen(true)}>
+            New budget
+          </Button>
         </div>
 
         <BudgetPolicyDialog open={open} onOpenChange={setOpen} onSaved={refreshBudgets} />
@@ -328,6 +346,9 @@ export default function FinancePage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="truncate font-medium text-foreground">{p.name}</span>
                 <Badge variant="gray">{p.scope}</Badge>
+                {p.scope === "project" && p.projectId && (
+                  <Badge variant="gray">{projectName(p.projectId)}</Badge>
+                )}
                 <Badge variant="blue">{p.window}</Badge>
                 {p.hardStop && <Badge variant="orange">hard stop</Badge>}
                 {!p.isActive && <Badge variant="gray">inactive</Badge>}

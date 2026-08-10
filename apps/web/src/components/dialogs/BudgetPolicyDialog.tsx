@@ -3,10 +3,35 @@
 import { useMutation } from "urql";
 import { CREATE_BUDGET_POLICY } from "@/lib/graphql/mutations";
 import { BUDGET_WINDOWS } from "@agentcenter/utils";
-import { Input, Select, Checkbox, FormField, FormDialog } from "@/components/ui";
+import { Input, Select, Checkbox, FormField, FormDialog, Tooltip } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
+import { useAppContext } from "@/components/context/AppContext";
 
 const WINDOWS = BUDGET_WINDOWS;
+
+// Human-readable copy for the scope + window pickers (surfaced as tooltips). Keep these in sync with
+// the enum members in packages/database/prisma/schema/finance.prisma.
+const SCOPE_HELP =
+  "Workspace: caps spend across every agent in the workspace. Project: caps spend across the agents " +
+  "assigned to one project — on a hard breach only that project's agents are paused.";
+const WINDOW_HELP =
+  "How often the budget resets. hourly/daily/weekly/monthly roll over at the start of each period. " +
+  "lifetime never resets — all spend accrues into a single perpetual window.";
+
+/** Small info affordance that carries a tooltip; keyboard-focusable via the Tooltip trigger. */
+function InfoHint({ content }: { content: string }) {
+  return (
+    <Tooltip content={content}>
+      <span
+        tabIndex={0}
+        aria-label={content}
+        className="inline-flex size-4 cursor-help items-center justify-center rounded-full border border-border text-[10px] font-semibold text-muted-foreground"
+      >
+        i
+      </span>
+    </Tooltip>
+  );
+}
 
 interface BudgetPolicyDialogProps {
   open: boolean;
@@ -14,20 +39,33 @@ interface BudgetPolicyDialogProps {
   onSaved?: () => void;
 }
 
-/** Create a workspace budget policy. */
+/** Create a workspace- or project-scoped budget policy. */
 export function BudgetPolicyDialog({ open, onOpenChange, onSaved }: BudgetPolicyDialogProps) {
   const [, createPolicy] = useMutation(CREATE_BUDGET_POLICY);
+  const { projects } = useAppContext();
+  const projectList = projects ?? [];
+
   const f = useResourceForm({
     open,
     onOpenChange,
-    empty: { name: "", limit: "", window: "monthly", hardStop: true, warn: "80" },
+    empty: {
+      scope: "workspace",
+      projectId: "",
+      name: "",
+      limit: "",
+      window: "monthly",
+      hardStop: true,
+      warn: "80",
+    },
     submit: async (v) => {
       const limitCents = Math.round(Number(v.limit) * 100);
       if (!v.name.trim()) return "Name is required";
+      if (v.scope === "project" && !v.projectId) return "Select a project for a project budget";
       if (!Number.isFinite(limitCents) || limitCents <= 0) return "Enter a positive limit";
       const warnPercent = Math.round(Number(v.warn));
       const res = await createPolicy({
-        scope: "workspace",
+        scope: v.scope,
+        projectId: v.scope === "project" ? v.projectId : null,
         name: v.name.trim(),
         limitCents,
         window: v.window,
@@ -39,40 +77,81 @@ export function BudgetPolicyDialog({ open, onOpenChange, onSaved }: BudgetPolicy
     onDone: onSaved,
   });
 
+  const isProject = f.values.scope === "project";
+
   return (
     <FormDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="New workspace budget"
+      title="New budget"
       onSubmit={f.onSubmit}
       submitLabel="Add budget"
       busy={f.busy}
       error={f.error}
-      submitDisabled={!f.values.name.trim() || !f.values.limit.trim()}
+      submitDisabled={
+        !f.values.name.trim() || !f.values.limit.trim() || (isProject && !f.values.projectId)
+      }
     >
       <FormField label="Name">
-        <Input placeholder="e.g. Monthly cap" value={f.values.name} onChange={(e) => f.set("name", e.target.value)} />
+        <Input
+          placeholder="e.g. Monthly cap"
+          value={f.values.name}
+          onChange={(e) => f.set("name", e.target.value)}
+        />
       </FormField>
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormField label="Scope" icon={<InfoHint content={SCOPE_HELP} />}>
+          <Select value={f.values.scope} onChange={(e) => f.set("scope", e.target.value)}>
+            <option value="workspace">workspace</option>
+            <option value="project">project</option>
+          </Select>
+        </FormField>
+        {isProject && (
+          <FormField label="Project">
+            <Select value={f.values.projectId} onChange={(e) => f.set("projectId", e.target.value)}>
+              <option value="">Select a project…</option>
+              {projectList.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        )}
+      </div>
+
       <div className="grid grid-cols-3 gap-4">
         <FormField label="Limit ($)">
-          <Input inputMode="decimal" placeholder="500" value={f.values.limit} onChange={(e) => f.set("limit", e.target.value)} />
+          <Input
+            inputMode="decimal"
+            placeholder="500"
+            value={f.values.limit}
+            onChange={(e) => f.set("limit", e.target.value)}
+          />
         </FormField>
-        <FormField label="Window">
-          <Select
-            value={f.values.window}
-            onChange={(e) => f.set("window", e.target.value)}
-          >
+        <FormField label="Window" icon={<InfoHint content={WINDOW_HELP} />}>
+          <Select value={f.values.window} onChange={(e) => f.set("window", e.target.value)}>
             {WINDOWS.map((w) => (
-              <option key={w} value={w}>{w}</option>
+              <option key={w} value={w}>
+                {w}
+              </option>
             ))}
           </Select>
         </FormField>
         <FormField label="Warn %">
-          <Input inputMode="numeric" value={f.values.warn} onChange={(e) => f.set("warn", e.target.value)} />
+          <Input
+            inputMode="numeric"
+            value={f.values.warn}
+            onChange={(e) => f.set("warn", e.target.value)}
+          />
         </FormField>
       </div>
       <label className="flex items-center gap-2 text-sm text-foreground">
-        <Checkbox checked={f.values.hardStop} onChange={(e) => f.set("hardStop", e.target.checked)} />
+        <Checkbox
+          checked={f.values.hardStop}
+          onChange={(e) => f.set("hardStop", e.target.checked)}
+        />
         Hard stop (auto-pause agents on breach)
       </label>
     </FormDialog>

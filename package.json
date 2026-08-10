@@ -24,6 +24,7 @@
     "doctor": "node scripts/doctor.mjs",
     "db:backup": "node scripts/db-backup.mjs",
     "operator": "node scripts/operator.mjs",
+    "telemetry:extract-proposed": "node scripts/extract-proposed-events.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "prepare": "husky"

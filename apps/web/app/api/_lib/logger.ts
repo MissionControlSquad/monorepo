@@ -1,5 +1,6 @@
 import { redactSensitive } from "@agentcenter/utils";
 import { getClientIp } from "./client-ip";
+import { redactHttpPath, shouldRedactPath, shouldSilenceHttpSuccessLog } from "./http-log-policy";
 
 function getIp(request?: Request): string | undefined {
   if (!request) return undefined;
@@ -10,10 +11,12 @@ function getIp(request?: Request): string | undefined {
 function getRequestMeta(request?: Request) {
   if (!request) return {};
   const url = new URL(request.url, "http://localhost");
+  // Redact token-bearing path segments (activation/reset/pairing/signed URLs) before logging.
+  const path = shouldRedactPath(url.pathname) ? redactHttpPath(url.pathname) : url.pathname;
   return {
     ip: getIp(request),
     method: request.method,
-    path: url.pathname,
+    path,
     requestId: request.headers.get("x-request-id") ?? undefined,
   };
 }
@@ -21,6 +24,14 @@ function getRequestMeta(request?: Request) {
 type LogLevel = "info" | "warn" | "error";
 
 function emit(level: LogLevel, tag: string, message: string, request?: Request): void {
+  // HTTP log policy: an info-level line IS the 2xx success/access log for a request. Silence it for
+  // high-frequency polling endpoints (connection/quota/health) so aggregation isn't drowned. Warn/error
+  // are never silenced. Non-request info logs always emit.
+  if (level === "info" && request) {
+    const { pathname } = new URL(request.url, "http://localhost");
+    if (shouldSilenceHttpSuccessLog(request.method, pathname, 200)) return;
+  }
+
   const entry = {
     timestamp: new Date().toISOString(),
     level,

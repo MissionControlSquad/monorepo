@@ -34,10 +34,40 @@ export function warnThresholdCents(limitCents: number, warnPercent: number): num
 
 type PolicyRow = NonNullable<Awaited<ReturnType<typeof prisma.budgetPolicy.findUnique>>>;
 
-/** Agents to pause on a hard breach: the one agent (agent scope) or all active workspace agents. */
+/**
+ * The active agent ids that are members of `projectId` in this workspace (via their agent Profile).
+ * Used to scope a project budget's auto-pause to just that project's agents.
+ */
+async function projectAgentIds(workspaceId: string, projectId: string): Promise<string[]> {
+  const members = await prisma.projectMember.findMany({
+    where: {
+      projectId,
+      status: "active",
+      profile: { kind: "agent", agentId: { not: null } },
+    },
+    select: { profile: { select: { agentId: true } } },
+  });
+  const ids = members.map((m) => m.profile?.agentId).filter((id): id is string => Boolean(id));
+  if (ids.length === 0) return [];
+  const agents = await prisma.agent.findMany({
+    where: { id: { in: ids }, workspaceId, status: { not: "blocked" } },
+    select: { id: true },
+  });
+  return agents.map((a) => a.id);
+}
+
+/**
+ * Agents to pause on a hard breach:
+ *  - agent scope:     the one agent.
+ *  - project scope:   every active agent that is a member of the project.
+ *  - workspace scope: every active agent in the workspace.
+ */
 async function agentsToPause(policy: PolicyRow): Promise<string[]> {
   if (!policy.hardStop) return [];
   if (policy.scope === "agent") return policy.agentId ? [policy.agentId] : [];
+  if (policy.scope === "project") {
+    return policy.projectId ? projectAgentIds(policy.workspaceId, policy.projectId) : [];
+  }
   const agents = await prisma.agent.findMany({
     where: { workspaceId: policy.workspaceId, status: { not: "blocked" } },
     select: { id: true },
