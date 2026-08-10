@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "urql";
 import { toast } from "sonner";
 import { AGENT_SKILLS_QUERY, SKILLS_QUERY } from "@/lib/graphql/queries";
 import { ASSIGN_SKILL, UNASSIGN_SKILL } from "@/lib/graphql/mutations";
-import { Card, Button, Badge } from "@/components/ui";
+import { Card, Button, Badge, Tooltip } from "@/components/ui";
 import { AgentSkillSyncStatus } from "./AgentSkillSyncStatus";
 
 // Epic #10: assign reusable skills to an agent. This is the UI home for agentSkills(agentId) +
@@ -83,14 +83,16 @@ export function AgentSkillsCard({ agentId }: { agentId: string }) {
           <Badge key={a.id} variant="blue">
             {a.skill?.icon ? `${a.skill.icon} ` : ""}
             {a.skill?.name ?? a.skillId}
-            <button
-              className="ml-1.5 text-muted-foreground hover:text-destructive"
-              disabled={busy}
-              onClick={() => onUnassign(a.skillId)}
-              aria-label="Unassign skill"
-            >
-              ×
-            </button>
+            <Tooltip content="Remove this skill from the agent. The skill stays in your library.">
+              <button
+                className="ml-1.5 text-muted-foreground hover:text-destructive"
+                disabled={busy}
+                onClick={() => onUnassign(a.skillId)}
+                aria-label="Unassign skill"
+              >
+                ×
+              </button>
+            </Tooltip>
           </Badge>
         ))}
       </div>

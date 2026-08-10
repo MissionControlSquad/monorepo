@@ -13,9 +13,22 @@ import {
   Loader2,
 } from "lucide-react";
 import { TaskCard } from "./TaskCard";
-import { Badge } from "../ui";
+import { Badge, Tooltip } from "../ui";
 import type { TaskCard as TaskCardType, Agent } from "@agentcenter/types";
 import { TaskStatus } from "@/server/constants";
+
+/** Plain-language explanation of what it means for a task to sit in each status column. */
+const COLUMN_HELP: Record<string, string> = {
+  [TaskStatus.BACKLOG]:
+    "Captured for later. Not ready to start and no agent will pick these up yet.",
+  [TaskStatus.INBOX]: "New tasks waiting to be triaged and assigned to an agent.",
+  [TaskStatus.ASSIGNED]: "An agent has been assigned but hasn't started working yet.",
+  [TaskStatus.IN_PROGRESS]: "An agent is actively working on these tasks right now.",
+  [TaskStatus.REVIEW]: "Work is finished and waiting for you to approve it or request changes.",
+  [TaskStatus.DONE]: "Approved and complete. Nothing more to do here.",
+  [TaskStatus.BLOCKED]:
+    "Stuck on a dependency or problem and can't move forward until it's resolved.",
+};
 const COLUMN_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   [TaskStatus.BACKLOG]: Archive,
   [TaskStatus.INBOX]: Inbox,
@@ -111,11 +124,21 @@ export const KanbanColumn = memo(function KanbanColumn({
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center gap-2">
           {IconComponent && <IconComponent className={`w-4 h-4 ${iconColor}`} />}
-          <span
-            className={`px-2 py-0.5 text-xs font-medium rounded-md ${COLOR_CLASSES[color as keyof typeof COLOR_CLASSES]}`}
-          >
-            {label}
-          </span>
+          {COLUMN_HELP[id] ? (
+            <Tooltip content={COLUMN_HELP[id]} side="bottom">
+              <span
+                className={`px-2 py-0.5 text-xs font-medium rounded-md ${COLOR_CLASSES[color as keyof typeof COLOR_CLASSES]}`}
+              >
+                {label}
+              </span>
+            </Tooltip>
+          ) : (
+            <span
+              className={`px-2 py-0.5 text-xs font-medium rounded-md ${COLOR_CLASSES[color as keyof typeof COLOR_CLASSES]}`}
+            >
+              {label}
+            </span>
+          )}
         </div>
         <Badge variant={BADGE_VARIANT_MAP[color] || "gray"} size="sm">
           {showTotalCount ? `${tasks.length} / ${totalCount}` : tasks.length}
@@ -135,7 +158,9 @@ export const KanbanColumn = memo(function KanbanColumn({
       >
         {tasks.length === 0 ? (
           <div className="flex items-center justify-center h-20 text-xs text-muted-foreground text-center px-2">
-            {hasActiveFilters ? "No tasks match filters" : "No tasks"}
+            {hasActiveFilters
+              ? "No tasks match your filters. Clear a filter to see more."
+              : "Nothing here yet. Tasks show up once they reach this stage."}
           </div>
         ) : (
           <div className="flex flex-col gap-2.5">

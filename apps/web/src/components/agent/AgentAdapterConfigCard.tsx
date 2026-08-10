@@ -155,6 +155,10 @@ export function AgentAdapterConfigCard({
               ))}
             </SelectContent>
           </Select>
+          <span className="block text-xs leading-snug text-muted-foreground">
+            The runtime CLI this agent runs on (e.g. Claude Code, Codex). Pick the one installed on
+            its environment — the connection settings below change to match.
+          </span>
         </label>
 
         <label className="space-y-1">
@@ -180,6 +184,10 @@ export function AgentAdapterConfigCard({
               placeholder="Adapter default"
             />
           )}
+          <span className="block text-xs leading-snug text-muted-foreground">
+            The model this agent uses for its work. Leave on the adapter default unless you need a
+            specific one.
+          </span>
         </label>
       </div>
 

@@ -13,7 +13,7 @@ import {
 } from "@/lib/graphql/mutations";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS, WORKSPACE_STRATEGIES } from "@agentcenter/utils";
-import { Card, Button, Badge } from "@/components/ui";
+import { Card, Button, Badge, Tooltip } from "@/components/ui";
 import { Input } from "@/components/ui/shadcn/input";
 
 // Domain 3 (11-ui §7): execution workspaces for a project — the repo/setup/strategy templates a run
@@ -146,17 +146,24 @@ export function ProjectWorkspacesCard({ projectId }: { projectId: string }) {
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="Name"
             />
-            <select
-              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-              value={form.defaultStrategy}
-              onChange={(e) => setForm((f) => ({ ...f, defaultStrategy: e.target.value }))}
-            >
-              {WORKSPACE_STRATEGIES.map((s) => (
-                <option key={s} value={s}>
-                  {s.replace(/_/g, " ")}
-                </option>
-              ))}
-            </select>
+            <div className="space-y-1">
+              <select
+                className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm"
+                value={form.defaultStrategy}
+                onChange={(e) => setForm((f) => ({ ...f, defaultStrategy: e.target.value }))}
+              >
+                {WORKSPACE_STRATEGIES.map((s) => (
+                  <option key={s} value={s}>
+                    {s.replace(/_/g, " ")}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs leading-snug text-muted-foreground">
+                Default branch strategy for runs: project primary reuses the project checkout, git
+                worktree isolates each run on its own branch, adapter managed lets the runtime
+                handle it, and cloud sandbox clones inside a fresh throwaway box.
+              </p>
+            </div>
             <Input
               value={form.repoUrl}
               onChange={(e) => setForm((f) => ({ ...f, repoUrl: e.target.value }))}
@@ -209,23 +216,27 @@ export function ProjectWorkspacesCard({ projectId }: { projectId: string }) {
                 )}
                 <span className="ml-auto flex gap-1">
                   {!w.isPrimary && (
+                    <Tooltip content="Make this the default workspace new runs in this project clone from.">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy === w.id}
+                        onClick={() => onMakePrimary(w.id)}
+                      >
+                        Make primary
+                      </Button>
+                    </Tooltip>
+                  )}
+                  <Tooltip content="Delete this workspace template. Runs that already used it are unaffected.">
                     <Button
                       size="sm"
                       variant="ghost"
                       disabled={busy === w.id}
-                      onClick={() => onMakePrimary(w.id)}
+                      onClick={() => onDelete(w.id, w.name)}
                     >
-                      Make primary
+                      Delete
                     </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={busy === w.id}
-                    onClick={() => onDelete(w.id, w.name)}
-                  >
-                    Delete
-                  </Button>
+                  </Tooltip>
                 </span>
               </div>
               {(w.repoUrl || w.setupCommand) && (

@@ -25,7 +25,16 @@ import {
 } from "@/lib/graphql/mutations";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
-import { Button, Card, Badge, Spinner, Select } from "@/components/ui";
+import {
+  Button,
+  Card,
+  Badge,
+  Spinner,
+  Select,
+  Tooltip,
+  ConfirmDialog,
+  EmptyState,
+} from "@/components/ui";
 import { EnvironmentDialog } from "@/components/dialogs/EnvironmentDialog";
 import { ShieldCheck, Bot, Boxes, GitBranch } from "lucide-react";
 
@@ -148,7 +157,12 @@ export default function EnvironmentsPage() {
           </div>
         )}
         {envs.length === 0 && !fetching && (
-          <p className="text-sm text-muted-foreground">No environments yet.</p>
+          <EmptyState
+            icon={<Boxes />}
+            title="No environments yet"
+            description="Create an environment to control where and how your agents run — locally, over SSH, or in an isolated sandbox."
+            action={<Button onClick={() => setOpen(true)}>New environment</Button>}
+          />
         )}
         {envs.map((env) => (
           <Card key={env.id} className="space-y-2 p-3">
@@ -160,13 +174,15 @@ export default function EnvironmentsPage() {
                 {env.status === "archived" && <Badge variant="gray">archived</Badge>}
               </div>
               <span className="flex items-center gap-3">
-                <button
-                  onClick={() => onProbe(env.id)}
-                  disabled={busy === `probe-${env.id}`}
-                  className="text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-50"
-                >
-                  {busy === `probe-${env.id}` ? "Probing…" : "Probe"}
-                </button>
+                <Tooltip content="Check this environment is reachable and the runtime is installed.">
+                  <button
+                    onClick={() => onProbe(env.id)}
+                    disabled={busy === `probe-${env.id}`}
+                    className="text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+                  >
+                    {busy === `probe-${env.id}` ? "Probing…" : "Probe"}
+                  </button>
+                </Tooltip>
                 {env.status === "active" ? (
                   <button
                     onClick={() => onArchive(env.id)}
@@ -239,6 +255,7 @@ function CustomImageControl({ environmentId }: { environmentId: string }) {
   const [, rollback] = useMutation(ROLLBACK_CUSTOM_IMAGE);
   const [, disable] = useMutation(DISABLE_CUSTOM_IMAGE);
   const [busy, setBusy] = useState(false);
+  const [confirmRollback, setConfirmRollback] = useState<CImgTemplate | null>(null);
   const ov = data?.environmentCustomImages;
   const refresh = () => refetch({ requestPolicy: "network-only" });
 
@@ -268,13 +285,18 @@ function CustomImageControl({ environmentId }: { environmentId: string }) {
             " · none"
           )}
         </span>
-        <button
-          onClick={() => run(() => capture({ environmentId }))}
-          disabled={busy}
-          className="text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+        <Tooltip
+          content="Snapshot this sandbox's current state as a reusable image. It becomes the active image and new runs start from it, superseding the previous one."
+          side="bottom"
         >
-          {busy ? "Capturing…" : "Capture image"}
-        </button>
+          <button
+            onClick={() => run(() => capture({ environmentId }))}
+            disabled={busy}
+            className="text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+          >
+            {busy ? "Capturing…" : "Capture image"}
+          </button>
+        </Tooltip>
       </div>
       {(ov?.templates ?? []).slice(0, 4).map((tpl) => (
         <div key={tpl.id} className="flex items-center justify-between gap-2">
@@ -284,24 +306,42 @@ function CustomImageControl({ environmentId }: { environmentId: string }) {
           </span>
           <span className="flex items-center gap-2">
             {tpl.status !== "active" && (
-              <button
-                onClick={() => run(() => rollback({ templateId: tpl.id }))}
-                disabled={busy}
-                className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
-              >
-                Rollback
-              </button>
+              <Tooltip content="Make this older image the active one again. New runs start from it instead of the current image.">
+                <button
+                  onClick={() => setConfirmRollback(tpl)}
+                  disabled={busy}
+                  className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                >
+                  Rollback
+                </button>
+              </Tooltip>
             )}
-            <button
-              onClick={() => run(() => disable({ templateId: tpl.id }))}
-              disabled={busy}
-              className="text-xs text-destructive hover:underline disabled:opacity-50"
-            >
-              Disable
-            </button>
+            <Tooltip content="Turn off this image. Runs fall back to the environment's base image.">
+              <button
+                onClick={() => run(() => disable({ templateId: tpl.id }))}
+                disabled={busy}
+                className="text-xs text-destructive hover:underline disabled:opacity-50"
+              >
+                Disable
+              </button>
+            </Tooltip>
           </span>
         </div>
       ))}
+
+      <ConfirmDialog
+        isOpen={confirmRollback !== null}
+        onClose={() => setConfirmRollback(null)}
+        onConfirm={async () => {
+          const tpl = confirmRollback;
+          setConfirmRollback(null);
+          if (tpl) await run(() => rollback({ templateId: tpl.id }));
+        }}
+        title="Roll back to this image?"
+        description="This makes the selected older image the active one again. The current active image is superseded, and every new run in this environment will start from the image you're rolling back to."
+        confirmLabel="Roll back"
+        loading={busy}
+      />
     </div>
   );
 }

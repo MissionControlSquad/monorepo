@@ -20,6 +20,7 @@ import {
   Spinner,
   EmptyState,
   ConfirmDialog,
+  Tooltip,
 } from "@/components/ui";
 import { WhenAdmin } from "@/components/auth/WhenAdmin";
 import {
@@ -190,9 +191,11 @@ export function MemoryInspectPage() {
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>Provider</span>
-          <Badge variant={providerVariant(selectedAgent?.memoryProvider)}>
-            {selectedAgent?.memoryProvider ?? "none"}
-          </Badge>
+          <Tooltip content="The memory backend bound to this agent: db stores searchable entries you can inspect here, markdown writes notes to files, and none turns memory off.">
+            <Badge variant={providerVariant(selectedAgent?.memoryProvider)}>
+              {selectedAgent?.memoryProvider ?? "none"}
+            </Badge>
+          </Tooltip>
           <span className="text-muted-foreground/70">company default: {companyDefault}</span>
         </div>
       </Card>
@@ -277,14 +280,16 @@ export function MemoryInspectPage() {
                     </p>
                   </div>
                   <WhenAdmin>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label="Forget entry"
-                      onClick={() => setConfirmId(e.id)}
-                    >
-                      <Trash2 className="size-4 text-destructive" />
-                    </Button>
+                    <Tooltip content="Permanently delete this remembered entry for the agent.">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label="Forget entry"
+                        onClick={() => setConfirmId(e.id)}
+                      >
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
+                    </Tooltip>
                   </WhenAdmin>
                 </li>
               ))}
@@ -295,7 +300,13 @@ export function MemoryInspectPage() {
 
       {/* Operations audit log */}
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">Memory operations</h2>
+        <div className="space-y-0.5">
+          <h2 className="text-sm font-semibold text-foreground">Memory operations</h2>
+          <p className="text-xs text-muted-foreground">
+            An audit trail of every time this agent read, saved, or deleted memory — including how
+            long each call took and what it cost.
+          </p>
+        </div>
         {!selectedId ? null : opsFetching && ops.length === 0 ? (
           <div className="flex justify-center p-8">
             <Spinner />
@@ -313,11 +324,31 @@ export function MemoryInspectPage() {
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-border text-xs text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-2 font-medium">Operation</th>
-                  <th className="px-4 py-2 font-medium">Source</th>
-                  <th className="px-4 py-2 font-medium">Results</th>
-                  <th className="px-4 py-2 font-medium">Latency</th>
-                  <th className="px-4 py-2 font-medium">Cost</th>
+                  <th className="px-4 py-2 font-medium">
+                    <Tooltip content="What the agent did: a recall/read, a capture/save, or a delete.">
+                      <span>Operation</span>
+                    </Tooltip>
+                  </th>
+                  <th className="px-4 py-2 font-medium">
+                    <Tooltip content="What triggered this memory call — the run, task, or provider behind it.">
+                      <span>Source</span>
+                    </Tooltip>
+                  </th>
+                  <th className="px-4 py-2 font-medium">
+                    <Tooltip content="How many memory entries the operation returned.">
+                      <span>Results</span>
+                    </Tooltip>
+                  </th>
+                  <th className="px-4 py-2 font-medium">
+                    <Tooltip content="How long the memory backend took to respond.">
+                      <span>Latency</span>
+                    </Tooltip>
+                  </th>
+                  <th className="px-4 py-2 font-medium">
+                    <Tooltip content="Estimated cost of this operation, when the backend bills for it.">
+                      <span>Cost</span>
+                    </Tooltip>
+                  </th>
                   <th className="px-4 py-2 font-medium">When</th>
                 </tr>
               </thead>

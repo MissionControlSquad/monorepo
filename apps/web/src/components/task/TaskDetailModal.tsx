@@ -70,7 +70,7 @@ import { format } from "date-fns";
 import { TimeAgo } from "../common/TimeAgo";
 import { CopyButton } from "../common/CopyButton";
 import { useTaskList } from "../context/TaskListContext";
-import { Button, Badge, StatusPill, PrioritySelect, DueDatePill } from "../ui";
+import { Button, Badge, StatusPill, PrioritySelect, DueDatePill, Tooltip } from "../ui";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import {
   Select,
@@ -1371,21 +1371,31 @@ export function TaskDetailModal({
         {task.status === TaskStatusValues.REVIEW && (
           <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-t border-amber-200 bg-amber-50">
             <span className="text-xs font-semibold text-amber-700 mr-auto">Awaiting review</span>
-            <Button
-              size="sm"
-              disabled={_approvalLoading !== null}
-              onClick={() => handleHumanReview("approve")}
+            <Tooltip
+              content="Approve the work, mark this task done, and move it out of review."
+              side="top"
             >
-              Approve
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={_approvalLoading !== null}
-              onClick={() => handleHumanReview("request_changes")}
+              <Button
+                size="sm"
+                disabled={_approvalLoading !== null}
+                onClick={() => handleHumanReview("approve")}
+              >
+                Approve
+              </Button>
+            </Tooltip>
+            <Tooltip
+              content="Send this task back to the assigned agent for changes. It returns to Assigned until the work is redone."
+              side="top"
             >
-              Request changes
-            </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={_approvalLoading !== null}
+                onClick={() => handleHumanReview("request_changes")}
+              >
+                Request changes
+              </Button>
+            </Tooltip>
           </div>
         )}
 

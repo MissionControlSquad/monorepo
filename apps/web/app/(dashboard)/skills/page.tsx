@@ -24,7 +24,8 @@ import {
   UPSERT_SKILL_FILE,
   DELETE_SKILL_FILE,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Textarea } from "@/components/ui";
+import { Button, Card, Badge, Textarea, Tooltip, EmptyState } from "@/components/ui";
+import { Blocks } from "lucide-react";
 import { SkillDialog } from "@/components/dialogs/SkillDialog";
 import { SkillComments } from "@/components/skills/SkillComments";
 import { SkillUpdatePanel } from "@/components/skills/SkillUpdatePanel";
@@ -171,24 +172,31 @@ export default function SkillsPage() {
                   ★ {c.starCount} · {c.installCount} agents · {c.forkCount} installs
                 </span>
               </span>
-              <Button
-                size="sm"
-                disabled={busy === c.id}
-                onClick={() =>
-                  act(async () => {
-                    await installCatalogSkill({ skillId: c.id });
-                  }, c.id)
-                }
-              >
-                Install
-              </Button>
+              <Tooltip content="Copies this published skill into your workspace as your own editable copy, so you can assign it to agents. Your copy stays independent of the original.">
+                <Button
+                  size="sm"
+                  disabled={busy === c.id}
+                  onClick={() =>
+                    act(async () => {
+                      await installCatalogSkill({ skillId: c.id });
+                    }, c.id)
+                  }
+                >
+                  Install
+                </Button>
+              </Tooltip>
             </div>
           ))}
         </Card>
       )}
 
       {skills.length === 0 && (
-        <Card className="p-8 text-center text-sm text-muted-foreground">No skills yet.</Card>
+        <EmptyState
+          icon={<Blocks />}
+          title="No skills yet"
+          description="Create a capability module or import one, then assign it to your agents."
+          action={<Button onClick={() => setCreateOpen(true)}>New skill</Button>}
+        />
       )}
       {skills.map((s) => (
         <Card key={s.id} className="space-y-3 p-4">
@@ -425,9 +433,11 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
               <Badge variant="gray">{p.category}</Badge>
               <Badge variant="blue">{p.trustLevel}</Badge>
             </span>
-            <Button size="sm" disabled={busy === p.id} onClick={() => onInstallCatalog(p.id)}>
-              Install
-            </Button>
+            <Tooltip content="Adds this catalog package to your workspace as a new, editable skill.">
+              <Button size="sm" disabled={busy === p.id} onClick={() => onInstallCatalog(p.id)}>
+                Install
+              </Button>
+            </Tooltip>
           </div>
         ))}
       </div>

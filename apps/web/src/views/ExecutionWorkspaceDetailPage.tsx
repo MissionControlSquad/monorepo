@@ -3,7 +3,7 @@
 import { useQuery } from "urql";
 import { Loader2, AlertCircle } from "lucide-react";
 import { EXECUTION_WORKSPACES_DETAIL_QUERY } from "@/lib/graphql/queries";
-import { Breadcrumbs, Card, Badge, PageLayout } from "@/components/ui";
+import { Breadcrumbs, Card, Badge, PageLayout, Tooltip } from "@/components/ui";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { selectWorkspaceById, formatTimestamp } from "@/lib/work-detail";
@@ -41,14 +41,24 @@ function ConfigRow({
   label,
   value,
   mono,
+  tip,
 }: {
   label: string;
   value: string | null;
   mono?: boolean;
+  tip?: string;
 }) {
   return (
     <div className="rounded-lg border border-border p-2">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dt className="text-xs font-medium text-muted-foreground">
+        {tip ? (
+          <Tooltip content={tip}>
+            <span className="underline decoration-dotted underline-offset-2">{label}</span>
+          </Tooltip>
+        ) : (
+          label
+        )}
+      </dt>
       <dd className={`truncate text-sm text-foreground ${mono ? "font-mono text-xs" : ""}`}>
         {value ?? "—"}
       </dd>
@@ -137,11 +147,24 @@ export function ExecutionWorkspaceDetailPage({ workspaceId }: { workspaceId: str
         <Card padding="lg" className="space-y-3">
           <h2 className="text-sm font-semibold text-foreground">Runtime config</h2>
           <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <ConfigRow label="Strategy" value={ws.strategyType} />
-            <ConfigRow label="Provider" value={ws.providerType} />
+            <ConfigRow
+              label="Strategy"
+              value={ws.strategyType}
+              tip="How this run got its own copy of the workspace — for example a fresh clone, a git worktree, or working in place."
+            />
+            <ConfigRow
+              label="Provider"
+              value={ws.providerType}
+              tip="Where the run executed — for example the local machine or a sandboxed container."
+            />
             <ConfigRow label="Provider ref" value={ws.providerRef} mono />
             <ConfigRow label="Repo" value={ws.repoUrl} mono />
-            <ConfigRow label="Branch" value={ws.branchName} mono />
+            <ConfigRow
+              label="Branch"
+              value={ws.branchName}
+              mono
+              tip="The git branch this run worked on."
+            />
             <ConfigRow label="Run" value={ws.runId} mono />
             <ConfigRow label="Task" value={ws.taskId} mono />
             <ConfigRow label="Project" value={ws.projectId} mono />
