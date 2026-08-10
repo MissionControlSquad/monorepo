@@ -34,6 +34,10 @@ builder.prismaObject("RoutineTrigger", {
     nextFireAt: t.expose("nextFireAt", { type: "DateTime", nullable: true }),
     publicId: t.exposeString("publicId", { nullable: true }),
     isEnabled: t.exposeBoolean("isEnabled"),
+    // §3 #11 (2) — overlap + missed-window scheduling policies (PIPELINES_ROUTINES-gated at scan time).
+    // concurrencyPolicy: allow | skip | queue. catchUpPolicy: skip | run_once.
+    concurrencyPolicy: t.exposeString("concurrencyPolicy"),
+    catchUpPolicy: t.exposeString("catchUpPolicy"),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
   }),
 });

@@ -7,11 +7,40 @@ import { randomUUID } from "node:crypto";
 import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
-import { isValidCron, nextCronTick } from "@agentcenter/utils";
+import { isValidCron, nextCronTick, FLAG_KEYS } from "@agentcenter/utils";
+import { isFeatureEnabled } from "@/server/feature-flags";
+import { resolveSchedulingSuppression } from "./agent-wakeups";
 import type { Routine, RoutineRun, RoutineTrigger } from "@agentcenter/database";
 
 function badRequest(message: string): never {
   throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
+}
+
+// ─── §3 #11 (2) routine scheduling policies ───────────────────────────
+export const CONCURRENCY_POLICIES = ["allow", "skip", "queue"] as const;
+export const CATCH_UP_POLICIES = ["skip", "run_once"] as const;
+export type ConcurrencyPolicy = (typeof CONCURRENCY_POLICIES)[number];
+export type CatchUpPolicy = (typeof CATCH_UP_POLICIES)[number];
+
+function coerceConcurrencyPolicy(v: string | null | undefined): ConcurrencyPolicy {
+  if (v && (CONCURRENCY_POLICIES as readonly string[]).includes(v)) return v as ConcurrencyPolicy;
+  if (v != null && v !== "")
+    badRequest(`concurrencyPolicy must be one of: ${CONCURRENCY_POLICIES.join(", ")}`);
+  return "allow";
+}
+function coerceCatchUpPolicy(v: string | null | undefined): CatchUpPolicy {
+  if (v && (CATCH_UP_POLICIES as readonly string[]).includes(v)) return v as CatchUpPolicy;
+  if (v != null && v !== "")
+    badRequest(`catchUpPolicy must be one of: ${CATCH_UP_POLICIES.join(", ")}`);
+  return "skip";
+}
+
+/** Is a prior run of this routine still active (queued or running)? Drives concurrencyPolicy. */
+async function hasActiveRoutineRun(routineId: string): Promise<boolean> {
+  const active = await prisma.routineRun.count({
+    where: { routineId, status: { in: ["queued", "running"] } },
+  });
+  return active > 0;
 }
 
 /** URL-safe, unguessable public id for a webhook fire URL (rotatable). */
@@ -138,11 +167,18 @@ export async function addRoutineTrigger(
     cronExpression?: string | null;
     timezone?: string | null;
     nextFireAt?: Date | null;
+    // §3 #11 (2) — overlap + missed-window policies (PIPELINES_ROUTINES-gated at scan time).
+    concurrencyPolicy?: string | null;
+    catchUpPolicy?: string | null;
   },
   now: Date = new Date(),
 ): Promise<RoutineTrigger> {
   const routine = await prisma.routine.findFirst({ where: { id: routineId, workspaceId } });
   if (!routine) throw new GraphQLError("Routine not found", { extensions: { code: "NOT_FOUND" } });
+
+  // Validate the scheduling policies up front (rejects an unknown value rather than silently defaulting).
+  const concurrencyPolicy = coerceConcurrencyPolicy(input.concurrencyPolicy);
+  const catchUpPolicy = coerceCatchUpPolicy(input.catchUpPolicy);
 
   // A cron trigger validates its expression and computes its first fire from `now`, so the scanner
   // (tickRoutineTriggers) has a due-time to key off. The trigger's own timezone wins, else the routine's.
@@ -165,8 +201,37 @@ export async function addRoutineTrigger(
       cronExpression,
       timezone,
       nextFireAt,
+      concurrencyPolicy,
+      catchUpPolicy,
       // Only webhook triggers get a public fire id.
       publicId: input.type === "webhook" ? generatePublicId() : null,
+    },
+  });
+}
+
+/**
+ * §3 #11 (2) — update a trigger's scheduling policies (concurrencyPolicy / catchUpPolicy). Workspace-
+ * scoped; validates each value. Exposed so a routine settings surface can tune overlap/catch-up behavior
+ * without recreating the trigger.
+ */
+export async function updateRoutineTriggerPolicies(
+  workspaceId: string,
+  triggerId: string,
+  patch: { concurrencyPolicy?: string | null; catchUpPolicy?: string | null },
+): Promise<RoutineTrigger> {
+  const trigger = await prisma.routineTrigger.findFirst({
+    where: { id: triggerId, routine: { workspaceId } },
+  });
+  if (!trigger) throw new GraphQLError("Trigger not found", { extensions: { code: "NOT_FOUND" } });
+  return prisma.routineTrigger.update({
+    where: { id: triggerId },
+    data: {
+      ...(patch.concurrencyPolicy !== undefined
+        ? { concurrencyPolicy: coerceConcurrencyPolicy(patch.concurrencyPolicy) }
+        : {}),
+      ...(patch.catchUpPolicy !== undefined
+        ? { catchUpPolicy: coerceCatchUpPolicy(patch.catchUpPolicy) }
+        : {}),
     },
   });
 }
@@ -188,29 +253,11 @@ export async function regenerateTriggerPublicId(
 }
 
 /**
- * Fire a routine now: create a RoutineRun and drive it queued→running→succeeded (or failed),
- * generating a Task as the run's output. Returns the finished run.
+ * Execute an already-persisted RoutineRun: drive it running→succeeded (or failed), generating a Task as
+ * the run's output. Shared by the immediate path ({@link triggerRoutineNow}) and the deferred/queued
+ * path (a `concurrencyPolicy: "queue"` run drained by {@link tickRoutineTriggers}).
  */
-export async function triggerRoutineNow(args: {
-  workspaceId: string;
-  routineId: string;
-  triggeredBy?: "cron" | "manual" | "webhook";
-  triggerId?: string | null;
-}): Promise<RoutineRun> {
-  const routine = await prisma.routine.findFirst({
-    where: { id: args.routineId, workspaceId: args.workspaceId },
-  });
-  if (!routine) throw new GraphQLError("Routine not found", { extensions: { code: "NOT_FOUND" } });
-
-  const run = await prisma.routineRun.create({
-    data: {
-      routineId: routine.id,
-      triggeredBy: args.triggeredBy ?? "manual",
-      triggerId: args.triggerId ?? null,
-      status: "queued",
-    },
-  });
-
+async function executeRoutineRun(routine: Routine, run: RoutineRun): Promise<RoutineRun> {
   try {
     await prisma.routineRun.update({
       where: { id: run.id },
@@ -251,18 +298,118 @@ export async function triggerRoutineNow(args: {
 }
 
 /**
+ * Fire a routine now: create a RoutineRun and drive it queued→running→succeeded (or failed),
+ * generating a Task as the run's output. Returns the finished run.
+ */
+export async function triggerRoutineNow(args: {
+  workspaceId: string;
+  routineId: string;
+  triggeredBy?: "cron" | "manual" | "webhook";
+  triggerId?: string | null;
+}): Promise<RoutineRun> {
+  const routine = await prisma.routine.findFirst({
+    where: { id: args.routineId, workspaceId: args.workspaceId },
+  });
+  if (!routine) throw new GraphQLError("Routine not found", { extensions: { code: "NOT_FOUND" } });
+
+  const run = await prisma.routineRun.create({
+    data: {
+      routineId: routine.id,
+      triggeredBy: args.triggeredBy ?? "manual",
+      triggerId: args.triggerId ?? null,
+      status: "queued",
+    },
+  });
+  return executeRoutineRun(routine, run);
+}
+
+/**
+ * Drain deferred (queued) RoutineRuns left by a `concurrencyPolicy: "queue"` overlap. Runs at most one
+ * queued run per routine per scan, and only when that routine currently has NO running run — so a
+ * queued occurrence executes once the prior run finished, never overlapping. PIPELINES_ROUTINES-gated.
+ */
+async function drainDeferredRoutineRuns(now: Date): Promise<void> {
+  const queuedRuns = await prisma.routineRun.findMany({
+    where: { status: "queued", triggeredBy: "cron" },
+    orderBy: { createdAt: "asc" },
+    take: 100,
+  });
+  const handledRoutine = new Set<string>();
+  for (const run of queuedRuns) {
+    if (handledRoutine.has(run.routineId)) continue; // one per routine per scan
+    const running = await prisma.routineRun.count({
+      where: { routineId: run.routineId, status: "running" },
+    });
+    if (running > 0) continue; // routine still busy — leave the deferred run queued
+    const routine = await prisma.routine.findUnique({ where: { id: run.routineId } });
+    if (!routine || !routine.isActive) continue;
+    // Honor the unified pause (§3 #11.3) for the deferred run too.
+    const suppression = await resolveSchedulingSuppression({
+      projectId: routine.projectId,
+      agentId: routine.assigneeAgentId,
+    });
+    if (suppression.suppressed) continue;
+    handledRoutine.add(run.routineId);
+    // Atomically claim the queued run so a concurrent scan can't double-execute it.
+    const claimed = await prisma.routineRun.updateMany({
+      where: { id: run.id, status: "queued" },
+      data: { status: "running", startedAt: now },
+    });
+    if (claimed.count === 0) continue;
+    try {
+      await executeRoutineRun(routine, { ...run, status: "running" });
+    } catch {
+      // executeRoutineRun records a failed RoutineRun in its own catch; keep draining.
+    }
+  }
+}
+
+/**
  * Cron scanner (Domain 9 #12) — fire every enabled cron trigger whose nextFireAt has passed. Called
  * from the reap-stale-work cron. For each due trigger it OPTIMISTICALLY CLAIMS the exact due-time
  * (updateMany WHERE nextFireAt = observed) so two overlapping cron invocations can't double-fire, then
  * advances nextFireAt to the next tick and fires the routine. A trigger whose routine is inactive or
  * whose expression became invalid is advanced/parked, never fired. Best-effort per trigger; one bad
  * routine never blocks the rest. Returns how many routines were fired.
+ *
+ * §3 #11 — three refinements layer in here:
+ *   (2, PIPELINES_ROUTINES-gated) concurrencyPolicy: when a prior run of the routine is still active at
+ *       the due moment — "allow" fires anyway; "skip" drops this occurrence; "queue" defers it as a
+ *       queued RoutineRun that a later scan drains once the routine is idle (drainDeferredRoutineRuns).
+ *   (2, PIPELINES_ROUTINES-gated) catchUpPolicy: when the trigger is due only because ≥1 whole tick
+ *       window was missed (downtime) — "skip" advances the schedule WITHOUT firing; "run_once" fires
+ *       once for the backlog. An on-time tick fires under either policy. The schedule is ALWAYS advanced.
+ *   (3) unified pause: resolveSchedulingSuppression() suppresses a fire whose routine's project (or the
+ *       system/instance) is paused — the schedule still advances, it just doesn't fire while paused.
+ *
+ * HOW TO TEST:
+ *   • concurrencyPolicy "skip": create a RUNNING RoutineRun for the routine, then tick a due trigger →
+ *     no new run/task is created (no overlap). "queue" instead leaves a queued RoutineRun that a later
+ *     tick (once the running one is gone) executes exactly once.
+ *   • catchUpPolicy "skip": arm a cron trigger with nextFireAt several windows in the past, then tick →
+ *     nextFireAt advances but NO run fires. "run_once" fires exactly one run for the same backlog.
+ *   • unified pause: pause the routine's project (project.shutdownActive=true) → a due tick advances the
+ *     schedule but fires nothing.
  */
 export async function tickRoutineTriggers(now: Date = new Date()): Promise<number> {
+  const policiesOn = await isFeatureEnabled(FLAG_KEYS.PIPELINES_ROUTINES);
+
+  // First, drain any deferred (queued) runs from a prior "queue" overlap now that routines may be idle.
+  if (policiesOn) await drainDeferredRoutineRuns(now);
+
   const due = await prisma.routineTrigger.findMany({
     where: { type: "cron", isEnabled: true, nextFireAt: { lte: now } },
     include: {
-      routine: { select: { id: true, workspaceId: true, isActive: true, timezone: true } },
+      routine: {
+        select: {
+          id: true,
+          workspaceId: true,
+          isActive: true,
+          timezone: true,
+          projectId: true,
+          assigneeAgentId: true,
+        },
+      },
     },
     take: 200,
   });
@@ -275,9 +422,8 @@ export async function tickRoutineTriggers(now: Date = new Date()): Promise<numbe
     // Advance to the next tick FIRST (compute-and-set), guarded by the observed due-time so a
     // concurrent invocation that already advanced this trigger loses the race and skips it.
     const tz = trigger.timezone ?? trigger.routine.timezone ?? "UTC";
-    const next = isValidCron(trigger.cronExpression)
-      ? nextCronTick(trigger.cronExpression, now, tz)
-      : null;
+    const exprValid = isValidCron(trigger.cronExpression);
+    const next = exprValid ? nextCronTick(trigger.cronExpression, now, tz) : null;
     const claim = await prisma.routineTrigger.updateMany({
       where: { id: trigger.id, nextFireAt: observed },
       data: { nextFireAt: next },
@@ -286,6 +432,43 @@ export async function tickRoutineTriggers(now: Date = new Date()): Promise<numbe
 
     // Only an active routine actually fires; the schedule still advanced above so it self-heals.
     if (!trigger.routine.isActive) continue;
+
+    // §3 #11 (3) — unified pause: never fire while the routine's project/system/instance is paused. The
+    // schedule already advanced, so it resumes cleanly once unpaused.
+    const suppression = await resolveSchedulingSuppression({
+      projectId: trigger.routine.projectId,
+      agentId: trigger.routine.assigneeAgentId,
+    });
+    if (suppression.suppressed) continue;
+
+    if (policiesOn) {
+      // §3 #11 (2) catchUpPolicy — is this fire only due to a MISSED (downtime) window? True when the
+      // tick immediately after the observed due-time already elapsed, i.e. ≥1 full window was skipped.
+      const nextAfterObserved = exprValid
+        ? nextCronTick(trigger.cronExpression, observed, tz)
+        : null;
+      const missedWindow = nextAfterObserved != null && nextAfterObserved <= now;
+      if (missedWindow && trigger.catchUpPolicy === "skip") continue; // drop the backlog, don't fire
+
+      // §3 #11 (2) concurrencyPolicy — overlap handling when a prior run is still active.
+      if (
+        trigger.concurrencyPolicy !== "allow" &&
+        (await hasActiveRoutineRun(trigger.routine.id))
+      ) {
+        if (trigger.concurrencyPolicy === "skip") continue; // drop this occurrence
+        // "queue": defer as a queued RoutineRun for a later idle scan to execute (not counted as fired).
+        await prisma.routineRun.create({
+          data: {
+            routineId: trigger.routine.id,
+            triggeredBy: "cron",
+            triggerId: trigger.id,
+            status: "queued",
+          },
+        });
+        continue;
+      }
+    }
+
     try {
       await triggerRoutineNow({
         workspaceId: trigger.routine.workspaceId,

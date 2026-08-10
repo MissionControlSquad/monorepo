@@ -3,10 +3,12 @@ import { prisma } from "../../src/server/prisma";
 import {
   requestAgentWake,
   resolveWakeSuppression,
+  resolveSchedulingSuppression,
   claimDueWakeups,
   drainAgentWakeups,
   WAKE_REASON,
 } from "../../src/server/services/agent-wakeups";
+import { setSystemShutdown } from "../../src/server/system-settings";
 import { createTestAgent } from "../helpers";
 
 /**
@@ -130,6 +132,61 @@ describe("drainAgentWakeups - suppression is respected", () => {
     expect(result.delivered).toBe(0);
     const rows = await queuedRows(agent.id);
     expect(rows).toHaveLength(1); // still queued
+  });
+});
+
+describe("§3 #11 (3) — unified pause via resolveSchedulingSuppression", () => {
+  it("suppresses when the target project is PAUSED", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Paused wake proj", shutdownActive: true },
+    });
+    const verdict = await resolveSchedulingSuppression({ projectId: project.id });
+    expect(verdict).toEqual({ suppressed: true, reason: "project_paused" });
+  });
+
+  it("suppresses when the target project is ARCHIVED", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Archived wake proj", status: "archived" },
+    });
+    const verdict = await resolveSchedulingSuppression({ projectId: project.id });
+    expect(verdict).toEqual({ suppressed: true, reason: "project_archived" });
+  });
+
+  it("suppresses ALL wakes under a system/workspace pause (shutdown), then clears", async () => {
+    const { agent } = await createTestAgent({ username: "shutdown-wake" });
+    await setSystemShutdown(true);
+    try {
+      const verdict = await resolveWakeSuppression(agent.id);
+      expect(verdict).toEqual({ suppressed: true, reason: "system_shutdown" });
+    } finally {
+      await setSystemShutdown(false);
+    }
+    // Once un-paused the same agent wakes normally again.
+    expect(await resolveWakeSuppression(agent.id)).toEqual({ suppressed: false, reason: null });
+  });
+
+  it("drainAgentWakeups does NOT deliver a wake for an agent whose current task's project is paused", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Paused current proj", shutdownActive: true },
+    });
+    const task = await prisma.task.create({
+      data: {
+        title: "In paused proj",
+        description: "d",
+        status: "assigned",
+        projectId: project.id,
+      },
+    });
+    const { agent } = await createTestAgent({ username: "paused-proj-agent" });
+    await prisma.agent.update({ where: { id: agent.id }, data: { currentTaskId: task.id } });
+
+    await requestAgentWake(agent.id, WAKE_REASON.STRANDED_WORK);
+    const result = await drainAgentWakeups();
+    expect(result.delivered).toBe(0);
+    expect(result.suppressed).toBe(1);
+    const row = await prisma.agentWakeup.findFirstOrThrow({ where: { agentId: agent.id } });
+    expect(row.status).toBe("suppressed");
+    expect(row.deliveredAt).toBeNull();
   });
 });
 

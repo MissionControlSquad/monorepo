@@ -41,6 +41,43 @@ builder.mutationField("setAgentSandboxProvider", (t) =>
   }),
 );
 
+// §3 #11 (1): set an agent's per-agent in-flight run cap (maxConcurrentRuns). The sandbox run-queue
+// drain never starts a run for an agent already at this many running runs. Pass null to clear (=
+// unlimited). RUNNERS-gated, admin. HOW TO USE: setAgentMaxConcurrentRuns(agentId, maxConcurrentRuns:2)
+// then enqueue > 2 runs for that agent — the drain keeps at most 2 in-flight; the rest stay queued.
+builder.mutationField("setAgentMaxConcurrentRuns", (t) =>
+  t.prismaField({
+    type: "Agent",
+    args: {
+      agentId: t.arg.string({ required: true }),
+      // Positive integer cap, or null to clear (unlimited).
+      maxConcurrentRuns: t.arg.int(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.RUNNERS);
+      const tenancy = requireRole(ctx, "admin");
+      if (args.maxConcurrentRuns != null && args.maxConcurrentRuns < 1) {
+        throw new GraphQLError(
+          "maxConcurrentRuns must be a positive integer (or null for unlimited)",
+          {
+            extensions: { code: "BAD_USER_INPUT" },
+          },
+        );
+      }
+      const agent = await ctx.prisma.agent.findFirst({
+        where: { id: args.agentId, workspaceId: tenancy.workspaceId },
+        select: { id: true },
+      });
+      if (!agent) throw new GraphQLError("Agent not found", { extensions: { code: "NOT_FOUND" } });
+      return ctx.prisma.agent.update({
+        ...query,
+        where: { id: agent.id },
+        data: { maxConcurrentRuns: args.maxConcurrentRuns ?? null },
+      });
+    },
+  }),
+);
+
 const EnqueuedSandboxRun = builder.simpleObject("EnqueuedSandboxRun", {
   fields: (t) => ({
     runId: t.string(),

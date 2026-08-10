@@ -217,6 +217,121 @@ describe("cron routine triggers (Domain 9 #12)", () => {
   });
 });
 
+describe("§3 #11 (2) — routine concurrency + catch-up policies", () => {
+  const AT_0830 = new Date("2026-07-19T08:30:00Z");
+  const HOURLY = "0 * * * *";
+
+  it("concurrencyPolicy=skip does NOT start a new run while a prior run is still active", async () => {
+    const routine = await createRoutine({ workspaceId: WS_A, name: "Skip", definition: {} });
+    const trig = await addRoutineTrigger(
+      WS_A,
+      routine.id,
+      { type: "cron", cronExpression: HOURLY, concurrencyPolicy: "skip" },
+      AT_0830,
+    );
+    // A prior run of this routine is still RUNNING when the next tick comes due.
+    await prisma.routineRun.create({
+      data: { routineId: routine.id, triggeredBy: "cron", status: "running", startedAt: AT_0830 },
+    });
+
+    const fired = await tickRoutineTriggers(new Date("2026-07-19T09:05:00Z"));
+    expect(fired).toBe(0); // overlap skipped — no new run
+    expect(await prisma.routineRun.count({ where: { routineId: routine.id } })).toBe(1);
+    // The schedule still advances so it self-heals on the next window.
+    const advanced = await prisma.routineTrigger.findUniqueOrThrow({ where: { id: trig.id } });
+    expect(advanced.nextFireAt?.toISOString()).toBe("2026-07-19T10:00:00.000Z");
+  });
+
+  it("concurrencyPolicy=queue defers the overlap and runs it once the routine is idle", async () => {
+    const routine = await createRoutine({ workspaceId: WS_A, name: "Queue", definition: {} });
+    await addRoutineTrigger(
+      WS_A,
+      routine.id,
+      { type: "cron", cronExpression: HOURLY, concurrencyPolicy: "queue" },
+      AT_0830,
+    );
+    const prior = await prisma.routineRun.create({
+      data: { routineId: routine.id, triggeredBy: "cron", status: "running", startedAt: AT_0830 },
+    });
+
+    // Due while busy → the occurrence is DEFERRED as a queued run (not fired now).
+    expect(await tickRoutineTriggers(new Date("2026-07-19T09:05:00Z"))).toBe(0);
+    const deferred = await prisma.routineRun.findFirstOrThrow({
+      where: { routineId: routine.id, status: "queued" },
+    });
+
+    // Prior run finishes → a later tick drains the deferred run exactly once (no overlap).
+    await prisma.routineRun.update({
+      where: { id: prior.id },
+      data: { status: "succeeded", finishedAt: new Date("2026-07-19T09:30:00Z") },
+    });
+    await tickRoutineTriggers(new Date("2026-07-19T10:05:00Z"));
+    const drained = await prisma.routineRun.findUniqueOrThrow({ where: { id: deferred.id } });
+    expect(drained.status).toBe("succeeded");
+    expect(drained.generatedTaskId).toBeTruthy();
+  });
+
+  it("catchUpPolicy=skip advances a missed (downtime) window WITHOUT firing", async () => {
+    const routine = await createRoutine({ workspaceId: WS_A, name: "CatchSkip", definition: {} });
+    const trig = await addRoutineTrigger(
+      WS_A,
+      routine.id,
+      { type: "cron", cronExpression: HOURLY, catchUpPolicy: "skip" },
+      AT_0830,
+    );
+    // Simulate downtime: the trigger became due several whole windows ago (06:00, now 09:05).
+    await prisma.routineTrigger.update({
+      where: { id: trig.id },
+      data: { nextFireAt: new Date("2026-07-19T06:00:00Z") },
+    });
+
+    expect(await tickRoutineTriggers(new Date("2026-07-19T09:05:00Z"))).toBe(0);
+    expect(await prisma.routineRun.count({ where: { routineId: routine.id } })).toBe(0);
+    const advanced = await prisma.routineTrigger.findUniqueOrThrow({ where: { id: trig.id } });
+    expect(advanced.nextFireAt?.toISOString()).toBe("2026-07-19T10:00:00.000Z");
+  });
+
+  it("catchUpPolicy=run_once fires exactly once for a missed backlog", async () => {
+    const routine = await createRoutine({ workspaceId: WS_A, name: "CatchOnce", definition: {} });
+    const trig = await addRoutineTrigger(
+      WS_A,
+      routine.id,
+      { type: "cron", cronExpression: HOURLY, catchUpPolicy: "run_once" },
+      AT_0830,
+    );
+    await prisma.routineTrigger.update({
+      where: { id: trig.id },
+      data: { nextFireAt: new Date("2026-07-19T06:00:00Z") },
+    });
+
+    expect(await tickRoutineTriggers(new Date("2026-07-19T09:05:00Z"))).toBe(1);
+    expect(await prisma.routineRun.count({ where: { routineId: routine.id } })).toBe(1);
+  });
+
+  it("§3 #11 (3) unified pause: a paused project suppresses the fire (schedule still advances)", async () => {
+    const project = await prisma.project.create({
+      data: { name: "Paused", workspaceId: WS_A, shutdownActive: true },
+    });
+    const routine = await createRoutine({
+      workspaceId: WS_A,
+      name: "PausedProj",
+      definition: {},
+      projectId: project.id,
+    });
+    const trig = await addRoutineTrigger(
+      WS_A,
+      routine.id,
+      { type: "cron", cronExpression: HOURLY },
+      AT_0830,
+    );
+
+    expect(await tickRoutineTriggers(new Date("2026-07-19T09:05:00Z"))).toBe(0);
+    expect(await prisma.routineRun.count({ where: { routineId: routine.id } })).toBe(0);
+    const advanced = await prisma.routineTrigger.findUniqueOrThrow({ where: { id: trig.id } });
+    expect(advanced.nextFireAt?.toISOString()).toBe("2026-07-19T10:00:00.000Z");
+  });
+});
+
 describe("pipeline cases (Epic #7)", () => {
   it("createCase places the case at the first stage; transition only moves forward", async () => {
     const { pid, stageIds } = await pipelineWithStages(WS_A);

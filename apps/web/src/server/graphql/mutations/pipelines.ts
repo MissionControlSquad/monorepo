@@ -8,6 +8,7 @@ import {
   addRoutineTrigger,
   triggerRoutineNow,
   regenerateTriggerPublicId,
+  updateRoutineTriggerPolicies,
 } from "@/server/services/routines";
 import {
   createPipeline,
@@ -106,6 +107,13 @@ builder.mutationField("addRoutineTrigger", (t) =>
       cronExpression: t.arg.string(),
       timezone: t.arg.string(),
       nextFireAt: t.arg({ type: "DateTime" }),
+      // §3 #11 (2) overlap policy — how to handle a due tick while the routine's prior run is still
+      // active: "allow" (default, fire anyway) | "skip" (don't start if the previous run is still
+      // going) | "queue" (defer and run once the routine is idle).
+      concurrencyPolicy: t.arg.string(),
+      // §3 #11 (2) missed-window policy — after downtime skipped ≥1 tick: "skip" (default, advance
+      // without firing) | "run_once" (fire once for the backlog).
+      catchUpPolicy: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
@@ -117,6 +125,30 @@ builder.mutationField("addRoutineTrigger", (t) =>
         cronExpression: args.cronExpression ?? null,
         timezone: args.timezone ?? null,
         nextFireAt: args.nextFireAt ?? null,
+        concurrencyPolicy: args.concurrencyPolicy ?? null,
+        catchUpPolicy: args.catchUpPolicy ?? null,
+      });
+      return ctx.prisma.routineTrigger.findUniqueOrThrow({ ...query, where: { id: trigger.id } });
+    },
+  }),
+);
+
+// §3 #11 (2): tune a routine trigger's overlap / missed-window policies without recreating it.
+// PIPELINES_ROUTINES-gated, admin.
+builder.mutationField("updateRoutineTriggerPolicies", (t) =>
+  t.prismaField({
+    type: "RoutineTrigger",
+    args: {
+      triggerId: t.arg.string({ required: true }),
+      concurrencyPolicy: t.arg.string(), // allow | skip | queue
+      catchUpPolicy: t.arg.string(), // skip | run_once
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
+      const tenancy = requireRole(ctx, "admin");
+      const trigger = await updateRoutineTriggerPolicies(tenancy.workspaceId, args.triggerId, {
+        concurrencyPolicy: args.concurrencyPolicy ?? undefined,
+        catchUpPolicy: args.catchUpPolicy ?? undefined,
       });
       return ctx.prisma.routineTrigger.findUniqueOrThrow({ ...query, where: { id: trigger.id } });
     },

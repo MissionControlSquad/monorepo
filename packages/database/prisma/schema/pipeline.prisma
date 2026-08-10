@@ -63,6 +63,14 @@ model RoutineTrigger {
   nextFireAt       DateTime?
   publicId         String?            @unique // nanoid; public fire URL (webhook)
   isEnabled        Boolean            @default(true)
+  // §3 #11 (2) — overlap handling when the routine's PRIOR run is still active (queued|running) at the
+  // moment this trigger is due. "allow" (default) fires regardless; "skip" drops this occurrence;
+  // "queue" defers it as a queued RoutineRun that a later scan drains once the routine is idle.
+  concurrencyPolicy String            @default("allow") // allow | skip | queue (PIPELINES_ROUTINES-gated)
+  // §3 #11 (2) — behavior when the scanner finds the trigger due AFTER one or more whole tick windows
+  // were missed (a downtime catch-up). "skip" (default) advances the schedule WITHOUT firing; "run_once"
+  // fires exactly once for the missed backlog. An on-time tick fires normally under either policy.
+  catchUpPolicy     String            @default("skip") // skip | run_once (PIPELINES_ROUTINES-gated)
   createdAt        DateTime           @default(now())
 
   routine Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
