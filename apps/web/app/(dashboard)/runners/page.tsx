@@ -112,6 +112,16 @@ const RUN_STATUS_HELP: Record<string, string> = {
   canceled: "Stopped by a user before it finished.",
 };
 
+// What a run's kind:provider transport means — surfaced on hover so the env-kind/driver is legible.
+const PROVIDER_KEY_HELP: Record<string, string> = {
+  local: "Ran in-process on the control-plane host (local driver).",
+  ssh: "Ran on a remote host over SSH (the environment's ssh driver).",
+};
+function providerKeyHelp(providerKey: string | null): string {
+  if (!providerKey) return "Where this run executed.";
+  return PROVIDER_KEY_HELP[providerKey] ?? `Ran on the "${providerKey}" sandbox provider.`;
+}
+
 // Plan 6: the redacted live tail of an in-flight run, polled every 2s while open.
 function LiveTail({ runId }: { runId: string }) {
   const [{ data }, refetch] = useQuery<{
@@ -210,9 +220,13 @@ function RunHistory() {
               className="flex-1 truncate text-left font-mono text-xs text-foreground"
               onClick={() => setOpen(open === r.id ? null : r.id)}
             >
-              {r.kind}
-              {r.providerKey ? `:${r.providerKey}` : ""} ·{" "}
-              {r.startedAt.slice(0, 19).replace("T", " ")}
+              <Tooltip content={providerKeyHelp(r.providerKey)}>
+                <span>
+                  {r.kind}
+                  {r.providerKey ? `:${r.providerKey}` : ""}
+                </span>
+              </Tooltip>{" "}
+              · {r.startedAt.slice(0, 19).replace("T", " ")}
             </button>
             <span className="flex items-center gap-2">
               {r.exitCode != null && (
@@ -267,6 +281,17 @@ function RunHistory() {
             <div className="mt-2 space-y-2">
               {(r.status === "running" || r.status === "queued") && <LiveTail runId={r.id} />}
               {/* Structured adapter execution result (usage/model + machine-readable outcome). */}
+              {/* Config gate: a run refused pre-dispatch renders a readable "needs configuration"
+                  callout listing exactly what's missing, instead of an opaque failure. */}
+              {r.exitReason === "configuration_incomplete" && (
+                <div className="rounded border border-orange-400/40 bg-orange-400/10 p-2 text-xs text-orange-700 dark:text-orange-300">
+                  <p className="font-medium">This run needs configuration</p>
+                  <p className="mt-0.5">
+                    {(r.errorMessage ?? "").replace(/^This run needs configuration:\s*/, "") ||
+                      "Required config or a secret binding is missing for this environment."}
+                  </p>
+                </div>
+              )}
               {(r.exitReason ||
                 r.errorFamily ||
                 r.usageModel ||
@@ -295,7 +320,9 @@ function RunHistory() {
                   {r.stderr}
                 </pre>
               )}
-              {r.errorMessage && <p className="text-xs text-destructive">{r.errorMessage}</p>}
+              {r.errorMessage && r.exitReason !== "configuration_incomplete" && (
+                <p className="text-xs text-destructive">{r.errorMessage}</p>
+              )}
             </div>
           )}
         </Card>
