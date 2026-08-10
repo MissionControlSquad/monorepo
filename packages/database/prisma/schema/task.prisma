@@ -1,6 +1,7 @@
 // ─── Tasks ────────────────────────────────────────────────────────
 
 enum TaskStatus {
+  backlog // Parity §3.12 — parked/un-triaged work; ordered before inbox
   inbox
   assigned
   in_progress
@@ -17,11 +18,22 @@ enum Priority {
   urgent
 }
 
+// Parity §3.12 — how an agent should approach a task. `standard` = execute normally; `ask` = ask
+// clarifying questions before acting; `planning` = produce a plan, don't execute; `skill_test` = a
+// sandboxed skill trial. Default `standard`. Additive + non-gated (a core-model field).
+enum WorkMode {
+  standard
+  ask
+  planning
+  skill_test
+}
+
 model Task {
   id                 String     @id @default(cuid())
   title              String
   description        String
   status             TaskStatus @default(inbox)
+  workMode           WorkMode   @default(standard) // Parity §3.12 — how an agent should approach this task
   priority           Priority?
   createdByProfileId String?
   createdAt          DateTime   @default(now())
@@ -67,6 +79,7 @@ model Task {
   relationsTo       TaskRelation[]     @relation("TaskRelationTarget")
   externalLinks     ExternalLink[]     @relation("TaskExternalLinks")
   attachments       TaskAttachment[]   @relation("TaskAttachments")
+  taskLabels        TaskLabel[]        @relation("TaskLabels") // Parity §3.12 — first-class task labels
 
   // Epic #8: lease-based atomic checkout + autonomy hardening.
   checkedOutByProfileId  String?
@@ -162,6 +175,24 @@ model ExternalLink {
 
   @@index([taskId])
   @@map("external_links")
+}
+
+// Parity §3.12 — first-class task labels. Reuses the generic workspace-scoped `Label` model (shared
+// with Cases) via a join, so a task can carry structured labels beyond the freeform `tags[]`.
+model TaskLabel {
+  id          String   @id @default(cuid())
+  workspaceId String
+  taskId      String
+  labelId     String
+  createdAt   DateTime @default(now())
+
+  task  Task  @relation("TaskLabels", fields: [taskId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, labelId])
+  @@index([workspaceId, taskId])
+  @@index([labelId])
+  @@map("task_labels")
 }
 
 model TaskAssignee {

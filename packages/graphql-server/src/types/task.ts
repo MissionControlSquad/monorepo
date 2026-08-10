@@ -6,6 +6,7 @@ builder.prismaObject("Task", {
     title: t.exposeString("title"),
     description: t.exposeString("description"),
     status: t.exposeString("status"),
+    workMode: t.exposeString("workMode"), // Parity §3.12
     priority: t.exposeString("priority", { nullable: true }),
     createdByProfileId: t.exposeString("createdByProfileId", { nullable: true }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
@@ -45,6 +46,18 @@ builder.prismaObject("Task", {
     workSessions: t.relation("workSessions"),
     agentActions: t.relation("agentActions"),
     documents: t.relation("documents"),
+    taskLabels: t.relation("taskLabels"), // Parity §3.12 — first-class task labels
+  }),
+});
+
+// Parity §3.12 — first-class task labels. Reuses the generic workspace-scoped `Label` model.
+builder.prismaObject("TaskLabel", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    taskId: t.exposeString("taskId"),
+    labelId: t.exposeString("labelId"),
+    label: t.relation("label"),
+    createdAt: t.expose("createdAt", { type: "DateTime" }),
   }),
 });
 

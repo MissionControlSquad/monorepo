@@ -61,16 +61,20 @@ import { useCurrentProject } from "../context/AppContext";
 import type { Agent, ProjectMember, TaskTemplate, Project } from "@agentcenter/types";
 import {
   Priority,
+  WorkMode,
+  WORK_MODE_META,
   SetupStatus,
   ProjectStatus,
   ProfileKind,
   type PriorityValue,
+  type WorkModeValue,
 } from "@/server/constants";
 
 const blankFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
   priority: z.enum(Object.values(Priority) as [PriorityValue, ...PriorityValue[]]),
+  workMode: z.enum(Object.values(WorkMode) as [WorkModeValue, ...WorkModeValue[]]),
   dueDate: z.string().optional(),
   selectedProjectId: z.string().nullable(),
   selectedAgentIds: z.array(z.string()),
@@ -107,6 +111,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
       title: "",
       description: "",
       priority: Priority.MEDIUM,
+      workMode: WorkMode.STANDARD,
       dueDate: "",
       selectedProjectId: null,
       selectedAgentIds: [],
@@ -200,6 +205,7 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
         title: data.title.trim(),
         description: data.description.trim(),
         priority: data.priority,
+        workMode: data.workMode,
         assigneeIds: data.selectedAgentIds.length > 0 ? data.selectedAgentIds : undefined,
         dueDate: data.dueDate ? new Date(data.dueDate).getTime().toString() : undefined,
         tags: data.tags.length > 0 ? data.tags : undefined,
@@ -587,6 +593,46 @@ export function CreateTaskModal({ isOpen, onClose }: CreateTaskModalProps) {
                               interactive={true}
                               onChange={(p) => field.onChange(p as PriorityValue)}
                             />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Work mode — how an agent should approach the task (Parity §3.12) */}
+                      <FormField
+                        control={form.control}
+                        name="workMode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel
+                              className="flex items-center gap-1.5"
+                              title="How an agent should approach this task"
+                            >
+                              Work mode
+                            </FormLabel>
+                            <Select
+                              value={field.value}
+                              onValueChange={(v) => field.onChange(v as WorkModeValue)}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Standard" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {Object.values(WorkMode).map((mode) => (
+                                  <SelectItem key={mode} value={mode} title={WORK_MODE_META[mode].help}>
+                                    <span className="font-medium">{WORK_MODE_META[mode].label}</span>
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      {WORK_MODE_META[mode].help}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              {WORK_MODE_META[field.value].help}
+                            </p>
                             <FormMessage />
                           </FormItem>
                         )}

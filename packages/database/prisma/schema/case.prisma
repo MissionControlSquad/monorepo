@@ -130,6 +130,7 @@ model Label {
   updatedAt   DateTime @updatedAt
 
   cases CaseLabel[]
+  tasks TaskLabel[] // Parity §3.12 — the same label can be applied to tasks
 
   @@unique([workspaceId, name])
   @@index([workspaceId])

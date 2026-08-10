@@ -50,6 +50,9 @@ model AgentRun {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
+  // Parity §3.12 — task comments this run posted (attribution).
+  postedMessages Message[] @relation("MessageCreatedByRun")
+
   @@index([workspaceId, createdAt])
   @@index([agentId])
   @@index([taskId])

@@ -137,11 +137,22 @@ async function resolveAndAdmitTarget(
 }
 
 /** Post the run outcome to the task timeline as a message from the agent (best-effort). */
-async function postRunToTask(agentId: string, taskId: string, summary: string): Promise<void> {
+async function postRunToTask(
+  agentId: string,
+  taskId: string,
+  summary: string,
+  runId?: string,
+): Promise<void> {
   try {
     const fromProfileId = await getOrCreateAgentProfileId(agentId);
     await prisma.message.create({
-      data: { taskId, fromProfileId, content: summary.slice(0, MAX_MESSAGE_CHARS) },
+      data: {
+        taskId,
+        fromProfileId,
+        content: summary.slice(0, MAX_MESSAGE_CHARS),
+        // Parity §3.12 — attribute the timeline post to the run that produced it.
+        createdByRunId: runId ?? null,
+      },
     });
   } catch {
     // Never fail the run because the timeline post failed.
@@ -604,6 +615,7 @@ export async function runTaskInSandbox(input: {
       agent.id,
       input.taskId,
       `Sandbox run (${providerKey}) - ${runStatus}${exitCode != null ? `, exit ${exitCode}` : ""}\n\n${displayOutput || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
+      run.id,
     );
 
     // Post-run memory auto-capture (Domain 4 GAP-B): persist run residue when the agent's effective
@@ -694,7 +706,12 @@ export async function runTaskInSandbox(input: {
         },
       })
       .catch(() => {});
-    await postRunToTask(agent.id, input.taskId, `Sandbox run (${providerKey}) failed: ${message}`);
+    await postRunToTask(
+      agent.id,
+      input.taskId,
+      `Sandbox run (${providerKey}) failed: ${message}`,
+      run?.id,
+    );
     throw err;
   }
 }
@@ -906,6 +923,7 @@ async function dispatchHermesGatewayRun(input: {
       agent.id,
       taskId,
       `Hermes gateway run (${providerKey}) — ${runStatus}, exit ${result.exitCode}\n\n${stdout || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
+      run.id,
     );
 
     return {
@@ -933,7 +951,12 @@ async function dispatchHermesGatewayRun(input: {
         data: { status: "failed", errorMessage: message, finishedAt: new Date() },
       })
       .catch(() => {});
-    await postRunToTask(agent.id, taskId, `Hermes gateway run (${providerKey}) failed: ${message}`);
+    await postRunToTask(
+      agent.id,
+      taskId,
+      `Hermes gateway run (${providerKey}) failed: ${message}`,
+      run?.id,
+    );
     throw err;
   }
 }

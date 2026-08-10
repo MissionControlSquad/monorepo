@@ -173,6 +173,7 @@ builder.queryField("tasksByStatusForAgent", (t) =>
       };
 
       const statuses = [
+        TaskStatus.BACKLOG,
         TaskStatus.INBOX,
         TaskStatus.ASSIGNED,
         TaskStatus.IN_PROGRESS,
@@ -192,12 +193,13 @@ builder.queryField("tasksByStatusForAgent", (t) =>
       );
 
       return {
-        inbox: results[0],
-        assigned: results[1],
-        inProgress: results[2],
-        review: results[3],
-        done: results[4],
-        blocked: results[5],
+        backlog: results[0],
+        inbox: results[1],
+        assigned: results[2],
+        inProgress: results[3],
+        review: results[4],
+        done: results[5],
+        blocked: results[6],
       };
     },
   }),
@@ -296,6 +298,7 @@ builder.queryField("tasksByProject", (t) =>
 // Helper types
 const TasksByStatusType = builder.simpleObject("TasksByStatus", {
   fields: (t) => ({
+    backlog: t.field({ type: ["JSON"] }),
     inbox: t.field({ type: ["JSON"] }),
     assigned: t.field({ type: ["JSON"] }),
     inProgress: t.field({ type: ["JSON"] }),
@@ -323,6 +326,7 @@ const WorkSummaryType = builder.simpleObject("WorkSummary", {
 
 function emptyTasksByStatus() {
   return {
+    backlog: [],
     inbox: [],
     assigned: [],
     inProgress: [],

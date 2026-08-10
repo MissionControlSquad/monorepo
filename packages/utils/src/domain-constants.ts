@@ -12,6 +12,7 @@ export type RoleValue = (typeof Roles)[keyof typeof Roles];
 
 // ─── Task Statuses ───────────────────────────────────────
 export const TaskStatus = {
+  BACKLOG: "backlog",
   INBOX: "inbox",
   ASSIGNED: "assigned",
   IN_PROGRESS: "in_progress",
@@ -22,6 +23,24 @@ export const TaskStatus = {
 } as const;
 
 export type TaskStatusValue = (typeof TaskStatus)[keyof typeof TaskStatus];
+
+/** Parity §3.12 — how an agent should approach a task. Mirrors the Prisma `WorkMode` enum. */
+export const WorkMode = {
+  STANDARD: "standard",
+  ASK: "ask",
+  PLANNING: "planning",
+  SKILL_TEST: "skill_test",
+} as const;
+
+export type WorkModeValue = (typeof WorkMode)[keyof typeof WorkMode];
+
+/** Human-readable labels + help text for each WorkMode (used by the create-task form select tooltip). */
+export const WORK_MODE_META: Record<WorkModeValue, { label: string; help: string }> = {
+  standard: { label: "Standard", help: "Execute the task normally." },
+  ask: { label: "Ask", help: "Ask clarifying questions before taking action." },
+  planning: { label: "Planning", help: "Produce a plan only — don't execute it yet." },
+  skill_test: { label: "Skill test", help: "A sandboxed trial run to exercise a skill." },
+};
 
 // ─── Priorities ──────────────────────────────────────────
 export const Priority = {
