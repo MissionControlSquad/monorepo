@@ -1,0 +1,19 @@
+// Plugin runtime capability grants (parity #103 — the execution runtime's security half). A plugin's
+// manifest DECLARES capabilities (recorded on Plugin.capabilities), but the runtime is FAIL-CLOSED: a
+// declared capability grants nothing until an admin explicitly grants it here. The dispatcher/host-call
+// path consults these rows (resolveGrantedCapabilities + requirePluginCapability) before letting a
+// plugin invoke a tool, run a job, or reach a host service — an ungranted capability is refused.
+// A grant cannot exceed what the manifest declares (least privilege, enforced in the service layer).
+// workspaceId-scoped, no FK (D5); capability is TEXT (validated against PLUGIN_CAPABILITIES in code).
+model PluginGrant {
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  pluginId           String // manifest slug (matches Plugin.pluginId)
+  capability         String // one of PLUGIN_CAPABILITIES
+  grantedByProfileId String? // operator who granted it (audit)
+  grantedAt          DateTime @default(now())
+
+  @@unique([workspaceId, pluginId, capability])
+  @@index([workspaceId, pluginId])
+  @@map("plugin_grants")
+}

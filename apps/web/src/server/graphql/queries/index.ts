@@ -37,6 +37,7 @@ import "./profile-analytics";
 import "./timeline";
 import "./boardroom";
 import "./plugins";
+import "./plugin-grants";
 import "./api-keys";
 import "./cli-auth";
 import "./terminals";

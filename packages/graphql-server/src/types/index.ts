@@ -37,6 +37,7 @@ import "./boardroom";
 import "./agent-authz";
 import "./tool-access";
 import "./plugin";
+import "./plugin-grant";
 import "./api-key";
 import "./terminal";
 import "./agent-instruction";
