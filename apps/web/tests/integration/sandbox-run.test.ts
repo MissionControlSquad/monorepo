@@ -448,7 +448,15 @@ describe("environment-driven execution (Plan 1 wiring)", () => {
     expect(result.stdout).toContain("VAR=env-value-123");
   });
 
-  it("rejects an ssh/plugin Environment (not yet runnable via the sandbox seam)", async () => {
+  it("rejects an ssh/plugin Environment when ENVIRONMENTS is off (not yet runnable via the seam)", async () => {
+    // Back-compat: with the ENVIRONMENTS flag dark, the ssh runtime driver stays disabled and an ssh env
+    // is refused up front (the unified driver only routes ssh when ENVIRONMENTS is enabled).
+    await prisma.featureFlag.upsert({
+      where: { key: "environments" },
+      create: { key: "environments", enabled: false, managedBy: "user" },
+      update: { enabled: false },
+    });
+    invalidateFlagCache();
     const env = await createEnvironment(WS, {
       name: "Ssh",
       driver: "ssh",

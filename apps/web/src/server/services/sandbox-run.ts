@@ -38,7 +38,6 @@ import { getProfileAgentId } from "@agentcenter/database";
 import { prisma } from "@/server/prisma";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { assembleContextBundle } from "./agent-context";
-import { getSandboxProvider } from "./sandbox-providers";
 import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
 import { captureRunMemory } from "./agent-memory";
 import { enqueueMemoryJob } from "./memory-jobs";
@@ -47,6 +46,9 @@ import { scheduleRunRetryIfTransient } from "./run-retry";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertExecutionAllowed } from "./execution-policy";
 import { resolveEnvironmentExecution, type EnvExecutionResolution } from "./environments";
+import { resolveEnvironmentRuntimeDriver } from "./environment-runtime-driver";
+import { evaluateRunConfig, CONFIGURATION_INCOMPLETE } from "./run-config-gate";
+import type { EnvSshResolution, SshExecTransport } from "./sandbox/ssh-runtime";
 import { acquireLease, releaseLease, coerceLeasePolicy } from "./environment-leases";
 import {
   getPrimaryProjectWorkspace,
@@ -99,36 +101,30 @@ async function resolveAndAdmitTarget(
   workspaceId: string,
   agent: AdmissionAgent,
   inputProviderKey?: string | null,
+  opts?: { sshExec?: SshExecTransport },
 ): Promise<{
   provider: SandboxProvider;
   providerKey: string;
   execDriver: string;
   envRes: EnvExecutionResolution | null;
+  ssh: EnvSshResolution | null;
 }> {
   const envRes =
     !inputProviderKey && agent.environmentId
       ? await resolveEnvironmentExecution(workspaceId, agent.environmentId)
       : null;
-  if (envRes && envRes.providerKey === null) {
-    throw new GraphQLError(
-      `Environment driver "${envRes.driver}" is not yet runnable via the sandbox seam. Use a local or sandbox environment.`,
-      { extensions: { code: "BAD_USER_INPUT" } },
-    );
-  }
-  const execDriver = envRes?.driver ?? "sandbox";
 
-  const providerKey = (inputProviderKey ?? envRes?.providerKey ?? agent.sandboxProvider) || null;
-  if (!providerKey) {
-    throw new GraphQLError("No sandbox provider is configured for this agent", {
-      extensions: { code: "BAD_USER_INPUT" },
-    });
-  }
-  const provider = getSandboxProvider(providerKey);
-  if (!provider) {
-    throw new GraphQLError(`Unknown sandbox provider: ${providerKey}`, {
-      extensions: { code: "BAD_USER_INPUT" },
-    });
-  }
+  // Unified runtime driver (this slice): route local/ssh/sandbox through ONE seam so an ssh Environment
+  // resolves to a real executable transport rather than providerKey:null. ENVIRONMENTS-gated for ssh.
+  const runtime = await resolveEnvironmentRuntimeDriver({
+    workspaceId,
+    envRes,
+    inputProviderKey,
+    agentSandboxProvider: agent.sandboxProvider,
+    environmentsEnabled: await isFeatureEnabled(FLAG_KEYS.ENVIRONMENTS),
+    sshExec: opts?.sshExec,
+  });
+  const { provider, providerKey, driver: execDriver, ssh } = runtime;
 
   // Fail-closed admission: a low-trust/untrusted (or explicitly contained) agent must run in an
   // ISOLATING sandbox — never on the control-plane host (the `local` provider).
@@ -149,7 +145,7 @@ async function resolveAndAdmitTarget(
   // Workspace execution allowlist (Plan 4): deny an inadmissible target BEFORE provisioning/queuing.
   await assertExecutionAllowed(workspaceId, { driver: execDriver, provider: providerKey });
 
-  return { provider, providerKey, execDriver, envRes };
+  return { provider, providerKey, execDriver, envRes, ssh: ssh ?? null };
 }
 
 /** Post the run outcome to the task timeline as a message from the agent (best-effort). */
@@ -364,6 +360,8 @@ export async function runTaskInSandbox(input: {
   existingRunId?: string;
   /** DI seam (tests): the fetch used by the Hermes gateway dispatch path. Defaults to global fetch. */
   fetchImpl?: typeof fetch;
+  /** DI seam (tests): the ssh exec transport injected into the ssh runtime driver. Defaults to real ssh2. */
+  sshExec?: SshExecTransport;
 }): Promise<SandboxRunResult> {
   const agent = await prisma.agent.findFirst({
     where: { id: input.agentId, workspaceId: input.workspaceId },
@@ -371,11 +369,12 @@ export async function runTaskInSandbox(input: {
   });
   if (!agent) throw new GraphQLError("Agent not found", { extensions: { code: "NOT_FOUND" } });
 
-  // Resolve the target (Environment → provider) + enforce trust containment + execution allowlist.
-  const { provider, providerKey, execDriver, envRes } = await resolveAndAdmitTarget(
+  // Resolve the target (Environment → unified runtime driver) + enforce trust containment + allowlist.
+  const { provider, providerKey, execDriver, envRes, ssh } = await resolveAndAdmitTarget(
     input.workspaceId,
     agent,
     input.providerKey,
+    { sshExec: input.sshExec },
   );
 
   const bundle = await assembleContextBundle(
@@ -457,6 +456,45 @@ export async function runTaskInSandbox(input: {
           requestedByProfileId: input.requestedByProfileId ?? null,
         },
       });
+
+  // Pre-dispatch config/binding gate (EXECUTION_POLICY-gated): verify every secret binding + config the
+  // execution target needs is present BEFORE provisioning. A run missing an ssh key / sandbox credential
+  // is refused UP FRONT with `configuration_incomplete` (the run is marked, the task is told what's
+  // missing) instead of provisioning and failing mid-run. Extends the old git/SSH-only preflight.
+  if (await isFeatureEnabled(FLAG_KEYS.EXECUTION_POLICY)) {
+    const gate = await evaluateRunConfig({
+      workspaceId: input.workspaceId,
+      driver: execDriver,
+      provider,
+      ssh,
+      resolveSecret: (name) => resolveWorkspaceSecret(input.workspaceId, name),
+    });
+    if (!gate.ok) {
+      const message = `This run needs configuration: ${gate.summary}`;
+      setRunPhase(run.id, "failed");
+      await prisma.agentRun
+        .update({
+          where: { id: run.id },
+          data: {
+            status: "failed",
+            exitReason: CONFIGURATION_INCOMPLETE,
+            errorMessage: message,
+            finishedAt: new Date(),
+            bridgeTokenHash: null,
+          },
+        })
+        .catch(() => {});
+      await postRunToTask(
+        agent.id,
+        input.taskId,
+        `Sandbox run (${providerKey}) blocked — ${message}`,
+        run.id,
+      );
+      throw new GraphQLError(message, {
+        extensions: { code: "FAILED_PRECONDITION", exitReason: CONFIGURATION_INCOMPLETE },
+      });
+    }
+  }
 
   // Inject the agent's OWN bound secrets (LLM API keys, etc.) so a real runtime can authenticate.
   // The Environment's instance-scoped envVars (a non-secret bag) go in first; the agent's resolved
