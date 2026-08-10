@@ -208,13 +208,18 @@ function RunHistory() {
               {r.reviewState === "changes_requested" && (
                 <Badge variant="orange">changes requested</Badge>
               )}
-              {r.status === "queued" && (
+              {(r.status === "queued" || r.status === "running") && (
                 <button
                   onClick={() => onCancel(r.id)}
                   disabled={busyCancel === r.id}
+                  title={
+                    r.status === "running"
+                      ? "Terminates the running task and marks it cancelled"
+                      : "Cancels the queued run before a worker picks it up"
+                  }
                   className="text-xs text-destructive transition hover:underline disabled:opacity-50"
                 >
-                  Cancel
+                  {r.status === "running" ? "Cancel run" : "Cancel"}
                 </button>
               )}
               {r.reviewState === "needs_review" && (

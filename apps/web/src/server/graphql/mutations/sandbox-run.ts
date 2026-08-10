@@ -72,15 +72,21 @@ builder.mutationField("enqueueTaskInSandbox", (t) =>
   }),
 );
 
-// Cancel a QUEUED run (a running one can't be cleanly killed in this model). RUNNERS-gated, admin.
+// Cancel a run (§3 #2). A QUEUED run is marked canceled so the worker never claims it; a RUNNING run
+// executing in this process is TERMINATED via its AbortSignal (child process killed) and finalized
+// canceled + reason. RUNNERS-gated, admin (arbitrary code execution + credential use).
 builder.mutationField("cancelAgentRun", (t) =>
   t.field({
     type: "Boolean",
-    args: { runId: t.arg.string({ required: true }) },
+    args: {
+      runId: t.arg.string({ required: true }),
+      // Optional operator-supplied cancellation reason (stored on AgentRun.cancelReason).
+      reason: t.arg.string(),
+    },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
       const tenancy = requireRole(ctx, "admin");
-      return cancelAgentRun(tenancy.workspaceId, args.runId);
+      return cancelAgentRun(tenancy.workspaceId, args.runId, args.reason ?? undefined);
     },
   }),
 );
