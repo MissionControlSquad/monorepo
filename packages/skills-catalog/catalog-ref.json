@@ -1,0 +1,7 @@
+{
+  "//": "Pinned upstream ref for future remote catalog updates. Remote fetch is deferred; today the catalog ships in-repo and this record is stamped into generated/catalog.json for provenance/audit. Bump `ref`/`commit` when a remote sync lands.",
+  "repo": "MissionControlSquad/agentcenter-skills-catalog",
+  "ref": "bundled",
+  "commit": null,
+  "fetchedAt": null
+}
