@@ -7,10 +7,12 @@ import { Input, Select, FormField, FormDialog } from "@/components/ui";
 import { useResourceForm } from "@/hooks/useCrud";
 
 const DRIVER_HELP: Record<string, string> = {
-  local: "Runs on the control-plane host. Not for untrusted/low-trust agents.",
-  ssh: "Runs on a reachable server over SSH (host + key from the vault).",
-  sandbox: "Provisions an isolated sandbox per run (pick a provider below).",
-  plugin: "Delegates to a registered environment plugin.",
+  local:
+    "Local runs the agent on the control-plane host. Fast, but not isolated — avoid for untrusted agents.",
+  ssh: "SSH runs the agent on a server you reach over SSH (host + private key from the vault).",
+  sandbox:
+    "Sandbox runs the agent in an isolated ephemeral container per run — nothing persists between runs.",
+  plugin: "Plugin hands the run off to a registered environment plugin.",
 };
 
 interface ProviderCap {
@@ -65,7 +67,8 @@ export function EnvironmentDialog({ open, onOpenChange, onSaved }: EnvironmentDi
             ? (() => {
                 const cfg: Record<string, unknown> = { host: v.host.trim() };
                 if (v.username.trim()) cfg.username = v.username.trim();
-                if (v.keySecret.trim()) cfg.privateKey = { secretRef: { name: v.keySecret.trim() } };
+                if (v.keySecret.trim())
+                  cfg.privateKey = { secretRef: { name: v.keySecret.trim() } };
                 return cfg;
               })()
             : {};
@@ -94,20 +97,22 @@ export function EnvironmentDialog({ open, onOpenChange, onSaved }: EnvironmentDi
     >
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Name">
-          <Input placeholder="e.g. staging-box" value={f.values.name} onChange={(e) => f.set("name", e.target.value)} />
+          <Input
+            placeholder="e.g. staging-box"
+            value={f.values.name}
+            onChange={(e) => f.set("name", e.target.value)}
+          />
         </FormField>
-        <FormField label="Driver">
-          <Select
-            value={f.values.driver}
-            onChange={(e) => f.set("driver", e.target.value)}
-          >
+        <FormField label="Driver" hint={DRIVER_HELP[f.values.driver]}>
+          <Select value={f.values.driver} onChange={(e) => f.set("driver", e.target.value)}>
             {drivers.map((d) => (
-              <option key={d} value={d}>{d}</option>
+              <option key={d} value={d}>
+                {d}
+              </option>
             ))}
           </Select>
         </FormField>
       </div>
-      <p className="text-xs text-muted-foreground">{DRIVER_HELP[f.values.driver]}</p>
 
       {(f.values.driver === "sandbox" || f.values.driver === "local") && (
         <FormField label="Machine reuse">
@@ -124,10 +129,7 @@ export function EnvironmentDialog({ open, onOpenChange, onSaved }: EnvironmentDi
 
       {f.values.driver === "sandbox" && (
         <FormField label="Provider">
-          <Select
-            value={f.values.provider}
-            onChange={(e) => f.set("provider", e.target.value)}
-          >
+          <Select value={f.values.provider} onChange={(e) => f.set("provider", e.target.value)}>
             <option value="">— pick a provider —</option>
             {providers.map((p) => (
               <option key={p.key} value={p.key}>
@@ -141,21 +143,36 @@ export function EnvironmentDialog({ open, onOpenChange, onSaved }: EnvironmentDi
       {f.values.driver === "ssh" && (
         <div className="grid grid-cols-[1fr_6rem] gap-4">
           <FormField label="Host or IP">
-            <Input className="font-mono" value={f.values.host} onChange={(e) => f.set("host", e.target.value)} />
+            <Input
+              className="font-mono"
+              value={f.values.host}
+              onChange={(e) => f.set("host", e.target.value)}
+            />
           </FormField>
           <FormField label="User">
-            <Input className="font-mono" value={f.values.username} onChange={(e) => f.set("username", e.target.value)} />
+            <Input
+              className="font-mono"
+              value={f.values.username}
+              onChange={(e) => f.set("username", e.target.value)}
+            />
           </FormField>
           <div className="col-span-2">
             <FormField label="Private-key vault secret name">
-              <Input className="font-mono" value={f.values.keySecret} onChange={(e) => f.set("keySecret", e.target.value)} />
+              <Input
+                className="font-mono"
+                value={f.values.keySecret}
+                onChange={(e) => f.set("keySecret", e.target.value)}
+              />
             </FormField>
           </div>
         </div>
       )}
 
       <FormField label="Description (optional)">
-        <Input value={f.values.description} onChange={(e) => f.set("description", e.target.value)} />
+        <Input
+          value={f.values.description}
+          onChange={(e) => f.set("description", e.target.value)}
+        />
       </FormField>
     </FormDialog>
   );

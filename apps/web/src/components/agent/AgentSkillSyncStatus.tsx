@@ -2,15 +2,31 @@
 
 import { useQuery } from "urql";
 import { AGENT_SKILL_SNAPSHOT_QUERY } from "@/lib/graphql/queries";
-import { Badge } from "@/components/ui";
+import { Badge, Tooltip } from "@/components/ui";
 
 // Runtime skill sync status (parity #F22). Shows the reconcile between an agent's DESIRED skills and the
 // runtime's reported state (installed/stale/missing/configured/external), plus the adapter mode. Read-
 // only; the push that materializes skills into the agent's skills dir is the runtime seam.
-interface Entry { skillId: string; state: string }
-interface Snapshot { adapterType: string | null; mode: string; entries: Entry[]; warnings: string[] }
+interface Entry {
+  skillId: string;
+  state: string;
+}
+interface Snapshot {
+  adapterType: string | null;
+  mode: string;
+  entries: Entry[];
+  warnings: string[];
+}
 const stateVariant = (s: string) =>
-  s === "installed" ? "green" : s === "stale" ? "yellow" : s === "missing" ? "red" : s === "configured" ? "blue" : "gray";
+  s === "installed"
+    ? "green"
+    : s === "stale"
+      ? "yellow"
+      : s === "missing"
+        ? "red"
+        : s === "configured"
+          ? "blue"
+          : "gray";
 
 export function AgentSkillSyncStatus({ agentId }: { agentId: string }) {
   const [{ data }] = useQuery<{ agentSkillSnapshot: Snapshot }>({
@@ -22,9 +38,12 @@ export function AgentSkillSyncStatus({ agentId }: { agentId: string }) {
 
   return (
     <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
-      <p className="text-xs text-muted-foreground">
-        Runtime sync — adapter <span className="font-mono">{snap.adapterType ?? "none"}</span> ({snap.mode})
-      </p>
+      <Tooltip content="How each assigned skill compares between what this agent should have and what its runtime actually reports: installed = in sync, stale = needs updating, missing = not yet pushed, configured = set up by the adapter, external = managed outside AgentCenter.">
+        <p className="text-xs text-muted-foreground">
+          Runtime sync — adapter <span className="font-mono">{snap.adapterType ?? "none"}</span> (
+          {snap.mode})
+        </p>
+      </Tooltip>
       {snap.mode === "unsupported" ? (
         <p className="text-xs text-muted-foreground">This adapter manages its own skills.</p>
       ) : snap.entries.length === 0 ? (
@@ -39,7 +58,9 @@ export function AgentSkillSyncStatus({ agentId }: { agentId: string }) {
         </ul>
       )}
       {snap.warnings.map((w, i) => (
-        <p key={i} className="text-xs text-yellow-600 dark:text-yellow-500">{w}</p>
+        <p key={i} className="text-xs text-yellow-600 dark:text-yellow-500">
+          {w}
+        </p>
       ))}
     </div>
   );

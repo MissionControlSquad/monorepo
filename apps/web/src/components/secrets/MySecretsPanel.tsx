@@ -8,7 +8,7 @@ import {
   CREATE_USER_SECRET_DEFINITION,
   DELETE_USER_SECRET_DEFINITION,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, EmptyState, Spinner, Tooltip } from "@/components/ui";
+import { Button, Card, Badge, EmptyState, Spinner, Tooltip, ConfirmDialog } from "@/components/ui";
 import { WhenAdmin } from "@/components/auth/WhenAdmin";
 import { KeyRound, ShieldCheck, ShieldAlert, Info, Plus, Trash2 } from "lucide-react";
 
@@ -52,6 +52,7 @@ export function MySecretsPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [openProvide, setOpenProvide] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<CoverageItem | null>(null);
   const [newDef, setNewDef] = useState({
     key: "",
     displayName: "",
@@ -170,6 +171,12 @@ export function MySecretsPanel() {
             {complete ? "You're all set." : "Provide the rest to unblock your agents."}
           </span>
         </div>
+      )}
+      {total > 0 && (
+        <p className="-mt-2 text-xs text-muted-foreground">
+          Coverage counts how many of the credentials this workspace requires you have supplied.
+          Agents that need a missing one can&apos;t run until you provide it.
+        </p>
       )}
 
       {formErr && (
@@ -297,15 +304,19 @@ export function MySecretsPanel() {
                       {isProvided ? "Update" : "Provide"}
                     </Button>
                     <WhenAdmin>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy === item.definitionId}
-                        onClick={() => onDeleteDefinition(item)}
-                        aria-label={`Delete definition ${item.key}`}
+                      <Tooltip
+                        content={`Remove the "${item.key}" requirement for everyone in this workspace. Members' saved values stay in their personal vault.`}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy === item.definitionId}
+                          onClick={() => setConfirmDelete(item)}
+                          aria-label={`Delete definition ${item.key}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </Tooltip>
                     </WhenAdmin>
                   </span>
                 </div>
@@ -343,6 +354,20 @@ export function MySecretsPanel() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={async () => {
+          const item = confirmDelete;
+          setConfirmDelete(null);
+          if (item) await onDeleteDefinition(item);
+        }}
+        title={confirmDelete ? `Remove "${confirmDelete.key}"?` : "Remove required secret?"}
+        description="This stops the workspace from asking members for this credential and drops it from everyone's coverage. Values members already saved stay in their personal vault and keep working."
+        confirmLabel="Remove definition"
+        loading={busy === confirmDelete?.definitionId}
+      />
     </div>
   );
 }

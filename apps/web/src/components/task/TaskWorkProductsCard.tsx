@@ -7,7 +7,7 @@ import { ExternalLink } from "lucide-react";
 import { WORK_PRODUCTS_BY_TASK_QUERY } from "@/lib/graphql/queries";
 import { SET_WORK_PRODUCT_REVIEW_STATE, SET_WORK_PRODUCT_STATUS } from "@/lib/graphql/mutations";
 import { WORK_PRODUCT_STATUSES } from "@agentcenter/utils";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, Tooltip } from "@/components/ui";
 
 // Domain 8 G1: work products = the code-output subset of a task's deliverables (PRs, branches,
 // preview URLs, runtime services) with a review lifecycle. Complements the general Deliverables list
@@ -106,37 +106,43 @@ export function TaskWorkProductsCard({ taskId }: { taskId: string }) {
               <Badge variant={REVIEW_VARIANT[wp.reviewState] ?? "gray"} size="sm">
                 {wp.reviewState.replace(/_/g, " ")}
               </Badge>
-              <select
-                className="rounded border border-border bg-background px-1.5 py-0.5 text-xs"
-                value={wp.outputStatus}
-                disabled={busy === wp.id}
-                onChange={(e) => changeStatus(wp.id, e.target.value)}
-                aria-label="Output status"
-              >
-                {WORK_PRODUCT_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <Tooltip content="Set where this output stands in its lifecycle (for example draft, live, or archived).">
+                <select
+                  className="rounded border border-border bg-background px-1.5 py-0.5 text-xs"
+                  value={wp.outputStatus}
+                  disabled={busy === wp.id}
+                  onChange={(e) => changeStatus(wp.id, e.target.value)}
+                  aria-label="Output status"
+                >
+                  {WORK_PRODUCT_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </Tooltip>
             </div>
             {wp.reviewState === "needs_review" && (
               <div className="mt-2 flex gap-2">
-                <Button
-                  size="sm"
-                  disabled={busy === wp.id}
-                  onClick={() => review(wp.id, "approved")}
-                >
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busy === wp.id}
-                  onClick={() => review(wp.id, "changes_requested")}
-                >
-                  Request changes
-                </Button>
+                <Tooltip content="Mark this work product as approved and clear its review flag.">
+                  <Button
+                    size="sm"
+                    disabled={busy === wp.id}
+                    onClick={() => review(wp.id, "approved")}
+                  >
+                    Approve
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Send this work product back to the agent for changes before it can be approved.">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy === wp.id}
+                    onClick={() => review(wp.id, "changes_requested")}
+                  >
+                    Request changes
+                  </Button>
+                </Tooltip>
               </div>
             )}
           </div>

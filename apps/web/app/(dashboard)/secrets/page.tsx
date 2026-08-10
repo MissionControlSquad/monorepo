@@ -16,7 +16,7 @@ import {
   DELETE_SECRET_PROVIDER,
   CHECK_SECRET_PROVIDER_HEALTH,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Select } from "@/components/ui";
+import { Button, Card, Badge, Select, Tooltip, ConfirmDialog } from "@/components/ui";
 import { SecretDialog } from "@/components/dialogs/SecretDialog";
 import { SecretProviderDialog } from "@/components/dialogs/SecretProviderDialog";
 import { SecretImportDialog } from "@/components/dialogs/SecretImportDialog";
@@ -89,6 +89,7 @@ export default function SecretsPage() {
     null,
   );
   const [openAudit, setOpenAudit] = useState<string | null>(null);
+  const [confirmDeleteProvider, setConfirmDeleteProvider] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
   const proposalsEnabled = useFeatureFlag("secret_proposals");
   const [tab, setTab] = useState<"secrets" | "my-secrets" | "proposals">("secrets");
@@ -103,6 +104,14 @@ export default function SecretsPage() {
     secrets: "secrets",
     "my-secrets": "my secrets",
     proposals: "proposals",
+  };
+  // Short "what lives here" copy for each tab.
+  const TAB_HINT: Record<string, string> = {
+    secrets:
+      "Workspace vault: shared secrets an admin manages. Bind one to an agent to inject it as an env var.",
+    "my-secrets": "Your own values for the credentials this workspace asks each member to provide.",
+    proposals:
+      "Secrets an agent asked for — an admin approves with the real value or denies the request.",
   };
 
   const secrets = data?.secrets ?? [];
@@ -204,20 +213,21 @@ export default function SecretsPage() {
       {/* Tabs: workspace secrets, the member's own required secrets, and (opt-in) agent proposals. */}
       <div className="flex gap-1 border-b border-border">
         {tabs.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            aria-current={tab === t ? "page" : undefined}
-            className={
-              "-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize transition-colors " +
-              (tab === t
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground")
-            }
-          >
-            {TAB_LABEL[t]}
-          </button>
+          <Tooltip key={t} content={TAB_HINT[t]} side="bottom">
+            <button
+              type="button"
+              onClick={() => setTab(t)}
+              aria-current={tab === t ? "page" : undefined}
+              className={
+                "-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize transition-colors " +
+                (tab === t
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground")
+              }
+            >
+              {TAB_LABEL[t]}
+            </button>
+          </Tooltip>
         ))}
       </div>
 
@@ -272,22 +282,32 @@ export default function SecretsPage() {
                     {p.lastError && <span className="text-xs text-destructive">{p.lastError}</span>}
                   </span>
                   <span className="flex shrink-0 gap-1">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={busy === p.id}
-                      onClick={() => onCheckProvider(p.id)}
+                    <Tooltip
+                      content="Check this provider is reachable and its stored credentials work."
+                      side="bottom"
                     >
-                      Check
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={busy === p.id}
-                      onClick={() => onDeleteProvider(p.id)}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy === p.id}
+                        onClick={() => onCheckProvider(p.id)}
+                      >
+                        Check
+                      </Button>
+                    </Tooltip>
+                    <Tooltip
+                      content="Remove this provider. Secrets stored in it can no longer be read or rotated."
+                      side="bottom"
                     >
-                      Delete
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy === p.id}
+                        onClick={() => setConfirmDeleteProvider(p)}
+                      >
+                        Delete
+                      </Button>
+                    </Tooltip>
                   </span>
                 </div>
               ))}
@@ -418,14 +438,19 @@ export default function SecretsPage() {
                         {b.pinnedVersion ? ` · pinned v${b.pinnedVersion}` : ""}
                       </span>
                     </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={busy === b.id}
-                      onClick={() => onUnbind(b.id)}
+                    <Tooltip
+                      content="Stop injecting this secret into that agent. Its next run won't have this env var."
+                      side="bottom"
                     >
-                      Unbind
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy === b.id}
+                        onClick={() => onUnbind(b.id)}
+                      >
+                        Unbind
+                      </Button>
+                    </Tooltip>
                   </div>
                 ))}
               </div>
@@ -440,14 +465,19 @@ export default function SecretsPage() {
                     value={rotateVal[s.id] ?? ""}
                     onChange={(e) => setRotateVal((m) => ({ ...m, [s.id]: e.target.value }))}
                   />
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={busy === s.id}
-                    onClick={() => onRotate(s.id)}
+                  <Tooltip
+                    content="Rotate replaces the stored value; every agent bound to this secret uses the new value on its next run."
+                    side="bottom"
                   >
-                    Rotate
-                  </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busy === s.id}
+                      onClick={() => onRotate(s.id)}
+                    >
+                      Rotate
+                    </Button>
+                  </Tooltip>
                 </div>
                 <div className="flex gap-2">
                   <input
@@ -472,13 +502,36 @@ export default function SecretsPage() {
                       }))
                     }
                   />
-                  <Button size="sm" disabled={busy === s.id} onClick={() => onBind(s.id)}>
-                    Bind
-                  </Button>
+                  <Tooltip
+                    content="Bind injects this secret into the chosen agent as the named env var at run time."
+                    side="bottom"
+                  >
+                    <Button size="sm" disabled={busy === s.id} onClick={() => onBind(s.id)}>
+                      Bind
+                    </Button>
+                  </Tooltip>
                 </div>
               </div>
             </Card>
           ))}
+
+          <ConfirmDialog
+            isOpen={confirmDeleteProvider !== null}
+            onClose={() => setConfirmDeleteProvider(null)}
+            onConfirm={async () => {
+              const p = confirmDeleteProvider;
+              setConfirmDeleteProvider(null);
+              if (p) await onDeleteProvider(p.id);
+            }}
+            title={
+              confirmDeleteProvider
+                ? `Delete provider "${confirmDeleteProvider.name}"?`
+                : "Delete provider?"
+            }
+            description="Any secret stored in this provider can no longer be read, rotated, or injected into agents bound to it. Their next runs will fail to load those values. This does not delete the secrets themselves."
+            confirmLabel="Delete provider"
+            loading={busy === confirmDeleteProvider?.id}
+          />
         </>
       )}
     </div>

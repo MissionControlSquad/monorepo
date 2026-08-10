@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "urql";
 import { Loader2, AlertCircle, Boxes } from "lucide-react";
 import { PROJECT_WORKSPACE_DETAIL_QUERY } from "@/lib/graphql/queries";
-import { Breadcrumbs, Card, Badge, PageLayout } from "@/components/ui";
+import { Breadcrumbs, Card, Badge, PageLayout, Tooltip } from "@/components/ui";
 import { buttonVariants } from "@/components/ui/shadcn/button";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
@@ -35,14 +35,24 @@ function ConfigRow({
   label,
   value,
   mono,
+  tip,
 }: {
   label: string;
   value: string | null;
   mono?: boolean;
+  tip?: string;
 }) {
   return (
     <div className="rounded-lg border border-border p-2">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dt className="text-xs font-medium text-muted-foreground">
+        {tip ? (
+          <Tooltip content={tip}>
+            <span className="underline decoration-dotted underline-offset-2">{label}</span>
+          </Tooltip>
+        ) : (
+          label
+        )}
+      </dt>
       <dd className={`truncate text-sm text-foreground ${mono ? "font-mono text-xs" : ""}`}>
         {value && value.length > 0 ? value : "—"}
       </dd>
@@ -94,15 +104,25 @@ function WorkspaceCard({ ws }: { ws: ProjectWorkspace }) {
 
       {/* Source settings */}
       <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <ConfigRow label="Source type" value={ws.sourceType} />
+        <ConfigRow
+          label="Source type"
+          value={ws.sourceType}
+          tip="Where this workspace comes from — for example a git repository clone or an existing local folder."
+        />
         <ConfigRow
           label="Default strategy"
           value={ws.defaultStrategy?.replace(/_/g, " ") ?? null}
+          tip="How each run gets its own copy of this workspace — for example a fresh clone, a git worktree, or working in place."
         />
         <ConfigRow label="Working directory" value={ws.cwd} mono />
         <ConfigRow label="Repo URL" value={ws.repoUrl} mono />
         <ConfigRow label="Repo ref" value={ws.repoRef} mono />
-        <ConfigRow label="Default ref" value={ws.defaultRef} mono />
+        <ConfigRow
+          label="Default ref"
+          value={ws.defaultRef}
+          mono
+          tip="The branch or commit a run starts from unless the task picks a different one."
+        />
       </dl>
 
       {/* Lifecycle commands */}

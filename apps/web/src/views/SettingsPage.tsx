@@ -21,7 +21,16 @@ import {
 } from "@/lib/graphql/mutations";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 import { MEMORY_PROVIDERS, FLAG_KEYS } from "@agentcenter/utils";
-import { Breadcrumbs, Card, Button, ConfirmDialog, PageLayout, Select, Checkbox } from "../components/ui";
+import {
+  Breadcrumbs,
+  Card,
+  Button,
+  ConfirmDialog,
+  PageLayout,
+  Select,
+  Checkbox,
+  Tooltip,
+} from "../components/ui";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -540,13 +549,22 @@ function FeatureFlagsCard() {
                   <p className="mt-0.5 text-xs text-muted-foreground">{f.description}</p>
                 )}
               </div>
-              <label className="inline-flex shrink-0 cursor-pointer items-center">
-                <Checkbox
-                  checked={f.enabled}
-                  disabled={locked || busy === f.key}
-                  onChange={(e) => toggle(f.key, e.target.checked)}
-                />
-              </label>
+              <Tooltip
+                side="bottom"
+                content={
+                  locked
+                    ? "Managed by your administrator — this flag can't be changed here."
+                    : "Turn this feature on or off for everyone in this workspace."
+                }
+              >
+                <label className="inline-flex shrink-0 cursor-pointer items-center">
+                  <Checkbox
+                    checked={f.enabled}
+                    disabled={locked || busy === f.key}
+                    onChange={(e) => toggle(f.key, e.target.checked)}
+                  />
+                </label>
+              </Tooltip>
             </li>
           );
         })}

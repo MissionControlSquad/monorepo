@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "urql";
 import { ATTENTION_SEVERITY, ATTENTION_SOURCE_KIND } from "@agentcenter/utils";
 import { ATTENTION_FEED_QUERY } from "@/lib/graphql/queries";
 import { DISMISS_ATTENTION_ITEM } from "@/lib/graphql/mutations";
-import { Button, Card, Badge } from "@/components/ui";
+import { Button, Card, Badge, Tooltip } from "@/components/ui";
 
 // Epic #20: unified attention feed. ATTENTION-gated. Ranked "what needs you now" over approvals,
 // budget incidents, blocked tasks, and broken org chains — each deep-links to its owning screen.
@@ -101,28 +101,33 @@ export default function AttentionPage() {
             <span className="text-xs text-muted-foreground">{item.whyNow}</span>
           </span>
           <span className="flex gap-2">
-            <Link href={SOURCE_HREF[item.sourceKind] ?? "/"}>
-              <Button size="sm" variant="secondary">
-                Resolve
+            <Tooltip content="Opens the screen where you can act on this item and clear it.">
+              <Link href={SOURCE_HREF[item.sourceKind] ?? "/"}>
+                <Button size="sm" variant="secondary">
+                  Resolve
+                </Button>
+              </Link>
+            </Tooltip>
+            <Tooltip content="Hides this item for a day. It comes back if it's still unresolved.">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy === item.id}
+                onClick={() => onDismiss(item.id, 24)}
+              >
+                Snooze 1d
               </Button>
-            </Link>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={busy === item.id}
-              onClick={() => onDismiss(item.id, 24)}
-              title="Hide for a day; it'll come back if still relevant"
-            >
-              Snooze 1d
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={busy === item.id}
-              onClick={() => onDismiss(item.id)}
-            >
-              Dismiss
-            </Button>
+            </Tooltip>
+            <Tooltip content="Removes this item from your feed. It won't return unless the underlying issue happens again.">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy === item.id}
+                onClick={() => onDismiss(item.id)}
+              >
+                Dismiss
+              </Button>
+            </Tooltip>
           </span>
         </Card>
       ))}

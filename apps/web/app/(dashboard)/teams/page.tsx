@@ -6,7 +6,7 @@ import { Users } from "lucide-react";
 import { TEAMS_QUERY, PREVIEW_TEAM_INSTALL_QUERY } from "@/lib/graphql/queries";
 import { INSTALL_TEAM } from "@/lib/graphql/mutations";
 import { COLLISION_STRATEGIES } from "@agentcenter/utils";
-import { Button, Card, Badge, EmptyState, Select } from "@/components/ui";
+import { Button, Card, Badge, EmptyState, Select, Tooltip } from "@/components/ui";
 import { TeamDialog } from "@/components/dialogs/TeamDialog";
 import { TeamMemberDialog } from "@/components/dialogs/TeamMemberDialog";
 
@@ -100,7 +100,12 @@ export default function TeamsPage() {
         <div className="flex flex-wrap gap-1.5">
           <FilterChip label="All" active={tagFilter === null} onClick={() => setTagFilter(null)} />
           {allTags.map((tag) => (
-            <FilterChip key={tag} label={tag} active={tagFilter === tag} onClick={() => setTagFilter(tag)} />
+            <FilterChip
+              key={tag}
+              label={tag}
+              active={tagFilter === tag}
+              onClick={() => setTagFilter(tag)}
+            />
           ))}
         </div>
       )}
@@ -110,6 +115,7 @@ export default function TeamsPage() {
           icon={<Users className="h-8 w-8" />}
           title="No teams yet"
           description="Create a team, add roles, then install it to spin up agents."
+          action={<Button onClick={() => setTeamOpen(true)}>New team</Button>}
         />
       ) : (
         teams.map((tm) => (
@@ -118,58 +124,77 @@ export default function TeamsPage() {
               <span className="flex flex-wrap items-center gap-2">
                 {tm.icon && <span className="text-base">{tm.icon}</span>}
                 <span className="font-medium text-foreground">{tm.name}</span>
-                {tm.tagline && <span className="text-xs text-muted-foreground">— {tm.tagline}</span>}
+                {tm.tagline && (
+                  <span className="text-xs text-muted-foreground">— {tm.tagline}</span>
+                )}
                 <Badge variant="gray">{tm.members.length} roles</Badge>
                 <span className="text-xs text-muted-foreground">{tm.installCount} installs</span>
                 {tm.tags.map((tag) => (
-                  <Badge key={tag} variant="blue">{tag}</Badge>
+                  <Badge key={tag} variant="blue">
+                    {tag}
+                  </Badge>
                 ))}
               </span>
               <span className="flex items-center gap-2">
-                <Select size="sm" value={strategy[tm.id] ?? "rename"}
-                  onChange={(e) => setStrategy((s) => ({ ...s, [tm.id]: e.target.value }))}
-                >
-                  {STRATEGIES.map((s) => (
-                    <option key={s} value={s}>on collision: {s}</option>
-                  ))}
-                </Select>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={tm.members.length === 0 || busy === tm.id}
-                  onClick={() =>
-                    act(async () => {
-                      const res = await client
-                        .query<{ previewTeamInstall: PlanItem[] }>(
-                          PREVIEW_TEAM_INSTALL_QUERY,
-                          { teamId: tm.id, collisionStrategy: strategy[tm.id] ?? "rename" },
-                          { requestPolicy: "network-only" },
-                        )
-                        .toPromise();
-                      setPreview((p) => ({ ...p, [tm.id]: res.data?.previewTeamInstall ?? [] }));
-                      setResult((r) => ({ ...r, [tm.id]: "" }));
-                    }, tm.id)
-                  }
-                >
-                  Preview
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={tm.members.length === 0 || busy === tm.id}
-                  onClick={() =>
-                    act(async () => {
-                      const res = await installTeam({ teamId: tm.id, collisionStrategy: strategy[tm.id] ?? "rename" });
-                      const ids = res.data?.installTeam?.createdAgentIds ?? [];
-                      setResult((r) => ({ ...r, [tm.id]: `installed — ${ids.length} agent(s)` }));
-                      setPreview((p) => ({ ...p, [tm.id]: [] }));
-                    }, tm.id)
-                  }
-                >
-                  Install
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => openAddMember(tm.id)}>
-                  Add role
-                </Button>
+                <Tooltip content="What to do when a role's agent name already exists: 'rename' installs a renamed copy and keeps the existing agent, 'replace' overwrites the existing agent, 'skip' leaves it untouched.">
+                  <Select
+                    size="sm"
+                    value={strategy[tm.id] ?? "rename"}
+                    onChange={(e) => setStrategy((s) => ({ ...s, [tm.id]: e.target.value }))}
+                  >
+                    {STRATEGIES.map((s) => (
+                      <option key={s} value={s}>
+                        on collision: {s}
+                      </option>
+                    ))}
+                  </Select>
+                </Tooltip>
+                <Tooltip content="Shows exactly which agents installing will create, replace, or skip — without making any changes yet.">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={tm.members.length === 0 || busy === tm.id}
+                    onClick={() =>
+                      act(async () => {
+                        const res = await client
+                          .query<{ previewTeamInstall: PlanItem[] }>(
+                            PREVIEW_TEAM_INSTALL_QUERY,
+                            { teamId: tm.id, collisionStrategy: strategy[tm.id] ?? "rename" },
+                            { requestPolicy: "network-only" },
+                          )
+                          .toPromise();
+                        setPreview((p) => ({ ...p, [tm.id]: res.data?.previewTeamInstall ?? [] }));
+                        setResult((r) => ({ ...r, [tm.id]: "" }));
+                      }, tm.id)
+                    }
+                  >
+                    Preview
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Creates one agent per role in this team, applying the collision rule above. This makes real changes.">
+                  <Button
+                    size="sm"
+                    disabled={tm.members.length === 0 || busy === tm.id}
+                    onClick={() =>
+                      act(async () => {
+                        const res = await installTeam({
+                          teamId: tm.id,
+                          collisionStrategy: strategy[tm.id] ?? "rename",
+                        });
+                        const ids = res.data?.installTeam?.createdAgentIds ?? [];
+                        setResult((r) => ({ ...r, [tm.id]: `installed — ${ids.length} agent(s)` }));
+                        setPreview((p) => ({ ...p, [tm.id]: [] }));
+                      }, tm.id)
+                    }
+                  >
+                    Install
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Add another role to this team; installing the team later creates an agent for it.">
+                  <Button size="sm" variant="ghost" onClick={() => openAddMember(tm.id)}>
+                    Add role
+                  </Button>
+                </Tooltip>
               </span>
             </div>
             {preview[tm.id] && preview[tm.id].length > 0 && (
@@ -191,7 +216,9 @@ export default function TeamsPage() {
             {result[tm.id] && <p className="text-xs text-muted-foreground">{result[tm.id]}</p>}
             <div className="flex flex-wrap gap-2">
               {tm.members.map((m) => (
-                <Badge key={m.id} variant="blue">{m.name} · {m.role}</Badge>
+                <Badge key={m.id} variant="blue">
+                  {m.name} · {m.role}
+                </Badge>
               ))}
             </div>
           </Card>

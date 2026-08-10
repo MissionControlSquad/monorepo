@@ -9,29 +9,14 @@ import { useAppContext } from "@/components/context/AppContext";
 
 const WINDOWS = BUDGET_WINDOWS;
 
-// Human-readable copy for the scope + window pickers (surfaced as tooltips). Keep these in sync with
-// the enum members in packages/database/prisma/schema/finance.prisma.
-const SCOPE_HELP =
-  "Workspace: caps spend across every agent in the workspace. Project: caps spend across the agents " +
-  "assigned to one project — on a hard breach only that project's agents are paused.";
-const WINDOW_HELP =
-  "How often the budget resets. hourly/daily/weekly/monthly roll over at the start of each period. " +
-  "lifetime never resets — all spend accrues into a single perpetual window.";
-
-/** Small info affordance that carries a tooltip; keyboard-focusable via the Tooltip trigger. */
-function InfoHint({ content }: { content: string }) {
-  return (
-    <Tooltip content={content}>
-      <span
-        tabIndex={0}
-        aria-label={content}
-        className="inline-flex size-4 cursor-help items-center justify-center rounded-full border border-border text-[10px] font-semibold text-muted-foreground"
-      >
-        i
-      </span>
-    </Tooltip>
-  );
-}
+// Human-readable helper lines for the scope + window pickers (surfaced as FormField hints). Keep these
+// in sync with the enum members in packages/database/prisma/schema/finance.prisma.
+const SCOPE_HINT =
+  "Budget scope sets whose spend this limit covers: the whole workspace, or one project's agents. " +
+  "On a hard breach only agents in scope are paused.";
+const WINDOW_HINT =
+  "Window is how often the budget resets: hourly, daily, weekly, and monthly roll over each period; " +
+  "lifetime never resets — all spend accrues into one perpetual window.";
 
 interface BudgetPolicyDialogProps {
   open: boolean;
@@ -101,7 +86,7 @@ export function BudgetPolicyDialog({ open, onOpenChange, onSaved }: BudgetPolicy
       </FormField>
 
       <div className="grid grid-cols-2 gap-4">
-        <FormField label="Scope" icon={<InfoHint content={SCOPE_HELP} />}>
+        <FormField label="Scope" hint={SCOPE_HINT}>
           <Select value={f.values.scope} onChange={(e) => f.set("scope", e.target.value)}>
             <option value="workspace">workspace</option>
             <option value="project">project</option>
@@ -130,7 +115,7 @@ export function BudgetPolicyDialog({ open, onOpenChange, onSaved }: BudgetPolicy
             onChange={(e) => f.set("limit", e.target.value)}
           />
         </FormField>
-        <FormField label="Window" icon={<InfoHint content={WINDOW_HELP} />}>
+        <FormField label="Window" hint={WINDOW_HINT}>
           <Select value={f.values.window} onChange={(e) => f.set("window", e.target.value)}>
             {WINDOWS.map((w) => (
               <option key={w} value={w}>
@@ -147,13 +132,15 @@ export function BudgetPolicyDialog({ open, onOpenChange, onSaved }: BudgetPolicy
           />
         </FormField>
       </div>
-      <label className="flex items-center gap-2 text-sm text-foreground">
-        <Checkbox
-          checked={f.values.hardStop}
-          onChange={(e) => f.set("hardStop", e.target.checked)}
-        />
-        Hard stop (auto-pause agents on breach)
-      </label>
+      <Tooltip content="Hard stop pauses every agent in scope the instant spend passes the limit, halting further runs. Off means warn only — agents keep running past the limit.">
+        <label className="flex items-center gap-2 text-sm text-foreground">
+          <Checkbox
+            checked={f.values.hardStop}
+            onChange={(e) => f.set("hardStop", e.target.checked)}
+          />
+          Hard stop (auto-pause agents on breach)
+        </label>
+      </Tooltip>
     </FormDialog>
   );
 }

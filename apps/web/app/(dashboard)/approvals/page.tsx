@@ -11,7 +11,7 @@ import {
   CAST_APPROVAL_VOTE,
   REQUEST_AGENT_HIRE,
 } from "@/lib/graphql/mutations";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, Tooltip } from "@/components/ui";
 import { Input } from "@/components/ui/shadcn/input";
 
 // Epic #3: governance approvals inbox. Gated at the API by the GOVERNANCE feature + buildbase role
@@ -86,7 +86,9 @@ export default function ApprovalsPage() {
           ? await approve({ id })
           : await reject({ id, decisionNote: "Changes needed" });
       if (res.error) {
-        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Something went wrong");
+        toast.error(
+          res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Something went wrong",
+        );
         return;
       }
       refetch({ requestPolicy: "network-only" });
@@ -116,7 +118,13 @@ export default function ApprovalsPage() {
   return (
     <div className="mx-auto space-y-4 p-4 sm:p-6">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold text-foreground">Approvals</h1>
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Approvals</h1>
+          <p className="text-sm text-muted-foreground">
+            Actions your agents can&apos;t take without a person&apos;s sign-off. Review each one
+            and approve to let it proceed, or reject to block it.
+          </p>
+        </div>
         <Button size="sm" variant="secondary" onClick={() => setHireOpen((v) => !v)}>
           {hireOpen ? "Cancel" : "Propose a hire"}
         </Button>
@@ -202,42 +210,52 @@ export default function ApprovalsPage() {
               a.subjectType !== "budget_override" &&
               a.requiredApprovals > 1 && (
                 <div className="flex shrink-0 gap-2">
-                  <Button
-                    size="sm"
-                    disabled={busyId === a.id}
-                    onClick={() => vote(a.id, "approve")}
+                  <Tooltip
+                    content={`Records your approve vote. This needs ${a.requiredApprovals} approvals from the board and only proceeds once that quorum is reached.`}
                   >
-                    Vote approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={busyId === a.id}
-                    onClick={() => vote(a.id, "reject")}
-                  >
-                    Vote reject
-                  </Button>
+                    <Button
+                      size="sm"
+                      disabled={busyId === a.id}
+                      onClick={() => vote(a.id, "approve")}
+                    >
+                      Vote approve
+                    </Button>
+                  </Tooltip>
+                  <Tooltip content="Records your reject vote, which counts against the quorum and can block the requested action.">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busyId === a.id}
+                      onClick={() => vote(a.id, "reject")}
+                    >
+                      Vote reject
+                    </Button>
+                  </Tooltip>
                 </div>
               )}
             {a.status === "pending" &&
               a.subjectType !== "budget_override" &&
               a.requiredApprovals <= 1 && (
                 <div className="flex shrink-0 gap-2">
-                  <Button
-                    size="sm"
-                    disabled={busyId === a.id}
-                    onClick={() => decide(a.id, "approve")}
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={busyId === a.id}
-                    onClick={() => decide(a.id, "reject")}
-                  >
-                    Reject
-                  </Button>
+                  <Tooltip content="Grants the request and lets the agent carry out the action it asked for.">
+                    <Button
+                      size="sm"
+                      disabled={busyId === a.id}
+                      onClick={() => decide(a.id, "approve")}
+                    >
+                      Approve
+                    </Button>
+                  </Tooltip>
+                  <Tooltip content="Blocks the requested action and sends it back to the agent with your note. The action does not run.">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busyId === a.id}
+                      onClick={() => decide(a.id, "reject")}
+                    >
+                      Reject
+                    </Button>
+                  </Tooltip>
                 </div>
               )}
           </Card>

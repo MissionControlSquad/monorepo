@@ -23,7 +23,7 @@ import {
   CANCEL_AGENT_RUN,
   PROMOTE_AGENT_RUN_REVIEW,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Spinner, Select } from "@/components/ui";
+import { Button, Card, Badge, Spinner, Select, Tooltip, ConfirmDialog } from "@/components/ui";
 import { RunnerHostDialog } from "@/components/dialogs/RunnerHostDialog";
 import { RunnerQueueCommandDialog } from "@/components/dialogs/RunnerQueueCommandDialog";
 import { Server, Bot, Box } from "lucide-react";
@@ -102,6 +102,16 @@ const RUN_STATUS_VARIANT: Record<string, "green" | "red" | "gray" | "yellow"> = 
   queued: "yellow",
 };
 
+// Plain-language meaning of each run status, surfaced on hover so the badge is self-explanatory.
+const RUN_STATUS_HELP: Record<string, string> = {
+  queued: "Waiting for a worker to pick it up.",
+  running: "The agent is executing this task now.",
+  done: "Finished successfully.",
+  failed: "Ended with an error before finishing.",
+  timeout: "Stopped after exceeding its time limit.",
+  canceled: "Stopped by a user before it finished.",
+};
+
 // Plan 6: the redacted live tail of an in-flight run, polled every 2s while open.
 function LiveTail({ runId }: { runId: string }) {
   const [{ data }, refetch] = useQuery<{
@@ -135,6 +145,7 @@ function RunHistory() {
   const [, promoteRun] = useMutation(PROMOTE_AGENT_RUN_REVIEW);
   const [open, setOpen] = useState<string | null>(null);
   const [busyCancel, setBusyCancel] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<AgentRun | null>(null);
   const [busyReview, setBusyReview] = useState<string | null>(null);
   const runs = data?.agentRuns ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
@@ -172,6 +183,7 @@ function RunHistory() {
       refresh();
     } finally {
       setBusyCancel(null);
+      setConfirmCancel(null);
     }
   }
 
@@ -186,7 +198,11 @@ function RunHistory() {
           Refresh
         </button>
       </div>
-      {runs.length === 0 && <p className="text-sm text-muted-foreground">No runs yet.</p>}
+      {runs.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          No runs yet. Run or enqueue a task in a sandbox above and it will appear here.
+        </p>
+      )}
       {runs.map((r) => (
         <Card key={r.id} className="p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -202,25 +218,30 @@ function RunHistory() {
               {r.exitCode != null && (
                 <span className="text-xs text-muted-foreground">exit {r.exitCode}</span>
               )}
-              <Badge variant={RUN_STATUS_VARIANT[r.status] ?? "gray"}>{r.status}</Badge>
+              <Tooltip content={RUN_STATUS_HELP[r.status] ?? "Current state of this run."}>
+                <Badge variant={RUN_STATUS_VARIANT[r.status] ?? "gray"}>{r.status}</Badge>
+              </Tooltip>
               {r.reviewState === "needs_review" && <Badge variant="yellow">needs review</Badge>}
               {r.reviewState === "approved" && <Badge variant="green">approved</Badge>}
               {r.reviewState === "changes_requested" && (
                 <Badge variant="orange">changes requested</Badge>
               )}
               {(r.status === "queued" || r.status === "running") && (
-                <button
-                  onClick={() => onCancel(r.id)}
-                  disabled={busyCancel === r.id}
-                  title={
+                <Tooltip
+                  content={
                     r.status === "running"
-                      ? "Terminates the running task and marks it cancelled"
-                      : "Cancels the queued run before a worker picks it up"
+                      ? "Cancel this run — the agent stops immediately and any unfinished work is discarded."
+                      : "Cancel this queued run before a worker picks it up."
                   }
-                  className="text-xs text-destructive transition hover:underline disabled:opacity-50"
                 >
-                  {r.status === "running" ? "Cancel run" : "Cancel"}
-                </button>
+                  <button
+                    onClick={() => setConfirmCancel(r)}
+                    disabled={busyCancel === r.id}
+                    className="text-xs text-destructive transition hover:underline disabled:opacity-50"
+                  >
+                    {r.status === "running" ? "Cancel run" : "Cancel"}
+                  </button>
+                </Tooltip>
               )}
               {r.reviewState === "needs_review" && (
                 <>
@@ -256,9 +277,11 @@ function RunHistory() {
                   {r.errorFamily && <Badge variant="orange">{r.errorFamily}</Badge>}
                   {r.usageModel && <span className="font-mono">{r.usageModel}</span>}
                   {(r.usageTokensIn != null || r.usageTokensOut != null) && (
-                    <span>
-                      tokens {r.usageTokensIn ?? 0} in / {r.usageTokensOut ?? 0} out
-                    </span>
+                    <Tooltip content="Tokens this run billed against the model: input is the prompt sent, output is the text generated.">
+                      <span>
+                        tokens {r.usageTokensIn ?? 0} in / {r.usageTokensOut ?? 0} out
+                      </span>
+                    </Tooltip>
                   )}
                 </div>
               )}
@@ -277,6 +300,22 @@ function RunHistory() {
           )}
         </Card>
       ))}
+      <ConfirmDialog
+        isOpen={confirmCancel != null}
+        onClose={() => setConfirmCancel(null)}
+        onConfirm={() => {
+          if (confirmCancel) onCancel(confirmCancel.id);
+        }}
+        title={confirmCancel?.status === "running" ? "Cancel this run?" : "Cancel this queued run?"}
+        description={
+          confirmCancel?.status === "running"
+            ? "The agent stops immediately and any unfinished work is discarded. This can't be undone."
+            : "The run is removed from the queue before a worker picks it up. This can't be undone."
+        }
+        confirmLabel="Cancel run"
+        cancelLabel="Keep running"
+        loading={busyCancel === confirmCancel?.id}
+      />
     </div>
   );
 }

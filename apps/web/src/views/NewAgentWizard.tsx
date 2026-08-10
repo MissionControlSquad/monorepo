@@ -565,6 +565,10 @@ export function NewAgentWizard() {
                           <SelectItem value="lead">Lead</SelectItem>
                         </SelectContent>
                       </Select>
+                      <FormDescription>
+                        Sets how much independence the agent has — Interns need more oversight,
+                        Specialists work on their own, and a Lead can coordinate other agents.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
