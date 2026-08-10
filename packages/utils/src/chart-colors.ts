@@ -4,6 +4,7 @@
  */
 
 export const STATUS_COLORS: Record<string, string> = {
+  backlog: "#64748b",
   inbox: "#9ca3af",
   assigned: "#3b82f6",
   in_progress: "#eab308",

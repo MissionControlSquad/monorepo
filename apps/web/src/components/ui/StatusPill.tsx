@@ -21,6 +21,12 @@ interface StatusPillProps {
 
 const STATUS_STYLES: Record<StatusId, { bg: string; text: string; dot: string; activeBg: string }> =
   {
+    backlog: {
+      bg: "bg-muted",
+      text: "text-muted-foreground",
+      dot: "bg-slate-400",
+      activeBg: "hover:bg-accent",
+    },
     inbox: {
       bg: "bg-muted",
       text: "text-foreground",

@@ -3,6 +3,7 @@
 import { useState, memo, useRef, useEffect } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import {
+  Archive,
   Inbox,
   UserCheck,
   PlayCircle,
@@ -17,6 +18,7 @@ import { Button } from "../ui";
 import type { TaskCard as TaskCardType, Agent } from "@agentcenter/types";
 import { TaskStatus } from "@/server/constants";
 const COLUMN_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  [TaskStatus.BACKLOG]: Archive,
   [TaskStatus.INBOX]: Inbox,
   [TaskStatus.ASSIGNED]: UserCheck,
   [TaskStatus.IN_PROGRESS]: PlayCircle,
@@ -26,6 +28,7 @@ const COLUMN_ICON_MAP: Record<string, React.ComponentType<{ className?: string }
 };
 
 const ICON_COLOR_MAP: Record<string, string> = {
+  slate: "text-slate-500",
   gray: "text-muted-foreground",
   blue: "text-blue-500",
   yellow: "text-yellow-500",
@@ -35,6 +38,7 @@ const ICON_COLOR_MAP: Record<string, string> = {
 };
 
 const COUNT_COLOR_MAP: Record<string, string> = {
+  slate: "text-slate-600",
   gray: "text-muted-foreground",
   blue: "text-blue-600",
   yellow: "text-yellow-600",

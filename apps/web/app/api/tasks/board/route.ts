@@ -8,6 +8,7 @@ import { assertProjectMember, getAgentProjectIds, isSquadLead } from "../../_lib
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 
 const STATUS_COLUMNS = [
+  TaskStatus.BACKLOG,
   TaskStatus.INBOX,
   TaskStatus.ASSIGNED,
   TaskStatus.IN_PROGRESS,

@@ -9,7 +9,14 @@ export {
   UPDATE_AGENT_PROFILE,
 } from "./agents";
 
-export { CREATE_TASK, CREATE_TASK_FROM_DASHBOARD, UPDATE_TASK, DELETE_TASK } from "./tasks";
+export {
+  CREATE_TASK,
+  CREATE_TASK_FROM_DASHBOARD,
+  UPDATE_TASK,
+  DELETE_TASK,
+  ADD_TASK_LABEL,
+  REMOVE_TASK_LABEL,
+} from "./tasks";
 
 export { CREATE_MESSAGE } from "./messages";
 export { TOGGLE_MESSAGE_REACTION } from "./message-reactions";

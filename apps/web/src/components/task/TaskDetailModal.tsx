@@ -51,6 +51,7 @@ import { useAppContext } from "../context/AppContext";
 import { TaskComments } from "./TaskComments";
 import { TaskRelationsCard } from "./TaskRelationsCard";
 import { TaskExternalLinksCard } from "./TaskExternalLinksCard";
+import { TaskLabelsCard } from "./TaskLabelsCard";
 import { TaskAttachmentsCard } from "./TaskAttachmentsCard";
 import { TaskGithubObjectsCard } from "./TaskGithubObjectsCard";
 import { TaskBlockerDiagnosticsCard } from "./TaskBlockerDiagnosticsCard";
@@ -1189,6 +1190,7 @@ export function TaskDetailModal({
                   <TaskCostRollupCard taskId={resolvedTaskId} />
                   <TaskRelationsCard taskId={resolvedTaskId} />
                   <div className="border-t border-border" />
+                  <TaskLabelsCard taskId={resolvedTaskId} />
                   <TaskExternalLinksCard taskId={resolvedTaskId} />
                   <TaskGithubObjectsCard taskId={resolvedTaskId} />
                 </>

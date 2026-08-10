@@ -56,7 +56,13 @@ export async function bridgePostMessage(run: VerifiedRun, content: string): Prom
   if (!trimmed) return false;
   const fromProfileId = await getOrCreateAgentProfileId(run.agentId);
   await prisma.message.create({
-    data: { taskId: run.taskId, fromProfileId, content: trimmed.slice(0, MAX_BRIDGE_MESSAGE) },
+    data: {
+      taskId: run.taskId,
+      fromProfileId,
+      content: trimmed.slice(0, MAX_BRIDGE_MESSAGE),
+      // Parity §3.12 — attribute the comment to the posting run.
+      createdByRunId: run.runId,
+    },
   });
   return true;
 }

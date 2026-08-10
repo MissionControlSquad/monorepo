@@ -54,6 +54,7 @@ export const CREATE_TASK_FROM_DASHBOARD = gql`
     $title: String!
     $description: String!
     $priority: String
+    $workMode: String
     $assigneeIds: [String!]
     $dueDate: String
     $tags: [String!]
@@ -65,6 +66,7 @@ export const CREATE_TASK_FROM_DASHBOARD = gql`
       title: $title
       description: $description
       priority: $priority
+      workMode: $workMode
       assigneeIds: $assigneeIds
       dueDate: $dueDate
       tags: $tags
@@ -76,6 +78,7 @@ export const CREATE_TASK_FROM_DASHBOARD = gql`
       title
       description
       status
+      workMode
       priority
       taskNumber
       tags
@@ -101,6 +104,7 @@ export const UPDATE_TASK = gql`
     $title: String
     $description: String
     $status: String
+    $workMode: String
     $assigneeIds: [String!]
     $priority: String
     $dueDate: String
@@ -115,6 +119,7 @@ export const UPDATE_TASK = gql`
       title: $title
       description: $description
       status: $status
+      workMode: $workMode
       assigneeIds: $assigneeIds
       priority: $priority
       dueDate: $dueDate
@@ -128,6 +133,7 @@ export const UPDATE_TASK = gql`
       title
       description
       status
+      workMode
       priority
       taskNumber
       tags
@@ -150,5 +156,26 @@ export const UPDATE_TASK = gql`
 export const DELETE_TASK = gql`
   mutation DeleteTask($id: String!, $agentId: String!) {
     deleteTask(id: $id, agentId: $agentId)
+  }
+`;
+
+// Parity §3.12 — first-class task labels.
+export const ADD_TASK_LABEL = gql`
+  mutation AddTaskLabel($taskId: String!, $name: String!, $color: String) {
+    addTaskLabel(taskId: $taskId, name: $name, color: $color) {
+      id
+      labelId
+      label {
+        id
+        name
+        color
+      }
+    }
+  }
+`;
+
+export const REMOVE_TASK_LABEL = gql`
+  mutation RemoveTaskLabel($taskId: String!, $labelId: String!) {
+    removeTaskLabel(taskId: $taskId, labelId: $labelId)
   }
 `;

@@ -2,7 +2,8 @@ import { builder } from "../builder";
 import { runTaskUpdateTransaction } from "@agentcenter/database";
 import { taskModel, agentModel } from "../../models";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "../../pubsub";
-import { TaskStatus } from "../../constants";
+import { TaskStatus, WorkMode } from "../../constants";
+import type { WorkModeValue } from "../../constants";
 import { assertAssignableAgents } from "../../assignment-guard";
 import { assertProjectWritable } from "../../system-settings";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
@@ -15,6 +16,14 @@ function publishTaskUpdated(taskId: string, projectId?: string) {
   pubsub.publish(taskTopic(taskId), payload);
   if (projectId) pubsub.publish(taskProjectTopic(projectId), payload);
   pubsub.publish(PubSubEvent.TASK.UPDATED, payload);
+}
+
+/** Parity §3.12 — validate a client-supplied WorkMode; returns undefined for null/unknown (falls back to the DB default). */
+export function parseWorkMode(value: string | null | undefined): WorkModeValue | undefined {
+  if (value == null) return undefined;
+  return (Object.values(WorkMode) as string[]).includes(value)
+    ? (value as WorkModeValue)
+    : undefined;
 }
 
 /** Parse dueDate from client: ISO string or numeric string (ms since epoch). Avoids Invalid Date when client sends timestamp. */
@@ -37,6 +46,7 @@ builder.mutationField("createTask", (t) =>
       assigneeIds: t.arg.stringList({ required: true }),
       createdById: t.arg.string(),
       priority: t.arg.string(),
+      workMode: t.arg.string(),
       dueDate: t.arg.string(),
       tags: t.arg.stringList(),
       parentTaskId: t.arg.string(),
@@ -69,6 +79,7 @@ builder.mutationField("createTask", (t) =>
           title: args.title,
           description: args.description,
           status: TaskStatus.INBOX,
+          workMode: parseWorkMode(args.workMode),
           priority: (args.priority as any) ?? undefined,
           createdByProfileId,
           dueDate: parseDueDate(args.dueDate),
@@ -106,6 +117,7 @@ builder.mutationField("createTaskFromDashboard", (t) =>
       title: t.arg.string({ required: true }),
       description: t.arg.string({ required: true }),
       priority: t.arg.string(),
+      workMode: t.arg.string(),
       assigneeIds: t.arg.stringList(),
       dueDate: t.arg.string(),
       tags: t.arg.stringList(),
@@ -131,6 +143,7 @@ builder.mutationField("createTaskFromDashboard", (t) =>
           title: args.title,
           description: args.description,
           status: TaskStatus.INBOX,
+          workMode: parseWorkMode(args.workMode),
           priority: (args.priority as any) ?? undefined,
           createdByProfileId,
           dueDate: parseDueDate(args.dueDate),
@@ -166,6 +179,7 @@ builder.mutationField("updateTask", (t) =>
       title: t.arg.string(),
       description: t.arg.string(),
       status: t.arg.string(),
+      workMode: t.arg.string(),
       assigneeIds: t.arg.stringList(),
       priority: t.arg.string(),
       dueDate: t.arg.string(),
@@ -192,6 +206,10 @@ builder.mutationField("updateTask", (t) =>
       if (args.description !== undefined && args.description !== null)
         data.description = args.description;
       if (args.status !== undefined && args.status !== null) data.status = args.status;
+      if (args.workMode !== undefined && args.workMode !== null) {
+        const wm = parseWorkMode(args.workMode);
+        if (wm) data.workMode = wm;
+      }
       if (args.priority !== undefined && args.priority !== null) data.priority = args.priority;
       if (args.dueDate !== undefined) data.dueDate = parseDueDate(args.dueDate) ?? null;
       if (args.tags !== undefined && args.tags !== null) data.tags = args.tags;

@@ -3,6 +3,7 @@
 import { memo, useRef, useEffect } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import {
+  Archive,
   Inbox,
   UserCheck,
   PlayCircle,
@@ -16,6 +17,7 @@ import { Badge } from "../ui";
 import type { TaskCard as TaskCardType, Agent } from "@agentcenter/types";
 import { TaskStatus } from "@/server/constants";
 const COLUMN_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  [TaskStatus.BACKLOG]: Archive,
   [TaskStatus.INBOX]: Inbox,
   [TaskStatus.ASSIGNED]: UserCheck,
   [TaskStatus.IN_PROGRESS]: PlayCircle,

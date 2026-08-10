@@ -48,6 +48,7 @@ import "./agent-authz";
 import "./agent-governance";
 import "./task-relations";
 import "./external-links";
+import "./task-labels";
 import "./deliverable-annotations";
 import "./deliverable-votes";
 import "./monitors";
