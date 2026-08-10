@@ -783,3 +783,116 @@ describe("issue monitors — one-shot deferred wake (Domain 9 #11)", () => {
     ).toBeNull();
   });
 });
+
+describe("§3 #11 (1) — priority dispatch + per-agent maxConcurrentRuns", () => {
+  /** A task with an explicit Priority (drives AgentRun.priority at enqueue). */
+  async function makeTaskWithPriority(priority: "low" | "medium" | "high" | "urgent") {
+    const task = await prisma.task.create({
+      data: { title: `T ${priority}`, description: "d", status: "assigned", priority, tags: [] },
+    });
+    return task.id;
+  }
+
+  it("stamps AgentRun.priority from the task's Priority at enqueue", async () => {
+    const agentId = await makeAgent("local");
+    const low = await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTaskWithPriority("low"),
+      agentId,
+    });
+    const urgent = await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTaskWithPriority("urgent"),
+      agentId,
+    });
+    expect((await prisma.agentRun.findUniqueOrThrow({ where: { id: low.runId } })).priority).toBe(
+      0,
+    );
+    expect(
+      (await prisma.agentRun.findUniqueOrThrow({ where: { id: urgent.runId } })).priority,
+    ).toBe(3);
+  });
+
+  it("drains the highest-priority queued run first (priority DESC, then FIFO)", async () => {
+    const agentId = await makeAgent("local");
+    // Three distinct tasks for the same agent, enqueued low → urgent → high.
+    await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTaskWithPriority("low"),
+      agentId,
+    });
+    await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTaskWithPriority("urgent"),
+      agentId,
+    });
+    await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTaskWithPriority("high"),
+      agentId,
+    });
+
+    // Drain exactly one → only the URGENT run starts; the rest stay queued in priority order.
+    const started = await drainSandboxRunQueue(1);
+    expect(started).toBe(1);
+    const runs = await prisma.agentRun.findMany({ where: { agentId } });
+    expect(runs.find((r) => r.priority === 3)?.status).toBe("done"); // urgent ran
+    expect(runs.find((r) => r.priority === 2)?.status).toBe("queued"); // high waits
+    expect(runs.find((r) => r.priority === 0)?.status).toBe("queued"); // low waits
+  });
+
+  it("respects the per-agent maxConcurrentRuns cap (skips while at capacity, runs once free)", async () => {
+    const agentId = await makeAgent("local");
+    await prisma.agent.update({ where: { id: agentId }, data: { maxConcurrentRuns: 1 } });
+
+    // Simulate one run already in-flight for this agent (as if on another worker).
+    await prisma.agentRun.create({
+      data: {
+        workspaceId: WS,
+        agentId,
+        taskId: await makeTaskWithPriority("high"),
+        kind: "sandbox",
+        providerKey: "local",
+        status: "running",
+      },
+    });
+
+    const { runId } = await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTask(),
+      agentId,
+    });
+    // At capacity (1 running ≥ cap 1) → the queued run is NOT started; it stays queued.
+    expect(await drainSandboxRunQueue()).toBe(0);
+    expect((await prisma.agentRun.findUnique({ where: { id: runId } }))?.status).toBe("queued");
+
+    // Free the in-flight slot → now under cap → the queued run drains + completes.
+    await prisma.agentRun.updateMany({
+      where: { agentId, status: "running" },
+      data: { status: "done", finishedAt: new Date() },
+    });
+    expect(await drainSandboxRunQueue()).toBeGreaterThanOrEqual(1);
+    expect((await prisma.agentRun.findUnique({ where: { id: runId } }))?.status).toBe("done");
+  });
+
+  it("with no cap set, drains a run regardless of other in-flight runs (unlimited)", async () => {
+    const agentId = await makeAgent("local"); // maxConcurrentRuns null = unlimited
+    await prisma.agentRun.create({
+      data: {
+        workspaceId: WS,
+        agentId,
+        taskId: await makeTask(),
+        kind: "sandbox",
+        providerKey: "local",
+        status: "running",
+      },
+    });
+    const { runId } = await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTask(),
+      agentId,
+    });
+    expect(await drainSandboxRunQueue()).toBeGreaterThanOrEqual(1);
+    expect((await prisma.agentRun.findUnique({ where: { id: runId } }))?.status).toBe("done");
+  });
+});

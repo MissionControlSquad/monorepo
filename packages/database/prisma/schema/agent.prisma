@@ -115,6 +115,9 @@ model Agent {
   runtimeTemplate String? // command/argv/URL template for process/shell/http adapters
   sandboxProvider String? // Tier D: run this agent's tasks inside a provisioned sandbox (provider key). null = local/runner
   environmentId   String? // Tier D / Phase 3: the Environment (where/how) this agent runs in. null = ad-hoc sandboxProvider
+  // §3 #11 (1) — per-agent dispatch cap. The sandbox run-queue drain never starts a run for an agent
+  // that already has this many runs in-flight (status=running). null = unlimited (global batch cap only).
+  maxConcurrentRuns Int? // RUNNERS-gated; enforced in drainSandboxRunQueue
   memoryProvider  String          @default("none") // Tier D memory binding: none | markdown | db
   createdBy       String?
   createdAt       DateTime        @default(now())

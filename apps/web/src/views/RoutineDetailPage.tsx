@@ -20,7 +20,23 @@ interface Trigger {
   nextFireAt: string | null;
   publicId: string | null;
   isEnabled: boolean;
+  // §3 #11 (2) — read-only scheduling policies (set via the addRoutineTrigger /
+  // updateRoutineTriggerPolicies mutations). allow|skip|queue and skip|run_once.
+  concurrencyPolicy: string;
+  catchUpPolicy: string;
 }
+
+// §3 #11 (2) — plain-language tooltips so an operator understands each policy at a glance.
+const CONCURRENCY_HELP: Record<string, string> = {
+  allow: "allow: start the routine even if its previous run is still going (overlap is fine).",
+  skip: "skip: don't start if the previous run is still going — drop this occurrence.",
+  queue:
+    "queue: if the previous run is still going, defer this one and run it once the routine is idle.",
+};
+const CATCHUP_HELP: Record<string, string> = {
+  skip: "skip: after downtime that missed one or more scheduled ticks, advance the schedule without firing.",
+  run_once: "run_once: after downtime that missed ticks, fire exactly once to catch up.",
+};
 interface Revision {
   id: string;
   version: number;
@@ -221,6 +237,24 @@ export function RoutineDetailPage({ routineId }: { routineId: string }) {
                         Next: {formatTimestamp(t.nextFireAt)}
                       </p>
                     )}
+                    {/* §3 #11 (2) — overlap + missed-window policies, each with a hover tooltip. */}
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <span
+                        className="cursor-help text-[11px] text-muted-foreground"
+                        title={
+                          CONCURRENCY_HELP[t.concurrencyPolicy] ??
+                          "How overlapping runs are handled."
+                        }
+                      >
+                        overlap: <span className="font-mono">{t.concurrencyPolicy}</span>
+                      </span>
+                      <span
+                        className="cursor-help text-[11px] text-muted-foreground"
+                        title={CATCHUP_HELP[t.catchUpPolicy] ?? "How missed ticks are handled."}
+                      >
+                        catch-up: <span className="font-mono">{t.catchUpPolicy}</span>
+                      </span>
+                    </div>
                   </li>
                 ))}
               </ul>

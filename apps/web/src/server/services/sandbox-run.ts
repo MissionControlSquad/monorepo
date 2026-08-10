@@ -73,6 +73,13 @@ const MAX_OUTPUT_CHARS = 45_000;
 const MAX_MESSAGE_CHARS = 8_000;
 const DEFAULT_TIMEOUT_MS = 600_000;
 
+// §3 #11 (1) — map a task's Priority enum to the numeric AgentRun.priority the run-queue drain orders by
+// (higher dispatches first). An unknown/absent priority ranks 0 (same as a plain FIFO run).
+const RUN_PRIORITY_RANK: Record<string, number> = { low: 0, medium: 1, high: 2, urgent: 3 };
+function runPriorityFromTask(priority: string | null | undefined): number {
+  return RUN_PRIORITY_RANK[priority ?? ""] ?? 0;
+}
+
 /** The subset of an agent the admission path needs (loaded with its trust profile). */
 type AdmissionAgent = {
   sandboxProvider: string | null;
@@ -1109,6 +1116,14 @@ export async function enqueueSandboxRun(input: {
   });
   if (existing) return { runId: existing.id, providerKey: existing.providerKey ?? providerKey };
 
+  // §3 #11 (1) — stamp the queued run's dispatch priority from the task's Priority so the drain can
+  // order higher-priority work ahead of older lower-priority work.
+  const task = await prisma.task.findUnique({
+    where: { id: input.taskId },
+    select: { priority: true },
+  });
+  const priority = runPriorityFromTask(task?.priority ?? null);
+
   try {
     const run = await prisma.agentRun.create({
       data: {
@@ -1118,6 +1133,7 @@ export async function enqueueSandboxRun(input: {
         kind: "sandbox",
         providerKey,
         status: "queued",
+        priority,
         requestedByProfileId: input.requestedByProfileId ?? null,
       },
     });
@@ -1138,18 +1154,68 @@ export async function enqueueSandboxRun(input: {
 /**
  * Drain queued sandbox runs — the worker (in-process loop on a persistent server, or the
  * run-sandbox-queue cron on serverless). Atomically claims each (queued→running so two workers never
- * double-run) and executes it, reusing its ledger row. Returns how many it started.
+ * double-run) and executes it, reusing its ledger row. Returns how many it STARTED (not skipped).
+ *
+ * §3 #11 (1) — PRIORITY DISPATCH + PER-AGENT CAP (RUNNERS-gated; the FIFO drain is unchanged when the
+ * flag is off):
+ *   • Priority: queued runs are scanned priority DESC then createdAt ASC, so a higher-priority run
+ *     (AgentRun.priority, stamped from the task's Priority at enqueue) dispatches ahead of an older
+ *     lower-priority one. `limit` still caps how many this call starts (the global batch cap).
+ *   • Per-agent cap: an agent with `maxConcurrentRuns` set never has a run started while it already has
+ *     that many in-flight (status=running, counted across workers) — such runs are left queued for a
+ *     later drain. null = unlimited.
+ *
+ * HOW TO TEST (mirrors the sandbox-run integration suite):
+ *   1. Cap: set `agent.maxConcurrentRuns = 1`, insert one `running` AgentRun for it, then enqueue +
+ *      drain — the queued run is NOT started (stays queued) because the agent is at capacity. Clearing
+ *      the running row and draining again starts it. With the cap null it always starts.
+ *   2. Priority: enqueue runs for distinct tasks with different Priority (urgent/high/low). Draining
+ *      with limit=1 starts ONLY the urgent one; the rest stay queued in priority order.
  */
 export async function drainSandboxRunQueue(limit = 5): Promise<number> {
+  const batchCap = Math.min(limit, 20);
+  // Caps + priority ordering only apply under RUNNERS; otherwise this is the original FIFO drain.
+  const refinementsOn = await isFeatureEnabled(FLAG_KEYS.RUNNERS);
+
   const queued = await prisma.agentRun.findMany({
     where: { status: "queued", kind: "sandbox" },
-    orderBy: { createdAt: "asc" },
-    take: Math.min(limit, 20),
+    orderBy: refinementsOn ? [{ priority: "desc" }, { createdAt: "asc" }] : { createdAt: "asc" },
+    // With caps on, scan a wider window so runs for an at-capacity agent don't starve other agents'.
+    take: refinementsOn ? Math.min(batchCap * 5, 50) : batchCap,
     select: { id: true, workspaceId: true, agentId: true, taskId: true, providerKey: true },
   });
+
+  // Resolve per-agent caps once (null = unlimited). Only agents that set a cap constrain the drain.
+  const capByAgent = new Map<string, number | null>();
+  if (refinementsOn) {
+    const agentIds = [...new Set(queued.map((q) => q.agentId).filter((id): id is string => !!id))];
+    if (agentIds.length) {
+      const agents = await prisma.agent.findMany({
+        where: { id: { in: agentIds } },
+        select: { id: true, maxConcurrentRuns: true },
+      });
+      for (const a of agents) capByAgent.set(a.id, a.maxConcurrentRuns ?? null);
+    }
+  }
+
   let started = 0;
+  const startedByAgent = new Map<string, number>();
   for (const q of queued) {
+    if (started >= batchCap) break; // global batch cap reached
     if (!q.agentId || !q.taskId) continue;
+
+    // Per-agent cap: skip (leave queued) an agent already at its in-flight limit. Counts runs RUNNING
+    // now (incl. on other workers) plus any this drain already started for the same agent.
+    if (refinementsOn) {
+      const cap = capByAgent.get(q.agentId) ?? null;
+      if (cap != null) {
+        const running = await prisma.agentRun.count({
+          where: { agentId: q.agentId, status: "running" },
+        });
+        if (running + (startedByAgent.get(q.agentId) ?? 0) >= cap) continue;
+      }
+    }
+
     // Atomic claim — only one worker wins (and a canceled/claimed row is skipped).
     const claimed = await prisma.agentRun.updateMany({
       where: { id: q.id, status: "queued" },
@@ -1157,6 +1223,7 @@ export async function drainSandboxRunQueue(limit = 5): Promise<number> {
     });
     if (claimed.count === 0) continue;
     started++;
+    startedByAgent.set(q.agentId, (startedByAgent.get(q.agentId) ?? 0) + 1);
     try {
       await runTaskInSandbox({
         workspaceId: q.workspaceId,

@@ -51,6 +51,10 @@ model AgentRun {
   retryReason          String?
   retryOfRunId         String?
   requestedByProfileId String?
+  // §3 #11 (1) — priority dispatch. The run-queue drain orders QUEUED runs by priority DESC then
+  // createdAt ASC, so a higher-priority queued run dispatches ahead of an older lower-priority one.
+  // Derived from the task's Priority at enqueue time (urgent=3, high=2, medium=1, low=0); default 0.
+  priority             Int       @default(0)
   bridgeTokenHash      String? // Plan 6: hash of the run-scoped in-sandbox bridge token (null when inactive)
   startedAt            DateTime  @default(now())
   finishedAt           DateTime?
@@ -66,5 +70,7 @@ model AgentRun {
   @@index([bridgeTokenHash])
   @@index([status])
   @@index([scheduledRetryAt])
+  // §3 #11 (1) — the drain's claim predicate: scan QUEUED runs highest-priority-first, then oldest.
+  @@index([status, kind, priority, createdAt])
   @@map("agent_runs")
 }
