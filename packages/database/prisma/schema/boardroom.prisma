@@ -21,17 +21,43 @@ model BoardThread {
 }
 
 model BoardMessage {
-  id             String      @id @default(cuid())
-  threadId       String
-  thread         BoardThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  role           BoardRole
-  body           String
-  authorId       String? // profile id for a user turn; null for an assistant turn
+  id               String      @id @default(cuid())
+  threadId         String
+  thread           BoardThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role             BoardRole
+  body             String
+  authorId         String? // profile id for a user turn; null for an assistant turn
+  // Attribution: when a board PRINCIPAL (a first-class board identity authenticated by its board API
+  // key) posts a turn, its id is recorded here (no FK — D5). Null for a human-operator/assistant turn.
+  boardPrincipalId String?
   // Operator feedback on an assistant turn: +1 up, -1 down, null none (Paperclip feedback votes).
-  feedbackScore  Int?
-  feedbackReason String?
-  createdAt      DateTime    @default(now())
+  feedbackScore    Int?
+  feedbackReason   String?
+  createdAt        DateTime    @default(now())
 
   @@index([threadId, createdAt])
+  @@index([boardPrincipalId])
   @@map("board_messages")
+}
+
+// ─── Board principal (Paperclip board-authz + board API keys) ─────
+// A first-class board identity that can ACT in the boardroom (post/read), distinct from a human
+// operator. It authenticates with its own board API key — the existing ApiKey mint/hash scheme (SHA-256
+// at rest) is reused verbatim via `apiKeyId` (a loose ref; no FK — D5); no new token scheme is invented.
+// What a principal MAY do is decided by board-authz (its `role` → permission set; pure logic in
+// @agentcenter/utils). workspaceId-scoped (D5; no FK). Revoke tombstones (revokedAt) and revokes the
+// linked ApiKey. BOARD_CHAT-gated.
+model BoardPrincipal {
+  id                 String    @id @default(cuid())
+  workspaceId        String // buildbase workspace _id; no FK
+  name               String
+  role               String    @default("member") // board-authz role: chair | member | observer
+  apiKeyId           String // the minted ApiKey.id this principal authenticates with (loose ref, no FK)
+  createdByProfileId String?
+  revokedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([workspaceId, revokedAt])
+  @@map("board_principals")
 }

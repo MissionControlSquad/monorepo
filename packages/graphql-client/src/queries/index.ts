@@ -195,6 +195,8 @@ export { EXPORT_WORKSPACE_BUNDLE, WORKSPACE_IMPORTS } from "./portability";
 export { GOALS_QUERY, GOAL_QUERY, DEFAULT_GOAL_QUERY } from "./goals";
 export { WORKSPACE_SUMMARY_QUERY } from "./observability";
 export { BOARD_THREAD_QUERY } from "./boardroom";
+export { BOARD_PRINCIPALS_QUERY } from "./board-principals";
+export { APPROVAL_POLICIES_QUERY } from "./approval-policies";
 export { PLUGINS_QUERY, PLUGIN_QUERY, PLUGIN_GRANTS_QUERY } from "./plugins";
 export { API_KEYS_QUERY } from "./api-keys";
 export { TERMINAL_SESSIONS_QUERY } from "./terminals";
