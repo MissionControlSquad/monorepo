@@ -16,6 +16,8 @@ import {
   redactCommandText,
   redactHomePathUserSegments,
 } from "./adapter-transcript";
+import { detectModelsForKey } from "./adapter-detect";
+import { claudeQuotaWindows } from "./adapter-quota";
 
 /** A single provider quota/rate-limit window (Domain 12 GAP-2). */
 export interface ProviderQuotaWindow {
@@ -1028,6 +1030,8 @@ const codexAdapter: Adapter = {
     useShell: false,
     layout: GENERIC_LAYOUT,
   }),
+  // Live model detection (best-effort): probe the installed CLI; empty → resolveAdapterModels keeps curated.
+  detectModels: () => detectModelsForKey("codex"),
   // Adapter-owned execution contract (parity slice): codex `exec` streams JSONL protocol events, so it
   // gets a real per-runtime line parser + codex-specific usage/outcome derivation.
   parseLine: codexParseLine,
@@ -1041,10 +1045,15 @@ const claudeAdapter: Adapter = {
   displayName: "Claude Code",
   requiresTemplate: false,
   supportsModel: true,
-  // Curated Claude model ids; a runner with the CLI can add more via detectModels (not wired here).
+  // Curated Claude model ids; a runner with the CLI adds more live via detectModels (below).
   models: ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5", "claude-fable-5"],
   installCommand: "npm install -g @anthropic-ai/claude-code",
   binName: "claude",
+  // Live model detection (best-effort): probe the installed CLI; empty → resolveAdapterModels keeps curated.
+  detectModels: () => detectModelsForKey("claude"),
+  // Concrete provider quota (best-effort): read a local Claude usage file if present, else an explicit
+  // "unknown" window (see adapter-quota.ts). Wired here so fetchAllProviderQuota returns claude data.
+  getQuotaWindows: claudeQuotaWindows,
   build: (ctx) => ({
     // stream-json (with --verbose, which Claude requires alongside --print) so the run emits the JSONL
     // that claudeParseLine turns into a typed transcript + usage. Without this the CLI prints plain text
@@ -1094,6 +1103,8 @@ const geminiAdapter: Adapter = {
     useShell: false,
     layout: GENERIC_LAYOUT,
   }),
+  // Live model detection (best-effort): probe the installed CLI; empty → resolveAdapterModels keeps curated.
+  detectModels: () => detectModelsForKey("gemini"),
   // Adapter-owned execution contract (parity slice): the gemini CLI streams JSONL assistant turns +
   // a terminal result envelope, so it gets a real per-runtime line parser + gemini-specific derivation.
   parseLine: geminiParseLine,

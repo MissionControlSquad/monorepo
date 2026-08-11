@@ -6,6 +6,7 @@
  * omitted. PROVIDER_QUOTA-flag gated at the edge (default off until a real adapter implements it).
  */
 import { listAdapters, type Adapter, type ProviderQuotaResult } from "@agentcenter/utils";
+import { ensureClaudeUsageReader } from "./adapter-runtime-probes";
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 
@@ -52,6 +53,9 @@ export async function fetchAllProviderQuota(
   opts: { timeoutMs?: number; adapters?: Adapter[] } = {},
 ): Promise<ProviderQuotaResult[]> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  // Wire the process-bound Claude usage-file reader once so the claude adapter's getQuotaWindows can
+  // read real windows (best-effort; absent file → the explicit "unknown" window). Idempotent + cheap.
+  ensureClaudeUsageReader();
   const candidates = (opts.adapters ?? listAdapters()).filter(
     (a) => typeof a.getQuotaWindows === "function",
   );

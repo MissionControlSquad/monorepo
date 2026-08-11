@@ -19,12 +19,14 @@ import {
   resolveEffectiveWorkspaceStrategyType,
   redactRunSecrets,
   renderAdapterTranscript,
+  createAdapterTranscriptStream,
   estimateRunCostCents,
   FLAG_KEYS,
   type TrustLevel,
   type AdapterExecutionResult,
   type AdapterErrorFamily,
   type AdapterExitReason,
+  type AdapterTranscriptEvent,
 } from "@agentcenter/utils";
 import {
   runHermesGateway,
@@ -630,15 +632,36 @@ export async function runTaskInSandbox(input: {
     // persist the FULL redacted transcript to the run-log store after exec. Kept separate from the
     // synchronous live tail above; ordering is guaranteed by persisting sequentially post-exec.
     const logChunks: { stream: "stdout" | "stderr"; data: string }[] = [];
+    // Live-streamed transcript (§3 adapters, Item 1): when the bound adapter owns a `parseLine`, feed each
+    // stdout line through a stateful streaming parser AS IT ARRIVES and push the rendered assistant turns
+    // to the live run tail — so a long run shows turns progressively (poll `agentRunLiveStatus`) instead
+    // of only at the end. The authoritative usage/outcome result is STILL derived post-hoc below from the
+    // full stdout blob (equivalent event stream). stderr + blob-only adapters keep the raw live tail.
+    const transcriptStream = adapter?.parseLine
+      ? createAdapterTranscriptStream(adapter.parseLine.bind(adapter))
+      : null;
+    const streamRendered = (events: AdapterTranscriptEvent[]): void => {
+      if (!events.length) return;
+      const text = renderAdapterTranscript(events);
+      if (text) appendRunLog(run.id, text + "\n");
+    };
     try {
       const result = await handle.exec(script, {
         timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         signal: abortController.signal,
         onLog: (chunk) => {
-          appendRunLog(run.id, chunk.data);
+          // Live tail: stream parsed transcript for adapter stdout; raw for stderr / blob-only adapters.
+          if (transcriptStream && chunk.stream === "stdout") {
+            streamRendered(transcriptStream.push(chunk.data));
+          } else {
+            appendRunLog(run.id, chunk.data);
+          }
+          // Durable transcript always keeps the RAW captured bytes (both streams), in order.
           logChunks.push({ stream: chunk.stream, data: chunk.data });
         },
       });
+      // Flush any trailing partial stdout line into the live tail before finalizing.
+      if (transcriptStream) streamRendered(transcriptStream.flush());
       exitCode = result.exitCode;
       // Redact resolved secret values BEFORE the tail slice so a secret straddling the cut can't leak
       // a partial. Everything downstream (persist, run->task post, memory summary, return) derives from
