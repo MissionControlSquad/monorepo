@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
-import { ShieldOff, Lock, KeyRound, FlaskConical, Brain } from "lucide-react";
+import Link from "next/link";
+import { ShieldOff, Lock, KeyRound, FlaskConical, Brain, Gauge, ArrowRight } from "lucide-react";
 import {
   SET_SYSTEM_SHUTDOWN,
   SYSTEM_SETTINGS_QUERY,
@@ -145,6 +146,25 @@ export function SettingsPage() {
 
       {/* Buildbase user-layer account/billing — opens inbuilt SDK screens (renders only when configured) */}
       <BuildbaseAccountCard />
+
+      {/* Usage & limits — our rendered plan-quota surface (human plan quota, not agent budgets) */}
+      <Card padding="none">
+        <Link
+          href="/usage"
+          className="flex items-center gap-4 rounded-xl p-5 transition-colors hover:bg-muted"
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Gauge className="size-5" aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-foreground">Usage &amp; limits</h2>
+            <p className="text-sm text-muted-foreground">
+              Your workspace plan&apos;s quotas (agents, projects) and recent activity.
+            </p>
+          </div>
+          <ArrowRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        </Link>
+      </Card>
 
       {/* Change Password */}
       <Card padding="lg" className="space-y-4">

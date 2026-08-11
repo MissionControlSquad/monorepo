@@ -4,6 +4,8 @@ import { Prisma } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { validateBody, createAgentSchema } from "../../_lib/validation";
 import { createSingleAgent } from "../_lib/create-agent";
+import { recordPlanUsageFromRequest } from "@/server/tenancy";
+import { USAGE_QUOTA_SLUGS } from "@/lib/quota-slugs";
 
 /**
  * POST /api/agents/create
@@ -39,6 +41,11 @@ export async function POST(request: Request) {
     }
 
     const result = await createSingleAgent(parsed.data, agentCount);
+
+    // Best-effort: record consumption of the workspace's HUMAN plan `agents` quota in buildbase.
+    // Fail-safe + dormant until buildbase is configured — never blocks or breaks the create.
+    // (Separate from the AI-agent LLM/run budget in finance.prisma.)
+    await recordPlanUsageFromRequest(request, { quotaSlug: USAGE_QUOTA_SLUGS.agents });
 
     return successResponse(result, 201);
   } catch (err) {

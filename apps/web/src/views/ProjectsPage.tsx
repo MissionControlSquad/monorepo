@@ -9,6 +9,8 @@ import { FolderKanban, Plus, Search } from "lucide-react";
 import { ProjectCard } from "../components/project/ProjectCard";
 import { CreateProjectModal } from "../components/project/CreateProjectModal";
 import { Breadcrumbs, Button, Input, EmptyState, SkeletonList, PageLayout } from "../components/ui";
+import { QuotaGate, QuotaIndicator } from "@/components/usage";
+import { USAGE_QUOTA_SLUGS } from "@/lib/quota-slugs";
 import type { Project } from "@agentcenter/types";
 import { ProjectStatus } from "@/server/constants";
 
@@ -46,9 +48,19 @@ export function ProjectsPage() {
             </p>
           </div>
         </div>
-        <Button variant="primary" size="md" icon={<Plus />} onClick={() => setIsCreateOpen(true)}>
-          New Project
-        </Button>
+        <div className="flex items-center gap-3">
+          <QuotaIndicator slug={USAGE_QUOTA_SLUGS.projects} />
+          <QuotaGate slug={USAGE_QUOTA_SLUGS.projects}>
+            <Button
+              variant="primary"
+              size="md"
+              icon={<Plus />}
+              onClick={() => setIsCreateOpen(true)}
+            >
+              New Project
+            </Button>
+          </QuotaGate>
+        </div>
       </div>
 
       {/* Search + filter bar */}

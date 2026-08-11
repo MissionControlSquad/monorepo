@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout } from "../components/ui";
 import { ProfileAvatar } from "../components/ui/ProfileAvatar";
+import { QuotaGate, QuotaIndicator } from "@/components/usage";
+import { USAGE_QUOTA_SLUGS } from "@/lib/quota-slugs";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
 import type { AgentDetailedStatus } from "../lib/constants";
 import type { AgentStatusValue } from "@/server/constants";
@@ -95,11 +97,16 @@ export function AgentsPage() {
               {visibleCount} agent{visibleCount !== 1 ? "s" : ""} in your squad
             </p>
           </div>
-          <Link href="/agents/new">
-            <Button variant="primary" icon={<Plus />}>
-              Create Agent
-            </Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            <QuotaIndicator slug={USAGE_QUOTA_SLUGS.agents} />
+            <QuotaGate slug={USAGE_QUOTA_SLUGS.agents}>
+              <Link href="/agents/new">
+                <Button variant="primary" icon={<Plus />}>
+                  Create Agent
+                </Button>
+              </Link>
+            </QuotaGate>
+          </div>
         </div>
 
         {/* Search */}

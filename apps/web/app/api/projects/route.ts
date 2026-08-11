@@ -7,6 +7,8 @@ import { ProjectStatus, ProjectMemberStatus } from "@/server/constants";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { squadLeadRequired } from "../_lib/project-access";
 import { checkLicenseLimit } from "@/server/license";
+import { recordPlanUsageFromRequest } from "@/server/tenancy";
+import { USAGE_QUOTA_SLUGS } from "@/lib/quota-slugs";
 
 export async function GET(request: Request) {
   try {
@@ -101,6 +103,11 @@ export async function POST(request: Request) {
     await projectModel.emitCreated(project, {
       memberIds: allMemberIds,
     });
+
+    // Best-effort: record consumption of the workspace's HUMAN plan `projects` quota in buildbase.
+    // No-ops for agent-authenticated/CLI callers with no human buildbase session and while buildbase
+    // is unconfigured. Fail-safe — never blocks or breaks the create.
+    await recordPlanUsageFromRequest(request, { quotaSlug: USAGE_QUOTA_SLUGS.projects });
 
     return successResponse(project, 201);
   } catch (err) {
