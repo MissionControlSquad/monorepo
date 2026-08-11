@@ -20,6 +20,7 @@
     "seed:enterprise": "npx dotenv -e .env -- tsx scripts/seed-enterprise.ts",
     "seed:load-tasks": "npx dotenv -e .env -- tsx scripts/seed-load-tasks.ts",
     "check:notifications": "npx dotenv -e .env -- tsx scripts/check-notifications.ts",
+    "generate:push-sw": "node scripts/generate-push-sw.mjs",
     "backfill:profiles": "npx dotenv -e .env -- tsx scripts/backfill-profiles.ts"
   },
   "dependencies": {
