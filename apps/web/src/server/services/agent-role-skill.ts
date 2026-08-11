@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { parseSkillFrontmatter, splitFrontmatter } from "@agentcenter/utils";
 
 // Cloud-served role skills. The control plane owns the role skill guides (agent-templates/skills/*.md);
 // agents fetch them via the context API — they are NOT required to have local skill files. This is what
@@ -22,7 +23,7 @@ const ROLE_ALIASES: Record<string, string> = {
   "fullstack-developer": "backend-dev",
   "full-stack-developer": "backend-dev",
   "qa-engineer": "qa-testing",
-  "qa": "qa-testing",
+  qa: "qa-testing",
   "test-engineer": "qa-testing",
   "quality-assurance": "qa-testing",
   "devops-engineer": "devops",
@@ -31,17 +32,91 @@ const ROLE_ALIASES: Record<string, string> = {
 };
 
 const kebab = (s: string) =>
-  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 const templateExists = (id: string) =>
   SAFE_TEMPLATE_ID.test(id) && existsSync(join(SKILLS_DIR, `${id}.md`));
 
 /**
+ * PURE: build the reverse `role → template-id` index from a set of template frontmatters. A skill that
+ * declares `recommendedForRoles: [x, y]` recommends itself for roles x and y. Roles are kebab-normalized
+ * so free-text roles ("Growth Lead") match a declared "growth-lead". First declaration wins on a
+ * collision, so the map is deterministic regardless of directory order (callers pass ids sorted).
+ * Exported for unit testing the resolution independent of the filesystem.
+ */
+export function buildRoleRecommendationIndex(
+  entries: { id: string; recommendedForRoles?: string[] | null }[],
+): Record<string, string> {
+  const index: Record<string, string> = {};
+  for (const entry of entries) {
+    if (!SAFE_TEMPLATE_ID.test(entry.id)) continue;
+    for (const raw of entry.recommendedForRoles ?? []) {
+      const role = kebab(raw);
+      if (role && !(role in index)) index[role] = entry.id;
+    }
+  }
+  return index;
+}
+
+// Cached reverse index of role → template-id derived from each template's `recommendedForRoles`
+// frontmatter. Built lazily on first use (scans the template library once) so a skill can recommend
+// itself for a role even when its filename/alias doesn't match. Cleared only per-process.
+let roleRecommendationIndex: Record<string, string> | null = null;
+
+function loadRoleRecommendationIndex(): Record<string, string> {
+  if (roleRecommendationIndex) return roleRecommendationIndex;
+  let files: string[] = [];
+  try {
+    files = readdirSync(SKILLS_DIR)
+      .filter((f) => f.endsWith(".md"))
+      .sort();
+  } catch {
+    // Library missing (unexpected) → empty index; callers fall back to alias/filename.
+    roleRecommendationIndex = {};
+    return roleRecommendationIndex;
+  }
+  const entries = files.map((f) => {
+    const id = f.replace(/\.md$/, "");
+    let recommendedForRoles: string[] | undefined;
+    try {
+      const fm = parseSkillFrontmatter(readFileSync(join(SKILLS_DIR, f), "utf8"));
+      recommendedForRoles = Array.isArray(fm?.recommendedForRoles)
+        ? fm.recommendedForRoles
+        : undefined;
+    } catch {
+      recommendedForRoles = undefined;
+    }
+    return { id, recommendedForRoles };
+  });
+  roleRecommendationIndex = buildRoleRecommendationIndex(entries);
+  return roleRecommendationIndex;
+}
+
+/** Test seam: drop the cached index so a test that annotates fixtures re-scans the library. */
+export function resetRoleRecommendationIndex(): void {
+  roleRecommendationIndex = null;
+}
+
+/**
  * Best-effort resolve a template id from a free-text role (e.g. "Backend Developer" → "backend-dev"),
- * so agents without an explicit templateId still get their specific role skill. Conservative: only
- * returns a match that actually exists in the library, else null (caller uses the generic guide).
+ * so agents without an explicit templateId still get their specific role skill. Resolution order:
+ *   1. a skill that declares this role in its `recommendedForRoles` frontmatter (a skill recommends
+ *      itself for the role, even when its filename/alias doesn't match);
+ *   2. the curated alias map;
+ *   3. an exact kebab filename match (e.g. "devops");
+ *   4. the "x-developer" → "x-dev" fallback.
+ * Conservative: only returns a match that actually exists in the library, else null (caller uses the
+ * generic guide).
  */
 export function resolveRoleTemplateId(role: string): string | null {
   const n = kebab(role);
+  // 1. frontmatter recommendation (a skill recommends itself for this role)
+  const recommended = loadRoleRecommendationIndex()[n];
+  if (recommended && templateExists(recommended)) return recommended;
+  // 2–4. existing alias/filename fallbacks.
   if (ROLE_ALIASES[n] && templateExists(ROLE_ALIASES[n])) return ROLE_ALIASES[n];
   if (templateExists(n)) return n; // exact kebab match (e.g. "devops")
   const dev = n.replace(/-developer$/, "-dev"); // "x-developer" → "x-dev"
@@ -72,8 +147,11 @@ export function loadRoleSkill(
     templateId && templateExists(templateId) ? templateId : resolveRoleTemplateId(role);
   if (effectiveId) {
     const path = join(SKILLS_DIR, `${effectiveId}.md`);
-    // Render the identity template vars so the delivered skill reads cleanly.
-    const markdown = readFileSync(path, "utf8")
+    // Strip any authoring frontmatter (e.g. recommendedForRoles) so the delivered guide is clean prose,
+    // then render the identity template vars.
+    const raw = readFileSync(path, "utf8");
+    const { body } = splitFrontmatter(raw);
+    const markdown = body
       .replaceAll("{{agent.role}}", role)
       .replaceAll("{{agent.name}}", name ?? role);
     return {

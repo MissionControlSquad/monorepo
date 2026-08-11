@@ -20,6 +20,11 @@ builder.prismaObject("Skill", {
     sourceRef: t.exposeString("sourceRef", { nullable: true }),
     packageName: t.exposeString("packageName", { nullable: true }),
     originHash: t.exposeString("originHash", { nullable: true }),
+    // §3 source-badge + catalog-manifest provenance (display-only).
+    catalogKey: t.exposeString("catalogKey", { nullable: true }),
+    packageVersion: t.exposeString("packageVersion", { nullable: true }),
+    catalogKind: t.exposeString("catalogKind", { nullable: true }),
+    sourceBadge: t.exposeString("sourceBadge", { nullable: true }),
     trustLevel: t.exposeString("trustLevel"),
     categories: t.exposeStringList("categories"),
     sharingScope: t.exposeString("sharingScope"),

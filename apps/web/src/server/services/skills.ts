@@ -18,9 +18,38 @@ import type {
   SkillTrustLevel,
   SkillSharingScope,
 } from "@agentcenter/database";
-import { resolveSkillSource } from "@/server/services/skill-import-sources";
+import {
+  resolveSkillSource,
+  scanProjectWorkspaceForSkills,
+  type ProjectSkillCandidate,
+} from "@/server/services/skill-import-sources";
 import { getCatalogEntry } from "@/server/skill-catalog/manifest";
+import { sha256Hex } from "../hash";
 import { badRequest, notFound } from "./service-errors";
+
+/**
+ * Map a skill's source (sourceType, or an explicit override) to the display-facing badge label rendered
+ * on the skill card. Kept in one place so every create/import/fork path stamps the same vocabulary:
+ * catalog · github · url · local · skillsh · project · forked.
+ */
+export function sourceBadgeForType(sourceType: string | null | undefined): string | null {
+  switch (sourceType) {
+    case "catalog":
+      return "catalog";
+    case "github":
+      return "github";
+    case "url":
+      return "url";
+    case "local_path":
+      return "local";
+    case "skills_sh":
+      return "skillsh";
+    case "project_scan":
+      return "project";
+    default:
+      return null;
+  }
+}
 
 /** Skill slug: the shared core slugify, capped at 64 chars with a "skill" fallback. */
 export function slugify(name: string): string {
@@ -164,13 +193,58 @@ export async function deleteSkill(workspaceId: string, id: string): Promise<bool
   return true;
 }
 
-/** Fork a skill into a new one (copies the current markdown as rev 1), bumping the source forkCount. */
+/** A pre-existing fork of the same origin in this workspace (drives the duplicate-fork precheck warn). */
+export interface ForkPrecheck {
+  originId: string;
+  hasExistingFork: boolean;
+  existingForkId: string | null;
+  existingForkName: string | null;
+}
+
+/**
+ * Precheck a fork: does this workspace already hold a fork of the given origin? Non-blocking — the UI
+ * surfaces the warning and the user can proceed (forkSkill without `force` throws so the warn is
+ * enforced server-side too; with `force` it duplicates deliberately).
+ */
+export async function precheckForkTarget(
+  workspaceId: string,
+  originId: string,
+): Promise<ForkPrecheck> {
+  await loadSkill(workspaceId, originId); // 404s cross-workspace / missing
+  const existing = await prisma.skill.findFirst({
+    where: { workspaceId, forkedFromSkillId: originId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true },
+  });
+  return {
+    originId,
+    hasExistingFork: !!existing,
+    existingForkId: existing?.id ?? null,
+    existingForkName: existing?.name ?? null,
+  };
+}
+
+/**
+ * Fork a skill into a new one (copies the current markdown as rev 1), bumping the source forkCount.
+ * Stamps `originHash` = the origin's content hash at fork time so drift (diverged) can later be
+ * detected in computeSkillUpdateStatus. Precheck: if the workspace already forks this origin the call
+ * throws unless `force` is set (the UI warns first). `sourceBadge` is stamped "forked".
+ */
 export async function forkSkill(
   workspaceId: string,
   id: string,
   createdByProfileId?: string | null,
+  opts: { force?: boolean } = {},
 ): Promise<Skill> {
   const source = await loadSkill(workspaceId, id);
+  if (!opts.force) {
+    const pre = await precheckForkTarget(workspaceId, id);
+    if (pre.hasExistingFork)
+      badRequest(
+        `this workspace already has a fork of "${source.name}" (${pre.existingForkName}); ` +
+          `pass force to fork again`,
+      );
+  }
   const baseKey = `${source.key}-fork`;
   let key = baseKey;
   for (let i = 2; await prisma.skill.findFirst({ where: { workspaceId, key } }); i++)
@@ -190,6 +264,10 @@ export async function forkSkill(
         trustLevel: source.trustLevel,
         sharingScope: "workspace",
         forkedFromSkillId: source.id,
+        // Pin the origin content at fork time so a later origin change flips the fork to `diverged`.
+        originHash: sha256Hex(source.markdown),
+        originVersion: source.currentVersion,
+        sourceBadge: "forked",
         createdByProfileId: createdByProfileId ?? null,
         currentVersion: 1,
       },
@@ -206,6 +284,46 @@ export async function forkSkill(
     },
   });
   return fork;
+}
+
+/**
+ * Reassign a fork's origin (§3 fork depth). Repoints `forkedFromSkillId` at a new origin skill in the
+ * same workspace and re-pins the diverged baseline (`originHash`/`originVersion`) to the new origin's
+ * current content, so divergence is measured against the new lineage. Adjusts both origins' forkCount.
+ * Rejects self-reassignment or a non-fork skill.
+ */
+export async function reassignSkillFork(
+  workspaceId: string,
+  forkId: string,
+  newOriginId: string,
+): Promise<Skill> {
+  if (forkId === newOriginId) badRequest("a skill cannot be a fork of itself");
+  const fork = await loadSkill(workspaceId, forkId);
+  const newOrigin = await loadSkill(workspaceId, newOriginId);
+  const previousOriginId = fork.forkedFromSkillId;
+  if (previousOriginId === newOriginId) return fork; // no-op
+
+  const ops: Prisma.PrismaPromise<unknown>[] = [
+    prisma.skill.update({
+      where: { id: fork.id },
+      data: {
+        forkedFromSkillId: newOrigin.id,
+        originHash: sha256Hex(newOrigin.markdown),
+        originVersion: newOrigin.currentVersion,
+        sourceBadge: "forked",
+      },
+    }),
+    prisma.skill.update({ where: { id: newOrigin.id }, data: { forkCount: { increment: 1 } } }),
+  ];
+  if (previousOriginId)
+    ops.push(
+      prisma.skill.updateMany({
+        where: { id: previousOriginId, forkCount: { gt: 0 } },
+        data: { forkCount: { decrement: 1 } },
+      }),
+    );
+  await prisma.$transaction(ops);
+  return prisma.skill.findUniqueOrThrow({ where: { id: fork.id } });
 }
 
 // ─── Public catalog (cross-workspace) ─────────────────────────────
@@ -267,6 +385,13 @@ export async function installCatalogSkill(
         // F13: stamp catalog-install provenance so update-drift (F18) + reset (F20) work.
         originSkillId: source.id,
         originVersion: source.currentVersion,
+        // §3 provenance: this copy came from the public catalog. Carry the origin's catalog coordinates
+        // (when it was itself catalog-sourced) and render a "catalog" source badge on the card.
+        catalogKey: source.catalogKey,
+        packageVersion: source.packageVersion,
+        catalogKind: source.catalogKind,
+        packageName: source.packageName,
+        sourceBadge: "catalog",
         createdByProfileId: createdByProfileId ?? null,
         currentVersion: 1,
       },
@@ -305,6 +430,12 @@ export async function importSkillPackage(input: {
   sourceType?: SkillSourceType | null;
   packageName?: string | null;
   originHash?: string | null;
+  // §3 catalog-manifest provenance + display badge. When importing an app-shipped catalog package these
+  // name the exact package key/version/tier; sourceBadge overrides the sourceType-derived default.
+  catalogKey?: string | null;
+  packageVersion?: string | null;
+  catalogKind?: string | null;
+  sourceBadge?: string | null;
 }): Promise<Skill> {
   const manifest = input.files.find((f) => /(^|\/)SKILL\.md$/i.test(f.path));
   if (!manifest) badRequest("package has no SKILL.md");
@@ -334,15 +465,21 @@ export async function importSkillPackage(input: {
     sourceType,
     createdByProfileId: input.createdByProfileId ?? null,
   });
-  if (input.sourceRef || input.packageName || input.originHash)
-    await prisma.skill.update({
-      where: { id: skill.id },
-      data: {
-        sourceRef: input.sourceRef ?? null,
-        packageName: input.packageName ?? null,
-        originHash: input.originHash ?? null,
-      },
-    });
+  // Always stamp a source badge from the resolved sourceType (falls back to the caller override), plus
+  // any resolved provenance. This is what renders the "where did this come from" badge on the card.
+  const sourceBadge = input.sourceBadge ?? sourceBadgeForType(sourceType);
+  await prisma.skill.update({
+    where: { id: skill.id },
+    data: {
+      sourceRef: input.sourceRef ?? null,
+      packageName: input.packageName ?? null,
+      originHash: input.originHash ?? null,
+      catalogKey: input.catalogKey ?? null,
+      packageVersion: input.packageVersion ?? null,
+      catalogKind: input.catalogKind ?? null,
+      sourceBadge,
+    },
+  });
 
   // Attach the remaining files (SKILL.md is already the markdown). upsertSkillFile normalizes the path
   // (rejecting traversal) and re-derives trust, so a scripts/ file correctly raises the rung.
@@ -401,11 +538,77 @@ export async function importFromCatalog(input: {
     sourceType: "catalog",
     packageName: entry.packageName,
     originHash: entry.contentHash,
+    // §3 catalog-manifest provenance: name exactly which catalog package/version/tier this came from.
+    catalogKey: entry.key,
+    packageVersion: entry.packageVersion,
+    catalogKind: entry.tier,
+    sourceBadge: "catalog",
     createdByProfileId: input.createdByProfileId ?? null,
   });
 }
 
-export type SkillUpdateState = "not_installed" | "up_to_date" | "update_available" | "origin_gone";
+// ─── Project-workspace scan import (§3 skills residuals) ──────────────────────
+// Scan a project workspace's checked-out files for SKILL.md bundles and import a chosen one with
+// `project_scan` provenance. `listFiles` is injectable so callers/tests can supply a file list instead
+// of touching disk (the GraphQL layer passes none → the on-disk workspace `cwd` is scanned).
+
+async function loadProjectWorkspace(workspaceId: string, id: string) {
+  const pw = await prisma.projectWorkspace.findFirst({ where: { id, workspaceId } });
+  if (!pw) notFound("ProjectWorkspace");
+  return pw;
+}
+
+/** Discover importable skill bundles inside a project workspace's checked-out files (for the picker). */
+export async function listProjectWorkspaceSkillCandidates(input: {
+  workspaceId: string;
+  projectWorkspaceId: string;
+  listFiles?: (root: string) => Promise<{ path: string; content: string }[]>;
+}): Promise<ProjectSkillCandidate[]> {
+  const pw = await loadProjectWorkspace(input.workspaceId, input.projectWorkspaceId);
+  // The scanned root is the project workspace's checked-out working directory. When it isn't set (never
+  // cloned) the scanner is only usable via an injected file list (tests); otherwise it errors readably.
+  const root = pw.cwd ?? (input.listFiles ? pw.id : "");
+  return scanProjectWorkspaceForSkills({
+    projectWorkspaceId: pw.id,
+    root,
+    listFiles: input.listFiles,
+  });
+}
+
+/**
+ * Import a skill discovered by scanning a project workspace. Re-scans, picks the bundle at `dir`
+ * (default the repo root), and installs it through importSkillPackage with `project_scan` provenance.
+ */
+export async function importSkillFromProjectScan(input: {
+  workspaceId: string;
+  projectWorkspaceId: string;
+  dir?: string | null;
+  createdByProfileId?: string | null;
+  listFiles?: (root: string) => Promise<{ path: string; content: string }[]>;
+}): Promise<Skill> {
+  const candidates = await listProjectWorkspaceSkillCandidates({
+    workspaceId: input.workspaceId,
+    projectWorkspaceId: input.projectWorkspaceId,
+    listFiles: input.listFiles,
+  });
+  if (candidates.length === 0)
+    badRequest("no SKILL.md bundles were found in this project workspace");
+  const wantDir = (input.dir ?? "").replace(/^\/+|\/+$/g, "");
+  const chosen = input.dir == null ? candidates[0] : candidates.find((c) => c.dir === wantDir);
+  if (!chosen) badRequest(`no skill bundle found at "${input.dir}" in this project workspace`);
+  return importSkillPackage({
+    workspaceId: input.workspaceId,
+    files: chosen.files,
+    sourceRef: chosen.provenance.sourceRef,
+    sourceType: "project_scan",
+    packageName: chosen.provenance.packageName,
+    originHash: chosen.provenance.originHash,
+    createdByProfileId: input.createdByProfileId ?? null,
+  });
+}
+
+export type SkillUpdateState =
+  "not_installed" | "up_to_date" | "update_available" | "origin_gone" | "diverged";
 
 export interface SkillUpdateStatus {
   state: SkillUpdateState;
@@ -414,28 +617,53 @@ export interface SkillUpdateStatus {
 }
 
 /**
- * Compute a catalog-installed skill's update status (F18): compare the pinned origin version to the
- * source's current version. A skill with no origin is `not_installed`; a deleted/unpublished source is
- * `origin_gone`.
+ * Compute a skill's update status:
+ *   - Catalog install (F18, originSkillId set): compare the pinned origin version to the public source's
+ *     current version → up_to_date | update_available | origin_gone.
+ *   - Fork (§3 fork depth, forkedFromSkillId set): compare the origin's CURRENT content hash to the
+ *     baseline pinned at fork time (originHash) → `diverged` when the origin has changed since the fork,
+ *     else up_to_date; `origin_gone` if the origin was deleted.
+ *   - Neither: `not_installed`.
  */
 export async function computeSkillUpdateStatus(
   workspaceId: string,
   skillId: string,
 ): Promise<SkillUpdateStatus> {
   const skill = await loadSkill(workspaceId, skillId);
-  if (!skill.originSkillId)
-    return { state: "not_installed", originVersion: null, latestVersion: null };
-  const source = await prisma.skill.findFirst({
-    where: { id: skill.originSkillId, sharingScope: "public" },
-    select: { currentVersion: true },
-  });
-  if (!source)
-    return { state: "origin_gone", originVersion: skill.originVersion, latestVersion: null };
-  return {
-    state: source.currentVersion > (skill.originVersion ?? 0) ? "update_available" : "up_to_date",
-    originVersion: skill.originVersion,
-    latestVersion: source.currentVersion,
-  };
+
+  // Catalog-install lineage takes precedence (installs set both originSkillId and forkedFromSkillId).
+  if (skill.originSkillId) {
+    const source = await prisma.skill.findFirst({
+      where: { id: skill.originSkillId, sharingScope: "public" },
+      select: { currentVersion: true },
+    });
+    if (!source)
+      return { state: "origin_gone", originVersion: skill.originVersion, latestVersion: null };
+    return {
+      state: source.currentVersion > (skill.originVersion ?? 0) ? "update_available" : "up_to_date",
+      originVersion: skill.originVersion,
+      latestVersion: source.currentVersion,
+    };
+  }
+
+  // Fork lineage: divergence is content-hash drift of the origin vs the fork's pinned baseline.
+  if (skill.forkedFromSkillId) {
+    const origin = await prisma.skill.findFirst({
+      where: { id: skill.forkedFromSkillId, workspaceId },
+      select: { markdown: true, currentVersion: true },
+    });
+    if (!origin)
+      return { state: "origin_gone", originVersion: skill.originVersion, latestVersion: null };
+    const originHashNow = sha256Hex(origin.markdown);
+    const diverged = skill.originHash != null && originHashNow !== skill.originHash;
+    return {
+      state: diverged ? "diverged" : "up_to_date",
+      originVersion: skill.originVersion,
+      latestVersion: origin.currentVersion,
+    };
+  }
+
+  return { state: "not_installed", originVersion: null, latestVersion: null };
 }
 
 /**

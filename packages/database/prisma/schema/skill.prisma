@@ -13,6 +13,7 @@ enum SkillSourceType {
   url
   catalog
   skills_sh
+  project_scan
 }
 
 enum SkillTrustLevel {
@@ -76,6 +77,15 @@ model Skill {
   // originHash is the content hash of the imported bundle, sourceRef records the resolved locator.
   packageName        String?
   originHash         String?
+  // Source-badge + catalog provenance (§3 skills residuals). sourceBadge is the display-facing origin
+  // kind (catalog|github|url|local|project|forked|skillsh), rendered as a labeled badge on the card.
+  // catalogKey/packageVersion/catalogKind carry the app-shipped catalog manifest coordinates so an
+  // installed skill can name exactly which catalog package + version + tier (bundled|optional) it came
+  // from. All nullable + display-only (no behavioral coupling).
+  catalogKey         String?
+  packageVersion     String?
+  catalogKind        String?
+  sourceBadge        String?
   starCount          Int               @default(0)
   installCount       Int               @default(0)
   forkCount          Int               @default(0)

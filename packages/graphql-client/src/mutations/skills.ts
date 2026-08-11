@@ -34,8 +34,8 @@ export const DELETE_SKILL = gql`
 `;
 
 export const FORK_SKILL = gql`
-  mutation ForkSkill($id: String!) {
-    forkSkill(id: $id) {
+  mutation ForkSkill($id: String!, $force: Boolean) {
+    forkSkill(id: $id, force: $force) {
       id
     }
   }
