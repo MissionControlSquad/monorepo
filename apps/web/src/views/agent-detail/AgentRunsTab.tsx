@@ -119,9 +119,11 @@ function RunDetail({ agentId, run }: { agentId: string; run: AgentRun }) {
             <span className="text-xs text-muted-foreground">exit {run.exitCode}</span>
           )}
           {run.reviewState === "needs_review" && (
-            <Badge variant="yellow" size="sm">
-              needs review
-            </Badge>
+            <span title="Output quarantined pending board review (untrusted/low-trust source). Untrusted-source checkouts are also routed through an isolated container profile. A reviewer must promote it before the output flows into higher-trust context.">
+              <Badge variant="yellow" size="sm">
+                needs review
+              </Badge>
+            </span>
           )}
           {run.startedAt && (
             <TimeAgo date={run.startedAt} className="ml-auto text-xs text-muted-foreground" />

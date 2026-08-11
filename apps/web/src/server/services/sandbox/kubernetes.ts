@@ -8,6 +8,7 @@
  * Credential: KUBECONFIG holds the kubeconfig YAML *content* (Paperclip's loadFromString), or a path.
  */
 import { PassThrough } from "node:stream";
+import { evaluateImageAllowlist, parseImageAllowlist } from "@agentcenter/utils";
 import {
   defineCloudProvider,
   loadOptionalModule,
@@ -119,6 +120,17 @@ export const kubernetesProvider = defineCloudProvider({
 
     const namespace = (await ctx.resolveSecret("K8S_NAMESPACE")) || "default";
     const image = spec?.image ?? (await ctx.resolveSecret("K8S_SANDBOX_IMAGE")) ?? "ubuntu:22.04";
+
+    // Image allowlist admission (security hardening — Item 2): refuse an image outside the workspace's
+    // configured allowlist BEFORE creating the pod, so a run can't be pointed at a hostile image that
+    // would exfiltrate the injected credentials. The allowlist is the K8S_IMAGE_ALLOWLIST vault secret
+    // (glob/registry patterns), falling back to a sensible default set of trusted public base images.
+    const allowlist = parseImageAllowlist(await ctx.resolveSecret("K8S_IMAGE_ALLOWLIST"));
+    const admission = evaluateImageAllowlist(allowlist, image);
+    if (!admission.allowed) {
+      throw new Error(`Kubernetes sandbox refused: ${admission.reason}`);
+    }
+
     const podName =
       `agentcenter-sbx-${Date.now().toString(36)}-${Math.abs(hash(image)).toString(36)}`.slice(
         0,

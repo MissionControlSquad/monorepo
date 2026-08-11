@@ -24,6 +24,11 @@ model EnvironmentLease {
   leasePolicy     String      @default("ephemeral")
   provider        String? // sandbox provider key
   providerLeaseId String? // provider handle id (dir / sandbox id / pod name)
+  // Secret-version fingerprint (security hardening — Item 1): a hash over the resolved secret VERSIONS
+  // this lease's machine was provisioned with (env config/envVars secret-refs + agent secret bindings).
+  // Reuse is gated on it — a rotated secret changes the fingerprint so the STALE-credential machine is
+  // never re-attached; a fresh machine is provisioned instead. Null on legacy rows (won't match → fresh).
+  secretFingerprint String?
   acquiredAt      DateTime    @default(now())
   lastUsedAt      DateTime    @default(now())
   expiresAt       DateTime?

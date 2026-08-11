@@ -686,6 +686,58 @@ export async function resolveEnvForAgent(
 }
 
 /**
+ * Resolve the concrete SecretVersion each of an agent's bindings points at — {secretId, version} pairs
+ * — WITHOUT decrypting anything. Feeds the lease secret-version fingerprint (security hardening Item 1):
+ * the fingerprint changes when any bound secret is rotated (its selected version bumps), so a reusable
+ * lease provisioned with the old credential is not re-attached. Same binding set (agent + adapter scope,
+ * active secrets only) as gatherAgentBindings, but version-only + no audit event (this is a preflight
+ * reuse check, not a real use of the secret).
+ */
+export async function resolveAgentSecretVersionRefs(
+  workspaceId: string,
+  agentId: string,
+): Promise<{ key: string; version: number }[]> {
+  const agent = await prisma.agent.findFirst({
+    where: { id: agentId, workspaceId },
+    select: { id: true, adapterType: true },
+  });
+  if (!agent) return [];
+  const bindings = await prisma.secretBinding.findMany({
+    where: {
+      OR: [
+        { agentId: agent.id },
+        ...(agent.adapterType
+          ? [{ scope: "adapter" as const, adapterType: agent.adapterType }]
+          : []),
+      ],
+      secret: { workspaceId, status: "active" },
+    },
+    include: { secret: { select: { currentVersion: true } } },
+  });
+  return bindings.map((b) => ({
+    key: b.secretId,
+    version: selectBindingVersion(b, b.secret.currentVersion),
+  }));
+}
+
+/**
+ * Resolve the current active version of each named workspace secret (no decrypt). Feeds the lease
+ * fingerprint for the environment's config/envVars secret-refs. A name with no active secret is skipped
+ * (it contributes nothing to the fingerprint — a later-created secret then changes it, forcing fresh).
+ */
+export async function resolveNamedSecretVersionRefs(
+  workspaceId: string,
+  names: string[],
+): Promise<{ key: string; version: number }[]> {
+  if (names.length === 0) return [];
+  const secrets = await prisma.secret.findMany({
+    where: { workspaceId, name: { in: [...new Set(names)] }, status: "active" },
+    select: { id: true, currentVersion: true },
+  });
+  return secrets.map((s) => ({ key: s.id, version: s.currentVersion }));
+}
+
+/**
  * Resolve the FULL projection for an agent — env vars, file mounts, and inline config patches — from
  * its bindings, honoring configPath/versionSelector/projectionClass. SERVER-ONLY. This is the richer
  * superset of resolveEnvForAgent (whose result equals the `.env` of this).
