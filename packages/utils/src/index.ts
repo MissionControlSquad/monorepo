@@ -16,6 +16,7 @@ export * from "./setup-session";
 export * from "./provider-auth";
 export * from "./service-supervision";
 export * from "./plugin-worker-protocol";
+export * from "./plugin-ui-protocol";
 export * from "./adapter-transcript";
 export * from "./adapter-session";
 export * from "./adapter-skills";

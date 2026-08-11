@@ -20,6 +20,14 @@ export const tools = {
 export const jobs = {
   // A job handler; returns something the runner records as the job result.
   sync: async (payload) => ({ ran: true, payload: payload ?? null }),
+  // Enqueued by the webhook receiver; echoes the delivered payload back.
+  "webhook:inbound": async (payload) => ({ handled: true, payload: payload ?? null }),
+};
+
+// Scoped API routes (§3). Keyed by "<METHOD> <path>" (the host's default handler key).
+export const routes = {
+  "GET /status": async (req) => ({ ok: true, method: req?.method, query: req?.query ?? {} }),
+  "POST /echo": async (req) => ({ echoed: req?.body ?? null }),
 };
 
 export const meta = {
