@@ -39,8 +39,7 @@ import { prisma } from "@/server/prisma";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { assembleContextBundle } from "./agent-context";
 import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
-import { captureRunMemory } from "./agent-memory";
-import { enqueueMemoryJob } from "./memory-jobs";
+import { enqueueOrCaptureRunMemory } from "./memory-jobs";
 import { stampRunReview } from "./run-review";
 import { scheduleRunRetryIfTransient } from "./run-retry";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
@@ -757,35 +756,19 @@ export async function runTaskInSandbox(input: {
     );
 
     // Post-run memory auto-capture (Domain 4 GAP-B): persist run residue when the agent's effective
-    // provider is `db`. Best-effort — never fails the run; no-op for none/markdown. When the MEMORY
-    // flag is on, capture is made DURABLE + async (Paperclip memory-jobs): the run finalizer only
-    // ENQUEUES a job and the reap cron drains it, so capture survives process loss. With the flag off
-    // we fall back to the original inline capture so nothing regresses.
+    // provider is `db`. Best-effort — never fails the run; no-op for none/markdown. Durable+async when
+    // the MEMORY flag is on (enqueue a job the reap cron drains), inline otherwise. Shared with the
+    // gateway/wake-driven finalize path via enqueueOrCaptureRunMemory so no run path is memory-blind.
     const memorySummary =
       `Run ${runStatus} (${providerKey}${exitCode != null ? `, exit ${exitCode}` : ""}).\n${displayOutput || ""}`.trim();
-    if (await isFeatureEnabled(FLAG_KEYS.MEMORY)) {
-      await enqueueMemoryJob({
-        workspaceId: input.workspaceId,
-        agentId: agent.id,
-        sourceKind: "run",
-        sourceRefId: run.id,
-        payload: {
-          agentProvider: agent.memoryProvider ?? null,
-          taskId: input.taskId,
-          runId: run.id,
-          summary: memorySummary,
-        },
-      }).catch(() => {}); // best-effort — enqueue must never fail the run
-    } else {
-      await captureRunMemory({
-        workspaceId: input.workspaceId,
-        agentId: agent.id,
-        agentProvider: agent.memoryProvider ?? null,
-        taskId: input.taskId,
-        runId: run.id,
-        summary: memorySummary,
-      });
-    }
+    await enqueueOrCaptureRunMemory({
+      workspaceId: input.workspaceId,
+      agentId: agent.id,
+      agentProvider: agent.memoryProvider ?? null,
+      taskId: input.taskId,
+      runId: run.id,
+      summary: memorySummary,
+    });
 
     // Untrusted-output review gate (Domain 8 G2, LOW_TRUST_REVIEW-gated): stamp the run's reviewState +
     // source-trust from the agent's trust profile. A low-trust/untrusted agent (or one whose profile
@@ -876,7 +859,12 @@ export async function runTaskInSandbox(input: {
 // reaches Hermes over HTTP+SSE via `runHermesGateway` instead of provisioning a box.
 
 /** The minimal agent shape the gateway dispatch needs (loaded with all scalars in runTaskInSandbox). */
-type GatewayAgent = { id: string; adapterConfig: unknown; runtimeTemplate: string | null };
+type GatewayAgent = {
+  id: string;
+  adapterConfig: unknown;
+  runtimeTemplate: string | null;
+  memoryProvider: string | null;
+};
 
 /** Resolve the per-run session key from the configured strategy (null → no cross-run memory). */
 function hermesSessionKey(
@@ -1087,6 +1075,19 @@ async function dispatchHermesGatewayRun(input: {
       `Hermes gateway run (${providerKey}) — ${runStatus}, exit ${result.exitCode}\n\n${stdout || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
       run.id,
     );
+
+    // Post-run memory auto-capture for the gateway/wake-driven finalize path (§3 memory) — the same
+    // shared capture the sandbox path uses, so a wakeup/heartbeat-driven gateway run is no longer
+    // memory-blind. Best-effort, `run` provenance; no-op unless the agent's effective provider is `db`.
+    await enqueueOrCaptureRunMemory({
+      workspaceId,
+      agentId: agent.id,
+      agentProvider: agent.memoryProvider ?? null,
+      taskId,
+      runId: run.id,
+      summary:
+        `Run ${runStatus} (${providerKey}, exit ${result.exitCode}).\n${stdout || ""}`.trim(),
+    });
 
     return {
       runId: run.id,

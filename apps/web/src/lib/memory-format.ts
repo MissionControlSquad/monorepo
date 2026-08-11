@@ -2,14 +2,7 @@
 // here so the formatting is unit-tested in isolation from the component that renders it.
 
 export type MemoryBadgeVariant =
-  | "gray"
-  | "blue"
-  | "green"
-  | "red"
-  | "yellow"
-  | "purple"
-  | "orange"
-  | "indigo";
+  "gray" | "blue" | "green" | "red" | "yellow" | "purple" | "orange" | "indigo";
 
 /** Human labels for a memory op's provenance source kind. */
 const SOURCE_KIND_LABELS: Record<string, string> = {
@@ -92,6 +85,38 @@ export function opTypeBadgeVariant(opType: string): MemoryBadgeVariant {
     default:
       return "gray";
   }
+}
+
+/** Human labels for a memory op type (raw enum -> Title Case). Unknown types fall back to verbatim. */
+const OP_TYPE_LABELS: Record<string, string> = {
+  capture: "Capture",
+  query: "Query",
+  list: "List",
+  get: "Get",
+  forget: "Forget",
+  correct: "Correct",
+  record_upsert: "Upsert",
+};
+
+/** Label a memory op type ("record_upsert" -> "Upsert"); unknown types are returned verbatim. */
+export function opTypeLabel(opType: string): string {
+  return OP_TYPE_LABELS[opType] ?? opType;
+}
+
+/** One-line explanation of what a memory op type did (for the inspect-table tooltip). */
+const OP_TYPE_TOOLTIPS: Record<string, string> = {
+  capture: "Saved a new memory entry (e.g. run residue or an in-run note).",
+  query: "Recalled entries by relevance/recency to inject into context.",
+  list: "Enumerated the agent's stored entries (paginated).",
+  get: "Fetched a single entry by id.",
+  forget: "Deleted an entry from the store.",
+  correct: "Superseded a prior entry and wrote a corrected replacement.",
+  record_upsert: "Idempotently wrote a keyed record (updated in place if the key already existed).",
+};
+
+/** Tooltip copy describing a memory op type; unknown types get a generic fallback. */
+export function opTypeTooltip(opType: string): string {
+  return OP_TYPE_TOOLTIPS[opType] ?? "A memory operation.";
 }
 
 /** Human label for the cost attribution mode. */
