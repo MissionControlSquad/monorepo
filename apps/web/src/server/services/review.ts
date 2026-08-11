@@ -10,6 +10,7 @@ import { TaskStatus } from "../constants";
 import { assertAssignableAgents } from "../assignment-guard";
 import { getOrCreateAgentProfileId } from "../agent-profile";
 import { getDisplayName } from "@agentcenter/utils";
+import { statusChangePresentation, changesRequestedPresentation } from "./message-presentation";
 
 export interface ReviewerInfo {
   id: string;
@@ -54,7 +55,18 @@ export async function performApproveTask(params: {
   await Promise.all([
     taskModel.update(taskId, { data: { status: TaskStatus.DONE } }),
     messageModel.create({
-      data: { taskId, fromProfileId: reviewerProfileId, content: comment },
+      data: {
+        taskId,
+        fromProfileId: reviewerProfileId,
+        content: comment,
+        // Work-items §3 Item 2 — status-change presentation for the approval auto-post.
+        presentation: statusChangePresentation({
+          fromStatus: fromStatusApprove,
+          toStatus: TaskStatus.DONE,
+          actor: reviewer.username ?? reviewer.name,
+          approved: true,
+        }),
+      },
     }),
   ]);
 
@@ -168,6 +180,11 @@ export async function performRejectTask(params: {
         taskId,
         fromProfileId: reviewerProfileId,
         content: `**Task rejected** by @${reviewer.username ?? reviewer.name}\n\n**Reason:** ${rejectionReason}\n\n**Changes needed:**\n${changesList}\n\n${mentions} please address these items.`,
+        // Work-items §3 Item 2 — changes-requested presentation for the rejection auto-post.
+        presentation: changesRequestedPresentation({
+          actor: reviewer.username ?? reviewer.name,
+          reason: rejectionReason,
+        }),
       },
     }),
   ]);
@@ -287,7 +304,23 @@ export async function reviewTaskByHuman(params: {
   const fromStatus = task.status;
   await Promise.all([
     taskModel.update(taskId, { data: { status: newStatus } }),
-    messageModel.create({ data: { taskId, fromProfileId: reviewerProfileId, content } }),
+    messageModel.create({
+      data: {
+        taskId,
+        fromProfileId: reviewerProfileId,
+        content,
+        // Work-items §3 Item 2 — presentation for the human-review decision auto-post.
+        presentation:
+          decision === "approve"
+            ? statusChangePresentation({
+                fromStatus,
+                toStatus: newStatus,
+                actor: reviewerName,
+                approved: true,
+              })
+            : changesRequestedPresentation({ actor: reviewerName, reason: note }),
+      },
+    }),
   ]);
 
   await taskModel

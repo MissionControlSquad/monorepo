@@ -7,6 +7,10 @@ builder.prismaObject("Message", {
     fromProfileId: t.exposeString("fromProfileId"),
     content: t.exposeString("content"),
     projectId: t.exposeString("projectId", { nullable: true }),
+    // Work-items §3 Item 2 — rich comment presentation metadata (null = plain).
+    presentation: t.expose("presentation", { type: "JSON", nullable: true }),
+    // Work-items §3 Item 1 — the annotation comment this message mirrors (origin link), if any.
+    annotationCommentId: t.exposeString("annotationCommentId", { nullable: true }),
     createdAt: t.expose("createdAt", { type: "DateTime" }),
 
     task: t.relation("task"),
@@ -15,6 +19,8 @@ builder.prismaObject("Message", {
     attachments: t.relation("attachments"),
     mentions: t.relation("mentions"),
     reactions: t.relation("reactions"),
+    // The originating document annotation comment (with its anchored thread), for the origin badge/link.
+    annotationComment: t.relation("annotationComment", { nullable: true }),
   }),
 });
 

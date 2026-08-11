@@ -35,6 +35,7 @@ import {
 } from "@/server/adapters/hermes-gateway";
 import type { AgentContextBundle } from "@agentcenter/types";
 import { getProfileAgentId } from "@agentcenter/database";
+import type { Prisma } from "@agentcenter/database";
 import { prisma } from "@/server/prisma";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { assembleContextBundle } from "./agent-context";
@@ -62,6 +63,11 @@ import {
 import { beginRunStatus, setRunPhase, appendRunLog } from "./run-runtime-status";
 import { appendRunLog as appendRunLogChunk, finalizeRunLog } from "./run-log-store";
 import { attachRunBridgeToken } from "./run-bridge";
+import {
+  runSummaryPresentation,
+  runErrorPresentation,
+  type MessagePresentation,
+} from "./message-presentation";
 import { resolveActiveImageRef } from "./environment-custom-images";
 import { recordCostEvent } from "./cost";
 import {
@@ -158,6 +164,7 @@ async function postRunToTask(
   taskId: string,
   summary: string,
   runId?: string,
+  presentation?: MessagePresentation | null,
 ): Promise<void> {
   try {
     const fromProfileId = await getOrCreateAgentProfileId(agentId);
@@ -168,6 +175,8 @@ async function postRunToTask(
         content: summary.slice(0, MAX_MESSAGE_CHARS),
         // Parity §3.12 — attribute the timeline post to the run that produced it.
         createdByRunId: runId ?? null,
+        // Work-items §3 Item 2 — structured presentation so the timeline renders a richer run card.
+        ...(presentation ? { presentation: presentation as unknown as Prisma.InputJsonValue } : {}),
       },
     });
   } catch {
@@ -493,6 +502,7 @@ export async function runTaskInSandbox(input: {
         input.taskId,
         `Sandbox run (${providerKey}) blocked — ${message}`,
         run.id,
+        runErrorPresentation({ provider: providerKey, runId: run.id }),
       );
       throw new GraphQLError(message, {
         extensions: { code: "FAILED_PRECONDITION", exitReason: CONFIGURATION_INCOMPLETE },
@@ -773,6 +783,7 @@ export async function runTaskInSandbox(input: {
       input.taskId,
       `Sandbox run (${providerKey}) - ${runStatus}${exitCode != null ? `, exit ${exitCode}` : ""}\n\n${displayOutput || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
       run.id,
+      runSummaryPresentation({ provider: providerKey, status: runStatus, exitCode, runId: run.id }),
     );
 
     // Post-run memory auto-capture (Domain 4 GAP-B): persist run residue when the agent's effective
@@ -863,6 +874,7 @@ export async function runTaskInSandbox(input: {
         ? `Sandbox run (${providerKey}) canceled: ${cancelReasonFromSignal(abortController.signal)}`
         : `Sandbox run (${providerKey}) failed: ${message}`,
       run?.id,
+      runErrorPresentation({ provider: providerKey, runId: run?.id }),
     );
     throw err;
   } finally {
@@ -1094,6 +1106,12 @@ async function dispatchHermesGatewayRun(input: {
       taskId,
       `Hermes gateway run (${providerKey}) — ${runStatus}, exit ${result.exitCode}\n\n${stdout || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
       run.id,
+      runSummaryPresentation({
+        provider: providerKey,
+        status: runStatus,
+        exitCode: result.exitCode,
+        runId: run.id,
+      }),
     );
 
     // Post-run memory auto-capture for the gateway/wake-driven finalize path (§3 memory) — the same
@@ -1139,6 +1157,7 @@ async function dispatchHermesGatewayRun(input: {
       taskId,
       `Hermes gateway run (${providerKey}) failed: ${message}`,
       run?.id,
+      runErrorPresentation({ provider: providerKey, runId: run?.id }),
     );
     throw err;
   }

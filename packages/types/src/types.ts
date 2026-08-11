@@ -290,12 +290,45 @@ export interface ChannelMessage {
 }
 
 /** Task message (comments). */
+/** Work-items §3 Item 2 — structured rich-comment presentation metadata (null/absent = plain). */
+export interface MessagePresentation {
+  kind: "note" | "status_change" | "run_summary" | "deliverable_ref" | "system";
+  title: string;
+  tone: "info" | "success" | "warning" | "neutral";
+  detail?: string;
+  runId?: string;
+  provider?: string;
+  status?: string;
+  exitCode?: number | null;
+  fromStatus?: string;
+  toStatus?: string;
+  actor?: string;
+  deliverableId?: string;
+}
+
+/** Work-items §3 Item 1 — the document annotation comment a message was mirrored from (origin link). */
+export interface MessageAnnotationOrigin {
+  id: string;
+  threadId: string;
+  thread?: {
+    id: string;
+    documentId: string;
+    quote: string;
+    startOffset: number;
+    endOffset: number;
+    status: string;
+  } | null;
+}
+
 export interface TaskMessage {
   id: string;
   taskId: string;
   fromProfileId: string;
   content: string;
   projectId?: string | null;
+  presentation?: MessagePresentation | null;
+  annotationCommentId?: string | null;
+  annotationComment?: MessageAnnotationOrigin | null;
   createdAt: string;
   fromProfile?: ProfileRef | null;
   task?: TaskRef | null;
