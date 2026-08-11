@@ -19,6 +19,11 @@ import {
   forgetAgentMemory,
   getAgentMemory,
   recordMemoryOperation,
+  correctAgentMemory,
+  listAgentMemory,
+  upsertAgentMemoryRecord,
+  type MemoryListPage,
+  type MemoryUpsertResult,
 } from "./agent-memory";
 
 /** The memory a call is allowed to touch. Always the caller's OWN workspace + agent (least-privilege). */
@@ -45,6 +50,21 @@ export interface MemoryAdapter {
   search(scope: MemoryScope, query: string, limit?: number): Promise<AgentMemory[]>;
   forget(scope: MemoryScope, memoryId: string): Promise<boolean>;
   get(scope: MemoryScope, memoryId: string): Promise<AgentMemory | null>;
+  // §3 memory residuals — the previously-declared op-types, now real. Optional so a provider that stores
+  // nothing (or a minimal test stub) need not implement them; the bridge feature-detects before calling.
+  correct?(
+    scope: MemoryScope,
+    memoryId: string,
+    content: string,
+    provenance?: MemoryProvenance,
+  ): Promise<AgentMemory | null>;
+  list?(scope: MemoryScope, opts?: { limit?: number; offset?: number }): Promise<MemoryListPage>;
+  upsertRecord?(
+    scope: MemoryScope,
+    key: string,
+    content: string,
+    provenance?: MemoryProvenance,
+  ): Promise<MemoryUpsertResult | null>;
 }
 
 /**
@@ -87,6 +107,25 @@ export const dbMemoryAdapter: MemoryAdapter = {
   },
   get(scope, memoryId) {
     return getAgentMemory(scope.workspaceId, scope.agentId, memoryId);
+  },
+  correct(scope, memoryId, content, provenance) {
+    return correctAgentMemory(scope.workspaceId, scope.agentId, memoryId, content, {
+      taskId: provenance?.taskId,
+      runId: provenance?.runId,
+      sourceKind: provenance?.sourceKind,
+      sourceRefId: provenance?.sourceRefId,
+    });
+  },
+  list(scope, opts) {
+    return listAgentMemory(scope.workspaceId, scope.agentId, opts);
+  },
+  upsertRecord(scope, key, content, provenance) {
+    return upsertAgentMemoryRecord(scope.workspaceId, scope.agentId, key, content, {
+      taskId: provenance?.taskId,
+      runId: provenance?.runId,
+      sourceKind: provenance?.sourceKind,
+      sourceRefId: provenance?.sourceRefId,
+    });
   },
 };
 

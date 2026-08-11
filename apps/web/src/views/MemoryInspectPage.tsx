@@ -28,6 +28,8 @@ import {
   formatMemoryCost,
   formatLatency,
   opTypeBadgeVariant,
+  opTypeLabel,
+  opTypeTooltip,
   sourceKindLabel,
   attributionLabel,
 } from "@/lib/memory-format";
@@ -357,9 +359,11 @@ export function MemoryInspectPage() {
                   <tr key={op.id}>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-2">
-                        <Badge variant={opTypeBadgeVariant(op.opType)} size="sm">
-                          {op.opType}
-                        </Badge>
+                        <Tooltip content={opTypeTooltip(op.opType)}>
+                          <Badge variant={opTypeBadgeVariant(op.opType)} size="sm">
+                            {opTypeLabel(op.opType)}
+                          </Badge>
+                        </Tooltip>
                         {!op.success && (
                           <Badge variant="red" size="sm">
                             failed

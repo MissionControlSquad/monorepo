@@ -6,6 +6,9 @@ import {
   bridgeMemoryNote,
   bridgeMemorySearch,
   bridgeMemoryForget,
+  bridgeMemoryCorrect,
+  bridgeMemoryList,
+  bridgeMemoryRecordUpsert,
 } from "@/server/services/run-bridge";
 
 /**
@@ -18,9 +21,12 @@ import {
  * and RUNNERS-gated. Routes through the MemoryAdapter registry (the default `db` adapter).
  *
  *   Authorization: Bearer rbt_<token>
- *   { "op": "note",   "content": "..." }              -> { id }
- *   { "op": "search", "query": "...", "limit": 20 }   -> { results: [{ id, content, createdAt }] }
- *   { "op": "forget", "memoryId": "..." }             -> { forgotten: true|false }
+ *   { "op": "note",          "content": "..." }                    -> { id }
+ *   { "op": "search",        "query": "...", "limit": 20 }         -> { results: [{ id, content, createdAt }] }
+ *   { "op": "forget",        "memoryId": "..." }                   -> { forgotten: true|false }
+ *   { "op": "correct",       "memoryId": "...", "content": "..." } -> { id }            (supersede + rewrite)
+ *   { "op": "list",          "limit": 20, "offset": 0 }           -> { results: [...], nextOffset }
+ *   { "op": "record_upsert", "key": "...", "content": "..." }      -> { id, created }   (idempotent by key)
  */
 export async function POST(request: Request) {
   try {
@@ -40,7 +46,9 @@ export async function POST(request: Request) {
       content?: unknown;
       query?: unknown;
       limit?: unknown;
+      offset?: unknown;
       memoryId?: unknown;
+      key?: unknown;
     };
     const op = typeof body.op === "string" ? body.op : "";
 
@@ -69,7 +77,48 @@ export async function POST(request: Request) {
       return successResponse({ ok: true, forgotten });
     }
 
-    return errorResponse("Unknown op (expected note | search | forget)", 400);
+    if (op === "correct") {
+      const memoryId = typeof body.memoryId === "string" ? body.memoryId : "";
+      const content = typeof body.content === "string" ? body.content : "";
+      if (!memoryId.trim()) return errorResponse("memoryId is required", 400);
+      if (!content.trim()) return errorResponse("content is required", 400);
+      const entry = await bridgeMemoryCorrect(run, memoryId, content);
+      if (!entry) {
+        return errorResponse(
+          "Nothing corrected (entry not found, already corrected, or memory unavailable for run)",
+          400,
+        );
+      }
+      return successResponse({ ok: true, id: entry.id }, 201);
+    }
+
+    if (op === "list") {
+      const limit = typeof body.limit === "number" ? body.limit : undefined;
+      const offset = typeof body.offset === "number" ? body.offset : undefined;
+      const page = await bridgeMemoryList(run, { limit, offset });
+      if (page === null) return errorResponse("Memory unavailable for run", 400);
+      return successResponse({ ok: true, results: page.results, nextOffset: page.nextOffset });
+    }
+
+    if (op === "record_upsert") {
+      const key = typeof body.key === "string" ? body.key : "";
+      const content = typeof body.content === "string" ? body.content : "";
+      if (!key.trim()) return errorResponse("key is required", 400);
+      if (!content.trim()) return errorResponse("content is required", 400);
+      const res = await bridgeMemoryRecordUpsert(run, key, content);
+      if (!res) {
+        return errorResponse("Nothing upserted (empty input or memory unavailable for run)", 400);
+      }
+      return successResponse(
+        { ok: true, id: res.id, created: res.created },
+        res.created ? 201 : 200,
+      );
+    }
+
+    return errorResponse(
+      "Unknown op (expected note | search | forget | correct | list | record_upsert)",
+      400,
+    );
   } catch (err) {
     return handleError(err);
   }

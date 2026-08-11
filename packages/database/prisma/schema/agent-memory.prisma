@@ -14,8 +14,19 @@ model AgentMemory {
   sourceTaskId String? // provenance: the task run that produced this entry
   sourceKind   String? // provenance kind: run | issue_comment | issue_document | manual_note | ... (default run)
   sourceRefId  String? // provenance ref: the specific comment/doc/activity id when sourceKind isn't a task
-  createdAt    DateTime @default(now())
+  // Correction lineage (memory.correct): when an entry is superseded by a correction, the OLD row is
+  // stamped with the id of the NEW row that replaces it (+ when). A superseded entry is excluded from
+  // recall/injection so a corrected fact never resurfaces, while both rows are kept for the audit trail.
+  supersededById String? // the correcting entry's id (null = live/current)
+  supersededAt   DateTime? // when this entry was corrected/replaced
+  // Idempotent keyed records (memory.record_upsert): a stable app-supplied key that dedupes an upserted
+  // record per (workspace, agent). Two upserts with the same key hit ONE row (update, not insert). Null
+  // for ordinary appended entries.
+  recordKey String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
 
   @@index([workspaceId, agentId, createdAt])
+  @@index([workspaceId, agentId, recordKey])
   @@map("agent_memories")
 }
