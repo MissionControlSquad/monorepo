@@ -48,7 +48,12 @@ import { resolveEnvironmentExecution, type EnvExecutionResolution } from "./envi
 import { resolveEnvironmentRuntimeDriver } from "./environment-runtime-driver";
 import { evaluateRunConfig, CONFIGURATION_INCOMPLETE } from "./run-config-gate";
 import type { EnvSshResolution, SshExecTransport } from "./sandbox/ssh-runtime";
-import { acquireLease, releaseLease, coerceLeasePolicy } from "./environment-leases";
+import {
+  acquireLease,
+  releaseLease,
+  coerceLeasePolicy,
+  computeLeaseSecretFingerprint,
+} from "./environment-leases";
 import {
   getPrimaryProjectWorkspace,
   recordExecutionWorkspace,
@@ -587,6 +592,13 @@ export async function runTaskInSandbox(input: {
   try {
     // Acquire an execution machine via the lease layer: a `reuse_by_environment` env re-attaches to a
     // kept machine; ephemeral (and ad-hoc, no-env) runs provision a fresh one. Release honors the policy.
+    // Secret-version fingerprint (security hardening — Item 1): a reusable machine is only re-attached
+    // when the secrets it was provisioned with are UNCHANGED; a rotated secret forces a fresh machine.
+    const secretFingerprint = await computeLeaseSecretFingerprint({
+      workspaceId: input.workspaceId,
+      environmentId: envRes?.environmentId ?? null,
+      agentId: agent.id,
+    });
     const acquired = await acquireLease({
       workspaceId: input.workspaceId,
       environmentId: envRes?.environmentId ?? null,
@@ -596,9 +608,17 @@ export async function runTaskInSandbox(input: {
       taskId: input.taskId,
       runId: run.id,
       spec: imageRef ? { image: imageRef } : undefined,
+      secretFingerprint,
     });
     handle = acquired.handle;
     lease = acquired.lease;
+    // Make the "reuse was skipped because a secret rotated" decision readable in the run UI.
+    if (acquired.freshDueToSecretRotation) {
+      appendRunLog(
+        run.id,
+        "[lease] A rotated secret changed this run's secret-version fingerprint — a fresh sandbox was provisioned with the current credentials instead of reusing the kept machine.\n",
+      );
+    }
     setRunPhase(run.id, "running");
 
     let exitCode: number | null;

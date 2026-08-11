@@ -30,6 +30,14 @@ export interface SourceTrust {
   sourceRunId?: string | null;
   /** Set when a board reviewer promotes a quarantined output out of review. */
   promotedByProfileId?: string | null;
+  /**
+   * Untrusted-PR-review isolation (security hardening — Item 3): true when this run's checkout/review
+   * was routed through the ISOLATED container profile because its source trust was untrusted. Recorded
+   * so the review UI can show that the hostile checkout ran contained. See resolveReviewCheckoutRouting.
+   */
+  reviewIsolated?: boolean;
+  /** The compose/provider profile the isolated review ran under (e.g. "review-checkout"). */
+  reviewProfile?: string | null;
 }
 
 export interface RunTrustInputs {
@@ -80,6 +88,9 @@ export function buildPromotedSourceTrust(prev: SourceTrust | null, promotedByPro
     sourceAgentId: prev?.sourceAgentId ?? null,
     sourceRunId: prev?.sourceRunId ?? null,
     promotedByProfileId,
+    // Preserve the isolation provenance (Item 3): a promoted review still records that its checkout ran
+    // isolated when it did.
+    ...(prev?.reviewIsolated ? { reviewIsolated: true, reviewProfile: prev.reviewProfile ?? null } : {}),
   };
 }
 
