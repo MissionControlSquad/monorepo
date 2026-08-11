@@ -49,6 +49,7 @@ import { SidebarCustomizeCard } from "@/components/layout/sidebar/SidebarCustomi
 import { AppearanceCard } from "@/components/settings/AppearanceCard";
 import { BuildbaseAccountCard } from "@/components/settings/BuildbaseAccountCard";
 import { ApprovalPoliciesCard } from "@/components/settings/ApprovalPoliciesCard";
+import { PushNotificationsCard } from "@/components/settings/PushNotificationsCard";
 
 const changePasswordSchema = z
   .object({
@@ -216,8 +217,9 @@ export function SettingsPage() {
       {/* Agent memory backend */}
       <MemoryDefaultCard />
 
-      {/* Notification preferences now live in buildbase — see BuildbaseAccountCard →
-          openWorkspaceSettings('notifications'). */}
+      {/* Push notifications — per-device web-push opt-in, delivered by buildbase. Email/in-app
+          preferences still live in buildbase (BuildbaseAccountCard → openWorkspaceSettings). */}
+      <PushNotificationsCard />
 
       {/* Appearance / theme */}
       <AppearanceCard />

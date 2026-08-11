@@ -1,6 +1,6 @@
 "use client";
 
-import { SaaSOSProvider, useSaaSAuth } from "@buildbase/sdk/react";
+import { SaaSOSProvider, useSaaSAuth, PushNotificationProvider } from "@buildbase/sdk/react";
 import { ApiVersion, consumeAuthIntent, type EventType, type EventData } from "@buildbase/sdk";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 
@@ -161,7 +161,17 @@ export function BuildbaseProvider({ children }: { children: React.ReactNode }) {
     >
       <BuildbaseReadyContext.Provider value={true}>
         <PostAuthRedirector />
-        {children}
+        {/*
+          Web-push provider. NOT part of SaaSOSProvider, so we mount it explicitly — only inside the
+          ready branch (SaaSOSProvider supplies the serverUrl/orgId/session context PushApi needs).
+          It registers the service worker committed at /push-sw.js (the SDK default path, generated
+          from PUSH_SERVICE_WORKER_SCRIPT — see scripts/generate-push-sw.mjs). autoSubscribe stays
+          false: subscribing is an explicit, per-device opt-in from the settings UI so we never
+          request the browser permission unprompted. Dormant until an org is provisioned.
+        */}
+        <PushNotificationProvider serviceWorkerPath="/push-sw.js" autoSubscribe={false}>
+          {children}
+        </PushNotificationProvider>
       </BuildbaseReadyContext.Provider>
     </SaaSOSProvider>
   );
