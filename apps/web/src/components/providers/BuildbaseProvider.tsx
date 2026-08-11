@@ -1,7 +1,13 @@
 "use client";
 
-import { SaaSOSProvider, useSaaSAuth, PushNotificationProvider } from "@buildbase/sdk/react";
+import {
+  SaaSOSProvider,
+  useSaaSAuth,
+  PushNotificationProvider,
+  SUPPORTED_LOCALES,
+} from "@buildbase/sdk/react";
 import { ApiVersion, consumeAuthIntent, type EventType, type EventData } from "@buildbase/sdk";
+import type { SDKLocale } from "@buildbase/sdk/react";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 
 // buildbase human-tenancy provider (Epic #1). Ported from the MissionControlSquad website.
@@ -18,6 +24,33 @@ const SERVER_URL = process.env.NEXT_PUBLIC_SAAS_SERVER_URL ?? "";
 const ORG_ID = process.env.NEXT_PUBLIC_SAAS_ORG_ID ?? "";
 const CLIENT_ID = process.env.NEXT_PUBLIC_SAAS_CLIENT_ID ?? "";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+// i18n: the SDK localizes every built-in screen (billing, devices, sessions, connected-agents,
+// passkeys, …) from the `locale` prop. We wire the SDK's own i18n only — not an app-wide system.
+// Resolution order (first supported wins): per-user override in localStorage ('saas_locale'),
+// then the browser's preferred language, then a build-time NEXT_PUBLIC_SAAS_LOCALE default, else 'en'.
+const DEFAULT_LOCALE: SDKLocale = "en";
+const ENV_LOCALE = process.env.NEXT_PUBLIC_SAAS_LOCALE ?? "";
+
+function isSupportedLocale(value: string): value is SDKLocale {
+  return (SUPPORTED_LOCALES as readonly string[]).includes(value);
+}
+
+/** Resolve the SDK UI locale from a user setting / browser / env default. Always returns a supported code. */
+function resolveLocale(): SDKLocale {
+  if (typeof window !== "undefined") {
+    try {
+      const stored = window.localStorage.getItem("saas_locale");
+      if (stored && isSupportedLocale(stored)) return stored;
+    } catch {
+      // localStorage may be unavailable (privacy mode) — fall through.
+    }
+    const nav = window.navigator?.language?.split("-")[0];
+    if (nav && isSupportedLocale(nav)) return nav;
+  }
+  if (ENV_LOCALE && isSupportedLocale(ENV_LOCALE)) return ENV_LOCALE;
+  return DEFAULT_LOCALE;
+}
 
 function storeAuthToken(token: string) {
   localStorage.setItem("auth_token", token);
@@ -70,6 +103,9 @@ function PostAuthRedirector() {
 
 export function BuildbaseProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
+  // Resolved on the client (reads localStorage / navigator); the SDK branch below only mounts
+  // client-side, so this is always a real user/browser-derived locale by the time it's used.
+  const [locale] = useState<SDKLocale>(resolveLocale);
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -88,6 +124,7 @@ export function BuildbaseProvider({ children }: { children: React.ReactNode }) {
       serverUrl={SERVER_URL}
       version={ApiVersion.V1}
       orgId={ORG_ID}
+      locale={locale}
       auth={{
         clientId: CLIENT_ID,
         redirectUrl: APP_URL,

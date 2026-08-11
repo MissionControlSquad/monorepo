@@ -49,6 +49,7 @@ import { API_ROUTES } from "@/lib/api-routes";
 import { SidebarCustomizeCard } from "@/components/layout/sidebar/SidebarCustomizeCard";
 import { AppearanceCard } from "@/components/settings/AppearanceCard";
 import { BuildbaseAccountCard } from "@/components/settings/BuildbaseAccountCard";
+import { AccountSecurityCard } from "@/components/settings/AccountSecurityCard";
 import { ApprovalPoliciesCard } from "@/components/settings/ApprovalPoliciesCard";
 import { PushNotificationsCard } from "@/components/settings/PushNotificationsCard";
 
@@ -146,6 +147,9 @@ export function SettingsPage() {
 
       {/* Buildbase user-layer account/billing — opens inbuilt SDK screens (renders only when configured) */}
       <BuildbaseAccountCard />
+
+      {/* Account & security — self-service sessions/devices/connected-agents/passkeys (own page) */}
+      <AccountSecurityCard />
 
       {/* Usage & limits — our rendered plan-quota surface (human plan quota, not agent budgets) */}
       <Card padding="none">
