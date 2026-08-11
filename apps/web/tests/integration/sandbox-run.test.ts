@@ -24,6 +24,7 @@ import { armTaskMonitor, tickDueTaskMonitors } from "../../src/server/services/t
 import { createEnvironment } from "../../src/server/services/environments";
 import { getRunRuntimeStatus } from "../../src/server/services/run-runtime-status";
 import { createSecret, bindSecret } from "../../src/server/services/secrets";
+import { registerAdapter, getAdapter } from "@agentcenter/utils";
 
 // Tier D: the sandbox EXECUTION SEAM. Exercised end-to-end against the REAL `local` provider (temp
 // dir + child_process, no keys) — proving provision → materialise the task → run the runtime → capture
@@ -227,6 +228,64 @@ describe("sandbox task execution (Tier D)", () => {
     expect(live!.phase).toBe("done");
     expect(live!.tail).toContain("LIVE_MARKER"); // streamed output captured
     expect(live!.tail).not.toContain("sk-streamed-secret"); // secret value scrubbed
+  });
+
+  it("streams the PARSED transcript live for an adapter with a parseLine (§3 Item 1)", async () => {
+    // Register a test adapter whose command emits ONE claude-style stream-json assistant line, and reuse
+    // claude's parseLine. The live tail must show the RENDERED assistant text (not raw JSONL) mid-run.
+    const claudeParse = getAdapter("claude")!.parseLine!;
+    const assistantLine = JSON.stringify({
+      type: "assistant",
+      message: { content: [{ type: "text", text: "STREAMED_TURN" }] },
+    });
+    registerAdapter({
+      key: "streamtest",
+      displayName: "Stream Test",
+      requiresTemplate: false,
+      supportsModel: false,
+      models: [],
+      build: (ctx) => ({
+        mode: "spawn",
+        argv: [`printf '%s\\n' '${assistantLine}'`],
+        cwd: ctx.workspaceDir,
+        useShell: true,
+        layout: {
+          instructionsFile: "AGENTS.md",
+          skillsDir: "skills",
+          identityFile: "IDENTITY.md",
+          taskFile: "TASK.md",
+        },
+      }),
+      parseLine: (line, ts) => claudeParse(line, ts),
+    });
+
+    const agent = await prisma.agent.create({
+      data: {
+        name: "StreamAdapter",
+        role: "worker",
+        personality: "x",
+        workspaceId: WS,
+        setupStatus: "active",
+        apiKeyHash: hashApiKey(`mc_streamadp_${Math.random()}`),
+        runtimeAdapter: "streamtest",
+        sandboxProvider: "local",
+      },
+    });
+    const taskId = await makeTask();
+
+    const result = await runTaskInSandbox({ workspaceId: WS, taskId, agentId: agent.id });
+    const live = getRunRuntimeStatus(result.runId);
+    expect(live).not.toBeNull();
+    // The live tail shows the human-readable assistant turn…
+    expect(live!.tail).toContain("STREAMED_TURN");
+    // …NOT the raw stream-json envelope (streaming replaced the JSONL blob on the live tail).
+    expect(live!.tail).not.toContain('"type":"assistant"');
+    // The post-hoc authoritative result still parsed the same transcript.
+    expect(
+      result.execution?.transcript?.some(
+        (e) => e.kind === "assistant" && e.text === "STREAMED_TURN",
+      ),
+    ).toBe(true);
   });
 
   it("exposes the persisted run via the agentRuns query (RUNNERS-gated)", async () => {
