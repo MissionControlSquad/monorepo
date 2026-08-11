@@ -46,6 +46,26 @@ or weak. During `next build` it uses a lenient schema (secrets aren't needed to 
 | `SUPPORT_EMAIL` | `dharmendra@agentcenter.cloud` | Support contact surfaced in‑app |
 | `SLACK_SUPPORT_WEBHOOK_URL` | — | Route support messages to Slack |
 
+#### buildbase human‑tenancy (all optional — absent = the app runs on its built‑in admin auth)
+
+Setting **`SAAS_ORG_ID` + `NEXT_PUBLIC_SAAS_ORG_ID`** (a 24‑char hex org id) is what activates the
+human‑tenancy plane. Without them buildbase stays **dormant**: the SDK provider renders children
+without itself, all hooks no‑op, and the Account & security page shows an "available once provisioned"
+state. **None of these are required — do not make any of them required, or the no‑buildbase deploy
+breaks.** All are declared (optional) in `apps/web/src/server/env.ts`.
+
+| Var | Default | Unlocks / effect |
+|-----|---------|------------------|
+| `NEXT_PUBLIC_SAAS_ORG_ID` | — | **Activator (client).** 24‑char hex org id; presence mounts `SaaSOSProvider` and enables sign‑in, workspaces, human roles, billing/quota, and the Account & security surfaces |
+| `SAAS_ORG_ID` | — | **Activator (server).** Same org id for the server `BuildBase()` factory (`getBuildbase()`) |
+| `SAAS_SERVER_URL` / `NEXT_PUBLIC_SAAS_SERVER_URL` | `https://api.console.buildbase.app` | buildbase API base URL (server / client) |
+| `SAAS_CLIENT_ID` / `NEXT_PUBLIC_SAAS_CLIENT_ID` | — | OAuth client id for the buildbase sign‑in flow (server exchange / client redirect) |
+| `SAAS_CLIENT_SECRET` | — | OAuth client secret for the server‑side `/api/auth/buildbase/token` code exchange |
+| `NEXT_PUBLIC_APP_URL` | — | Public app URL used as the OAuth `redirectUrl` |
+| `NEXT_PUBLIC_SAAS_LOCALE` | `en` | Default SDK UI language for buildbase screens (`en, es, fr, de, ja, zh, hi, ar`); a per‑user `saas_locale` in localStorage and the browser language override it |
+| `BUILDBASE_MCP_SECRET` | — | Shared secret the in‑sandbox MCP bridge uses to authenticate callbacks into buildbase surfaces |
+| `BUILDBASE_SERVICE_SESSION_ID` | — | Service session id for background (non‑request) buildbase calls where no user cookie exists |
+
 Notes carried from `env.ts`:
 
 - **Sandbox / cloud‑provider credentials are NOT deployment env.** Every cloud sandbox and host
