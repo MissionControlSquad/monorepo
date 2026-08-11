@@ -23,6 +23,8 @@ export const apiLimiters = {
   liveGatewayConnections: createRateLimiter({ max: 120, windowSec: 60, prefix: "rl:lgconn" }),
   /** Storage uploads */
   storage: createRateLimiter({ max: 30, windowSec: 60, prefix: "rl:store" }),
+  /** Inbound plugin webhooks — external senders; bounded per client IP. */
+  pluginWebhooks: createRateLimiter({ max: 60, windowSec: 60, prefix: "rl:pluginhook" }),
 };
 
 /**

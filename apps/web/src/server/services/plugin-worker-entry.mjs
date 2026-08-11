@@ -4,9 +4,10 @@
 // JSON-RPC — logs go to stderr — so the wire never desyncs.
 //
 // The plugin module contract (kept intentionally tiny):
-//   export const tools = { [name]: async (args, ctx) => result }
-//   export const jobs  = { [jobKey]: async (payload, ctx) => result }
-//   export const meta  = { onShutdown?: async () => void }   // optional
+//   export const tools  = { [name]: async (args, ctx) => result }
+//   export const jobs   = { [jobKey]: async (payload, ctx) => result }
+//   export const routes = { [handlerKey]: async (req, ctx) => result }   // scoped API routes (§3)
+//   export const meta   = { onShutdown?: async () => void }   // optional
 //
 // SECURITY SEAM: this loads the module with a normal dynamic import — it does NOT sandbox untrusted code
 // (no seccomp / container / VM). The isolation we DO get is process + minimal-env isolation from the
@@ -50,6 +51,13 @@ async function handleInvoke(id, params) {
     const fn = mod.jobs?.[name];
     if (typeof fn !== "function") return replyError(id, `unknown job '${name}'`, -32601);
     const result = await fn(payload, { pluginId: PLUGIN_ID });
+    return replyResult(id, result);
+  }
+  if (kind === "api") {
+    // Scoped API route dispatch (§3): `name` is the handler key, `args` the {method,path,query,body}.
+    const fn = mod.routes?.[name];
+    if (typeof fn !== "function") return replyError(id, `unknown route '${name}'`, -32601);
+    const result = await fn(args, { pluginId: PLUGIN_ID });
     return replyResult(id, result);
   }
   return replyError(id, `unknown invoke kind '${kind}'`, -32602);

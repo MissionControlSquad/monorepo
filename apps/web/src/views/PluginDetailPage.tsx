@@ -16,6 +16,7 @@ import {
 } from "@/lib/graphql/mutations";
 import { Breadcrumbs, Button, Card, Badge, PageLayout, Tooltip } from "@/components/ui";
 import { JsonSchemaForm } from "@/components/common/JsonSchemaForm";
+import { PluginSlot } from "@/components/plugins/PluginSlot";
 import { adapterConfigFields } from "@agentcenter/utils";
 
 // Epic #6: per-plugin detail — manifest info, capabilities, tools/jobs, a config form rendered from
@@ -27,6 +28,15 @@ interface Manifest {
   configSchema?: unknown;
   tools?: { name: string; displayName: string; description: string }[];
   jobs?: { jobKey: string; displayName: string; schedule?: string }[];
+  // Extensibility residuals (§3) — declared UI slots, scoped API routes, and inbound webhooks.
+  ui?: { slot: string; entry: string; title?: string; description?: string }[];
+  apiRoutes?: {
+    path: string;
+    method?: string;
+    capability?: string;
+    description?: string;
+  }[];
+  webhooks?: { hook: string; secretName?: string; jobKey?: string; description?: string }[];
 }
 interface Plugin {
   id: string;
@@ -196,6 +206,10 @@ export function PluginDetailPage({ pluginId }: { pluginId: string }) {
 
   const tools = plugin.manifest?.tools ?? [];
   const jobs = plugin.manifest?.jobs ?? [];
+  const uiSlots = plugin.manifest?.ui ?? [];
+  const apiRoutes = plugin.manifest?.apiRoutes ?? [];
+  const webhooks = plugin.manifest?.webhooks ?? [];
+  const hasExtensions = uiSlots.length > 0 || apiRoutes.length > 0 || webhooks.length > 0;
 
   return (
     <PageLayout maxWidth="wide">
@@ -345,6 +359,109 @@ export function PluginDetailPage({ pluginId }: { pluginId: string }) {
             })}
           </ul>
         )}
+      </Card>
+
+      {/* Extension surface (§3): declared UI slots, scoped API routes, inbound webhooks. Each row has a
+          tooltip explaining the mechanism + its security posture. */}
+      {hasExtensions && (
+        <Card padding="lg" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-foreground">Extension surface</h2>
+            <Tooltip content="Declared in the plugin manifest (ui / apiRoutes / webhooks). UI runs in a sandboxed iframe; routes + webhooks dispatch into the plugin worker and are fail-closed on capability grants.">
+              <Badge variant="gray">manifest-declared</Badge>
+            </Tooltip>
+          </div>
+
+          {uiSlots.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                UI slots
+              </h3>
+              <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
+                {uiSlots.map((s) => (
+                  <li key={s.slot} className="flex items-center gap-2">
+                    <Tooltip content="A UI extension slot. The host renders this entry inside a sandboxed iframe (allow-scripts only, opaque origin) and exchanges typed postMessage frames — no direct DOM access.">
+                      <code className="text-xs text-foreground">{s.slot}</code>
+                    </Tooltip>
+                    <span className="truncate">→ {s.title ?? s.entry}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {apiRoutes.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                API routes
+              </h3>
+              <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
+                {apiRoutes.map((r) => (
+                  <li key={`${r.method ?? "GET"} ${r.path}`} className="flex items-center gap-2">
+                    <Tooltip content="A scoped API route, mounted under /api/plugins/<id>/x/… and dispatched into the plugin worker. Fail-closed: refused unless the route's declared capability is granted.">
+                      <code className="text-xs text-foreground">
+                        {(r.method ?? "GET").toUpperCase()} /api/plugins/{plugin.pluginId}/x{r.path}
+                      </code>
+                    </Tooltip>
+                    {r.capability && <Badge variant="gray">{r.capability}</Badge>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {webhooks.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Webhooks
+              </h3>
+              <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
+                {webhooks.map((w) => (
+                  <li key={w.hook} className="flex items-center gap-2">
+                    <Tooltip content="An inbound webhook. The host verifies an HMAC-SHA256 signature against a per-plugin signing secret and enqueues a job. Fail-closed: bad/missing signature → 401; requires the webhooks.receive capability, granted.">
+                      <code className="text-xs text-foreground">
+                        POST /api/plugins/{plugin.pluginId}/webhooks/{w.hook}
+                      </code>
+                    </Tooltip>
+                    {w.description && <span className="truncate">— {w.description}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Live example UI slot — always rendered so the sandbox + postMessage bridge is demonstrable on
+          any plugin. Renders the first declared slot's entry when present, else the bundled echo demo. */}
+      <Card padding="lg" className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-foreground">Example UI slot</h2>
+            <Badge variant="gray">example</Badge>
+          </div>
+          <Tooltip content="Security: the fragment runs in a sandboxed iframe with allow-scripts only (no allow-same-origin), so it has an opaque origin and cannot read the host page, cookies, or storage. The host validates every message by frame identity + origin before trusting it.">
+            <span className="text-xs text-muted-foreground underline decoration-dotted">
+              why is this safe?
+            </span>
+          </Tooltip>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          A round-trip demo: the fragment announces <code>plugin:ready</code>, the host replies with
+          context, and the button drives a host <code>action-request → action-result</code>{" "}
+          round-trip.
+        </p>
+        <PluginSlot
+          pluginId={plugin.pluginId}
+          slot={uiSlots[0]?.slot ?? "example.detail.panel"}
+          entry={uiSlots[0]?.entry ?? "/plugin-slots/echo.html"}
+          title={uiSlots[0]?.title ?? "Example slot"}
+          onAction={(action, payload) =>
+            action === "ping"
+              ? { pong: true, ts: Date.now(), echo: payload }
+              : { error: `unknown action '${action}'` }
+          }
+        />
       </Card>
 
       {/* Tools + Jobs */}
