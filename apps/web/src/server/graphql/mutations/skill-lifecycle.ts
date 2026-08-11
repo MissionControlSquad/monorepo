@@ -7,6 +7,8 @@ import {
   importSkillPackage,
   importSkillFromSource,
   importFromCatalog,
+  reassignSkillFork,
+  importSkillFromProjectScan,
 } from "@/server/services/skills";
 import { assertSkillAction } from "@/server/services/skill-policy";
 
@@ -73,6 +75,45 @@ builder.mutationField("importSkillFromCatalog", (t) =>
       return importFromCatalog({
         workspaceId: tn.workspaceId,
         ref: args.ref,
+        createdByProfileId: tn.userId,
+      });
+    },
+  }),
+);
+
+// §3 fork depth: reassign a fork's origin (repoint lineage + re-pin the diverged baseline). Member+,
+// policy-checked as an edit of the fork.
+builder.mutationField("reassignSkillFork", (t) =>
+  t.prismaField({
+    type: "Skill",
+    args: {
+      skillId: t.arg.string({ required: true }),
+      newOriginId: t.arg.string({ required: true }),
+    },
+    resolve: async (_q, _r, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tn = requireRole(ctx, "member");
+      await assertSkillAction(tn.workspaceId, "edit", { role: tn.role }, { skillId: args.skillId });
+      return reassignSkillFork(tn.workspaceId, args.skillId, args.newOriginId);
+    },
+  }),
+);
+
+// §3 project-workspace scan: import a skill discovered by scanning a project workspace's checked-out
+// files. Admin-gated (reads the workspace repo) + policy-checked (`import`). `dir` selects a bundle from
+// the picker; omit it to import the first-found bundle.
+builder.mutationField("importSkillFromProjectScan", (t) =>
+  t.prismaField({
+    type: "Skill",
+    args: { projectWorkspaceId: t.arg.string({ required: true }), dir: t.arg.string() },
+    resolve: async (_q, _r, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tn = requireRole(ctx, "admin");
+      await assertSkillAction(tn.workspaceId, "import", { role: tn.role });
+      return importSkillFromProjectScan({
+        workspaceId: tn.workspaceId,
+        projectWorkspaceId: args.projectWorkspaceId,
+        dir: args.dir ?? null,
         createdByProfileId: tn.userId,
       });
     },

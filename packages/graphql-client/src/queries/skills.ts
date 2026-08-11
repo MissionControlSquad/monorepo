@@ -20,6 +20,11 @@ export const SKILLS_QUERY = gql`
       trustLevel
       sharingScope
       forkedFromSkillId
+      sourceType
+      sourceBadge
+      catalogKey
+      packageVersion
+      catalogKind
     }
   }
 `;

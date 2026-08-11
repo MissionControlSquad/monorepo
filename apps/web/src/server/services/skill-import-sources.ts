@@ -26,7 +26,8 @@ import { getCatalogEntry, type CatalogSkill } from "@/server/skill-catalog/manif
 export type SkillSourceKind = "github" | "github-tree" | "url" | "local" | "skillsh" | "catalog";
 
 /** The DB SkillSourceType a resolved import stamps. Mirrors the Prisma enum values. */
-export type ResolvedSourceType = "github" | "url" | "catalog" | "local_path" | "skills_sh";
+export type ResolvedSourceType =
+  "github" | "url" | "catalog" | "local_path" | "skills_sh" | "project_scan";
 
 export interface GitHubSourcePlan {
   kind: "github";
@@ -724,4 +725,136 @@ export async function resolveSkillSource(
       originHash: sha256(content),
     },
   };
+}
+
+// ─── Project-workspace scan (§3 skills residuals) ────────────────────────────
+// Scan a project workspace's checked-out files for skill bundles (a SKILL.md and its siblings) and
+// offer them for import. Unlike the single-spec resolvers above a repo may hold MANY skills, so this
+// returns a LIST of candidates (each a self-contained bundle) the UI picker presents. Provenance is
+// stamped `project_scan` with a `project:<projectWorkspaceId>#<dir>` locator so the origin is auditable.
+
+const SKILL_MD_RE = /(^|\/)SKILL\.md$/i;
+
+/** A discovered skill bundle inside a project workspace, ready to import via importSkillPackage. */
+export interface ProjectSkillCandidate {
+  /** bundle root, relative to the workspace root ("" = the repo root). */
+  dir: string;
+  /** display name — the SKILL.md frontmatter `name`, else the dir basename, else "SKILL". */
+  name: string;
+  /** bundle files rebased to the bundle root (SKILL.md at the top). */
+  files: { path: string; content: string }[];
+  provenance: {
+    sourceType: "project_scan";
+    sourceRef: string;
+    packageName: string | null;
+    originHash: string;
+  };
+}
+
+/** The dir portion of a repo-relative path ("" for a root-level file). */
+function dirOf(path: string): string {
+  const i = path.lastIndexOf("/");
+  return i === -1 ? "" : path.slice(0, i);
+}
+
+/** Read the `name:` scalar out of a SKILL.md without pulling in the full frontmatter parser. */
+function skillMdName(content: string): string | null {
+  const m = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---/.exec(content);
+  if (!m) return null;
+  const line = m[1].split(/\r?\n/).find((l) => /^name:[ \t]*\S/.test(l));
+  if (!line) return null;
+  return (
+    line
+      .replace(/^name:[ \t]*/, "")
+      .trim()
+      .replace(/^["']|["']$/g, "") || null
+  );
+}
+
+/**
+ * PURE: group a flat project file list into per-skill bundles. Each SKILL.md defines a bundle rooted at
+ * its directory; every other file is assigned to the DEEPEST SKILL.md directory that is its ancestor
+ * (so nested skills don't swallow each other). Paths are traversal-checked and rebased to the bundle
+ * root. Files that escape the bundle are skipped, never fetched. Bundles are returned dir-sorted.
+ */
+export function groupProjectSkillBundles(
+  files: { path: string; content: string }[],
+  projectWorkspaceId: string,
+): ProjectSkillCandidate[] {
+  const normalized = files
+    .map((f) => ({ path: f.path.replace(/\\/g, "/").replace(/^\/+/, ""), content: f.content }))
+    .filter((f) => f.path && !f.path.split("/").includes(".."));
+  const skillDirs = normalized.filter((f) => SKILL_MD_RE.test(f.path)).map((f) => dirOf(f.path));
+  if (skillDirs.length === 0) return [];
+  // Deepest-first so the ancestor search picks the most specific bundle.
+  const byDepthDesc = [...new Set(skillDirs)].sort(
+    (a, b) => b.split("/").length - a.split("/").length || a.localeCompare(b),
+  );
+  const isUnder = (dir: string, path: string) =>
+    dir === "" ? true : path === dir || path.startsWith(`${dir}/`);
+
+  const buckets = new Map<string, { path: string; content: string }[]>();
+  for (const dir of byDepthDesc) buckets.set(dir, []);
+  for (const f of normalized) {
+    const owner = byDepthDesc.find((d) => isUnder(d, f.path));
+    if (owner === undefined) continue;
+    const prefix = owner === "" ? "" : `${owner}/`;
+    const rebased = f.path.slice(prefix.length);
+    try {
+      buckets.get(owner)!.push({ path: assertSafeBundlePath(rebased), content: f.content });
+    } catch {
+      // unsafe rebased path → skip this file rather than drop the whole bundle
+    }
+  }
+
+  const out: ProjectSkillCandidate[] = [];
+  for (const dir of [...buckets.keys()].sort((a, b) => a.localeCompare(b))) {
+    const bundle = buckets.get(dir)!;
+    const md = bundle.find((f) => SKILL_MD_RE.test(f.path));
+    if (!md) continue;
+    const name = skillMdName(md.content) || (dir ? basename(dir) : "SKILL");
+    out.push({
+      dir,
+      name,
+      files: bundle,
+      provenance: {
+        sourceType: "project_scan",
+        sourceRef: `project:${projectWorkspaceId}#${dir || "."}`,
+        packageName: dir ? basename(dir) : null,
+        originHash: sha256(md.content),
+      },
+    });
+  }
+  return out;
+}
+
+/**
+ * Scan a project workspace's checked-out files on disk for skill bundles. Reads the workspace `root`
+ * (bounded, dotfiles/node_modules skipped — same walker the local-path resolver uses), then groups the
+ * files into per-skill bundles. `listFiles` is injectable so tests never touch disk. No allow-list gate
+ * (the root is a server-owned, already-cloned workspace path), but every bundle path is traversal-checked.
+ */
+export async function scanProjectWorkspaceForSkills(input: {
+  projectWorkspaceId: string;
+  root: string;
+  listFiles?: (root: string) => Promise<{ path: string; content: string }[]>;
+}): Promise<ProjectSkillCandidate[]> {
+  const root = input.root?.trim();
+  if (!root) throw new SkillSourceError("project workspace has no checked-out path to scan");
+  const lister =
+    input.listFiles ??
+    (async (r: string) => {
+      const out: { path: string; content: string }[] = [];
+      await collectLocalDir(r, r, out);
+      return out;
+    });
+  let files: { path: string; content: string }[];
+  try {
+    files = await lister(root);
+  } catch (err) {
+    throw new SkillSourceError(
+      `failed to scan project workspace: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  return groupProjectSkillBundles(files, input.projectWorkspaceId);
 }

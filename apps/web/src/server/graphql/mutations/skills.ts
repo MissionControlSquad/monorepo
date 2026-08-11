@@ -144,7 +144,8 @@ builder.mutationField("deleteSkill", (t) =>
 builder.mutationField("forkSkill", (t) =>
   t.prismaField({
     type: "Skill",
-    args: { id: t.arg.string({ required: true }) },
+    // `force` overrides the duplicate-fork precheck (the UI warns first, then re-submits with force).
+    args: { id: t.arg.string({ required: true }), force: t.arg.boolean() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
       const tenancy = requireRole(ctx, "member");
@@ -154,7 +155,9 @@ builder.mutationField("forkSkill", (t) =>
         { role: tenancy.role },
         { skillId: args.id },
       );
-      const s = await forkSkill(tenancy.workspaceId, args.id, tenancy.userId);
+      const s = await forkSkill(tenancy.workspaceId, args.id, tenancy.userId, {
+        force: args.force ?? false,
+      });
       return ctx.prisma.skill.findUniqueOrThrow({ ...query, where: { id: s.id } });
     },
   }),
