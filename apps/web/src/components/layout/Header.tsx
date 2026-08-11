@@ -4,6 +4,7 @@ import { memo } from "react";
 import { usePathname } from "next/navigation";
 import { Activity, Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { GlobalSearch } from "./GlobalSearch";
+import { AccountMenuSlot } from "./AccountMenuSlot";
 import { Button } from "../ui";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { WorkspaceSwitcherSlot } from "../providers/WorkspaceSwitcherSlot";
@@ -68,6 +69,9 @@ export const Header = memo(function Header({
         <div className="flex items-center gap-1 shrink-0">
           {/* buildbase workspace switcher — renders only when buildbase is configured (Epic #1) */}
           <WorkspaceSwitcherSlot />
+          {/* buildbase sign-in + account menu — dormant (renders nothing) until buildbase is
+              configured; coexists with the app's own admin login. */}
+          <AccountMenuSlot />
           <WhenFeatureEnabled flag={FLAG_KEYS.NOTIFICATIONS}>
             <NotificationBell />
           </WhenFeatureEnabled>
