@@ -33,6 +33,10 @@ model DocumentAnnotationComment {
   createdAt       DateTime  @default(now())
 
   thread DocumentAnnotationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  // Work-items §3 Item 1 — the task Message this annotation comment was mirrored into, so an annotation
+  // discussion surfaces in the task timeline and back. Reverse of Message.annotationCommentId (FK lives
+  // on Message); at-most-one. Null until/unless the comment's document is task-scoped and mirrored.
+  mirroredMessage Message? @relation("AnnotationCommentMirror")
 
   @@index([threadId, createdAt])
   @@map("document_annotation_comments")

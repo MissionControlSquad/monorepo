@@ -15,6 +15,7 @@ import { MarkdownWithMentions } from "../common/MarkdownWithMentions";
 import { CopyButton } from "../common/CopyButton";
 import { MessageReactions } from "./MessageReactions";
 import { TaskChatSystemNotice } from "./TaskChatSystemNotice";
+import { MessagePresentationCard, AnnotationOriginBadge } from "./MessagePresentationCard";
 import { humanizeSystemNotice } from "../../lib/system-notice-humanizer";
 import { Button } from "../ui";
 import { MessageCircle, Send, Loader2, Check } from "lucide-react";
@@ -262,8 +263,13 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
               const sender = message.fromProfile;
               // Machine-authored recovery / system notices (sandbox run outcomes, review
               // decisions) render as a compact humanized row instead of a raw text block.
-              // Unknown / ordinary chat falls through to the normal bubble.
-              const notice = message._optimistic ? null : humanizeSystemNotice(message.content);
+              // Unknown / ordinary chat falls through to the normal bubble. A message that carries
+              // structured `presentation` (Work-items §3 Item 2) skips the legacy content-sniffing and
+              // renders the richer presentation card in the bubble below.
+              const notice =
+                message._optimistic || message.presentation
+                  ? null
+                  : humanizeSystemNotice(message.content);
               if (notice) {
                 return (
                   <TaskChatSystemNotice
@@ -296,6 +302,9 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
                       >
                         {sender?.displayName || "Unknown"}
                       </span>
+                      {!message._optimistic && message.annotationComment && (
+                        <AnnotationOriginBadge origin={message.annotationComment} />
+                      )}
                       {message._optimistic ? (
                         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                           <Loader2 className="w-3 h-3 animate-spin" />
@@ -313,11 +322,19 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
                         </>
                       )}
                     </div>
-                    <div
-                      className={`text-sm ${message._optimistic ? "text-muted-foreground" : "text-foreground"}`}
-                    >
-                      <MarkdownWithMentions content={message.content} />
-                    </div>
+                    {!message._optimistic && message.presentation ? (
+                      // Work-items §3 Item 2 — richer card for system-authored structured comments.
+                      <MessagePresentationCard
+                        presentation={message.presentation}
+                        content={message.content}
+                      />
+                    ) : (
+                      <div
+                        className={`text-sm ${message._optimistic ? "text-muted-foreground" : "text-foreground"}`}
+                      >
+                        <MarkdownWithMentions content={message.content} />
+                      </div>
+                    )}
                     {!message._optimistic && (
                       <MessageReactions
                         messageId={message.id}
