@@ -1,7 +1,51 @@
 import { listAllFeatureFlags } from "@agentcenter/database";
 import { isFeatureLicensed, getLicenseStatus } from "./license";
 import { LicenseStatusCode } from "./constants";
+import { getBuildbase } from "./tenancy/buildbase";
 
+/**
+ * Feature entitlements. TARGET STATE: buildbase is the single source of truth — a feature is enabled
+ * when the workspace's plan (buildbase `workspace.features[slug]`) includes it. Slug == FLAG_KEYS value.
+ *
+ * CUTOVER: `USE_BUILDBASE_FEATURES=1` switches reads to buildbase. It ships OFF so features don't go
+ * dark before every FLAG_KEYS slug exists in the buildbase plans; once configured + verified, flip it,
+ * then the legacy DB/license path below (and the local feature_flags table + admin UI + infra seeding)
+ * is deleted. This is a migration switch, NOT a runtime availability fallback.
+ */
+const USE_BUILDBASE_FEATURES = process.env.USE_BUILDBASE_FEATURES === "1";
+
+// ---------------------------------------------------------------------------
+// Target: buildbase workspace entitlements
+// ---------------------------------------------------------------------------
+let bbFeatures: { map: Record<string, boolean>; at: number } | null = null;
+const BB_TTL = 60_000; // 1 minute
+
+/**
+ * The current tenant workspace's buildbase feature map. Read directly on session-bearing (HTTP)
+ * requests; session-less contexts (WS / background dispatch, where buildbase's cookie auth is
+ * unavailable) reuse the most recent map warmed by an HTTP request. `TENANT_WORKSPACE_ID` pins the
+ * single workspace per tenant. Unknown slug ⇒ not entitled (false) — buildbase entitlement semantics.
+ */
+async function getBuildbaseFeatures(): Promise<Record<string, boolean>> {
+  const bb = getBuildbase();
+  const workspaceId = process.env.TENANT_WORKSPACE_ID?.trim();
+  if (!bb || !workspaceId) return bbFeatures?.map ?? {};
+  const ttl = process.env.DISABLE_FLAG_CACHE === "1" ? -1 : BB_TTL;
+  if (!bbFeatures || Date.now() - bbFeatures.at > ttl) {
+    try {
+      const ws = await bb.workspace.get(workspaceId);
+      bbFeatures = { map: ws.features ?? {}, at: Date.now() };
+    } catch {
+      // Session-less context (background/WS) or a transient error: reuse the HTTP-warmed map.
+      // buildbase remains the source of truth; this only bridges contexts with no request cookie.
+    }
+  }
+  return bbFeatures?.map ?? {};
+}
+
+// ---------------------------------------------------------------------------
+// Legacy: local feature_flags table + self-host license (deleted after cutover)
+// ---------------------------------------------------------------------------
 interface FlagEntry {
   key: string;
   enabled: boolean;
@@ -47,10 +91,16 @@ export async function getFeatureFlags(): Promise<Map<string, FlagEntry>> {
 
 /**
  * Check if a feature is enabled.
- * Double-gated: feature flag must be enabled AND license must include the feature.
- * If no license is configured (status "none"), only the flag check applies.
+ *
+ * TARGET (USE_BUILDBASE_FEATURES): enabled ⇔ the workspace's buildbase plan includes the slug.
+ * LEGACY: local feature_flags table AND (self-host license OR none/dev). Removed after cutover.
  */
 export async function isFeatureEnabled(key: string): Promise<boolean> {
+  if (USE_BUILDBASE_FEATURES) {
+    const features = await getBuildbaseFeatures();
+    return features[key] === true;
+  }
+
   const flags = await getFeatureFlags();
   const flagEnabled = flags.get(key)?.enabled ?? true;
   if (!flagEnabled) return false;
@@ -76,4 +126,5 @@ export async function getAllFlags(): Promise<FlagEntry[]> {
 export function invalidateFlagCache(): void {
   flagCache = null;
   lastRefresh = 0;
+  bbFeatures = null;
 }
