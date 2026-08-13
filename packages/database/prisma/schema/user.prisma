@@ -36,6 +36,12 @@ model Profile {
   user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
   agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
+  /// buildbase (SaaS) user identity this human profile bridges to. Nullable so admin/agent
+  /// profiles have none; @unique gives a nullable-unique index (Postgres allows many NULLs) so
+  /// each buildbase user maps to exactly one local Profile (the auth-bridge upsert key). See
+  /// apps/web/src/server/auth/buildbase-bridge.ts.
+  buildbaseUserId String? @unique
+
   channelMemberships       ChannelMember[]
   channelMessagesFrom      ChannelMessage[]         @relation("ChannelMessageFrom")
   channelMessagesPinned    ChannelMessage[]         @relation("ChannelMessagePinnedBy")

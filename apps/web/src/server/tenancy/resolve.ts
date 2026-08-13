@@ -96,6 +96,17 @@ export async function resolveTenancy(
   const fromBuildbase = await fromBuildbaseToken(cookieHeader);
   if (fromBuildbase) return fromBuildbase;
 
+  // Bootstrap fallback: mc_session → DEFAULT_WORKSPACE_ID as owner.
+  //
+  // SECURITY: this fallback is ONLY safe for a single-tenant / self-host install and the test harness.
+  // In a hosted multi-tenant container (TENANT_WORKSPACE_ID set), the `bb-session-id` cookie is shared
+  // across all *.agentcenter.cloud hosts, so an authenticated-but-non-member user could otherwise be
+  // silently granted OWNER of the default workspace — a cross-tenant breach. When this container is
+  // bound to a workspace we therefore REFUSE the fallback: a verified member always carries a
+  // bb-workspace-token pinned to TENANT_WORKSPACE_ID (resolved above by fromBuildbaseToken); a
+  // non-member is denied at the auth bridge and never obtains that token. Fail-closed → null.
+  if (process.env.TENANT_WORKSPACE_ID?.trim()) return null;
+
   if (!session?.profileId) return null;
   const role: WorkspaceRole = "owner";
   return {

@@ -20,6 +20,11 @@ export const serverSchema = z.object({
     .refine((s) => s !== "mc-dev-secret-change-in-production", {
       message: "AUTH_SECRET must not be the default dev value in production",
     }),
+  // Optional. When set (e.g. ".agentcenter.cloud" in prod), the mc_session cookie is issued with
+  // Domain=<value> so it is shared across subdomains — enabling cross-subdomain buildbase SSO from
+  // the landing site to a tenant dashboard subdomain. Leave UNSET for local dev + self-host (default
+  // host-only cookie, no behavior change). See apps/web/src/server/admin-auth.ts getSessionCookieOptions.
+  AUTH_COOKIE_DOMAIN: z.string().optional(),
 
   // ── Cloudflare R2 Storage (optional — only needed for file deliverables) ──
   R2_ACCOUNT_ID: z.string().optional(),
