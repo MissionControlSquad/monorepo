@@ -31,10 +31,19 @@ function BuildbaseSignIn() {
   const { signIn, isAuthenticated } = useSaaSAuth();
   const router = useRouter();
   const [manual, setManual] = useState(false);
+  // True while a buildbase OAuth callback (?bb=…) is present — the SDK provider is exchanging the code
+  // here; we must NOT auto-redirect back to buildbase or we'd discard the code mid-exchange.
+  const [completing, setCompleting] = useState(false);
   const started = useRef(false);
 
   useEffect(() => {
     if (started.current) return;
+    // OAuth callback in flight: the middleware forwarded ?bb=<code> here for the SDK provider to
+    // exchange. Do nothing (show "Completing sign-in…") and let the provider finish + navigate.
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("bb")) {
+      setCompleting(true);
+      return;
+    }
     // Already authenticated (e.g. arrived here with a live session) → go to the dashboard, don't sign in again.
     if (isAuthenticated) {
       started.current = true;
@@ -60,6 +69,16 @@ function BuildbaseSignIn() {
     }
     void signIn("/"); // full-page redirect to buildbase; returns to the dashboard root after OAuth
   }, [isAuthenticated, signIn, router]);
+
+  if (completing) {
+    // OAuth callback being exchanged for a session by the provider — then it navigates to the dashboard.
+    return (
+      <div className="flex flex-col items-center gap-3 py-2 text-center">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Completing sign-in…</p>
+      </div>
+    );
+  }
 
   if (manual) {
     return (

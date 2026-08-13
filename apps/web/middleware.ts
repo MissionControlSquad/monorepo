@@ -7,6 +7,23 @@ const COOKIE_NAME = "mc_session";
 // buildbase session cookie set by BOTH this app's /api/auth/buildbase/token route AND the landing
 // site (same buildbase org). Its presence without an mc_session triggers server-side auto-SSO.
 const BB_SESSION_COOKIE = "bb-session-id";
+// The query param the buildbase SDK appends on the OAuth callback (BB_PARAM = "bb"), carrying the
+// encoded auth code the SDK exchanges for a session.
+const BB_CALLBACK_PARAM = "bb";
+
+/**
+ * Build the /login redirect URL, PRESERVING the buildbase OAuth callback param (?bb=…) if present.
+ * buildbase redirects the signed-in user back to APP_URL ("/") with ?bb=<code>; that hits the
+ * middleware with no session yet, and a bare redirect to /login would DROP the param — so the SDK
+ * never exchanges the code and the user is stuck at {sessionId:null}. Carrying ?bb through to /login
+ * lets the SDK provider (mounted app-wide) consume it there and mint the session.
+ */
+function buildLoginUrl(request: NextRequest): URL {
+  const url = new URL("/login", request.url);
+  const bb = request.nextUrl.searchParams.get(BB_CALLBACK_PARAM);
+  if (bb) url.searchParams.set(BB_CALLBACK_PARAM, bb);
+  return url;
+}
 
 function getSecret() {
   const raw = process.env.AUTH_SECRET;
@@ -215,7 +232,7 @@ export async function middleware(request: NextRequest) {
         NextResponse.json({ error: "Authentication required" }, { status: 401 }),
       );
     }
-    return withRequestId(NextResponse.redirect(new URL("/login", request.url)));
+    return withRequestId(NextResponse.redirect(buildLoginUrl(request)));
   }
 
   try {
@@ -228,7 +245,7 @@ export async function middleware(request: NextRequest) {
       response.cookies.delete(COOKIE_NAME);
       return withRequestId(response);
     }
-    const response = NextResponse.redirect(new URL("/login", request.url));
+    const response = NextResponse.redirect(buildLoginUrl(request));
     response.cookies.delete(COOKIE_NAME);
     return withRequestId(response);
   }
