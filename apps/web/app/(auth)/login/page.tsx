@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSaaSAuth } from "@buildbase/sdk/react";
@@ -16,23 +16,81 @@ import { resolveLoginMode } from "@/components/auth/login-mode";
 // unusable — self-host operators MUST configure NEXT_PUBLIC_SAAS_ORG_ID (there is no fallback).
 const BUILDBASE_CONFIGURED = resolveLoginMode(process.env.NEXT_PUBLIC_SAAS_ORG_ID) === "buildbase";
 
-/** Primary (and only) sign-in control. Mounted only once the SDK provider is ready. */
-function BuildbaseSignInButton() {
-  const { signIn } = useSaaSAuth();
-  const [loading, setLoading] = useState(false);
+// If we auto-redirected to buildbase within this window and landed back on /login, the sign-in was
+// cancelled or failed — so we STOP auto-redirecting and show a manual button instead of looping.
+const AUTO_REDIRECT_GUARD_MS = 20_000;
+const GUARD_KEY = "bb_auto_signin_at";
+
+/**
+ * The only sign-in path. Mounted once the SDK provider is ready. Rather than making the user click an
+ * intermediate "Continue with Buildbase" button, it redirects STRAIGHT to buildbase on mount (single
+ * login screen). A recent-attempt guard prevents an infinite loop when the user cancels/fails on
+ * buildbase and is returned here; in that case it falls back to a manual retry button.
+ */
+function BuildbaseSignIn() {
+  const { signIn, isAuthenticated } = useSaaSAuth();
+  const router = useRouter();
+  const [manual, setManual] = useState(false);
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (started.current) return;
+    // Already authenticated (e.g. arrived here with a live session) → go to the dashboard, don't sign in again.
+    if (isAuthenticated) {
+      started.current = true;
+      router.replace("/");
+      return;
+    }
+    // Loop guard: a recent auto-redirect that returned here means cancel/failure → show manual retry.
+    let last = 0;
+    try {
+      last = Number(sessionStorage.getItem(GUARD_KEY) ?? 0);
+    } catch {
+      /* sessionStorage unavailable — fall through to auto-redirect */
+    }
+    if (Date.now() - last < AUTO_REDIRECT_GUARD_MS) {
+      setManual(true);
+      return;
+    }
+    started.current = true;
+    try {
+      sessionStorage.setItem(GUARD_KEY, String(Date.now()));
+    } catch {
+      /* ignore */
+    }
+    void signIn("/"); // full-page redirect to buildbase; returns to the dashboard root after OAuth
+  }, [isAuthenticated, signIn, router]);
+
+  if (manual) {
+    return (
+      <div className="space-y-3">
+        <Button
+          type="button"
+          className="w-full"
+          onClick={() => {
+            try {
+              sessionStorage.setItem(GUARD_KEY, String(Date.now()));
+            } catch {
+              /* ignore */
+            }
+            void signIn("/");
+          }}
+        >
+          Continue with Buildbase
+        </Button>
+        <p className="text-center text-xs text-muted-foreground">
+          Sign-in didn&apos;t complete. Click to try again.
+        </p>
+      </div>
+    );
+  }
+
+  // Auto-redirecting to buildbase — brief transitional state before the page navigates away.
   return (
-    <Button
-      type="button"
-      className="w-full"
-      disabled={loading}
-      onClick={() => {
-        setLoading(true);
-        void signIn("/"); // returns to the dashboard root after the OAuth round-trip
-      }}
-    >
-      {loading && <Loader2 className="animate-spin" />}
-      {loading ? "Redirecting…" : "Continue with Buildbase"}
-    </Button>
+    <div className="flex flex-col items-center gap-3 py-2 text-center">
+      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      <p className="text-sm text-muted-foreground">Redirecting to Buildbase to sign in…</p>
+    </div>
   );
 }
 
@@ -107,19 +165,14 @@ export default function LoginPage() {
         {/* Card */}
         <div className="p-0 sm:rounded-xl sm:border sm:border-border sm:bg-card sm:p-6">
           {BUILDBASE_CONFIGURED ? (
-            <div className="space-y-3">
-              {buildbaseReady ? (
-                <BuildbaseSignInButton />
-              ) : (
-                <Button type="button" className="w-full" disabled>
-                  <Loader2 className="animate-spin" />
-                  Loading sign-in…
-                </Button>
-              )}
-              <p className="text-center text-xs text-muted-foreground">
-                You&apos;ll be redirected to Buildbase to sign in securely.
-              </p>
-            </div>
+            buildbaseReady ? (
+              <BuildbaseSignIn />
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-2 text-center">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Loading sign-in…</p>
+              </div>
+            )
           ) : (
             <AuthNotConfigured />
           )}
