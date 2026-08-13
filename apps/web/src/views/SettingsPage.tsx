@@ -51,6 +51,7 @@ import { AppearanceCard } from "@/components/settings/AppearanceCard";
 import { BuildbaseAccountCard } from "@/components/settings/BuildbaseAccountCard";
 import { AccountSecurityCard } from "@/components/settings/AccountSecurityCard";
 import { ApprovalPoliciesCard } from "@/components/settings/ApprovalPoliciesCard";
+import { WhenAdmin } from "@/components/auth/WhenAdmin";
 import { PushNotificationsCard } from "@/components/settings/PushNotificationsCard";
 
 const changePasswordSchema = z
@@ -232,11 +233,15 @@ export function SettingsPage() {
         </Form>
       </Card>
 
-      {/* Agent Governance */}
-      <AgentGovernanceCard />
+      {/* Agent Governance (manage — admin/owner only; server: SET_AGENT_GOVERNANCE requires admin) */}
+      <WhenAdmin>
+        <AgentGovernanceCard />
+      </WhenAdmin>
 
-      {/* Rule-based approval policies (GOVERNANCE — self-hides when off) */}
-      <ApprovalPoliciesCard />
+      {/* Rule-based approval policies (GOVERNANCE — self-hides when off; manage → admin/owner) */}
+      <WhenAdmin>
+        <ApprovalPoliciesCard />
+      </WhenAdmin>
 
       {/* Agent memory backend */}
       <MemoryDefaultCard />
@@ -251,8 +256,10 @@ export function SettingsPage() {
       {/* Sidebar customization */}
       <SidebarCustomizeCard />
 
-      {/* Experimental feature flags */}
-      <FeatureFlagsCard />
+      {/* Experimental feature flags (manage — admin/owner; server: UPDATE_FEATURE_FLAG requires admin) */}
+      <WhenAdmin>
+        <FeatureFlagsCard />
+      </WhenAdmin>
 
       {/* License */}
       {licenseInfo && licenseInfo.status !== LicenseStatusCode.NONE && (
@@ -329,63 +336,65 @@ export function SettingsPage() {
         </Card>
       )}
 
-      {/* System Shutdown */}
-      <div
-        className={`rounded-xl border p-6 space-y-4 ${
-          shutdownActive
-            ? "border-destructive/30 bg-destructive-muted"
-            : "border-border bg-background"
-        }`}
-      >
-        <div className="flex items-start gap-4">
-          <div
-            className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
-              shutdownActive ? "bg-destructive/15" : "bg-muted"
-            }`}
-          >
-            <ShieldOff
-              className={`w-5 h-5 ${shutdownActive ? "text-destructive" : "text-muted-foreground"}`}
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-foreground">System Shutdown</h2>
-            <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
-              <li>Blocks all new task creation (dashboard & API)</li>
-              <li>Prevents agents from picking up new work</li>
-              <li>Stops recurring tasks from generating</li>
-              <li>Does not affect tasks already in progress</li>
-            </ul>
-            {shutdownActive && (
-              <div className="mt-3 flex items-center gap-2 text-sm font-medium text-destructive">
-                <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-                System is currently shut down
-              </div>
-            )}
-          </div>
-        </div>
-
-        <Button
-          onClick={() => setShowConfirm(true)}
-          variant={shutdownActive ? "primary" : "danger"}
-          className="w-full"
-        >
-          {shutdownActive ? "Resume Operations" : "Activate Shutdown"}
-        </Button>
-        <ConfirmDialog
-          isOpen={showConfirm}
-          onClose={() => setShowConfirm(false)}
-          onConfirm={handleToggleShutdown}
-          title={shutdownActive ? "Resume operations?" : "Activate system shutdown?"}
-          description={
+      {/* System Shutdown (manage — admin/owner; server: SET_SYSTEM_SHUTDOWN requires admin) */}
+      <WhenAdmin>
+        <div
+          className={`rounded-xl border p-6 space-y-4 ${
             shutdownActive
-              ? "Agents will be able to receive tasks again."
-              : "This will immediately block all task creation and agent assignments across the entire system."
-          }
-          confirmLabel={shutdownActive ? "Yes, resume operations" : "Yes, shut down"}
-          variant={shutdownActive ? "primary" : "danger"}
-          loading={isToggling}
-        />
-      </div>
+              ? "border-destructive/30 bg-destructive-muted"
+              : "border-border bg-background"
+          }`}
+        >
+          <div className="flex items-start gap-4">
+            <div
+              className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
+                shutdownActive ? "bg-destructive/15" : "bg-muted"
+              }`}
+            >
+              <ShieldOff
+                className={`w-5 h-5 ${shutdownActive ? "text-destructive" : "text-muted-foreground"}`}
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base font-semibold text-foreground">System Shutdown</h2>
+              <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+                <li>Blocks all new task creation (dashboard & API)</li>
+                <li>Prevents agents from picking up new work</li>
+                <li>Stops recurring tasks from generating</li>
+                <li>Does not affect tasks already in progress</li>
+              </ul>
+              {shutdownActive && (
+                <div className="mt-3 flex items-center gap-2 text-sm font-medium text-destructive">
+                  <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+                  System is currently shut down
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Button
+            onClick={() => setShowConfirm(true)}
+            variant={shutdownActive ? "primary" : "danger"}
+            className="w-full"
+          >
+            {shutdownActive ? "Resume Operations" : "Activate Shutdown"}
+          </Button>
+          <ConfirmDialog
+            isOpen={showConfirm}
+            onClose={() => setShowConfirm(false)}
+            onConfirm={handleToggleShutdown}
+            title={shutdownActive ? "Resume operations?" : "Activate system shutdown?"}
+            description={
+              shutdownActive
+                ? "Agents will be able to receive tasks again."
+                : "This will immediately block all task creation and agent assignments across the entire system."
+            }
+            confirmLabel={shutdownActive ? "Yes, resume operations" : "Yes, shut down"}
+            variant={shutdownActive ? "primary" : "danger"}
+            loading={isToggling}
+          />
+        </div>
+      </WhenAdmin>
     </PageLayout>
   );
 }

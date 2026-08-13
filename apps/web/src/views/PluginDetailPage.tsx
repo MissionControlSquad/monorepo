@@ -17,6 +17,7 @@ import {
 import { Breadcrumbs, Button, Card, Badge, PageLayout, Tooltip } from "@/components/ui";
 import { JsonSchemaForm } from "@/components/common/JsonSchemaForm";
 import { PluginSlot } from "@/components/plugins/PluginSlot";
+import { WhenAdmin } from "@/components/auth/WhenAdmin";
 import { adapterConfigFields } from "@agentcenter/utils";
 
 // Epic #6: per-plugin detail — manifest info, capabilities, tools/jobs, a config form rendered from
@@ -234,30 +235,33 @@ export function PluginDetailPage({ pluginId }: { pluginId: string }) {
               <p className="mt-1 text-sm text-muted-foreground">{plugin.description}</p>
             )}
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant={plugin.enabled ? "secondary" : "primary"}
-              size="sm"
-              disabled={busy}
-              onClick={() =>
-                run(
-                  () => setEnabled({ pluginId, enabled: !plugin.enabled }),
-                  plugin.enabled ? "Disabled" : "Enabled",
-                )
-              }
-            >
-              {plugin.enabled ? "Disable" : "Enable"}
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              icon={<Trash2 className="h-4 w-4" />}
-              disabled={busy}
-              onClick={remove}
-            >
-              Uninstall
-            </Button>
-          </div>
+          {/* Manage — admin/owner only (server: SET_PLUGIN_ENABLED / UNINSTALL_PLUGIN require admin) */}
+          <WhenAdmin>
+            <div className="flex gap-2">
+              <Button
+                variant={plugin.enabled ? "secondary" : "primary"}
+                size="sm"
+                disabled={busy}
+                onClick={() =>
+                  run(
+                    () => setEnabled({ pluginId, enabled: !plugin.enabled }),
+                    plugin.enabled ? "Disabled" : "Enabled",
+                  )
+                }
+              >
+                {plugin.enabled ? "Disable" : "Enable"}
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                icon={<Trash2 className="h-4 w-4" />}
+                disabled={busy}
+                onClick={remove}
+              >
+                Uninstall
+              </Button>
+            </div>
+          </WhenAdmin>
         </div>
 
         {plugin.status === "error" && (
@@ -332,27 +336,29 @@ export function PluginDetailPage({ pluginId }: { pluginId: string }) {
                     </Badge>
                   </div>
                   {runtimeEnabled && (
-                    <div className="flex-shrink-0">
-                      {granted ? (
-                        <Button
-                          size="xs"
-                          variant="secondary"
-                          disabled={busy}
-                          onClick={() => revoke(c)}
-                        >
-                          Revoke
-                        </Button>
-                      ) : (
-                        <Button
-                          size="xs"
-                          variant="primary"
-                          disabled={busy}
-                          onClick={() => grant(c)}
-                        >
-                          Grant
-                        </Button>
-                      )}
-                    </div>
+                    <WhenAdmin>
+                      <div className="flex-shrink-0">
+                        {granted ? (
+                          <Button
+                            size="xs"
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() => revoke(c)}
+                          >
+                            Revoke
+                          </Button>
+                        ) : (
+                          <Button
+                            size="xs"
+                            variant="primary"
+                            disabled={busy}
+                            onClick={() => grant(c)}
+                          >
+                            Grant
+                          </Button>
+                        )}
+                      </div>
+                    </WhenAdmin>
                   )}
                 </li>
               );

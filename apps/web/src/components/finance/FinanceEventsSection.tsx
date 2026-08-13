@@ -15,6 +15,7 @@ import { INGEST_FINANCE_EVENT, REPRICE_COST_EVENT } from "@/lib/graphql/mutation
 import { formatCents as money, FINANCE_EVENT_KINDS, COST_WINDOWS } from "@agentcenter/utils";
 import { Card, Badge, Button } from "@/components/ui";
 import { Input } from "@/components/ui/shadcn/input";
+import { WhenAdmin } from "@/components/auth/WhenAdmin";
 
 // Domain 12 GAP-1/6: account-level provider money (finance events) + rolling cost windows + the
 // metered-vs-subscription billing split. Distinct from the per-inference cost breakdown already on
@@ -211,13 +212,15 @@ function UnpricedCostsSection() {
               inputMode="decimal"
               className="w-28"
             />
-            <Button
-              size="sm"
-              disabled={busy === e.id || !amounts[e.id]}
-              onClick={() => onReprice(e.id)}
-            >
-              Reprice
-            </Button>
+            <WhenAdmin>
+              <Button
+                size="sm"
+                disabled={busy === e.id || !amounts[e.id]}
+                onClick={() => onReprice(e.id)}
+              >
+                Reprice
+              </Button>
+            </WhenAdmin>
           </div>
         </Card>
       ))}
@@ -346,51 +349,53 @@ export function FinanceEventsSection() {
         </Card>
       )}
 
-      {/* Record a finance event (admin) */}
-      <Card className="space-y-2 p-4">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
-          <select
-            className="rounded border border-border bg-background px-2 py-1.5 text-sm sm:col-span-2"
-            value={form.eventKind}
-            onChange={(e) => setForm((f) => ({ ...f, eventKind: e.target.value }))}
-          >
-            {FINANCE_EVENT_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
-          <select
-            className="rounded border border-border bg-background px-2 py-1.5 text-sm"
-            value={form.direction}
-            onChange={(e) => setForm((f) => ({ ...f, direction: e.target.value }))}
-          >
-            <option value="debit">debit</option>
-            <option value="credit">credit</option>
-          </select>
-          <Input
-            value={form.amount}
-            onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-            placeholder="Amount ($)"
-            inputMode="decimal"
-          />
-          <Input
-            value={form.biller}
-            onChange={(e) => setForm((f) => ({ ...f, biller: e.target.value }))}
-            placeholder="Biller (optional)"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Input
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            placeholder="Description (optional)"
-          />
-          <Button size="sm" disabled={busy || !form.amount.trim()} onClick={onIngest}>
-            Record event
-          </Button>
-        </div>
-      </Card>
+      {/* Record a finance event (manage — admin/owner; server: INGEST_FINANCE_EVENT requires admin) */}
+      <WhenAdmin>
+        <Card className="space-y-2 p-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+            <select
+              className="rounded border border-border bg-background px-2 py-1.5 text-sm sm:col-span-2"
+              value={form.eventKind}
+              onChange={(e) => setForm((f) => ({ ...f, eventKind: e.target.value }))}
+            >
+              {FINANCE_EVENT_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+            <select
+              className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+              value={form.direction}
+              onChange={(e) => setForm((f) => ({ ...f, direction: e.target.value }))}
+            >
+              <option value="debit">debit</option>
+              <option value="credit">credit</option>
+            </select>
+            <Input
+              value={form.amount}
+              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+              placeholder="Amount ($)"
+              inputMode="decimal"
+            />
+            <Input
+              value={form.biller}
+              onChange={(e) => setForm((f) => ({ ...f, biller: e.target.value }))}
+              placeholder="Biller (optional)"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="Description (optional)"
+            />
+            <Button size="sm" disabled={busy || !form.amount.trim()} onClick={onIngest}>
+              Record event
+            </Button>
+          </div>
+        </Card>
+      </WhenAdmin>
 
       {/* Recent finance events */}
       <Card className="divide-y divide-border p-0">
