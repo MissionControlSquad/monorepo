@@ -3,52 +3,73 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-} from "@/components/ui/shadcn/form";
-import { Input } from "@/components/ui/shadcn/input";
+import { useSaaSAuth } from "@buildbase/sdk/react";
 import { Button } from "@/components/ui";
-import { Loader2 } from "lucide-react";
+import { Loader2, ShieldAlert } from "lucide-react";
 import { LicenseStatusCode } from "@/server/constants";
+import { useBuildbaseReady } from "@/components/providers/BuildbaseProvider";
+import { resolveLoginMode } from "@/components/auth/login-mode";
 
-const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
-});
+// buildbase is the ONLY production auth. There is no admin username/password login: the first
+// buildbase user who owns the bound workspace auto-provisions as owner via the auth bridge, and every
+// human signs in through buildbase. When buildbase is NOT configured the app is intentionally
+// unusable — self-host operators MUST configure NEXT_PUBLIC_SAAS_ORG_ID (there is no fallback).
+const BUILDBASE_CONFIGURED = resolveLoginMode(process.env.NEXT_PUBLIC_SAAS_ORG_ID) === "buildbase";
 
-type LoginValues = z.infer<typeof loginSchema>;
+/** Primary (and only) sign-in control. Mounted only once the SDK provider is ready. */
+function BuildbaseSignInButton() {
+  const { signIn } = useSaaSAuth();
+  const [loading, setLoading] = useState(false);
+  return (
+    <Button
+      type="button"
+      className="w-full"
+      disabled={loading}
+      onClick={() => {
+        setLoading(true);
+        void signIn("/"); // returns to the dashboard root after the OAuth round-trip
+      }}
+    >
+      {loading && <Loader2 className="animate-spin" />}
+      {loading ? "Redirecting…" : "Continue with Buildbase"}
+    </Button>
+  );
+}
+
+/** Rendered when buildbase is not configured — the app cannot authenticate anyone. */
+function AuthNotConfigured() {
+  return (
+    <div className="text-center">
+      <ShieldAlert className="w-8 h-8 text-muted-foreground mb-3 inline-block" />
+      <h2 className="text-sm font-medium text-foreground">Authentication is not configured</h2>
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        This installation has no identity provider. Set <code>NEXT_PUBLIC_SAAS_ORG_ID</code> (and
+        the related <code>SAAS_*</code> credentials) to enable Buildbase sign-in. There is no other
+        way in.
+      </p>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
-
-  const form = useForm<LoginValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { username: "", password: "" },
-  });
+  // True only when the buildbase SDK provider is actually mounted (client, non-empty org id). Until
+  // then we show a disabled placeholder so useSaaSAuth is never called outside its provider.
+  const buildbaseReady = useBuildbaseReady();
 
   useEffect(() => {
+    // Still honor the license/activation gate (self-host licensing). Setup is gone — the first
+    // buildbase owner provisions automatically — so there is no /setup redirect anymore.
     fetch("/api/auth/status")
       .then((r) => r.json())
       .then((data) => {
-        if (!data.setupComplete) {
-          router.replace("/setup");
-        } else if (
+        if (
           data.license?.status === LicenseStatusCode.NONE ||
           data.license?.status === LicenseStatusCode.EXPIRED ||
           data.license?.status === LicenseStatusCode.INVALID ||
           data.license?.status === LicenseStatusCode.REVOKED
         ) {
-          // License not active — redirect to activation
           router.replace("/activate");
         } else {
           setChecking(false);
@@ -56,27 +77,6 @@ export default function LoginPage() {
       })
       .catch(() => setChecking(false));
   }, [router]);
-
-  async function onSubmit(values: LoginValues) {
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ username: values.username.trim(), password: values.password }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Login failed");
-        return;
-      }
-
-      router.push("/");
-    } catch {
-      toast.error("Something went wrong. Please try again.");
-    }
-  }
 
   if (checking) {
     return (
@@ -104,44 +104,25 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Form Card */}
+        {/* Card */}
         <div className="p-0 sm:rounded-xl sm:border sm:border-border sm:bg-card sm:p-6">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
-                    <FormControl>
-                      <Input type="text" placeholder="Enter your username" autoFocus {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="Enter your password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <Button type="submit" disabled={form.formState.isSubmitting} className="w-full mt-2">
-                {form.formState.isSubmitting && <Loader2 className="animate-spin" />}
-                {form.formState.isSubmitting ? "Signing in..." : "Sign In"}
-              </Button>
-            </form>
-          </Form>
+          {BUILDBASE_CONFIGURED ? (
+            <div className="space-y-3">
+              {buildbaseReady ? (
+                <BuildbaseSignInButton />
+              ) : (
+                <Button type="button" className="w-full" disabled>
+                  <Loader2 className="animate-spin" />
+                  Loading sign-in…
+                </Button>
+              )}
+              <p className="text-center text-xs text-muted-foreground">
+                You&apos;ll be redirected to Buildbase to sign in securely.
+              </p>
+            </div>
+          ) : (
+            <AuthNotConfigured />
+          )}
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6">

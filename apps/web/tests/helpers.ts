@@ -1,44 +1,62 @@
+import { NextResponse } from "next/server";
 import { prisma } from "../src/server/prisma";
 import { generateApiKey } from "../src/server/api-key";
+import { ensureUserAndProfileForAdmin } from "@agentcenter/database";
 import type { Agent, Task, Project } from "@agentcenter/database";
 import { AgentStatus, SetupStatus, TaskStatus } from "../src/server/constants";
+import { COOKIE_NAME, getSessionCookieOptions, createSessionToken } from "../src/server/admin-auth";
 
 // ─── Admin Auth Helpers ────────────────────────────────────────────
+//
+// Production/dev auth is buildbase-only (there is no password login route). Tests can't run a real
+// buildbase OAuth flow, so these helpers establish an app session by minting an mc_session IN-PROCESS
+// via the test-only, env-gated `mintTestSessionToken`. Signatures are unchanged so call sites don't
+// churn; the `password` arg is now ignored (kept for source compatibility).
 
 /**
- * Call the admin setup route to create the first admin account.
- * Returns the response (with session cookie).
+ * Ensure a local AdminUser + User + Profile exist for `username` and return them. Mirrors what the
+ * removed setup route used to persist, so downstream code that expects an owner/AdminUser still works.
  */
-export async function adminSetup(username: string, password: string, ip = "10.0.0.1") {
-  const { POST } = await import("../app/api/auth/setup/route");
-  return POST(
-    new Request("http://localhost:3000/api/auth/setup", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-forwarded-for": ip,
-      },
-      body: JSON.stringify({ username, password }),
-    }),
-  );
+async function ensureTestAdmin(username: string) {
+  const normalized = username.trim().toLowerCase();
+  let admin = await prisma.adminUser.findUnique({ where: { username: normalized } });
+  if (!admin) {
+    admin = await prisma.adminUser.create({
+      data: { username: normalized, passwordHash: "test-only-no-login" },
+    });
+  }
+  const { profileId } = await ensureUserAndProfileForAdmin(admin.id, admin.username);
+  return { admin, profileId };
 }
 
 /**
- * Call the login route.
- * Returns the response (with session cookie on success).
+ * Build a Response carrying the mc_session cookie (so extractSessionCookie keeps working). Mints via
+ * the core createSessionToken primitive — this is test-only source (never shipped), so it does not go
+ * through the env-gated mintTestSessionToken (that gate protects the HTTP /api/test/session route).
  */
-export async function adminLogin(username: string, password: string, ip = "10.0.0.1") {
-  const { POST } = await import("../app/api/auth/login/route");
-  return POST(
-    new Request("http://localhost:3000/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-forwarded-for": ip,
-      },
-      body: JSON.stringify({ username, password }),
-    }),
-  );
+async function sessionResponse(adminId: string, username: string, profileId: string) {
+  const token = await createSessionToken({ sub: adminId, username, profileId });
+  const res = NextResponse.json({ success: true, username, profileId });
+  res.cookies.set(COOKIE_NAME, token, getSessionCookieOptions());
+  return res;
+}
+
+/**
+ * Establish the first admin account + session (idempotent). Replaces the deleted password-setup route.
+ * `_password` is ignored.
+ */
+export async function adminSetup(username: string, _password?: string, _ip = "10.0.0.1") {
+  const { admin, profileId } = await ensureTestAdmin(username);
+  return sessionResponse(admin.id, admin.username, profileId);
+}
+
+/**
+ * Establish a session for an existing (or newly-ensured) admin. Replaces the deleted password-login
+ * route. `_password` is ignored.
+ */
+export async function adminLogin(username: string, _password?: string, _ip = "10.0.0.1") {
+  const { admin, profileId } = await ensureTestAdmin(username);
+  return sessionResponse(admin.id, admin.username, profileId);
 }
 
 /**

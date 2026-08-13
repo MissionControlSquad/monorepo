@@ -4,6 +4,9 @@ import { jwtVerify } from "jose";
 import { getClientIp } from "./app/api/_lib/client-ip";
 
 const COOKIE_NAME = "mc_session";
+// buildbase session cookie set by BOTH this app's /api/auth/buildbase/token route AND the landing
+// site (same buildbase org). Its presence without an mc_session triggers server-side auto-SSO.
+const BB_SESSION_COOKIE = "bb-session-id";
 
 function getSecret() {
   const raw = process.env.AUTH_SECRET;
@@ -88,6 +91,7 @@ const PUBLIC_EXACT = new Set([
   "/setup",
   "/activate",
   "/reset-password",
+  "/no-access", // Cross-tenant deny page (buildbase user who isn't a member of this workspace)
   "/favicon.ico",
   "/logo.png",
   "/robots.txt",
@@ -95,7 +99,8 @@ const PUBLIC_EXACT = new Set([
 ]);
 
 const PUBLIC_PREFIXES = [
-  "/api/auth/", // Auth endpoints (login, logout, setup, status)
+  "/api/auth/", // Auth endpoints (buildbase token/session/sso/logout, status)
+  "/api/test/", // TEST-ONLY session bootstrap — the route itself 404s unless NODE_ENV=test (fail-closed)
   "/api/license", // License activation (public — before auth)
   "/api/events/", // Agent event ingestion (Bearer token auth in handler)
   "/api/agents/me", // Agent-scoped "me" routes (Bearer token auth in handler)
@@ -190,6 +195,20 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get(COOKIE_NAME)?.value;
 
   if (!token) {
+    // Auto-SSO: the user has a buildbase session (e.g. from the landing site) but no app session yet.
+    // Hand off to the server-side sso route, which validates the buildbase session, upserts the
+    // Profile, mints mc_session, and redirects back to the originally-requested path — no login step.
+    // Edge middleware can't do DB/network work, so it only routes here. Page navigations only; API
+    // callers get a 401 (the browser page will have bridged first). The sso route is public
+    // (/api/auth/* allowlist) so this never loops; on failure it lands on /login.
+    const hasBuildbaseSession = Boolean(request.cookies.get(BB_SESSION_COOKIE)?.value);
+    if (hasBuildbaseSession && !pathname.startsWith("/api/")) {
+      const returnTo = pathname + request.nextUrl.search;
+      const ssoUrl = new URL("/api/auth/buildbase/sso", request.url);
+      ssoUrl.searchParams.set("returnTo", returnTo);
+      return withRequestId(NextResponse.redirect(ssoUrl));
+    }
+
     // API requests get 401, page requests get redirected
     if (pathname.startsWith("/api/")) {
       return withRequestId(
