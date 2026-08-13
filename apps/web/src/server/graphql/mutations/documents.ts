@@ -1,5 +1,6 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
+import { requireRole } from "@/server/tenancy/guards";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { taskModel, documentModel, agentModel } from "../../models";
 import { snapshotDocumentRevision } from "@/server/services/document-revisions";
@@ -14,8 +15,9 @@ builder.mutationField("createDocument", (t) =>
       taskId: t.arg.string(),
       createdById: t.arg.string({ required: true }),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
+      requireRole(ctx, "member");
       let projectId: string | undefined;
       let taskTitle: string | undefined;
       if (args.taskId) {
@@ -65,6 +67,7 @@ builder.mutationField("updateDocument", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
+      requireRole(ctx, "member");
       const doc = await documentModel.update(args.id, {
         ...query,
         data: {
@@ -86,8 +89,9 @@ builder.mutationField("deleteDocument", (t) =>
   t.field({
     type: "Boolean",
     args: { id: t.arg.string({ required: true }) },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
+      requireRole(ctx, "member");
       await documentModel.deleteById(args.id);
       return true;
     },

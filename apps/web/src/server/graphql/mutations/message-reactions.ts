@@ -1,4 +1,5 @@
 import { builder } from "../builder";
+import { requireRole } from "@/server/tenancy/guards";
 import { messageReactionModel, messageModel } from "../../models";
 import { pubsub, messageReactionTopic } from "../../pubsub";
 import { MessageReactionEmoji } from "../../constants";
@@ -13,7 +14,8 @@ builder.mutationField("toggleMessageReaction", (t) =>
       profileId: t.arg.string({ required: true }),
       emoji: t.arg.string({ required: true }),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, "member");
       if (!VALID_EMOJIS.includes(args.emoji)) {
         throw new Error(`Invalid emoji: ${args.emoji}. Valid: ${VALID_EMOJIS.join(", ")}`);
       }

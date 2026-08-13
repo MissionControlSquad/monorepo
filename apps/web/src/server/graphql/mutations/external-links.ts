@@ -1,5 +1,6 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
+import { requireRole } from "@/server/tenancy/guards";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { addExternalLink, removeExternalLink } from "@/server/services/external-links";
 
@@ -14,6 +15,7 @@ builder.mutationField("addExternalLink", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.EXTERNAL_LINKS);
+      requireRole(ctx, "member");
       const link = await addExternalLink({
         taskId: args.taskId,
         url: args.url,
@@ -29,8 +31,9 @@ builder.mutationField("removeExternalLink", (t) =>
   t.field({
     type: "Boolean",
     args: { id: t.arg.string({ required: true }) },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.EXTERNAL_LINKS);
+      requireRole(ctx, "member");
       return removeExternalLink(args.id);
     },
   }),

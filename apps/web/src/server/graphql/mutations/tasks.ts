@@ -1,4 +1,5 @@
 import { builder } from "../builder";
+import { requireRole } from "@/server/tenancy/guards";
 import { runTaskUpdateTransaction } from "@agentcenter/database";
 import { taskModel, agentModel } from "../../models";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "../../pubsub";
@@ -55,6 +56,9 @@ builder.mutationField("createTask", (t) =>
       blockedByTaskId: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
+      // Human write gate (docs/RBAC.md §D): viewer is read-only; member+ (and API-key agents,
+      // which resolve as `member`) may operate. Run-bridge agents bypass this resolver entirely.
+      requireRole(ctx, "member");
       if (args.projectId) await assertProjectWritable(args.projectId);
       await assertAssignableAgents(args.assigneeIds, args.projectId);
 
@@ -126,6 +130,7 @@ builder.mutationField("createTaskFromDashboard", (t) =>
       blockedByTaskId: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, "member");
       if (args.projectId) await assertProjectWritable(args.projectId);
       const assigneeIds = args.assigneeIds ?? [];
       await assertAssignableAgents(assigneeIds, args.projectId);
@@ -192,6 +197,7 @@ builder.mutationField("updateTask", (t) =>
       clearGoal: t.arg.boolean(),
     },
     resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, "member");
       const oldTask = await taskModel.findById(args.id, {
         include: { assignees: { include: { profile: true } } },
       });
@@ -378,7 +384,8 @@ builder.mutationField("deleteTask", (t) =>
       id: t.arg.string({ required: true }),
       agentId: t.arg.string({ required: true }),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
+      requireRole(ctx, "member");
       const task = await taskModel.findById(args.id, {
         include: { assignees: { include: { profile: true } } },
       });
