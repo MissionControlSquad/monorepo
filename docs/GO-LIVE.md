@@ -66,6 +66,11 @@ breaks.** All are declared (optional) in `apps/web/src/server/env.ts`.
 | `BUILDBASE_MCP_SECRET` | — | Shared secret the in‑sandbox MCP bridge uses to authenticate callbacks into buildbase surfaces |
 | `BUILDBASE_SERVICE_SESSION_ID` | — | Service session id for background (non‑request) buildbase calls where no user cookie exists |
 
+For a **single-tenant self-host** install authenticated by buildbase (leave `TENANT_WORKSPACE_ID` and
+`AUTH_COOKIE_DOMAIN` unset; any authenticated org user is admitted as owner of the default workspace),
+see [SELF-HOSTING-BUILDBASE.md](./SELF-HOSTING-BUILDBASE.md) for the exact env set, login flow,
+authorization model, and the lockout warning (buildbase is the only auth).
+
 Notes carried from `env.ts`:
 
 - **Sandbox / cloud‑provider credentials are NOT deployment env.** Every cloud sandbox and host

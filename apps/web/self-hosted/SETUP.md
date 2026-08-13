@@ -324,6 +324,15 @@ NOTIFICATION_FROM_EMAIL=notifications@yourcompany.com
 
 Restart: `docker compose up -d app`
 
+### Sign-in via buildbase (single-tenant)
+
+To authenticate your install with your buildbase org instead of the built-in admin auth, see
+[Self-Hosting AgentCenter with buildbase](../../../docs/SELF-HOSTING-BUILDBASE.md). In short: set the
+`SAAS_*` config, leave `TENANT_WORKSPACE_ID` **unset** (single-tenant — any authenticated org user is
+admitted as owner of the default workspace), and leave `AUTH_COOKIE_DOMAIN` unset (no cross-subdomain
+SSO on a single host). buildbase becomes the **only** auth path, so a valid `SAAS_CLIENT_SECRET` +
+reachable buildbase server are mandatory.
+
 ### Custom Port
 
 ```bash
