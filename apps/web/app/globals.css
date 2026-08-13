@@ -114,6 +114,19 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
   }
+  /* buildbase SDK modal centering (matches buildbase's official nextjs-starter). The SDK's dialogs
+     portal into #saas-os-portal; Radix applies a `transform` to the dialog wrapper ([id^='radix-']),
+     which creates a containing block that traps the dialog's position:fixed — so the modal renders
+     top-left instead of centered on the viewport. Neutralizing that transform lets `fixed` resolve
+     against the viewport again. The height:0/overflow:visible collapses the 100%-sized portal host so
+     it never affects page layout while its fixed children still render. */
+  #saas-os-portal {
+    height: 0 !important;
+    overflow: visible !important;
+  }
+  #saas-os-portal [id^="radix-"] {
+    transform: none !important;
+  }
 }
 
 @utility text-balance {

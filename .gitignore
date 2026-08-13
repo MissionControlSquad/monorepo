@@ -55,3 +55,6 @@ test-results/
 
 # Generated telemetry proposed-events manifest (scripts/extract-proposed-events.mjs)
 telemetry-proposed-events.json
+
+# Local git worktrees created by agents (never commit)
+.claude/worktrees/

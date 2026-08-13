@@ -76,3 +76,34 @@ ApiVersion.V1`, `orgId`, `auth.clientId`, `auth.redirectUrl`, `auth.callbacks` (
 - `orgId` must be a 24-char hex (Mongo ObjectId).
 - Agents never call buildbase (they use `apiKeyHash`). Only human request paths touch buildbase.
 - Cache `auth()`/role/quota per request; don't call buildbase in a hot loop.
+
+## Client UI gotchas (settings modal / CSS)
+**When anything about the SDK's built-in dialogs (settings/billing/credits) misbehaves, compare against
+`buildbase-app/nextjs-starter` (`src/app/globals.css`, `layout.tsx`) FIRST — its setup is the ground
+truth and most issues are a missing line there.** Verified fixes (all live in this repo):
+
+- **Modal renders top-left / not centered.** The SDK portals dialogs into `#saas-os-portal` and Radix
+  puts a `transform` on the dialog wrapper (`[id^='radix-']`); a transform creates a containing block
+  that traps the dialog's `position:fixed`. **Fix (required, in `globals.css` `@layer base`, copied
+  from the starter):**
+  ```css
+  #saas-os-portal { height: 0 !important; overflow: visible !important; }
+  #saas-os-portal [id^="radix-"] { transform: none !important; }
+  ```
+- **`openWorkspaceSettings()` / `openCreditStore()` / `openPlanPicker()` do nothing (no modal).** The
+  SDK renders the settings dialog **inside `<WorkspaceSwitcher>`** — it is the host component, and the
+  SDK exports no standalone settings dialog. If `WorkspaceSwitcher` is not mounted anywhere, those
+  calls set manager state but nothing renders. Mount it (visibly, or invisibly via a
+  `display:none` wrapper — see `components/providers/BuildbaseSettingsHost.tsx`; the dialog portals to
+  `#saas-os-portal` so the hidden wrapper doesn't hide the opened modal).
+- **Modal opens then instantly closes / never appears when triggered from a menu.** Don't call
+  `openWorkspaceSettings()` from a Radix `DropdownMenuItem.onSelect` — the dropdown's dismiss layer
+  closes the just-opened Radix dialog. Use a plain popover + `<button onClick>` (see `AccountMenuSlot`).
+- **`WorkspaceSwitcher` trigger render-prop must NOT return a `<button>`** — the SDK wraps it in its own
+  `<button>` (nested buttons = hydration error). Return a `<span>`.
+- The SDK scopes ALL its CSS under `.saas-os-ui` (unlayered) and needs `import "@buildbase/sdk/css"` in
+  the root layout. Tailwind v4 here; the starter is also v4 — parity matters, diff their `globals.css`.
+- **Token route returns 503 "not configured"** when ANY of `SAAS_ORG_ID/CLIENT_ID/CLIENT_SECRET/
+  SYSTEM_SECRET` is falsy — `SYSTEM_SECRET` is the one that's easy to forget (per-deployment).
+- Middleware must **preserve the `?code=&state=` OAuth callback query** when redirecting `/`→`/login`,
+  or the SDK never exchanges the code and the session stays `{sessionId:null}`.

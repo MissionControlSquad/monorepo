@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -11,9 +11,6 @@ import {
   FolderKanban,
   BarChart3,
   SquarePen,
-  User,
-  Settings,
-  LogOut,
   CreditCard,
   Receipt,
   KeyRound,
@@ -61,13 +58,12 @@ import {
   SIDEBAR_BADGES_QUERY,
   SIDEBAR_PREFERENCE_QUERY,
 } from "@agentcenter/graphql-client/queries";
-import { useAppContext } from "../../context/AppContext";
 import { useFeatureFlags } from "../../context/FeatureFlagContext";
 import { useTheme } from "@/hooks/useTheme";
 import { FLAG_KEYS } from "@agentcenter/utils";
-import { API_ROUTES } from "@/lib/api-routes";
-import { ProfileAvatar } from "../../ui/ProfileAvatar";
 import { SupportMenu } from "../../support/SupportMenu";
+import { AccountMenuSlot } from "@/components/layout/AccountMenuSlot";
+import { BuildbaseSettingsHost } from "@/components/providers/BuildbaseSettingsHost";
 
 interface IconRailProps {
   onCreateTask: () => void;
@@ -418,10 +414,8 @@ function isActive(pathname: string | null, href: string): boolean {
 }
 
 export function IconRail({ onCreateTask }: IconRailProps) {
-  const { currentUserProfile } = useAppContext();
   const { isEnabled } = useFeatureFlags();
   const { isDark, setTheme } = useTheme();
-  const router = useRouter();
   const pathname = usePathname();
 
   const [{ data: badges }] = useQuery<{
@@ -442,26 +436,6 @@ export function IconRail({ onCreateTask }: IconRailProps) {
     },
     [badges],
   );
-
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const handleLogout = useCallback(async () => {
-    setUserMenuOpen(false);
-    await fetch(API_ROUTES.auth.logout, { method: "POST" });
-    router.push("/login");
-  }, [router]);
-
-  useEffect(() => {
-    if (!userMenuOpen) return;
-    function onMouseDown(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setUserMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onMouseDown);
-    return () => document.removeEventListener("mousedown", onMouseDown);
-  }, [userMenuOpen]);
 
   const visibleItems = useMemo(
     () =>
@@ -560,74 +534,12 @@ export function IconRail({ onCreateTask }: IconRailProps) {
           </button>
           <SupportMenu />
 
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setUserMenuOpen((v) => !v)}
-              className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full ring-2 ring-transparent transition-all hover:ring-border"
-              title={currentUserProfile?.displayName ?? "Account"}
-              aria-label={currentUserProfile?.displayName ?? "Account"}
-            >
-              {currentUserProfile?.id ? (
-                <ProfileAvatar profileId={currentUserProfile.id} size="md+" />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center bg-muted text-sm font-medium text-muted-foreground">
-                  ?
-                </span>
-              )}
-            </button>
-
-            {userMenuOpen && (
-              <div className="absolute bottom-0 left-full z-[100] ml-2 w-52 rounded-lg border border-border bg-background py-1 shadow-lg">
-                {currentUserProfile && (
-                  <div className="border-b border-border px-3 py-2">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {currentUserProfile.displayName}
-                    </p>
-                    {currentUserProfile.username && (
-                      <p className="truncate text-xs text-muted-foreground">
-                        @{currentUserProfile.username}
-                      </p>
-                    )}
-                  </div>
-                )}
-                <div className="py-0.5">
-                  <Link
-                    href="/profile"
-                    onClick={() => setUserMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
-                  >
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    Profile
-                  </Link>
-                  <Link
-                    href="/settings"
-                    onClick={() => setUserMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
-                  >
-                    <Settings className="h-4 w-4 text-muted-foreground" />
-                    Settings
-                  </Link>
-                  <a
-                    href="https://billing.stripe.com/p/login/dRm7sN0KKdnfbs4afl53O00"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setUserMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
-                  >
-                    <CreditCard className="h-4 w-4 text-muted-foreground" />
-                    Billing
-                  </a>
-                  <button
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
-                  >
-                    <LogOut className="h-4 w-4 text-muted-foreground" />
-                    Log out
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Account/profile menu (buildbase). The header carries no account menu or workspace switcher. */}
+          <AccountMenuSlot />
+          {/* Invisible: mounts buildbase's WorkspaceSwitcher so openWorkspaceSettings() (Profile/
+              Settings/Billing above) actually renders its modal — the SDK hosts the settings dialog
+              inside WorkspaceSwitcher. No visible switcher (one workspace per tenant). */}
+          <BuildbaseSettingsHost />
         </div>
       </div>
 

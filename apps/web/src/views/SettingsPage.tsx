@@ -4,12 +4,8 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import Link from "next/link";
-import { ShieldOff, Lock, KeyRound, FlaskConical, Brain, Gauge, ArrowRight } from "lucide-react";
-import {
-  SET_SYSTEM_SHUTDOWN,
-  SYSTEM_SETTINGS_QUERY,
-  CHANGE_PASSWORD,
-} from "../lib/graphql/mutations/system";
+import { ShieldOff, KeyRound, FlaskConical, Brain, Gauge, ArrowRight } from "lucide-react";
+import { SET_SYSTEM_SHUTDOWN, SYSTEM_SETTINGS_QUERY } from "../lib/graphql/mutations/system";
 import {
   AGENT_GOVERNANCE_QUERY,
   FEATURE_FLAGS_QUERY,
@@ -32,18 +28,6 @@ import {
   Checkbox,
   Tooltip,
 } from "../components/ui";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-} from "@/components/ui/shadcn/form";
-import { Input } from "@/components/ui/shadcn/input";
 import { LicenseStatusCode } from "@/server/constants";
 import { API_ROUTES } from "@/lib/api-routes";
 import { SidebarCustomizeCard } from "@/components/layout/sidebar/SidebarCustomizeCard";
@@ -54,23 +38,9 @@ import { ApprovalPoliciesCard } from "@/components/settings/ApprovalPoliciesCard
 import { WhenAdmin } from "@/components/auth/WhenAdmin";
 import { PushNotificationsCard } from "@/components/settings/PushNotificationsCard";
 
-const changePasswordSchema = z
-  .object({
-    currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z.string().min(8, "New password must be at least 8 characters"),
-    confirmPassword: z.string().min(1, "Please confirm your new password"),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
-
-type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
-
 export function SettingsPage() {
   const [systemSettingsResult] = useQuery({ query: SYSTEM_SETTINGS_QUERY });
   const [, executeSetShutdown] = useMutation(SET_SYSTEM_SHUTDOWN);
-  const [, executeChangePassword] = useMutation(CHANGE_PASSWORD);
   const shutdownActive = systemSettingsResult.data?.systemSettings?.shutdownActive ?? false;
 
   const [showConfirm, setShowConfirm] = useState(false);
@@ -93,11 +63,6 @@ export function SettingsPage() {
       .catch(() => {});
   }, []);
 
-  const form = useForm<ChangePasswordValues>({
-    resolver: zodResolver(changePasswordSchema),
-    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
-  });
-
   const handleToggleShutdown = async () => {
     setIsToggling(true);
     try {
@@ -113,28 +78,6 @@ export function SettingsPage() {
     } finally {
       setIsToggling(false);
       setShowConfirm(false);
-    }
-  };
-
-  const onSubmitPassword = async (values: ChangePasswordValues) => {
-    try {
-      const result = await executeChangePassword({
-        currentPassword: values.currentPassword,
-        newPassword: values.newPassword,
-      });
-      if (result.error) {
-        const msg = result.error.graphQLErrors[0]?.message || result.error.message;
-        toast.error(msg);
-        return;
-      }
-      toast.success("Password changed. You will be redirected to login.");
-      form.reset();
-      // Session was revoked — redirect to login after a short delay
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 1500);
-    } catch {
-      toast.error("Failed to change password");
     }
   };
 
@@ -169,68 +112,6 @@ export function SettingsPage() {
           </div>
           <ArrowRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
         </Link>
-      </Card>
-
-      {/* Change Password */}
-      <Card padding="lg" className="space-y-4">
-        <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-muted">
-            <Lock className="w-5 h-5 text-muted-foreground" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-foreground">Change Password</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Update your password. All existing sessions will be revoked.
-            </p>
-          </div>
-        </div>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmitPassword)} className="space-y-3">
-            <FormField
-              control={form.control}
-              name="currentPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Current Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="newPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="Min. 8 characters" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirm New Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" loading={form.formState.isSubmitting} className="w-full">
-              {form.formState.isSubmitting ? "Changing..." : "Change Password"}
-            </Button>
-          </form>
-        </Form>
       </Card>
 
       {/* Agent Governance (manage — admin/owner only; server: SET_AGENT_GOVERNANCE requires admin) */}
