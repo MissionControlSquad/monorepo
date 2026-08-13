@@ -1,0 +1,530 @@
+{
+  "planGroup": "main",
+  "note": "Slug == FLAG_KEYS value. Set each plan’s features[slug]. core/operational = true on all plans; plan-gated split Free<Pro<Enterprise (adjust freely). Quotas/limits (agents/projects/seats/budgets) configured separately as quotas, not here.",
+  "totalSlugs": 63,
+  "tierCounts": {
+    "core": 19,
+    "planGated": 40,
+    "operational": 4
+  },
+  "items": [
+    {
+      "slug": "adapter_plugins",
+      "name": "Adapter Plugins",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "agent_authz",
+      "name": "Agent Authz",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "agent_companies",
+      "name": "Agent Companies",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "agent_instructions",
+      "name": "Agent Instructions",
+      "tier": "core"
+    },
+    {
+      "slug": "agent_queue",
+      "name": "Agent Queue",
+      "tier": "core"
+    },
+    {
+      "slug": "ai_tools",
+      "name": "Ai Tools",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "analytics",
+      "name": "Analytics",
+      "tier": "core"
+    },
+    {
+      "slug": "annotations",
+      "name": "Annotations",
+      "tier": "core"
+    },
+    {
+      "slug": "api_keys",
+      "name": "Api Keys",
+      "tier": "core"
+    },
+    {
+      "slug": "artifacts",
+      "name": "Artifacts",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "assets",
+      "name": "Assets",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "attention",
+      "name": "Attention",
+      "tier": "core"
+    },
+    {
+      "slug": "board_chat",
+      "name": "Board Chat",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "budgets",
+      "name": "Budgets",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "cases",
+      "name": "Cases",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "channels",
+      "name": "Channels",
+      "tier": "core"
+    },
+    {
+      "slug": "cloud_upstreams",
+      "name": "Cloud Upstreams",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "continuation_summaries",
+      "name": "Continuation Summaries",
+      "tier": "operational"
+    },
+    {
+      "slug": "custom_images",
+      "name": "Custom Images",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "decision_training",
+      "name": "Decision Training",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "documents",
+      "name": "Documents",
+      "tier": "core"
+    },
+    {
+      "slug": "environments",
+      "name": "Environments",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "execution_policy",
+      "name": "Execution Policy",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "execution_workspaces",
+      "name": "Execution Workspaces",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "external_links",
+      "name": "External Links",
+      "tier": "core"
+    },
+    {
+      "slug": "external_objects",
+      "name": "External Objects",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "feedback",
+      "name": "Feedback",
+      "tier": "core"
+    },
+    {
+      "slug": "folders",
+      "name": "Folders",
+      "tier": "core"
+    },
+    {
+      "slug": "goals",
+      "name": "Goals",
+      "tier": "core"
+    },
+    {
+      "slug": "governance",
+      "name": "Governance",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "inbox_policy",
+      "name": "Inbox Policy",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "ledger",
+      "name": "Ledger",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "live_gateway",
+      "name": "Live Gateway",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "local_services",
+      "name": "Local Services",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "low_trust_review",
+      "name": "Low Trust Review",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "memory",
+      "name": "Memory",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "monitors",
+      "name": "Monitors",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "multi_provider_adapters",
+      "name": "Multi Provider Adapters",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "notifications",
+      "name": "Notifications",
+      "tier": "core"
+    },
+    {
+      "slug": "observability",
+      "name": "Observability",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "org_chart",
+      "name": "Org Chart",
+      "tier": "core"
+    },
+    {
+      "slug": "pipelines_routines",
+      "name": "Pipelines Routines",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "plugin_runtime",
+      "name": "Plugin Runtime",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "plugin_sdk",
+      "name": "Plugin Sdk",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "productivity_review",
+      "name": "Productivity Review",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "provider_auth",
+      "name": "Provider Auth",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "provider_quota",
+      "name": "Provider Quota",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "recurring_tasks",
+      "name": "Recurring Tasks",
+      "tier": "core"
+    },
+    {
+      "slug": "reviews",
+      "name": "Reviews",
+      "tier": "core"
+    },
+    {
+      "slug": "runners",
+      "name": "Runners",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "secret_proposals",
+      "name": "Secret Proposals",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "secrets_vault",
+      "name": "Secrets Vault",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "skills_teams",
+      "name": "Skills Teams",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "smoke_lab",
+      "name": "Smoke Lab",
+      "tier": "operational"
+    },
+    {
+      "slug": "task_autonomy",
+      "name": "Task Autonomy",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "task_relations",
+      "name": "Task Relations",
+      "tier": "core"
+    },
+    {
+      "slug": "telemetry",
+      "name": "Telemetry",
+      "tier": "operational"
+    },
+    {
+      "slug": "terminals",
+      "name": "Terminals",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "thread_interactions",
+      "name": "Thread Interactions",
+      "tier": "core"
+    },
+    {
+      "slug": "tool_runtime_metrics",
+      "name": "Tool Runtime Metrics",
+      "tier": "operational"
+    },
+    {
+      "slug": "voting",
+      "name": "Voting",
+      "tier": "core"
+    },
+    {
+      "slug": "work_products",
+      "name": "Work Products",
+      "tier": "plan-gated"
+    },
+    {
+      "slug": "workspace_portability",
+      "name": "Workspace Portability",
+      "tier": "plan-gated"
+    }
+  ],
+  "plans": {
+    "free": {
+      "features": {
+        "adapter_plugins": false,
+        "agent_authz": false,
+        "agent_companies": false,
+        "agent_instructions": true,
+        "agent_queue": true,
+        "ai_tools": false,
+        "analytics": true,
+        "annotations": true,
+        "api_keys": true,
+        "artifacts": false,
+        "assets": false,
+        "attention": true,
+        "board_chat": false,
+        "budgets": false,
+        "cases": false,
+        "channels": true,
+        "cloud_upstreams": false,
+        "continuation_summaries": true,
+        "custom_images": false,
+        "decision_training": false,
+        "documents": true,
+        "environments": false,
+        "execution_policy": false,
+        "execution_workspaces": false,
+        "external_links": true,
+        "external_objects": false,
+        "feedback": true,
+        "folders": true,
+        "goals": true,
+        "governance": false,
+        "inbox_policy": false,
+        "ledger": false,
+        "live_gateway": false,
+        "local_services": false,
+        "low_trust_review": false,
+        "memory": false,
+        "monitors": false,
+        "multi_provider_adapters": false,
+        "notifications": true,
+        "observability": false,
+        "org_chart": true,
+        "pipelines_routines": false,
+        "plugin_runtime": false,
+        "plugin_sdk": false,
+        "productivity_review": false,
+        "provider_auth": false,
+        "provider_quota": false,
+        "recurring_tasks": true,
+        "reviews": true,
+        "runners": false,
+        "secret_proposals": false,
+        "secrets_vault": false,
+        "skills_teams": false,
+        "smoke_lab": true,
+        "task_autonomy": false,
+        "task_relations": true,
+        "telemetry": true,
+        "terminals": false,
+        "thread_interactions": true,
+        "tool_runtime_metrics": true,
+        "voting": true,
+        "work_products": false,
+        "workspace_portability": false
+      }
+    },
+    "pro": {
+      "features": {
+        "adapter_plugins": true,
+        "agent_authz": false,
+        "agent_companies": true,
+        "agent_instructions": true,
+        "agent_queue": true,
+        "ai_tools": true,
+        "analytics": true,
+        "annotations": true,
+        "api_keys": true,
+        "artifacts": true,
+        "assets": true,
+        "attention": true,
+        "board_chat": false,
+        "budgets": true,
+        "cases": true,
+        "channels": true,
+        "cloud_upstreams": false,
+        "continuation_summaries": true,
+        "custom_images": false,
+        "decision_training": true,
+        "documents": true,
+        "environments": true,
+        "execution_policy": false,
+        "execution_workspaces": false,
+        "external_links": true,
+        "external_objects": true,
+        "feedback": true,
+        "folders": true,
+        "goals": true,
+        "governance": true,
+        "inbox_policy": true,
+        "ledger": true,
+        "live_gateway": true,
+        "local_services": false,
+        "low_trust_review": false,
+        "memory": true,
+        "monitors": true,
+        "multi_provider_adapters": true,
+        "notifications": true,
+        "observability": true,
+        "org_chart": true,
+        "pipelines_routines": true,
+        "plugin_runtime": true,
+        "plugin_sdk": true,
+        "productivity_review": true,
+        "provider_auth": false,
+        "provider_quota": true,
+        "recurring_tasks": true,
+        "reviews": true,
+        "runners": false,
+        "secret_proposals": true,
+        "secrets_vault": true,
+        "skills_teams": true,
+        "smoke_lab": true,
+        "task_autonomy": true,
+        "task_relations": true,
+        "telemetry": true,
+        "terminals": false,
+        "thread_interactions": true,
+        "tool_runtime_metrics": true,
+        "voting": true,
+        "work_products": true,
+        "workspace_portability": true
+      }
+    },
+    "enterprise": {
+      "features": {
+        "adapter_plugins": true,
+        "agent_authz": true,
+        "agent_companies": true,
+        "agent_instructions": true,
+        "agent_queue": true,
+        "ai_tools": true,
+        "analytics": true,
+        "annotations": true,
+        "api_keys": true,
+        "artifacts": true,
+        "assets": true,
+        "attention": true,
+        "board_chat": true,
+        "budgets": true,
+        "cases": true,
+        "channels": true,
+        "cloud_upstreams": true,
+        "continuation_summaries": true,
+        "custom_images": true,
+        "decision_training": true,
+        "documents": true,
+        "environments": true,
+        "execution_policy": true,
+        "execution_workspaces": true,
+        "external_links": true,
+        "external_objects": true,
+        "feedback": true,
+        "folders": true,
+        "goals": true,
+        "governance": true,
+        "inbox_policy": true,
+        "ledger": true,
+        "live_gateway": true,
+        "local_services": true,
+        "low_trust_review": true,
+        "memory": true,
+        "monitors": true,
+        "multi_provider_adapters": true,
+        "notifications": true,
+        "observability": true,
+        "org_chart": true,
+        "pipelines_routines": true,
+        "plugin_runtime": true,
+        "plugin_sdk": true,
+        "productivity_review": true,
+        "provider_auth": true,
+        "provider_quota": true,
+        "recurring_tasks": true,
+        "reviews": true,
+        "runners": true,
+        "secret_proposals": true,
+        "secrets_vault": true,
+        "skills_teams": true,
+        "smoke_lab": true,
+        "task_autonomy": true,
+        "task_relations": true,
+        "telemetry": true,
+        "terminals": true,
+        "thread_interactions": true,
+        "tool_runtime_metrics": true,
+        "voting": true,
+        "work_products": true,
+        "workspace_portability": true
+      }
+    }
+  }
+}
