@@ -7,21 +7,23 @@ const COOKIE_NAME = "mc_session";
 // buildbase session cookie set by BOTH this app's /api/auth/buildbase/token route AND the landing
 // site (same buildbase org). Its presence without an mc_session triggers server-side auto-SSO.
 const BB_SESSION_COOKIE = "bb-session-id";
-// The query param the buildbase SDK appends on the OAuth callback (BB_PARAM = "bb"), carrying the
-// encoded auth code the SDK exchanges for a session.
-const BB_CALLBACK_PARAM = "bb";
-
 /**
- * Build the /login redirect URL, PRESERVING the buildbase OAuth callback param (?bb=…) if present.
- * buildbase redirects the signed-in user back to APP_URL ("/") with ?bb=<code>; that hits the
- * middleware with no session yet, and a bare redirect to /login would DROP the param — so the SDK
- * never exchanges the code and the user is stuck at {sessionId:null}. Carrying ?bb through to /login
- * lets the SDK provider (mounted app-wide) consume it there and mint the session.
+ * Build the /login redirect URL, PRESERVING the buildbase OAuth callback query if present.
+ *
+ * buildbase redirects the signed-in user back to APP_URL ("/") with `?code=<code>&state=<state>` (and
+ * in some SDK flows a `?bb=…` param). That request hits the middleware with no session yet, and a bare
+ * redirect to /login would DROP the query — so the SDK never exchanges the code, the token route never
+ * runs, and the session stays {sessionId:null} forever. When a callback is detected we carry the whole
+ * query through to /login (which is public), where the app-wide SaaSOSProvider completes the exchange
+ * and mints the session. The official buildbase starter avoids this by not gating via middleware at all;
+ * we keep middleware gating (more secure) and simply let the callback pass through to the provider.
  */
 function buildLoginUrl(request: NextRequest): URL {
   const url = new URL("/login", request.url);
-  const bb = request.nextUrl.searchParams.get(BB_CALLBACK_PARAM);
-  if (bb) url.searchParams.set(BB_CALLBACK_PARAM, bb);
+  const sp = request.nextUrl.searchParams;
+  if (sp.has("code") || sp.has("bb")) {
+    url.search = request.nextUrl.search;
+  }
   return url;
 }
 

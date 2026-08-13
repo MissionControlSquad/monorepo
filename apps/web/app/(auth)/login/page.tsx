@@ -38,11 +38,15 @@ function BuildbaseSignIn() {
 
   useEffect(() => {
     if (started.current) return;
-    // OAuth callback in flight: the middleware forwarded ?bb=<code> here for the SDK provider to
-    // exchange. Do nothing (show "Completing sign-in…") and let the provider finish + navigate.
-    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("bb")) {
-      setCompleting(true);
-      return;
+    // OAuth callback in flight: the middleware forwarded the buildbase callback (?code=…&state=…, or
+    // the SDK's ?bb=…) here for the app-wide SaaSOSProvider to exchange. Do nothing (show
+    // "Completing sign-in…") and let the provider finish the exchange + navigate to the dashboard.
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.has("code") || sp.has("bb")) {
+        setCompleting(true);
+        return;
+      }
     }
     // Already authenticated (e.g. arrived here with a live session) → go to the dashboard, don't sign in again.
     if (isAuthenticated) {
