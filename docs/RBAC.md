@@ -206,7 +206,16 @@ human session (`resolveSession`), and cron secret (`Bearer ${CRON_SECRET}`).
 
 ---
 
-## D. The `member = read-only` problem for teams — DECISION NEEDED
+## D. The `member = read-only` problem for teams — ✅ APPLIED
+
+> **APPLIED** (`feat/member-operate-rbac`). The team role→capability matrix below is approved and
+> implemented: `ROLE_CAPS.member = ["read","operate"]` (owner/admin stay `["*"]`, viewer stays
+> `["read"]`); `roleCan` now resolves operate-class permissions true for members and manage-class
+> false (fail-safe on unknown perms). Server `requireRole` gates already enforced the two-tier split
+> (no gate changes needed — audit confirmed correct). UI: the highest-value manage controls (§E rows
+> 1–4, 7, 8, 11, 12) are now wrapped in `WhenAdmin`. Matrix proved by
+> `apps/web/tests/unit/rbac-member-operate.test.ts`.
+
 
 **Problem.** `ROLE_CAPS.member = ["read"]`. `ctx.tenancy.can(perm)` only ever returns true for
 `read`. For a **team** (multiple invited users per workspace), this means an invited `member`
@@ -216,7 +225,7 @@ so the inconsistency is: **requireRole says "members operate", but `ROLE_CAPS`/`
 "members read only".** For teams this is wrong — a member should be able to create tasks, run
 agents, post messages, submit deliverables, comment, vote, etc.
 
-**Proposed team role → capability matrix (RECOMMENDATION — do NOT apply without approval).**
+**Team role → capability matrix (APPROVED + APPLIED).**
 Split capabilities into **operate** (do the work) vs **manage** (secrets, budgets, governance,
 workspace/infra config, deletes).
 
@@ -321,9 +330,10 @@ Runner-ups: `LiveGatewayPage.tsx` (`APPROVE/REVOKE_LIVE_GATEWAY_DEVICE`), `Plugi
    takeover). ✅
 
 **P0 — decision the user must make:**
-4. **Approve the team role→capability matrix (§D).** Without it, invited `member`s are read-only
-   and the team model does not function. The change is scoped to `ROLE_CAPS.member` + UI gates;
-   server mutation gates already assume operate-capable members.
+4. ✅ **APPLIED — team role→capability matrix (§D).** `ROLE_CAPS.member = ["read","operate"]` +
+   `roleCan` operate/manage classification + §E UI gates (rows 1–4, 7, 8, 11, 12). Server mutation
+   gates already assumed operate-capable members (no gate changes). Covered by
+   `apps/web/tests/unit/rbac-member-operate.test.ts`.
 
 **P1 — follow-ups (not fixed here):**
 5. Gate global `system.ts` kill-switches to a **platform super-admin**, not any workspace admin
