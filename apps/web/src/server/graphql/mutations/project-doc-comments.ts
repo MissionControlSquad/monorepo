@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   addProjectDocComment,
   setProjectDocCommentResolved,
@@ -19,7 +20,7 @@ builder.mutationField("addProjectDocComment", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const created = await addProjectDocComment({
         docId: args.docId,
         body: args.body,
@@ -40,7 +41,7 @@ builder.mutationField("resolveProjectDocComment", (t) =>
     args: { id: t.arg.string({ required: true }), resolved: t.arg.boolean({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await setProjectDocCommentResolved(args.id, args.resolved);
       return ctx.prisma.projectDocComment.findUniqueOrThrow({ ...query, where: { id: args.id } });
     },
@@ -53,7 +54,7 @@ builder.mutationField("deleteProjectDocComment", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return deleteProjectDocComment(args.id);
     },
   }),

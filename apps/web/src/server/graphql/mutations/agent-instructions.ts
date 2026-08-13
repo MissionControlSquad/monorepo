@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   upsertInstruction,
   deleteInstruction,
@@ -20,7 +21,7 @@ builder.mutationField("upsertAgentInstruction", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AGENT_INSTRUCTIONS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const row = await upsertInstruction({
         workspaceId: tenancy.workspaceId,
         agentId: args.agentId,
@@ -42,7 +43,7 @@ builder.mutationField("deleteAgentInstruction", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AGENT_INSTRUCTIONS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return deleteInstruction(tenancy.workspaceId, args.agentId, args.fileName);
     },
   }),
@@ -54,7 +55,7 @@ builder.mutationField("seedAgentInstructions", (t) =>
     args: { agentId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AGENT_INSTRUCTIONS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const rows = await seedDefaultInstructions(tenancy.workspaceId, args.agentId, tenancy.userId);
       const ids = rows.map((r) => r.id);
       return ctx.prisma.agentInstruction.findMany({

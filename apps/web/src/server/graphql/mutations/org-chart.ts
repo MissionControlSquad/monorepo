@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { setAgentReportsTo } from "@/server/services/org-chart";
 
 // Epic #19: set an agent's manager (org edge). member; ORG_CHART-gated; cycle + cross-workspace safe.
@@ -14,7 +15,7 @@ builder.mutationField("setAgentReportsTo", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ORG_CHART);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const agent = await setAgentReportsTo(
         tenancy.workspaceId,
         args.agentId,

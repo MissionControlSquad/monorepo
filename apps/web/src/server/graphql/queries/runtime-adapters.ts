@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS, listAdapters, type Adapter } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { ensureAdapterModelProbe } from "@/server/services/adapter-runtime-probes";
 
@@ -50,7 +51,7 @@ builder.queryField("runtimeAdapters", (t) =>
     type: [RuntimeAdapterType],
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Live CLI model detection is MULTI_PROVIDER_ADAPTERS-gated (it spawns the runtime CLIs).
       const liveEnabled = await isFeatureEnabled(FLAG_KEYS.MULTI_PROVIDER_ADAPTERS);
       if (liveEnabled) ensureAdapterModelProbe();

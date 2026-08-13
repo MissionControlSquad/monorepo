@@ -1,5 +1,6 @@
 import { builder } from "../builder";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { upsertAdapterPlugin, deleteAdapterPlugin } from "@/server/services/adapter-plugins";
@@ -18,7 +19,7 @@ builder.mutationField("upsertAdapterPlugin", (t) =>
     },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.ADAPTER_PLUGINS);
-      const tn = requireRole(ctx, "admin");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return upsertAdapterPlugin({
         workspaceId: tn.workspaceId,
         key: args.key,
@@ -39,7 +40,7 @@ builder.mutationField("deleteAdapterPlugin", (t) =>
     args: { key: t.arg.string({ required: true }) },
     resolve: async (_r, args, ctx) => {
       await requireFeature(FLAG_KEYS.ADAPTER_PLUGINS);
-      const tn = requireRole(ctx, "admin");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return deleteAdapterPlugin(tn.workspaceId, args.key);
     },
   }),

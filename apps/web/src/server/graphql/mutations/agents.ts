@@ -7,6 +7,7 @@ import { ensureAgentProfile } from "../../agent-profile";
 import { pubsub, PubSubEvent } from "../../pubsub";
 import { findProfileForAgentId } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 /**
  * Resolve an agent by apiKey argument.
@@ -32,7 +33,7 @@ builder.mutationField("updateAgentStatus", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       // Tenancy: scope the agent to the caller's workspace so one workspace can't mutate another's agent.
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const agent = await agentModel.delegate.findFirst({
         where: { id: args.id, workspaceId: tenancy.workspaceId },
       });
@@ -134,7 +135,7 @@ builder.mutationField("updateAgentProfile", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       // Tenancy: require a workspace member and confirm the agent belongs to that workspace.
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const owned = await agentModel.delegate.findFirst({
         where: { id: args.id, workspaceId: tenancy.workspaceId },
         select: { id: true },
@@ -180,7 +181,7 @@ builder.mutationField("setAgentActivation", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       // Tenancy: activation/deactivation is workspace-scoped, admin-gated.
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const owned = await agentModel.delegate.findFirst({
         where: { id: args.id, workspaceId: tenancy.workspaceId },
         select: { id: true },

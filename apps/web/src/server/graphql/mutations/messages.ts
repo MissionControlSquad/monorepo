@@ -1,5 +1,6 @@
 import { builder } from "../builder";
 import { requireRole } from "@/server/tenancy/guards";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { taskModel, messageModel } from "../../models";
 import {
   getAllProfilesForMentions,
@@ -21,7 +22,7 @@ builder.mutationField("createMessage", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       // Human write gate (docs/RBAC.md §D): viewer read-only; member+ / API-key agents may post.
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Parse @mentions from content — match profiles by @[id:xxx], @username, @displayName word
       const profiles = await getAllProfilesForMentions();
 

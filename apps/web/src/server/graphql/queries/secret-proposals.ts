@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { GraphQLError } from "graphql";
 import { isProposalStatus } from "@/server/services/secret-proposals";
 
@@ -13,7 +14,7 @@ builder.queryField("secretProposals", (t) =>
     args: { status: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRET_PROPOSALS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       if (args.status && !isProposalStatus(args.status))
         throw new GraphQLError(`Invalid status '${args.status}'`, {
           extensions: { code: "BAD_USER_INPUT" },

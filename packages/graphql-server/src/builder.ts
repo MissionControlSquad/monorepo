@@ -19,6 +19,14 @@ export interface SessionPayload {
 /** Workspace-level role of the current human, resolved from buildbase (Epic #1). */
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 
+/** Canonical workspace-role values. Use instead of raw string literals at every call site. */
+export const WORKSPACE_ROLES = {
+  OWNER: "owner",
+  ADMIN: "admin",
+  MEMBER: "member",
+  VIEWER: "viewer",
+} as const satisfies Record<string, WorkspaceRole>;
+
 /**
  * Per-request human tenancy, bridging the buildbase SaaS plane to the AgentCenter domain plane.
  * Present for human (session) requests; null for anonymous or agent (apiKeyHash) requests.

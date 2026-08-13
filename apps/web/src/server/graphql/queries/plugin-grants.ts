@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 // Plugin capability grants read (parity #103). PLUGIN_RUNTIME-gated, admin, workspace-scoped. Powers the
 // plugin detail page's granted-capabilities panel.
@@ -11,7 +12,7 @@ builder.queryField("pluginGrants", (t) =>
     args: { pluginId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PLUGIN_RUNTIME);
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return ctx.prisma.pluginGrant.findMany({
         ...query,
         where: scoped(ctx, { pluginId: args.pluginId }),

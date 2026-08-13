@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole, scoped, requireTenancy } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   reviewCases,
   computePipelineHealth,
@@ -36,7 +37,7 @@ builder.queryField("routines", (t) =>
     type: ["Routine"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.routine.findMany({
         ...query,
         where: scoped(ctx, {}),
@@ -53,7 +54,7 @@ builder.queryField("routine", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.routine.findFirst({ ...query, where: scoped(ctx, { id: args.id }) });
     },
   }),
@@ -65,7 +66,7 @@ builder.queryField("routineRuns", (t) =>
     args: { routineId: t.arg.string({ required: true }), limit: t.arg.int() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const routine = await ctx.prisma.routine.findFirst({
         where: scoped(ctx, { id: args.routineId }),
         select: { id: true },
@@ -86,7 +87,7 @@ builder.queryField("pipelines", (t) =>
     type: ["Pipeline"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.pipeline.findMany({
         ...query,
         where: scoped(ctx, {}),
@@ -103,7 +104,7 @@ builder.queryField("pipeline", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.pipeline.findFirst({ ...query, where: scoped(ctx, { id: args.id }) });
     },
   }),
@@ -115,7 +116,7 @@ builder.queryField("casesInPipeline", (t) =>
     args: { pipelineId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Scope through the owning pipeline so another workspace's cases never leak.
       const pipeline = await ctx.prisma.pipeline.findFirst({
         where: scoped(ctx, { id: args.pipelineId }),
@@ -137,7 +138,7 @@ builder.queryField("reviewCases", (t) =>
     args: { pipelineId: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Service builds the review-stage filter; re-apply Pothos selection over the same ids.
       const cases = await reviewCases(tenancy.workspaceId, args.pipelineId ?? null);
       return ctx.prisma.pipelineCase.findMany({
@@ -156,7 +157,7 @@ builder.queryField("pipelineHealth", (t) =>
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
       const tenancy = requireTenancy(ctx);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return computePipelineHealth(tenancy.workspaceId, args.pipelineId);
     },
   }),
@@ -188,7 +189,7 @@ builder.queryField("pipelineStats", (t) =>
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
       const tenancy = requireTenancy(ctx);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return computePipelineStats(tenancy.workspaceId, args.pipelineId);
     },
   }),
@@ -202,7 +203,7 @@ builder.queryField("pipelineCaseEvents", (t) =>
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
       const tenancy = requireTenancy(ctx);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Scope through the owning case so another workspace's timeline is never returned.
       const c = await ctx.prisma.pipelineCase.findFirst({
         where: { id: args.caseId, pipeline: { workspaceId: tenancy.workspaceId } },
@@ -226,7 +227,7 @@ builder.queryField("staleClaims", (t) =>
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
       const tenancy = requireTenancy(ctx);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const lease = Math.min(Math.max(args.leaseMinutes ?? 60, 1), 100000);
       return staleClaimedCases(tenancy.workspaceId, lease, args.pipelineId ?? null);
     },

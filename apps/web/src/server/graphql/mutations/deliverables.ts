@@ -1,6 +1,7 @@
 import { DeliverableKind } from "@agentcenter/database";
 import { builder } from "../builder";
 import { requireRole } from "@/server/tenancy/guards";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 // reviseDeliverable mutation retired — deliverable revision is agent-facing via the REST PATCH
 // /api/tasks/[id]/deliverables/[deliverableId] path (same snapshot+version-increment). The GraphQL
 // mutation was unwired (no client op, no caller) and duplicated that logic.
@@ -35,7 +36,7 @@ builder.mutationField("submitDeliverable", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       // Human write gate (docs/RBAC.md §D): viewer read-only; member+ / API-key agents may submit.
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const [task, agent, profileId] = await Promise.all([
         taskModel.findByIdSelect(args.taskId, {
           title: true,
@@ -83,7 +84,7 @@ builder.mutationField("deleteDeliverable", (t) =>
     type: "Boolean",
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await deliverableModel.deleteById(args.id);
       return true;
     },

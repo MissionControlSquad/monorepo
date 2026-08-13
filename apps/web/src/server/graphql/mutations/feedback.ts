@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { submitFeedback } from "@/server/services/feedback";
 
 // Parity #60/#62: submit feedback (thumbs-up/down + optional comment). FEEDBACK-gated, member+.
@@ -17,7 +18,7 @@ builder.mutationField("submitFeedback", (t) =>
     },
     resolve: async (_query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.FEEDBACK);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return submitFeedback({
         workspaceId: tenancy.workspaceId,
         targetType: args.targetType,

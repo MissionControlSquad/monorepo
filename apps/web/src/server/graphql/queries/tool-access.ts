@@ -1,5 +1,6 @@
 import { builder } from "../builder";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 // Tool access-policy reads (parity #21). The Agent Detail "Tools" tab shows an agent's effective tool
 // access: the workspace-wide rules (agentId null) plus the rules that name this agent, ordered agent-
@@ -11,7 +12,7 @@ builder.queryField("agentToolAccessPolicies", (t) =>
     type: ["ToolAccessPolicy"],
     args: { agentId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Confirm the agent belongs to this workspace before surfacing its rules.
       const agent = await ctx.prisma.agent.findFirst({
         where: { id: args.agentId, workspaceId: tenancy.workspaceId },

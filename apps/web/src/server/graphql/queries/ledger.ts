@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { LedgerKind } from "@agentcenter/database";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { prisma } from "@/server/prisma";
 import {
   bucketStartOf,
@@ -111,7 +112,7 @@ builder.queryField("ledgerSummary", (t) =>
     args: { from: t.arg({ type: "DateTime" }), to: t.arg({ type: "DateTime" }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const cacheKey = `${tenancy.workspaceId}|${rangeKey(args.from, args.to)}`;
       const cached = ledgerSummaryCache.get(cacheKey);
       if (cached) return cached;
@@ -156,7 +157,7 @@ builder.queryField("ledgerByKind", (t) =>
     args: { from: t.arg({ type: "DateTime" }), to: t.arg({ type: "DateTime" }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const cacheKey = `${tenancy.workspaceId}|${rangeKey(args.from, args.to)}`;
       const cached = ledgerByKindCache.get(cacheKey);
       if (cached) return cached;
@@ -184,7 +185,7 @@ builder.queryField("ledgerByBiller", (t) =>
     args: { from: t.arg({ type: "DateTime" }), to: t.arg({ type: "DateTime" }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const cacheKey = `${tenancy.workspaceId}|${rangeKey(args.from, args.to)}`;
       const cached = ledgerByBillerCache.get(cacheKey);
       if (cached) return cached;
@@ -228,7 +229,7 @@ builder.queryField("ledgerByCategory", (t) =>
     args: { from: t.arg({ type: "DateTime" }), to: t.arg({ type: "DateTime" }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const cacheKey = `${tenancy.workspaceId}|${rangeKey(args.from, args.to)}`;
       const cached = ledgerByCategoryCache.get(cacheKey);
       if (cached) return cached;
@@ -257,7 +258,7 @@ builder.queryField("ledgerByProject", (t) =>
     args: { from: t.arg({ type: "DateTime" }), to: t.arg({ type: "DateTime" }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const cacheKey = `${tenancy.workspaceId}|${rangeKey(args.from, args.to)}`;
       const cached = ledgerByProjectCache.get(cacheKey);
       if (cached) return cached;
@@ -323,7 +324,7 @@ builder.queryField("ledgerTimeline", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const bucket = (
         ["day", "week", "month"].includes(args.bucket ?? "day") ? (args.bucket ?? "day") : "day"
       ) as LedgerBucketKind;
@@ -377,7 +378,7 @@ builder.queryField("ledgerEvents", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const take = Math.min(Math.max(args.limit ?? 50, 1), 200);
       const where = scoped(ctx, {
         ...rangeWhere(args.from, args.to),
@@ -405,7 +406,7 @@ builder.queryField("ledgerCategories", (t) =>
     args: { kind: t.arg.string(), includeArchived: t.arg.boolean() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.ledgerCategory.findMany({
         ...query,
         where: scoped(ctx, {

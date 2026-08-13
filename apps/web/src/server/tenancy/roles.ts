@@ -17,6 +17,32 @@ export function roleAtLeast(role: WorkspaceRole, min: WorkspaceRole): boolean {
   return RANK[role] >= RANK[min];
 }
 
+/** Canonical capability strings used by the coarse role→capability map. */
+export const CAPS = {
+  ALL: "*",
+  READ: "read",
+  OPERATE: "operate",
+} as const;
+
+/**
+ * Operate-class permission strings — the concrete "do the work" capabilities that the coarse
+ * `operate` cap grants. A role holding `operate` (member+) resolves true for any of these; anything
+ * NOT listed here (and not an exact cap match) is manage-class and stays owner/admin-only.
+ * Fail-safe by design: unknown permission strings default to manage (denied for members).
+ */
+export const OPERATE_PERMISSION = {
+  OPERATE: CAPS.OPERATE,
+  TASK_WRITE: "task:write",
+  MESSAGE_WRITE: "message:write",
+  DELIVERABLE_WRITE: "deliverable:write",
+  COMMENT_WRITE: "comment:write",
+  VOTE: "vote",
+  AGENT_RUN: "agent:run",
+  SKILL_AUTHOR: "skill:author",
+} as const;
+
+const OPERATE_PERMISSIONS: ReadonlySet<string> = new Set(Object.values(OPERATE_PERMISSION));
+
 /**
  * Coarse capability map per role — the APPROVED team RBAC matrix (docs/RBAC.md §D).
  *
@@ -40,39 +66,22 @@ export function roleAtLeast(role: WorkspaceRole, min: WorkspaceRole): boolean {
  * (see docs/gap-plans/01-buildbase-tenancy.md); this map is the safe default.
  */
 const ROLE_CAPS: Record<WorkspaceRole, readonly string[]> = {
-  owner: ["*"],
-  admin: ["*"],
-  member: ["read", "operate"],
-  viewer: ["read"],
+  owner: [CAPS.ALL],
+  admin: [CAPS.ALL],
+  member: [CAPS.READ, CAPS.OPERATE],
+  viewer: [CAPS.READ],
 };
-
-/**
- * Operate-class permission strings — the concrete "do the work" capabilities that the coarse
- * `"operate"` cap grants. A role holding `"operate"` (member+) resolves true for any of these;
- * anything NOT listed here (and not an exact cap match) is manage-class and stays owner/admin-only.
- * Fail-safe by design: unknown permission strings default to manage (denied for members).
- */
-const OPERATE_PERMISSIONS: ReadonlySet<string> = new Set([
-  "operate",
-  "task:write",
-  "message:write",
-  "deliverable:write",
-  "comment:write",
-  "vote",
-  "agent:run",
-  "skill:author",
-]);
 
 /**
  * True if `role` grants `permission`.
  *   - `"*"` (owner/admin) grants everything.
  *   - an exact cap match grants it (e.g. `read`).
- *   - the `"operate"` cap grants any operate-class permission (see `OPERATE_PERMISSIONS`).
+ *   - the `operate` cap grants any operate-class permission (see `OPERATE_PERMISSIONS`).
  * Manage-class permissions are granted only via `"*"`, so members/viewers are denied fail-safe.
  */
 export function roleCan(role: WorkspaceRole, permission: string): boolean {
   const caps = ROLE_CAPS[role] ?? [];
-  if (caps.includes("*") || caps.includes(permission)) return true;
-  if (caps.includes("operate") && OPERATE_PERMISSIONS.has(permission)) return true;
+  if (caps.includes(CAPS.ALL) || caps.includes(permission)) return true;
+  if (caps.includes(CAPS.OPERATE) && OPERATE_PERMISSIONS.has(permission)) return true;
   return false;
 }

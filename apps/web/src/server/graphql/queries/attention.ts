@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { getAttentionFeed } from "@/server/services/attention";
 
 // Epic #20: unified attention feed. ATTENTION-gated, member, workspace-scoped.
@@ -32,7 +33,7 @@ builder.queryField("attentionFeed", (t) =>
     args: { includeDismissed: t.arg.boolean() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ATTENTION);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return getAttentionFeed(tenancy.workspaceId, args.includeDismissed ?? false);
     },
   }),

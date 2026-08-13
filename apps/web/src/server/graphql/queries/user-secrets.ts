@@ -3,6 +3,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole, roleAtLeast, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { getUserSecretCoverage } from "@/server/services/user-secrets";
 
 // Parity §3 #7: user-scoped secret coverage read shape. A plain object (no plaintext, no ciphertext)
@@ -36,7 +37,7 @@ builder.queryField("userSecretDefinitions", (t) =>
     type: ["UserSecretDefinition"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.userSecretDefinition.findMany({
         ...query,
         where: scoped(ctx, {}),
@@ -54,9 +55,9 @@ builder.queryField("userSecretCoverage", (t) =>
     args: { profileId: t.arg.string() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const target = args.profileId ?? tenancy.userId;
-      if (target !== tenancy.userId && !roleAtLeast(tenancy.role, "admin")) {
+      if (target !== tenancy.userId && !roleAtLeast(tenancy.role, WORKSPACE_ROLES.ADMIN)) {
         throw new GraphQLError("Members can only view their own secret coverage", {
           extensions: { code: "FORBIDDEN" },
         });

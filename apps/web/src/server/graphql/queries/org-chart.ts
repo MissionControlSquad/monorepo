@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS, renderOrgChartSvg } from "@agentcenter/utils";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { getAgentOrgChainHealth } from "@/server/services/org-chart";
 
 // Epic #19: org chart reads — ORG_CHART-gated, workspace-scoped, member.
@@ -10,7 +11,7 @@ builder.queryField("orgChart", (t) =>
     type: ["Agent"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.ORG_CHART);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.agent.findMany({
         ...query,
         where: scoped(ctx, {}),
@@ -35,7 +36,7 @@ builder.queryField("agentOrgChainHealth", (t) =>
     args: { agentId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ORG_CHART);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const agents = await ctx.prisma.agent.findMany({
         where: { workspaceId: tenancy.workspaceId },
         select: { id: true, name: true, reportsToAgentId: true },
@@ -51,7 +52,7 @@ builder.queryField("orgChartSvg", (t) =>
     type: "String",
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.ORG_CHART);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const agents = await ctx.prisma.agent.findMany({
         where: { workspaceId: tenancy.workspaceId },
         select: { id: true, name: true, role: true, reportsToAgentId: true },

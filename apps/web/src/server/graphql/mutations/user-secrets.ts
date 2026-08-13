@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   createUserSecretDefinition,
   deleteUserSecretDefinition,
@@ -24,7 +25,7 @@ builder.mutationField("createUserSecretDefinition", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const def = await createUserSecretDefinition({
         workspaceId: tenancy.workspaceId,
         key: args.key,
@@ -48,7 +49,7 @@ builder.mutationField("deleteUserSecretDefinition", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return deleteUserSecretDefinition(tenancy.workspaceId, args.id);
     },
   }),
@@ -65,7 +66,7 @@ builder.mutationField("declareUserSecret", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const decl = await declareUserSecret({
         workspaceId: tenancy.workspaceId,
         definitionId: args.definitionId,

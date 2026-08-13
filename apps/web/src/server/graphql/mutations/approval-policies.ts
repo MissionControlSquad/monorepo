@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { Prisma } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   setApprovalPolicy,
   deleteApprovalPolicy,
@@ -27,7 +28,7 @@ builder.mutationField("setApprovalPolicy", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const saved = await setApprovalPolicy({
         id: args.id ?? null,
         workspaceId: tenancy.workspaceId,
@@ -50,7 +51,7 @@ builder.mutationField("deleteApprovalPolicy", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return deleteApprovalPolicy(args.id, tenancy.workspaceId);
     },
   }),
@@ -79,7 +80,7 @@ builder.mutationField("requestAgentAction", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const result = await requestAgentAction({
         workspaceId: tenancy.workspaceId,
         action: args.action,

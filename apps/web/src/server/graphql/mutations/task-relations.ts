@@ -1,6 +1,7 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { requireRole } from "@/server/tenancy/guards";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { GraphQLError } from "graphql";
 import { linkTasks, unlinkTasks, isTaskRelationType } from "@/server/services/task-relations";
@@ -17,7 +18,7 @@ builder.mutationField("linkTasks", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_RELATIONS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       if (!isTaskRelationType(args.type))
         throw new GraphQLError(`Invalid relation type '${args.type}'`, {
           extensions: { code: "BAD_USER_INPUT" },
@@ -39,7 +40,7 @@ builder.mutationField("unlinkTasks", (t) =>
     args: { relationId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_RELATIONS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return unlinkTasks(args.relationId);
     },
   }),

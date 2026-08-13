@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { dismissAttentionItem, undismissAttentionItem } from "@/server/services/attention";
 
 // Epic #20b: dismiss / restore an attention feed item. member, ATTENTION-gated.
@@ -12,7 +13,7 @@ builder.mutationField("dismissAttentionItem", (t) =>
     args: { itemKey: t.arg.string({ required: true }), snoozeHours: t.arg.int() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ATTENTION);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const snoozedUntil =
         args.snoozeHours && args.snoozeHours > 0
           ? new Date(Date.now() + args.snoozeHours * 3600_000)
@@ -28,7 +29,7 @@ builder.mutationField("undismissAttentionItem", (t) =>
     args: { itemKey: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ATTENTION);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return undismissAttentionItem(tenancy.workspaceId, args.itemKey);
     },
   }),

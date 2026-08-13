@@ -1,6 +1,7 @@
 import { builder } from "../builder";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { listAdapters } from "@/server/adapters/registry";
 
@@ -12,7 +13,7 @@ builder.queryField("agentAdapters", (t) =>
     type: ["AgentAdapter"],
     args: { enabledOnly: t.arg.boolean() },
     resolve: async (query, _root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const featureEnabled = await isFeatureEnabled(FLAG_KEYS.MULTI_PROVIDER_ADAPTERS);
       // Reuse the registry's flag logic for the where-clause, then apply Pothos query selection.
       const rows = await listAdapters({ featureEnabled, enabledOnly: args.enabledOnly ?? false });
@@ -31,7 +32,7 @@ builder.queryField("adapterModelProfiles", (t) =>
     type: ["AdapterModelProfile"],
     args: { adapterType: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.adapterModelProfile.findMany({
         ...query,
         where: { adapterType: args.adapterType },

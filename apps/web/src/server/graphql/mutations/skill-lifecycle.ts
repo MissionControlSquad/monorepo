@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   resetSkillToOrigin,
   importSkillPackage,
@@ -21,7 +22,7 @@ builder.mutationField("resetSkillToOrigin", (t) =>
     args: { skillId: t.arg.string({ required: true }) },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tn = requireRole(ctx, "member");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return resetSkillToOrigin(tn.workspaceId, args.skillId, tn.userId);
     },
   }),
@@ -32,7 +33,7 @@ builder.mutationField("importSkillPackage", (t) =>
     args: { files: t.arg({ type: [SkillFileInput], required: true }), sourceRef: t.arg.string() },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tn = requireRole(ctx, "member");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return importSkillPackage({
         workspaceId: tn.workspaceId,
         files: args.files.map((f) => ({ path: f.path, content: f.content })),
@@ -53,7 +54,7 @@ builder.mutationField("importSkillFromSource", (t) =>
     args: { source: t.arg.string({ required: true }) },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tn = requireRole(ctx, "admin");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await assertSkillAction(tn.workspaceId, "import", { role: tn.role });
       return importSkillFromSource({
         workspaceId: tn.workspaceId,
@@ -70,7 +71,7 @@ builder.mutationField("importSkillFromCatalog", (t) =>
     args: { ref: t.arg.string({ required: true }) },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tn = requireRole(ctx, "admin");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await assertSkillAction(tn.workspaceId, "import", { role: tn.role });
       return importFromCatalog({
         workspaceId: tn.workspaceId,
@@ -92,7 +93,7 @@ builder.mutationField("reassignSkillFork", (t) =>
     },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tn = requireRole(ctx, "member");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await assertSkillAction(tn.workspaceId, "edit", { role: tn.role }, { skillId: args.skillId });
       return reassignSkillFork(tn.workspaceId, args.skillId, args.newOriginId);
     },
@@ -108,7 +109,7 @@ builder.mutationField("importSkillFromProjectScan", (t) =>
     args: { projectWorkspaceId: t.arg.string({ required: true }), dir: t.arg.string() },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tn = requireRole(ctx, "admin");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await assertSkillAction(tn.workspaceId, "import", { role: tn.role });
       return importSkillFromProjectScan({
         workspaceId: tn.workspaceId,

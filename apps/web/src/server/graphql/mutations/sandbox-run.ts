@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { GraphQLError } from "graphql";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { getSandboxProvider } from "@/server/services/sandbox-providers";
 import { runTaskInSandbox, enqueueSandboxRun, cancelAgentRun } from "@/server/services/sandbox-run";
 import { promoteAgentRunReview } from "@/server/services/run-review";
@@ -21,7 +22,7 @@ builder.mutationField("setAgentSandboxProvider", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       if (args.provider && !getSandboxProvider(args.provider)) {
         throw new GraphQLError(`Unknown sandbox provider: ${args.provider}`, {
           extensions: { code: "BAD_USER_INPUT" },
@@ -55,7 +56,7 @@ builder.mutationField("setAgentMaxConcurrentRuns", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       if (args.maxConcurrentRuns != null && args.maxConcurrentRuns < 1) {
         throw new GraphQLError(
           "maxConcurrentRuns must be a positive integer (or null for unlimited)",
@@ -97,7 +98,7 @@ builder.mutationField("enqueueTaskInSandbox", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return enqueueSandboxRun({
         workspaceId: tenancy.workspaceId,
         taskId: args.taskId,
@@ -122,7 +123,7 @@ builder.mutationField("cancelAgentRun", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return cancelAgentRun(tenancy.workspaceId, args.runId, args.reason ?? undefined);
     },
   }),
@@ -139,7 +140,7 @@ builder.mutationField("promoteAgentRunReview", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LOW_TRUST_REVIEW);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const run = await promoteAgentRunReview({
         workspaceId: tenancy.workspaceId,
         runId: args.runId,
@@ -175,7 +176,7 @@ builder.mutationField("runTaskInSandbox", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       // Tenancy is enforced downstream: the agent is workspace-scoped and assembleContextBundle
       // scopes the task to that agent's accessible projects (throws if not accessible).
       return runTaskInSandbox({

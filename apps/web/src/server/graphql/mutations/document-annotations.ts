@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   createAnnotationThread,
   addAnnotationComment,
@@ -28,7 +29,7 @@ builder.mutationField("createAnnotationThread", (t) =>
     },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
-      const tn = requireRole(ctx, "member");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return createAnnotationThread({
         documentId: args.documentId,
         startOffset: args.startOffset,
@@ -44,7 +45,7 @@ builder.mutationField("addAnnotationComment", (t) =>
     args: { threadId: t.arg.string({ required: true }), body: t.arg.string({ required: true }) },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
-      const tn = requireRole(ctx, "member");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Work-items §3 Item 1 — mirror into the task timeline only when ANNOTATIONS is enabled.
       const mirrorToTask = await isFeatureEnabled(FLAG_KEYS.ANNOTATIONS);
       return addAnnotationComment({
@@ -62,7 +63,7 @@ builder.mutationField("resolveAnnotationThread", (t) =>
     args: { threadId: t.arg.string({ required: true }) },
     resolve: async (_r, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return resolveAnnotationThread(args.threadId);
     },
   }),
@@ -73,7 +74,7 @@ builder.mutationField("acquireDocumentLock", (t) =>
     args: { documentId: t.arg.string({ required: true }) },
     resolve: async (_r, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
-      const tn = requireRole(ctx, "member");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return acquireDocumentLock(args.documentId, tn.userId);
     },
   }),
@@ -84,7 +85,7 @@ builder.mutationField("releaseDocumentLock", (t) =>
     args: { documentId: t.arg.string({ required: true }) },
     resolve: async (_r, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
-      const tn = requireRole(ctx, "member");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return releaseDocumentLock(args.documentId, tn.userId);
     },
   }),

@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { voteSummary } from "@/server/services/deliverable-votes";
 
 // Tier C: deliverable vote summary. VOTING-gated, member+.
@@ -20,7 +21,7 @@ builder.queryField("deliverableVotes", (t) =>
     args: { deliverableId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.VOTING);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return voteSummary(args.deliverableId, tenancy.userId);
     },
   }),

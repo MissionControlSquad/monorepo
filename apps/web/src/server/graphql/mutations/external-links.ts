@@ -1,6 +1,7 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { requireRole } from "@/server/tenancy/guards";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { addExternalLink, removeExternalLink } from "@/server/services/external-links";
 
@@ -15,7 +16,7 @@ builder.mutationField("addExternalLink", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.EXTERNAL_LINKS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const link = await addExternalLink({
         taskId: args.taskId,
         url: args.url,
@@ -33,7 +34,7 @@ builder.mutationField("removeExternalLink", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.EXTERNAL_LINKS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return removeExternalLink(args.id);
     },
   }),

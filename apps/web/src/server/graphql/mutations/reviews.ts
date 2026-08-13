@@ -4,6 +4,7 @@ import { FLAG_KEYS } from "@agentcenter/utils";
 import { agentModel } from "../../models";
 import { Roles } from "../../constants";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { prisma } from "@/server/prisma";
 import { isSystemShutdown } from "../../system-settings";
 import {
@@ -147,7 +148,7 @@ builder.mutationField("reviewTask", (t) =>
       await requireFeature(FLAG_KEYS.REVIEWS);
       if (await isSystemShutdown())
         throw new Error("System is in shutdown mode. No task reviews allowed.");
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const decision = args.decision === "approve" ? "approve" : "request_changes";
       const profile = await prisma.profile.findUnique({
         where: { id: tenancy.userId },

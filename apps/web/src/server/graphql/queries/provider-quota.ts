@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { fetchAllProviderQuota } from "@/server/services/provider-quota";
 
 // Domain 12 GAP-2: live provider quota/rate-limit windows. PROVIDER_QUOTA-gated, admin (polling uses
@@ -31,7 +32,7 @@ builder.queryField("providerQuotaWindows", (t) =>
     type: [ProviderQuotaResultType],
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.PROVIDER_QUOTA);
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return fetchAllProviderQuota();
     },
   }),

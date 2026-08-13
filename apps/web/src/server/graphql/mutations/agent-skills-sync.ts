@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS, SKILL_MERGE_MODES, type SkillMergeMode } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { syncAgentSkills } from "@/server/services/agent-skills-sync";
 
 // Explicit merge mode for skill sync (parity Paperclip #10978). Required on the mutation so a caller
@@ -42,7 +43,7 @@ builder.mutationField("syncAgentSkills", (t) =>
     },
     resolve: async (_r, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tn = requireRole(ctx, "admin");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return syncAgentSkills(
         tn.workspaceId,
         args.agentId,

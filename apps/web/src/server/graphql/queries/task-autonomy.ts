@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { DecompositionStatus } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { getRecoveryStats } from "@/server/services/recovery-observability";
 
 // Epic #8: task-autonomy reads — TASK_AUTONOMY-gated, member+. Tasks are not workspace-scoped
@@ -13,7 +14,7 @@ builder.queryField("pendingDecompositions", (t) =>
     args: { status: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.planDecomposition.findMany({
         ...query,
         where: args.status
@@ -30,7 +31,7 @@ builder.queryField("taskTreeHolds", (t) =>
     type: ["TaskTreeHold"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.taskTreeHold.findMany({
         ...query,
         where: { isActive: true },
@@ -46,7 +47,7 @@ builder.queryField("taskRecoveryActions", (t) =>
     args: { limit: t.arg.int() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.taskRecoveryAction.findMany({
         ...query,
         orderBy: { createdAt: "desc" },
@@ -74,7 +75,7 @@ builder.queryField("recoveryStats", (t) =>
     type: RecoveryStatsType,
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const { byDetectedBy: _omit, ...stats } = await getRecoveryStats();
       return stats;
     },
@@ -88,7 +89,7 @@ builder.queryField("threadInteractions", (t) =>
     args: { taskId: t.arg.string({ required: true }), status: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.THREAD_INTERACTIONS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.taskThreadInteraction.findMany({
         ...query,
         where: { taskId: args.taskId, ...(args.status ? { status: args.status } : {}) },

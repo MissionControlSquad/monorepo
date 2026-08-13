@@ -7,6 +7,7 @@ import { getOrCreateAgentProfileId } from "../../agent-profile";
 import { findProfilesWithAgentIdsByIds, findProfileAgentId } from "@agentcenter/database";
 import { checkLicenseLimit } from "../../license";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { isProjectSourceType, isProjectVisibility, sourceTypeUsesRepo } from "@agentcenter/utils";
 
 builder.mutationField("createProject", (t) =>
@@ -150,7 +151,7 @@ builder.mutationField("setProjectSource", (t) =>
       visibility: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const project = await ctx.prisma.project.findFirst({
         where: scoped(ctx, { id: args.projectId }),
         select: { id: true },

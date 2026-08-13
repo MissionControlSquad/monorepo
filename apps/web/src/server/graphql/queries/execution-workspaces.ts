@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   listProjectWorkspaces,
   listExecutionWorkspaces,
@@ -64,7 +65,7 @@ builder.queryField("projectWorkspaces", (t) =>
     args: { projectId: t.arg.string() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.EXECUTION_WORKSPACES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return listProjectWorkspaces(tenancy.workspaceId, args.projectId);
     },
   }),
@@ -76,7 +77,7 @@ builder.queryField("executionWorkspaces", (t) =>
     args: { projectId: t.arg.string(), runId: t.arg.string() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.EXECUTION_WORKSPACES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return listExecutionWorkspaces(tenancy.workspaceId, {
         projectId: args.projectId,
         runId: args.runId,

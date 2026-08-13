@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   createFolder,
   renameFolder,
@@ -18,7 +19,7 @@ builder.mutationField("createFolder", (t) =>
     args: { name: t.arg.string({ required: true }), parentFolderId: t.arg.string() },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.FOLDERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return createFolder({
         workspaceId: tenancy.workspaceId,
         name: args.name,
@@ -35,7 +36,7 @@ builder.mutationField("renameFolder", (t) =>
     args: { id: t.arg.string({ required: true }), name: t.arg.string({ required: true }) },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.FOLDERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return renameFolder(tenancy.workspaceId, args.id, args.name);
     },
   }),
@@ -47,7 +48,7 @@ builder.mutationField("moveFolder", (t) =>
     args: { id: t.arg.string({ required: true }), parentFolderId: t.arg.string() },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.FOLDERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return moveFolder(tenancy.workspaceId, args.id, args.parentFolderId ?? null);
     },
   }),
@@ -59,7 +60,7 @@ builder.mutationField("deleteFolder", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_r, args, ctx) => {
       await requireFeature(FLAG_KEYS.FOLDERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return deleteFolder(tenancy.workspaceId, args.id);
     },
   }),
@@ -75,7 +76,7 @@ builder.mutationField("addFolderItem", (t) =>
     },
     resolve: async (_q, _r, args, ctx) => {
       await requireFeature(FLAG_KEYS.FOLDERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return addFolderItem(tenancy.workspaceId, args.folderId, args.itemType, args.itemId);
     },
   }),
@@ -91,7 +92,7 @@ builder.mutationField("removeFolderItem", (t) =>
     },
     resolve: async (_r, args, ctx) => {
       await requireFeature(FLAG_KEYS.FOLDERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return removeFolderItem(tenancy.workspaceId, args.folderId, args.itemType, args.itemId);
     },
   }),

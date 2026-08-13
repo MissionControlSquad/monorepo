@@ -1,5 +1,6 @@
 import { builder } from "../builder";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { getProfileAnalytics } from "@/server/services/profile-analytics";
 
 // Per-member analytics (Epic: Multiple Human Users — member productivity/cost). Member-visible,
@@ -44,7 +45,7 @@ builder.queryField("profileAnalytics", (t) =>
     nullable: true,
     args: { profileId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Ensure the requested profile belongs to an agent in this workspace, or is the caller — a
       // member can't probe arbitrary cross-workspace profiles. Agent profiles are workspace-scoped
       // via the agent; a profile with no agent (human) is only self-viewable here.

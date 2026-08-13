@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   createCompany,
   updateCompany,
@@ -23,7 +24,7 @@ builder.mutationField("createAgentCompany", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AGENT_COMPANIES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const c = await createCompany({
         workspaceId: tenancy.workspaceId,
         name: args.name,
@@ -50,7 +51,7 @@ builder.mutationField("updateAgentCompany", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AGENT_COMPANIES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const c = await updateCompany(tenancy.workspaceId, args.id, {
         name: args.name ?? null,
         description: args.description ?? undefined,
@@ -68,7 +69,7 @@ builder.mutationField("deleteAgentCompany", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AGENT_COMPANIES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return deleteCompany(tenancy.workspaceId, args.id);
     },
   }),
@@ -80,7 +81,7 @@ builder.mutationField("setAgentCompany", (t) =>
     args: { agentId: t.arg.string({ required: true }), companyId: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AGENT_COMPANIES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await setAgentCompany(tenancy.workspaceId, args.agentId, args.companyId ?? null);
       return ctx.prisma.agent.findUniqueOrThrow({ ...query, where: { id: args.agentId } });
     },
@@ -106,7 +107,7 @@ builder.mutationField("importCompanyPackage", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AGENT_COMPANIES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const files = Array.isArray(args.files)
         ? (args.files as { path: string; content: string }[])
         : [];

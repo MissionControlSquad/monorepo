@@ -3,6 +3,7 @@ import { projectModel, projectDocModel, projectDocRevisionModel } from "../../mo
 import { invalidateProjectContext } from "../../cache";
 import { requireFeature } from "../require-feature";
 import { requireRole } from "@/server/tenancy/guards";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { ProjectStatus } from "../../constants";
 
@@ -18,7 +19,7 @@ builder.mutationField("createProjectDoc", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const project = await projectModel.findById(args.projectId, { select: { status: true } });
       if (project?.status === ProjectStatus.ARCHIVED) {
         throw new Error("Cannot modify docs of an archived project");
@@ -65,7 +66,7 @@ builder.mutationField("updateProjectDoc", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Save pre-edit snapshot as revision
       const current = await projectDocModel.delegate.findUniqueOrThrow({
         where: { id: args.id },
@@ -109,7 +110,7 @@ builder.mutationField("deleteProjectDoc", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const doc = await projectDocModel.delegate.findUniqueOrThrow({
         where: { id: args.id },
       });

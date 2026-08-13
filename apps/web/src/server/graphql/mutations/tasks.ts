@@ -1,5 +1,6 @@
 import { builder } from "../builder";
 import { requireRole } from "@/server/tenancy/guards";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { runTaskUpdateTransaction } from "@agentcenter/database";
 import { taskModel, agentModel } from "../../models";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "../../pubsub";
@@ -58,7 +59,7 @@ builder.mutationField("createTask", (t) =>
     resolve: async (query, _root, args, ctx) => {
       // Human write gate (docs/RBAC.md §D): viewer is read-only; member+ (and API-key agents,
       // which resolve as `member`) may operate. Run-bridge agents bypass this resolver entirely.
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       if (args.projectId) await assertProjectWritable(args.projectId);
       await assertAssignableAgents(args.assigneeIds, args.projectId);
 
@@ -130,7 +131,7 @@ builder.mutationField("createTaskFromDashboard", (t) =>
       blockedByTaskId: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       if (args.projectId) await assertProjectWritable(args.projectId);
       const assigneeIds = args.assigneeIds ?? [];
       await assertAssignableAgents(assigneeIds, args.projectId);
@@ -197,7 +198,7 @@ builder.mutationField("updateTask", (t) =>
       clearGoal: t.arg.boolean(),
     },
     resolve: async (query, _root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const oldTask = await taskModel.findById(args.id, {
         include: { assignees: { include: { profile: true } } },
       });
@@ -385,7 +386,7 @@ builder.mutationField("deleteTask", (t) =>
       agentId: t.arg.string({ required: true }),
     },
     resolve: async (_root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const task = await taskModel.findById(args.id, {
         include: { assignees: { include: { profile: true } } },
       });

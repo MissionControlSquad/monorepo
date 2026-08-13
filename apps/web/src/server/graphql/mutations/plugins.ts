@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   installPlugin,
   setPluginEnabled,
@@ -18,7 +19,7 @@ builder.mutationField("installPlugin", (t) =>
     args: { manifest: t.arg({ type: "JSON", required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PLUGIN_SDK);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const plugin = await installPlugin(tenancy.workspaceId, args.manifest, tenancy.userId);
       return ctx.prisma.plugin.findUniqueOrThrow({ ...query, where: { id: plugin.id } });
     },
@@ -34,7 +35,7 @@ builder.mutationField("setPluginEnabled", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PLUGIN_SDK);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const plugin = await setPluginEnabled(tenancy.workspaceId, args.pluginId, args.enabled);
       return ctx.prisma.plugin.findUniqueOrThrow({ ...query, where: { id: plugin.id } });
     },
@@ -47,7 +48,7 @@ builder.mutationField("uninstallPlugin", (t) =>
     args: { pluginId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PLUGIN_SDK);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return uninstallPlugin(tenancy.workspaceId, args.pluginId);
     },
   }),
@@ -62,7 +63,7 @@ builder.mutationField("setPluginConfig", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PLUGIN_SDK);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const plugin = await setPluginConfig(
         tenancy.workspaceId,
         args.pluginId,
@@ -79,7 +80,7 @@ builder.mutationField("clearPluginError", (t) =>
     args: { pluginId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PLUGIN_SDK);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const plugin = await clearPluginError(tenancy.workspaceId, args.pluginId);
       return ctx.prisma.plugin.findUniqueOrThrow({ ...query, where: { id: plugin.id } });
     },

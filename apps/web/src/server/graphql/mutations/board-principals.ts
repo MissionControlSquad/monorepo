@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { createBoardPrincipal, revokeBoardPrincipal } from "@/server/services/board-principals";
 
 // Board principal mutations. admin-only (minting a board credential is privileged); BOARD_CHAT-gated.
@@ -26,7 +27,7 @@ builder.mutationField("createBoardPrincipal", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BOARD_CHAT);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const { principal, plainKey, keyPrefix } = await createBoardPrincipal({
         workspaceId: tenancy.workspaceId,
         name: args.name,
@@ -44,7 +45,7 @@ builder.mutationField("revokeBoardPrincipal", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BOARD_CHAT);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const revoked = await revokeBoardPrincipal(tenancy.workspaceId, args.id);
       return ctx.prisma.boardPrincipal.findUniqueOrThrow({ ...query, where: { id: revoked.id } });
     },

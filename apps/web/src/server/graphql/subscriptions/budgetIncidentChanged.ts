@@ -3,18 +3,19 @@ import { pubsub, budgetIncidentTopic } from "../../pubsub";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 // Epic #4: live budget incidents (open/resolve) for the caller's workspace only.
 builder.subscriptionField("budgetIncidentChanged", (t) =>
   t.prismaField({
     type: "BudgetIncident",
     subscribe: (_root, _args, ctx) => {
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return pubsub.subscribe(budgetIncidentTopic(tenancy.workspaceId));
     },
     resolve: async (query, payload, _args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Re-scope by workspace on read — never surface another workspace's incident.
       return ctx.prisma.budgetIncident.findFirstOrThrow({
         ...query,

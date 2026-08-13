@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { detectLocalRuntimes, type RuntimeInventory } from "@/server/services/ai-runtime-detect";
 import { listReportedInventories, coerceOs } from "@/server/services/ai-runtime-inventory";
 
@@ -63,7 +64,7 @@ builder.queryField("aiRuntimeInventory", (t) =>
     args: { os: t.arg.string() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AI_TOOLS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const os = coerceOs(args.os);
       return detectLocalRuntimes(os ?? undefined);
     },
@@ -76,7 +77,7 @@ builder.queryField("reportedRuntimeInventories", (t) =>
     type: [AiReportedInventory],
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.AI_TOOLS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const rows = await listReportedInventories(tenancy.workspaceId);
       return rows.map((r) => ({
         runnerId: r.runnerId,

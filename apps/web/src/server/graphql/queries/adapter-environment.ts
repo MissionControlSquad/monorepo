@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { adapterPreflight } from "@/server/services/adapter-preflight";
 
 // Adapter environment preflight ("Test connection") — Paperclip parity. Probes that a runtime adapter is
@@ -32,7 +33,7 @@ builder.queryField("testAdapterEnvironment", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.MULTI_PROVIDER_ADAPTERS);
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return adapterPreflight(args.key, { model: args.model ?? null });
     },
   }),

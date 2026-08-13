@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { GraphQLError } from "graphql";
 import { FLAG_KEYS, isMemoryProvider } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { setCompanyDefaultMemoryProvider, forgetAgentMemory } from "@/server/services/agent-memory";
 
 // Tier D: bind an agent's memory provider (none | markdown | db). MEMORY-gated, admin.
@@ -15,7 +16,7 @@ builder.mutationField("setAgentMemoryProvider", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.MEMORY);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       if (!isMemoryProvider(args.provider))
         throw new GraphQLError(`Unknown memory provider: ${args.provider}`, {
           extensions: { code: "BAD_USER_INPUT" },
@@ -43,7 +44,7 @@ builder.mutationField("setCompanyMemoryProvider", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.MEMORY);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       if (!isMemoryProvider(args.provider))
         throw new GraphQLError(`Unknown memory provider: ${args.provider}`, {
           extensions: { code: "BAD_USER_INPUT" },
@@ -59,7 +60,7 @@ builder.mutationField("forgetAgentMemory", (t) =>
     args: { agentId: t.arg.string({ required: true }), memoryId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.MEMORY);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return forgetAgentMemory(tenancy.workspaceId, args.agentId, args.memoryId);
     },
   }),

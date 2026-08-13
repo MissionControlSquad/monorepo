@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   createWorkProduct,
   setWorkProductReviewState,
@@ -27,7 +28,7 @@ builder.mutationField("createWorkProduct", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.WORK_PRODUCTS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Author profile = the caller's profile (the human recording the output).
       const wp = await createWorkProduct({
         taskId: args.taskId,
@@ -54,7 +55,7 @@ builder.mutationField("setWorkProductReviewState", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.WORK_PRODUCTS);
-      const tenancy = requireRole(ctx, "admin"); // board reviewer only — no agent self-approval
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN); // board reviewer only — no agent self-approval
       const wp = await setWorkProductReviewState({
         deliverableId: args.deliverableId,
         reviewState: args.reviewState,
@@ -74,7 +75,7 @@ builder.mutationField("setWorkProductStatus", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.WORK_PRODUCTS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const wp = await setWorkProductStatus(args.deliverableId, args.status);
       return ctx.prisma.deliverable.findUniqueOrThrow({ ...query, where: { id: wp.id } });
     },

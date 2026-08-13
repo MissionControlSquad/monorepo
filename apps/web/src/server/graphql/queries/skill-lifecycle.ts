@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   computeSkillUpdateStatus,
   precheckForkTarget,
@@ -22,7 +23,7 @@ builder.queryField("skillUpdateStatus", (t) =>
     args: { skillId: t.arg.string({ required: true }) },
     resolve: async (_r, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tn = requireRole(ctx, "member");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return computeSkillUpdateStatus(tn.workspaceId, args.skillId);
     },
   }),
@@ -58,7 +59,7 @@ builder.queryField("forkPrecheck", (t) =>
     args: { skillId: t.arg.string({ required: true }) },
     resolve: async (_r, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tn = requireRole(ctx, "member");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return precheckForkTarget(tn.workspaceId, args.skillId);
     },
   }),
@@ -79,7 +80,7 @@ builder.queryField("projectWorkspaceSkillCandidates", (t) =>
     args: { projectWorkspaceId: t.arg.string({ required: true }) },
     resolve: async (_r, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tn = requireRole(ctx, "admin");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const candidates = await listProjectWorkspaceSkillCandidates({
         workspaceId: tn.workspaceId,
         projectWorkspaceId: args.projectWorkspaceId,
@@ -99,7 +100,7 @@ builder.queryField("skillCatalogPackages", (t) =>
     type: [CatalogSkillEntry],
     resolve: async (_r, _args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return listCatalogSkills().map((s) => ({
         id: s.id,
         key: s.key,

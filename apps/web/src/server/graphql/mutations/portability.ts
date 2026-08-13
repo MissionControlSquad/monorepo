@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS, isCollisionStrategy } from "@agentcenter/utils";
 import type { CollisionStrategy } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { importWorkspaceBundle } from "@/server/services/portability";
 
 // Epic #14: import a bundle. admin only — it provisions agents/projects/skills (high blast radius).
@@ -15,7 +16,7 @@ builder.mutationField("importWorkspaceBundle", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.WORKSPACE_PORTABILITY);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const strategy = isCollisionStrategy(args.collisionStrategy ?? "")
         ? (args.collisionStrategy as CollisionStrategy)
         : "rename";

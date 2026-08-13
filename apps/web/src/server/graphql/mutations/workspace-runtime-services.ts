@@ -3,6 +3,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { verifyRunBridgeToken } from "@/server/services/run-bridge";
 import {
   startWorkspaceRuntimeService,
@@ -31,7 +32,7 @@ builder.mutationField("startWorkspaceRuntimeService", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LOCAL_SERVICES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const { service } = await startWorkspaceRuntimeService(tenancy.workspaceId, {
         executionWorkspaceId: args.executionWorkspaceId,
         name: args.name,
@@ -60,7 +61,7 @@ builder.mutationField("stopWorkspaceRuntimeService", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LOCAL_SERVICES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const reason = (args.reason ?? "manual") as StopReason;
       await stopWorkspaceRuntimeService(tenancy.workspaceId, args.id, { reason });
       return ctx.prisma.workspaceRuntimeService.findUniqueOrThrow({
@@ -104,7 +105,7 @@ builder.mutationField("setWorkspaceRuntimeServiceHealth", (t) =>
         }
         workspaceId = run.workspaceId;
       } else {
-        workspaceId = requireRole(ctx, "admin").workspaceId;
+        workspaceId = requireRole(ctx, WORKSPACE_ROLES.ADMIN).workspaceId;
       }
 
       await setRuntimeServiceHealth(workspaceId, args.id, args.health);

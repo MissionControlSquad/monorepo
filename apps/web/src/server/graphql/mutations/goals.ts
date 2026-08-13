@@ -4,6 +4,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS, isGoalLevel, isGoalStatus } from "@agentcenter/utils";
 import type { GoalLevel, GoalStatus } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { createGoal, updateGoal, deleteGoal, setProjectDefaultGoal } from "@/server/services/goals";
 
 // Epic #11: goals mutations. Member CRUD (goals are low blast-radius; matches Paperclip company access).
@@ -34,7 +35,7 @@ builder.mutationField("createGoal", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOALS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const g = await createGoal({
         workspaceId: tenancy.workspaceId,
         title: args.title,
@@ -65,7 +66,7 @@ builder.mutationField("updateGoal", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOALS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const g = await updateGoal(tenancy.workspaceId, args.id, {
         title: args.title ?? null,
         description: args.description ?? undefined,
@@ -85,7 +86,7 @@ builder.mutationField("deleteGoal", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOALS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await deleteGoal(tenancy.workspaceId, args.id);
       return true;
     },
@@ -102,7 +103,7 @@ builder.mutationField("setProjectDefaultGoal", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOALS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await setProjectDefaultGoal(tenancy.workspaceId, args.projectId, args.goalId ?? null);
       return ctx.prisma.project.findUniqueOrThrow({ ...query, where: { id: args.projectId } });
     },

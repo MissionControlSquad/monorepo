@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { grantPluginCapability, revokePluginCapability } from "@/server/services/plugin-grants";
 import { dispatchPluginTool } from "@/server/services/plugin-runtime";
 
@@ -18,7 +19,7 @@ builder.mutationField("grantPluginCapability", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PLUGIN_RUNTIME);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const grant = await grantPluginCapability({
         workspaceId: tenancy.workspaceId,
         pluginId: args.pluginId,
@@ -39,7 +40,7 @@ builder.mutationField("revokePluginCapability", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PLUGIN_RUNTIME);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return revokePluginCapability(tenancy.workspaceId, args.pluginId, args.capability);
     },
   }),
@@ -56,7 +57,7 @@ builder.mutationField("dispatchPluginTool", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PLUGIN_RUNTIME);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return dispatchPluginTool(tenancy.workspaceId, args.toolName, args.args ?? {});
     },
   }),

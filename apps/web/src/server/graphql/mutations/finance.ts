@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { BudgetScope, BudgetWindow } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { recordCostEvent, repriceCostEvent } from "@/server/services/cost";
 import { recordFinanceEvent } from "@/server/services/finance-events";
 import {
@@ -32,7 +33,7 @@ builder.mutationField("createBudgetPolicy", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const policy = await createBudgetPolicy({
         workspaceId: tenancy.workspaceId,
         scope: args.scope as BudgetScope,
@@ -62,7 +63,7 @@ builder.mutationField("updateBudgetPolicy", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const policy = await updateBudgetPolicy({
         workspaceId: tenancy.workspaceId,
         id: args.id,
@@ -83,7 +84,7 @@ builder.mutationField("deleteBudgetPolicy", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return deleteBudgetPolicy(tenancy.workspaceId, args.id);
     },
   }),
@@ -110,7 +111,7 @@ builder.mutationField("ingestCostEvent", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const event = await recordCostEvent({
         workspaceId: tenancy.workspaceId,
         agentId: args.agentId ?? null,
@@ -139,7 +140,7 @@ builder.mutationField("resolveBudgetIncident", (t) =>
     args: { id: t.arg.string({ required: true }), detail: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const incident = await resolveBudgetIncident({
         incidentId: args.id,
         workspaceId: tenancy.workspaceId,
@@ -158,7 +159,7 @@ builder.mutationField("raiseBudgetAndResume", (t) =>
     args: { id: t.arg.string({ required: true }), newLimitCents: t.arg.int({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const incident = await raiseBudgetAndResume({
         incidentId: args.id,
         workspaceId: tenancy.workspaceId,
@@ -194,7 +195,7 @@ builder.mutationField("ingestFinanceEvent", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const ev = await recordFinanceEvent({
         workspaceId: tenancy.workspaceId,
         eventKind: args.eventKind,
@@ -227,7 +228,7 @@ builder.mutationField("repriceCostEvent", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const ev = await repriceCostEvent(tenancy.workspaceId, args.costEventId, args.amountCents);
       return ctx.prisma.costEvent.findUniqueOrThrow({ ...query, where: { id: ev.id } });
     },
@@ -245,7 +246,7 @@ builder.mutationField("setAgentSalary", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const pol = await setAgentSalary({
         workspaceId: tenancy.workspaceId,
         agentId: args.agentId,

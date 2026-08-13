@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { ApprovalSubjectType, TrustLevel } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   createApproval,
   decideApproval,
@@ -32,7 +33,7 @@ builder.mutationField("createApproval", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const created = await createApproval({
         workspaceId: tenancy.workspaceId,
         subjectType: args.subjectType as ApprovalSubjectType,
@@ -63,7 +64,7 @@ builder.mutationField("requestAgentHire", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const created = await requestAgentHire({
         workspaceId: tenancy.workspaceId,
         spec: {
@@ -87,7 +88,7 @@ builder.mutationField("approveApproval", (t) =>
     args: { id: t.arg.string({ required: true }), decisionNote: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await decideApproval({
         approvalId: args.id,
         workspaceId: tenancy.workspaceId,
@@ -106,7 +107,7 @@ builder.mutationField("rejectApproval", (t) =>
     args: { id: t.arg.string({ required: true }), decisionNote: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await decideApproval({
         approvalId: args.id,
         workspaceId: tenancy.workspaceId,
@@ -125,7 +126,7 @@ builder.mutationField("requestApprovalChanges", (t) =>
     args: { id: t.arg.string({ required: true }), decisionNote: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await requestChanges({
         approvalId: args.id,
         workspaceId: tenancy.workspaceId,
@@ -143,7 +144,7 @@ builder.mutationField("resubmitApproval", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await resubmitApproval(args.id, tenancy.workspaceId);
       return ctx.prisma.approval.findUniqueOrThrow({ ...query, where: { id: args.id } });
     },
@@ -156,7 +157,7 @@ builder.mutationField("cancelApproval", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await cancelApproval(args.id, tenancy.workspaceId);
       return ctx.prisma.approval.findUniqueOrThrow({ ...query, where: { id: args.id } });
     },
@@ -169,7 +170,7 @@ builder.mutationField("addApprovalComment", (t) =>
     args: { approvalId: t.arg.string({ required: true }), body: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const comment = await addComment({
         approvalId: args.approvalId,
         workspaceId: tenancy.workspaceId,
@@ -196,7 +197,7 @@ builder.mutationField("setAgentTrustProfile", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await setTrustProfile({
         agentId: args.agentId,
         workspaceId: tenancy.workspaceId,
@@ -231,7 +232,7 @@ builder.mutationField("castApprovalVote", (t) =>
     args: { id: t.arg.string({ required: true }), vote: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "admin"); // board members are admins/owners
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN); // board members are admins/owners
       return castApprovalVote({
         approvalId: args.id,
         workspaceId: tenancy.workspaceId,

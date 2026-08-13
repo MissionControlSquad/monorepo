@@ -9,6 +9,7 @@ import type {
   CollisionStrategy,
 } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   createSkill,
   updateSkill,
@@ -51,7 +52,7 @@ builder.mutationField("createSkill", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await assertSkillAction(tenancy.workspaceId, "create", { role: tenancy.role });
       const s = await createSkill({
         workspaceId: tenancy.workspaceId,
@@ -93,7 +94,7 @@ builder.mutationField("updateSkill", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await assertSkillAction(
         tenancy.workspaceId,
         "edit",
@@ -129,7 +130,7 @@ builder.mutationField("deleteSkill", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await assertSkillAction(
         tenancy.workspaceId,
         "remove",
@@ -148,7 +149,7 @@ builder.mutationField("forkSkill", (t) =>
     args: { id: t.arg.string({ required: true }), force: t.arg.boolean() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await assertSkillAction(
         tenancy.workspaceId,
         "create",
@@ -169,7 +170,7 @@ builder.mutationField("starSkill", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return starSkill(tenancy.workspaceId, args.id, tenancy.userId);
     },
   }),
@@ -181,7 +182,7 @@ builder.mutationField("unstarSkill", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return unstarSkill(tenancy.workspaceId, args.id, tenancy.userId);
     },
   }),
@@ -197,7 +198,7 @@ builder.mutationField("assignSkill", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const link = await assignSkillToAgent({
         workspaceId: tenancy.workspaceId,
         agentId: args.agentId,
@@ -215,7 +216,7 @@ builder.mutationField("unassignSkill", (t) =>
     args: { agentId: t.arg.string({ required: true }), skillId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return unassignSkillFromAgent(tenancy.workspaceId, args.agentId, args.skillId);
     },
   }),
@@ -227,7 +228,7 @@ builder.mutationField("installCatalogSkill", (t) =>
     args: { skillId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await assertSkillAction(tenancy.workspaceId, "install", { role: tenancy.role });
       const skill = await installCatalogSkill(tenancy.workspaceId, args.skillId, tenancy.userId);
       return ctx.prisma.skill.findUniqueOrThrow({ ...query, where: { id: skill.id } });
@@ -245,7 +246,7 @@ builder.mutationField("upsertSkillFile", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const file = await upsertSkillFile(tenancy.workspaceId, args.skillId, {
         path: args.path,
         content: args.content,
@@ -261,7 +262,7 @@ builder.mutationField("deleteSkillFile", (t) =>
     args: { skillId: t.arg.string({ required: true }), path: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return deleteSkillFile(tenancy.workspaceId, args.skillId, args.path);
     },
   }),
@@ -283,7 +284,7 @@ builder.mutationField("createTeam", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const team = await createTeam({
         workspaceId: tenancy.workspaceId,
         createdByProfileId: tenancy.userId,
@@ -315,7 +316,7 @@ builder.mutationField("addTeamMember", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const m = await addTeamMember(tenancy.workspaceId, args.teamId, {
         name: args.name,
         role: args.role,
@@ -336,7 +337,7 @@ builder.mutationField("installTeamFromCatalog", (t) =>
     args: { ref: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const team = await installTeamFromCatalog({
         workspaceId: tenancy.workspaceId,
         ref: args.ref,
@@ -353,7 +354,7 @@ builder.mutationField("installTeam", (t) =>
     args: { teamId: t.arg.string({ required: true }), collisionStrategy: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const strategy = isCollisionStrategy(args.collisionStrategy ?? "")
         ? (args.collisionStrategy as CollisionStrategy)
         : "rename";
@@ -379,7 +380,7 @@ builder.mutationField("replaceSkillPolicy", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return replaceSkillPolicy({
         workspaceId: tenancy.workspaceId,
         defaultEffect: args.defaultEffect,

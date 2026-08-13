@@ -1,5 +1,6 @@
 import { builder } from "../builder";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 // Paperclip parity (server/src/services/sidebar-badges.ts): lightweight actionable counts to badge
 // the sidebar nav — how much is waiting on the human, at a glance. Member+; workspace-scoped for the
@@ -17,7 +18,7 @@ builder.queryField("sidebarBadges", (t) =>
   t.field({
     type: SidebarBadgesType,
     resolve: async (_root, _args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const [approvals, decompositions, incidents, tasksInReview, blockedTasks] = await Promise.all(
         [
           ctx.prisma.approval.count({ where: scoped(ctx, { status: "pending" as never }) }),

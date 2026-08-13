@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { exportWorkspaceBundle } from "@/server/services/portability";
 
 // Epic #14: portability reads. Export is member (read-only serialization of the caller's workspace);
@@ -11,7 +12,7 @@ builder.queryField("exportWorkspaceBundle", (t) =>
     type: "JSON",
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.WORKSPACE_PORTABILITY);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return exportWorkspaceBundle(tenancy.workspaceId);
     },
   }),
@@ -22,7 +23,7 @@ builder.queryField("workspaceImports", (t) =>
     type: ["WorkspaceImport"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.WORKSPACE_PORTABILITY);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.workspaceImport.findMany({
         ...query,
         where: scoped(ctx, {}),

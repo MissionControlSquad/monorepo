@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { ApprovalStatus, ApprovalSubjectType } from "@agentcenter/database";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 // Epic #3: governance queries — workspace-scoped, GOVERNANCE-gated, member+.
 builder.queryField("approvals", (t) =>
@@ -14,7 +15,7 @@ builder.queryField("approvals", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const where = scoped(ctx, {
         ...(args.status ? { status: args.status as ApprovalStatus } : {}),
         ...(args.subjectType ? { subjectType: args.subjectType as ApprovalSubjectType } : {}),
@@ -31,7 +32,7 @@ builder.queryField("approval", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.approval.findFirst({ ...query, where: scoped(ctx, { id: args.id }) });
     },
   }),
@@ -42,7 +43,7 @@ builder.queryField("pendingApprovalsForMe", (t) =>
     type: ["Approval"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.approval.findMany({
         ...query,
         where: scoped(ctx, { status: "pending" as ApprovalStatus }),
@@ -59,7 +60,7 @@ builder.queryField("agentTrustProfile", (t) =>
     args: { agentId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.agentTrustProfile.findFirst({
         ...query,
         where: scoped(ctx, { agentId: args.agentId }),

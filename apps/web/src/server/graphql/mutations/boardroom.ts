@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { sendBoardMessage, setBoardMessageFeedback } from "@/server/services/boardroom";
 
 // Epic #15: post a board-chat turn. admin only (operator surface); BOARD_CHAT-gated (off by default).
@@ -12,7 +13,7 @@ builder.mutationField("sendBoardMessage", (t) =>
     args: { body: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BOARD_CHAT);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       if (!args.body.trim()) {
         throw new Error("body is required");
       }
@@ -42,7 +43,7 @@ builder.mutationField("setBoardMessageFeedback", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BOARD_CHAT);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const message = await setBoardMessageFeedback({
         workspaceId: tenancy.workspaceId,
         messageId: args.messageId,

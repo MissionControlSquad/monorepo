@@ -8,6 +8,7 @@ import {
 } from "@agentcenter/utils";
 import type { BudgetWindow, IncidentStatus } from "@agentcenter/database";
 import { requireRole, scoped, requireTenancy } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { prisma } from "@/server/prisma";
 import { windowBounds } from "@/server/services/budget-window";
 import { costByTaskTree } from "@/server/services/cost-rollup";
@@ -66,7 +67,7 @@ builder.queryField("budgetPolicies", (t) =>
     type: ["BudgetPolicy"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.budgetPolicy.findMany({
         ...query,
         where: scoped(ctx, {}),
@@ -83,7 +84,7 @@ builder.queryField("budgetPolicy", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.budgetPolicy.findFirst({ ...query, where: scoped(ctx, { id: args.id }) });
     },
   }),
@@ -95,7 +96,7 @@ builder.queryField("budgetIncidents", (t) =>
     args: { status: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.budgetIncident.findMany({
         ...query,
         where: scoped(ctx, args.status ? { status: args.status as IncidentStatus } : {}),
@@ -113,7 +114,7 @@ builder.queryField("unpricedCostEvents", (t) =>
     args: { limit: t.arg.int({ defaultValue: 50 }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.costEvent.findMany({
         ...query,
         where: scoped(ctx, { costStatus: "unpriced" }),
@@ -135,7 +136,7 @@ builder.queryField("costBreakdown", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const column = GROUP_BY_COLUMN[args.groupBy as CostGroupBy];
       if (!column) {
         throw new Error(`Invalid groupBy: ${args.groupBy}`);
@@ -187,7 +188,7 @@ builder.queryField("costTrend", (t) =>
     args: { days: t.arg.int(), projectId: t.arg.string() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const days = Math.min(Math.max(args.days ?? 30, 1), 365);
       const cacheKey = [tenancy.workspaceId, days, args.projectId ?? ""].join("|");
       const cached = costTrendCache.get(cacheKey);
@@ -224,7 +225,7 @@ builder.queryField("financeSummary", (t) =>
     args: { window: t.arg.string() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const window = (args.window as BudgetWindow) ?? "monthly";
       const cacheKey = [tenancy.workspaceId, window].join("|");
       const cached = financeSummaryCache.get(cacheKey);
@@ -265,7 +266,7 @@ builder.queryField("agentWindowSpend", (t) =>
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
       const tenancy = requireTenancy(ctx);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Agent-scope policies for this agent, plus the workspace-wide policies that also cover it.
       const policies = await prisma.budgetPolicy.findMany({
         where: {
@@ -312,7 +313,7 @@ builder.queryField("costWindowSpend", (t) =>
     type: [CostWindowSpend],
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const now = new Date();
       const longest = Math.max(...COST_WINDOWS.map((w) => w.ms));
       const rows = await prisma.costEvent.findMany({
@@ -345,7 +346,7 @@ builder.queryField("costByTaskTree", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return costByTaskTree(tenancy.workspaceId, args.rootTaskId, args.excludeRoot ?? false);
     },
   }),
@@ -369,7 +370,7 @@ builder.queryField("costBillingSplit", (t) =>
     args: { from: t.arg({ type: "DateTime" }), to: t.arg({ type: "DateTime" }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const rows = await prisma.costEvent.findMany({
         where: scoped(ctx, {
           ...(args.from || args.to
@@ -396,7 +397,7 @@ builder.queryField("agentSalary", (t) =>
     args: { agentId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.budgetPolicy.findFirst({
         ...query,
         where: { workspaceId: tenancy.workspaceId, agentId: args.agentId, isSalary: true },

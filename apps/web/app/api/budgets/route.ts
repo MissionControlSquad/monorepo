@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/server/prisma";
 import { roleAtLeast } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { BudgetScope, BudgetWindow } from "@agentcenter/database";
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
       return errorResponse("Budgets are not enabled", 403, "FEATURE_DISABLED");
     const tenancy = await resolveRestTenancy(request);
     if (!tenancy) return errorResponse("Unauthenticated", 401, "UNAUTHENTICATED");
-    if (!roleAtLeast(tenancy.role, "admin"))
+    if (!roleAtLeast(tenancy.role, WORKSPACE_ROLES.ADMIN))
       return errorResponse("Requires 'admin' role", 403, "FORBIDDEN");
 
     const body = (await request.json().catch(() => ({}))) as {

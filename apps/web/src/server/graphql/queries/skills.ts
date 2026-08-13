@@ -9,6 +9,7 @@ import {
 } from "@agentcenter/utils";
 import type { CollisionStrategy } from "@agentcenter/utils";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { previewTeamInstall, listTeamCatalog } from "@/server/services/teams";
 import { getSkillPolicy, evaluateSkillAction } from "@/server/services/skill-policy";
 
@@ -56,7 +57,7 @@ builder.queryField("skills", (t) =>
     type: ["Skill"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.skill.findMany({
         ...query,
         where: scoped(ctx, {}),
@@ -73,7 +74,7 @@ builder.queryField("skill", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.skill.findFirst({ ...query, where: scoped(ctx, { id: args.id }) });
     },
   }),
@@ -85,7 +86,7 @@ builder.queryField("skillVersions", (t) =>
     args: { skillId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const s = await ctx.prisma.skill.findFirst({
         where: scoped(ctx, { id: args.skillId }),
         select: { id: true },
@@ -106,7 +107,7 @@ builder.queryField("skillCatalog", (t) =>
     type: ["Skill"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // ONLY sharingScope=public + never the caller's own workspace — never a private/workspace leak.
       return ctx.prisma.skill.findMany({
         ...query,
@@ -125,7 +126,7 @@ builder.queryField("lintSkill", (t) =>
     args: { skillId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const skill = await ctx.prisma.skill.findFirst({
         where: scoped(ctx, { id: args.skillId }),
         select: { markdown: true, files: { select: { path: true, content: true } } },
@@ -142,7 +143,7 @@ builder.queryField("skillFiles", (t) =>
     args: { skillId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const s = await ctx.prisma.skill.findFirst({
         where: scoped(ctx, { id: args.skillId }),
         select: { id: true },
@@ -163,7 +164,7 @@ builder.queryField("agentSkills", (t) =>
     args: { agentId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.agentSkill.findMany({
         ...query,
         where: scoped(ctx, { agentId: args.agentId }),
@@ -178,7 +179,7 @@ builder.queryField("teams", (t) =>
     type: ["Team"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.team.findMany({
         ...query,
         where: scoped(ctx, {}),
@@ -195,7 +196,7 @@ builder.queryField("team", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.team.findFirst({ ...query, where: scoped(ctx, { id: args.id }) });
     },
   }),
@@ -208,7 +209,7 @@ builder.queryField("previewTeamInstall", (t) =>
     args: { teamId: t.arg.string({ required: true }), collisionStrategy: t.arg.string() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const strategy: CollisionStrategy = isCollisionStrategy(args.collisionStrategy ?? "")
         ? (args.collisionStrategy as CollisionStrategy)
         : "rename";
@@ -227,7 +228,7 @@ builder.queryField("teamCatalog", (t) =>
     type: [CatalogTeamType],
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return listTeamCatalog();
     },
   }),
@@ -247,7 +248,7 @@ builder.queryField("skillPolicy", (t) =>
     type: SkillPolicyType,
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return getSkillPolicy(tenancy.workspaceId);
     },
   }),
@@ -276,7 +277,7 @@ builder.queryField("evaluateSkillPolicy", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       if (!isSkillAction(args.action)) throw new Error(`unknown skill action: ${args.action}`);
       return evaluateSkillAction(
         tenancy.workspaceId,
@@ -314,7 +315,7 @@ builder.queryField("auditSkill", (t) =>
     args: { skillId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const skill = await ctx.prisma.skill.findFirst({
         where: scoped(ctx, { id: args.skillId }),
         select: { markdown: true, files: { select: { path: true, content: true } } },

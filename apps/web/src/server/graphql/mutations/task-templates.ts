@@ -1,5 +1,6 @@
 import { builder } from "../builder";
 import { requireRole } from "@/server/tenancy/guards";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { assertAssignableAgents } from "../../assignment-guard";
 import { taskTemplateModel } from "../../models";
 import { taskModel } from "../../models/task";
@@ -16,7 +17,7 @@ builder.mutationField("createTaskTemplate", (t) =>
       subtasks: t.arg.string({ required: true }), // JSON string
     },
     resolve: (query, _root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return taskTemplateModel.delegate.create({
         ...query,
         data: {
@@ -39,7 +40,7 @@ builder.mutationField("updateTaskTemplate", (t) =>
       subtasks: t.arg.string(), // JSON string
     },
     resolve: (query, _root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return taskTemplateModel.delegate.update({
         ...query,
         where: { id: args.id },
@@ -58,7 +59,7 @@ builder.mutationField("deleteTaskTemplate", (t) =>
     type: "Boolean",
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await taskTemplateModel.deleteById(args.id);
       return true;
     },
@@ -70,7 +71,7 @@ builder.mutationField("saveTaskAsTemplate", (t) =>
     type: "TaskTemplate",
     args: { taskId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const parentTask = await taskModel.findByIdOrThrow(args.taskId, {
         include: { childTasks: true },
       });
@@ -107,7 +108,7 @@ builder.mutationField("instantiateTemplate", (t) =>
       projectId: t.arg.string(),
     },
     resolve: async (_root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const template = await taskTemplateModel.findByIdOrThrow(args.templateId);
       const assigneeIds = args.assigneeIds ?? [];
       await assertAssignableAgents(assigneeIds);

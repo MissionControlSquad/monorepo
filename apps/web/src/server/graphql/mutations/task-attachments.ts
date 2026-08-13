@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { roleAtLeast } from "@/server/tenancy/roles";
 import {
   presignTaskAttachment,
@@ -29,7 +30,7 @@ builder.mutationField("presignTaskAttachment", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ASSETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const { attachment, uploadUrl } = await presignTaskAttachment({
         workspaceId: tenancy.workspaceId,
         taskId: args.taskId,
@@ -48,7 +49,7 @@ builder.mutationField("confirmTaskAttachment", (t) =>
     args: { id: t.arg.string({ required: true }), byteSize: t.arg.int() },
     resolve: async (_query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ASSETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return confirmTaskAttachment(tenancy.workspaceId, args.id, args.byteSize ?? undefined);
     },
   }),
@@ -60,10 +61,10 @@ builder.mutationField("deleteTaskAttachment", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ASSETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return deleteTaskAttachment(tenancy.workspaceId, args.id, {
         requesterProfileId: tenancy.userId,
-        isAdmin: roleAtLeast(tenancy.role, "admin"),
+        isAdmin: roleAtLeast(tenancy.role, WORKSPACE_ROLES.ADMIN),
       });
     },
   }),

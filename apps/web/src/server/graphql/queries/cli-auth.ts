@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { lookupCliAuth } from "@/server/services/cli-auth";
 
 // Epic #12: look up a pending CLI device-auth challenge by its userCode, so the browser approval page
@@ -21,7 +22,7 @@ builder.queryField("cliAuthChallenge", (t) =>
     args: { userCode: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.API_KEYS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return lookupCliAuth(args.userCode);
     },
   }),

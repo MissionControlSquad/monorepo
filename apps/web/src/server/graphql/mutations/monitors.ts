@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { GraphQLError } from "graphql";
 import { FLAG_KEYS, isMonitorMetric, isMonitorComparator } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { createMonitor, updateMonitor, deleteMonitor } from "@/server/services/monitors";
 
 // Tier C: monitor writes. MONITORS-gated, admin manages.
@@ -17,7 +18,7 @@ builder.mutationField("createMonitor", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.MONITORS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       if (!isMonitorMetric(args.metric) || !isMonitorComparator(args.comparator))
         throw new GraphQLError("Invalid metric or comparator", {
           extensions: { code: "BAD_USER_INPUT" },
@@ -46,7 +47,7 @@ builder.mutationField("updateMonitor", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.MONITORS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const m = await updateMonitor(tenancy.workspaceId, args.id, {
         name: args.name ?? null,
         threshold: args.threshold ?? null,
@@ -63,7 +64,7 @@ builder.mutationField("deleteMonitor", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.MONITORS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return deleteMonitor(tenancy.workspaceId, args.id);
     },
   }),
