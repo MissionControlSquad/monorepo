@@ -61,17 +61,21 @@ const nextConfig = {
                 ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.hs-scripts.com https://*.hs-banner.com https://*.hsforms.net https://*.hsforms.com https://*.hstatic.net https://*.hsappstatic.net https://*.usemessages.com https://*.hs-analytics.net https://*.hscollectedforms.net"
                 : "script-src 'self' 'unsafe-inline' https://*.hs-scripts.com https://*.hs-banner.com https://*.hsforms.net https://*.hsforms.com https://*.hstatic.net https://*.hsappstatic.net https://*.usemessages.com https://*.hs-analytics.net https://*.hscollectedforms.net",
               "style-src 'self' 'unsafe-inline' https://*.hstatic.net https://*.hsappstatic.net",
-              "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.hubspot.com https://*.hubapi.com https://*.hstatic.net https://*.hsforms.com https://*.hsappstatic.net",
+              // buildbase (@buildbase/sdk) is the identity/billing/quota provider — the SDK loads user &
+              // workspace avatars, calls the console API, may embed built-in settings dialogs, and the
+              // OAuth sign-in redirects to it. Allow its origin across img/frame/connect/form directives.
+              "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.buildbase.app https://*.hubspot.com https://*.hubapi.com https://*.hstatic.net https://*.hsforms.com https://*.hsappstatic.net",
               "font-src 'self' https://*.hstatic.net https://*.hsappstatic.net",
               "media-src 'self' blob: https://*.r2.cloudflarestorage.com",
               "object-src 'self' blob: https://*.r2.cloudflarestorage.com",
-              "frame-src 'self' blob: https://*.r2.cloudflarestorage.com https://*.hubspot.com https://*.hsforms.com",
-              // HubSpot widget connects to: hubspot, hubapi, usemessages, hscollectedforms, hsforms, hsappstatic
-              "connect-src 'self' ws: wss: https://*.r2.cloudflarestorage.com https://*.hubspot.com https://*.hubapi.com https://*.usemessages.com https://*.hscollectedforms.net https://*.hsforms.com https://*.hsappstatic.net https://ipapi.co",
+              "frame-src 'self' blob: https://*.r2.cloudflarestorage.com https://*.buildbase.app https://*.hubspot.com https://*.hsforms.com",
+              // buildbase console API + websockets; HubSpot widget: hubspot, hubapi, usemessages, hscollectedforms, hsforms, hsappstatic
+              "connect-src 'self' ws: wss: https://*.buildbase.app https://*.r2.cloudflarestorage.com https://*.hubspot.com https://*.hubapi.com https://*.usemessages.com https://*.hscollectedforms.net https://*.hsforms.com https://*.hsappstatic.net https://ipapi.co",
               "worker-src 'self' blob:",
               "frame-ancestors 'none'",
               "base-uri 'self'",
-              "form-action 'self'",
+              // OAuth sign-in / billing checkout redirect to buildbase (and its Stripe-hosted pages via buildbase).
+              "form-action 'self' https://*.buildbase.app",
             ].join("; "),
           },
         ],
