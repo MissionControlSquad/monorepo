@@ -1,5 +1,6 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
+import { requireRole } from "@/server/tenancy/guards";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { recurringTaskModel } from "../../models";
 import { validateRecurrenceConfig, calculateInitialDueDate } from "../../recurring-tasks";
@@ -22,8 +23,9 @@ builder.mutationField("createRecurringTask", (t) =>
       projectId: t.arg.string(),
       createdByProfileId: t.arg.string(),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RECURRING_TASKS);
+      requireRole(ctx, "member");
       if (args.projectId) await assertProjectWritable(args.projectId);
 
       const config = validateRecurrenceConfig(JSON.parse(args.recurrenceConfig));
@@ -74,8 +76,9 @@ builder.mutationField("updateRecurringTask", (t) =>
       assigneeIds: t.arg.stringList(),
       projectId: t.arg.string(),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RECURRING_TASKS);
+      requireRole(ctx, "member");
       if (args.projectId) await assertProjectWritable(args.projectId);
 
       const data: Record<string, unknown> = {};
@@ -125,8 +128,9 @@ builder.mutationField("pauseRecurringTask", (t) =>
   t.prismaField({
     type: "RecurringTask",
     args: { id: t.arg.string({ required: true }) },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RECURRING_TASKS);
+      requireRole(ctx, "member");
       await recurringTaskModel.pause(args.id);
       return recurringTaskModel.delegate.findUniqueOrThrow({
         ...query,
@@ -140,8 +144,9 @@ builder.mutationField("resumeRecurringTask", (t) =>
   t.prismaField({
     type: "RecurringTask",
     args: { id: t.arg.string({ required: true }) },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RECURRING_TASKS);
+      requireRole(ctx, "member");
       await recurringTaskModel.resume(args.id);
       return recurringTaskModel.delegate.findUniqueOrThrow({
         ...query,
@@ -155,8 +160,9 @@ builder.mutationField("triggerRecurringTask", (t) =>
   t.field({
     type: "Boolean",
     args: { id: t.arg.string({ required: true }) },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RECURRING_TASKS);
+      requireRole(ctx, "member");
       const { triggerRecurringTaskNow } = await import("../../recurring-tasks");
       await triggerRecurringTaskNow(args.id);
       return true;
@@ -168,8 +174,9 @@ builder.mutationField("deleteRecurringTask", (t) =>
   t.field({
     type: "Boolean",
     args: { id: t.arg.string({ required: true }) },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RECURRING_TASKS);
+      requireRole(ctx, "member");
       await recurringTaskModel.deleteById(args.id);
       return true;
     },

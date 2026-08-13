@@ -137,15 +137,13 @@ create/hire/fire paths route through the **approvals** workflow (`requestAgentHi
 `approveApproval`, which is admin-gated in `approvals.ts`/`graphql-governance.test.ts`). Agent
 *hire/fire* is therefore admin-gated end-to-end. ✅ Confirmed via existing governance test.
 
-### C.5 Ungated files that are **acceptable** (operate / self / agent-auth)
+### C.5 Ungated files — the operate surface (self / agent-auth stay ungated; operate now **GATED**)
 
-These call no `requireRole`, and that is defensible:
-
-| file | why acceptable |
+| file | status |
 | --- | --- |
-| `tasks.ts`, `messages.ts`, `channels.ts`, `deliverables.ts`, `deliverable-annotations.ts`, `documents.ts`, `project-docs.ts`, `recurring-tasks.ts`, `task-templates.ts`, `task-relations.ts`, `external-links.ts`, `message-reactions.ts` | **operate**-level actions any team member should perform. Leaving them ungated is what lets members work today. Gating these is exactly the §D matrix decision — **do not** gate without product sign-off (would either lock members out or need the operate cap). |
-| `profile.ts` (updateMyProfile), `notifications.ts`, `sidebar-preferences.ts` | **self**-scoped to `ctx.session.profileId`. |
-| `agent-actions.ts`, `agent-queue.ts`, `events.ts` (`ingestEvent`) | **agent**-facing; `ingestEvent` authenticates with an `apiKey` arg (separate agent-auth path), not human tenancy. |
+| `tasks.ts`, `messages.ts`, `channels.ts`, `deliverables.ts`, `deliverable-annotations.ts`, `documents.ts`, `project-docs.ts`, `recurring-tasks.ts`, `task-templates.ts`, `task-relations.ts`, `external-links.ts`, `message-reactions.ts` | **✅ VIEWER-WRITE GAP CLOSED** (`feat/viewer-readonly-gate`). Every write resolver in these files now calls `requireRole(ctx, "member")` at the top of the resolver (after `requireFeature` where present). This makes **viewer** truly read-only while still admitting member/admin/owner — and API-key agents, which resolve as `member` (`resolve.ts` `fromApiKey`). The gate is at the **GraphQL resolver layer only**, NOT in the shared services, so the run-bridge path (`services/run-bridge.ts` `bridgePostMessage` → direct `prisma.message.create`, authed by the run-scoped token) is unaffected. Proved by `tests/integration/viewer-readonly.test.ts` (viewer✗ / member✓ / admin✓ / owner✓ / API-key-agent✓ / run-bridge✓). |
+| `profile.ts` (updateMyProfile), `notifications.ts`, `sidebar-preferences.ts` | **self**-scoped to `ctx.session.profileId` — left ungated (a user editing their own row is not a role-gated operation). |
+| `agent-actions.ts`, `agent-queue.ts`, `events.ts` (`ingestEvent`) | **agent**-facing; `ingestEvent` authenticates with an `apiKey` arg (separate agent-auth path), not human tenancy — left ungated. |
 
 > ⚠️ Separate (non-role) note: several of these operate/self files also do not call `scoped()`
 > or `requireTenancy()`, so they rely on args (taskId, workspaceId, etc.) rather than the JWT for
