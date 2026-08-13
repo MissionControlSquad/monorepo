@@ -12,6 +12,7 @@ import {
 } from "@agentcenter/database";
 import { verifyPassword, hashPassword, revokeAllSessions } from "../../admin-auth";
 import { createPasswordResetToken, invalidateAllResetTokens } from "../../password-reset";
+import { requireRole } from "@/server/tenancy";
 
 const SystemSettingsType = builder.simpleObject("SystemSettings", {
   fields: (t) => ({
@@ -36,6 +37,8 @@ builder.mutationField("setSystemShutdown", (t) =>
       active: t.arg.boolean({ required: true }),
     },
     resolve: async (_root, args, ctx) => {
+      // System-wide kill switch — admin+ only. Previously reachable with no auth at all.
+      requireRole(ctx, "admin");
       await setSystemShutdown(args.active);
 
       // Log activity with who toggled it
@@ -77,6 +80,8 @@ builder.mutationField("setProjectShutdown", (t) =>
       active: t.arg.boolean({ required: true }),
     },
     resolve: async (_root, args, ctx) => {
+      // Project kill switch — admin+ only. Previously reachable with no auth at all.
+      requireRole(ctx, "admin");
       await setProjectShutdown(args.projectId, args.active);
 
       const profileId = ctx.session?.profileId;
@@ -159,6 +164,9 @@ builder.mutationField("generatePasswordResetLink", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       if (!ctx.session?.sub) throw new GraphQLError("Authentication required");
+      // Minting a reset link for ANY admin user is an account-takeover vector — admin+ only.
+      // Previously any authenticated session could generate a reset link for any admin.
+      requireRole(ctx, "admin");
 
       const targetAdmin = await findAdminUserById(args.adminUserId);
       if (!targetAdmin) throw new GraphQLError("Selected admin user not found");

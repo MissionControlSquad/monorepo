@@ -6,6 +6,7 @@ import {
 } from "@agentcenter/database";
 import { invalidateFlagCache } from "../../feature-flags";
 import { pubsub, PubSubEvent } from "../../pubsub";
+import { requireRole } from "@/server/tenancy";
 
 const FeatureFlagResultType = builder.simpleObject("FeatureFlagResult", {
   fields: (t) => ({
@@ -23,7 +24,11 @@ builder.mutationField("updateFeatureFlag", (t) =>
       key: t.arg.string({ required: true }),
       enabled: t.arg.boolean({ required: true }),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
+      // Toggling a workspace feature flag is a governance/config action — admin+ only.
+      // Without this gate any authenticated member/viewer could flip user-managed flags.
+      requireRole(ctx, "admin");
+
       const flag = await findFeatureFlagByKey(args.key);
 
       if (!flag) {
