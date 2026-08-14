@@ -79,6 +79,9 @@ services:
       - CRON_SECRET=${CRON_SECRET}
       - REDIS_URL=redis://:${REDIS_PASS}@redis:6379
       - NEXT_PUBLIC_MC_URL=${PUBLIC_URL:-http://localhost:3000}
+      # Workspace binding — unset = single default workspace (everyone owner); set = gated to that one
+      # buildbase workspace (team RBAC). Only meaningful when buildbase is configured (see .env.example).
+      - TENANT_WORKSPACE_ID=${TENANT_WORKSPACE_ID:-}
       # Optional — R2 storage for file uploads
       - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
