@@ -55,6 +55,7 @@ const RESET = "\x1b[0m";
 export const COMMANDS = [
   "onboard",
   "configure",
+  "bind-workspace",
   "run",
   "token",
   "doctor",
@@ -128,6 +129,49 @@ export function envCheck(_rest = [], { env = process.env, log = console.log, err
   }
   log(missing ? `${RED}✗ env:check: ${missing} required var(s) missing${RESET}` : `${GREEN}✓ env:check: all required vars set${RESET}`);
   return missing ? 1 : 0;
+}
+
+// ── bind-workspace ──────────────────────────────────────────────────────────────────────────────
+const bindWorkspaceUsage = [
+  "operator bind-workspace <workspace-id> - bind this self-host instance to ONE buildbase workspace",
+  "",
+  "Writes TENANT_WORKSPACE_ID to the .env so ONLY members of that workspace can sign in (team RBAC:",
+  "viewer/member/admin/owner). Leave it unset for the simple single-default-workspace mode where any",
+  "authenticated buildbase user is owner. Multiple workspaces = multiple self-host instances.",
+  "Find the workspace id in your buildbase console → Workspace settings (24-hex).",
+  "",
+  "Usage: npm run operator bind-workspace <workspace-id> [-- --env-file <path>]",
+].join("\n");
+
+/**
+ * `bind-workspace` handler — writes TENANT_WORKSPACE_ID into the deployment .env (idempotently, via the
+ * pure mergeEnvFile helper). A restart applies it. Pure/dep-injected fs for testability.
+ */
+export function bindWorkspaceCmd(
+  rest = [],
+  { fs = { readFileSync, writeFileSync, existsSync }, log = console.log, errorLog = console.error } = {},
+) {
+  if (wantsHelp(rest)) {
+    log(bindWorkspaceUsage);
+    return 0;
+  }
+  const { flags } = parseOpts(rest);
+  const positional = rest.find((a) => a && !String(a).startsWith("-"));
+  const workspaceId = String(flags["workspace-id"] || positional || "").trim();
+  if (!/^[a-f0-9]{24}$/i.test(workspaceId)) {
+    errorLog(`${RED}✗ bind-workspace: a 24-hex buildbase workspace id is required${RESET}`);
+    errorLog(`${DIM}${bindWorkspaceUsage}${RESET}`);
+    return 1;
+  }
+  const envFile = resolve(root, flags["env-file"] || "apps/web/.env");
+  const existingText = fs.existsSync(envFile) ? fs.readFileSync(envFile, "utf8") : "";
+  const nextText = mergeEnvFile(existingText, { TENANT_WORKSPACE_ID: workspaceId });
+  fs.writeFileSync(envFile, nextText, { mode: 0o600 });
+  log(`${GREEN}✓ Bound this instance to buildbase workspace ${workspaceId}${RESET}`);
+  log(
+    `${DIM}  TENANT_WORKSPACE_ID written to ${envFile}. Only members of this workspace can now sign in.\n  Restart to apply:  docker compose up -d${RESET}`,
+  );
+  return 0;
 }
 
 // ── Managed install / service-lifecycle ─────────────────────────────────────────────────────────
@@ -810,6 +854,7 @@ export function makeDefaultHandlers({ spawn } = {}) {
   return {
     onboard: (rest) => onboardCmd(rest, { spawn: doSpawn }),
     configure: (rest) => configureCmd(rest),
+    "bind-workspace": (rest) => bindWorkspaceCmd(rest),
     run: (rest) => runCmd(rest, { spawn: doSpawn }),
     token: (rest) => tokenCmd(rest, { spawn: doSpawn }),
     doctor: (rest) => runNode("scripts/doctor.mjs", rest),
@@ -845,6 +890,7 @@ export function usage(log = console.log) {
       "Commands:",
       "  onboard               guided first-run: prereqs + generate/collect env + migrate (idempotent)",
       "  configure --section <name>   read/edit a section of the structured operator config file",
+      "  bind-workspace <id>   bind this instance to one buildbase workspace (writes TENANT_WORKSPACE_ID)",
       "  run                   bootstrap (env + migrations) then exec the app server (thin wrapper)",
       "  token <mint|list|revoke>     mint/list/revoke an operator or runner API token (reuses ApiKey)",
       "  doctor                environment + DB connectivity + migration status (read-only)",
