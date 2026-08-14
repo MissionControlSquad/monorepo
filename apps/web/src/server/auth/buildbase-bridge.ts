@@ -59,7 +59,7 @@ export type BridgeOutcome =
   | { status: "denied"; reason: "no-identity" | "not-a-member" | "misconfigured" };
 
 /** This container's bound buildbase workspace, or null in self-host. */
-function tenantWorkspaceId(): string | null {
+export function tenantWorkspaceId(): string | null {
   return (process.env.TENANT_WORKSPACE_ID ?? "").trim() || null;
 }
 
@@ -90,7 +90,7 @@ export function roleFromBuildbase(role?: string | null): "manage" | "member" {
  * their role there. Returns null when NOT a member / on any error (fail-closed). buildbase gates
  * workspace.list() by membership, so mere presence of TENANT_WORKSPACE_ID in the result proves it.
  */
-async function verifyWorkspaceMembership(
+export async function verifyWorkspaceMembership(
   sessionId: string,
   workspaceId: string,
   buildbaseUserId: string,
