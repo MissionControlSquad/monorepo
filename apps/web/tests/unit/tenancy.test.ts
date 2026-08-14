@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import type { GraphQLContext, TenancyContext, WorkspaceRole } from "@agentcenter/graphql-server";
 import { roleAtLeast, roleCan } from "@/server/tenancy/roles";
 import { requireTenancy, requireRole, requirePermission, scoped } from "@/server/tenancy/guards";
@@ -96,5 +96,41 @@ describe("resolveTenancy", () => {
     const t = await resolveTenancy(adminSession, "bb-workspace-token=not-a-valid-jwt");
     expect(t!.workspaceId).not.toBe("ws_bb");
     expect(t!.role).toBe("owner");
+  });
+
+  describe("bound tenant (TENANT_WORKSPACE_ID set) — switch-block", () => {
+    afterEach(() => {
+      delete process.env.TENANT_WORKSPACE_ID;
+    });
+
+    it("accepts a workspace token pinned to the bound workspace", async () => {
+      process.env.SYSTEM_SECRET = "test-secret";
+      process.env.TENANT_WORKSPACE_ID = "ws_bound";
+      const token = await createJWT(
+        { userId: "bbUser", workspaceId: "ws_bound", userRole: "admin" },
+        "test-secret",
+      );
+      const t = await resolveTenancy(adminSession, `bb-workspace-token=${token}`);
+      expect(t!.workspaceId).toBe("ws_bound");
+      expect(t!.userId).toBe("bbUser");
+      expect(t!.role).toBe("admin");
+    });
+
+    it("refuses a stale token for a DIFFERENT workspace and fails closed (no owner bootstrap)", async () => {
+      process.env.SYSTEM_SECRET = "test-secret";
+      process.env.TENANT_WORKSPACE_ID = "ws_bound";
+      // e.g. a 7-day bb-workspace-token minted before this tenant was migrated unbound → bound.
+      const stale = await createJWT(
+        { userId: "bbUser", workspaceId: "ws_other", userRole: "owner" },
+        "test-secret",
+      );
+      // Must NOT resolve to ws_other; the bound-fallback refusal then makes the whole resolution null.
+      expect(await resolveTenancy(adminSession, `bb-workspace-token=${stale}`)).toBeNull();
+    });
+
+    it("refuses the owner bootstrap fallback entirely when bound (no token)", async () => {
+      process.env.TENANT_WORKSPACE_ID = "ws_bound";
+      expect(await resolveTenancy(adminSession)).toBeNull();
+    });
   });
 });

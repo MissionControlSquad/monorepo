@@ -49,6 +49,15 @@ async function fromBuildbaseToken(
   const workspaceId = typeof claims.workspaceId === "string" ? claims.workspaceId : "";
   if (!userId || !workspaceId) return null;
 
+  // Belt-and-suspenders: in a bound (hosted) tenant, refuse any workspace-token whose workspaceId isn't
+  // the bound one. The switch-block route + auth bridge only ever mint tokens pinned to
+  // TENANT_WORKSPACE_ID, so a mismatch means a STALE cookie — e.g. a tenant that was migrated from
+  // unbound (email-keyed) to bound (set-workspace) while a user still held a 7-day bb-workspace-token
+  // carrying the old workspaceId. Returning null here fails closed → resolveTenancy falls through to the
+  // bound-fallback refusal, and the client re-mints a correctly-pinned token on the next workspace event.
+  const bound = process.env.TENANT_WORKSPACE_ID?.trim();
+  if (bound && workspaceId !== bound) return null;
+
   const role = mapRole(claims.userRole);
   return { userId, workspaceId, role, can: (permission: string) => roleCan(role, permission) };
 }
