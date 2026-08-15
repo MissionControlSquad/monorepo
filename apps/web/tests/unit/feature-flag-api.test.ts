@@ -32,7 +32,8 @@ describe("feature-flags invalidate API", () => {
       method: "POST",
       headers,
     });
-    return POST(req);
+    // POST is wrapped by withCronAuth (2-arg); this static route gets a dummy ctx.
+    return POST(req, undefined as never);
   }
 
   it("returns 401 without authorization header", async () => {
