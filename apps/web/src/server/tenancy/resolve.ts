@@ -1,3 +1,4 @@
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import type { GraphQLContext, TenancyContext, WorkspaceRole } from "@agentcenter/graphql-server";
 import { roleCan } from "./roles";
 import { WORKSPACE_TOKEN_COOKIE } from "./buildbase";
@@ -15,14 +16,14 @@ export const DEFAULT_WORKSPACE_ID = process.env.DEFAULT_WORKSPACE_ID ?? "ws_defa
 
 function mapRole(raw: unknown): WorkspaceRole {
   switch (typeof raw === "string" ? raw.toLowerCase() : "") {
-    case "owner":
-      return "owner";
-    case "admin":
-      return "admin";
-    case "viewer":
-      return "viewer";
+    case WORKSPACE_ROLES.OWNER:
+      return WORKSPACE_ROLES.OWNER;
+    case WORKSPACE_ROLES.ADMIN:
+      return WORKSPACE_ROLES.ADMIN;
+    case WORKSPACE_ROLES.VIEWER:
+      return WORKSPACE_ROLES.VIEWER;
     default:
-      return "member";
+      return WORKSPACE_ROLES.MEMBER;
   }
 }
 
@@ -75,7 +76,7 @@ async function fromApiKey(authHeader: string | null | undefined): Promise<Tenanc
   const verified = await verifyApiKey(match[1]);
   if (!verified) return null;
 
-  const role: WorkspaceRole = "member";
+  const role: WorkspaceRole = WORKSPACE_ROLES.MEMBER;
   return {
     userId: verified.createdByProfileId ?? `apikey_${verified.apiKeyId}`,
     workspaceId: verified.workspaceId,
@@ -115,7 +116,7 @@ export async function resolveTenancy(
   if (process.env.TENANT_WORKSPACE_ID?.trim()) return null;
 
   if (!session?.profileId) return null;
-  const role: WorkspaceRole = "owner";
+  const role: WorkspaceRole = WORKSPACE_ROLES.OWNER;
   return {
     userId: session.profileId,
     workspaceId: DEFAULT_WORKSPACE_ID,

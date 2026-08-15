@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { WhenWorkspaceRoles } from "@buildbase/sdk/react";
+import { WORKSPACE_ROLES } from "@agentcenter/utils";
 import { useBuildbaseReady } from "@/components/providers/BuildbaseProvider";
 
 // Human-RBAC gate for user-facing admin UI, backed by buildbase workspace roles (owner/admin).
@@ -13,7 +14,7 @@ import { useBuildbaseReady } from "@/components/providers/BuildbaseProvider";
 // the security floor, so wrapping UI in <WhenAdmin> can never regress current behavior. Once
 // provisioned, it restricts to workspace owner/admin.
 
-const ADMIN_ROLES = ["owner", "admin"];
+const ADMIN_ROLES = [WORKSPACE_ROLES.OWNER, WORKSPACE_ROLES.ADMIN];
 
 export function WhenAdmin({
   children,

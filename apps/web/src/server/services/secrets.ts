@@ -5,6 +5,7 @@
  * append-only SecretAccessEvent.
  */
 import { GraphQLError } from "graphql";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { prisma } from "@/server/prisma";
 import type {
   Secret,
@@ -103,7 +104,7 @@ export function canManageSecret(
   actor: SecretActor,
 ): boolean {
   if (secret.personal) return secret.createdBy === actor.userId;
-  return actor.role === "admin" || actor.role === "owner";
+  return actor.role === WORKSPACE_ROLES.ADMIN || actor.role === WORKSPACE_ROLES.OWNER;
 }
 
 export async function createSecret(input: CreateSecretInput): Promise<Secret> {

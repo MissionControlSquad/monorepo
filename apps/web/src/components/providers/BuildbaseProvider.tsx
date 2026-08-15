@@ -9,6 +9,7 @@ import {
 } from "@buildbase/sdk/react";
 import { ApiVersion, consumeAuthIntent, type EventType, type EventData } from "@buildbase/sdk";
 import type { SDKLocale } from "@buildbase/sdk/react";
+import { WORKSPACE_ROLES } from "@agentcenter/utils";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 
 // buildbase human-tenancy provider (Epic #1). Ported from the MissionControlSquad website.
@@ -220,7 +221,7 @@ export function BuildbaseProvider({ children }: { children: React.ReactNode }) {
                   await updateAuthToken(
                     userId,
                     eventData.workspace._id,
-                    eventData.userRole || "member",
+                    eventData.userRole || WORKSPACE_ROLES.MEMBER,
                   );
                 }
               }
@@ -244,7 +245,7 @@ export function BuildbaseProvider({ children }: { children: React.ReactNode }) {
               localStorage.getItem("user_email") ??
               "";
             if (email) storeUserEmail(email);
-            await updateAuthToken(user.id, workspace._id, userRole ?? "member");
+            await updateAuthToken(user.id, workspace._id, userRole ?? WORKSPACE_ROLES.MEMBER);
           },
         },
       }}

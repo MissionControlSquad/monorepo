@@ -6,6 +6,8 @@ import { createSessionToken } from "@/server/admin-auth";
 import { createJWT } from "@/lib/jwt";
 import { getBuildbase } from "@/server/tenancy/buildbase";
 import { isManagerRole } from "@/server/tenancy/roles";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
+import type { WorkspaceRole } from "@agentcenter/graphql-server";
 
 /**
  * Auth bridge — buildbase session → mc_session, GATED BY buildbase WORKSPACE MEMBERSHIP.
@@ -38,7 +40,8 @@ import { isManagerRole } from "@/server/tenancy/roles";
  *   2. /api/auth/buildbase/sso   — after validating an existing bb-session-id (auto-SSO).
  */
 
-export type WorkspaceRoleName = "owner" | "admin" | "member" | "viewer";
+// Alias of the canonical WorkspaceRole (kept for local readability); no longer a duplicated union.
+export type WorkspaceRoleName = WorkspaceRole;
 
 export interface BuildbaseBridgeUser {
   id?: string | null;
@@ -66,14 +69,14 @@ export function tenantWorkspaceId(): string | null {
 
 function normalizeRole(raw: unknown): WorkspaceRoleName {
   switch (typeof raw === "string" ? raw.toLowerCase() : "") {
-    case "owner":
-      return "owner";
-    case "admin":
-      return "admin";
-    case "viewer":
-      return "viewer";
+    case WORKSPACE_ROLES.OWNER:
+      return WORKSPACE_ROLES.OWNER;
+    case WORKSPACE_ROLES.ADMIN:
+      return WORKSPACE_ROLES.ADMIN;
+    case WORKSPACE_ROLES.VIEWER:
+      return WORKSPACE_ROLES.VIEWER;
     default:
-      return "member";
+      return WORKSPACE_ROLES.MEMBER;
   }
 }
 
@@ -149,7 +152,7 @@ export async function bridgeBuildbaseSession(input: {
 
     // Owner bootstrap is constrained to the user buildbase reports as the workspace OWNER — never a
     // random visitor (idempotent: no-op once any owner exists).
-    if (role === "owner") {
+    if (role === WORKSPACE_ROLES.OWNER) {
       try {
         await provisionFirstBuildbaseOwner(
           userId,

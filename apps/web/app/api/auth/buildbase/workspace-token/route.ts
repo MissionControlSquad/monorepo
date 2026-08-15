@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createJWT, verifyJWT } from "@/lib/jwt";
 import { tenantWorkspaceId, verifyWorkspaceMembership } from "@/server/auth/buildbase-bridge";
 import { BB_SESSION_COOKIE, WORKSPACE_TOKEN_COOKIE } from "@/server/tenancy/buildbase";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 // Mints a workspace-scoped JWT ({ userId, workspaceId, userRole, email }) on workspace switch/add
 // (Epic #1). Ported from the MissionControlSquad website; extended to ALSO set an httpOnly
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
 
   let workspaceId = bodyWorkspaceId;
   // Default role source is the bearer claim (used only in self-host, where there is no bound workspace).
-  let userRole = String(claims.userRole ?? "member");
+  let userRole = String(claims.userRole ?? WORKSPACE_ROLES.MEMBER);
 
   // ── SERVER-SIDE SWITCH-BLOCK (hosted, TENANT_WORKSPACE_ID set) ──────────────────────────────────
   // This container is bound to ONE workspace. The bb-session-id cookie is shared across every
