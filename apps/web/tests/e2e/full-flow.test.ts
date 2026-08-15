@@ -36,6 +36,15 @@ import {
 
 // ─── Shared state across the sequential flow ───────────────────────
 let sessionCookie: string;
+
+// agents/create is now human-ADMIN gated (withTenancy). Direct handler calls bypass middleware, so
+// every create in the flow must carry the admin session cookie established by the auth-session tests.
+const createAgentReq = (body: Record<string, unknown>) =>
+  buildRequest("POST", "/api/agents/create", {
+    body,
+    headers: { cookie: `mc_session=${sessionCookie}` },
+  });
+
 let rexApiKey: string;
 let rexAgentId: string;
 let rexProfileId: string;
@@ -170,13 +179,11 @@ describe("2. Session Lifecycle", () => {
 
 describe("3. Agent Management", () => {
   it("creates Rex — frontend dev", async () => {
-    const req = buildRequest("POST", "/api/agents/create", {
-      body: {
-        name: "Rex",
-        role: "Frontend Developer",
-        username: "rex",
-        templateId: "frontend-dev",
-      },
+    const req = createAgentReq({
+      name: "Rex",
+      role: "Frontend Developer",
+      username: "rex",
+      templateId: "frontend-dev",
     });
 
     const res = await callRoute(createAgent, req);
@@ -196,12 +203,10 @@ describe("3. Agent Management", () => {
   });
 
   it("creates Nova — researcher", async () => {
-    const req = buildRequest("POST", "/api/agents/create", {
-      body: {
-        name: "Nova",
-        role: "Research Analyst",
-        username: "nova",
-      },
+    const req = createAgentReq({
+      name: "Nova",
+      role: "Research Analyst",
+      username: "nova",
     });
 
     const res = await callRoute(createAgent, req);
@@ -213,9 +218,7 @@ describe("3. Agent Management", () => {
   });
 
   it("rejects duplicate username — 409", async () => {
-    const req = buildRequest("POST", "/api/agents/create", {
-      body: { name: "Fake Rex", role: "Impostor", username: "rex" },
-    });
+    const req = createAgentReq({ name: "Fake Rex", role: "Impostor", username: "rex" });
 
     const res = await callRoute(createAgent, req);
     expect(res.status).toBe(409);
@@ -225,9 +228,7 @@ describe("3. Agent Management", () => {
   });
 
   it("rejects agent creation without name — 400", async () => {
-    const req = buildRequest("POST", "/api/agents/create", {
-      body: { role: "Developer" },
-    });
+    const req = createAgentReq({ role: "Developer" });
 
     const res = await callRoute(createAgent, req);
     expect(res.status).toBe(400);
@@ -1787,9 +1788,7 @@ describe.skipIf(!r2Configured)("6½. Real R2 Storage — Upload, Download, Verif
 describe("9. Project-Scoped Collaboration", () => {
   // Create Kia (Squad Lead) and Sage (non-member) for project tests
   it("creates Kia — Squad Lead", async () => {
-    const req = buildRequest("POST", "/api/agents/create", {
-      body: { name: "Kia", role: "Squad Lead", username: "kia" },
-    });
+    const req = createAgentReq({ name: "Kia", role: "Squad Lead", username: "kia" });
     const res = await callRoute(createAgent, req);
     expect(res.status).toBe(201);
     const data = await res.json();
@@ -1804,9 +1803,7 @@ describe("9. Project-Scoped Collaboration", () => {
   });
 
   it("creates Sage — Social Media (will be non-member)", async () => {
-    const req = buildRequest("POST", "/api/agents/create", {
-      body: { name: "Sage", role: "Social Media Manager", username: "sage" },
-    });
+    const req = createAgentReq({ name: "Sage", role: "Social Media Manager", username: "sage" });
     const res = await callRoute(createAgent, req);
     expect(res.status).toBe(201);
     const data = await res.json();
@@ -4778,9 +4775,7 @@ describe("G. Pending Review, Events Ingest & Additional Routes", () => {
     // Create a temporary agent for this test
     const createRes = await callRoute(
       createAgent,
-      buildRequest("POST", "/api/agents/create", {
-        body: { name: "KeyRegenTest", role: "Tester", username: "keyregen-test" },
-      }),
+      createAgentReq({ name: "KeyRegenTest", role: "Tester", username: "keyregen-test" }),
     );
     const { agent: tempAgent, apiKey: oldKey } = await createRes.json();
 
