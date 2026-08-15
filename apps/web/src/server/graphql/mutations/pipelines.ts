@@ -1,7 +1,7 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
-import { requireRole } from "@/server/tenancy";
+import { requireRole, isManagerRole } from "@/server/tenancy";
 import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   createRoutine,
@@ -339,7 +339,7 @@ builder.mutationField("releaseCase", (t) =>
         workspaceId: tenancy.workspaceId,
         caseId: args.caseId,
         actorProfileId: tenancy.userId,
-        actorIsAdmin: tenancy.role === "admin" || tenancy.role === "owner",
+        actorIsAdmin: isManagerRole(tenancy.role),
       });
       return ctx.prisma.pipelineCase.findUniqueOrThrow({ ...query, where: { id: c.id } });
     },
@@ -380,7 +380,7 @@ builder.mutationField("transitionCase", (t) =>
         caseId: args.caseId,
         toStageId: args.toStageId,
         actorProfileId: tenancy.userId,
-        actorIsAdmin: tenancy.role === "admin" || tenancy.role === "owner",
+        actorIsAdmin: isManagerRole(tenancy.role),
         note: args.note ?? null,
       });
       return ctx.prisma.pipelineCase.findUniqueOrThrow({ ...query, where: { id: c.id } });

@@ -1,5 +1,6 @@
 import type { GraphQLContext, TenancyContext, WorkspaceRole } from "@agentcenter/graphql-server";
 import { roleCan } from "./roles";
+import { WORKSPACE_TOKEN_COOKIE } from "./buildbase";
 import { verifyJWT } from "@/lib/jwt";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { isFeatureEnabled } from "@/server/feature-flags";
@@ -11,9 +12,6 @@ import { verifyApiKey } from "@/server/services/api-keys";
  * present (buildbase not yet configured).
  */
 export const DEFAULT_WORKSPACE_ID = process.env.DEFAULT_WORKSPACE_ID ?? "ws_default";
-
-/** httpOnly cookie holding the buildbase workspace-scoped JWT (minted by /api/auth/buildbase/workspace-token). */
-const WORKSPACE_TOKEN_COOKIE = "bb-workspace-token";
 
 function mapRole(raw: unknown): WorkspaceRole {
   switch (typeof raw === "string" ? raw.toLowerCase() : "") {

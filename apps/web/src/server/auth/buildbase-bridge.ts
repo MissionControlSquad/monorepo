@@ -5,6 +5,7 @@ import {
 import { createSessionToken } from "@/server/admin-auth";
 import { createJWT } from "@/lib/jwt";
 import { getBuildbase } from "@/server/tenancy/buildbase";
+import { isManagerRole } from "@/server/tenancy/roles";
 
 /**
  * Auth bridge — buildbase session → mc_session, GATED BY buildbase WORKSPACE MEMBERSHIP.
@@ -82,7 +83,7 @@ function normalizeRole(raw: unknown): WorkspaceRoleName {
  */
 export function roleFromBuildbase(role?: string | null): "manage" | "member" {
   const r = normalizeRole(role);
-  return r === "owner" || r === "admin" ? "manage" : "member";
+  return isManagerRole(r) ? "manage" : "member";
 }
 
 /**

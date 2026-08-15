@@ -12,6 +12,8 @@ import { cookies } from "next/headers";
  * convention (SAAS_*), with the skill's BUILDBASE_* names accepted as a fallback.
  */
 export const BB_SESSION_COOKIE = "bb-session-id";
+/** App-minted, workspace-scoped JWT cookie (host-only, pinned to TENANT_WORKSPACE_ID). Canonical name. */
+export const WORKSPACE_TOKEN_COOKIE = "bb-workspace-token";
 
 const SERVER_URL =
   process.env.SAAS_SERVER_URL ||

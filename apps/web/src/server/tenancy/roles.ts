@@ -17,6 +17,11 @@ export function roleAtLeast(role: WorkspaceRole, min: WorkspaceRole): boolean {
   return RANK[role] >= RANK[min];
 }
 
+/** True for the manager tier (owner/admin) — replaces the `role === "admin" || role === "owner"` idiom. */
+export function isManagerRole(role: WorkspaceRole): boolean {
+  return roleAtLeast(role, "admin");
+}
+
 /** Canonical capability strings used by the coarse role→capability map. */
 export const CAPS = {
   ALL: "*",
