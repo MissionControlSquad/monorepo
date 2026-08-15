@@ -1,17 +1,10 @@
 import { resolveAgent } from "./resolve-agent";
 import { requireAgentCapability } from "@/server/services/agent-authz";
-import { isFeatureEnabled } from "@/server/feature-flags";
 import { isSystemShutdown } from "@/server/system-settings";
 import { errorResponse, handleError } from "./json-response";
-import type { FlagKey } from "@agentcenter/utils";
+import { featureGateResponse, type FeatureGate } from "./feature-gate";
 
 type ResolvedAgent = Awaited<ReturnType<typeof resolveAgent>>;
-
-/**
- * Feature gate for a route: a bare flag uses the standard "This feature is not enabled on your plan" /
- * FEATURE_DISABLED 403, or `{ flag, error, code }` to preserve a route's own message/code.
- */
-type FeatureGate = FlagKey | { flag: FlagKey; error?: string; code?: string };
 
 /**
  * Agent-plane twin of `withTenancy`. Wraps a Next.js route handler with the standard agent envelope so
@@ -45,16 +38,8 @@ export function withAgent<C = unknown>(
 ) {
   return async (request: Request, context: C): Promise<Response> => {
     try {
-      if (opts.feature) {
-        const gate = typeof opts.feature === "string" ? { flag: opts.feature } : opts.feature;
-        if (!(await isFeatureEnabled(gate.flag))) {
-          return errorResponse(
-            gate.error ?? "This feature is not enabled on your plan",
-            403,
-            gate.code ?? "FEATURE_DISABLED",
-          );
-        }
-      }
+      const featureBlock = await featureGateResponse(opts.feature);
+      if (featureBlock) return featureBlock;
       if (opts.blockOnShutdown && (await isSystemShutdown())) {
         const msg =
           typeof opts.blockOnShutdown === "object" ? opts.blockOnShutdown.error : undefined;

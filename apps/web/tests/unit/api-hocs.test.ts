@@ -147,7 +147,10 @@ describe("withCronAuth", () => {
 });
 
 describe("withTenancy", () => {
-  beforeEach(() => resolveTenancy.mockReset());
+  beforeEach(() => {
+    resolveTenancy.mockReset();
+    isFeatureEnabled.mockReset().mockResolvedValue(true);
+  });
 
   it("401 when unauthenticated", async () => {
     resolveTenancy.mockResolvedValue(null);
@@ -175,5 +178,41 @@ describe("withTenancy", () => {
     const res = await withTenancy(handler, { minRole: WORKSPACE_ROLES.ADMIN })(req(), CTX);
     expect(res.status).toBe(200);
     expect(handler).toHaveBeenCalledWith(expect.any(Request), tenancy, CTX);
+  });
+
+  it("feature gate → 403 with the custom message when the flag is off", async () => {
+    isFeatureEnabled.mockResolvedValue(false);
+    resolveTenancy.mockResolvedValue({
+      userId: "u",
+      workspaceId: "w",
+      role: "admin",
+      can: () => true,
+    });
+    const handler = vi.fn(async () => Response.json({ ok: true }));
+    const res = await withTenancy(handler, {
+      feature: { flag: "BUDGETS" as never, error: "Budgets are not enabled" },
+    })(req(), CTX);
+    expect(res.status).toBe(403);
+    expect(await body(res)).toMatchObject({
+      code: "FEATURE_DISABLED",
+      error: "Budgets are not enabled",
+    });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("role is checked BEFORE the feature gate (below-role → FORBIDDEN, not FEATURE_DISABLED)", async () => {
+    isFeatureEnabled.mockResolvedValue(false);
+    resolveTenancy.mockResolvedValue({
+      userId: "u",
+      workspaceId: "w",
+      role: "member",
+      can: () => false,
+    });
+    const res = await withTenancy(async () => Response.json({ ok: true }), {
+      minRole: WORKSPACE_ROLES.ADMIN,
+      feature: { flag: "BUDGETS" as never },
+    })(req(), CTX);
+    expect(res.status).toBe(403);
+    expect((await body(res)).code).toBe("FORBIDDEN");
   });
 });

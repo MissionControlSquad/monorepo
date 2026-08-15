@@ -4,6 +4,7 @@ import { resolveTenancy, roleAtLeast } from "@/server/tenancy";
 import type { GraphQLContext } from "@/server/graphql/builder";
 import type { TenancyContext, WorkspaceRole } from "@agentcenter/graphql-server";
 import { errorResponse, handleError } from "./json-response";
+import { featureGateResponse, type FeatureGate } from "./feature-gate";
 
 /**
  * Resolve human/agent tenancy for a REST route exactly the way the GraphQL context builder does:
@@ -34,12 +35,15 @@ export async function resolveRestTenancy(request: Request) {
  *
  *   export const DELETE = withTenancy(
  *     async (request, tenancy, { params }) => { ...use tenancy.workspaceId... },
- *     { minRole: WORKSPACE_ROLES.ADMIN },
+ *     { minRole: WORKSPACE_ROLES.ADMIN, feature: { flag: FLAG_KEYS.BUDGETS, error: "Budgets are not enabled" } },
  *   );
+ *
+ * Order: unauthenticated → 401; below `minRole` → 403 FORBIDDEN; `feature` flag off → 403 (declarative,
+ * via the shared feature-gate helper) — so an authorized user still sees FEATURE_DISABLED, not FORBIDDEN.
  */
 export function withTenancy<C = unknown>(
   handler: (request: Request, tenancy: TenancyContext, context: C) => Response | Promise<Response>,
-  opts: { minRole?: WorkspaceRole } = {},
+  opts: { minRole?: WorkspaceRole; feature?: FeatureGate } = {},
 ) {
   // `context` is required in the type (Next's route-type validator rejects `RouteContext | undefined`
   // for dynamic routes); at runtime Next omits it for static routes, so treat it as possibly-undefined.
@@ -49,6 +53,8 @@ export function withTenancy<C = unknown>(
     if (opts.minRole && !roleAtLeast(tenancy.role, opts.minRole)) {
       return errorResponse("Forbidden", 403, "FORBIDDEN");
     }
+    const featureBlock = await featureGateResponse(opts.feature);
+    if (featureBlock) return featureBlock;
     return handler(request, tenancy, context as C);
   };
 }
