@@ -7,6 +7,8 @@ import {
   getMcUrl,
 } from "@/server/agent-config-generator";
 import { workspacePathUnix } from "@/server/workspace-paths";
+import { withTenancy } from "../../../_lib/rest-tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { successResponse, handleError, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { AgentLevel } from "@/server/constants";
@@ -15,83 +17,87 @@ import type { RouteContext } from "../../../_lib/route-context";
 
 /**
  * GET /api/agents/:id/setup
- * Returns generated config files and cron command (without API key).
+ * Returns generated config files and cron command (without API key). Any authenticated workspace member
+ * may read it (previously unauthenticated). Agents live in this tenant's own isolated database.
  * Workspace path is always Unix-style (~/.openclaw/agents/<slug>/workspace) for macOS/Linux.
  */
-export async function GET(_request: Request, ctx: RouteContext) {
-  try {
-    const { id } = await ctx.params;
+export const GET = withTenancy(
+  async (_request, _tenancy, ctx: RouteContext) => {
+    try {
+      const { id } = await ctx.params;
 
-    const agent = await agentModel.findById(id);
-    assertFound(agent, ERR.AGENT_NOT_FOUND);
+      const agent = await agentModel.findById(id);
+      assertFound(agent, ERR.AGENT_NOT_FOUND);
 
-    const template = agent.templateId ? getTemplate(agent.templateId) : undefined;
-    const mcUrl = getMcUrl();
+      const template = agent.templateId ? getTemplate(agent.templateId) : undefined;
+      const mcUrl = getMcUrl();
 
-    // Compute slug once and reuse everywhere
-    const agentSlug = getAgentSlug(agent);
-    const resolvedWorkspacePath = agent.workspacePath ?? workspacePathUnix(agentSlug);
+      // Compute slug once and reuse everywhere
+      const agentSlug = getAgentSlug(agent);
+      const resolvedWorkspacePath = agent.workspacePath ?? workspacePathUnix(agentSlug);
 
-    // Count agents created before this one for cron scheduling
-    const agentsBefore = await agentModel.count({
-      where: { createdAt: { lt: agent.createdAt } },
-    });
-    const cronSchedule = computeCronSchedule(agentsBefore);
+      // Count agents created before this one for cron scheduling
+      const agentsBefore = await agentModel.count({
+        where: { createdAt: { lt: agent.createdAt } },
+      });
+      const cronSchedule = computeCronSchedule(agentsBefore);
 
-    const agentInfo = {
-      id: agent.id,
-      name: agent.name,
-      role: agent.role,
-      username: agentSlug,
-      identityEmoji: agent.identityEmoji || "🤖",
-      personality: agent.personality || "",
-      level: agent.level || AgentLevel.SPECIALIST,
-      capabilities: template?.capabilities,
-      templateId: agent.templateId || undefined,
-    };
-
-    const configFiles = generateAgentConfig(agentInfo, mcUrl, cronSchedule);
-
-    // OpenClaw agent config snippet
-    const openclawAgentConfig = {
-      id: agentSlug,
-      name: agent.name,
-      workspace: resolvedWorkspacePath,
-    };
-
-    const cronMessage = "Read HEARTBEAT.md and follow the instructions.";
-    const cronCommand = `openclaw cron add --name "${agentSlug}-heartbeat" --agent "${agentSlug}" --cron "${cronSchedule}" --session isolated --message "${cronMessage}" --timeout-seconds 300`;
-
-    // Auto-mode bootstrap (uses $API_KEY placeholder since plain key not available)
-    const bootstrapMessage = generateBootstrapMessage(agentInfo, mcUrl, "$API_KEY", {
-      workspacePath: resolvedWorkspacePath,
-      cronCommand,
-      configFiles,
-      openclawAgentConfig,
-    });
-
-    return successResponse({
-      agent: {
+      const agentInfo = {
         id: agent.id,
         name: agent.name,
         role: agent.role,
-        setupStatus: agent.setupStatus,
-        apiKeyPrefix: agent.apiKeyPrefix,
-        hostingType: agent.hostingType,
-      },
-      configFiles,
-      bootstrapMessage,
-      cronSchedule,
-      cronMessage,
-      cronCommand,
-      workspacePath: resolvedWorkspacePath,
-      openclawAgentConfig,
-      // CLIs the desktop bootstrap handler must verify before setup starts.
-      // Add "claude", "codex", etc. here when they become required.
-      requiredClis: ["openclaw"],
-      mcUrl,
-    });
-  } catch (err) {
-    return handleError(err);
-  }
-}
+        username: agentSlug,
+        identityEmoji: agent.identityEmoji || "🤖",
+        personality: agent.personality || "",
+        level: agent.level || AgentLevel.SPECIALIST,
+        capabilities: template?.capabilities,
+        templateId: agent.templateId || undefined,
+      };
+
+      const configFiles = generateAgentConfig(agentInfo, mcUrl, cronSchedule);
+
+      // OpenClaw agent config snippet
+      const openclawAgentConfig = {
+        id: agentSlug,
+        name: agent.name,
+        workspace: resolvedWorkspacePath,
+      };
+
+      const cronMessage = "Read HEARTBEAT.md and follow the instructions.";
+      const cronCommand = `openclaw cron add --name "${agentSlug}-heartbeat" --agent "${agentSlug}" --cron "${cronSchedule}" --session isolated --message "${cronMessage}" --timeout-seconds 300`;
+
+      // Auto-mode bootstrap (uses $API_KEY placeholder since plain key not available)
+      const bootstrapMessage = generateBootstrapMessage(agentInfo, mcUrl, "$API_KEY", {
+        workspacePath: resolvedWorkspacePath,
+        cronCommand,
+        configFiles,
+        openclawAgentConfig,
+      });
+
+      return successResponse({
+        agent: {
+          id: agent.id,
+          name: agent.name,
+          role: agent.role,
+          setupStatus: agent.setupStatus,
+          apiKeyPrefix: agent.apiKeyPrefix,
+          hostingType: agent.hostingType,
+        },
+        configFiles,
+        bootstrapMessage,
+        cronSchedule,
+        cronMessage,
+        cronCommand,
+        workspacePath: resolvedWorkspacePath,
+        openclawAgentConfig,
+        // CLIs the desktop bootstrap handler must verify before setup starts.
+        // Add "claude", "codex", etc. here when they become required.
+        requiredClis: ["openclaw"],
+        mcUrl,
+      });
+    } catch (err) {
+      return handleError(err);
+    }
+  },
+  { minRole: WORKSPACE_ROLES.MEMBER },
+);

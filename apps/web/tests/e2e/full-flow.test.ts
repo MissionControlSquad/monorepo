@@ -4797,7 +4797,10 @@ describe("G. Pending Review, Events Ingest & Additional Routes", () => {
     expect(meRes.status).toBe(200);
 
     // Regenerate
-    const regenReq = buildRequest("POST", `/api/agents/${tempAgent.id}/regenerate-key`);
+    // regenerate-key is now human-ADMIN gated (withTenancy) — authenticate with the admin session.
+    const regenReq = buildRequest("POST", `/api/agents/${tempAgent.id}/regenerate-key`, {
+      headers: { cookie: `mc_session=${sessionCookie}` },
+    });
     const regenRes = await callRoute(regenerateKey, regenReq, { id: tempAgent.id });
     expect(regenRes.status).toBe(200);
     const regenData = await regenRes.json();
@@ -4819,9 +4822,19 @@ describe("G. Pending Review, Events Ingest & Additional Routes", () => {
   });
 
   it("regenerate key for nonexistent agent — 404", async () => {
-    const req = buildRequest("POST", "/api/agents/nonexistent/regenerate-key");
+    const req = buildRequest("POST", "/api/agents/nonexistent/regenerate-key", {
+      headers: { cookie: `mc_session=${sessionCookie}` },
+    });
     const res = await callRoute(regenerateKey, req, { id: "nonexistent" });
     expect(res.status).toBe(404);
+  });
+
+  it("regenerate-key without a session is rejected — 401 (auth-gap regression)", async () => {
+    // This route used to have NO auth at all — anyone could mint a fresh agent key. withTenancy now
+    // gates it; an unauthenticated caller is rejected before the agent is ever looked up.
+    const req = buildRequest("POST", "/api/agents/anything/regenerate-key");
+    const res = await callRoute(regenerateKey, req, { id: "anything" });
+    expect(res.status).toBe(401);
   });
 
   // ── Queue: Skipped Status ─────────────────────────────────────
