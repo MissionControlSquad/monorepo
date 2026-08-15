@@ -1,6 +1,7 @@
 import { GraphQLError } from "graphql";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
 import { resolveTenancy, roleAtLeast } from "@/server/tenancy";
+import { readCookie } from "@/server/tenancy/buildbase";
 import type { GraphQLContext } from "@/server/graphql/builder";
 import type { TenancyContext, WorkspaceRole } from "@agentcenter/graphql-server";
 import { errorResponse, handleError } from "./json-response";
@@ -14,13 +15,11 @@ import { featureGateResponse, type FeatureGate } from "./feature-gate";
 export async function resolveRestTenancy(request: Request) {
   const cookie = request.headers.get("cookie");
   let session: GraphQLContext["session"] = null;
-  if (cookie) {
-    const match = cookie.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-    if (match) {
-      const payload = await verifySessionToken(match[1].trim());
-      if (payload?.profileId) {
-        session = { sub: payload.sub, username: payload.username, profileId: payload.profileId };
-      }
+  const raw = readCookie(cookie, COOKIE_NAME);
+  if (raw) {
+    const payload = await verifySessionToken(raw);
+    if (payload?.profileId) {
+      session = { sub: payload.sub, username: payload.username, profileId: payload.profileId };
     }
   }
   return resolveTenancy(session, cookie, request.headers.get("authorization"));

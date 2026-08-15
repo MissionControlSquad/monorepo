@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { COOKIE_NAME } from "@/server/admin-auth";
+import { BB_SESSION_COOKIE, WORKSPACE_TOKEN_COOKIE } from "@/server/tenancy/buildbase";
 
 // App (operator) logout. Clears mc_session, plus the buildbase cookies so a buildbase-bridged user
 // who hits the app logout is fully signed out of BOTH planes (symmetric with the buildbase logout
 // route, which also clears mc_session).
-const BB_SESSION_COOKIE = "bb-session-id";
-const BB_WORKSPACE_TOKEN_COOKIE = "bb-workspace-token";
 const COOKIE_DOMAIN = process.env.AUTH_COOKIE_DOMAIN?.trim();
 
 export async function POST() {
@@ -16,6 +15,6 @@ export async function POST() {
     response.cookies.set(COOKIE_NAME, "", { path: "/", maxAge: 0, domain: COOKIE_DOMAIN });
   }
   response.cookies.delete(BB_SESSION_COOKIE);
-  response.cookies.delete(BB_WORKSPACE_TOKEN_COOKIE);
+  response.cookies.delete(WORKSPACE_TOKEN_COOKIE);
   return response;
 }

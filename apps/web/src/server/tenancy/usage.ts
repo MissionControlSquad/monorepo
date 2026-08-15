@@ -3,6 +3,7 @@ import {
   isBuildbaseConfigured,
   BB_SESSION_COOKIE,
   WORKSPACE_TOKEN_COOKIE,
+  readCookie,
 } from "./buildbase";
 import { verifyJWT } from "@/lib/jwt";
 import type { UsageQuotaSlug } from "@/lib/quota-slugs";
@@ -22,12 +23,6 @@ import type { UsageQuotaSlug } from "@/lib/quota-slugs";
  *    request (e.g. agent-authenticated or admin-bootstrap calls).
  *  - This is the human plan quota — NOT the AI-agent LLM/run budget (finance.prisma). Keep separate.
  */
-
-function readCookie(cookieHeader: string | null | undefined, name: string): string | null {
-  if (!cookieHeader) return null;
-  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
 
 /** The human buildbase identity resolved from a request's cookies, if a real workspace session exists. */
 export interface UsageContext {

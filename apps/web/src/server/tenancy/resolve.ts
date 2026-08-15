@@ -1,7 +1,7 @@
 import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import type { GraphQLContext, TenancyContext, WorkspaceRole } from "@agentcenter/graphql-server";
 import { roleCan } from "./roles";
-import { WORKSPACE_TOKEN_COOKIE } from "./buildbase";
+import { WORKSPACE_TOKEN_COOKIE, readCookie } from "./buildbase";
 import { verifyJWT } from "@/lib/jwt";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { isFeatureEnabled } from "@/server/feature-flags";
@@ -25,12 +25,6 @@ function mapRole(raw: unknown): WorkspaceRole {
     default:
       return WORKSPACE_ROLES.MEMBER;
   }
-}
-
-function readCookie(cookieHeader: string | null | undefined, name: string): string | null {
-  if (!cookieHeader) return null;
-  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[1]) : null;
 }
 
 /** Resolve tenancy from the buildbase workspace-scoped JWT, if present + valid. */

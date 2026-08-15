@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBuildbase, isBuildbaseConfigured, BB_SESSION_COOKIE } from "@/server/tenancy/buildbase";
+import {
+  getBuildbase,
+  isBuildbaseConfigured,
+  BB_SESSION_COOKIE,
+  WORKSPACE_TOKEN_COOKIE,
+} from "@/server/tenancy/buildbase";
 import { bridgeBuildbaseSession } from "@/server/auth/buildbase-bridge";
 import { COOKIE_NAME as MC_SESSION_COOKIE, getSessionCookieOptions } from "@/server/admin-auth";
 
@@ -71,7 +76,7 @@ export async function GET(request: NextRequest) {
   response.cookies.set(MC_SESSION_COOKIE, bridge.mcToken, getSessionCookieOptions());
   // Host-only workspace token pinned to THIS tenant (see token route for why it is never shared).
   if (bridge.workspaceToken) {
-    response.cookies.set("bb-workspace-token", bridge.workspaceToken, {
+    response.cookies.set(WORKSPACE_TOKEN_COOKIE, bridge.workspaceToken, {
       httpOnly: true,
       path: "/",
       sameSite: "lax",
