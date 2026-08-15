@@ -273,6 +273,7 @@ builder.mutationField("setAgentVacation", (t) =>
       onVacation: t.arg.boolean({ required: true }),
     },
     resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const agent = await agentModel.delegate.findUnique({
         where: { id: args.id },
         select: { name: true, username: true },
