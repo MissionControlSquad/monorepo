@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { Button } from "@/components/ui";
+import { clearAuthToken } from "@/components/providers/BuildbaseProvider";
 
 // Shown when a buildbase-authenticated user reaches this tenant dashboard but is NOT a member of the
 // workspace it is bound to (the cross-tenant membership check in the auth bridge denied them). No app
@@ -17,8 +18,7 @@ export default function NoAccessPage() {
       // best-effort — navigate away regardless
     }
     try {
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("user_email");
+      clearAuthToken();
     } catch {
       // ignore
     }

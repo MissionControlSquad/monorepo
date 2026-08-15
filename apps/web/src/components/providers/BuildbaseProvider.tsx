@@ -54,20 +54,26 @@ function resolveLocale(): SDKLocale {
   return DEFAULT_LOCALE;
 }
 
+/** localStorage keys for the buildbase client auth token + last-known user email. Single source. */
+const AUTH_TOKEN_KEY = "auth_token";
+const USER_EMAIL_KEY = "user_email";
+
 function storeAuthToken(token: string) {
-  localStorage.setItem("auth_token", token);
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
 }
 function storeUserEmail(email: string) {
-  if (email) localStorage.setItem("user_email", email);
+  if (email) localStorage.setItem(USER_EMAIL_KEY, email);
 }
-function clearAuthToken() {
-  localStorage.removeItem("auth_token");
-  localStorage.removeItem("user_email");
+/** Clear the buildbase client auth token + email. Exported so sign-out surfaces (e.g. the no-access
+ *  page) don't re-hardcode the key names. */
+export function clearAuthToken() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(USER_EMAIL_KEY);
 }
 
 async function updateAuthToken(userId: string, workspaceId: string, userRole: string) {
-  const email = localStorage.getItem("user_email") ?? "";
-  const currentToken = localStorage.getItem("auth_token") ?? "";
+  const email = localStorage.getItem(USER_EMAIL_KEY) ?? "";
+  const currentToken = localStorage.getItem(AUTH_TOKEN_KEY) ?? "";
   try {
     const response = await fetch("/api/auth/buildbase/workspace-token", {
       method: "POST",

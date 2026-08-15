@@ -1,7 +1,6 @@
 import { updateProfileAvatar } from "@agentcenter/database";
 import { uploadFileToR2 } from "@/server/storage/r2";
-import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
-import { readCookie } from "@/server/tenancy/buildbase";
+import { resolveSession } from "../../_lib/resolve-session";
 import { successResponse, errorResponse } from "../../_lib/json-response";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
@@ -20,17 +19,12 @@ const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "ima
  * current user's profile.avatarUrl, and returns the serving URL.
  */
 export async function POST(request: Request) {
-  const sessionToken = readCookie(request.headers.get("cookie"), COOKIE_NAME);
-
-  let profileId: string | null = null;
-  if (sessionToken) {
-    const session = await verifySessionToken(sessionToken);
-    if (session?.profileId) {
-      profileId = session.profileId;
-    }
-  }
-
-  if (!profileId) {
+  let profileId: string;
+  try {
+    const session = await resolveSession(request);
+    if (!session.profileId) return errorResponse("Authentication required", 401);
+    profileId = session.profileId;
+  } catch {
     return errorResponse("Authentication required", 401);
   }
 
