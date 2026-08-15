@@ -5059,6 +5059,7 @@ describe("H. Extended GraphQL Coverage", () => {
         deleteDeliverable(id: $id)
       }`,
       { id: gqlDeliverableId },
+      sessionCookie,
     );
     expect(result.errors).toBeFalsy();
     expect(result.data?.deleteDeliverable).toBe(true);
