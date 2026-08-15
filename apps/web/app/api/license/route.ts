@@ -8,8 +8,7 @@ import {
 } from "@/server/license";
 import { createRateLimiter } from "@/server/rate-limit";
 import { checkRateLimit } from "../_lib/rate-limit-check";
-import { resolveRestTenancy } from "../_lib/rest-tenancy";
-import { roleAtLeast } from "@/server/tenancy";
+import { withTenancy } from "../_lib/rest-tenancy";
 import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 /** License activation — tight limit to prevent brute-force */
@@ -65,22 +64,18 @@ export async function POST(request: Request) {
  * gate it in-handler: require an authenticated workspace admin/owner. Agents (mc_ API keys resolve to
  * least-privilege "member") and anonymous callers are refused.
  */
-export async function DELETE(request: Request) {
-  const tenancy = await resolveRestTenancy(request);
-  if (!tenancy) {
-    return Response.json({ success: false, message: "Unauthorized" }, { status: 401 });
-  }
-  if (!roleAtLeast(tenancy.role, WORKSPACE_ROLES.ADMIN)) {
-    return Response.json({ success: false, message: "Forbidden" }, { status: 403 });
-  }
-  try {
-    await clearStoredLicense();
-    invalidateLicenseCache();
-    return Response.json({ success: true, message: "License deactivated" });
-  } catch {
-    return Response.json(
-      { success: false, message: "Failed to deactivate license" },
-      { status: 500 },
-    );
-  }
-}
+export const DELETE = withTenancy(
+  async () => {
+    try {
+      await clearStoredLicense();
+      invalidateLicenseCache();
+      return Response.json({ success: true, message: "License deactivated" });
+    } catch {
+      return Response.json(
+        { success: false, message: "Failed to deactivate license" },
+        { status: 500 },
+      );
+    }
+  },
+  { minRole: WORKSPACE_ROLES.ADMIN },
+);
