@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation } from "urql";
 import { toast } from "sonner";
-import { Loader2, AlertCircle, MessageSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
+import { CenteredSpinner, CenteredMessage } from "@/components/common/AsyncBoundary";
 import { APPROVAL_QUERY } from "@/lib/graphql/queries";
 import {
   APPROVE_APPROVAL,
@@ -136,21 +137,8 @@ export function ApprovalDetailPage({ approvalId }: { approvalId: string }) {
     }
   }
 
-  if (fetching && !approval) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (!approval) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-        <AlertCircle className="h-8 w-8" />
-        <p className="text-sm font-medium">Approval not found</p>
-      </div>
-    );
-  }
+  if (fetching && !approval) return <CenteredSpinner />;
+  if (!approval) return <CenteredMessage>Approval not found</CenteredMessage>;
 
   const isPending = approval.status === ApprovalStatus.PENDING;
   const isQuorum = (approval.requiredApprovals ?? 1) > 1;

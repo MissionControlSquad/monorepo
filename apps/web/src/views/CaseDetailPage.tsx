@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation } from "urql";
 import { toast } from "sonner";
-import { Loader2, AlertCircle, X } from "lucide-react";
+import { X } from "lucide-react";
+import { CenteredSpinner, CenteredMessage } from "@/components/common/AsyncBoundary";
 import { CASE_QUERY, CASE_EVENTS_QUERY, LABELS_QUERY } from "@/lib/graphql/queries";
 import {
   UPDATE_CASE,
@@ -106,21 +107,8 @@ export function CaseDetailPage({ caseId }: { caseId: string }) {
     }
   }
 
-  if (fetching && !kase) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (!kase) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-        <AlertCircle className="h-8 w-8" />
-        <p className="text-sm font-medium">Case not found</p>
-      </div>
-    );
-  }
+  if (fetching && !kase) return <CenteredSpinner />;
+  if (!kase) return <CenteredMessage>Case not found</CenteredMessage>;
 
   const fieldEntries = Object.entries(kase.fields ?? {});
 
