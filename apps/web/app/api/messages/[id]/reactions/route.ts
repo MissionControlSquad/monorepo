@@ -1,17 +1,16 @@
 import { messageModel, messageReactionModel } from "@/server/models";
 import { pubsub, messageReactionTopic } from "@/server/pubsub";
-import { resolveAgent } from "../../../_lib/resolve-agent";
-import { successResponse, handleError, assertFound } from "../../../_lib/json-response";
+import { withAgent } from "../../../_lib/with-agent";
+import { successResponse, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { validateBody, messageReactionSchema } from "../../../_lib/validation";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  try {
+export const POST = withAgent(
+  async (request, agent, { params }: { params: Promise<{ id: string }> }) => {
     const { id: messageId } = await params;
     const v = await validateBody(request, messageReactionSchema);
     if (v.error) return v.error;
-    const agent = await resolveAgent(request);
     const { emoji } = v.data;
 
     const message = await messageModel.findById(messageId, {
@@ -45,7 +44,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
 
     return successResponse({ messageId, emoji, action });
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+);

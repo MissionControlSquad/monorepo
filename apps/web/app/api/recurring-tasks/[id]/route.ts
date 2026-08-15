@@ -1,6 +1,6 @@
 import { recurringTaskModel } from "@/server/models";
-import { resolveAgent } from "../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError, assertFound } from "../../_lib/json-response";
+import { withAgent } from "../../_lib/with-agent";
+import { successResponse, errorResponse, assertFound } from "../../_lib/json-response";
 import { ERR } from "../../_lib/error-messages";
 import { validateBody, updateRecurringTaskSchema } from "../../_lib/validation";
 import { assertProjectMember } from "../../_lib/project-access";
@@ -9,94 +9,79 @@ import { assertAssignableAgents } from "@/server/assignment-guard";
 import { validateRecurrenceConfig, calculateInitialDueDate } from "@/server/recurring-tasks";
 import type { RouteContext } from "../../_lib/route-context";
 
-export async function GET(request: Request, ctx: RouteContext) {
-  try {
-    await resolveAgent(request);
-    const { id } = await ctx.params;
+export const GET = withAgent(async (_request, _agent, ctx: RouteContext) => {
+  const { id } = await ctx.params;
 
-    const rt = await recurringTaskModel.findById(id, {
-      include: {
-        assignees: { include: { profile: true } },
-        generatedTasks: { take: 10, orderBy: { createdAt: "desc" } },
-      },
-    });
+  const rt = await recurringTaskModel.findById(id, {
+    include: {
+      assignees: { include: { profile: true } },
+      generatedTasks: { take: 10, orderBy: { createdAt: "desc" } },
+    },
+  });
 
-    assertFound(rt, ERR.RECURRING_TASK_NOT_FOUND);
-    return successResponse(rt);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  assertFound(rt, ERR.RECURRING_TASK_NOT_FOUND);
+  return successResponse(rt);
+});
 
-export async function PATCH(request: Request, ctx: RouteContext) {
-  try {
-    const v = await validateBody(request, updateRecurringTaskSchema);
-    if (v.error) return v.error;
-    const body = v.data;
-    const agent = await resolveAgent(request);
-    const { id } = await ctx.params;
+export const PATCH = withAgent(async (request, agent, ctx: RouteContext) => {
+  const v = await validateBody(request, updateRecurringTaskSchema);
+  if (v.error) return v.error;
+  const body = v.data;
+  const { id } = await ctx.params;
 
-    const existing = await recurringTaskModel.findById(id);
-    assertFound(existing, ERR.RECURRING_TASK_NOT_FOUND);
-    if (existing.projectId) await assertProjectMember(agent.id, existing.projectId);
+  const existing = await recurringTaskModel.findById(id);
+  assertFound(existing, ERR.RECURRING_TASK_NOT_FOUND);
+  if (existing.projectId) await assertProjectMember(agent.id, existing.projectId);
 
-    const data: Record<string, unknown> = {};
+  const data: Record<string, unknown> = {};
 
-    if (body.title !== undefined) data.title = body.title;
-    if (body.description !== undefined) data.description = body.description;
-    if (body.status !== undefined) data.status = body.status;
-    if (body.priority !== undefined) data.priority = body.priority;
-    if (body.tags !== undefined) data.tags = body.tags;
-    if (body.timezone !== undefined) data.timezone = body.timezone;
-    if (body.projectId !== undefined) data.projectId = body.projectId;
+  if (body.title !== undefined) data.title = body.title;
+  if (body.description !== undefined) data.description = body.description;
+  if (body.status !== undefined) data.status = body.status;
+  if (body.priority !== undefined) data.priority = body.priority;
+  if (body.tags !== undefined) data.tags = body.tags;
+  if (body.timezone !== undefined) data.timezone = body.timezone;
+  if (body.projectId !== undefined) data.projectId = body.projectId;
 
-    if (body.recurrenceConfig !== undefined) {
-      try {
-        const config = validateRecurrenceConfig(body.recurrenceConfig);
-        data.recurrenceConfig = config as any;
-        data.nextDueAt = calculateInitialDueDate(config);
-      } catch (e: any) {
-        return errorResponse(e.message, 400);
-      }
+  if (body.recurrenceConfig !== undefined) {
+    try {
+      const config = validateRecurrenceConfig(body.recurrenceConfig);
+      data.recurrenceConfig = config as any;
+      data.nextDueAt = calculateInitialDueDate(config);
+    } catch (e: any) {
+      return errorResponse(e.message, 400);
     }
+  }
 
-    await recurringTaskModel.update(id, { data });
+  await recurringTaskModel.update(id, { data });
 
-    // Handle assignee changes
-    if (body.assigneeIds) {
-      try {
-        await assertAssignableAgents(body.assigneeIds);
-      } catch (e: any) {
-        return errorResponse(e.message, 400);
-      }
-      const profileIds = await Promise.all(
-        (body.assigneeIds as string[]).map((aid: string) => getOrCreateAgentProfileId(aid)),
-      );
-      await recurringTaskModel.setAssignees(id, profileIds);
+  // Handle assignee changes
+  if (body.assigneeIds) {
+    try {
+      await assertAssignableAgents(body.assigneeIds);
+    } catch (e: any) {
+      return errorResponse(e.message, 400);
     }
-
-    // Re-fetch with relations
-    const result = await recurringTaskModel.findById(id, {
-      include: { assignees: { include: { profile: true } } },
-    });
-    return successResponse(result);
-  } catch (err) {
-    return handleError(err);
+    const profileIds = await Promise.all(
+      (body.assigneeIds as string[]).map((aid: string) => getOrCreateAgentProfileId(aid)),
+    );
+    await recurringTaskModel.setAssignees(id, profileIds);
   }
-}
 
-export async function DELETE(request: Request, ctx: RouteContext) {
-  try {
-    const agent = await resolveAgent(request);
-    const { id } = await ctx.params;
+  // Re-fetch with relations
+  const result = await recurringTaskModel.findById(id, {
+    include: { assignees: { include: { profile: true } } },
+  });
+  return successResponse(result);
+});
 
-    const existing = await recurringTaskModel.findById(id);
-    assertFound(existing, ERR.RECURRING_TASK_NOT_FOUND);
-    if (existing.projectId) await assertProjectMember(agent.id, existing.projectId);
+export const DELETE = withAgent(async (_request, agent, ctx: RouteContext) => {
+  const { id } = await ctx.params;
 
-    await recurringTaskModel.deleteById(id);
-    return successResponse({ success: true });
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  const existing = await recurringTaskModel.findById(id);
+  assertFound(existing, ERR.RECURRING_TASK_NOT_FOUND);
+  if (existing.projectId) await assertProjectMember(agent.id, existing.projectId);
+
+  await recurringTaskModel.deleteById(id);
+  return successResponse({ success: true });
+});

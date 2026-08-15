@@ -7,60 +7,47 @@ import { pubsub, messageTopic } from "@/server/pubsub";
 import { agentListCache } from "@/server/cache";
 import { escapeHtml } from "@/server/sanitize";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
-import { resolveAgent } from "../_lib/resolve-agent";
-import { requireAgentCapability } from "@/server/services/agent-authz";
+import { withAgent } from "../_lib/with-agent";
 import { AGENT_CAPABILITY } from "@agentcenter/utils";
-import { successResponse, errorResponse, handleError } from "../_lib/json-response";
+import { successResponse, errorResponse } from "../_lib/json-response";
 import { validateBody, createMessageSchema } from "../_lib/validation";
 import { parsePaginationParams } from "../_lib/pagination";
 import { apiLimiters, checkRateLimit } from "../_lib/rate-limit-check";
-import { isSystemShutdown } from "@/server/system-settings";
 
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    await resolveAgent(request);
+export const GET = withAgent(async (request, _agent) => {
+  const { searchParams } = new URL(request.url);
 
-    const taskId = searchParams.get("taskId");
-    if (!taskId) return errorResponse("taskId query parameter is required", 400);
+  const taskId = searchParams.get("taskId");
+  if (!taskId) return errorResponse("taskId query parameter is required", 400);
 
-    const { limit, offset } = parsePaginationParams(searchParams, {
-      defaultLimit: 200,
-      maxLimit: 500,
-    });
+  const { limit, offset } = parsePaginationParams(searchParams, {
+    defaultLimit: 200,
+    maxLimit: 500,
+  });
 
-    const messages = await messageModel.findMany({
-      where: { taskId },
-      include: {
-        fromProfile: { select: { id: true, displayName: true, username: true, avatarUrl: true } },
-        mentions: {
-          include: { profile: { select: { id: true, displayName: true, username: true } } },
-        },
+  const messages = await messageModel.findMany({
+    where: { taskId },
+    include: {
+      fromProfile: { select: { id: true, displayName: true, username: true, avatarUrl: true } },
+      mentions: {
+        include: { profile: { select: { id: true, displayName: true, username: true } } },
       },
-      orderBy: { createdAt: "asc" },
-      take: limit,
-      skip: offset,
-    });
+    },
+    orderBy: { createdAt: "asc" },
+    take: limit,
+    skip: offset,
+  });
 
-    return successResponse(messages);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  return successResponse(messages);
+});
 
-export async function POST(request: Request) {
-  const limited = await checkRateLimit(apiLimiters.messages, request);
-  if (limited) return limited;
+export const POST = withAgent(
+  async (request, agent) => {
+    const limited = await checkRateLimit(apiLimiters.messages, request);
+    if (limited) return limited;
 
-  try {
     const v = await validateBody(request, createMessageSchema);
     if (v.error) return v.error;
-    const agent = await resolveAgent(request);
-    await requireAgentCapability(agent, AGENT_CAPABILITY.MESSAGES_SEND);
-
-    if (await isSystemShutdown()) {
-      return errorResponse("System is in shutdown mode. No messages can be sent.", 503);
-    }
 
     const { taskId, content: rawContent, attachmentIds } = v.data;
     if (!taskId) {
@@ -165,7 +152,9 @@ export async function POST(request: Request) {
 
     pubsub.publish(messageTopic(taskId), { taskId, messageId: message.id });
     return successResponse(message, 201);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  {
+    capability: AGENT_CAPABILITY.MESSAGES_SEND,
+    blockOnShutdown: { error: "System is in shutdown mode. No messages can be sent." },
+  },
+);

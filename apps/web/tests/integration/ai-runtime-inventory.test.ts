@@ -146,6 +146,7 @@ function postReport(key: string, body: unknown) {
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+    { params: Promise.resolve({}) },
   );
 }
 
@@ -199,6 +200,7 @@ describe("runner report endpoint + reportedRuntimeInventories", () => {
         method: "POST",
         body: JSON.stringify({ inventory: remoteInventory }),
       }),
+      { params: Promise.resolve({}) },
     );
     expect(res.status).toBe(401);
   });

@@ -1,6 +1,5 @@
-import { resolveAgent } from "../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
-import { isFeatureEnabled } from "@/server/feature-flags";
+import { withAgent } from "../../_lib/with-agent";
+import { successResponse, errorResponse } from "../../_lib/json-response";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { saveReportedInventory } from "@/server/services/ai-runtime-inventory";
 import type { RuntimeInventory } from "@/server/services/ai-runtime-detect";
@@ -19,11 +18,8 @@ export const dynamic = "force-dynamic";
  *   Authorization: Bearer mc_<agent_key>
  *   { "inventory": RuntimeInventory, "runnerName"?: string }
  */
-export async function POST(request: Request) {
-  try {
-    if (!(await isFeatureEnabled(FLAG_KEYS.AI_TOOLS)))
-      return errorResponse("AI Tools is not enabled", 403, "FEATURE_DISABLED");
-    const agent = await resolveAgent(request);
+export const POST = withAgent(
+  async (request, agent) => {
     if (!agent.workspaceId) return errorResponse("Agent has no workspace", 400);
 
     const body = (await request.json().catch(() => ({}))) as {
@@ -40,7 +36,6 @@ export async function POST(request: Request) {
       inventory: body.inventory,
     });
     return successResponse({ ok: true, runnerId: saved.runnerId, reportedAt: saved.reportedAt });
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  { feature: { flag: FLAG_KEYS.AI_TOOLS, error: "AI Tools is not enabled" } },
+);

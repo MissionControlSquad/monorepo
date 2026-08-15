@@ -1,22 +1,17 @@
 import { recurringTaskModel } from "@/server/models";
-import { resolveAgent } from "../../../_lib/resolve-agent";
-import { successResponse, handleError, assertFound } from "../../../_lib/json-response";
+import { withAgent } from "../../../_lib/with-agent";
+import { successResponse, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { assertProjectMember } from "../../../_lib/project-access";
 import type { RouteContext } from "../../../_lib/route-context";
 
-export async function POST(request: Request, ctx: RouteContext) {
-  try {
-    const agent = await resolveAgent(request);
-    const { id } = await ctx.params;
+export const POST = withAgent(async (_request, agent, ctx: RouteContext) => {
+  const { id } = await ctx.params;
 
-    const existing = await recurringTaskModel.findById(id);
-    assertFound(existing, ERR.RECURRING_TASK_NOT_FOUND);
-    if (existing.projectId) await assertProjectMember(agent.id, existing.projectId);
+  const existing = await recurringTaskModel.findById(id);
+  assertFound(existing, ERR.RECURRING_TASK_NOT_FOUND);
+  if (existing.projectId) await assertProjectMember(agent.id, existing.projectId);
 
-    const updated = await recurringTaskModel.pause(id);
-    return successResponse(updated);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  const updated = await recurringTaskModel.pause(id);
+  return successResponse(updated);
+});

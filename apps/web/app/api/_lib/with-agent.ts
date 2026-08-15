@@ -1,10 +1,17 @@
 import { resolveAgent } from "./resolve-agent";
 import { requireAgentCapability } from "@/server/services/agent-authz";
 import { isFeatureEnabled } from "@/server/feature-flags";
+import { isSystemShutdown } from "@/server/system-settings";
 import { errorResponse, handleError } from "./json-response";
 import type { FlagKey } from "@agentcenter/utils";
 
 type ResolvedAgent = Awaited<ReturnType<typeof resolveAgent>>;
+
+/**
+ * Feature gate for a route: a bare flag uses the standard "This feature is not enabled on your plan" /
+ * FEATURE_DISABLED 403, or `{ flag, error, code }` to preserve a route's own message/code.
+ */
+type FeatureGate = FlagKey | { flag: FlagKey; error?: string; code?: string };
 
 /**
  * Agent-plane twin of `withTenancy`. Wraps a Next.js route handler with the standard agent envelope so
@@ -28,18 +35,40 @@ type ResolvedAgent = Awaited<ReturnType<typeof resolveAgent>>;
  */
 export function withAgent<C = unknown>(
   handler: (request: Request, agent: ResolvedAgent, context: C) => Response | Promise<Response>,
-  opts: { feature?: FlagKey; capability?: string; allowPendingSetup?: boolean } = {},
+  opts: {
+    feature?: FeatureGate;
+    capability?: string;
+    allowPendingSetup?: boolean;
+    /** Block writes while the instance is in maintenance/shutdown (503). true = default message. */
+    blockOnShutdown?: boolean | { error?: string };
+  } = {},
 ) {
-  return async (request: Request, context?: C): Promise<Response> => {
+  return async (request: Request, context: C): Promise<Response> => {
     try {
-      if (opts.feature && !(await isFeatureEnabled(opts.feature))) {
-        return errorResponse("This feature is not enabled on your plan", 403, "FEATURE_DISABLED");
+      if (opts.feature) {
+        const gate = typeof opts.feature === "string" ? { flag: opts.feature } : opts.feature;
+        if (!(await isFeatureEnabled(gate.flag))) {
+          return errorResponse(
+            gate.error ?? "This feature is not enabled on your plan",
+            403,
+            gate.code ?? "FEATURE_DISABLED",
+          );
+        }
+      }
+      if (opts.blockOnShutdown && (await isSystemShutdown())) {
+        const msg =
+          typeof opts.blockOnShutdown === "object" ? opts.blockOnShutdown.error : undefined;
+        return errorResponse(
+          msg ?? "The system is in shutdown mode. Please try again shortly.",
+          503,
+          "SYSTEM_SHUTDOWN",
+        );
       }
       const agent = await resolveAgent(request, { allowPendingSetup: opts.allowPendingSetup });
       if (opts.capability) {
         await requireAgentCapability(agent, opts.capability);
       }
-      return await handler(request, agent, context as C);
+      return await handler(request, agent, context);
     } catch (err) {
       return handleError(err);
     }

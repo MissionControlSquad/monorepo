@@ -1,16 +1,9 @@
-import { resolveAgent } from "../../../_lib/resolve-agent";
-import {
-  successResponse,
-  errorResponse,
-  handleError,
-  assertFound,
-} from "../../../_lib/json-response";
+import { withAgent } from "../../../_lib/with-agent";
+import { successResponse, errorResponse, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { validateBody, approveTaskSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
 import { assertProjectMember, squadLeadRequired } from "../../../_lib/project-access";
-import { isSystemShutdown } from "@/server/system-settings";
-import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { taskModel } from "@/server/models/task";
 import { parseChildTasks } from "@/server/sanitize";
@@ -18,20 +11,13 @@ import { assertAssignableAgents } from "@/server/assignment-guard";
 import { performApproveTask } from "@/server/services/review";
 import type { RouteContext } from "../../../_lib/route-context";
 
-export async function POST(request: Request, ctx: RouteContext) {
-  try {
+export const POST = withAgent(
+  async (request, reviewer, ctx: RouteContext) => {
     const v = await validateBody(request, approveTaskSchema);
     if (v.error) return v.error;
     const body = v.data;
-    const reviewer = await resolveAgent(request);
     const { id: taskId } = await ctx.params;
 
-    if (!(await isFeatureEnabled(FLAG_KEYS.REVIEWS))) {
-      return errorResponse(ERR.FEATURE_REVIEWS_UNAVAILABLE, 403);
-    }
-    if (await isSystemShutdown()) {
-      return errorResponse("System is in shutdown mode. No task approvals allowed.", 503);
-    }
     const guard = squadLeadRequired(reviewer);
     if (guard) return guard;
 
@@ -78,7 +64,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       newStatus: result.newStatus,
       childTaskIds: result.childTaskIds,
     });
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  {
+    feature: { flag: FLAG_KEYS.REVIEWS, error: ERR.FEATURE_REVIEWS_UNAVAILABLE },
+    blockOnShutdown: { error: "System is in shutdown mode. No task approvals allowed." },
+  },
+);

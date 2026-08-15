@@ -41,9 +41,9 @@ export function withTenancy<C = unknown>(
   handler: (request: Request, tenancy: TenancyContext, context: C) => Response | Promise<Response>,
   opts: { minRole?: WorkspaceRole } = {},
 ) {
-  // `context` is optional: Next passes `{ params }` for dynamic routes but omits it for static ones, so
-  // the wrapped export must be callable with 1 or 2 args.
-  return async (request: Request, context?: C): Promise<Response> => {
+  // `context` is required in the type (Next's route-type validator rejects `RouteContext | undefined`
+  // for dynamic routes); at runtime Next omits it for static routes, so treat it as possibly-undefined.
+  return async (request: Request, context: C): Promise<Response> => {
     const tenancy = await resolveRestTenancy(request);
     if (!tenancy) return errorResponse("Unauthorized", 401, "UNAUTHENTICATED");
     if (opts.minRole && !roleAtLeast(tenancy.role, opts.minRole)) {

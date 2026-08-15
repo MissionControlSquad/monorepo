@@ -1,6 +1,5 @@
-import { resolveAgent } from "../../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
-import { isFeatureEnabled } from "@/server/feature-flags";
+import { withAgent } from "../../../_lib/with-agent";
+import { successResponse, errorResponse } from "../../../_lib/json-response";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { assembleContextBundle } from "@/server/services/agent-context";
 
@@ -8,12 +7,8 @@ import { assembleContextBundle } from "@/server/services/agent-context";
 // ONE task — identity + skills + instructions + the task, its project (git ref) and linked
 // docs/deliverables/subtasks — assembled fresh from data we already own. No persistent memory store.
 // Agent-key auth; the task is scoped to what the agent may access.
-export async function GET(request: Request) {
-  try {
-    if (!(await isFeatureEnabled(FLAG_KEYS.RUNNERS)))
-      return errorResponse("Runners are not enabled", 403, "FEATURE_DISABLED");
-    const agent = await resolveAgent(request);
-
+export const GET = withAgent(
+  async (request, agent) => {
     const taskId = new URL(request.url).searchParams.get("taskId");
     if (!taskId) return errorResponse("taskId is required", 400);
 
@@ -36,7 +31,6 @@ export async function GET(request: Request) {
       taskId,
     );
     return successResponse(bundle);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  { feature: { flag: FLAG_KEYS.RUNNERS, error: "Runners are not enabled" } },
+);

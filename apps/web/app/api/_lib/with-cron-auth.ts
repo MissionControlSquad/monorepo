@@ -12,11 +12,11 @@ import { errorResponse } from "./json-response";
 export function withCronAuth<C = unknown>(
   handler: (request: Request, context: C) => Response | Promise<Response>,
 ) {
-  return async (request: Request, context?: C): Promise<Response> => {
+  return async (request: Request, context: C): Promise<Response> => {
     const authHeader = request.headers.get("authorization");
     if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
       return errorResponse("Unauthorized", 401);
     }
-    return handler(request, context as C);
+    return handler(request, context);
   };
 }

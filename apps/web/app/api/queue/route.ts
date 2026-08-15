@@ -2,10 +2,9 @@ export const dynamic = "force-dynamic";
 
 import { taskModel } from "@/server/models/task";
 import { agentQueueItemModel } from "@/server/models";
-import { resolveAgent } from "../_lib/resolve-agent";
-import { requireAgentCapability } from "@/server/services/agent-authz";
+import { withAgent } from "../_lib/with-agent";
 import { AGENT_CAPABILITY } from "@agentcenter/utils";
-import { successResponse, errorResponse, handleError } from "../_lib/json-response";
+import { successResponse, errorResponse } from "../_lib/json-response";
 import { validateBody, createQueueItemSchema } from "../_lib/validation";
 import { log } from "../_lib/logger";
 import { isSystemShutdown } from "@/server/system-settings";
@@ -13,51 +12,43 @@ import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS, QueueItemStatus, Priority, QueueItemType } from "@agentcenter/utils";
 import { parsePaginationParams } from "../_lib/pagination";
 
-export async function GET(request: Request) {
-  try {
-    const agent = await resolveAgent(request);
-
-    if (!(await isFeatureEnabled(FLAG_KEYS.AGENT_QUEUE))) {
-      return errorResponse("Agent queue feature is not available on your current plan", 403);
-    }
-
-    const { searchParams } = new URL(request.url);
-
-    const active = searchParams.get("active") === "true";
-    const status = searchParams.get("status");
-
-    const where: Record<string, unknown> = { agentId: agent.id };
-
-    if (active) {
-      where.status = { in: [QueueItemStatus.PENDING, QueueItemStatus.IN_PROGRESS] };
-    } else if (status) {
-      where.status = status;
-    }
-
-    const { limit, offset } = parsePaginationParams(searchParams, {
-      defaultLimit: 200,
-      maxLimit: 500,
-    });
-
-    const items = await agentQueueItemModel.findMany({
-      where,
-      orderBy: [{ order: "asc" }],
-      take: limit,
-      skip: offset,
-    });
-
-    return successResponse(items);
-  } catch (err) {
-    return handleError(err);
+export const GET = withAgent(async (request, agent) => {
+  if (!(await isFeatureEnabled(FLAG_KEYS.AGENT_QUEUE))) {
+    return errorResponse("Agent queue feature is not available on your current plan", 403);
   }
-}
 
-export async function POST(request: Request) {
-  try {
+  const { searchParams } = new URL(request.url);
+
+  const active = searchParams.get("active") === "true";
+  const status = searchParams.get("status");
+
+  const where: Record<string, unknown> = { agentId: agent.id };
+
+  if (active) {
+    where.status = { in: [QueueItemStatus.PENDING, QueueItemStatus.IN_PROGRESS] };
+  } else if (status) {
+    where.status = status;
+  }
+
+  const { limit, offset } = parsePaginationParams(searchParams, {
+    defaultLimit: 200,
+    maxLimit: 500,
+  });
+
+  const items = await agentQueueItemModel.findMany({
+    where,
+    orderBy: [{ order: "asc" }],
+    take: limit,
+    skip: offset,
+  });
+
+  return successResponse(items);
+});
+
+export const POST = withAgent(
+  async (request, agent) => {
     const v = await validateBody(request, createQueueItemSchema);
     if (v.error) return v.error;
-    const agent = await resolveAgent(request);
-    await requireAgentCapability(agent, AGENT_CAPABILITY.QUEUE_CONSUME);
 
     const {
       title,
@@ -111,7 +102,6 @@ export async function POST(request: Request) {
 
     log("queue", `CREATED agent="${agent.name}" item="${title}"`, request);
     return successResponse(item, 201);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  { capability: AGENT_CAPABILITY.QUEUE_CONSUME },
+);

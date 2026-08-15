@@ -1,21 +1,14 @@
-import { resolveAgent } from "../../_lib/resolve-agent";
-import { requireAgentCapability } from "@/server/services/agent-authz";
+import { withAgent } from "../../_lib/with-agent";
 import { AGENT_CAPABILITY } from "@agentcenter/utils";
-import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
-import { isFeatureEnabled } from "@/server/feature-flags";
+import { successResponse, errorResponse } from "../../_lib/json-response";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { checkoutTask, renewCheckout, releaseCheckout } from "@/server/services/task-checkout";
 
 // Epic #8: agents claim/renew/release a task lease (API-key auth, not a session). Atomic checkout
 // hands back a fencing token that renew/release must present.
-export async function POST(request: Request) {
-  try {
-    if (!(await isFeatureEnabled(FLAG_KEYS.TASK_AUTONOMY)))
-      return errorResponse("Task autonomy is not enabled", 403, "FEATURE_DISABLED");
-    const agent = await resolveAgent(request);
-    await requireAgentCapability(agent, AGENT_CAPABILITY.TASKS_CHECKOUT);
-
+export const POST = withAgent(
+  async (request, agent) => {
     const body = (await request.json()) as {
       taskId?: string;
       action?: "checkout" | "renew" | "release";
@@ -45,7 +38,6 @@ export async function POST(request: Request) {
       return successResponse({ ok: released });
     }
     return errorResponse("action must be checkout|renew|release", 400);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  { feature: FLAG_KEYS.TASK_AUTONOMY, capability: AGENT_CAPABILITY.TASKS_CHECKOUT },
+);

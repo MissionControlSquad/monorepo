@@ -60,6 +60,7 @@ function postMemory(body: unknown) {
       headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+    { params: Promise.resolve({}) },
   );
 }
 async function gql(query: string, role: "admin" | "member" = "admin") {
@@ -120,6 +121,7 @@ describe("agent memory (Tier D two-layer)", () => {
         new Request(`http://test/api/agents/me/context?taskId=${task.id}`, {
           headers: { Authorization: `Bearer ${KEY}` },
         }),
+        { params: Promise.resolve({}) },
       );
     // default provider "none" → memory null
     expect((await (await ctx()).json()).memory).toBeNull();

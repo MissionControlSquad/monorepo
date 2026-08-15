@@ -1,6 +1,6 @@
 import { agentModel } from "@/server/models";
-import { resolveAgent } from "../_lib/resolve-agent";
-import { successResponse, handleError } from "../_lib/json-response";
+import { withAgent } from "../_lib/with-agent";
+import { successResponse } from "../_lib/json-response";
 import { parsePaginationParams } from "../_lib/pagination";
 import { ProjectMemberStatus } from "@/server/constants";
 
@@ -21,29 +21,24 @@ const SAFE_AGENT_SELECT = {
   templateId: true,
 } as const;
 
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    await resolveAgent(request);
+export const GET = withAgent(async (request, _agent) => {
+  const { searchParams } = new URL(request.url);
 
-    const projectId = searchParams.get("projectId");
+  const projectId = searchParams.get("projectId");
 
-    const { limit, offset } = parsePaginationParams(searchParams, {
-      defaultLimit: 100,
-      maxLimit: 500,
-    });
+  const { limit, offset } = parsePaginationParams(searchParams, {
+    defaultLimit: 100,
+    maxLimit: 500,
+  });
 
-    const agents = await agentModel.findMany({
-      where: projectId
-        ? { projectMemberships: { some: { projectId, status: ProjectMemberStatus.ACTIVE } } }
-        : undefined,
-      select: SAFE_AGENT_SELECT,
-      orderBy: { name: "asc" },
-      take: limit,
-      skip: offset,
-    });
-    return successResponse(agents);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  const agents = await agentModel.findMany({
+    where: projectId
+      ? { projectMemberships: { some: { projectId, status: ProjectMemberStatus.ACTIVE } } }
+      : undefined,
+    select: SAFE_AGENT_SELECT,
+    orderBy: { name: "asc" },
+    take: limit,
+    skip: offset,
+  });
+  return successResponse(agents);
+});

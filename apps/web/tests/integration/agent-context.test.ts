@@ -30,7 +30,9 @@ async function makeAgent(key: string): Promise<string> {
 
 function getContext(taskId: string | null, key = KEY) {
   const url = `http://test/api/agents/me/context${taskId ? `?taskId=${taskId}` : ""}`;
-  return GET_CONTEXT(new Request(url, { headers: { Authorization: `Bearer ${key}` } }));
+  return GET_CONTEXT(new Request(url, { headers: { Authorization: `Bearer ${key}` } }), {
+    params: Promise.resolve({}),
+  });
 }
 
 async function enableRunners() {
@@ -212,7 +214,9 @@ describe("agent context endpoint (Tier D Slice 3)", () => {
   });
 
   it("rejects an unauthenticated request", async () => {
-    const res = await GET_CONTEXT(new Request("http://test/api/agents/me/context?taskId=x"));
+    const res = await GET_CONTEXT(new Request("http://test/api/agents/me/context?taskId=x"), {
+      params: Promise.resolve({}),
+    });
     expect(res.status).toBe(401);
   });
 });

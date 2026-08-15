@@ -23,8 +23,8 @@
  *
  * Registered in vercel.json to run every 5 minutes.
  */
-import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
-import { env } from "@/server/env";
+import { successResponse, handleError } from "../../_lib/json-response";
+import { withCronAuth } from "../../_lib/with-cron-auth";
 import { reapStuckRunnerCommands } from "@/server/services/runner-commands";
 import { reapStaleLeases } from "@/server/services/environment-leases";
 import { reapIdleRuntimeServices } from "@/server/services/workspace-runtime-services";
@@ -46,12 +46,8 @@ import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { drainAgentWakeups } from "@/server/services/agent-wakeups";
 
-export async function GET(request: Request) {
+export const GET = withCronAuth(async () => {
   try {
-    const authHeader = request.headers.get("authorization");
-    if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-      return errorResponse("Unauthorized", 401);
-    }
     const now = new Date();
     // Watchdogs FIRST + sequentially: they read expired leases to record recovery decisions; the
     // blanket sweep below would otherwise clear those leases before the watchdog sees them, losing
@@ -139,4 +135,4 @@ export async function GET(request: Request) {
   } catch (err) {
     return handleError(err);
   }
-}
+});
