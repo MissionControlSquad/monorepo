@@ -19,36 +19,3 @@ export function CenteredMessage({ children }: { children: ReactNode }) {
     </div>
   );
 }
-
-/**
- * Standardizes the detail-page `fetching → error → not-found → data` triad that was hand-rolled after
- * every single-record `useQuery`. Renders a spinner while fetching with no data yet, an error message on
- * error, a "<Label> not found" message when the query resolved but the record is absent, otherwise the
- * children called with the non-null record.
- *
- *   <AsyncBoundary data={data?.routine} fetching={fetching} error={error} label="routine">
- *     {(routine) => <RoutineBody routine={routine} />}
- *   </AsyncBoundary>
- */
-export function AsyncBoundary<T>({
-  data,
-  fetching,
-  error,
-  label,
-  children,
-}: {
-  data: T | null | undefined;
-  fetching: boolean;
-  error?: unknown;
-  /** Lowercase noun, e.g. "routine" → "Could not load this routine" / "Routine not found". */
-  label: string;
-  children: (data: T) => ReactNode;
-}) {
-  if (fetching && data == null) return <CenteredSpinner />;
-  if (error) return <CenteredMessage>Could not load this {label}</CenteredMessage>;
-  if (data == null) {
-    const capitalized = label.charAt(0).toUpperCase() + label.slice(1);
-    return <CenteredMessage>{capitalized} not found</CenteredMessage>;
-  }
-  return <>{children(data)}</>;
-}
