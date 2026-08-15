@@ -8,6 +8,9 @@ import {
 } from "@/server/license";
 import { createRateLimiter } from "@/server/rate-limit";
 import { checkRateLimit } from "../_lib/rate-limit-check";
+import { resolveRestTenancy } from "../_lib/rest-tenancy";
+import { roleAtLeast } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 /** License activation — tight limit to prevent brute-force */
 const activateLimiter = createRateLimiter({ max: 5, windowSec: 60, prefix: "rl:lic:activate" });
@@ -53,8 +56,23 @@ export async function POST(request: Request) {
   }
 }
 
-/** DELETE /api/license — Deactivate / remove license */
-export async function DELETE() {
+/**
+ * DELETE /api/license — Deactivate / remove license.
+ *
+ * /api/license is in the middleware PUBLIC allowlist so first-run GET (status) + POST (activation) work
+ * before any session exists. DELETE, however, de-licenses the instance — and since every agent operation
+ * gates on isLicenseActive(), an anonymous DELETE would remotely disable the whole agent plane (DoS). So
+ * gate it in-handler: require an authenticated workspace admin/owner. Agents (mc_ API keys resolve to
+ * least-privilege "member") and anonymous callers are refused.
+ */
+export async function DELETE(request: Request) {
+  const tenancy = await resolveRestTenancy(request);
+  if (!tenancy) {
+    return Response.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+  if (!roleAtLeast(tenancy.role, WORKSPACE_ROLES.ADMIN)) {
+    return Response.json({ success: false, message: "Forbidden" }, { status: 403 });
+  }
   try {
     await clearStoredLicense();
     invalidateLicenseCache();
