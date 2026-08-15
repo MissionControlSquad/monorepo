@@ -186,6 +186,13 @@ export function BuildbaseProvider({ children }: { children: React.ReactNode }) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ code }),
             });
+            // 403 = authenticated with buildbase but NOT a member of this tenant's bound workspace. No
+            // session was set (fail-closed). Send them to the clear /no-access page instead of looping
+            // back to /login with a vague "sign-in didn't complete" — mirrors the SSO route's behavior.
+            if (response.status === 403) {
+              window.location.href = "/no-access";
+              return { sessionId: "" };
+            }
             const data = (await response.json()) as {
               success?: boolean;
               sessionId?: string;
