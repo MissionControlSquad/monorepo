@@ -3,6 +3,7 @@
 import {
   SaaSOSProvider,
   useSaaSAuth,
+  useSaaSWorkspaces,
   PushNotificationProvider,
   SUPPORTED_LOCALES,
 } from "@buildbase/sdk/react";
@@ -98,6 +99,51 @@ function PostAuthRedirector() {
     }
     prevAuthRef.current = isAuthenticated;
   }, [isAuthenticated, isLoading]);
+  return null;
+}
+
+// Pins the SDK's currentWorkspace to THIS container's bound workspace (TENANT_WORKSPACE_ID). Without
+// this, the SDK defaults to the user's default workspace, so every tenant's settings/billing modal (and
+// useSubscription, quotas, etc.) shows the SAME workspace regardless of which one the tenant is bound to.
+// The bound id is server-only, so we fetch it from /api/auth/status (not a NEXT_PUBLIC var, which a
+// runtime-injected per-tenant value can't reach in a prebuilt image). No-op when unbound (self-host).
+function WorkspacePinner() {
+  const { workspaces, currentWorkspace, switchToWorkspace } = useSaaSWorkspaces();
+  // undefined = still loading; null = unbound (self-host); string = the bound workspace id.
+  const [boundId, setBoundId] = useState<string | null | undefined>(undefined);
+  const pinnedRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/status")
+      .then((r) => r.json())
+      .then((d: { boundWorkspaceId?: string | null }) => {
+        if (!cancelled) setBoundId(d.boundWorkspaceId ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setBoundId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (pinnedRef.current) return;
+    if (!boundId) return; // still loading (undefined) or unbound (null) → nothing to pin
+    if (currentWorkspace?._id === boundId) {
+      pinnedRef.current = true; // already on the bound workspace
+      return;
+    }
+    const target = (workspaces ?? []).find((w) => w._id === boundId);
+    if (target) {
+      pinnedRef.current = true;
+      // Switch TO the bound workspace (allowed — it IS this tenant's workspace; the server switch-block
+      // only refuses OTHER workspaces). This also re-mints the app token scoped to the bound workspace.
+      void switchToWorkspace(target);
+    }
+  }, [boundId, workspaces, currentWorkspace, switchToWorkspace]);
+
   return null;
 }
 
@@ -198,6 +244,7 @@ export function BuildbaseProvider({ children }: { children: React.ReactNode }) {
     >
       <BuildbaseReadyContext.Provider value={true}>
         <PostAuthRedirector />
+        <WorkspacePinner />
         {/*
           Web-push provider. NOT part of SaaSOSProvider, so we mount it explicitly — only inside the
           ready branch (SaaSOSProvider supplies the serverUrl/orgId/session context PushApi needs).
