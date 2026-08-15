@@ -1,6 +1,7 @@
 import { updateProfileAvatar } from "@agentcenter/database";
 import { uploadFileToR2 } from "@/server/storage/r2";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
+import { readCookie } from "@/server/tenancy/buildbase";
 import { successResponse, errorResponse } from "../../_lib/json-response";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
@@ -19,9 +20,7 @@ const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "ima
  * current user's profile.avatarUrl, and returns the serving URL.
  */
 export async function POST(request: Request) {
-  const cookie = request.headers.get("cookie");
-  const match = cookie?.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-  const sessionToken = match ? match[1].trim() : null;
+  const sessionToken = readCookie(request.headers.get("cookie"), COOKIE_NAME);
 
   let profileId: string | null = null;
   if (sessionToken) {

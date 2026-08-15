@@ -6,6 +6,7 @@ import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, errorResponse } from "../../_lib/json-response";
 import { ERR } from "../../_lib/error-messages";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
+import { readCookie } from "@/server/tenancy/buildbase";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 
@@ -51,9 +52,7 @@ async function postHandler(request: Request) {
 
   // Fall back to session cookie
   if (!agentId && !profileId) {
-    const cookie = request.headers.get("cookie");
-    const match = cookie?.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-    const sessionToken = match ? match[1].trim() : null;
+    const sessionToken = readCookie(request.headers.get("cookie"), COOKIE_NAME);
     if (sessionToken) {
       const session = await verifySessionToken(sessionToken);
       if (session?.profileId) {
