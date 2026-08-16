@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { activateTerminalSession } from "../../src/server/services/terminals";
 import { hashApiKey } from "../../src/server/api-key";
 
@@ -33,11 +37,7 @@ async function cookieFor(workspaceId: string, role: "admin" | "member") {
   return `bb-workspace-token=${token}`;
 }
 async function setTerminals(enabled: boolean) {
-  await prisma.featureFlag.upsert({
-    where: { key: "terminals" },
-    create: { key: "terminals", enabled, managedBy: "user" },
-    update: { enabled },
-  });
+  setTestFeature("terminals", enabled);
   invalidateFlagCache();
 }
 const OPEN = `mutation($c:String!,$cwd:String){ openTerminalSession(command:$c, cwd:$cwd){ id host port username connectToken } }`;
@@ -48,7 +48,7 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE terminal_sessions, agents, profiles CASCADE`);
-  await prisma.featureFlag.deleteMany({ where: { key: "terminals" } });
+  resetTestFeature("terminals");
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Term Human" } });
   humanId = p.id;

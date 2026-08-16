@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { installTeam } from "../../src/server/services/teams";
 import { createTeam, addTeamMember } from "../../src/server/services/teams";
 import { createTestAgent } from "../helpers";
@@ -464,16 +468,12 @@ describe("isolation + gate (Epic #10)", () => {
   });
   it("rejects access when SKILLS_TEAMS is off", async () => {
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "skills_teams" },
-        create: { key: "skills_teams", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature("skills_teams", false);
       invalidateFlagCache();
       const r = await gql(`query{ skills{ id } }`, undefined, await cookieFor(WS_A, "member"));
       expect(r.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "skills_teams" } });
+      resetTestFeature("skills_teams");
       invalidateFlagCache();
     }
   });

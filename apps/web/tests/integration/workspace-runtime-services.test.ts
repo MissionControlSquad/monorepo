@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import { schema } from "../../src/server/graphql/schema";
 import { requireFeature } from "../../src/server/graphql/require-feature";
 import { requireRole } from "../../src/server/tenancy";
@@ -23,11 +23,7 @@ const WS = "ws_runtime_svc";
 const OTHER_WS = "ws_runtime_other";
 
 async function setFlag(key: string, enabled: boolean) {
-  await prisma.featureFlag.upsert({
-    where: { key },
-    create: { key, enabled, managedBy: "user" },
-    update: { enabled },
-  });
+  setTestFeature(key, enabled);
   invalidateFlagCache();
 }
 

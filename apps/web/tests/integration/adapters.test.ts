@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { createTestAgent } from "../helpers";
 
 /**
@@ -39,11 +43,7 @@ async function makeAgentInWs(ws: string) {
 }
 
 async function setFeature(enabled: boolean) {
-  await prisma.featureFlag.upsert({
-    where: { key: "multi_provider_adapters" },
-    create: { key: "multi_provider_adapters", enabled, managedBy: "user" },
-    update: { enabled },
-  });
+  setTestFeature("multi_provider_adapters", enabled);
   invalidateFlagCache();
 }
 
@@ -56,7 +56,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await prisma.featureFlag.deleteMany({ where: { key: "multi_provider_adapters" } });
+  resetTestFeature("multi_provider_adapters");
   invalidateFlagCache();
   // agent_adapters is global seed data (not truncated between files), so restore any adapter this
   // file toggled back to enabled so the disabled state can't bleed into other test files.

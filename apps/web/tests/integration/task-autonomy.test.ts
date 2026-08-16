@@ -17,6 +17,7 @@ import {
 import { holdSubtree, releaseSubtreeHold } from "../../src/server/services/task-tree-hold";
 import { createWatchdog, evaluateWatchdogs } from "../../src/server/services/task-watchdog";
 import { createTestAgent, createTestTask } from "../helpers";
+import { setTestFeature, resetTestFeature } from "../../src/server/feature-flags";
 
 /**
  * Epic #8 task autonomy — services against real Postgres (the atomic-checkout race, lease reclaim,
@@ -217,11 +218,7 @@ describe("feature gate (GraphQL)", () => {
     const token = await createJWT({ userId: "u", workspaceId: "ws", userRole: "admin" }, SECRET);
     const cookie = `bb-workspace-token=${token}`;
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "task_autonomy" },
-        create: { key: "task_autonomy", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature("task_autonomy", false);
       invalidateFlagCache();
       const req = new Request("http://test/api/graphql", {
         method: "POST",
@@ -232,7 +229,7 @@ describe("feature gate (GraphQL)", () => {
       const json = JSON.parse(await res.text());
       expect(json.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "task_autonomy" } });
+      resetTestFeature("task_autonomy");
       invalidateFlagCache();
     }
   });
@@ -241,11 +238,7 @@ describe("feature gate (GraphQL)", () => {
 describe("typed thread interactions (Domain 8 G6.5)", () => {
   async function tiGql(query: string, variables?: Record<string, unknown>) {
     const { invalidateFlagCache } = await import("../../src/server/feature-flags");
-    await prisma.featureFlag.upsert({
-      where: { key: "thread_interactions" },
-      create: { key: "thread_interactions", enabled: true, managedBy: "user" },
-      update: { enabled: true },
-    });
+    setTestFeature("thread_interactions", true);
     invalidateFlagCache();
     const token = await createJWT({ userId: "u", workspaceId: "ws", userRole: "member" }, SECRET);
     const req = new Request("http://test/api/graphql", {
@@ -333,7 +326,7 @@ describe("cancel task (Domain 8 G6.7)", () => {
 describe("subtree cancel / restore (Domain 8 G6.6)", () => {
   async function adminGql(query: string, variables?: Record<string, unknown>) {
     const { invalidateFlagCache } = await import("../../src/server/feature-flags");
-    await prisma.featureFlag.deleteMany({ where: { key: "task_autonomy" } });
+    resetTestFeature("task_autonomy");
     invalidateFlagCache();
     const token = await createJWT({ userId: "u", workspaceId: "ws", userRole: "admin" }, SECRET);
     const req = new Request("http://test/api/graphql", {

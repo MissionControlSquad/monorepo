@@ -3,7 +3,11 @@ import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
 import { agentCache } from "../../src/server/cache";
 import { createJWT } from "../../src/lib/jwt";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
 import { POST as POST_MEMORY } from "../../app/api/agents/me/memory/route";
 import { GET as GET_CONTEXT } from "../../app/api/agents/me/context/route";
@@ -38,19 +42,11 @@ async function makeAgent(): Promise<string> {
   return a.id;
 }
 async function enableMemory(on = true) {
-  await prisma.featureFlag.upsert({
-    where: { key: "memory" },
-    create: { key: "memory", enabled: on, managedBy: "user" },
-    update: { enabled: on },
-  });
+  setTestFeature("memory", on);
   invalidateFlagCache();
 }
 async function enableRunners() {
-  await prisma.featureFlag.upsert({
-    where: { key: "runners" },
-    create: { key: "runners", enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature("runners", true);
   invalidateFlagCache();
 }
 function postMemory(body: unknown) {
@@ -84,7 +80,8 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE agent_memories, memory_operations, workspace_memory_settings, agent_runs, tasks, agents CASCADE`,
   );
-  await prisma.featureFlag.deleteMany({ where: { key: { in: ["memory", "runners"] } } });
+  resetTestFeature("memory");
+  resetTestFeature("runners");
   invalidateFlagCache();
   await enableMemory();
   await enableRunners();

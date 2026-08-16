@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
 import { agentCache } from "../../src/server/cache";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import { runTaskInSandbox } from "../../src/server/services/sandbox-run";
 import { createEnvironment } from "../../src/server/services/environments";
 import { resolveEnvironmentExecution } from "../../src/server/services/environments";
@@ -16,11 +16,7 @@ import type { SshExecTransport } from "../../src/server/services/sandbox/ssh-run
 const WS = "ws_envdriver";
 
 async function setFlag(key: string, enabled: boolean) {
-  await prisma.featureFlag.upsert({
-    where: { key },
-    create: { key, enabled, managedBy: "user" },
-    update: { enabled },
-  });
+  setTestFeature(key, enabled);
   invalidateFlagCache();
 }
 

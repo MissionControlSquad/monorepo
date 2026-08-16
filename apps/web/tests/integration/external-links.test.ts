@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import {
   addExternalLink,
   removeExternalLink,
@@ -75,11 +79,7 @@ describe("external links GraphQL (Tier C)", () => {
     expect(list.data.taskExternalLinks).toHaveLength(1);
 
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "external_links" },
-        create: { key: "external_links", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature("external_links", false);
       invalidateFlagCache();
       const gated = await gql(
         `mutation($t:String!,$u:String!){ addExternalLink(taskId:$t, url:$u){ id } }`,
@@ -87,7 +87,7 @@ describe("external links GraphQL (Tier C)", () => {
       );
       expect(gated.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "external_links" } });
+      resetTestFeature("external_links");
       invalidateFlagCache();
     }
   });

@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 /**
  * Epic #18 agent instructions — real GraphQL route + Postgres. Per-agent AGENTS.md bundles, scoped to
@@ -142,16 +146,12 @@ describe("guards (Epic #18)", () => {
   it("rejects access when AGENT_INSTRUCTIONS is off", async () => {
     const agentId = await makeAgent(WS_A);
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "agent_instructions" },
-        create: { key: "agent_instructions", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature("agent_instructions", false);
       invalidateFlagCache();
       const r = await gql(LIST, { a: agentId }, await cookieFor(WS_A, "member"));
       expect(r.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "agent_instructions" } });
+      resetTestFeature("agent_instructions");
       invalidateFlagCache();
     }
   });

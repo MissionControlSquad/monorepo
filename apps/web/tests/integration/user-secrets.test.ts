@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { decryptSecret } from "../../src/server/services/secrets-crypto";
 import { declarationSecretName } from "../../src/server/services/user-secrets";
 
@@ -204,11 +208,7 @@ describe("feature gate (parity §3 #7)", () => {
   it("rejects all user-secret ops when SECRETS_VAULT is off", async () => {
     const admin = await cookieFor(WS_A, "admin");
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "secrets_vault" },
-        create: { key: "secrets_vault", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature("secrets_vault", false);
       invalidateFlagCache();
       const defs = await gql(`query{ userSecretDefinitions{ id } }`, undefined, admin);
       expect(defs.errors).toBeDefined();
@@ -217,7 +217,7 @@ describe("feature gate (parity §3 #7)", () => {
       const create = await addDefinition("BLOCKED");
       expect(create.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "secrets_vault" } });
+      resetTestFeature("secrets_vault");
       invalidateFlagCache();
     }
   });

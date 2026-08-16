@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
 import { agentCache } from "../../src/server/cache";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { getOrCreateAgentProfileId } from "../../src/server/agent-profile";
 import { GET as GET_CONTEXT } from "../../app/api/agents/me/context/route";
 
@@ -36,11 +40,7 @@ function getContext(taskId: string | null, key = KEY) {
 }
 
 async function enableRunners() {
-  await prisma.featureFlag.upsert({
-    where: { key: "runners" },
-    create: { key: "runners", enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature("runners", true);
   invalidateFlagCache();
 }
 
@@ -52,7 +52,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE deliverables, documents, tasks, project_members, projects, agent_skills, skills, agent_instructions, agents, profiles CASCADE`,
   );
-  await prisma.featureFlag.deleteMany({ where: { key: "runners" } });
+  resetTestFeature("runners");
   invalidateFlagCache();
   await enableRunners();
   agentId = await makeAgent(KEY);
@@ -203,11 +203,7 @@ describe("agent context endpoint (Tier D Slice 3)", () => {
 
   it("is feature-gated", async () => {
     const { taskId } = await makeProjectTask();
-    await prisma.featureFlag.upsert({
-      where: { key: "runners" },
-      create: { key: "runners", enabled: false, managedBy: "user" },
-      update: { enabled: false },
-    });
+    setTestFeature("runners", false);
     invalidateFlagCache();
     const res = await getContext(taskId);
     expect(res.status).toBe(403);

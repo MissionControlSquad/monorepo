@@ -3,7 +3,7 @@ import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import {
   createEnvironment,
   removeEnvironmentIfDeletable,
@@ -31,11 +31,7 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE environments, agents CASCADE`);
-  await prisma.featureFlag.upsert({
-    where: { key: "environments" },
-    create: { key: "environments", enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature("environments", true);
   invalidateFlagCache();
 });
 

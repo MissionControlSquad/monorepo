@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 /**
  * Epic #2 Adapter Manager — installAdapter / removeAdapter (record-level install of an external
@@ -34,16 +38,12 @@ describe("adapter install/remove (Epic #2)", () => {
   beforeAll(async () => {
     process.env.SYSTEM_SECRET = SECRET;
     await prisma.agentAdapter.deleteMany({ where: { type: TEST_TYPE } });
-    await prisma.featureFlag.upsert({
-      where: { key: "multi_provider_adapters" },
-      create: { key: "multi_provider_adapters", enabled: true, managedBy: "user" },
-      update: { enabled: true },
-    });
+    setTestFeature("multi_provider_adapters", true);
     invalidateFlagCache();
   });
   afterAll(async () => {
     await prisma.agentAdapter.deleteMany({ where: { type: TEST_TYPE } });
-    await prisma.featureFlag.deleteMany({ where: { key: "multi_provider_adapters" } });
+    resetTestFeature("multi_provider_adapters");
     invalidateFlagCache();
   });
 

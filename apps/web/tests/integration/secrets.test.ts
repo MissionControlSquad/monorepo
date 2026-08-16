@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { decryptSecret } from "../../src/server/services/secrets-crypto";
 import { getDecrypted, resolveEnvForAgent } from "../../src/server/services/secrets";
 import { createTestAgent } from "../helpers";
@@ -267,17 +271,13 @@ describe("feature gate (Epic #5)", () => {
   it("rejects vault access when SECRETS_VAULT is off", async () => {
     const admin = await cookieFor(WS_A, "admin");
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "secrets_vault" },
-        create: { key: "secrets_vault", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature("secrets_vault", false);
       invalidateFlagCache();
       const r = await gql(`query{ secrets{ id } }`, undefined, admin);
       expect(r.errors).toBeDefined();
       expect(r.data?.secrets).toBeFalsy();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "secrets_vault" } });
+      resetTestFeature("secrets_vault");
       invalidateFlagCache();
     }
   });

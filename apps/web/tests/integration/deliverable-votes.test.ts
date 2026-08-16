@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { castVote, voteSummary } from "../../src/server/services/deliverable-votes";
 
 /** Tier C: deliverable votes — service + GraphQL (per-caller vote) + feature gate. */
@@ -90,16 +94,12 @@ describe("deliverable votes GraphQL (Tier C)", () => {
     expect(seenByC.data.deliverableVotes.myVote).toBe(0);
 
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "voting" },
-        create: { key: "voting", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature("voting", false);
       invalidateFlagCache();
       const gated = await gql(CAST, { d, v: 1 }, "human_a");
       expect(gated.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "voting" } });
+      resetTestFeature("voting");
       invalidateFlagCache();
     }
     void voteSummary;

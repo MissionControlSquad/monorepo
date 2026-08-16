@@ -3,7 +3,11 @@ import { randomUUID } from "node:crypto";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { setAgentGovernance } from "../../src/server/services/agent-governance";
 import { setApprovalPolicy, requestAgentAction } from "../../src/server/services/approval-policies";
 
@@ -34,11 +38,7 @@ async function cookieFor(workspaceId: string, role: "admin" | "member") {
   return `bb-workspace-token=${token}`;
 }
 async function setGovernance(enabled: boolean) {
-  await prisma.featureFlag.upsert({
-    where: { key: "governance" },
-    create: { key: "governance", enabled, managedBy: "user" },
-    update: { enabled },
-  });
+  setTestFeature("governance", enabled);
   invalidateFlagCache();
 }
 async function makeAgent(workspaceId: string, over: { role?: string; trustLevel?: any } = {}) {
@@ -66,7 +66,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE approval_policies, approvals, agents, agent_governance_policies, profiles CASCADE`,
   );
-  await prisma.featureFlag.deleteMany({ where: { key: "governance" } });
+  resetTestFeature("governance");
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "AP Human" } });
   humanId = p.id;

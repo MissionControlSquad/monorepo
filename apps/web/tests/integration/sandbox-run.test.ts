@@ -4,7 +4,7 @@ import { hashApiKey } from "../../src/server/api-key";
 import { agentCache } from "../../src/server/cache";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import {
   runTaskInSandbox,
   composeSandboxScript,
@@ -89,11 +89,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE agent_runs, messages, tasks, agent_skills, skills, agent_instructions, agents, profiles, environments, secrets CASCADE`,
   );
-  await prisma.featureFlag.upsert({
-    where: { key: "runners" },
-    create: { key: "runners", enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature("runners", true);
   invalidateFlagCache();
 });
 
@@ -510,11 +506,7 @@ describe("environment-driven execution (Plan 1 wiring)", () => {
   it("rejects an ssh/plugin Environment when ENVIRONMENTS is off (not yet runnable via the seam)", async () => {
     // Back-compat: with the ENVIRONMENTS flag dark, the ssh runtime driver stays disabled and an ssh env
     // is refused up front (the unified driver only routes ssh when ENVIRONMENTS is enabled).
-    await prisma.featureFlag.upsert({
-      where: { key: "environments" },
-      create: { key: "environments", enabled: false, managedBy: "user" },
-      update: { enabled: false },
-    });
+    setTestFeature("environments", false);
     invalidateFlagCache();
     const env = await createEnvironment(WS, {
       name: "Ssh",
@@ -566,11 +558,7 @@ describe("environment-driven execution (Plan 1 wiring)", () => {
 
 describe("untrusted-output review gate (Domain 8 G2)", () => {
   async function enableLowTrustReview(on = true) {
-    await prisma.featureFlag.upsert({
-      where: { key: "low_trust_review" },
-      create: { key: "low_trust_review", enabled: on, managedBy: "user" },
-      update: { enabled: on },
-    });
+    setTestFeature("low_trust_review", on);
     invalidateFlagCache();
   }
 

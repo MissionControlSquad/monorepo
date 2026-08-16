@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { wakeDependentsOf } from "../../src/server/services/dependency-wakeups";
 import { createTestAgent, createTestTask } from "../helpers";
 
@@ -25,7 +29,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   invalidateFlagCache();
   // TASK_AUTONOMY defaults on (no flag row + no license). Ensure any prior test's disable is cleared.
-  await prisma.featureFlag.deleteMany({ where: { key: "task_autonomy" } });
+  resetTestFeature("task_autonomy");
 });
 
 describe("wakeDependentsOf (blockedByTaskId edge)", () => {
@@ -99,11 +103,7 @@ describe("wakeDependentsOf (multiple blockers via `blocks` relations)", () => {
 
 describe("gating", () => {
   it("is a no-op when TASK_AUTONOMY is disabled", async () => {
-    await prisma.featureFlag.upsert({
-      where: { key: "task_autonomy" },
-      create: { key: "task_autonomy", enabled: false, managedBy: "system" },
-      update: { enabled: false },
-    });
+    setTestFeature("task_autonomy", false);
     invalidateFlagCache();
 
     const blocker = await createTestTask(agentId, { status: "done" });

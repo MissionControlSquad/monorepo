@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import {
   requireAgentCapability,
   grantAgentCapability,
@@ -13,11 +17,7 @@ let agentId = "";
 let role = "worker";
 
 async function enableAuthz(on = true) {
-  await prisma.featureFlag.upsert({
-    where: { key: "agent_authz" },
-    create: { key: "agent_authz", enabled: on, managedBy: "system" },
-    update: { enabled: on },
-  });
+  setTestFeature("agent_authz", on);
   invalidateFlagCache();
 }
 
@@ -33,7 +33,7 @@ beforeEach(async () => {
   await prisma.agentAuthzEvent.deleteMany({});
   await prisma.agentCapabilityGrant.deleteMany({});
   await prisma.agentTrustProfile.deleteMany({});
-  await prisma.featureFlag.deleteMany({ where: { key: "agent_authz" } });
+  resetTestFeature("agent_authz");
   invalidateFlagCache();
   const { agent } = await createTestAgent({ role: "worker" });
   agentId = agent.id;

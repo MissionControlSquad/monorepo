@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import {
   tryDeliverTaskToLiveAgents,
   redeliverStalePending,
@@ -13,11 +17,7 @@ import {
 const WS = "ws_race";
 
 async function enableLiveGateway() {
-  await prisma.featureFlag.upsert({
-    where: { key: "live_gateway" },
-    create: { key: "live_gateway", enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature("live_gateway", true);
   invalidateFlagCache();
 }
 
@@ -25,7 +25,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE live_pending_deliveries, live_agent_routes, live_gateway_connections, tasks, agents CASCADE`,
   );
-  await prisma.featureFlag.deleteMany({ where: { key: "live_gateway" } });
+  resetTestFeature("live_gateway");
   invalidateFlagCache();
   await enableLiveGateway();
 });

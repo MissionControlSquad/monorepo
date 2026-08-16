@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { requireAgentCapability } from "../../src/server/services/agent-authz";
 
 /**
@@ -49,7 +53,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE agent_capability_grants, agent_authz_events, agent_trust_profiles, agents, profiles CASCADE`,
   );
-  await prisma.featureFlag.deleteMany({ where: { key: "agent_authz" } });
+  resetTestFeature("agent_authz");
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Authz Human" } });
   humanId = p.id;
@@ -138,18 +142,14 @@ describe("enforcement — requireAgentCapability (Epic #21)", () => {
     const id = await makeAgent(WS_A);
     await restrict(id, WS_A);
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "agent_authz" },
-        create: { key: "agent_authz", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature("agent_authz", false);
       invalidateFlagCache();
       // even a restricted, ungranted capability is allowed when the feature is off
       await expect(
         requireAgentCapability({ id, role: "worker" }, "host.write"),
       ).resolves.toBeUndefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "agent_authz" } });
+      resetTestFeature("agent_authz");
       invalidateFlagCache();
     }
   });
@@ -159,16 +159,12 @@ describe("gate (Epic #21)", () => {
   it("rejects grant reads when AGENT_AUTHZ is off", async () => {
     const agentId = await makeAgent(WS_A);
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "agent_authz" },
-        create: { key: "agent_authz", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature("agent_authz", false);
       invalidateFlagCache();
       const r = await gql(GRANTS, { a: agentId }, await cookieFor(WS_A, "member"));
       expect(r.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "agent_authz" } });
+      resetTestFeature("agent_authz");
       invalidateFlagCache();
     }
   });

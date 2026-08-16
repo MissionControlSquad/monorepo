@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 /**
  * Epic #4 route-level integration — real GraphQL route (schema + resolvers + DB), with human
@@ -152,11 +156,7 @@ describe("BUDGETS feature gate (Epic #4)", () => {
   it("budgetPolicies is rejected when the feature is off", async () => {
     const admin = await cookieFor(WS_A, "admin");
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "budgets" },
-        create: { key: "budgets", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature("budgets", false);
       invalidateFlagCache();
 
       const r = await runGraphQL(`query{ budgetPolicies{ id } }`, undefined, admin);
@@ -164,7 +164,7 @@ describe("BUDGETS feature gate (Epic #4)", () => {
       expect(r.errors!.length).toBeGreaterThan(0);
       expect(r.data?.budgetPolicies).toBeFalsy();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "budgets" } });
+      resetTestFeature("budgets");
       invalidateFlagCache();
     }
   });

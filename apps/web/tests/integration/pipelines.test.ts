@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import {
   createRoutine,
   addRoutineTrigger,
@@ -713,16 +717,12 @@ describe("isolation + gate (Epic #7)", () => {
 
   it("rejects access when the feature is off", async () => {
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "pipelines_routines" },
-        create: { key: "pipelines_routines", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature("pipelines_routines", false);
       invalidateFlagCache();
       const r = await gql(`query{ routines{ id } }`, undefined, await cookieFor(WS_A, "member"));
       expect(r.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "pipelines_routines" } });
+      resetTestFeature("pipelines_routines");
       invalidateFlagCache();
     }
   });

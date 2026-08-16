@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 /**
  * Plugin EXECUTION runtime — GraphQL surface (parity #103). grant/revoke/list capability, admin-only,
@@ -34,11 +38,7 @@ async function cookieFor(workspaceId: string, role: "admin" | "member") {
   return `bb-workspace-token=${token}`;
 }
 async function setFlag(key: string, enabled: boolean) {
-  await prisma.featureFlag.upsert({
-    where: { key },
-    create: { key, enabled, managedBy: "user" },
-    update: { enabled },
-  });
+  setTestFeature(key, enabled);
   invalidateFlagCache();
 }
 
@@ -61,7 +61,8 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE plugins, plugin_grants, profiles CASCADE`);
-  await prisma.featureFlag.deleteMany({ where: { key: { in: ["plugin_sdk", "plugin_runtime"] } } });
+  resetTestFeature("plugin_sdk");
+  resetTestFeature("plugin_runtime");
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Grant Human" } });
   humanId = p.id;

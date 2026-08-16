@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import {
   evaluateExecutionAllowlist,
   getWorkspaceExecutionPolicy,
@@ -14,11 +14,7 @@ import { probeEnvironment, createEnvironment } from "../../src/server/services/e
 const WS = "ws_execpol";
 
 async function enableFlag(key: string) {
-  await prisma.featureFlag.upsert({
-    where: { key },
-    create: { key, enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature(key, true);
 }
 
 beforeAll(() => {

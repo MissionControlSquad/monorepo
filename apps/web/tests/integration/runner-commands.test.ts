@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 // Isolate the RunnerCommand lifecycle from real SSH + key decryption:
 //   • sshExec is mocked so no network happens; we control its result per test.
@@ -67,11 +71,7 @@ async function makeHost(): Promise<string> {
 }
 
 async function enableRunners() {
-  await prisma.featureFlag.upsert({
-    where: { key: "runners" },
-    create: { key: "runners", enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature("runners", true);
   invalidateFlagCache();
 }
 
@@ -81,7 +81,7 @@ beforeAll(() => {
 beforeEach(async () => {
   mockedSshExec.mockReset();
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE runner_commands, runner_hosts CASCADE`);
-  await prisma.featureFlag.deleteMany({ where: { key: "runners" } });
+  resetTestFeature("runners");
   invalidateFlagCache();
 });
 
@@ -254,11 +254,7 @@ describe("runner-commands GraphQL (Tier D)", () => {
     expect(denied.errors).toBeDefined();
 
     // disable the flag → gated
-    await prisma.featureFlag.upsert({
-      where: { key: "runners" },
-      create: { key: "runners", enabled: false, managedBy: "user" },
-      update: { enabled: false },
-    });
+    setTestFeature("runners", false);
     invalidateFlagCache();
     const gated = await gql(`query($hostId:String!){ runnerCommands(targetId:$hostId){ id } }`, {
       hostId,
