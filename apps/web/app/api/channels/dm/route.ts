@@ -6,64 +6,54 @@ import {
   findProfileForDisplay,
 } from "@agentcenter/database";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
-import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS, ChannelVisibility } from "@agentcenter/utils";
-import { resolveAgent } from "../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError, assertFound } from "../../_lib/json-response";
+import { withAgent } from "../../_lib/with-agent";
+import { successResponse, errorResponse, assertFound } from "../../_lib/json-response";
 import { ERR } from "../../_lib/error-messages";
 import { validateBody, createDMSchema } from "../../_lib/validation";
 import { log } from "../../_lib/logger";
 
-export async function GET(request: Request) {
-  try {
-    const agent = await resolveAgent(request);
-    const agentProfileId = await getOrCreateAgentProfileId(agent.id);
+export const GET = withAgent(async (_request, agent) => {
+  const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
-    // Find all DM channels the agent is a member of
-    const memberships = await listMemberChannels(agentProfileId, ChannelVisibility.DM);
+  // Find all DM channels the agent is a member of
+  const memberships = await listMemberChannels(agentProfileId, ChannelVisibility.DM);
 
-    // Build response with unread counts
-    const channels = await Promise.all(
-      memberships.map(async (membership) => {
-        const channel = membership.channel;
+  // Build response with unread counts
+  const channels = await Promise.all(
+    memberships.map(async (membership) => {
+      const channel = membership.channel;
 
-        const unreadCount = await getChannelUnreadCount(channel.id, agentProfileId);
+      const unreadCount = await getChannelUnreadCount(channel.id, agentProfileId);
 
-        const otherMember = channel.members.find((m) => m.profileId !== agentProfileId);
+      const otherMember = channel.members.find((m) => m.profileId !== agentProfileId);
 
-        return {
-          id: channel.id,
-          slug: channel.slug,
-          otherProfile: otherMember?.profile ?? null,
-          unreadCount,
-          lastMessage: channel.messages[0] ?? null,
-        };
-      }),
-    );
+      return {
+        id: channel.id,
+        slug: channel.slug,
+        otherProfile: otherMember?.profile ?? null,
+        unreadCount,
+        lastMessage: channel.messages[0] ?? null,
+      };
+    }),
+  );
 
-    // Sort by latest message descending (channels with no messages last)
-    channels.sort((a, b) => {
-      const aTime = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
-      const bTime = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
-      return bTime - aTime;
-    });
+  // Sort by latest message descending (channels with no messages last)
+  channels.sort((a, b) => {
+    const aTime = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
+    const bTime = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
+    return bTime - aTime;
+  });
 
-    return successResponse(channels);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  return successResponse(channels);
+});
 
 // ---------- POST — Start a new DM conversation ----------
 
-export async function POST(request: Request) {
-  try {
-    if (!(await isFeatureEnabled(FLAG_KEYS.CHANNELS))) {
-      return errorResponse(ERR.FEATURE_CHANNELS_UNAVAILABLE, 403);
-    }
+export const POST = withAgent(
+  async (request, agent) => {
     const v = await validateBody(request, createDMSchema);
     if (v.error) return v.error;
-    const agent = await resolveAgent(request);
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
     const otherProfileId = v.data.profileId;
@@ -99,7 +89,6 @@ export async function POST(request: Request) {
       { id: channel.id, slug: channel.slug, otherProfile, created: true },
       201,
     );
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  { feature: { flag: FLAG_KEYS.CHANNELS, error: ERR.FEATURE_CHANNELS_UNAVAILABLE } },
+);

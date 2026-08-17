@@ -6,45 +6,37 @@ import { agentListCache } from "@/server/cache";
 import { escapeHtml } from "@/server/sanitize";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { parseMentions } from "@agentcenter/utils";
-import { resolveAgent } from "../../../_lib/resolve-agent";
-import { requireAgentCapability } from "@/server/services/agent-authz";
+import { withAgent } from "../../../_lib/with-agent";
 import { AGENT_CAPABILITY } from "@agentcenter/utils";
-import { successResponse, handleError, assertFound } from "../../../_lib/json-response";
+import { successResponse, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { validateBody, createMessageSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
 import { tryMentionAutoAssign } from "@/server/services/mention-auto-assign";
 import type { RouteContext } from "../../../_lib/route-context";
 
-export async function GET(request: Request, ctx: RouteContext) {
-  try {
-    const { id: taskId } = await ctx.params;
-    await resolveAgent(request);
+export const GET = withAgent(async (_request, _agent, ctx: RouteContext) => {
+  const { id: taskId } = await ctx.params;
 
-    const messages = await messageModel.findMany({
-      where: { taskId },
-      include: {
-        fromProfile: { select: { id: true, displayName: true, username: true, avatarUrl: true } },
-        mentions: {
-          include: { profile: { select: { id: true, displayName: true, username: true } } },
-        },
+  const messages = await messageModel.findMany({
+    where: { taskId },
+    include: {
+      fromProfile: { select: { id: true, displayName: true, username: true, avatarUrl: true } },
+      mentions: {
+        include: { profile: { select: { id: true, displayName: true, username: true } } },
       },
-      orderBy: { createdAt: "asc" },
-    });
+    },
+    orderBy: { createdAt: "asc" },
+  });
 
-    return successResponse(messages);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  return successResponse(messages);
+});
 
-export async function POST(request: Request, ctx: RouteContext) {
-  try {
+export const POST = withAgent(
+  async (request, agent, ctx: RouteContext) => {
     const { id: taskId } = await ctx.params;
     const v = await validateBody(request, createMessageSchema);
     if (v.error) return v.error;
-    const agent = await resolveAgent(request);
-    await requireAgentCapability(agent, AGENT_CAPABILITY.MESSAGES_SEND);
 
     const { content: rawContent, attachmentIds } = v.data;
     const content = escapeHtml(rawContent);
@@ -181,7 +173,6 @@ export async function POST(request: Request, ctx: RouteContext) {
       request,
     );
     return successResponse(message, 201);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  { capability: AGENT_CAPABILITY.MESSAGES_SEND },
+);

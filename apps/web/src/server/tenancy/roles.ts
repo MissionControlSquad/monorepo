@@ -1,3 +1,4 @@
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import type { WorkspaceRole } from "@agentcenter/graphql-server";
 
 /**
@@ -6,15 +7,20 @@ import type { WorkspaceRole } from "@agentcenter/graphql-server";
  * view-vs-manage across the whole workspace; there is no per-object ACL.
  */
 const RANK: Record<WorkspaceRole, number> = {
-  viewer: 0,
-  member: 1,
-  admin: 2,
-  owner: 3,
+  [WORKSPACE_ROLES.VIEWER]: 0,
+  [WORKSPACE_ROLES.MEMBER]: 1,
+  [WORKSPACE_ROLES.ADMIN]: 2,
+  [WORKSPACE_ROLES.OWNER]: 3,
 };
 
 /** True if `role` is at least `min` in the workspace-role hierarchy. */
 export function roleAtLeast(role: WorkspaceRole, min: WorkspaceRole): boolean {
   return RANK[role] >= RANK[min];
+}
+
+/** True for the manager tier (owner/admin) — replaces the `role === "admin" || role === "owner"` idiom. */
+export function isManagerRole(role: WorkspaceRole): boolean {
+  return roleAtLeast(role, WORKSPACE_ROLES.ADMIN);
 }
 
 /** Canonical capability strings used by the coarse role→capability map. */
@@ -66,10 +72,10 @@ const OPERATE_PERMISSIONS: ReadonlySet<string> = new Set(Object.values(OPERATE_P
  * (see docs/gap-plans/01-buildbase-tenancy.md); this map is the safe default.
  */
 const ROLE_CAPS: Record<WorkspaceRole, readonly string[]> = {
-  owner: [CAPS.ALL],
-  admin: [CAPS.ALL],
-  member: [CAPS.READ, CAPS.OPERATE],
-  viewer: [CAPS.READ],
+  [WORKSPACE_ROLES.OWNER]: [CAPS.ALL],
+  [WORKSPACE_ROLES.ADMIN]: [CAPS.ALL],
+  [WORKSPACE_ROLES.MEMBER]: [CAPS.READ, CAPS.OPERATE],
+  [WORKSPACE_ROLES.VIEWER]: [CAPS.READ],
 };
 
 /**

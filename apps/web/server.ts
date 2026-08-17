@@ -19,6 +19,7 @@ import { schema } from "./src/server/graphql/schema";
 import { prisma } from "./src/server/prisma";
 import { verifySessionToken, COOKIE_NAME } from "./src/server/admin-auth";
 import { resolveTenancy } from "./src/server/tenancy";
+import { readCookie } from "./src/server/tenancy/buildbase";
 import { isFeatureEnabled } from "./src/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import {
@@ -34,9 +35,7 @@ const port = parseInt(process.env.PORT || "3000", 10);
 
 // ── Helper: extract session from cookie header ────────────────────
 async function sessionFromRequest(req: IncomingMessage) {
-  const cookie = req.headers.cookie || "";
-  const match = cookie.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-  const token = match ? match[1].trim() : null;
+  const token = readCookie(req.headers.cookie, COOKIE_NAME);
   if (!token) return null;
   const payload = await verifySessionToken(token);
   if (!payload?.profileId) return null;

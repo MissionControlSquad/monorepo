@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "urql";
 import { toast } from "sonner";
-import { Loader2, AlertCircle, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
+import { CenteredSpinner, CenteredMessage } from "@/components/common/AsyncBoundary";
 import { GOAL_QUERY, GOALS_QUERY, AGENTS_QUERY } from "@/lib/graphql/queries";
 import { CREATE_GOAL, UPDATE_GOAL, DELETE_GOAL } from "@/lib/graphql/mutations";
 import { Breadcrumbs, Button, Card, Badge, PageLayout, Textarea } from "@/components/ui";
@@ -121,21 +122,8 @@ export function GoalDetailPage({ goalId }: { goalId: string }) {
     router.push("/goals");
   }
 
-  if (fetching && !goal) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (!goal) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-        <AlertCircle className="h-8 w-8" />
-        <p className="text-sm font-medium">Goal not found</p>
-      </div>
-    );
-  }
+  if (fetching && !goal) return <CenteredSpinner />;
+  if (!goal) return <CenteredMessage>Goal not found</CenteredMessage>;
 
   return (
     <PageLayout maxWidth="wide">

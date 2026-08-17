@@ -21,6 +21,7 @@
  */
 import { prisma } from "@/server/prisma";
 import type { UserSecretDefinition, UserSecretDeclaration } from "@agentcenter/database";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { createSecret, rotateSecret, recordSecretAccess } from "./secrets";
 import { badRequest, notFound } from "./service-errors";
 
@@ -121,7 +122,7 @@ export async function declareUserSecret(input: {
       secretId: existing.id,
       value: input.value,
       createdBy: input.profileId,
-      actor: { userId: input.profileId, role: "member" },
+      actor: { userId: input.profileId, role: WORKSPACE_ROLES.MEMBER },
     });
     secretId = rotated.id;
   } else {

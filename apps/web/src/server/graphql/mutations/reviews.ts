@@ -32,7 +32,8 @@ builder.mutationField("approveTask", (t) =>
       approvalComment: t.arg.string(),
       childTasks: t.arg.string(), // JSON string: [{title, description?, priority?, assigneeIds?}]
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await requireFeature(FLAG_KEYS.REVIEWS);
       if (await isSystemShutdown())
         throw new Error("System is in shutdown mode. No task approvals allowed.");
@@ -75,7 +76,8 @@ builder.mutationField("rejectTask", (t) =>
       rejectionReason: t.arg.string({ required: true }),
       changesNeeded: t.arg.stringList({ required: true }),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await requireFeature(FLAG_KEYS.REVIEWS);
       if (await isSystemShutdown())
         throw new Error("System is in shutdown mode. No task rejections allowed.");
@@ -108,7 +110,8 @@ builder.mutationField("requestClarification", (t) =>
       taskId: t.arg.string({ required: true }),
       questions: t.arg.stringList({ required: true }),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await requireFeature(FLAG_KEYS.REVIEWS);
       if (await isSystemShutdown())
         throw new Error("System is in shutdown mode. No clarification requests allowed.");

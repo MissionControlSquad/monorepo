@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useQuery } from "urql";
-import { Loader2, AlertCircle, Boxes } from "lucide-react";
+import { Boxes } from "lucide-react";
+import { CenteredSpinner, CenteredMessage } from "@/components/common/AsyncBoundary";
 import { PROJECT_WORKSPACE_DETAIL_QUERY } from "@/lib/graphql/queries";
 import { Breadcrumbs, Card, Badge, PageLayout, Tooltip } from "@/components/ui";
 import { buttonVariants } from "@/components/ui/shadcn/button";
@@ -170,9 +171,7 @@ export function ProjectWorkspaceDetailPage({ projectId }: { projectId: string })
     return (
       <PageLayout maxWidth="wide">
         {crumbs}
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <CenteredSpinner />
       </PageLayout>
     );
   }
@@ -181,10 +180,7 @@ export function ProjectWorkspaceDetailPage({ projectId }: { projectId: string })
     return (
       <PageLayout maxWidth="wide">
         {crumbs}
-        <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-          <AlertCircle className="h-8 w-8" />
-          <p className="text-sm font-medium">Could not load this project&apos;s workspaces</p>
-        </div>
+        <CenteredMessage>Could not load this project&apos;s workspaces</CenteredMessage>
       </PageLayout>
     );
   }

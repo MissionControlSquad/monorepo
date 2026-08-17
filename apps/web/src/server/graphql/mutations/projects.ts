@@ -19,7 +19,8 @@ builder.mutationField("createProject", (t) =>
       memberProfileIds: t.arg.stringList(),
       memberIds: t.arg.stringList(),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Enforce license limit on project count
       const projectCount = await projectModel.count({ where: { status: ProjectStatus.ACTIVE } });
       const limitCheck = await checkLicenseLimit("projects", projectCount);
@@ -92,7 +93,8 @@ builder.mutationField("updateProject", (t) =>
       description: t.arg.string(),
       status: t.arg.string(),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const result = await projectModel.update(args.id, {
         ...query,
         data: {
@@ -111,7 +113,8 @@ builder.mutationField("archiveProject", (t) =>
   t.prismaField({
     type: "Project",
     args: { id: t.arg.string({ required: true }) },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const result = await projectModel.update(args.id, {
         ...query,
         data: { status: ProjectStatus.ARCHIVED },
@@ -126,7 +129,8 @@ builder.mutationField("restoreProject", (t) =>
   t.prismaField({
     type: "Project",
     args: { id: t.arg.string({ required: true }) },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const result = await projectModel.update(args.id, {
         ...query,
         data: { status: ProjectStatus.ACTIVE },
@@ -194,7 +198,8 @@ builder.mutationField("addProjectMember", (t) =>
       profileId: t.arg.string(),
       agentId: t.arg.string(),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const project = await projectModel.findById(args.projectId, { select: { status: true } });
       if (project?.status === ProjectStatus.ARCHIVED) {
         throw new Error("Cannot modify members of an archived project");
@@ -269,7 +274,8 @@ builder.mutationField("removeProjectMember", (t) =>
       profileId: t.arg.string(),
       agentId: t.arg.string(),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const projectForCheck = await projectModel.findById(args.projectId, {
         select: { status: true },
       });

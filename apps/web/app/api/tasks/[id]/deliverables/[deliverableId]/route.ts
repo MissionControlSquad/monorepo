@@ -1,35 +1,20 @@
 import { taskModel } from "@/server/models/task";
 import { deliverableModel, deliverableVersionModel } from "@/server/models";
-import { resolveAgent } from "../../../../_lib/resolve-agent";
-import { requireAgentCapability } from "@/server/services/agent-authz";
+import { withAgent } from "../../../../_lib/with-agent";
 import { AGENT_CAPABILITY } from "@agentcenter/utils";
-import {
-  successResponse,
-  errorResponse,
-  handleError,
-  assertFound,
-} from "../../../../_lib/json-response";
+import { successResponse, errorResponse, assertFound } from "../../../../_lib/json-response";
 import { ERR } from "../../../../_lib/error-messages";
 import { validateBody, updateDeliverableSchema } from "../../../../_lib/validation";
 import { log } from "../../../../_lib/logger";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
-import { isSystemShutdown } from "@/server/system-settings";
 import type { RouteContext as _RouteContext } from "../../../../_lib/route-context";
 type RouteContext = _RouteContext<{ id: string; deliverableId: string }>;
 
-export async function PATCH(request: Request, ctx: RouteContext) {
-  try {
+export const PATCH = withAgent(
+  async (request, agent, ctx: RouteContext) => {
     const { id: taskId, deliverableId } = await ctx.params;
     const v = await validateBody(request, updateDeliverableSchema);
     if (v.error) return v.error;
-    const agent = await resolveAgent(request);
-    // Enforce the same capability as submitting a deliverable — revising is a deliverable write
-    // (parity #9/#10: the sibling POST checks TASKS_COMPLETE; this PATCH previously did not).
-    await requireAgentCapability(agent, AGENT_CAPABILITY.TASKS_COMPLETE);
-
-    if (await isSystemShutdown()) {
-      return errorResponse("System is in shutdown mode. No deliverable revisions allowed.", 503);
-    }
 
     const current = await deliverableModel.findById(deliverableId);
     assertFound(current, ERR.DELIVERABLE_NOT_FOUND);
@@ -93,7 +78,11 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       request,
     );
     return successResponse(deliverable);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  // Enforce the same capability as submitting a deliverable — revising is a deliverable write
+  // (parity #9/#10: the sibling POST checks TASKS_COMPLETE; this PATCH previously did not).
+  {
+    capability: AGENT_CAPABILITY.TASKS_COMPLETE,
+    blockOnShutdown: { error: "System is in shutdown mode. No deliverable revisions allowed." },
+  },
+);

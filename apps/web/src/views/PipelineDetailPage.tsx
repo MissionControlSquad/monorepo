@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "urql";
-import { Loader2, AlertCircle } from "lucide-react";
+import { CenteredSpinner, CenteredMessage } from "@/components/common/AsyncBoundary";
 import {
   PIPELINE_QUERY,
   PIPELINE_STATS_QUERY,
@@ -125,29 +125,9 @@ export function PipelineDetailPage({ pipelineId }: { pipelineId: string }) {
 
   const pipeline = data?.pipeline;
 
-  if (fetching && !pipeline) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-        <AlertCircle className="h-8 w-8" />
-        <p className="text-sm font-medium">Could not load this pipeline</p>
-      </div>
-    );
-  }
-  if (!pipeline) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-        <AlertCircle className="h-8 w-8" />
-        <p className="text-sm font-medium">Pipeline not found</p>
-      </div>
-    );
-  }
+  if (fetching && !pipeline) return <CenteredSpinner />;
+  if (error) return <CenteredMessage>Could not load this pipeline</CenteredMessage>;
+  if (!pipeline) return <CenteredMessage>Pipeline not found</CenteredMessage>;
 
   const stages = sortStages(pipeline.stages);
   const cases = casesData?.casesInPipeline ?? [];

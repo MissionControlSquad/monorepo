@@ -1,12 +1,12 @@
 "use client";
 
 import { useQuery } from "urql";
-import { Loader2, AlertCircle } from "lucide-react";
 import { EXECUTION_WORKSPACES_DETAIL_QUERY } from "@/lib/graphql/queries";
 import { Breadcrumbs, Card, Badge, PageLayout, Tooltip } from "@/components/ui";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { selectWorkspaceById, formatTimestamp } from "@/lib/work-detail";
+import { CenteredSpinner, CenteredMessage } from "@/components/common/AsyncBoundary";
 
 // Detail route for one execution workspace (Tier D / Phase 3). Reuses the workspace-scoped
 // `executionWorkspaces` list resolver and selects the row by id — no new server field. Read-only
@@ -92,31 +92,11 @@ export function ExecutionWorkspaceDetailPage({ workspaceId }: { workspaceId: str
     );
   }
 
-  if (fetching && !data) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-        <AlertCircle className="h-8 w-8" />
-        <p className="text-sm font-medium">Could not load this workspace</p>
-      </div>
-    );
-  }
+  if (fetching && !data) return <CenteredSpinner />;
+  if (error) return <CenteredMessage>Could not load this workspace</CenteredMessage>;
 
   const ws = selectWorkspaceById(data?.executionWorkspaces, workspaceId);
-  if (!ws) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-        <AlertCircle className="h-8 w-8" />
-        <p className="text-sm font-medium">Execution workspace not found</p>
-      </div>
-    );
-  }
+  if (!ws) return <CenteredMessage>Execution workspace not found</CenteredMessage>;
 
   return (
     <PageLayout maxWidth="wide">

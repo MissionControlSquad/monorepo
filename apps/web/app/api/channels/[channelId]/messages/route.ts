@@ -9,17 +9,10 @@ import { pubsub, channelMessageTopic } from "@/server/pubsub";
 import { notifyAgentChannelMembers } from "@/server/dm-notify";
 import { escapeHtml } from "@/server/sanitize";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
-import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS, parseMentionIds } from "@agentcenter/utils";
-import { resolveAgent } from "../../../_lib/resolve-agent";
-import { requireAgentCapability } from "@/server/services/agent-authz";
+import { withAgent } from "../../../_lib/with-agent";
 import { AGENT_CAPABILITY } from "@agentcenter/utils";
-import {
-  successResponse,
-  errorResponse,
-  handleError,
-  assertFound,
-} from "../../../_lib/json-response";
+import { successResponse, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { parsePaginationParams } from "../../../_lib/pagination";
 import { validateBody, createChannelMessageSchema } from "../../../_lib/validation";
@@ -30,51 +23,41 @@ type RouteContext = _RouteContext<{ channelId: string }>;
 
 // ---------- GET — Fetch messages ----------
 
-export async function GET(request: Request, ctx: RouteContext) {
-  try {
-    const { channelId } = await ctx.params;
-    const agent = await resolveAgent(request);
-    const agentProfileId = await getOrCreateAgentProfileId(agent.id);
+export const GET = withAgent(async (request, agent, ctx: RouteContext) => {
+  const { channelId } = await ctx.params;
+  const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
-    const membership = await findChannelMember(channelId, agentProfileId);
-    assertFound(membership, ERR.NOT_CHANNEL_MEMBER, 403);
+  const membership = await findChannelMember(channelId, agentProfileId);
+  assertFound(membership, ERR.NOT_CHANNEL_MEMBER, 403);
 
-    const { searchParams } = new URL(request.url);
-    const unreadOnly = searchParams.get("unreadOnly") !== "false";
-    const { limit } = parsePaginationParams(searchParams, { defaultLimit: 50, maxLimit: 200 });
+  const { searchParams } = new URL(request.url);
+  const unreadOnly = searchParams.get("unreadOnly") !== "false";
+  const { limit } = parsePaginationParams(searchParams, { defaultLimit: 50, maxLimit: 200 });
 
-    const sinceDate = membership.lastReadAt ?? membership.joinedAt;
+  const sinceDate = membership.lastReadAt ?? membership.joinedAt;
 
-    const messages = await getChannelMessages(channelId, {
-      limit,
-      since: unreadOnly ? sinceDate : undefined,
-    });
+  const messages = await getChannelMessages(channelId, {
+    limit,
+    since: unreadOnly ? sinceDate : undefined,
+  });
 
-    // Auto-mark read
-    const markedReadAt = new Date();
-    await markChannelRead(channelId, agentProfileId, markedReadAt);
+  // Auto-mark read
+  const markedReadAt = new Date();
+  await markChannelRead(channelId, agentProfileId, markedReadAt);
 
-    return successResponse({ messages, markedReadAt: markedReadAt.toISOString() });
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  return successResponse({ messages, markedReadAt: markedReadAt.toISOString() });
+});
 
 // ---------- POST — Agent sends a message ----------
 
-export async function POST(request: Request, ctx: RouteContext) {
-  if (!(await isFeatureEnabled(FLAG_KEYS.CHANNELS))) {
-    return errorResponse(ERR.FEATURE_CHANNELS_UNAVAILABLE, 403);
-  }
-  const limited = await checkRateLimit(apiLimiters.channels, request);
-  if (limited) return limited;
+export const POST = withAgent(
+  async (request, agent, ctx: RouteContext) => {
+    const limited = await checkRateLimit(apiLimiters.channels, request);
+    if (limited) return limited;
 
-  try {
     const { channelId } = await ctx.params;
     const v = await validateBody(request, createChannelMessageSchema);
     if (v.error) return v.error;
-    const agent = await resolveAgent(request);
-    await requireAgentCapability(agent, AGENT_CAPABILITY.CHANNELS_POST);
     const agentProfileId = await getOrCreateAgentProfileId(agent.id);
 
     const membership = await findChannelMember(channelId, agentProfileId);
@@ -123,7 +106,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       request,
     );
     return successResponse(message, 201);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  {
+    feature: { flag: FLAG_KEYS.CHANNELS, error: ERR.FEATURE_CHANNELS_UNAVAILABLE },
+    capability: AGENT_CAPABILITY.CHANNELS_POST,
+  },
+);

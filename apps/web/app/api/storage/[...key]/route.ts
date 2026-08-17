@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { errorResponse } from "../../_lib/json-response";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
+import { readCookie } from "@/server/tenancy/buildbase";
 import { generateDownloadUrl } from "@/server/storage/r2";
 import { env } from "@/server/env";
 import { readFile } from "fs/promises";
@@ -72,9 +73,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
     }
 
     if (!authenticated) {
-      const cookie = request.headers.get("cookie");
-      const match = cookie?.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-      const sessionToken = match ? match[1].trim() : null;
+      const sessionToken = readCookie(request.headers.get("cookie"), COOKIE_NAME);
       if (sessionToken) {
         const session = await verifySessionToken(sessionToken);
         if (session) {

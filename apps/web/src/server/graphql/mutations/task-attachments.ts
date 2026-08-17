@@ -3,7 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
 import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
-import { roleAtLeast } from "@/server/tenancy/roles";
+import { isManagerRole } from "@/server/tenancy/roles";
 import {
   presignTaskAttachment,
   confirmTaskAttachment,
@@ -64,7 +64,7 @@ builder.mutationField("deleteTaskAttachment", (t) =>
       const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return deleteTaskAttachment(tenancy.workspaceId, args.id, {
         requesterProfileId: tenancy.userId,
-        isAdmin: roleAtLeast(tenancy.role, WORKSPACE_ROLES.ADMIN),
+        isAdmin: isManagerRole(tenancy.role),
       });
     },
   }),

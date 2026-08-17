@@ -1,15 +1,9 @@
 import { NextRequest } from "next/server";
+import { BB_SESSION_COOKIE, readCookie } from "@/server/tenancy/buildbase";
 
 // Returns the buildbase session id from the httpOnly cookie (Epic #1). Called by the SDK's
 // getSession callback on page refresh. Ported from the MissionControlSquad website.
-const SESSION_COOKIE_NAME = "bb-session-id";
-
 export async function GET(request: NextRequest) {
-  const cookieHeader = request.headers.get("Cookie") ?? "";
-  const sessionCookie = cookieHeader
-    .split(";")
-    .map((p) => p.trim())
-    .find((p) => p.startsWith(`${SESSION_COOKIE_NAME}=`));
-  const sessionId = sessionCookie ? sessionCookie.slice(`${SESSION_COOKIE_NAME}=`.length) : null;
+  const sessionId = readCookie(request.headers.get("Cookie"), BB_SESSION_COOKIE);
   return Response.json({ sessionId: sessionId || null });
 }

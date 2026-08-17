@@ -2,7 +2,7 @@ import { GraphQLError } from "graphql";
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
-import { requireRole, roleAtLeast, scoped } from "@/server/tenancy";
+import { requireRole, isManagerRole, scoped } from "@/server/tenancy";
 import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { getUserSecretCoverage } from "@/server/services/user-secrets";
 
@@ -57,7 +57,7 @@ builder.queryField("userSecretCoverage", (t) =>
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
       const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const target = args.profileId ?? tenancy.userId;
-      if (target !== tenancy.userId && !roleAtLeast(tenancy.role, WORKSPACE_ROLES.ADMIN)) {
+      if (target !== tenancy.userId && !isManagerRole(tenancy.role)) {
         throw new GraphQLError("Members can only view their own secret coverage", {
           extensions: { code: "FORBIDDEN" },
         });

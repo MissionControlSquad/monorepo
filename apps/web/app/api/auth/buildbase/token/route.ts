@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createJWT } from "@/lib/jwt";
 import { bridgeBuildbaseSession } from "@/server/auth/buildbase-bridge";
 import { COOKIE_NAME as MC_SESSION_COOKIE, getSessionCookieOptions } from "@/server/admin-auth";
+import { BB_SESSION_COOKIE, WORKSPACE_TOKEN_COOKIE } from "@/server/tenancy/buildbase";
 
 // buildbase OAuth code → session exchange (Epic #1). Ported from the MissionControlSquad website.
 // Namespaced under /api/auth/buildbase/* to avoid colliding with the existing admin auth routes.
@@ -12,8 +13,6 @@ import { COOKIE_NAME as MC_SESSION_COOKIE, getSessionCookieOptions } from "@/ser
 // ONLY when the exchange returned a valid session AND a user id; otherwise nothing is set and an error
 // is returned. See src/server/auth/buildbase-bridge.ts for the security posture (authenticated identity
 // only — capability is still governed by buildbase RBAC, never platform-admin).
-const SESSION_COOKIE_NAME = "bb-session-id";
-const WORKSPACE_TOKEN_COOKIE = "bb-workspace-token";
 
 export async function POST(request: NextRequest) {
   const SAAS_CLIENT_SECRET = process.env.SAAS_CLIENT_SECRET;
@@ -111,7 +110,7 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({ success: true, sessionId, token, user });
 
   // buildbase session cookie (unchanged semantics: httpOnly, 7-day, Lax, Secure on https).
-  response.cookies.set(SESSION_COOKIE_NAME, sessionId, {
+  response.cookies.set(BB_SESSION_COOKIE, sessionId, {
     httpOnly: true,
     path: "/",
     sameSite: "lax",

@@ -1,51 +1,33 @@
 import { taskModel } from "@/server/models/task";
 import { deliverableModel } from "@/server/models";
-import { resolveAgent } from "../../../_lib/resolve-agent";
-import { requireAgentCapability } from "@/server/services/agent-authz";
+import { withAgent } from "../../../_lib/with-agent";
 import { AGENT_CAPABILITY } from "@agentcenter/utils";
-import {
-  successResponse,
-  errorResponse,
-  handleError,
-  assertFound,
-} from "../../../_lib/json-response";
+import { successResponse, assertFound } from "../../../_lib/json-response";
 import { ERR } from "../../../_lib/error-messages";
 import { validateBody, createDeliverableSchema } from "../../../_lib/validation";
 import { log } from "../../../_lib/logger";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
-import { isSystemShutdown } from "@/server/system-settings";
 import type { RouteContext } from "../../../_lib/route-context";
 
-export async function GET(request: Request, ctx: RouteContext) {
-  try {
-    const { id: taskId } = await ctx.params;
-    await resolveAgent(request);
+export const GET = withAgent(async (_request, _agent, ctx: RouteContext) => {
+  const { id: taskId } = await ctx.params;
 
-    const deliverables = await deliverableModel.findMany({
-      where: { taskId },
-      include: {
-        profile: { select: { id: true, displayName: true, username: true, avatarUrl: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+  const deliverables = await deliverableModel.findMany({
+    where: { taskId },
+    include: {
+      profile: { select: { id: true, displayName: true, username: true, avatarUrl: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
 
-    return successResponse(deliverables);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  return successResponse(deliverables);
+});
 
-export async function POST(request: Request, ctx: RouteContext) {
-  try {
+export const POST = withAgent(
+  async (request, agent, ctx: RouteContext) => {
     const { id: taskId } = await ctx.params;
     const v = await validateBody(request, createDeliverableSchema);
     if (v.error) return v.error;
-    const agent = await resolveAgent(request);
-    await requireAgentCapability(agent, AGENT_CAPABILITY.TASKS_COMPLETE);
-
-    if (await isSystemShutdown()) {
-      return errorResponse("System is in shutdown mode. No deliverables can be submitted.", 503);
-    }
 
     const { title, kind, content, language, storageKey, fileName, mimeType, fileSize, url } =
       v.data;
@@ -88,7 +70,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       request,
     );
     return successResponse(deliverable, 201);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  {
+    capability: AGENT_CAPABILITY.TASKS_COMPLETE,
+    blockOnShutdown: { error: "System is in shutdown mode. No deliverables can be submitted." },
+  },
+);

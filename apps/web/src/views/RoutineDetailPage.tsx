@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "urql";
-import { Loader2, AlertCircle } from "lucide-react";
+import { CenteredSpinner, CenteredMessage } from "@/components/common/AsyncBoundary";
 import { ROUTINE_QUERY, ROUTINE_RUNS_QUERY } from "@/lib/graphql/queries";
 import { Breadcrumbs, Card, Badge, PageLayout } from "@/components/ui";
 import { useFeatureFlags } from "@/components/context/FeatureFlagContext";
@@ -101,29 +101,9 @@ export function RoutineDetailPage({ routineId }: { routineId: string }) {
 
   const routine = data?.routine;
 
-  if (fetching && !routine) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-        <AlertCircle className="h-8 w-8" />
-        <p className="text-sm font-medium">Could not load this routine</p>
-      </div>
-    );
-  }
-  if (!routine) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-        <AlertCircle className="h-8 w-8" />
-        <p className="text-sm font-medium">Routine not found</p>
-      </div>
-    );
-  }
+  if (fetching && !routine) return <CenteredSpinner />;
+  if (error) return <CenteredMessage>Could not load this routine</CenteredMessage>;
+  if (!routine) return <CenteredMessage>Routine not found</CenteredMessage>;
 
   const runs = runsData?.routineRuns ?? [];
   const definitionText = JSON.stringify(routine.definition ?? {}, null, 2);

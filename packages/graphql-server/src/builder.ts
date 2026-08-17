@@ -16,16 +16,12 @@ export interface SessionPayload {
   iat?: number;
 }
 
-/** Workspace-level role of the current human, resolved from buildbase (Epic #1). */
-export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
-
-/** Canonical workspace-role values. Use instead of raw string literals at every call site. */
-export const WORKSPACE_ROLES = {
-  OWNER: "owner",
-  ADMIN: "admin",
-  MEMBER: "member",
-  VIEWER: "viewer",
-} as const satisfies Record<string, WorkspaceRole>;
+// Workspace-role vocabulary is defined once in the client-safe `@agentcenter/utils` package and
+// re-exported here so every existing `import { WORKSPACE_ROLES } from "@agentcenter/graphql-server"`
+// keeps resolving to the same single source (client components import it straight from utils).
+import { WORKSPACE_ROLES, type WorkspaceRole } from "@agentcenter/utils";
+export { WORKSPACE_ROLES };
+export type { WorkspaceRole };
 
 /**
  * Per-request human tenancy, bridging the buildbase SaaS plane to the AgentCenter domain plane.

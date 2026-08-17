@@ -30,6 +30,7 @@ export * from "./observability";
 export * from "./api-key-status";
 export * from "./boardroom";
 export * from "./board-authz";
+export * from "./workspace-roles";
 export * from "./agent-instructions";
 export * from "./trust";
 export * from "./approval-policy";

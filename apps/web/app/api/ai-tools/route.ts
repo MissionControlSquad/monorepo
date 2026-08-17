@@ -1,5 +1,5 @@
-import { successResponse, errorResponse, handleError } from "../_lib/json-response";
-import { isFeatureEnabled } from "@/server/feature-flags";
+import { successResponse, handleError } from "../_lib/json-response";
+import { withFeature } from "../_lib/with-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { detectLocalRuntimes } from "@/server/services/ai-runtime-detect";
 
@@ -14,16 +14,17 @@ export const dynamic = "force-dynamic";
  * JSON, AI_TOOLS-gated. Detection runs the pure catalog's bin names (never user input) so it is
  * injection-safe. An `?os=` query previews another OS's install commands without changing detection.
  */
-export async function GET(request: Request) {
-  try {
-    if (!(await isFeatureEnabled(FLAG_KEYS.AI_TOOLS)))
-      return errorResponse("AI Tools is not enabled", 403, "FEATURE_DISABLED");
-    const os = new URL(request.url).searchParams.get("os") ?? undefined;
-    const inventory = await detectLocalRuntimes(
-      os === "macos" || os === "linux" || os === "windows" ? os : undefined,
-    );
-    return successResponse(inventory);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+export const GET = withFeature(
+  { flag: FLAG_KEYS.AI_TOOLS, error: "AI Tools is not enabled" },
+  async (request) => {
+    try {
+      const os = new URL(request.url).searchParams.get("os") ?? undefined;
+      const inventory = await detectLocalRuntimes(
+        os === "macos" || os === "linux" || os === "windows" ? os : undefined,
+      );
+      return successResponse(inventory);
+    } catch (err) {
+      return handleError(err);
+    }
+  },
+);

@@ -28,7 +28,9 @@ async function makeAgent(key: string, workspaceId = WS): Promise<string> {
 
 function getCommands(key: string, limit?: number) {
   const url = `http://test/api/runner/commands${limit ? `?limit=${limit}` : ""}`;
-  return GET_COMMANDS(new Request(url, { headers: { Authorization: `Bearer ${key}` } }));
+  return GET_COMMANDS(new Request(url, { headers: { Authorization: `Bearer ${key}` } }), {
+    params: Promise.resolve({}),
+  });
 }
 
 function postResult(key: string, id: string, body: unknown) {
@@ -152,7 +154,9 @@ describe("runner poll endpoints (Tier D Slice 2)", () => {
   });
 
   it("rejects an unauthenticated poll", async () => {
-    const res = await GET_COMMANDS(new Request("http://test/api/runner/commands"));
+    const res = await GET_COMMANDS(new Request("http://test/api/runner/commands"), {
+      params: Promise.resolve({}),
+    });
     expect(res.status).toBe(401);
   });
 

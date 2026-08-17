@@ -1,6 +1,7 @@
 import { generateUploadUrl } from "@/server/storage/r2";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
+import { readCookie } from "@/server/tenancy/buildbase";
 import { successResponse, errorResponse } from "../../_lib/json-response";
 import { storageUploadSchema } from "../../_lib/validation";
 import { StoragePrefix } from "@/server/constants";
@@ -30,9 +31,7 @@ export async function POST(request: Request) {
 
   // Fall back to session cookie
   if (!authenticated) {
-    const cookie = request.headers.get("cookie");
-    const match = cookie?.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-    const sessionToken = match ? match[1].trim() : null;
+    const sessionToken = readCookie(request.headers.get("cookie"), COOKIE_NAME);
     if (sessionToken) {
       const session = await verifySessionToken(sessionToken);
       if (session) {

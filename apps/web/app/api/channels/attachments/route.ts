@@ -1,11 +1,12 @@
 import { findProfileByAgentId, createFileDocument } from "@agentcenter/database";
 import { uploadFileToR2 } from "@/server/storage/r2";
-import { isFeatureEnabled } from "@/server/feature-flags";
+import { withFeature } from "../../_lib/with-feature";
 import { FLAG_KEYS, MAX_FILE_SIZE } from "@agentcenter/utils";
 import { resolveAgent } from "../../_lib/resolve-agent";
 import { successResponse, errorResponse } from "../../_lib/json-response";
 import { ERR } from "../../_lib/error-messages";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
+import { readCookie } from "@/server/tenancy/buildbase";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 
@@ -25,11 +26,14 @@ const BLOCKED_MIME_TYPES = new Set([
  * Uploads the file to R2 via the S3 SDK, then creates a Document record.
  * Falls back to local filesystem storage if R2 is unreachable.
  */
-export async function POST(request: Request) {
-  if (!(await isFeatureEnabled(FLAG_KEYS.CHANNELS))) {
-    return errorResponse(ERR.FEATURE_CHANNELS_UNAVAILABLE, 403);
-  }
+// CHANNELS feature gate moves to the wrapper; the route keeps its own dual (session-or-bearer) auth
+// inside the handler (withFeature is auth-agnostic — it only gates the flag before the handler runs).
+export const POST = withFeature(
+  { flag: FLAG_KEYS.CHANNELS, error: ERR.FEATURE_CHANNELS_UNAVAILABLE },
+  postHandler,
+);
 
+async function postHandler(request: Request) {
   let profileId: string | null = null;
   let agentId: string | null = null;
 
@@ -48,9 +52,7 @@ export async function POST(request: Request) {
 
   // Fall back to session cookie
   if (!agentId && !profileId) {
-    const cookie = request.headers.get("cookie");
-    const match = cookie?.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-    const sessionToken = match ? match[1].trim() : null;
+    const sessionToken = readCookie(request.headers.get("cookie"), COOKIE_NAME);
     if (sessionToken) {
       const session = await verifySessionToken(sessionToken);
       if (session?.profileId) {

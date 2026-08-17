@@ -1,5 +1,7 @@
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import type { GraphQLContext, TenancyContext, WorkspaceRole } from "@agentcenter/graphql-server";
 import { roleCan } from "./roles";
+import { WORKSPACE_TOKEN_COOKIE, readCookie } from "./buildbase";
 import { verifyJWT } from "@/lib/jwt";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { isFeatureEnabled } from "@/server/feature-flags";
@@ -12,26 +14,17 @@ import { verifyApiKey } from "@/server/services/api-keys";
  */
 export const DEFAULT_WORKSPACE_ID = process.env.DEFAULT_WORKSPACE_ID ?? "ws_default";
 
-/** httpOnly cookie holding the buildbase workspace-scoped JWT (minted by /api/auth/buildbase/workspace-token). */
-const WORKSPACE_TOKEN_COOKIE = "bb-workspace-token";
-
 function mapRole(raw: unknown): WorkspaceRole {
   switch (typeof raw === "string" ? raw.toLowerCase() : "") {
-    case "owner":
-      return "owner";
-    case "admin":
-      return "admin";
-    case "viewer":
-      return "viewer";
+    case WORKSPACE_ROLES.OWNER:
+      return WORKSPACE_ROLES.OWNER;
+    case WORKSPACE_ROLES.ADMIN:
+      return WORKSPACE_ROLES.ADMIN;
+    case WORKSPACE_ROLES.VIEWER:
+      return WORKSPACE_ROLES.VIEWER;
     default:
-      return "member";
+      return WORKSPACE_ROLES.MEMBER;
   }
-}
-
-function readCookie(cookieHeader: string | null | undefined, name: string): string | null {
-  if (!cookieHeader) return null;
-  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[1]) : null;
 }
 
 /** Resolve tenancy from the buildbase workspace-scoped JWT, if present + valid. */
@@ -77,7 +70,7 @@ async function fromApiKey(authHeader: string | null | undefined): Promise<Tenanc
   const verified = await verifyApiKey(match[1]);
   if (!verified) return null;
 
-  const role: WorkspaceRole = "member";
+  const role: WorkspaceRole = WORKSPACE_ROLES.MEMBER;
   return {
     userId: verified.createdByProfileId ?? `apikey_${verified.apiKeyId}`,
     workspaceId: verified.workspaceId,
@@ -117,7 +110,7 @@ export async function resolveTenancy(
   if (process.env.TENANT_WORKSPACE_ID?.trim()) return null;
 
   if (!session?.profileId) return null;
-  const role: WorkspaceRole = "owner";
+  const role: WorkspaceRole = WORKSPACE_ROLES.OWNER;
   return {
     userId: session.profileId,
     workspaceId: DEFAULT_WORKSPACE_ID,

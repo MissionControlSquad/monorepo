@@ -3,10 +3,10 @@ export const dynamic = "force-dynamic";
 import { taskModel } from "@/server/models/task";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "@/server/pubsub";
 import { TaskStatus, Priority } from "@/server/constants";
-import { resolveAgent } from "../_lib/resolve-agent";
+import { withAgent } from "../_lib/with-agent";
 import { assertAssignableAgents } from "@/server/assignment-guard";
-import { isSystemShutdown, assertProjectWritable } from "@/server/system-settings";
-import { successResponse, errorResponse, handleError } from "../_lib/json-response";
+import { assertProjectWritable } from "@/server/system-settings";
+import { successResponse, errorResponse } from "../_lib/json-response";
 import { validateBody, createTaskSchema } from "../_lib/validation";
 import { apiLimiters, checkRateLimit } from "../_lib/rate-limit-check";
 import { log } from "../_lib/logger";
@@ -22,65 +22,59 @@ import {
   tryDeliverInboxTaskNotification,
 } from "@/server/services/live-task-delivery";
 
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const agent = await resolveAgent(request);
+export const GET = withAgent(async (request, agent) => {
+  const { searchParams } = new URL(request.url);
 
-    const assigneeId = searchParams.get("assigneeId");
-    const status = searchParams.get("status");
-    const projectId = searchParams.get("projectId");
+  const assigneeId = searchParams.get("assigneeId");
+  const status = searchParams.get("status");
+  const projectId = searchParams.get("projectId");
 
-    // Lazy-generate any overdue recurring task instances
-    await generateRecurringTasks({ projectId: projectId ?? undefined });
-    const includeDone = searchParams.get("includeDone") === "true";
+  // Lazy-generate any overdue recurring task instances
+  await generateRecurringTasks({ projectId: projectId ?? undefined });
+  const includeDone = searchParams.get("includeDone") === "true";
 
-    const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = {};
 
-    if (status) {
-      where.status = status.includes(",") ? { in: status.split(",") } : status;
-    }
-
-    if (projectId) {
-      await assertProjectMember(agent.id, projectId);
-      where.projectId = projectId;
-    } else {
-      // Auto-scope: own projects' tasks + unscoped
-      const agentProjectIds = await getAgentProjectIds(agent.id);
-      where.OR = [{ projectId: { in: agentProjectIds } }, { projectId: null }];
-    }
-
-    if (assigneeId) {
-      // Resolve agentId → profileId for filtering
-      const assigneeProfileId = await getOrCreateAgentProfileId(assigneeId);
-      where.assignees = { some: { profileId: assigneeProfileId } };
-      if (!includeDone && !status) {
-        where.status = { not: TaskStatus.DONE };
-      }
-    }
-
-    const tasks = await taskModel.findMany({
-      where,
-      include: { assignees: { include: { profile: true } } },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    });
-
-    log("tasks", `GET agent="${agent.name}" count=${tasks.length}`, request);
-    return successResponse(tasks);
-  } catch (err) {
-    return handleError(err);
+  if (status) {
+    where.status = status.includes(",") ? { in: status.split(",") } : status;
   }
-}
 
-export async function POST(request: Request) {
-  const limited = await checkRateLimit(apiLimiters.tasks, request);
-  if (limited) return limited;
+  if (projectId) {
+    await assertProjectMember(agent.id, projectId);
+    where.projectId = projectId;
+  } else {
+    // Auto-scope: own projects' tasks + unscoped
+    const agentProjectIds = await getAgentProjectIds(agent.id);
+    where.OR = [{ projectId: { in: agentProjectIds } }, { projectId: null }];
+  }
 
-  try {
+  if (assigneeId) {
+    // Resolve agentId → profileId for filtering
+    const assigneeProfileId = await getOrCreateAgentProfileId(assigneeId);
+    where.assignees = { some: { profileId: assigneeProfileId } };
+    if (!includeDone && !status) {
+      where.status = { not: TaskStatus.DONE };
+    }
+  }
+
+  const tasks = await taskModel.findMany({
+    where,
+    include: { assignees: { include: { profile: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+
+  log("tasks", `GET agent="${agent.name}" count=${tasks.length}`, request);
+  return successResponse(tasks);
+});
+
+export const POST = withAgent(
+  async (request, agent) => {
+    const limited = await checkRateLimit(apiLimiters.tasks, request);
+    if (limited) return limited;
+
     const parsed = await validateBody(request, createTaskSchema);
     if (parsed.error) return parsed.error;
-    const agent = await resolveAgent(request);
 
     const {
       title,
@@ -93,10 +87,6 @@ export async function POST(request: Request) {
       projectId,
       blockedByTaskId,
     } = parsed.data;
-
-    if (await isSystemShutdown()) {
-      return errorResponse("System is in shutdown mode. No new tasks can be created.", 503);
-    }
 
     if (projectId) {
       await assertProjectWritable(projectId);
@@ -171,7 +161,6 @@ export async function POST(request: Request) {
     }
 
     return successResponse(task, 201);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  { blockOnShutdown: { error: "System is in shutdown mode. No new tasks can be created." } },
+);
