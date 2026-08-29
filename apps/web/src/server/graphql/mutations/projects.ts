@@ -6,7 +6,8 @@ import { Roles, ProjectStatus, ProjectMemberStatus } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 import { findProfilesWithAgentIdsByIds, findProfileAgentId } from "@agentcenter/database";
 import { checkLicenseLimit } from "../../license";
-import { requireRole, scoped } from "@/server/tenancy";
+import { requireRole, scoped, recordPlanUsage } from "@/server/tenancy";
+import { USAGE_QUOTA_SLUGS } from "@/lib/quota-slugs";
 import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { isProjectSourceType, isProjectVisibility, sourceTypeUsesRepo } from "@agentcenter/utils";
 
@@ -79,6 +80,19 @@ builder.mutationField("createProject", (t) =>
       });
 
       invalidateProjectsList();
+
+      // Best-effort: record consumption of the workspace's HUMAN plan `projects` quota in buildbase.
+      // This is the human dashboard path (requireRole above); ctx.usage is the buildbase session
+      // resolved from the request cookies (null for agent/self-host callers → skipped). Fail-safe +
+      // dormant until buildbase is configured; never blocks or breaks the create.
+      if (ctx.usage) {
+        await recordPlanUsage({
+          sessionId: ctx.usage.sessionId,
+          workspaceId: ctx.usage.workspaceId,
+          quotaSlug: USAGE_QUOTA_SLUGS.projects,
+        });
+      }
+
       return project;
     },
   }),

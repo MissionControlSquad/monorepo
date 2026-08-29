@@ -105,6 +105,12 @@ export const serverSchema = z.object({
     .transform((v) => v || undefined),
   NEXT_PUBLIC_SAAS_ORG_ID: z.string().optional(),
   NEXT_PUBLIC_SAAS_CLIENT_ID: z.string().optional(),
+  // SDK i18n locale for the SaaSOSProvider (BuildbaseProvider). Falls back to browser/`en` when unset.
+  NEXT_PUBLIC_SAAS_LOCALE: z.string().optional(),
+  // Public pricing page (PricingView): plan-group slug + display currency. Default to buildbase's
+  // canonical "main-pricing" / "usd" when unset.
+  NEXT_PUBLIC_SAAS_PRICING_SLUG: z.string().optional(),
+  NEXT_PUBLIC_SAAS_PRICING_CURRENCY: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z
     .union([z.string().url(), z.literal("")])
     .optional()

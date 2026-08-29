@@ -11,11 +11,7 @@ import {
   FEATURE_FLAGS_QUERY,
   COMPANY_MEMORY_DEFAULT_QUERY,
 } from "@/lib/graphql/queries";
-import {
-  SET_AGENT_GOVERNANCE,
-  UPDATE_FEATURE_FLAG,
-  SET_COMPANY_MEMORY_PROVIDER,
-} from "@/lib/graphql/mutations";
+import { SET_AGENT_GOVERNANCE, SET_COMPANY_MEMORY_PROVIDER } from "@/lib/graphql/mutations";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 import { MEMORY_PROVIDERS, FLAG_KEYS } from "@agentcenter/utils";
 import {
@@ -26,7 +22,6 @@ import {
   PageLayout,
   Select,
   Checkbox,
-  Tooltip,
 } from "../components/ui";
 import { LicenseStatusCode } from "@/server/constants";
 import { API_ROUTES } from "@/lib/api-routes";
@@ -137,7 +132,7 @@ export function SettingsPage() {
       {/* Sidebar customization */}
       <SidebarCustomizeCard />
 
-      {/* Experimental feature flags (manage — admin/owner; server: UPDATE_FEATURE_FLAG requires admin) */}
+      {/* Plan features — READ-ONLY entitlement sourced from buildbase (no local toggle post-cutover) */}
       <WhenAdmin>
         <FeatureFlagsCard />
       </WhenAdmin>
@@ -404,33 +399,17 @@ interface FeatureFlag {
 }
 
 /**
- * Experimental feature flags — a per-flag toggle grid so an admin can turn optional features on/off
- * without a DB round-trip. Only user-managed flags are toggleable; system-managed ones are shown but
- * locked (the server rejects toggling them). Mirrors Paperclip's InstanceExperimentalSettings.
+ * Feature entitlement — a READ-ONLY view of which optional features are enabled for this workspace.
+ * Entitlement is now sourced entirely from buildbase (the customer's plan): `featureFlags` resolves to
+ * the workspace's buildbase `features` map. There is no local toggle — features are changed by moving
+ * plans in buildbase, not per-flag here (the old per-flag write path was removed in the cutover).
  */
 function FeatureFlagsCard() {
-  const [{ data, fetching }, refetch] = useQuery<{ featureFlags: FeatureFlag[] }>({
+  const [{ data, fetching }] = useQuery<{ featureFlags: FeatureFlag[] }>({
     query: FEATURE_FLAGS_QUERY,
   });
-  const [, updateFlag] = useMutation(UPDATE_FEATURE_FLAG);
-  const [busy, setBusy] = useState<string | null>(null);
 
   const flags = [...(data?.featureFlags ?? [])].sort((a, b) => a.key.localeCompare(b.key));
-
-  async function toggle(key: string, next: boolean) {
-    setBusy(key);
-    try {
-      const res = await updateFlag({ key, enabled: next });
-      if (res.error) {
-        toast.error(res.error.graphQLErrors[0]?.message ?? "Failed to update flag");
-      } else {
-        toast.success(`${key} ${next ? "enabled" : "disabled"}`);
-        refetch({ requestPolicy: "network-only" });
-      }
-    } finally {
-      setBusy(null);
-    }
-  }
 
   return (
     <Card padding="lg" className="space-y-4">
@@ -439,55 +418,38 @@ function FeatureFlagsCard() {
           <FlaskConical className="h-5 w-5 text-muted-foreground" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold text-foreground">Experimental Features</h2>
+          <h2 className="text-base font-semibold text-foreground">Plan features</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Turn optional features on or off for this workspace. System-managed flags are shown but
-            can only be changed by your administrator.
+            The optional features included with your workspace&apos;s plan. Entitlement is managed
+            by your plan in buildbase — upgrade your plan to enable more.
           </p>
         </div>
       </div>
 
       {fetching && flags.length === 0 && (
-        <p className="text-sm text-muted-foreground">Loading flags…</p>
+        <p className="text-sm text-muted-foreground">Loading features…</p>
       )}
 
       <ul className="divide-y divide-border">
-        {flags.map((f) => {
-          const locked = f.managedBy !== "user";
-          return (
-            <li key={f.key} className="flex items-center justify-between gap-4 py-2.5">
-              <div className="min-w-0">
-                <p className="flex items-center gap-2 font-mono text-sm text-foreground">
-                  {f.key}
-                  {locked && (
-                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                      system
-                    </span>
-                  )}
-                </p>
-                {f.description && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{f.description}</p>
-                )}
-              </div>
-              <Tooltip
-                side="bottom"
-                content={
-                  locked
-                    ? "Managed by your administrator — this flag can't be changed here."
-                    : "Turn this feature on or off for everyone in this workspace."
-                }
-              >
-                <label className="inline-flex shrink-0 cursor-pointer items-center">
-                  <Checkbox
-                    checked={f.enabled}
-                    disabled={locked || busy === f.key}
-                    onChange={(e) => toggle(f.key, e.target.checked)}
-                  />
-                </label>
-              </Tooltip>
-            </li>
-          );
-        })}
+        {flags.map((f) => (
+          <li key={f.key} className="flex items-center justify-between gap-4 py-2.5">
+            <div className="min-w-0">
+              <p className="font-mono text-sm text-foreground">{f.key}</p>
+              {f.description && (
+                <p className="mt-0.5 text-xs text-muted-foreground">{f.description}</p>
+              )}
+            </div>
+            <span
+              className={
+                f.enabled
+                  ? "shrink-0 rounded bg-success/10 px-2 py-0.5 text-xs font-medium text-success"
+                  : "shrink-0 rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
+              }
+            >
+              {f.enabled ? "Included" : "Not in plan"}
+            </span>
+          </li>
+        ))}
       </ul>
     </Card>
   );
