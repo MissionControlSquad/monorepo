@@ -1,5 +1,7 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
+import { requireRole } from "@/server/tenancy/guards";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   FLAG_KEYS,
   ChannelVisibility,
@@ -52,8 +54,9 @@ builder.mutationField("createChannel", (t) =>
       createdByProfileId: t.arg.string({ required: true }),
       projectId: t.arg.string(),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const visibility = args.visibility as ChannelVisibilityValue;
       if (!CHANNEL_VISIBILITY_VALUES.includes(visibility)) {
         throw new Error(`visibility must be one of: ${CHANNEL_VISIBILITY_VALUES.join(", ")}`);
@@ -89,8 +92,9 @@ builder.mutationField("startConversation", (t) =>
       myProfileId: t.arg.string({ required: true }),
       otherProfileId: t.arg.string({ required: true }),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       if (args.myProfileId === args.otherProfileId) {
         throw new Error("Cannot start a conversation with yourself.");
       }
@@ -122,8 +126,9 @@ builder.mutationField("joinChannel", (t) =>
       channelId: t.arg.string({ required: true }),
       profileId: t.arg.string({ required: true }),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const channel = await getChannelVisibilityOrThrow(args.channelId);
       if (channel.visibility === ChannelVisibility.DM) {
         throw new Error(
@@ -166,8 +171,9 @@ builder.mutationField("addChannelMember", (t) =>
       profileId: t.arg.string({ required: true }),
       addedByProfileId: t.arg.string({ required: true }),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const channel = await getChannelVisibilityOrThrow(args.channelId);
       if (channel.visibility !== ChannelVisibility.PRIVATE) {
         throw new Error(
@@ -209,8 +215,9 @@ builder.mutationField("removeChannelMember", (t) =>
       profileId: t.arg.string({ required: true }),
       removedByProfileId: t.arg.string({ required: true }),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const channel = await getChannelVisibilityOrThrow(args.channelId);
       if (channel.visibility === ChannelVisibility.DM) {
         throw new Error(
@@ -251,8 +258,9 @@ builder.mutationField("leaveChannel", (t) =>
       channelId: t.arg.string({ required: true }),
       profileId: t.arg.string({ required: true }),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const member = await findChannelMemberRole(args.channelId, args.profileId);
       if (!member) return true;
       if (member.role === ChannelMemberRole.CREATOR) {
@@ -282,8 +290,9 @@ builder.mutationField("markChannelRead", (t) =>
       channelId: t.arg.string({ required: true }),
       profileId: t.arg.string({ required: true }),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await markChannelMemberRead(args.channelId, args.profileId);
       return true;
     },
@@ -340,8 +349,9 @@ builder.mutationField("createChannelMessage", (t) =>
       content: t.arg.string({ required: true }),
       attachmentIds: t.arg.stringList(),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const membership = await findChannelMemberRecord(args.channelId, args.fromProfileId);
       if (!membership) {
         throw new Error("You must be a member of the channel to post.");
@@ -409,8 +419,9 @@ builder.mutationField("toggleChannelMessageReaction", (t) =>
       profileId: t.arg.string({ required: true }),
       emoji: t.arg.string({ required: true }),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       if (!CHANNEL_MESSAGE_REACTION_EMOJIS.includes(args.emoji as any)) {
         throw new Error(`Invalid emoji. Valid: ${CHANNEL_MESSAGE_REACTION_EMOJIS.join(", ")}`);
       }
@@ -442,8 +453,9 @@ builder.mutationField("updateChannelMessage", (t) =>
       profileId: t.arg.string({ required: true }),
       content: t.arg.string({ required: true }),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const message = await getChannelMessageOrThrow(args.messageId);
       if (message.fromProfileId !== args.profileId) {
         throw new Error("Only the message author can edit this message.");
@@ -478,8 +490,9 @@ builder.mutationField("deleteChannelMessage", (t) =>
       messageId: t.arg.string({ required: true }),
       profileId: t.arg.string({ required: true }),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const message = await getChannelMessageOrThrow(args.messageId);
       const membership = await findChannelMemberRole(message.channelId, args.profileId);
       if (!membership) throw new Error("You must be a member of the channel.");
@@ -501,8 +514,9 @@ builder.mutationField("pinChannelMessage", (t) =>
       messageId: t.arg.string({ required: true }),
       profileId: t.arg.string({ required: true }),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const message = await getChannelMessagePinStatus(args.messageId);
       const membership = await findChannelMemberRecord(message.channelId, args.profileId);
       if (!membership) throw new Error("You must be a member of the channel to pin messages.");
@@ -519,8 +533,9 @@ builder.mutationField("unpinChannelMessage", (t) =>
       messageId: t.arg.string({ required: true }),
       profileId: t.arg.string({ required: true }),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const message = await getChannelMessagePinStatus(args.messageId);
       const membership = await findChannelMemberRecord(message.channelId, args.profileId);
       if (!membership) throw new Error("You must be a member of the channel to unpin messages.");
@@ -537,8 +552,9 @@ builder.mutationField("deleteChannel", (t) =>
       channelId: t.arg.string({ required: true }),
       profileId: t.arg.string({ required: true }),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CHANNELS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const channel = await findChannelById(args.channelId);
       if (!channel) {
         throw new Error("Channel not found.");

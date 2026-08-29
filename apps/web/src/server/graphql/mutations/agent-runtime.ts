@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { GraphQLError } from "graphql";
 import { FLAG_KEYS, isAdapterKey } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 // Tier D: set an agent's runtime adapter/model/template so the control plane dictates how a runner
 // launches it (overrides the runner's own default). RUNNERS-gated, admin. Pass adapter=null to clear.
@@ -17,7 +18,7 @@ builder.mutationField("setAgentRuntime", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       if (args.adapter && !isAdapterKey(args.adapter))
         throw new GraphQLError(`Unknown runtime adapter: ${args.adapter}`, {
           extensions: { code: "BAD_USER_INPUT" },

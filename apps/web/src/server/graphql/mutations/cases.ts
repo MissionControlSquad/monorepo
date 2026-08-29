@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { CaseState, CaseTaskRole } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   createCase,
   updateCase,
@@ -30,7 +31,7 @@ builder.mutationField("createCase", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const c = await createCase({
         workspaceId: tenancy.workspaceId,
         createdByProfileId: tenancy.userId,
@@ -59,7 +60,7 @@ builder.mutationField("updateCase", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const c = await updateCase(
         tenancy.workspaceId,
         args.id,
@@ -82,7 +83,7 @@ builder.mutationField("setCaseStatus", (t) =>
     args: { id: t.arg.string({ required: true }), status: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const c = await setCaseStatus(
         tenancy.workspaceId,
         args.id,
@@ -104,7 +105,7 @@ builder.mutationField("linkTaskToCase", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const role = ["origin", "work", "reference"].includes(args.role ?? "")
         ? (args.role as CaseTaskRole)
         : "work";
@@ -126,7 +127,7 @@ builder.mutationField("unlinkTaskFromCase", (t) =>
     args: { caseId: t.arg.string({ required: true }), taskId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return unlinkTaskFromCase({
         workspaceId: tenancy.workspaceId,
         caseId: args.caseId,
@@ -143,7 +144,7 @@ builder.mutationField("createLabel", (t) =>
     args: { name: t.arg.string({ required: true }), color: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const label = await createLabel(tenancy.workspaceId, args.name, args.color ?? "#888888");
       return ctx.prisma.label.findUniqueOrThrow({ ...query, where: { id: label.id } });
     },
@@ -156,7 +157,7 @@ builder.mutationField("addCaseLabel", (t) =>
     args: { caseId: t.arg.string({ required: true }), labelId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await addCaseLabel({
         workspaceId: tenancy.workspaceId,
         caseId: args.caseId,
@@ -174,7 +175,7 @@ builder.mutationField("removeCaseLabel", (t) =>
     args: { caseId: t.arg.string({ required: true }), labelId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return removeCaseLabel({
         workspaceId: tenancy.workspaceId,
         caseId: args.caseId,
@@ -195,7 +196,7 @@ builder.mutationField("attachCaseDocument", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const cd = await attachCaseDocument({
         workspaceId: tenancy.workspaceId,
         caseId: args.caseId,

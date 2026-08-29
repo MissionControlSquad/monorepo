@@ -2,11 +2,13 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { GraphQLError } from "graphql";
 import { isSecretStatus, parseDotEnv } from "@agentcenter/utils";
 import {
   createSecret,
   rotateSecret,
+  rotateManagedSecret,
   bindSecret,
   unbindSecret,
   updateSecret,
@@ -16,6 +18,7 @@ import {
   checkSecretProviderHealth,
   importSecrets,
   isSecretProviderKind,
+  isSecretBindingScope,
 } from "@/server/services/secrets";
 
 const ImportSecretsSummary = builder.simpleObject("ImportSecretsSummary", {
@@ -40,7 +43,7 @@ builder.mutationField("createSecret", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const secret = await createSecret({
         workspaceId: tenancy.workspaceId,
         createdBy: tenancy.userId,
@@ -66,7 +69,7 @@ builder.mutationField("createUserSecret", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const secret = await createSecret({
         workspaceId: tenancy.workspaceId,
         createdBy: tenancy.userId,
@@ -87,7 +90,7 @@ builder.mutationField("rotateSecret", (t) =>
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
       // member+ then the service authorizes (owner for personal, admin for workspace).
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const secret = await rotateSecret({
         workspaceId: tenancy.workspaceId,
         secretId: args.id,
@@ -109,23 +112,63 @@ builder.mutationField("bindSecret", (t) =>
       envVarName: t.arg.string({ required: true }),
       agentId: t.arg.string(),
       adapterType: t.arg.string(),
+      toolConnectionId: t.arg.string(),
       pinnedVersion: t.arg.int(),
+      // Richer bindings (parity §3 secrets depth) — additive, safe defaults in the service.
+      configPath: t.arg.string(),
+      versionSelector: t.arg.string(),
+      projectionClass: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
+      if (!isSecretBindingScope(args.scope))
+        throw new GraphQLError(`Invalid binding scope '${args.scope}'`, {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
       const binding = await bindSecret({
         workspaceId: tenancy.workspaceId,
         createdBy: tenancy.userId,
         secretId: args.secretId,
-        scope: args.scope === "adapter" ? "adapter" : "agent",
+        scope: args.scope,
         agentId: args.agentId ?? null,
         adapterType: args.adapterType ?? null,
+        toolConnectionId: args.toolConnectionId ?? null,
         envVarName: args.envVarName,
         pinnedVersion: args.pinnedVersion ?? null,
+        configPath: args.configPath ?? null,
+        versionSelector: args.versionSelector ?? null,
+        projectionClass: args.projectionClass ?? null,
         actor: { userId: tenancy.userId, role: tenancy.role },
       });
       return ctx.prisma.secretBinding.findUniqueOrThrow({ ...query, where: { id: binding.id } });
+    },
+  }),
+);
+
+// Provider WRITE-side managed rotation (parity §3 secrets depth): rotate a provider-backed secret by
+// writing the new value to the external store (AWS/Vault), then record a new version + audit. Admin +
+// SECRETS_VAULT. The provider client is injectable in the service so tests mock it (no live cloud call).
+builder.mutationField("rotateManagedSecret", (t) =>
+  t.prismaField({
+    type: "Secret",
+    args: {
+      id: t.arg.string({ required: true }),
+      value: t.arg.string({ required: true }),
+      createRemote: t.arg.boolean(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SECRETS_VAULT);
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
+      const secret = await rotateManagedSecret({
+        workspaceId: tenancy.workspaceId,
+        secretId: args.id,
+        value: args.value,
+        createdBy: tenancy.userId,
+        createRemote: args.createRemote ?? false,
+        actor: { userId: tenancy.userId, role: tenancy.role },
+      });
+      return ctx.prisma.secret.findUniqueOrThrow({ ...query, where: { id: secret.id } });
     },
   }),
 );
@@ -136,7 +179,7 @@ builder.mutationField("unbindSecret", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return unbindSecret(tenancy.workspaceId, args.id, tenancy.userId, {
         userId: tenancy.userId,
         role: tenancy.role,
@@ -155,7 +198,7 @@ builder.mutationField("updateSecret", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const secret = await updateSecret(
         tenancy.workspaceId,
         args.id,
@@ -177,7 +220,7 @@ builder.mutationField("createSecretProvider", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       if (!isSecretProviderKind(args.kind))
         throw new GraphQLError(`Invalid provider kind '${args.kind}'`, {
           extensions: { code: "BAD_USER_INPUT" },
@@ -202,7 +245,7 @@ builder.mutationField("deleteSecretProvider", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return deleteSecretProvider(tenancy.workspaceId, args.id);
     },
   }),
@@ -215,7 +258,7 @@ builder.mutationField("checkSecretProviderHealth", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const provider = await checkSecretProviderHealth(tenancy.workspaceId, args.id);
       return ctx.prisma.secretProviderConfig.findUniqueOrThrow({
         ...query,
@@ -231,7 +274,7 @@ builder.mutationField("importSecrets", (t) =>
     args: { text: t.arg.string({ required: true }), overwrite: t.arg.boolean() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const parsed = parseDotEnv(args.text);
       const res = await importSecrets({
         workspaceId: tenancy.workspaceId,
@@ -250,7 +293,7 @@ builder.mutationField("setSecretStatus", (t) =>
     args: { id: t.arg.string({ required: true }), status: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       if (!isSecretStatus(args.status))
         throw new GraphQLError(`Invalid status '${args.status}'`, {
           extensions: { code: "BAD_USER_INPUT" },

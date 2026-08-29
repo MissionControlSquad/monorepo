@@ -67,9 +67,11 @@ export function AgentRunsCard({ agentId }: { agentId: string }) {
             </span>
             {r.exitCode != null && <span className="text-muted-foreground">exit {r.exitCode}</span>}
             {r.reviewState === "needs_review" && (
-              <Badge variant="yellow" size="sm">
-                needs review
-              </Badge>
+              <span title="This run's output is quarantined pending board review because its source is untrusted/low-trust. Untrusted-source checkouts are also routed through an isolated container profile. A reviewer must promote it before the output can flow into higher-trust context.">
+                <Badge variant="yellow" size="sm">
+                  needs review
+                </Badge>
+              </span>
             )}
             {r.taskId && (
               <Link href={`/task/${r.taskId}`} className="text-muted-foreground hover:underline">

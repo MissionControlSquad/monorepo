@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { LedgerKind, LedgerSource } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { invalidateLedger } from "@/server/cache";
 import {
   createLedgerEvent,
@@ -32,7 +33,7 @@ builder.mutationField("createLedgerEvent", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const event = await createLedgerEvent({
         workspaceId: tenancy.workspaceId,
         createdBy: tenancy.userId,
@@ -70,7 +71,7 @@ builder.mutationField("updateLedgerEvent", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const event = await updateLedgerEvent(tenancy.workspaceId, args.id, {
         kind: (args.kind as LedgerKind) ?? null,
         category: args.category ?? null,
@@ -94,7 +95,7 @@ builder.mutationField("deleteLedgerEvent", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const ok = await deleteLedgerEvent(tenancy.workspaceId, args.id);
       invalidateLedger();
       return ok;
@@ -108,7 +109,7 @@ builder.mutationField("createLedgerCategory", (t) =>
     args: { kind: t.arg.string({ required: true }), name: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const cat = await createLedgerCategory({
         workspaceId: tenancy.workspaceId,
         createdBy: tenancy.userId,
@@ -130,7 +131,7 @@ builder.mutationField("updateLedgerCategory", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LEDGER);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const cat = await updateLedgerCategory(tenancy.workspaceId, args.id, {
         name: args.name ?? null,
         archived: args.archived ?? null,

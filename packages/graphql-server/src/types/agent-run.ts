@@ -29,6 +29,9 @@ builder.prismaObject("AgentRun", {
     }),
     errorMessage: t.exposeString("errorMessage", { nullable: true }),
     costCents: t.exposeInt("costCents", { nullable: true }),
+    // §3 #2 — cost pricing status ("reported" | "unpriced") + cancellation reason.
+    costStatus: t.exposeString("costStatus", { nullable: true }),
+    cancelReason: t.exposeString("cancelReason", { nullable: true }),
     // Structured adapter execution result (PR #99 tail) — usage/model + machine-readable outcome.
     usageTokensIn: t.exposeInt("usageTokensIn", { nullable: true }),
     usageTokensOut: t.exposeInt("usageTokensOut", { nullable: true }),

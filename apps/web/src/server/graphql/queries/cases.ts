@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { CaseState } from "@agentcenter/database";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 // Epic #17: cases reads — CASES-gated, workspace-scoped, member+.
 builder.queryField("cases", (t) =>
@@ -11,7 +12,7 @@ builder.queryField("cases", (t) =>
     args: { status: t.arg.string(), caseType: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.case.findMany({
         ...query,
         where: scoped(ctx, {
@@ -31,7 +32,7 @@ builder.queryField("case", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.case.findFirst({ ...query, where: scoped(ctx, { id: args.id }) });
     },
   }),
@@ -43,7 +44,7 @@ builder.queryField("caseEvents", (t) =>
     args: { caseId: t.arg.string({ required: true }), limit: t.arg.int() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const c = await ctx.prisma.case.findFirst({
         where: scoped(ctx, { id: args.caseId }),
         select: { id: true },
@@ -65,7 +66,7 @@ builder.queryField("casesForTask", (t) =>
     args: { taskId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.case.findMany({
         ...query,
         where: scoped(ctx, { taskLinks: { some: { taskId: args.taskId } } }),
@@ -80,7 +81,7 @@ builder.queryField("labels", (t) =>
     type: ["Label"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.CASES);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.label.findMany({
         ...query,
         where: scoped(ctx, {}),

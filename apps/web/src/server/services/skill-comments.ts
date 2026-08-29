@@ -1,16 +1,12 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { SkillComment } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // Skill comments (parity #F12). Threaded discussion on a skill. A reply references parentCommentId;
 // deletion is soft (keeps thread structure, body tombstoned). Workspace-scoped; author is an agent or a
 // human profile.
 
 const MAX_BODY = 8_000;
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 export async function addSkillComment(input: {
   workspaceId: string;

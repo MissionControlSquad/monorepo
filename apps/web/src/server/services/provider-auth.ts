@@ -1,15 +1,11 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { ProviderAuthState as ProviderAuthStateRow } from "@agentcenter/database";
 import { classifyProviderAuth, type ProviderAuthClassification } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 // Provider auth reconciliation (parity #25). Track an AI provider credential's auth state and decide the
 // reconciliation action (refresh / reauth) before a run. The refresh/validate network call is the infra
 // seam; this owns the tracked state + classification. Workspace-scoped.
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 /** Record/observe a provider credential's auth facts, recomputing its state. */
 export async function recordProviderAuth(input: {

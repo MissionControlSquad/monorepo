@@ -3,11 +3,11 @@
  * plaintext is returned exactly once at mint; only keyHash + keyPrefix are stored. Revoke tombstones.
  * Ports Paperclip `board_api_keys` + `board-auth`. Reuses the existing `server/api-key` util.
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import { generateApiKey, hashApiKey } from "@/server/api-key";
 import { isApiKeyActive } from "@agentcenter/utils";
 import type { ApiKey } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // isApiKeyActive + redactKey are shared pure helpers in @agentcenter/utils (web/desktop/mobile).
 export { isApiKeyActive, redactKey } from "@agentcenter/utils";
@@ -19,10 +19,6 @@ function stripHash(key: ApiKey): SafeApiKey {
   const { keyHash: _keyHash, ...safe } = key;
   void _keyHash;
   return safe;
-}
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
 }
 
 export async function mintApiKey(args: {

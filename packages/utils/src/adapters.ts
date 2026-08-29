@@ -16,6 +16,8 @@ import {
   redactCommandText,
   redactHomePathUserSegments,
 } from "./adapter-transcript";
+import { detectModelsForKey } from "./adapter-detect";
+import { claudeQuotaWindows } from "./adapter-quota";
 
 /** A single provider quota/rate-limit window (Domain 12 GAP-2). */
 export interface ProviderQuotaWindow {
@@ -140,6 +142,53 @@ export interface AdapterExecutionResult {
   transcript?: AdapterTranscriptEvent[];
 }
 
+// ─── Environment preflight ("Test connection") contract ─────────────────────
+// Paperclip adapters expose a `testEnvironment` preflight that verifies a runtime is installed +
+// reachable + authenticated BEFORE a run is dispatched. This is the additive, runtime-neutral TYPE +
+// a PURE `summarizePreflight` helper. The actual probe (spawning `<bin> --version` / a cheap auth
+// check) is process-bound, so it lives server-side (apps/web) — nothing here spawns a process.
+
+/** One named check performed during a preflight (e.g. "CLI installed", "Reachable", "Authenticated"). */
+export interface AdapterPreflightCheck {
+  /** Short human label for what was verified. */
+  name: string;
+  /** Whether this individual check passed. */
+  ok: boolean;
+  /** Readable outcome/reason — a friendly explanation, never a raw stack/stderr dump. */
+  detail?: string;
+}
+
+/** The structured result of a runtime preflight — the whole run passes only if every check passes. */
+export interface AdapterPreflightResult {
+  ok: boolean;
+  checks: AdapterPreflightCheck[];
+  /** Machine-readable failure class when a check failed for a classifiable reason (e.g. auth_required). */
+  errorFamily?: AdapterErrorFamily;
+}
+
+/** Context handed to a preflight — an optional model to target, and where the runtime would run. */
+export interface AdapterPreflightContext {
+  model?: string | null;
+  /** Optional cwd the runtime would launch in (informational; a preflight need not use it). */
+  workspaceDir?: string;
+}
+
+/**
+ * PURE preflight summarizer: fold a list of checks into an {@link AdapterPreflightResult}. `ok` is true
+ * iff EVERY check passed. `errorFamily` is passed through only when supplied (a classifiable failure like
+ * `auth_required`). No I/O — fixture-testable and shared by every server-side probe.
+ */
+export function summarizePreflight(
+  checks: AdapterPreflightCheck[],
+  errorFamily?: AdapterErrorFamily,
+): AdapterPreflightResult {
+  return {
+    ok: checks.length > 0 && checks.every((c) => c.ok),
+    checks,
+    ...(errorFamily ? { errorFamily } : {}),
+  };
+}
+
 export interface Adapter {
   /** Stable key used in config / selection (e.g. "openclaw", "codex", "claude", "process"). */
   key: string;
@@ -185,6 +234,14 @@ export interface Adapter {
    * as the shared implementation.
    */
   execute?(input: AdapterExecutionInput): AdapterExecutionResult;
+  /**
+   * OPTIONAL environment preflight ("Test connection") — verify the runtime is installed + reachable +
+   * authenticated BEFORE dispatching a run (Paperclip parity). This IS process-bound (it spawns the CLI
+   * or hits an auth endpoint), so it is normally implemented server-side, not on the pure built-in
+   * adapters here. When an adapter declares one, the server probe delegates to it; otherwise the server
+   * probe runs a generic `<binName> --version` check. Shape results via {@link summarizePreflight}.
+   */
+  testEnvironment?(ctx: AdapterPreflightContext): Promise<AdapterPreflightResult>;
 }
 
 /** Models an adapter offers: live-detected if it supports it (deduped with the curated list), else curated. */
@@ -662,6 +719,201 @@ function extractGeminiOutcome(stdout: string): {
   return { usage, model, isError, subtype };
 }
 
+// ─── opencode JSON parsing (verified live against opencode 1.18) ─────────────
+// `opencode run --format json` streams newline-delimited events: `step_start`, `text`
+// (part:{type:"text",text}), `tool_use` (part:{type:"tool",tool,state:{status,input,output}}),
+// optional `reasoning`, and the per-step terminal `step_finish`
+// (part:{reason,tokens:{input,output,cache:{write,read}}}). Only text/reasoning/tool turns become
+// transcript events; token usage accumulates from every `step_finish`.
+
+/** opencode JSON line parser (a concrete per-runtime `parseLine`). */
+function opencodeParseLine(line: string, ts = Date.now()): AdapterTranscriptEvent[] | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed[0] !== "{") return null;
+  let event: Record<string, unknown>;
+  try {
+    event = JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const type = asStr(event.type);
+  const part = asRecord(event.part) ?? {};
+  if (type === "text") {
+    const text = asStr(part.text).trim();
+    return text ? [{ kind: "assistant", ts, text: scrubText(text) }] : null;
+  }
+  if (type === "reasoning") {
+    const text = asStr(part.text ?? part.reasoning).trim();
+    return text ? [{ kind: "thinking", ts, text: scrubText(text) }] : null;
+  }
+  if (type === "tool_use") {
+    const tool = asStr(part.tool) || "tool";
+    const state = asRecord(part.state) ?? {};
+    const status = asStr(state.status);
+    const events: AdapterTranscriptEvent[] = [{ kind: "tool_call", ts, tool, args: state.input ?? {} }];
+    if (status === "completed" || status === "error" || status === "failed" || state.output !== undefined) {
+      events.push({
+        kind: "tool_result",
+        ts,
+        tool,
+        result: state.output ?? asRecord(state.metadata)?.output,
+        isError: status === "error" || status === "failed",
+      });
+    }
+    return events;
+  }
+  return null;
+}
+
+/**
+ * Extract usage/outcome from an opencode JSON stdout blob. Token usage accumulates from each
+ * `step_finish` (`part.tokens`); opencode's `input` excludes cache reads (like codex) while `cache.write`
+ * is billed prompt, so - mirroring claude's cache-creation add - `cache.write` counts toward `tokensIn`.
+ * opencode's JSON events carry no model id, so `model` stays null.
+ */
+function extractOpencodeOutcome(stdout: string): {
+  usage: AdapterUsage | null;
+  model: string | null;
+  isError: boolean;
+  subtype: string;
+} {
+  let isError = false;
+  let subtype = "";
+  let sawUsage = false;
+  const totals = { input: 0, output: 0 };
+  for (const raw of stdout.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line[0] !== "{") continue;
+    let event: Record<string, unknown>;
+    try {
+      event = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const type = asStr(event.type);
+    if (type === "step_finish") {
+      const part = asRecord(event.part) ?? {};
+      const tokens = asRecord(part.tokens) ?? {};
+      const cache = asRecord(tokens.cache) ?? {};
+      totals.input += asNum(tokens.input) + asNum(cache.write);
+      totals.output += asNum(tokens.output);
+      sawUsage = true;
+      if (asStr(part.reason) === "error") {
+        isError = true;
+        subtype = "error";
+      }
+    } else if (type === "error") {
+      isError = true;
+      subtype = "error";
+    }
+  }
+  const usage: AdapterUsage | null = sawUsage
+    ? { tokensIn: totals.input, tokensOut: totals.output, model: null }
+    : null;
+  return { usage, model: null, isError, subtype };
+}
+
+// ─── pi JSON parsing (verified against pi 0.73 docs/json.md + pi-ai types) ───
+// `pi -p --mode json` streams AgentSessionEvents: a `session` header then agent/turn/message lifecycle
+// events. The per-turn terminal `message_end` carries the full assistant message
+// (content:[{type:"text"|"thinking"|"toolCall"}], usage:{input,output,cacheWrite,...}, model, stopReason);
+// `tool_execution_end` carries a tool result. Only those two become transcript events (using message_end's
+// final message avoids the duplicate deltas emitted by message_update).
+
+/** Map a pi assistant message's content blocks into transcript events, or null when it carries no turn. */
+function piMessageEvents(message: unknown, ts: number): AdapterTranscriptEvent[] | null {
+  const msg = asRecord(message);
+  if (!msg || asStr(msg.role) !== "assistant") return null;
+  const content = Array.isArray(msg.content) ? msg.content : [];
+  const out: AdapterTranscriptEvent[] = [];
+  for (const blockRaw of content) {
+    const block = asRecord(blockRaw);
+    if (!block) continue;
+    const bType = asStr(block.type);
+    if (bType === "text") {
+      const t = asStr(block.text).trim();
+      if (t) out.push({ kind: "assistant", ts, text: scrubText(t) });
+    } else if (bType === "thinking") {
+      const t = asStr(block.thinking).trim();
+      if (t) out.push({ kind: "thinking", ts, text: scrubText(t) });
+    } else if (bType === "toolCall") {
+      out.push({ kind: "tool_call", ts, tool: asStr(block.name) || "tool", args: block.arguments ?? {} });
+    }
+  }
+  return out.length ? out : null;
+}
+
+/** pi JSON line parser (a concrete per-runtime `parseLine`). */
+function piParseLine(line: string, ts = Date.now()): AdapterTranscriptEvent[] | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed[0] !== "{") return null;
+  let event: Record<string, unknown>;
+  try {
+    event = JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const type = asStr(event.type);
+  if (type === "message_end") return piMessageEvents(event.message, ts);
+  if (type === "tool_execution_end") {
+    return [
+      {
+        kind: "tool_result",
+        ts,
+        tool: asStr(event.toolName) || undefined,
+        result: event.result,
+        isError: event.isError === true,
+      },
+    ];
+  }
+  return null;
+}
+
+/**
+ * Extract usage/model/outcome from a pi JSON stdout blob. Each assistant `message_end` carries its own
+ * `usage`; totals accumulate across turns. `cacheWrite` is billed prompt (cache creation), so - mirroring
+ * claude - it counts toward `tokensIn`. A terminal assistant `stopReason` of error/aborted marks failure.
+ */
+function extractPiOutcome(stdout: string): {
+  usage: AdapterUsage | null;
+  model: string | null;
+  isError: boolean;
+  subtype: string;
+} {
+  let model: string | null = null;
+  let isError = false;
+  let subtype = "";
+  let sawUsage = false;
+  const totals = { input: 0, output: 0 };
+  for (const raw of stdout.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line[0] !== "{") continue;
+    let event: Record<string, unknown>;
+    try {
+      event = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    if (asStr(event.type) !== "message_end") continue;
+    const msg = asRecord(event.message);
+    if (!msg || asStr(msg.role) !== "assistant") continue;
+    if (typeof msg.model === "string" && msg.model) model = msg.model;
+    const u = asRecord(msg.usage) ?? {};
+    totals.input += asNum(u.input) + asNum(u.cacheWrite);
+    totals.output += asNum(u.output);
+    sawUsage = true;
+    const stop = asStr(msg.stopReason);
+    if (stop === "error" || stop === "aborted") {
+      isError = true;
+      subtype = stop;
+    }
+  }
+  const usage: AdapterUsage | null = sawUsage
+    ? { tokensIn: totals.input, tokensOut: totals.output, model }
+    : null;
+  return { usage, model, isError, subtype };
+}
+
 /** The usage/outcome extractor a runtime plugs into {@link deriveAdapterExecutionResult}. */
 type OutcomeExtractor = (stdout: string) => {
   usage: AdapterUsage | null;
@@ -778,6 +1030,8 @@ const codexAdapter: Adapter = {
     useShell: false,
     layout: GENERIC_LAYOUT,
   }),
+  // Live model detection (best-effort): probe the installed CLI; empty → resolveAdapterModels keeps curated.
+  detectModels: () => detectModelsForKey("codex"),
   // Adapter-owned execution contract (parity slice): codex `exec` streams JSONL protocol events, so it
   // gets a real per-runtime line parser + codex-specific usage/outcome derivation.
   parseLine: codexParseLine,
@@ -791,10 +1045,15 @@ const claudeAdapter: Adapter = {
   displayName: "Claude Code",
   requiresTemplate: false,
   supportsModel: true,
-  // Curated Claude model ids; a runner with the CLI can add more via detectModels (not wired here).
+  // Curated Claude model ids; a runner with the CLI adds more live via detectModels (below).
   models: ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5", "claude-fable-5"],
   installCommand: "npm install -g @anthropic-ai/claude-code",
   binName: "claude",
+  // Live model detection (best-effort): probe the installed CLI; empty → resolveAdapterModels keeps curated.
+  detectModels: () => detectModelsForKey("claude"),
+  // Concrete provider quota (best-effort): read a local Claude usage file if present, else an explicit
+  // "unknown" window (see adapter-quota.ts). Wired here so fetchAllProviderQuota returns claude data.
+  getQuotaWindows: claudeQuotaWindows,
   build: (ctx) => ({
     // stream-json (with --verbose, which Claude requires alongside --print) so the run emits the JSONL
     // that claudeParseLine turns into a typed transcript + usage. Without this the CLI prints plain text
@@ -844,6 +1103,8 @@ const geminiAdapter: Adapter = {
     useShell: false,
     layout: GENERIC_LAYOUT,
   }),
+  // Live model detection (best-effort): probe the installed CLI; empty → resolveAdapterModels keeps curated.
+  detectModels: () => detectModelsForKey("gemini"),
   // Adapter-owned execution contract (parity slice): the gemini CLI streams JSONL assistant turns +
   // a terminal result envelope, so it gets a real per-runtime line parser + gemini-specific derivation.
   parseLine: geminiParseLine,
@@ -940,12 +1201,29 @@ const cursorAdapter: Adapter = {
   installCommand: "curl https://cursor.com/install -fsS | bash",
   binName: "cursor-agent",
   build: (ctx) => ({
-    argv: ["cursor-agent", "-p", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    // Verified live via `cursor-agent --help` + Cursor headless docs: `-p --output-format stream-json`
+    // makes cursor-agent stream Claude-Code-style JSONL (system/init + assistant + result) that
+    // claudeParseLine/extractClaudeOutcome consume; `--force` (alias `--yolo`) auto-approves tool calls
+    // for unattended runs (without it edits are only proposed, not applied). Prompt is positional (last).
+    argv: [
+      "cursor-agent",
+      "-p",
+      "--output-format",
+      "stream-json",
+      "--force",
+      ...(ctx.model ? ["--model", ctx.model] : []),
+      brief(ctx),
+    ],
     mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
     layout: GENERIC_LAYOUT,
   }),
+  // Cursor's stream-json mirrors Claude Code's shape, so it reuses claude's line parser + outcome extractor.
+  parseLine: claudeParseLine,
+  execute(input) {
+    return deriveAdapterExecutionResult(this, input);
+  },
 };
 
 const grokAdapter: Adapter = {
@@ -957,7 +1235,10 @@ const grokAdapter: Adapter = {
   installCommand: "npm install -g @vibe-kit/grok-cli",
   binName: "grok",
   build: (ctx) => ({
-    argv: ["grok", "-p", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    // Verified live via `grok --help` (v1.0.1): headless mode is `-p <prompt>` and there is NO JSON /
+    // stream output flag - grok only emits plain text - so it stays on the blob path (no parseLine/execute).
+    // The model flag (`-m`/`--model`) MUST precede `-p`; otherwise `-p` swallows `--model` as its prompt value.
+    argv: ["grok", ...(ctx.model ? ["-m", ctx.model] : []), "-p", brief(ctx)],
     mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
@@ -974,12 +1255,19 @@ const opencodeAdapter: Adapter = {
   installCommand: "npm install -g opencode-ai",
   binName: "opencode",
   build: (ctx) => ({
-    argv: ["opencode", "run", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    // Verified live via `opencode run --help` + a real `opencode run --format json` run (v1.18): `--format
+    // json` streams raw JSONL events (text/tool_use/step_finish) that opencodeParseLine + extractOpencodeOutcome
+    // consume. Model is `provider/model` via `--model`; the message is positional (last).
+    argv: ["opencode", "run", "--format", "json", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
     mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
     layout: GENERIC_LAYOUT,
   }),
+  parseLine: opencodeParseLine,
+  execute(input) {
+    return deriveAdapterExecutionResult(this, input, extractOpencodeOutcome);
+  },
 };
 
 const piAdapter: Adapter = {
@@ -991,12 +1279,19 @@ const piAdapter: Adapter = {
   installCommand: "npm install -g @mariozechner/pi-coding-agent",
   binName: "pi",
   build: (ctx) => ({
-    argv: ["pi", "-p", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
+    // Verified live via `pi --help` + bundled docs/json.md + pi-ai types (v0.73): `-p` is non-interactive
+    // and `--mode json` streams AgentSessionEvents (message_end carries the assistant turn + usage) that
+    // piParseLine + extractPiOutcome consume. Model via `--model`; the prompt is positional (last).
+    argv: ["pi", "-p", "--mode", "json", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],
     mode: "spawn",
     cwd: ctx.workspaceDir,
     useShell: false,
     layout: GENERIC_LAYOUT,
   }),
+  parseLine: piParseLine,
+  execute(input) {
+    return deriveAdapterExecutionResult(this, input, extractPiOutcome);
+  },
 };
 
 const hermesAdapter: Adapter = {
@@ -1006,6 +1301,9 @@ const hermesAdapter: Adapter = {
   supportsModel: true,
   models: [],
   // Hermes CLI package name is deployment-specific; leave install unset (probe-only) until confirmed.
+  // UNVERIFIED: no public `hermes` package was installable to run `--help` against, so this argv could not
+  // be confirmed against a real CLI (unlike cursor/grok/opencode/pi, which were verified live). It stays on
+  // the plain blob path (no parseLine/execute) until a real Hermes local CLI is available to confirm its form.
   binName: "hermes",
   build: (ctx) => ({
     argv: ["hermes", "run", ...(ctx.model ? ["--model", ctx.model] : []), brief(ctx)],

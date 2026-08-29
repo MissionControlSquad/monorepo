@@ -9,6 +9,54 @@ import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import { isUnderHold } from "./task-tree-hold";
 
+/** A blocker is "resolved" once it reaches a terminal status; only then can the blocked task proceed. */
+const TERMINAL_BLOCKER_STATUSES = new Set(["done", "cancelled"]);
+
+/**
+ * Parity §3.12 — refuse checkout while a task still has an UNRESOLVED blocking dependency. A task is
+ * blocked by its `blockedByTaskId` edge and by every `TaskRelation` of type `blocks` targeting it; a
+ * blocker is resolved only once it is `done`/`cancelled`. Previously this was only noticed later in
+ * stranded-work; catching it at claim time gives the claimer an actionable, readable error. Returns
+ * the list of open blockers (empty when clear) so callers can surface which tasks to finish first.
+ */
+export async function findUnresolvedBlockers(
+  taskId: string,
+): Promise<{ id: string; taskNumber: number; title: string; status: string }[]> {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { blockedByTaskId: true },
+  });
+  if (!task) return [];
+
+  const blockerIds = new Set<string>();
+  if (task.blockedByTaskId) blockerIds.add(task.blockedByTaskId);
+  const relations = await prisma.taskRelation.findMany({
+    where: { targetTaskId: taskId, type: "blocks" },
+    select: { sourceTaskId: true },
+  });
+  for (const r of relations) blockerIds.add(r.sourceTaskId);
+  if (blockerIds.size === 0) return [];
+
+  const blockers = await prisma.task.findMany({
+    where: { id: { in: [...blockerIds] } },
+    select: { id: true, taskNumber: true, title: true, status: true },
+  });
+  return blockers.filter((b) => !TERMINAL_BLOCKER_STATUSES.has(b.status));
+}
+
+/** Throw a readable, actionable error if the task has any unresolved blocker. No-op when clear. */
+export async function assertNoUnresolvedBlockers(taskId: string): Promise<void> {
+  const open = await findUnresolvedBlockers(taskId);
+  if (open.length === 0) return;
+  const list = open.map((b) => `#${b.taskNumber} "${b.title}" (${b.status})`).join(", ");
+  throw new GraphQLError(
+    `Task is blocked by unresolved work: ${list}. Finish (mark done or cancel) ${
+      open.length === 1 ? "that task" : "those tasks"
+    } before checking this one out.`,
+    { extensions: { code: "TASK_BLOCKED", blockers: open.map((b) => b.id) } },
+  );
+}
+
 /** Pure: a lease is expired when its expiry is in the past. Unit-testable. */
 export function isLeaseExpired(expiresAt: Date | null, now: Date = new Date()): boolean {
   return expiresAt != null && expiresAt.getTime() < now.getTime();
@@ -43,6 +91,8 @@ export async function checkoutTask(
     });
   if (await isUnderHold(taskId))
     throw new GraphQLError("Task is under a subtree hold", { extensions: { code: "CONFLICT" } });
+  // Parity §3.12 — a task with unresolved blockers can't be claimed (fail early with a clear error).
+  await assertNoUnresolvedBlockers(taskId);
 
   const token = randomUUID();
   const rows = await prisma.$queryRaw<{ id: string; token: string; expires: Date }[]>`

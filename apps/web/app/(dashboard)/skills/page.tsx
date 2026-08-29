@@ -10,11 +10,15 @@ import {
   LINT_SKILL_QUERY,
   AUDIT_SKILL_QUERY,
   SKILL_VERSIONS_QUERY,
+  SKILL_UPDATE_STATUS_QUERY,
+  PROJECT_WORKSPACES_QUERY,
+  PROJECT_WORKSPACE_SKILL_CANDIDATES_QUERY,
 } from "@/lib/graphql/queries";
 import {
   IMPORT_SKILL_PACKAGE,
   IMPORT_SKILL_FROM_SOURCE,
   IMPORT_SKILL_FROM_CATALOG,
+  IMPORT_SKILL_FROM_PROJECT_SCAN,
   FORK_SKILL,
   STAR_SKILL,
   UNSTAR_SKILL,
@@ -24,7 +28,8 @@ import {
   UPSERT_SKILL_FILE,
   DELETE_SKILL_FILE,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Textarea } from "@/components/ui";
+import { Button, Card, Badge, Textarea, Tooltip, EmptyState } from "@/components/ui";
+import { Blocks } from "lucide-react";
 import { SkillDialog } from "@/components/dialogs/SkillDialog";
 import { SkillComments } from "@/components/skills/SkillComments";
 import { SkillUpdatePanel } from "@/components/skills/SkillUpdatePanel";
@@ -45,6 +50,11 @@ interface Skill {
   trustLevel: string;
   sharingScope: string;
   forkedFromSkillId: string | null;
+  sourceType: string | null;
+  sourceBadge: string | null;
+  catalogKey: string | null;
+  packageVersion: string | null;
+  catalogKind: string | null;
 }
 interface CatalogSkill {
   id: string;
@@ -74,6 +84,7 @@ export default function SkillsPage() {
     if (!r.error) refetch({ requestPolicy: "network-only" });
   }
   const [, forkSkill] = useMutation(FORK_SKILL);
+  const [, importFromProjectScan] = useMutation(IMPORT_SKILL_FROM_PROJECT_SCAN);
   const [, starSkill] = useMutation(STAR_SKILL);
   const [, unstarSkill] = useMutation(UNSTAR_SKILL);
   const [, deleteSkill] = useMutation(DELETE_SKILL);
@@ -86,6 +97,7 @@ export default function SkillsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showProject, setShowProject] = useState(false);
   const [openFiles, setOpenFiles] = useState<string | null>(null);
   const [openLint, setOpenLint] = useState<string | null>(null);
   const [openAudit, setOpenAudit] = useState<string | null>(null);
@@ -101,6 +113,24 @@ export default function SkillsPage() {
     setBusy(key);
     try {
       await fn();
+      refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Fork with a duplicate-fork precheck: the server rejects a second fork of the same origin unless
+  // `force` is set, so on that specific rejection we confirm with the user and retry with force.
+  async function onFork(s: Skill) {
+    setBusy(s.id);
+    try {
+      const res = await forkSkill({ id: s.id });
+      const msg = res.error?.graphQLErrors[0]?.message ?? "";
+      if (msg.includes("already has a fork")) {
+        if (confirm(`${msg}.\n\nFork "${s.name}" again anyway?`)) {
+          await forkSkill({ id: s.id, force: true });
+        }
+      }
       refresh();
     } finally {
       setBusy(null);
@@ -125,6 +155,11 @@ export default function SkillsPage() {
           <Button size="sm" variant="secondary" onClick={() => setShowImport((v) => !v)}>
             Import from source
           </Button>
+          <Tooltip content="Scan a project workspace's checked-out repo for SKILL.md bundles and import one into this workspace.">
+            <Button size="sm" variant="secondary" onClick={() => setShowProject((v) => !v)}>
+              Import from project
+            </Button>
+          </Tooltip>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             New skill
           </Button>
@@ -139,6 +174,15 @@ export default function SkillsPage() {
       {/* Domain 5 real-import: install from a GitHub/URL source or the app-shipped catalog. Admin-only
           on the server (importSkillFromSource / importSkillFromCatalog). */}
       {showImport && <ImportPanel onImported={refresh} />}
+
+      {/* §3 project-workspace scan: pick a project workspace, scan its checked-out repo for SKILL.md
+          bundles, and import one. Admin-only on the server (importSkillFromProjectScan). */}
+      {showProject && (
+        <ImportFromProjectPanel
+          importScan={(vars) => importFromProjectScan(vars)}
+          onImported={refresh}
+        />
+      )}
 
       {/* Public catalog — skills other workspaces published (sharingScope=public). Install copies
           one into your workspace. */}
@@ -171,24 +215,31 @@ export default function SkillsPage() {
                   ★ {c.starCount} · {c.installCount} agents · {c.forkCount} installs
                 </span>
               </span>
-              <Button
-                size="sm"
-                disabled={busy === c.id}
-                onClick={() =>
-                  act(async () => {
-                    await installCatalogSkill({ skillId: c.id });
-                  }, c.id)
-                }
-              >
-                Install
-              </Button>
+              <Tooltip content="Copies this published skill into your workspace as your own editable copy, so you can assign it to agents. Your copy stays independent of the original.">
+                <Button
+                  size="sm"
+                  disabled={busy === c.id}
+                  onClick={() =>
+                    act(async () => {
+                      await installCatalogSkill({ skillId: c.id });
+                    }, c.id)
+                  }
+                >
+                  Install
+                </Button>
+              </Tooltip>
             </div>
           ))}
         </Card>
       )}
 
       {skills.length === 0 && (
-        <Card className="p-8 text-center text-sm text-muted-foreground">No skills yet.</Card>
+        <EmptyState
+          icon={<Blocks />}
+          title="No skills yet"
+          description="Create a capability module or import one, then assign it to your agents."
+          action={<Button onClick={() => setCreateOpen(true)}>New skill</Button>}
+        />
       )}
       {skills.map((s) => (
         <Card key={s.id} className="space-y-3 p-4">
@@ -200,6 +251,8 @@ export default function SkillsPage() {
               <Badge variant="gray">v{s.currentVersion}</Badge>
               <Badge variant="blue">{s.trustLevel}</Badge>
               {s.forkedFromSkillId && <Badge variant="purple">fork</Badge>}
+              <SourceBadge skill={s} />
+              {s.forkedFromSkillId && <SkillLineageBadge skillId={s.id} />}
               <span className="text-xs text-muted-foreground">
                 ★ {s.starCount} · {s.installCount} agents · {s.forkCount} forks
               </span>
@@ -284,7 +337,7 @@ export default function SkillsPage() {
                 size="sm"
                 variant="secondary"
                 disabled={busy === s.id}
-                onClick={() => act(() => forkSkill({ id: s.id }), s.id)}
+                onClick={() => onFork(s)}
               >
                 Fork
               </Button>
@@ -425,12 +478,207 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
               <Badge variant="gray">{p.category}</Badge>
               <Badge variant="blue">{p.trustLevel}</Badge>
             </span>
-            <Button size="sm" disabled={busy === p.id} onClick={() => onInstallCatalog(p.id)}>
-              Install
-            </Button>
+            <Tooltip content="Adds this catalog package to your workspace as a new, editable skill.">
+              <Button size="sm" disabled={busy === p.id} onClick={() => onInstallCatalog(p.id)}>
+                Install
+              </Button>
+            </Tooltip>
           </div>
         ))}
       </div>
+      {err && <p className="text-xs text-destructive">{err}</p>}
+      {ok && <p className="text-xs text-emerald-600">{ok}</p>}
+    </Card>
+  );
+}
+
+// §3 source badge: where a skill came from (catalog/github/url/local/project/forked/skillsh), rendered
+// with an explanatory tooltip. Falls back to the raw sourceType when no badge was stamped.
+const SOURCE_BADGE_TOOLTIP: Record<string, string> = {
+  catalog: "Installed from the app-shipped skills catalog.",
+  github: "Imported from a GitHub repository.",
+  url: "Imported from a raw file URL.",
+  local: "Imported from an allow-listed local path on the server.",
+  project: "Discovered by scanning a project workspace's checked-out repo.",
+  forked: "Forked from another skill in this workspace.",
+  skillsh: "Imported from the skills.sh registry.",
+};
+
+function SourceBadge({ skill }: { skill: Skill }) {
+  const badge = skill.sourceBadge ?? (skill.sourceType === "local_path" ? null : skill.sourceType);
+  if (!badge) return null;
+  const detail = SOURCE_BADGE_TOOLTIP[badge] ?? `Source: ${badge}.`;
+  const provenance = [
+    skill.catalogKey && `package ${skill.catalogKey}`,
+    skill.packageVersion && `v${skill.packageVersion}`,
+    skill.catalogKind && `(${skill.catalogKind})`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <Tooltip content={provenance ? `${detail} · ${provenance}` : detail}>
+      <Badge variant="indigo">{badge}</Badge>
+    </Tooltip>
+  );
+}
+
+// §3 fork diverged-detection: for a fork, surface whether its origin has advanced since the fork
+// (diverged) or an installed origin has an update, using the shared skillUpdateStatus resolver.
+function SkillLineageBadge({ skillId }: { skillId: string }) {
+  const [{ data }] = useQuery<{
+    skillUpdateStatus: {
+      state: string;
+      originVersion: number | null;
+      latestVersion: number | null;
+    };
+  }>({
+    query: SKILL_UPDATE_STATUS_QUERY,
+    variables: { skillId },
+    requestPolicy: "cache-and-network",
+  });
+  const state = data?.skillUpdateStatus?.state;
+  if (state === "diverged")
+    return (
+      <Tooltip content="This fork's origin has changed since you forked it — the fork and its origin have diverged. Reassign or reset to reconcile.">
+        <Badge variant="yellow">diverged</Badge>
+      </Tooltip>
+    );
+  if (state === "update_available")
+    return (
+      <Tooltip content="The origin this skill was installed from has published a newer version.">
+        <Badge variant="orange">update available</Badge>
+      </Tooltip>
+    );
+  if (state === "origin_gone")
+    return (
+      <Tooltip content="The origin this skill was forked/installed from no longer exists.">
+        <Badge variant="red">origin gone</Badge>
+      </Tooltip>
+    );
+  return null;
+}
+
+interface ProjectWorkspaceRow {
+  id: string;
+  name: string;
+  projectId: string;
+}
+interface ProjectSkillCandidateRow {
+  dir: string;
+  name: string;
+  fileCount: number;
+  sourceRef: string;
+}
+
+// §3 project-workspace scan: choose a project workspace, scan its checked-out repo for SKILL.md
+// bundles, and import a chosen one. Admin-gated on the server; the project list needs the
+// EXECUTION_WORKSPACES flag, so it degrades to an empty list (with a hint) when unavailable.
+function ImportFromProjectPanel({
+  importScan,
+  onImported,
+}: {
+  importScan: (vars: { projectWorkspaceId: string; dir?: string }) => Promise<{
+    error?: { graphQLErrors: { message: string }[] };
+    data?: { importSkillFromProjectScan?: { name: string } };
+  }>;
+  onImported: () => void;
+}) {
+  const [pwId, setPwId] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+  const [{ data: pwData, error: pwErr }] = useQuery<{ projectWorkspaces: ProjectWorkspaceRow[] }>({
+    query: PROJECT_WORKSPACES_QUERY,
+  });
+  const workspaces = pwData?.projectWorkspaces ?? [];
+  const [{ data: candData, fetching: scanning, error: scanErr }, refetchCandidates] = useQuery<{
+    projectWorkspaceSkillCandidates: ProjectSkillCandidateRow[];
+  }>({
+    query: PROJECT_WORKSPACE_SKILL_CANDIDATES_QUERY,
+    variables: { projectWorkspaceId: pwId },
+    pause: !pwId,
+    requestPolicy: "cache-and-network",
+  });
+  const candidates = candData?.projectWorkspaceSkillCandidates ?? [];
+
+  async function onImportDir(dir: string, name: string) {
+    setErr(null);
+    setOk(null);
+    if (!confirm(`Import skill "${name}" from this project workspace?`)) return;
+    setBusy(dir);
+    try {
+      const res = await importScan({ projectWorkspaceId: pwId, dir });
+      if (res.error) return setErr(res.error.graphQLErrors[0]?.message ?? "Import failed");
+      setOk(`Imported "${res.data?.importSkillFromProjectScan?.name}"`);
+      onImported();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card className="space-y-3 p-4">
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-foreground">Import from project</p>
+        <p className="text-xs text-muted-foreground">
+          Scans a project workspace&apos;s checked-out repo for <code>SKILL.md</code> bundles and
+          imports one into this workspace. Admin only.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          className="min-w-[16rem] flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
+          value={pwId}
+          onChange={(e) => setPwId(e.target.value)}
+        >
+          <option value="">Select a project workspace…</option>
+          {workspaces.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.name}
+            </option>
+          ))}
+        </select>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!pwId || scanning}
+          onClick={() => refetchCandidates({ requestPolicy: "network-only" })}
+        >
+          {scanning ? "Scanning…" : "Rescan"}
+        </Button>
+      </div>
+      {pwErr && (
+        <p className="text-xs text-muted-foreground">
+          Project workspaces aren&apos;t available (the execution-workspaces feature may be off).
+        </p>
+      )}
+      {pwId && scanErr && (
+        <p className="text-xs text-destructive">
+          {scanErr.graphQLErrors[0]?.message ?? "Could not scan this workspace."}
+        </p>
+      )}
+      {pwId && !scanning && !scanErr && candidates.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          No <code>SKILL.md</code> bundles found in this workspace&apos;s checked-out files.
+        </p>
+      )}
+      {candidates.map((c) => (
+        <div
+          key={c.sourceRef}
+          className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 last:border-0 last:pb-0"
+        >
+          <span className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium text-foreground">{c.name}</span>
+            <span className="font-mono text-xs text-muted-foreground">{c.dir || "."}</span>
+            <Badge variant="gray">{c.fileCount} files</Badge>
+          </span>
+          <Tooltip content="Imports this SKILL.md bundle into your workspace as a new skill, stamped with project-scan provenance.">
+            <Button size="sm" disabled={busy === c.dir} onClick={() => onImportDir(c.dir, c.name)}>
+              Import
+            </Button>
+          </Tooltip>
+        </div>
+      ))}
       {err && <p className="text-xs text-destructive">{err}</p>}
       {ok && <p className="text-xs text-emerald-600">{ok}</p>}
     </Card>

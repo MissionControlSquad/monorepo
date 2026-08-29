@@ -1,21 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import { taskModel } from "@/server/models/task";
-import { resolveAgent } from "../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
+import { withAgent } from "../../_lib/with-agent";
+import { successResponse } from "../../_lib/json-response";
 import { ERR } from "../../_lib/error-messages";
 import { getAgentProjectIds } from "../../_lib/project-access";
-import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS, TaskStatus } from "@agentcenter/utils";
 
-export async function GET(request: Request) {
-  try {
-    const agent = await resolveAgent(request);
-
-    if (!(await isFeatureEnabled(FLAG_KEYS.REVIEWS))) {
-      return errorResponse(ERR.FEATURE_REVIEWS_UNAVAILABLE, 403);
-    }
-
+export const GET = withAgent(
+  async (_request, agent) => {
     const agentProjectIds = await getAgentProjectIds(agent.id);
 
     const tasks = await taskModel.findMany({
@@ -37,7 +30,6 @@ export async function GET(request: Request) {
     });
 
     return successResponse(tasks);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  { feature: { flag: FLAG_KEYS.REVIEWS, error: ERR.FEATURE_REVIEWS_UNAVAILABLE } },
+);

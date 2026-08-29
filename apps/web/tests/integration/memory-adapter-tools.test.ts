@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
-import { POST as BRIDGE_MEMORY } from "../../app/api/runner/bridge/memory/route";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
+import { POST as _BRIDGE_MEMORY } from "../../app/api/runner/bridge/memory/route";
+// memory route is now wrapped by withFeature (2-arg); it is static, so supply a dummy ctx.
+const BRIDGE_MEMORY = (req: Request) => _BRIDGE_MEMORY(req, undefined as never);
 import { attachRunBridgeToken } from "../../src/server/services/run-bridge";
 import {
   resolveMemoryAdapter,
@@ -16,11 +18,7 @@ import {
 const WS = "ws_mem_tools";
 
 async function enableFlag(key: string, on = true) {
-  await prisma.featureFlag.upsert({
-    where: { key },
-    create: { key, enabled: on, managedBy: "user" },
-    update: { enabled: on },
-  });
+  setTestFeature(key, on);
   invalidateFlagCache();
 }
 

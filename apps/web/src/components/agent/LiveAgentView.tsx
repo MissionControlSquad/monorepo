@@ -28,7 +28,7 @@ import { useAgentStatus } from "../context/AgentStatusContext";
 import { TimeAgo } from "../common/TimeAgo";
 import { AgentStatusBadge } from "./AgentStatusBadge";
 import { type AgentDetailedStatus } from "../../lib/constants";
-import { Button } from "@/components/ui";
+import { Button, Tooltip } from "@/components/ui";
 import { Checkbox } from "@/components/ui/shadcn/checkbox";
 import type { Agent, AgentAction } from "@agentcenter/types";
 
@@ -133,15 +133,17 @@ const LiveAgentViewContent = memo(function LiveAgentViewContent({
               </p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            aria-label="Close live view"
-            className="text-white hover:text-indigo-100 hover:bg-background/10 shrink-0 ml-2"
-          >
-            <X className="w-6 h-6" />
-          </Button>
+          <Tooltip content="Close live view">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label="Close live view"
+              className="text-white hover:text-indigo-100 hover:bg-background/10 shrink-0 ml-2"
+            >
+              <X className="w-6 h-6" />
+            </Button>
+          </Tooltip>
         </div>
 
         {/* Current Status */}
@@ -184,13 +186,15 @@ const LiveAgentViewContent = memo(function LiveAgentViewContent({
           Live Activity Feed - {actions.length} actions
         </div>
         <div className="flex items-center space-x-2">
-          <label className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <Checkbox
-              checked={autoScroll}
-              onCheckedChange={(checked) => setAutoScroll(checked === true)}
-            />
-            <span>Auto-scroll</span>
-          </label>
+          <Tooltip content="Keep the feed pinned to the newest action as it streams in. Turn off to scroll back through earlier activity without it jumping.">
+            <label className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <Checkbox
+                checked={autoScroll}
+                onCheckedChange={(checked) => setAutoScroll(checked === true)}
+              />
+              <span>Auto-scroll</span>
+            </label>
+          </Tooltip>
         </div>
       </div>
 

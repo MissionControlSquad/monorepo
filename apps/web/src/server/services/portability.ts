@@ -8,12 +8,12 @@
  */
 import { randomUUID } from "node:crypto";
 import { COLLISION_ACTION } from "@agentcenter/utils";
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { CollisionStrategy } from "@agentcenter/database";
 import { resolveCollision } from "./teams";
 import { createSkill, slugify } from "./skills";
 import { provisionSetupStatus } from "./agent-governance";
+import { badRequest } from "./service-errors";
 
 export const BUNDLE_VERSION = 1;
 
@@ -45,10 +45,6 @@ export interface PortableBundle {
   agents: PortableAgent[];
   projects: PortableProject[];
   skills: PortableSkill[];
-}
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
 }
 
 /** Pure: validate a bundle's shape + version. Throws BAD_USER_INPUT on a malformed bundle. */

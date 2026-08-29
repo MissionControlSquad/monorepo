@@ -17,10 +17,7 @@ import {
   resolveWorkspaceRuntimeConfig,
   type WorkspaceRuntimeConfig,
 } from "@agentcenter/utils";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 // ── ProjectWorkspace CRUD ────────────────────────────────────────────────────
 export interface ProjectWorkspaceInput {

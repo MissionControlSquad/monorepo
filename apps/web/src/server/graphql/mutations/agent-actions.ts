@@ -1,20 +1,9 @@
 import { builder } from "../builder";
 import { agentModel, taskModel, agentActionModel } from "../../models";
 import { pubsub, PubSubEvent, agentActionAgentTopic, agentActionProjectTopic } from "../../pubsub";
-import { applyAgentStatusUpdate } from "../../agent-status";
-
-const ACTION_TO_DETAILED_STATUS: Record<string, string> = {
-  file_edited: "coding",
-  code_written: "coding",
-  command_executed: "coding",
-  file_opened: "coding",
-  research_done: "researching",
-  thinking: "thinking",
-  reviewing: "reviewing",
-  deploying: "deploying",
-  testing: "testing",
-  writing_docs: "writing",
-};
+import { applyAgentStatusUpdate, ACTION_TO_DETAILED_STATUS } from "../../agent-status";
+import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 builder.mutationField("logAgentAction", (t) =>
   t.prismaField({
@@ -26,7 +15,8 @@ builder.mutationField("logAgentAction", (t) =>
       taskId: t.arg.string(),
       metadata: t.arg.string(), // JSON string
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const agent = await agentModel.findById(args.agentId);
       if (!agent) throw new Error("Agent not found");
 

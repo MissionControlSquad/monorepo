@@ -23,10 +23,11 @@
  *
  * Registered in vercel.json to run every 5 minutes.
  */
-import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
-import { env } from "@/server/env";
+import { successResponse, handleError } from "../../_lib/json-response";
+import { withCronAuth } from "../../_lib/with-cron-auth";
 import { reapStuckRunnerCommands } from "@/server/services/runner-commands";
 import { reapStaleLeases } from "@/server/services/environment-leases";
+import { reapIdleRuntimeServices } from "@/server/services/workspace-runtime-services";
 import { reapStaleTerminalSessions } from "@/server/services/terminals";
 import { sweepExpiredCheckouts } from "@/server/services/task-checkout";
 import { evaluateWatchdogs } from "@/server/services/task-watchdog";
@@ -45,12 +46,8 @@ import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { drainAgentWakeups } from "@/server/services/agent-wakeups";
 
-export async function GET(request: Request) {
+export const GET = withCronAuth(async () => {
   try {
-    const authHeader = request.headers.get("authorization");
-    if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-      return errorResponse("Unauthorized", 401);
-    }
     const now = new Date();
     // Watchdogs FIRST + sequentially: they read expired leases to record recovery decisions; the
     // blanket sweep below would otherwise clear those leases before the watchdog sees them, losing
@@ -71,6 +68,7 @@ export async function GET(request: Request) {
       telemetryPruned,
       memoryJobs,
       externalObjects,
+      runtimeServicesReaped,
     ] = await Promise.all([
       sweepExpiredCheckouts(now),
       reapStuckRunnerCommands(now),
@@ -96,6 +94,11 @@ export async function GET(request: Request) {
           on ? refreshDueExternalObjects({ now }) : { due: 0, refreshed: 0, failed: 0 },
         )
         .catch(() => ({ due: 0, refreshed: 0, failed: 0 })),
+      // Idle-reap long-lived workspace runtime services (dev/preview servers) with stopPolicy on_idle
+      // whose workspace has gone idle past the TTL. LOCAL_SERVICES-gated (mirrors the mutation surface).
+      isFeatureEnabled(FLAG_KEYS.LOCAL_SERVICES)
+        .then((on) => (on ? reapIdleRuntimeServices(now) : 0))
+        .catch(() => 0),
     ]);
     // Stranded-work reconciliation runs AFTER retry promotion so a run that just earned a retry (now
     // queued) is not mistaken for stranded. Owner-preserving re-dispatch → escalate-to-blocked ladder.
@@ -124,6 +127,7 @@ export async function GET(request: Request) {
       memoryJobsDrained: memoryJobs.completed,
       memoryJobsFailed: memoryJobs.failed,
       externalObjectsRefreshed: externalObjects.refreshed,
+      runtimeServicesReaped,
       wakesDelivered: wakes.delivered,
       wakesSuppressed: wakes.suppressed,
       at: now.toISOString(),
@@ -131,4 +135,4 @@ export async function GET(request: Request) {
   } catch (err) {
     return handleError(err);
   }
-}
+});

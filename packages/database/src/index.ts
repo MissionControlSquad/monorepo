@@ -15,7 +15,6 @@ export * from "./health";
 export * from "./system-settings";
 export * from "./project";
 export * from "./password-reset";
-export * from "./feature-flag";
 export * from "./license";
 export * from "./delegates";
 export * from "./activity";

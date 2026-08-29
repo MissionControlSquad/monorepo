@@ -19,11 +19,14 @@ import {
   resolveEffectiveWorkspaceStrategyType,
   redactRunSecrets,
   renderAdapterTranscript,
+  createAdapterTranscriptStream,
+  estimateRunCostCents,
   FLAG_KEYS,
   type TrustLevel,
   type AdapterExecutionResult,
   type AdapterErrorFamily,
   type AdapterExitReason,
+  type AdapterTranscriptEvent,
 } from "@agentcenter/utils";
 import {
   runHermesGateway,
@@ -34,19 +37,26 @@ import {
 } from "@/server/adapters/hermes-gateway";
 import type { AgentContextBundle } from "@agentcenter/types";
 import { getProfileAgentId } from "@agentcenter/database";
+import type { Prisma } from "@agentcenter/database";
 import { prisma } from "@/server/prisma";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { assembleContextBundle } from "./agent-context";
-import { getSandboxProvider } from "./sandbox-providers";
 import { resolveWorkspaceSecret, resolveEnvForAgent } from "./secrets";
-import { captureRunMemory } from "./agent-memory";
-import { enqueueMemoryJob } from "./memory-jobs";
+import { enqueueOrCaptureRunMemory } from "./memory-jobs";
 import { stampRunReview } from "./run-review";
 import { scheduleRunRetryIfTransient } from "./run-retry";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { assertExecutionAllowed } from "./execution-policy";
 import { resolveEnvironmentExecution, type EnvExecutionResolution } from "./environments";
-import { acquireLease, releaseLease, coerceLeasePolicy } from "./environment-leases";
+import { resolveEnvironmentRuntimeDriver } from "./environment-runtime-driver";
+import { evaluateRunConfig, CONFIGURATION_INCOMPLETE } from "./run-config-gate";
+import type { EnvSshResolution, SshExecTransport } from "./sandbox/ssh-runtime";
+import {
+  acquireLease,
+  releaseLease,
+  coerceLeasePolicy,
+  computeLeaseSecretFingerprint,
+} from "./environment-leases";
 import {
   getPrimaryProjectWorkspace,
   recordExecutionWorkspace,
@@ -55,7 +65,20 @@ import {
 import { beginRunStatus, setRunPhase, appendRunLog } from "./run-runtime-status";
 import { appendRunLog as appendRunLogChunk, finalizeRunLog } from "./run-log-store";
 import { attachRunBridgeToken } from "./run-bridge";
+import {
+  runSummaryPresentation,
+  runErrorPresentation,
+  type MessagePresentation,
+} from "./message-presentation";
 import { resolveActiveImageRef } from "./environment-custom-images";
+import { recordCostEvent } from "./cost";
+import {
+  registerRunAbort,
+  unregisterRunAbort,
+  requestRunCancellation,
+  isRunActive,
+  cancelReasonFromSignal,
+} from "./run-cancellation";
 import { env as env_ } from "../env";
 import type { SandboxProvider, SandboxHandle } from "./sandbox/types";
 import type { AgentTrustProfile, EnvironmentLease } from "@agentcenter/database";
@@ -63,6 +86,13 @@ import type { AgentTrustProfile, EnvironmentLease } from "@agentcenter/database"
 const MAX_OUTPUT_CHARS = 45_000;
 const MAX_MESSAGE_CHARS = 8_000;
 const DEFAULT_TIMEOUT_MS = 600_000;
+
+// §3 #11 (1) — map a task's Priority enum to the numeric AgentRun.priority the run-queue drain orders by
+// (higher dispatches first). An unknown/absent priority ranks 0 (same as a plain FIFO run).
+const RUN_PRIORITY_RANK: Record<string, number> = { low: 0, medium: 1, high: 2, urgent: 3 };
+function runPriorityFromTask(priority: string | null | undefined): number {
+  return RUN_PRIORITY_RANK[priority ?? ""] ?? 0;
+}
 
 /** The subset of an agent the admission path needs (loaded with its trust profile). */
 type AdmissionAgent = {
@@ -83,36 +113,30 @@ async function resolveAndAdmitTarget(
   workspaceId: string,
   agent: AdmissionAgent,
   inputProviderKey?: string | null,
+  opts?: { sshExec?: SshExecTransport },
 ): Promise<{
   provider: SandboxProvider;
   providerKey: string;
   execDriver: string;
   envRes: EnvExecutionResolution | null;
+  ssh: EnvSshResolution | null;
 }> {
   const envRes =
     !inputProviderKey && agent.environmentId
       ? await resolveEnvironmentExecution(workspaceId, agent.environmentId)
       : null;
-  if (envRes && envRes.providerKey === null) {
-    throw new GraphQLError(
-      `Environment driver "${envRes.driver}" is not yet runnable via the sandbox seam. Use a local or sandbox environment.`,
-      { extensions: { code: "BAD_USER_INPUT" } },
-    );
-  }
-  const execDriver = envRes?.driver ?? "sandbox";
 
-  const providerKey = (inputProviderKey ?? envRes?.providerKey ?? agent.sandboxProvider) || null;
-  if (!providerKey) {
-    throw new GraphQLError("No sandbox provider is configured for this agent", {
-      extensions: { code: "BAD_USER_INPUT" },
-    });
-  }
-  const provider = getSandboxProvider(providerKey);
-  if (!provider) {
-    throw new GraphQLError(`Unknown sandbox provider: ${providerKey}`, {
-      extensions: { code: "BAD_USER_INPUT" },
-    });
-  }
+  // Unified runtime driver (this slice): route local/ssh/sandbox through ONE seam so an ssh Environment
+  // resolves to a real executable transport rather than providerKey:null. ENVIRONMENTS-gated for ssh.
+  const runtime = await resolveEnvironmentRuntimeDriver({
+    workspaceId,
+    envRes,
+    inputProviderKey,
+    agentSandboxProvider: agent.sandboxProvider,
+    environmentsEnabled: await isFeatureEnabled(FLAG_KEYS.ENVIRONMENTS),
+    sshExec: opts?.sshExec,
+  });
+  const { provider, providerKey, driver: execDriver, ssh } = runtime;
 
   // Fail-closed admission: a low-trust/untrusted (or explicitly contained) agent must run in an
   // ISOLATING sandbox — never on the control-plane host (the `local` provider).
@@ -133,15 +157,29 @@ async function resolveAndAdmitTarget(
   // Workspace execution allowlist (Plan 4): deny an inadmissible target BEFORE provisioning/queuing.
   await assertExecutionAllowed(workspaceId, { driver: execDriver, provider: providerKey });
 
-  return { provider, providerKey, execDriver, envRes };
+  return { provider, providerKey, execDriver, envRes, ssh: ssh ?? null };
 }
 
 /** Post the run outcome to the task timeline as a message from the agent (best-effort). */
-async function postRunToTask(agentId: string, taskId: string, summary: string): Promise<void> {
+async function postRunToTask(
+  agentId: string,
+  taskId: string,
+  summary: string,
+  runId?: string,
+  presentation?: MessagePresentation | null,
+): Promise<void> {
   try {
     const fromProfileId = await getOrCreateAgentProfileId(agentId);
     await prisma.message.create({
-      data: { taskId, fromProfileId, content: summary.slice(0, MAX_MESSAGE_CHARS) },
+      data: {
+        taskId,
+        fromProfileId,
+        content: summary.slice(0, MAX_MESSAGE_CHARS),
+        // Parity §3.12 — attribute the timeline post to the run that produced it.
+        createdByRunId: runId ?? null,
+        // Work-items §3 Item 2 — structured presentation so the timeline renders a richer run card.
+        ...(presentation ? { presentation: presentation as unknown as Prisma.InputJsonValue } : {}),
+      },
     });
   } catch {
     // Never fail the run because the timeline post failed.
@@ -197,6 +235,58 @@ function executionColumns(execution: AdapterExecutionResult | undefined): {
     ...(execution.errorFamily ? { errorFamily: execution.errorFamily } : {}),
     exitReason: execution.exitReason,
   };
+}
+
+/**
+ * Cost half (§3 #2): price a finished run from its captured token usage + model against the curated
+ * rate-card, PERSIST it onto the AgentRun (`costCents` + `costStatus`), and emit a `CostEvent`
+ * attributing the spend to the agent/model/task/run (the CostEvent funnel fans it into every budget
+ * policy). No-op when the run captured no usage (a blob-only adapter with no token counts) so we never
+ * write a bogus $0. An UNKNOWN model prices at 0 with `priced:false` → persisted + emitted as
+ * `unpriced` (never silently billed as the real cost; repriceable later via repriceCostEvent).
+ *
+ * HOW COST IS COMPUTED: cents = round(tokensIn/1e6 * $in/Mtok + tokensOut/1e6 * $out/Mtok). Example —
+ * a claude-opus-4-8 run with 100 in / 50 out → ~$0.0053 → 1 cent (priced). An unknown model → 0 cents,
+ * costStatus "unpriced". Best-effort: cost accounting must NEVER fail a run, so this returns the columns
+ * to fold into the terminal write and swallows any CostEvent error.
+ *
+ * Returns the AgentRun cost columns to merge into the terminal update (empty when there is no usage).
+ */
+async function persistRunCost(input: {
+  workspaceId: string;
+  agentId: string;
+  taskId: string | null;
+  projectId?: string | null;
+  runId: string;
+  execution: AdapterExecutionResult | undefined;
+}): Promise<{ costCents?: number; costStatus?: string }> {
+  const usage = input.execution?.usage;
+  if (!usage) return {}; // no captured token usage → nothing to price
+  const cost = estimateRunCostCents({
+    model: usage.model,
+    tokensIn: usage.tokensIn,
+    tokensOut: usage.tokensOut,
+  });
+  const costStatus = cost.priced ? "reported" : "unpriced";
+  try {
+    await recordCostEvent({
+      workspaceId: input.workspaceId,
+      agentId: input.agentId,
+      model: usage.model ?? null,
+      taskId: input.taskId,
+      projectId: input.projectId ?? null,
+      tokensIn: usage.tokensIn,
+      tokensOut: usage.tokensOut,
+      amountCents: cost.cents,
+      costStatus,
+      source: "run",
+      // Attribute to THIS run + make the emission idempotent (a re-run of the finalizer won't double-bill).
+      idempotencyKey: `run:${input.runId}`,
+    });
+  } catch {
+    // best-effort — cost accounting must never fail a run
+  }
+  return { costCents: cost.cents, costStatus };
 }
 
 /** The task prompt written into the sandbox as TASK.md (mirrors the runner's taskMarkdown). */
@@ -285,6 +375,8 @@ export async function runTaskInSandbox(input: {
   existingRunId?: string;
   /** DI seam (tests): the fetch used by the Hermes gateway dispatch path. Defaults to global fetch. */
   fetchImpl?: typeof fetch;
+  /** DI seam (tests): the ssh exec transport injected into the ssh runtime driver. Defaults to real ssh2. */
+  sshExec?: SshExecTransport;
 }): Promise<SandboxRunResult> {
   const agent = await prisma.agent.findFirst({
     where: { id: input.agentId, workspaceId: input.workspaceId },
@@ -292,11 +384,12 @@ export async function runTaskInSandbox(input: {
   });
   if (!agent) throw new GraphQLError("Agent not found", { extensions: { code: "NOT_FOUND" } });
 
-  // Resolve the target (Environment → provider) + enforce trust containment + execution allowlist.
-  const { provider, providerKey, execDriver, envRes } = await resolveAndAdmitTarget(
+  // Resolve the target (Environment → unified runtime driver) + enforce trust containment + allowlist.
+  const { provider, providerKey, execDriver, envRes, ssh } = await resolveAndAdmitTarget(
     input.workspaceId,
     agent,
     input.providerKey,
+    { sshExec: input.sshExec },
   );
 
   const bundle = await assembleContextBundle(
@@ -378,6 +471,46 @@ export async function runTaskInSandbox(input: {
           requestedByProfileId: input.requestedByProfileId ?? null,
         },
       });
+
+  // Pre-dispatch config/binding gate (EXECUTION_POLICY-gated): verify every secret binding + config the
+  // execution target needs is present BEFORE provisioning. A run missing an ssh key / sandbox credential
+  // is refused UP FRONT with `configuration_incomplete` (the run is marked, the task is told what's
+  // missing) instead of provisioning and failing mid-run. Extends the old git/SSH-only preflight.
+  if (await isFeatureEnabled(FLAG_KEYS.EXECUTION_POLICY)) {
+    const gate = await evaluateRunConfig({
+      workspaceId: input.workspaceId,
+      driver: execDriver,
+      provider,
+      ssh,
+      resolveSecret: (name) => resolveWorkspaceSecret(input.workspaceId, name),
+    });
+    if (!gate.ok) {
+      const message = `This run needs configuration: ${gate.summary}`;
+      setRunPhase(run.id, "failed");
+      await prisma.agentRun
+        .update({
+          where: { id: run.id },
+          data: {
+            status: "failed",
+            exitReason: CONFIGURATION_INCOMPLETE,
+            errorMessage: message,
+            finishedAt: new Date(),
+            bridgeTokenHash: null,
+          },
+        })
+        .catch(() => {});
+      await postRunToTask(
+        agent.id,
+        input.taskId,
+        `Sandbox run (${providerKey}) blocked — ${message}`,
+        run.id,
+        runErrorPresentation({ provider: providerKey, runId: run.id }),
+      );
+      throw new GraphQLError(message, {
+        extensions: { code: "FAILED_PRECONDITION", exitReason: CONFIGURATION_INCOMPLETE },
+      });
+    }
+  }
 
   // Inject the agent's OWN bound secrets (LLM API keys, etc.) so a real runtime can authenticate.
   // The Environment's instance-scoped envVars (a non-secret bag) go in first; the agent's resolved
@@ -461,11 +594,23 @@ export async function runTaskInSandbox(input: {
   // Secret VALUES (env + git token) are scrubbed from every streamed chunk.
   beginRunStatus(run.id, secretValues);
 
+  // In-flight cancellation (§3 #2): register an AbortController keyed by this run id BEFORE exec so
+  // `cancelAgentRun` can abort the running exec. Its signal is threaded into handle.exec below; the
+  // finalizer reads `signal.aborted` to mark the run `canceled`. Always unregistered in the finally.
+  const abortController = registerRunAbort(run.id);
+
   let handle: SandboxHandle | undefined;
   let lease: EnvironmentLease | null = null;
   try {
     // Acquire an execution machine via the lease layer: a `reuse_by_environment` env re-attaches to a
     // kept machine; ephemeral (and ad-hoc, no-env) runs provision a fresh one. Release honors the policy.
+    // Secret-version fingerprint (security hardening — Item 1): a reusable machine is only re-attached
+    // when the secrets it was provisioned with are UNCHANGED; a rotated secret forces a fresh machine.
+    const secretFingerprint = await computeLeaseSecretFingerprint({
+      workspaceId: input.workspaceId,
+      environmentId: envRes?.environmentId ?? null,
+      agentId: agent.id,
+    });
     const acquired = await acquireLease({
       workspaceId: input.workspaceId,
       environmentId: envRes?.environmentId ?? null,
@@ -475,27 +620,58 @@ export async function runTaskInSandbox(input: {
       taskId: input.taskId,
       runId: run.id,
       spec: imageRef ? { image: imageRef } : undefined,
+      secretFingerprint,
     });
     handle = acquired.handle;
     lease = acquired.lease;
+    // Make the "reuse was skipped because a secret rotated" decision readable in the run UI.
+    if (acquired.freshDueToSecretRotation) {
+      appendRunLog(
+        run.id,
+        "[lease] A rotated secret changed this run's secret-version fingerprint — a fresh sandbox was provisioned with the current credentials instead of reusing the kept machine.\n",
+      );
+    }
     setRunPhase(run.id, "running");
 
     let exitCode: number | null;
     let stdout: string;
     let stderr: string;
     let timedOut = false;
+    let canceled = false;
     // Durable transcript capture: buffer every streamed chunk (in order, with its stream) so we can
     // persist the FULL redacted transcript to the run-log store after exec. Kept separate from the
     // synchronous live tail above; ordering is guaranteed by persisting sequentially post-exec.
     const logChunks: { stream: "stdout" | "stderr"; data: string }[] = [];
+    // Live-streamed transcript (§3 adapters, Item 1): when the bound adapter owns a `parseLine`, feed each
+    // stdout line through a stateful streaming parser AS IT ARRIVES and push the rendered assistant turns
+    // to the live run tail — so a long run shows turns progressively (poll `agentRunLiveStatus`) instead
+    // of only at the end. The authoritative usage/outcome result is STILL derived post-hoc below from the
+    // full stdout blob (equivalent event stream). stderr + blob-only adapters keep the raw live tail.
+    const transcriptStream = adapter?.parseLine
+      ? createAdapterTranscriptStream(adapter.parseLine.bind(adapter))
+      : null;
+    const streamRendered = (events: AdapterTranscriptEvent[]): void => {
+      if (!events.length) return;
+      const text = renderAdapterTranscript(events);
+      if (text) appendRunLog(run.id, text + "\n");
+    };
     try {
       const result = await handle.exec(script, {
         timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        signal: abortController.signal,
         onLog: (chunk) => {
-          appendRunLog(run.id, chunk.data);
+          // Live tail: stream parsed transcript for adapter stdout; raw for stderr / blob-only adapters.
+          if (transcriptStream && chunk.stream === "stdout") {
+            streamRendered(transcriptStream.push(chunk.data));
+          } else {
+            appendRunLog(run.id, chunk.data);
+          }
+          // Durable transcript always keeps the RAW captured bytes (both streams), in order.
           logChunks.push({ stream: chunk.stream, data: chunk.data });
         },
       });
+      // Flush any trailing partial stdout line into the live tail before finalizing.
+      if (transcriptStream) streamRendered(transcriptStream.flush());
       exitCode = result.exitCode;
       // Redact resolved secret values BEFORE the tail slice so a secret straddling the cut can't leak
       // a partial. Everything downstream (persist, run->task post, memory summary, return) derives from
@@ -503,6 +679,9 @@ export async function runTaskInSandbox(input: {
       stdout = redactRunSecrets(result.stdout, secretValues).slice(-MAX_OUTPUT_CHARS);
       stderr = redactRunSecrets(result.stderr, secretValues).slice(-MAX_OUTPUT_CHARS);
       timedOut = result.timedOut ?? false;
+      // The exec was terminated by a cancel request (its AbortSignal fired) — the provider killed the
+      // child. Distinct from a timeout kill; drives the terminal `canceled` status below.
+      canceled = result.aborted === true || abortController.signal.aborted;
     } catch (execErr) {
       // exec itself blew up - persist whatever transcript we captured (best-effort), then release as a
       // failure (retain_on_failure keeps the box) and re-throw.
@@ -523,7 +702,13 @@ export async function runTaskInSandbox(input: {
       outcome: exitCode === 0 && !timedOut ? "success" : "failure",
     });
 
-    const runStatus = timedOut ? "timeout" : exitCode === 0 ? "done" : "failed";
+    const runStatus = canceled
+      ? "canceled"
+      : timedOut
+        ? "timeout"
+        : exitCode === 0
+          ? "done"
+          : "failed";
     setRunPhase(run.id, runStatus);
 
     // Adapter-owned structured result (parity slice): if the bound adapter owns an `execute()` (or at
@@ -551,6 +736,17 @@ export async function runTaskInSandbox(input: {
         : "";
     const displayOutput = parsedOutput || stdout;
 
+    // Cost half (§3 #2): price the run from its captured usage, emit the CostEvent, and fold the
+    // costCents/costStatus columns into the terminal write. Empty for a no-usage (blob) run.
+    const costColumns = await persistRunCost({
+      workspaceId: input.workspaceId,
+      agentId: agent.id,
+      taskId: input.taskId,
+      projectId,
+      runId: run.id,
+      execution,
+    });
+
     await prisma.agentRun.update({
       where: { id: run.id },
       data: {
@@ -562,6 +758,11 @@ export async function runTaskInSandbox(input: {
         finishedAt: new Date(),
         bridgeTokenHash: null, // invalidate the in-sandbox bridge token now the run is over
         ...executionColumns(execution),
+        ...costColumns,
+        // Cancellation (§3 #2): a canceled run overrides the derived exitReason and records the reason.
+        ...(canceled
+          ? { exitReason: "canceled", cancelReason: cancelReasonFromSignal(abortController.signal) }
+          : {}),
       },
     });
 
@@ -604,38 +805,24 @@ export async function runTaskInSandbox(input: {
       agent.id,
       input.taskId,
       `Sandbox run (${providerKey}) - ${runStatus}${exitCode != null ? `, exit ${exitCode}` : ""}\n\n${displayOutput || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
+      run.id,
+      runSummaryPresentation({ provider: providerKey, status: runStatus, exitCode, runId: run.id }),
     );
 
     // Post-run memory auto-capture (Domain 4 GAP-B): persist run residue when the agent's effective
-    // provider is `db`. Best-effort — never fails the run; no-op for none/markdown. When the MEMORY
-    // flag is on, capture is made DURABLE + async (Paperclip memory-jobs): the run finalizer only
-    // ENQUEUES a job and the reap cron drains it, so capture survives process loss. With the flag off
-    // we fall back to the original inline capture so nothing regresses.
+    // provider is `db`. Best-effort — never fails the run; no-op for none/markdown. Durable+async when
+    // the MEMORY flag is on (enqueue a job the reap cron drains), inline otherwise. Shared with the
+    // gateway/wake-driven finalize path via enqueueOrCaptureRunMemory so no run path is memory-blind.
     const memorySummary =
       `Run ${runStatus} (${providerKey}${exitCode != null ? `, exit ${exitCode}` : ""}).\n${displayOutput || ""}`.trim();
-    if (await isFeatureEnabled(FLAG_KEYS.MEMORY)) {
-      await enqueueMemoryJob({
-        workspaceId: input.workspaceId,
-        agentId: agent.id,
-        sourceKind: "run",
-        sourceRefId: run.id,
-        payload: {
-          agentProvider: agent.memoryProvider ?? null,
-          taskId: input.taskId,
-          runId: run.id,
-          summary: memorySummary,
-        },
-      }).catch(() => {}); // best-effort — enqueue must never fail the run
-    } else {
-      await captureRunMemory({
-        workspaceId: input.workspaceId,
-        agentId: agent.id,
-        agentProvider: agent.memoryProvider ?? null,
-        taskId: input.taskId,
-        runId: run.id,
-        summary: memorySummary,
-      });
-    }
+    await enqueueOrCaptureRunMemory({
+      workspaceId: input.workspaceId,
+      agentId: agent.id,
+      agentProvider: agent.memoryProvider ?? null,
+      taskId: input.taskId,
+      runId: run.id,
+      summary: memorySummary,
+    });
 
     // Untrusted-output review gate (Domain 8 G2, LOW_TRUST_REVIEW-gated): stamp the run's reviewState +
     // source-trust from the agent's trust profile. A low-trust/untrusted agent (or one whose profile
@@ -674,8 +861,11 @@ export async function runTaskInSandbox(input: {
       ...(execution ? { execution } : {}),
     };
   } catch (err) {
+    // A cancel that landed DURING provisioning (before/at exec) surfaces here — mark the run canceled
+    // (not failed) with its reason, rather than treating the abort as a provisioning failure.
+    const wasCanceled = abortController.signal.aborted;
     // Provision/exec threw before we could record a result — mark the run failed, then re-throw.
-    setRunPhase(run.id, "failed");
+    setRunPhase(run.id, wasCanceled ? "canceled" : "failed");
     // A provision/exec error message can echo a resolved secret (e.g. a git error printing the token in
     // the remote URL), so scrub it before it is persisted or posted to the task timeline.
     const message = redactRunSecrets(
@@ -686,16 +876,33 @@ export async function runTaskInSandbox(input: {
       .update({
         where: { id: run.id },
         data: {
-          status: "failed",
+          status: wasCanceled ? "canceled" : "failed",
           errorMessage: message,
           finishedAt: new Date(),
           bridgeTokenHash: null, // invalidate the in-sandbox bridge token
           ...(handle ? { sandboxId: handle.id } : {}),
+          ...(wasCanceled
+            ? {
+                exitReason: "canceled",
+                cancelReason: cancelReasonFromSignal(abortController.signal),
+              }
+            : {}),
         },
       })
       .catch(() => {});
-    await postRunToTask(agent.id, input.taskId, `Sandbox run (${providerKey}) failed: ${message}`);
+    await postRunToTask(
+      agent.id,
+      input.taskId,
+      wasCanceled
+        ? `Sandbox run (${providerKey}) canceled: ${cancelReasonFromSignal(abortController.signal)}`
+        : `Sandbox run (${providerKey}) failed: ${message}`,
+      run?.id,
+      runErrorPresentation({ provider: providerKey, runId: run?.id }),
+    );
     throw err;
+  } finally {
+    // Always release the in-process cancellation controller once this run is done executing.
+    unregisterRunAbort(run.id);
   }
 }
 
@@ -707,7 +914,12 @@ export async function runTaskInSandbox(input: {
 // reaches Hermes over HTTP+SSE via `runHermesGateway` instead of provisioning a box.
 
 /** The minimal agent shape the gateway dispatch needs (loaded with all scalars in runTaskInSandbox). */
-type GatewayAgent = { id: string; adapterConfig: unknown; runtimeTemplate: string | null };
+type GatewayAgent = {
+  id: string;
+  adapterConfig: unknown;
+  runtimeTemplate: string | null;
+  memoryProvider: string | null;
+};
 
 /** Resolve the per-run session key from the configured strategy (null → no cross-run memory). */
 function hermesSessionKey(
@@ -886,6 +1098,15 @@ async function dispatchHermesGatewayRun(input: {
     const execution = hermesExecution(result, input.model);
     setRunPhase(run.id, runStatus);
 
+    // Cost half (§3 #2): the gateway path also captures usage — price it + emit the CostEvent.
+    const costColumns = await persistRunCost({
+      workspaceId,
+      agentId: agent.id,
+      taskId,
+      runId: run.id,
+      execution,
+    });
+
     await prisma.agentRun.update({
       where: { id: run.id },
       data: {
@@ -899,6 +1120,7 @@ async function dispatchHermesGatewayRun(input: {
           : {}),
         finishedAt: new Date(),
         ...executionColumns(execution),
+        ...costColumns,
       },
     });
 
@@ -906,7 +1128,27 @@ async function dispatchHermesGatewayRun(input: {
       agent.id,
       taskId,
       `Hermes gateway run (${providerKey}) — ${runStatus}, exit ${result.exitCode}\n\n${stdout || "(no output)"}${stderr ? `\n[stderr]\n${stderr}` : ""}`,
+      run.id,
+      runSummaryPresentation({
+        provider: providerKey,
+        status: runStatus,
+        exitCode: result.exitCode,
+        runId: run.id,
+      }),
     );
+
+    // Post-run memory auto-capture for the gateway/wake-driven finalize path (§3 memory) — the same
+    // shared capture the sandbox path uses, so a wakeup/heartbeat-driven gateway run is no longer
+    // memory-blind. Best-effort, `run` provenance; no-op unless the agent's effective provider is `db`.
+    await enqueueOrCaptureRunMemory({
+      workspaceId,
+      agentId: agent.id,
+      agentProvider: agent.memoryProvider ?? null,
+      taskId,
+      runId: run.id,
+      summary:
+        `Run ${runStatus} (${providerKey}, exit ${result.exitCode}).\n${stdout || ""}`.trim(),
+    });
 
     return {
       runId: run.id,
@@ -933,7 +1175,13 @@ async function dispatchHermesGatewayRun(input: {
         data: { status: "failed", errorMessage: message, finishedAt: new Date() },
       })
       .catch(() => {});
-    await postRunToTask(agent.id, taskId, `Hermes gateway run (${providerKey}) failed: ${message}`);
+    await postRunToTask(
+      agent.id,
+      taskId,
+      `Hermes gateway run (${providerKey}) failed: ${message}`,
+      run?.id,
+      runErrorPresentation({ provider: providerKey, runId: run?.id }),
+    );
     throw err;
   }
 }
@@ -969,6 +1217,14 @@ export async function enqueueSandboxRun(input: {
   });
   if (existing) return { runId: existing.id, providerKey: existing.providerKey ?? providerKey };
 
+  // §3 #11 (1) — stamp the queued run's dispatch priority from the task's Priority so the drain can
+  // order higher-priority work ahead of older lower-priority work.
+  const task = await prisma.task.findUnique({
+    where: { id: input.taskId },
+    select: { priority: true },
+  });
+  const priority = runPriorityFromTask(task?.priority ?? null);
+
   try {
     const run = await prisma.agentRun.create({
       data: {
@@ -978,6 +1234,7 @@ export async function enqueueSandboxRun(input: {
         kind: "sandbox",
         providerKey,
         status: "queued",
+        priority,
         requestedByProfileId: input.requestedByProfileId ?? null,
       },
     });
@@ -998,18 +1255,68 @@ export async function enqueueSandboxRun(input: {
 /**
  * Drain queued sandbox runs — the worker (in-process loop on a persistent server, or the
  * run-sandbox-queue cron on serverless). Atomically claims each (queued→running so two workers never
- * double-run) and executes it, reusing its ledger row. Returns how many it started.
+ * double-run) and executes it, reusing its ledger row. Returns how many it STARTED (not skipped).
+ *
+ * §3 #11 (1) — PRIORITY DISPATCH + PER-AGENT CAP (RUNNERS-gated; the FIFO drain is unchanged when the
+ * flag is off):
+ *   • Priority: queued runs are scanned priority DESC then createdAt ASC, so a higher-priority run
+ *     (AgentRun.priority, stamped from the task's Priority at enqueue) dispatches ahead of an older
+ *     lower-priority one. `limit` still caps how many this call starts (the global batch cap).
+ *   • Per-agent cap: an agent with `maxConcurrentRuns` set never has a run started while it already has
+ *     that many in-flight (status=running, counted across workers) — such runs are left queued for a
+ *     later drain. null = unlimited.
+ *
+ * HOW TO TEST (mirrors the sandbox-run integration suite):
+ *   1. Cap: set `agent.maxConcurrentRuns = 1`, insert one `running` AgentRun for it, then enqueue +
+ *      drain — the queued run is NOT started (stays queued) because the agent is at capacity. Clearing
+ *      the running row and draining again starts it. With the cap null it always starts.
+ *   2. Priority: enqueue runs for distinct tasks with different Priority (urgent/high/low). Draining
+ *      with limit=1 starts ONLY the urgent one; the rest stay queued in priority order.
  */
 export async function drainSandboxRunQueue(limit = 5): Promise<number> {
+  const batchCap = Math.min(limit, 20);
+  // Caps + priority ordering only apply under RUNNERS; otherwise this is the original FIFO drain.
+  const refinementsOn = await isFeatureEnabled(FLAG_KEYS.RUNNERS);
+
   const queued = await prisma.agentRun.findMany({
     where: { status: "queued", kind: "sandbox" },
-    orderBy: { createdAt: "asc" },
-    take: Math.min(limit, 20),
+    orderBy: refinementsOn ? [{ priority: "desc" }, { createdAt: "asc" }] : { createdAt: "asc" },
+    // With caps on, scan a wider window so runs for an at-capacity agent don't starve other agents'.
+    take: refinementsOn ? Math.min(batchCap * 5, 50) : batchCap,
     select: { id: true, workspaceId: true, agentId: true, taskId: true, providerKey: true },
   });
+
+  // Resolve per-agent caps once (null = unlimited). Only agents that set a cap constrain the drain.
+  const capByAgent = new Map<string, number | null>();
+  if (refinementsOn) {
+    const agentIds = [...new Set(queued.map((q) => q.agentId).filter((id): id is string => !!id))];
+    if (agentIds.length) {
+      const agents = await prisma.agent.findMany({
+        where: { id: { in: agentIds } },
+        select: { id: true, maxConcurrentRuns: true },
+      });
+      for (const a of agents) capByAgent.set(a.id, a.maxConcurrentRuns ?? null);
+    }
+  }
+
   let started = 0;
+  const startedByAgent = new Map<string, number>();
   for (const q of queued) {
+    if (started >= batchCap) break; // global batch cap reached
     if (!q.agentId || !q.taskId) continue;
+
+    // Per-agent cap: skip (leave queued) an agent already at its in-flight limit. Counts runs RUNNING
+    // now (incl. on other workers) plus any this drain already started for the same agent.
+    if (refinementsOn) {
+      const cap = capByAgent.get(q.agentId) ?? null;
+      if (cap != null) {
+        const running = await prisma.agentRun.count({
+          where: { agentId: q.agentId, status: "running" },
+        });
+        if (running + (startedByAgent.get(q.agentId) ?? 0) >= cap) continue;
+      }
+    }
+
     // Atomic claim — only one worker wins (and a canceled/claimed row is skipped).
     const claimed = await prisma.agentRun.updateMany({
       where: { id: q.id, status: "queued" },
@@ -1017,6 +1324,7 @@ export async function drainSandboxRunQueue(limit = 5): Promise<number> {
     });
     if (claimed.count === 0) continue;
     started++;
+    startedByAgent.set(q.agentId, (startedByAgent.get(q.agentId) ?? 0) + 1);
     try {
       await runTaskInSandbox({
         workspaceId: q.workspaceId,
@@ -1033,13 +1341,44 @@ export async function drainSandboxRunQueue(limit = 5): Promise<number> {
 }
 
 /**
- * Cancel a QUEUED sandbox run (queued→canceled, so the worker never picks it up). A run already
- * executing cannot be cleanly killed in this model — only queued runs are cancellable.
+ * Cancel an agent run (§3 #2). Two cases, workspace-scoped:
+ *   1. RUNNING in THIS process — abort the in-flight exec via the in-process cancellation registry. The
+ *      provider kills the child process; the run finalizer marks the row `canceled` + records the
+ *      reason. Returns true (cancellation requested; the terminal write follows asynchronously).
+ *   2. QUEUED (or a run we can't reach) — mark the row `canceled` in the DB so the worker never picks
+ *      it up (the original queued-cancel behavior), stamping exitReason + cancelReason.
+ *
+ * LIMITATION (see run-cancellation.ts): the registry is IN-PROCESS. A RUNNING run executing on a
+ * DIFFERENT instance/invocation than the one handling this request is not reachable — `isRunActive`
+ * is false there, so it falls through to the queued-cancel updateMany, which no-ops on a running row
+ * and returns false. Killing such a run cross-process needs a durable cancel flag (deferred).
  */
-export async function cancelAgentRun(workspaceId: string, runId: string): Promise<boolean> {
+export async function cancelAgentRun(
+  workspaceId: string,
+  runId: string,
+  reason = "canceled by operator",
+): Promise<boolean> {
+  // Scope-check first: never signal/cancel a run outside the caller's workspace.
+  const run = await prisma.agentRun.findFirst({
+    where: { id: runId, workspaceId },
+    select: { status: true },
+  });
+  if (!run) return false;
+
+  // RUNNING here → abort the live exec; the run's finalizer writes the terminal canceled row + reason.
+  if (run.status === "running" && isRunActive(runId)) {
+    return requestRunCancellation(runId, reason);
+  }
+
+  // QUEUED (or unreachable running) → best-effort DB cancel so the worker never claims it.
   const res = await prisma.agentRun.updateMany({
     where: { id: runId, workspaceId, status: "queued" },
-    data: { status: "canceled", finishedAt: new Date() },
+    data: {
+      status: "canceled",
+      finishedAt: new Date(),
+      exitReason: "canceled",
+      cancelReason: reason,
+    },
   });
   return res.count > 0;
 }

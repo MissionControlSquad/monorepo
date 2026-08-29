@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 /**
  * Epic #12 (deferred seam, now wired): an `Authorization: Bearer mc_…` API key establishes tenancy.
@@ -49,7 +54,7 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE api_keys, goals, profiles CASCADE`);
-  await prisma.featureFlag.deleteMany({ where: { key: "api_keys" } });
+  resetTestFeature(FLAG_KEYS.API_KEYS);
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "KeyAuth Human" } });
   humanId = p.id;
@@ -89,16 +94,12 @@ describe("API-key auth middleware (Epic #12)", () => {
   it("is a kill-switch: disabling API_KEYS stops key auth", async () => {
     const { plainKey } = await mintKey(WS_A);
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "api_keys" },
-        create: { key: "api_keys", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature(FLAG_KEYS.API_KEYS, false);
       invalidateFlagCache();
       const r = await gql(`query{ goals{ id } }`, undefined, bearer(plainKey));
       expect(r.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "api_keys" } });
+      resetTestFeature(FLAG_KEYS.API_KEYS);
       invalidateFlagCache();
     }
   });

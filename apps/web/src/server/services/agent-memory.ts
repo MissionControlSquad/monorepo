@@ -129,7 +129,9 @@ export async function readAgentMemory(
   limit = 20,
 ): Promise<AgentMemory[]> {
   return prisma.agentMemory.findMany({
-    where: { workspaceId, agentId },
+    // Superseded (corrected) entries are excluded from recall so a corrected fact never resurfaces;
+    // both rows are still kept in the table for the audit trail (see correctAgentMemory).
+    where: { workspaceId, agentId, supersededById: null },
     orderBy: { createdAt: "desc" },
     take: Math.min(limit, 100),
   });
@@ -289,6 +291,7 @@ export async function searchAgentMemory(
     where: {
       workspaceId,
       agentId,
+      supersededById: null, // corrected entries never resurface in recall
       ...(q ? { content: { contains: q, mode: "insensitive" } } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -351,4 +354,190 @@ export async function forgetAgentMemory(
     success: res.count > 0,
   }).catch(() => {});
   return res.count > 0;
+}
+
+/** Provenance to carry onto a corrected/upserted entry (who/what produced it). */
+export interface MemoryEntryProvenance {
+  taskId?: string | null;
+  runId?: string | null;
+  sourceKind?: MemorySourceKind | null;
+  sourceRefId?: string | null;
+}
+
+/**
+ * memory.correct (§3 memory) — supersede/replace a prior memory entry. The OLD entry is marked
+ * corrected (supersededById → the new entry, supersededAt → now) so it drops out of recall; a NEW entry
+ * is written with the corrected content while PRESERVING the original provenance (sourceTaskId /
+ * sourceKind / sourceRefId are inherited unless the caller overrides them). Both rows are kept for the
+ * audit trail. Workspace + agent scoped: an id owned by another agent (or already superseded) is a
+ * no-op → null. Records a `correct` op (subjectId = the old entry). Returns the new entry, or null.
+ */
+export async function correctAgentMemory(
+  workspaceId: string,
+  agentId: string,
+  memoryId: string,
+  newContent: string,
+  provenance?: MemoryEntryProvenance,
+): Promise<AgentMemory | null> {
+  const start = Date.now();
+  const content = newContent.trim();
+  // Only a LIVE, in-scope entry can be corrected (already-superseded / other-agent ids are refused).
+  const old = await prisma.agentMemory.findFirst({
+    where: { id: memoryId, workspaceId, agentId, supersededById: null },
+  });
+  if (!old || !content) {
+    await recordMemoryOperation({
+      workspaceId,
+      agentId,
+      provider: "db",
+      opType: "correct",
+      subjectId: memoryId,
+      resultCount: 0,
+      success: false,
+      error: !old ? "entry not found or already corrected" : "empty correction",
+      latencyMs: Date.now() - start,
+    }).catch(() => {});
+    return null;
+  }
+  // Provenance is preserved: inherit the original entry's provenance unless the caller overrides it.
+  const replacement = await prisma.agentMemory.create({
+    data: {
+      workspaceId,
+      agentId,
+      content: content.slice(0, MAX_CAPTURE_CHARS),
+      sourceTaskId: provenance?.taskId ?? old.sourceTaskId,
+      sourceKind: provenance?.sourceKind ?? old.sourceKind,
+      sourceRefId: provenance?.sourceRefId ?? old.sourceRefId,
+      recordKey: old.recordKey, // a corrected keyed record keeps its key
+    },
+  });
+  await prisma.agentMemory.update({
+    where: { id: old.id },
+    data: { supersededById: replacement.id, supersededAt: new Date() },
+  });
+  await recordMemoryOperation({
+    workspaceId,
+    agentId,
+    provider: "db",
+    opType: "correct",
+    taskId: provenance?.taskId ?? old.sourceTaskId ?? null,
+    runId: provenance?.runId ?? null,
+    subjectId: old.id, // the entry that was corrected
+    sourceKind: (provenance?.sourceKind ?? old.sourceKind) as MemorySourceKind | null,
+    sourceRefId: replacement.id, // the correcting entry
+    resultCount: 1,
+    latencyMs: Date.now() - start,
+    attributionMode: provenance?.runId ? "included_in_run" : null,
+  }).catch(() => {});
+  return replacement;
+}
+
+/** A page of an agent's memory (paginated list) plus the next offset (null when the page is the last). */
+export interface MemoryListPage {
+  items: AgentMemory[];
+  nextOffset: number | null;
+}
+
+/**
+ * memory.list (§3 memory) — list an agent's LIVE memory entries, newest-first, scoped + paginated
+ * (offset/limit). Distinct from search (no query filter) and from the crude newest-20 inject: this is
+ * the agent-facing "what do I remember" enumeration. Records a `list` op with the returned count.
+ */
+export async function listAgentMemory(
+  workspaceId: string,
+  agentId: string,
+  opts: { limit?: number; offset?: number } = {},
+): Promise<MemoryListPage> {
+  const start = Date.now();
+  const limit = Math.min(Math.max(opts.limit ?? 20, 1), 100);
+  const offset = Math.max(opts.offset ?? 0, 0);
+  // Over-fetch by one to know whether another page exists (cheap next-offset signal).
+  const rows = await prisma.agentMemory.findMany({
+    where: { workspaceId, agentId, supersededById: null },
+    orderBy: { createdAt: "desc" },
+    skip: offset,
+    take: limit + 1,
+  });
+  const items = rows.slice(0, limit);
+  const nextOffset = rows.length > limit ? offset + limit : null;
+  await recordMemoryOperation({
+    workspaceId,
+    agentId,
+    provider: "db",
+    opType: "list",
+    resultCount: items.length,
+    latencyMs: Date.now() - start,
+  }).catch(() => {});
+  return { items, nextOffset };
+}
+
+/** Result of a keyed upsert: the (created or updated) entry and whether it was newly created. */
+export interface MemoryUpsertResult {
+  entry: AgentMemory;
+  created: boolean;
+}
+
+/**
+ * memory.record_upsert (§3 memory) — idempotent upsert of a keyed memory record. Dedupe is by a stable
+ * app-supplied `key` per (workspace, agent): the FIRST upsert inserts, subsequent upserts with the same
+ * key UPDATE the same row (content + provenance refreshed, updatedAt bumped) rather than appending a
+ * duplicate. Workspace + agent scoped. Records a `record_upsert` op. Returns the entry + `created`.
+ */
+export async function upsertAgentMemoryRecord(
+  workspaceId: string,
+  agentId: string,
+  key: string,
+  content: string,
+  provenance?: MemoryEntryProvenance,
+): Promise<MemoryUpsertResult | null> {
+  const start = Date.now();
+  const recordKey = key.trim();
+  const body = content.trim();
+  if (!recordKey || !body) return null;
+  const existing = await prisma.agentMemory.findFirst({
+    where: { workspaceId, agentId, recordKey, supersededById: null },
+    orderBy: { createdAt: "desc" },
+  });
+  let entry: AgentMemory;
+  let created: boolean;
+  if (existing) {
+    entry = await prisma.agentMemory.update({
+      where: { id: existing.id },
+      data: {
+        content: body.slice(0, MAX_CAPTURE_CHARS),
+        sourceTaskId: provenance?.taskId ?? existing.sourceTaskId,
+        sourceKind: provenance?.sourceKind ?? existing.sourceKind,
+        sourceRefId: provenance?.sourceRefId ?? existing.sourceRefId,
+      },
+    });
+    created = false;
+  } else {
+    entry = await prisma.agentMemory.create({
+      data: {
+        workspaceId,
+        agentId,
+        content: body.slice(0, MAX_CAPTURE_CHARS),
+        recordKey,
+        sourceTaskId: provenance?.taskId ?? null,
+        sourceKind: provenance?.sourceKind ?? (provenance?.runId ? "run" : "manual_note"),
+        sourceRefId: provenance?.sourceRefId ?? provenance?.runId ?? null,
+      },
+    });
+    created = true;
+  }
+  await recordMemoryOperation({
+    workspaceId,
+    agentId,
+    provider: "db",
+    opType: "record_upsert",
+    taskId: provenance?.taskId ?? null,
+    runId: provenance?.runId ?? null,
+    subjectId: entry.id,
+    sourceKind: entry.sourceKind as MemorySourceKind | null,
+    sourceRefId: recordKey,
+    resultCount: 1,
+    latencyMs: Date.now() - start,
+    attributionMode: provenance?.runId ? "included_in_run" : null,
+  }).catch(() => {});
+  return { entry, created };
 }

@@ -38,6 +38,11 @@ export default defineConfig({
       "tests/unit/attention.test.ts",
       "tests/unit/agent-authz.test.ts",
       "tests/unit/system-notice-humanizer.test.ts",
+      "tests/unit/push-sw.test.ts",
+      "tests/unit/push-card-state.test.ts",
+      "tests/unit/notification-delivery.test.ts",
+      "tests/unit/usage-recording.test.ts",
+      "tests/unit/quota-gate.test.ts",
     ],
   },
   resolve: {

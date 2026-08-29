@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 /**
  * Epic #13 observability summary — real GraphQL route + Postgres. Read-only workspace rollup.
@@ -138,16 +143,12 @@ describe("workspace summary (Epic #13)", () => {
 
   it("rejects access when OBSERVABILITY is off", async () => {
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "observability" },
-        create: { key: "observability", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature(FLAG_KEYS.OBSERVABILITY, false);
       invalidateFlagCache();
       const r = await gql(SUMMARY, undefined, await cookieFor(WS_A, "member"));
       expect(r.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "observability" } });
+      resetTestFeature(FLAG_KEYS.OBSERVABILITY);
       invalidateFlagCache();
     }
   });

@@ -12,6 +12,8 @@ import {
   parseCatalogSource,
   assertSafeBundlePath,
   resolveSkillSource,
+  groupProjectSkillBundles,
+  scanProjectWorkspaceForSkills,
   SkillSourceError,
 } from "@/server/services/skill-import-sources";
 import { getCatalogEntry, listCatalogSkills } from "@/server/skill-catalog/manifest";
@@ -510,5 +512,59 @@ describe("resolveSkillSource — skills.sh registry (mocked)", () => {
       text: async () => JSON.stringify({ name: "x" }),
     }));
     await expect(resolveSkillSource("skillsh:x", { fetchImpl })).rejects.toThrow(/no files/i);
+  });
+});
+
+// §3 project-workspace scan: group a workspace's flat file list into per-skill SKILL.md bundles.
+describe("project-workspace scan", () => {
+  const files = [
+    { path: "README.md", content: "repo readme" },
+    { path: "skills/writer/SKILL.md", content: "---\nname: Writer\n---\n# Writer" },
+    { path: "skills/writer/scripts/run.sh", content: "echo hi" },
+    { path: "skills/nested/SKILL.md", content: "---\nname: Nested\n---\n# Nested" },
+    { path: "skills/nested/deep/SKILL.md", content: "---\nname: Deep\n---\n# Deep" },
+    { path: "skills/nested/deep/ref.md", content: "deep ref" },
+  ];
+
+  it("groups files into bundles keyed by each SKILL.md dir, deepest-owner wins", () => {
+    const bundles = groupProjectSkillBundles(files, "pw_1");
+    const byDir = Object.fromEntries(bundles.map((b) => [b.dir, b]));
+    expect(Object.keys(byDir).sort()).toEqual([
+      "skills/nested",
+      "skills/nested/deep",
+      "skills/writer",
+    ]);
+    // writer bundle keeps its script, rebased to the bundle root
+    expect(byDir["skills/writer"].files.map((f) => f.path).sort()).toEqual([
+      "SKILL.md",
+      "scripts/run.sh",
+    ]);
+    expect(byDir["skills/writer"].name).toBe("Writer");
+    // the deep ref belongs to the DEEPEST enclosing SKILL.md, not "skills/nested"
+    expect(byDir["skills/nested/deep"].files.map((f) => f.path).sort()).toEqual([
+      "SKILL.md",
+      "ref.md",
+    ]);
+    expect(byDir["skills/nested"].files.map((f) => f.path)).toEqual(["SKILL.md"]);
+    // provenance is project_scan with a stable locator
+    expect(byDir["skills/writer"].provenance.sourceType).toBe("project_scan");
+    expect(byDir["skills/writer"].provenance.sourceRef).toBe("project:pw_1#skills/writer");
+  });
+
+  it("returns no bundles when there is no SKILL.md", () => {
+    expect(groupProjectSkillBundles([{ path: "a.txt", content: "x" }], "pw_1")).toEqual([]);
+  });
+
+  it("scanProjectWorkspaceForSkills groups an injected file list without touching disk", async () => {
+    const bundles = await scanProjectWorkspaceForSkills({
+      projectWorkspaceId: "pw_1",
+      root: "/unused",
+      listFiles: async () => files,
+    });
+    expect(bundles.map((b) => b.dir).sort()).toEqual([
+      "skills/nested",
+      "skills/nested/deep",
+      "skills/writer",
+    ]);
   });
 });

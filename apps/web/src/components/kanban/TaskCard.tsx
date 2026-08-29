@@ -6,7 +6,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Zap, GripVertical, WifiOff, ArrowUpRight, FolderKanban, Link2, Clock } from "lucide-react";
 import { MentionText } from "../common/MarkdownWithMentions";
 import { TimeAgo } from "../common/TimeAgo";
-import { Badge, DueDatePill } from "../ui";
+import { Badge, DueDatePill, Tooltip } from "../ui";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { useQuery } from "urql";
 import { PROJECT_QUERY } from "../../lib/graphql/queries";
@@ -109,12 +109,17 @@ export const TaskCard = memo(function TaskCard({ task, agents: _agents, onClick 
       <div className="p-3 sm:p-4 flex flex-col flex-1 pl-6 sm:pl-7">
         {/* Active work indicator */}
         {hasActiveWork && (
-          <div className="flex items-center space-x-1 mb-2 pb-2 border-b border-warning/30">
-            <Zap className="w-3 h-3 text-warning animate-pulse" />
-            <span className="text-xs font-semibold text-warning uppercase tracking-wide">
-              {workingAgents.length} working
-            </span>
-          </div>
+          <Tooltip
+            content={`${workingAgents.length} assigned ${workingAgents.length === 1 ? "agent is" : "agents are"} working on this task right now.`}
+            side="bottom"
+          >
+            <div className="flex items-center space-x-1 mb-2 pb-2 border-b border-warning/30">
+              <Zap className="w-3 h-3 text-warning animate-pulse" />
+              <span className="text-xs font-semibold text-warning uppercase tracking-wide">
+                {workingAgents.length} working
+              </span>
+            </div>
+          </Tooltip>
         )}
 
         {/* Title row with agent avatars */}

@@ -24,6 +24,7 @@ export {
   KANBAN_BOARD_QUERY,
   TASK_COUNTS_BY_STATUS_QUERY,
   LOAD_MORE_COLUMN_QUERY,
+  TASK_LABELS_QUERY,
 } from "./tasks";
 
 export { MESSAGES_BY_TASK_QUERY, MESSAGES_BY_TASK_CONNECTION_QUERY } from "./messages";
@@ -153,6 +154,8 @@ export { SECRETS_QUERY, SECRET_PROVIDERS_QUERY, SECRET_ACCESS_EVENTS_QUERY } fro
 
 export { SECRET_PROPOSALS_QUERY } from "./secret-proposals";
 
+export { USER_SECRET_DEFINITIONS_QUERY, USER_SECRET_COVERAGE_QUERY } from "./user-secrets";
+
 export {
   ROUTINES_QUERY,
   ROUTINE_QUERY,
@@ -186,12 +189,15 @@ export {
   AGENT_SKILLS_QUERY,
   TEAMS_QUERY,
   PREVIEW_TEAM_INSTALL_QUERY,
+  TEAM_CATALOG_QUERY,
 } from "./skills";
 export { EXPORT_WORKSPACE_BUNDLE, WORKSPACE_IMPORTS } from "./portability";
 export { GOALS_QUERY, GOAL_QUERY, DEFAULT_GOAL_QUERY } from "./goals";
 export { WORKSPACE_SUMMARY_QUERY } from "./observability";
 export { BOARD_THREAD_QUERY } from "./boardroom";
-export { PLUGINS_QUERY, PLUGIN_QUERY } from "./plugins";
+export { BOARD_PRINCIPALS_QUERY } from "./board-principals";
+export { APPROVAL_POLICIES_QUERY } from "./approval-policies";
+export { PLUGINS_QUERY, PLUGIN_QUERY, PLUGIN_GRANTS_QUERY } from "./plugins";
 export { API_KEYS_QUERY } from "./api-keys";
 export { TERMINAL_SESSIONS_QUERY } from "./terminals";
 export { AGENT_INSTRUCTIONS_QUERY } from "./agent-instructions";
@@ -262,8 +268,17 @@ export { PROVIDER_AUTH_STATES_QUERY } from "./provider-auth";
 export { ADAPTER_PLUGINS_QUERY } from "./adapter-plugins";
 export { SMOKE_CASES_QUERY } from "./smoke-lab";
 export { LOCAL_SERVICES_QUERY } from "./local-services";
+export {
+  WORKSPACE_RUNTIME_SERVICES_QUERY,
+  WORKSPACE_RUNTIME_SERVICE_FIELDS,
+} from "./workspace-runtime-services";
 export { AGENT_SKILL_SNAPSHOT_QUERY } from "./agent-skills-sync";
-export { SKILL_UPDATE_STATUS_QUERY, SKILL_CATALOG_PACKAGES_QUERY } from "./skill-lifecycle";
+export {
+  SKILL_UPDATE_STATUS_QUERY,
+  SKILL_CATALOG_PACKAGES_QUERY,
+  FORK_PRECHECK_QUERY,
+  PROJECT_WORKSPACE_SKILL_CANDIDATES_QUERY,
+} from "./skill-lifecycle";
 export { FLAGGED_AGENTS_QUERY } from "./productivity-reviews";
 export { DECISIONS_QUERY } from "./decision-training";
 export {

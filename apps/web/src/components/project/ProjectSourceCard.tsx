@@ -101,6 +101,10 @@ export function ProjectSourceCard({
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs leading-snug text-muted-foreground">
+            Where the code lives: a local git repo, a plain folder without git, or a remote
+            repository agents clone for each run.
+          </p>
         </label>
 
         <label className="space-y-1">
@@ -117,6 +121,9 @@ export function ProjectSourceCard({
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs leading-snug text-muted-foreground">
+            Private: only project members can see it. Workspace: everyone in your workspace can.
+          </p>
         </label>
       </div>
 
@@ -139,6 +146,10 @@ export function ProjectSourceCard({
               placeholder="main"
               disabled={readOnly}
             />
+            <p className="text-xs leading-snug text-muted-foreground">
+              Branch, tag, or commit to check out. Leave blank to use the repo&apos;s default
+              branch.
+            </p>
           </label>
         </div>
       )}

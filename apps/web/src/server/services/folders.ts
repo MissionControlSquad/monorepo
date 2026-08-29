@@ -1,18 +1,11 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Folder, FolderItem } from "@agentcenter/database";
+import { badRequest, notFound } from "./service-errors";
 
 // Folders service (parity #64) — nestable organization tree + generic item placement. Workspace-scoped.
 
 const ITEM_TYPES = new Set(["task", "project", "agent", "company"]);
 const MAX_DEPTH = 10;
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
-function notFound(what: string): never {
-  throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
-}
 
 async function requireFolder(workspaceId: string, id: string): Promise<Folder> {
   const folder = await prisma.folder.findFirst({ where: { id, workspaceId } });

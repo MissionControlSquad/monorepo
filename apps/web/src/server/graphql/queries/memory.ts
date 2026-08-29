@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { getCompanyDefaultMemoryProvider, searchAgentMemory } from "@/server/services/agent-memory";
 
 // Tier D / Domain 4: memory read surfaces (inspect). All MEMORY-gated, member+, workspace-scoped.
@@ -18,7 +19,7 @@ builder.queryField("memoryOperations", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.MEMORY);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.memoryOperation.findMany({
         ...query,
         where: {
@@ -44,7 +45,7 @@ builder.queryField("agentMemoryEntries", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.MEMORY);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.agentMemory.findMany({
         ...query,
         where: { workspaceId: tenancy.workspaceId, agentId: args.agentId },
@@ -60,7 +61,7 @@ builder.queryField("companyMemoryDefault", (t) =>
   t.string({
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.MEMORY);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return getCompanyDefaultMemoryProvider(tenancy.workspaceId);
     },
   }),
@@ -77,7 +78,7 @@ builder.queryField("searchAgentMemory", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.MEMORY);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const rows = await searchAgentMemory(
         tenancy.workspaceId,
         args.agentId,

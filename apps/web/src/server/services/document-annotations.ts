@@ -1,7 +1,8 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { DocumentAnnotationThread, DocumentAnnotationComment } from "@agentcenter/database";
 import { makeAnchor, remapOpenThreadsForDocument, type AnchorSpec } from "@agentcenter/utils";
+import { getOrCreateAgentProfileId } from "@/server/agent-profile";
+import { badRequest } from "./service-errors";
 
 // Document annotation threads + cooperative locks (parity Domain-8 §2.5 / G5). Threads anchor to a text
 // span and re-anchor across revisions (pure remap in @agentcenter/utils); the advisory lock lets one
@@ -9,10 +10,6 @@ import { makeAnchor, remapOpenThreadsForDocument, type AnchorSpec } from "@agent
 // the document.
 
 const LOCK_TTL_MS = 5 * 60_000;
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 async function documentContent(documentId: string): Promise<string> {
   const doc = await prisma.document.findUnique({
@@ -58,21 +55,80 @@ export async function addAnnotationComment(input: {
   body: string;
   authorProfileId?: string | null;
   authorAgentId?: string | null;
+  /**
+   * Work-items §3 Item 1 — mirror this annotation comment into the annotated document's task as a
+   * timeline Message (linked both ways). Best-effort: a no-op when the document isn't task-scoped or no
+   * author profile can be resolved. Defaults on; the resolver passes `false` when ANNOTATIONS is off.
+   */
+  mirrorToTask?: boolean;
 }): Promise<DocumentAnnotationComment> {
   if (!input.body?.trim()) badRequest("comment body is required");
   const thread = await prisma.documentAnnotationThread.findUnique({
     where: { id: input.threadId },
-    select: { id: true },
+    select: { id: true, quote: true, documentId: true, startOffset: true, endOffset: true },
   });
   if (!thread) badRequest("Thread not found");
-  return prisma.documentAnnotationComment.create({
+  const body = input.body.slice(0, 8_000);
+  const comment = await prisma.documentAnnotationComment.create({
     data: {
       threadId: input.threadId,
-      body: input.body.slice(0, 8_000),
+      body,
       authorProfileId: input.authorProfileId ?? null,
       authorAgentId: input.authorAgentId ?? null,
     },
   });
+
+  if (input.mirrorToTask !== false) {
+    await mirrorAnnotationCommentToTask({
+      comment,
+      thread: thread!,
+      authorProfileId: input.authorProfileId ?? null,
+      authorAgentId: input.authorAgentId ?? null,
+    }).catch(() => {
+      // Mirroring is a surfacing convenience, never a correctness dependency of the annotation write.
+    });
+  }
+  return comment;
+}
+
+/**
+ * Mirror an annotation comment into its document's task timeline (Work-items §3 Item 1). Creates a task
+ * `Message` carrying the annotated quote + comment body and a back-link (`annotationCommentId`) to the
+ * originating comment, so the discussion surfaces in the task timeline and can be traced back. No-op
+ * (returns null) when the document isn't task-scoped or no author profile can be resolved.
+ */
+async function mirrorAnnotationCommentToTask(input: {
+  comment: Pick<DocumentAnnotationComment, "id" | "body">;
+  thread: { quote: string; documentId: string; startOffset: number; endOffset: number };
+  authorProfileId: string | null;
+  authorAgentId: string | null;
+}): Promise<{ messageId: string } | null> {
+  const doc = await prisma.document.findUnique({
+    where: { id: input.thread.documentId },
+    select: { taskId: true, projectId: true },
+  });
+  if (!doc?.taskId) return null;
+
+  const fromProfileId =
+    input.authorProfileId ??
+    (input.authorAgentId ? await getOrCreateAgentProfileId(input.authorAgentId) : null);
+  if (!fromProfileId) return null;
+
+  const quote =
+    input.thread.quote.length > 140 ? `${input.thread.quote.slice(0, 139)}…` : input.thread.quote;
+  const content = `> ${quote}\n\n${input.comment.body}`;
+
+  const message = await prisma.message.create({
+    data: {
+      taskId: doc.taskId,
+      fromProfileId,
+      projectId: doc.projectId ?? null,
+      content: content.slice(0, 8_000),
+      annotationCommentId: input.comment.id,
+    },
+    select: { id: true },
+  });
+  return { messageId: message.id };
 }
 
 export function listAnnotationThreads(

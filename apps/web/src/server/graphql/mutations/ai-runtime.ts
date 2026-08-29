@@ -3,6 +3,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS, getRuntimeTool } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { createRunnerCommand } from "@/server/services/runner-commands";
 import {
   buildRunnerInstallCommand,
@@ -25,7 +26,7 @@ builder.mutationField("installRuntimeToolViaRunner", (t) =>
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AI_TOOLS);
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
 
       if (!getRuntimeTool(args.toolKey))
         throw new GraphQLError(`Unknown tool: ${args.toolKey}`, {

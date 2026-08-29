@@ -18,10 +18,12 @@
  *    event emit (a live-gateway push is a future seam); marking `delivered` closes the loop.
  */
 import { prisma } from "@/server/prisma";
-import { Prisma } from "@agentcenter/database";
+import { Prisma, getProjectStatus } from "@agentcenter/database";
 import { emit } from "@/server/events/bus";
 import { EventTypes } from "@/server/constants";
 import { logError } from "@/server/logger";
+import { isSystemShutdown } from "@/server/system-settings";
+import { ProjectStatus } from "@/server/constants";
 
 /** Well-known wake reasons. Combined with agentId to form the coalescing dedupeKey. */
 export const WAKE_REASON = {
@@ -32,8 +34,85 @@ export const WAKE_REASON = {
 
 export type WakeReason = (typeof WAKE_REASON)[keyof typeof WAKE_REASON] | (string & {});
 
-export type WakeSuppressionReason =
-  "worktree_instance" | "database_restore_in_progress" | "agent_deactivated" | "agent_missing";
+/**
+ * Every reason a scheduling path may be suppressed. Superset of the original wake-only reasons: the
+ * §3 #11 (3) unification folds project-pause + system-pause (shutdown) + instance-suppression into ONE
+ * guard so recurring tasks, routine triggers, and agent wakes all honor pause identically.
+ */
+export type SchedulingSuppressionReason =
+  | "worktree_instance"
+  | "database_restore_in_progress"
+  | "system_shutdown"
+  | "workspace_paused"
+  | "project_archived"
+  | "project_paused"
+  | "agent_deactivated"
+  | "agent_missing";
+
+export type WakeSuppressionReason = SchedulingSuppressionReason;
+
+/**
+ * §3 #11 (3) — the SINGLE scheduling-suppression guard. Any path that is about to create scheduled work
+ * (generate a recurring task, fire a routine, deliver an agent wake, drain a queued run) calls this so a
+ * pause is honored consistently instead of being re-checked ad hoc. Precedence, fail-safe:
+ *   1. INSTANCE-global (env): a preview worktree / db-restore instance suppresses everything.
+ *   2. SYSTEM pause: the global shutdown switch (SystemSettings.shutdownActive) — the "workspace pause".
+ *   3. AGENT (when agentId given): a deactivated or missing agent is per-agent suppressed (unknown ⇒
+ *      suppressed, never woken). We also read the agent's current task to derive its project.
+ *   4. PROJECT (explicit projectId, else the agent's current-task project): archived or paused ⇒ suppress.
+ * Returns { suppressed:false, reason:null } when nothing pauses the work.
+ */
+export async function resolveSchedulingSuppression(opts: {
+  agentId?: string | null;
+  projectId?: string | null;
+  env?: NodeJS.ProcessEnv;
+}): Promise<{ suppressed: boolean; reason: SchedulingSuppressionReason | null }> {
+  const env = opts.env ?? process.env;
+  // 1. INSTANCE-global suppression (worktree preview / database restore) — never schedule here.
+  if (isTruthyEnv(env.AGENTCENTER_IN_WORKTREE)) {
+    return { suppressed: true, reason: "worktree_instance" };
+  }
+  if (
+    isTruthyEnv(env.AGENTCENTER_DATABASE_RESTORE_IN_PROGRESS) ||
+    isTruthyEnv(env.AGENTCENTER_RESTORE_IN_PROGRESS)
+  ) {
+    return { suppressed: true, reason: "database_restore_in_progress" };
+  }
+  // 2. SYSTEM (global "workspace") pause — the operator-flipped shutdown switch.
+  if (await isSystemShutdown()) {
+    return { suppressed: true, reason: "system_shutdown" };
+  }
+  // 3. AGENT suppression (+ derive the agent's current project for the project check below).
+  let projectId = opts.projectId ?? null;
+  if (opts.agentId) {
+    const agent = await prisma.agent.findUnique({
+      where: { id: opts.agentId },
+      select: { setupStatus: true, currentTaskId: true },
+    });
+    if (!agent) return { suppressed: true, reason: "agent_missing" };
+    if (agent.setupStatus === "deactivated") {
+      return { suppressed: true, reason: "agent_deactivated" };
+    }
+    if (!projectId && agent.currentTaskId) {
+      const task = await prisma.task.findUnique({
+        where: { id: agent.currentTaskId },
+        select: { projectId: true },
+      });
+      projectId = task?.projectId ?? null;
+    }
+  }
+  // 4. PROJECT pause / archive.
+  if (projectId) {
+    const project = await getProjectStatus(projectId);
+    if (project?.status === ProjectStatus.ARCHIVED) {
+      return { suppressed: true, reason: "project_archived" };
+    }
+    if (project?.shutdownActive) {
+      return { suppressed: true, reason: "project_paused" };
+    }
+  }
+  return { suppressed: false, reason: null };
+}
 
 interface RequestAgentWakeResult {
   id: string;
@@ -139,31 +218,17 @@ async function coalesceOnto(
 }
 
 /**
- * Scheduling-suppression guard (ported from Paperclip). A wake is suppressed - never delivered - when
- * the INSTANCE is a preview worktree or has a database restore in progress (global, env-driven), or
- * when the target AGENT is deactivated or no longer exists (per-agent). Fail-safe: an unknown agent is
- * treated as suppressed rather than woken.
+ * Wake-suppression guard (parity port). Now a THIN delegate over the unified
+ * {@link resolveSchedulingSuppression} (§3 #11.3) so a wake honors the exact same pause set as every
+ * other scheduling path: instance suppression (worktree / db-restore), the system/workspace pause, the
+ * target agent's deactivation, and — derived from the agent's current task — a paused/archived project.
+ * Fail-safe: an unknown agent is treated as suppressed rather than woken.
  */
 export async function resolveWakeSuppression(
   agentId: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<{ suppressed: boolean; reason: WakeSuppressionReason | null }> {
-  if (isTruthyEnv(env.AGENTCENTER_IN_WORKTREE)) {
-    return { suppressed: true, reason: "worktree_instance" };
-  }
-  if (
-    isTruthyEnv(env.AGENTCENTER_DATABASE_RESTORE_IN_PROGRESS) ||
-    isTruthyEnv(env.AGENTCENTER_RESTORE_IN_PROGRESS)
-  ) {
-    return { suppressed: true, reason: "database_restore_in_progress" };
-  }
-  const agent = await prisma.agent.findUnique({
-    where: { id: agentId },
-    select: { setupStatus: true },
-  });
-  if (!agent) return { suppressed: true, reason: "agent_missing" };
-  if (agent.setupStatus === "deactivated") return { suppressed: true, reason: "agent_deactivated" };
-  return { suppressed: false, reason: null };
+  return resolveSchedulingSuppression({ agentId, env });
 }
 
 export interface ClaimedWake {

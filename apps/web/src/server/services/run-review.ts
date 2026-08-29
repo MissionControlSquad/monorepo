@@ -11,6 +11,7 @@ import {
   buildRunSourceTrust,
   buildPromotedSourceTrust,
   isRunReviewState,
+  resolveReviewCheckoutRouting,
   type RunReviewState,
   type SourceTrust,
   type RunTrustInputs,
@@ -25,9 +26,17 @@ export function computeRunReview(
   inputs: RunTrustInputs | null,
   ctx: { agentId?: string | null; runId?: string | null },
 ): { reviewState: RunReviewState; sourceTrust: SourceTrust } {
+  // Untrusted-PR-review isolation (Item 3): an untrusted source routes its checkout/review through the
+  // isolated container profile. Record that decision on the source-trust marker so the review UI can
+  // show the hostile checkout ran contained (the container itself is the documented compose-profile seam).
+  const routing = resolveReviewCheckoutRouting(inputs);
   return {
     reviewState: resolveRunReviewState(inputs),
-    sourceTrust: buildRunSourceTrust(inputs, ctx),
+    sourceTrust: {
+      ...buildRunSourceTrust(inputs, ctx),
+      reviewIsolated: routing.isolated,
+      reviewProfile: routing.composeProfile,
+    },
   };
 }
 

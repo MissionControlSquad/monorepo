@@ -34,8 +34,8 @@ export const DELETE_SKILL = gql`
 `;
 
 export const FORK_SKILL = gql`
-  mutation ForkSkill($id: String!) {
-    forkSkill(id: $id) {
+  mutation ForkSkill($id: String!, $force: Boolean) {
+    forkSkill(id: $id, force: $force) {
       id
     }
   }
@@ -137,6 +137,20 @@ export const INSTALL_TEAM = gql`
     installTeam(teamId: $teamId, collisionStrategy: $collisionStrategy) {
       id
       createdAgentIds
+    }
+  }
+`;
+
+// Domain 14: install a team from the app-shipped markdown catalog (sha256-verified on the server).
+export const INSTALL_TEAM_FROM_CATALOG = gql`
+  mutation InstallTeamFromCatalog($ref: String!) {
+    installTeamFromCatalog(ref: $ref) {
+      id
+      name
+      key
+      members {
+        id
+      }
     }
   }
 `;

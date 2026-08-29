@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { getWorkspaceSummary } from "@/server/services/observability";
 
 // Epic #13: workspace observability summary. OBSERVABILITY-gated, member, workspace-scoped.
@@ -41,7 +42,7 @@ builder.queryField("workspaceSummary", (t) =>
     type: WorkspaceSummary,
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.OBSERVABILITY);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return getWorkspaceSummary(tenancy.workspaceId);
     },
   }),

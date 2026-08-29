@@ -1,17 +1,13 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { SmokeCase } from "@agentcenter/database";
 import { admitToolCall } from "@/server/services/tool-gateway";
+import { badRequest } from "./service-errors";
 
 // Tool smoke-lab (parity #153). Saved cases asserting how a tool call should be admitted; running one
 // drives the real tool gateway (access policy + content guards + plugin routing) and records pass/fail,
 // so an operator can validate their config before agents depend on it. Workspace-scoped.
 
 const DECISIONS = new Set(["allow", "deny"]);
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 export async function createSmokeCase(input: {
   workspaceId: string;

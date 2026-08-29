@@ -1,5 +1,7 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
+import { requireRole } from "@/server/tenancy/guards";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import {
   addDeliverableAnnotation,
@@ -18,6 +20,7 @@ builder.mutationField("addDeliverableAnnotation", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ANNOTATIONS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const a = await addDeliverableAnnotation({
         deliverableId: args.deliverableId,
         body: args.body,
@@ -38,6 +41,7 @@ builder.mutationField("resolveDeliverableAnnotation", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ANNOTATIONS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const a = await setAnnotationResolved(args.id, args.resolved);
       return ctx.prisma.deliverableAnnotation.findUniqueOrThrow({ ...query, where: { id: a.id } });
     },
@@ -48,8 +52,9 @@ builder.mutationField("deleteDeliverableAnnotation", (t) =>
   t.field({
     type: "Boolean",
     args: { id: t.arg.string({ required: true }) },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ANNOTATIONS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return deleteDeliverableAnnotation(args.id);
     },
   }),

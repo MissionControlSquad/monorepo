@@ -9,6 +9,7 @@ import { prisma } from "@/server/prisma";
 import {
   ApprovalStatus as ApprovalStatusConst,
   ApprovalSubjectType as ApprovalSubjectTypeConst,
+  slugify as coreSlugify,
 } from "@agentcenter/utils";
 import type { ApprovalSubjectType, Prisma, AgentLevel } from "@agentcenter/database";
 import { TaskStatus } from "../constants";
@@ -107,14 +108,9 @@ export interface AgentHireSpec {
 
 const VALID_AGENT_LEVELS = new Set(["intern", "specialist", "lead"]);
 
+/** Agent-username slug: the shared core slugify, capped at 40 chars with an "agent" fallback. */
 function slugify(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 40) || "agent"
-  );
+  return coreSlugify(name, 40, "agent");
 }
 
 /**

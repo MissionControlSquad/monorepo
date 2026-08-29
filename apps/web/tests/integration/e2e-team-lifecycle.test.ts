@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { createTestAgent } from "../helpers";
 
@@ -17,7 +17,10 @@ const WS = "ws_e2e_team";
 let humanId = "";
 
 async function gql(q: string, v?: Record<string, unknown>, role: "admin" | "member" = "admin") {
-  const token = await createJWT({ userId: humanId, workspaceId: WS, userRole: role, email: "lead@x.com" }, SECRET);
+  const token = await createJWT(
+    { userId: humanId, workspaceId: WS, userRole: role, email: "lead@x.com" },
+    SECRET,
+  );
   const req = new Request("http://test/api/graphql", {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: `bb-workspace-token=${token}` },
@@ -25,7 +28,8 @@ async function gql(q: string, v?: Record<string, unknown>, role: "admin" | "memb
   });
   return JSON.parse(await (await POST(req)).text()) as { data?: any; errors?: any };
 }
-const ok = (r: { errors?: any }, label: string) => expect(r.errors, `${label}: ${JSON.stringify(r.errors)}`).toBeUndefined();
+const ok = (r: { errors?: any }, label: string) =>
+  expect(r.errors, `${label}: ${JSON.stringify(r.errors)}`).toBeUndefined();
 
 beforeAll(() => {
   process.env.SYSTEM_SECRET = SECRET;
@@ -33,9 +37,14 @@ beforeAll(() => {
 });
 
 beforeEach(async () => {
-  const wsProjects = await prisma.project.findMany({ where: { workspaceId: WS }, select: { id: true } });
+  const wsProjects = await prisma.project.findMany({
+    where: { workspaceId: WS },
+    select: { id: true },
+  });
   const projIds = wsProjects.map((p) => p.id);
-  await prisma.deliverable.deleteMany({ where: { task: { projectId: { in: projIds } } } }).catch(() => {});
+  await prisma.deliverable
+    .deleteMany({ where: { task: { projectId: { in: projIds } } } })
+    .catch(() => {});
   await prisma.task.deleteMany({ where: { projectId: { in: projIds } } });
   await prisma.approval.deleteMany({ where: { requestedById: humanId } }).catch(() => {});
   await prisma.agent.deleteMany({ where: { workspaceId: WS } });
@@ -48,7 +57,7 @@ beforeEach(async () => {
     update: {},
   });
   for (const key of Object.values(FLAG_KEYS)) {
-    await prisma.featureFlag.upsert({ where: { key }, create: { key, enabled: true, managedBy: "user" }, update: { enabled: true } });
+    setTestFeature(key, true);
   }
   invalidateFlagCache();
 });
@@ -64,9 +73,20 @@ describe("E2E: engineering-team lifecycle (leader → worker → task → delive
     ok(pr, "createProject");
     const projectId = pr.data.createProject.id;
 
-    const { agent: leader } = await createTestAgent({ name: "Ada (Lead)", role: "Tech Lead", status: "active" });
-    const { agent: worker } = await createTestAgent({ name: "Linus (Eng)", role: "Engineer", status: "active" });
-    await prisma.agent.updateMany({ where: { id: { in: [leader.id, worker.id] } }, data: { workspaceId: WS } });
+    const { agent: leader } = await createTestAgent({
+      name: "Ada (Lead)",
+      role: "Tech Lead",
+      status: "active",
+    });
+    const { agent: worker } = await createTestAgent({
+      name: "Linus (Eng)",
+      role: "Engineer",
+      status: "active",
+    });
+    await prisma.agent.updateMany({
+      where: { id: { in: [leader.id, worker.id] } },
+      data: { workspaceId: WS },
+    });
 
     // worker reports to the leader
     const reports = await gql(
@@ -77,8 +97,20 @@ describe("E2E: engineering-team lifecycle (leader → worker → task → delive
 
     // both agents join the company + project
     for (const id of [leader.id, worker.id]) {
-      ok(await gql(`mutation($a:String!,$c:String!){ setAgentCompany(agentId:$a, companyId:$c){ id } }`, { a: id, c: companyId }), "setAgentCompany");
-      ok(await gql(`mutation($p:String!,$a:String!){ addProjectMember(projectId:$p, agentId:$a){ id } }`, { p: projectId, a: id }), "addProjectMember");
+      ok(
+        await gql(
+          `mutation($a:String!,$c:String!){ setAgentCompany(agentId:$a, companyId:$c){ id } }`,
+          { a: id, c: companyId },
+        ),
+        "setAgentCompany",
+      );
+      ok(
+        await gql(
+          `mutation($p:String!,$a:String!){ addProjectMember(projectId:$p, agentId:$a){ id } }`,
+          { p: projectId, a: id },
+        ),
+        "addProjectMember",
+      );
     }
 
     // ── credentials the worker will use during the task ─────────────────────
@@ -110,12 +142,26 @@ describe("E2E: engineering-team lifecycle (leader → worker → task → delive
     const taskId = task.data.createTask.id;
 
     // ── worker EXECUTES: reads knowledge, uses the bound credential, works ───
-    const kb = await gql(`query($a:String!){ agentInstructions(agentId:$a){ fileName content } }`, { a: worker.id }, "member");
+    const kb = await gql(
+      `query($a:String!){ agentInstructions(agentId:$a){ fileName content } }`,
+      { a: worker.id },
+      "member",
+    );
     ok(kb, "agentInstructions(read knowledge)");
     expect(kb.data.agentInstructions.some((f: any) => f.fileName === "AGENTS.md")).toBe(true);
 
-    ok(await gql(`mutation($id:String!){ updateTask(id:$id, status:"in_progress"){ id status } }`, { id: taskId }), "start work");
-    ok(await gql(`mutation($id:String!){ updateTask(id:$id, status:"review"){ id status } }`, { id: taskId }), "submit for review");
+    ok(
+      await gql(`mutation($id:String!){ updateTask(id:$id, status:"in_progress"){ id status } }`, {
+        id: taskId,
+      }),
+      "start work",
+    );
+    ok(
+      await gql(`mutation($id:String!){ updateTask(id:$id, status:"review"){ id status } }`, {
+        id: taskId,
+      }),
+      "submit for review",
+    );
 
     // ── worker submits the result as a deliverable ──────────────────────────
     const deliv = await gql(
@@ -126,10 +172,19 @@ describe("E2E: engineering-team lifecycle (leader → worker → task → delive
     const deliverableId = deliv.data.submitDeliverable.id;
 
     // ── leader verifies the deliverable (vote up + annotation) ──────────────
-    const vote = await gql(`mutation($d:String!){ castDeliverableVote(deliverableId:$d, value:1){ score upCount } }`, { d: deliverableId });
+    const vote = await gql(
+      `mutation($d:String!){ castDeliverableVote(deliverableId:$d, value:1){ score upCount } }`,
+      { d: deliverableId },
+    );
     ok(vote, "leader vote");
     expect(vote.data.castDeliverableVote.upCount).toBeGreaterThan(0);
-    ok(await gql(`mutation($d:String!){ addDeliverableAnnotation(deliverableId:$d, body:"LGTM — matches the runbook, ship it."){ id } }`, { d: deliverableId }), "leader annotation");
+    ok(
+      await gql(
+        `mutation($d:String!){ addDeliverableAnnotation(deliverableId:$d, body:"LGTM — matches the runbook, ship it."){ id } }`,
+        { d: deliverableId },
+      ),
+      "leader annotation",
+    );
 
     // ── physical-user approval gate before marking done ─────────────────────
     const appr = await gql(
@@ -138,11 +193,19 @@ describe("E2E: engineering-team lifecycle (leader → worker → task → delive
     );
     ok(appr, "createApproval");
     const approvalId = appr.data.createApproval.id;
-    const decide = await gql(`mutation($id:String!){ approveApproval(id:$id, decisionNote:"Approved by human"){ id status } }`, { id: approvalId });
+    const decide = await gql(
+      `mutation($id:String!){ approveApproval(id:$id, decisionNote:"Approved by human"){ id status } }`,
+      { id: approvalId },
+    );
     ok(decide, "approveApproval");
 
     // ── task marked done ────────────────────────────────────────────────────
-    ok(await gql(`mutation($id:String!){ updateTask(id:$id, status:"done"){ id status } }`, { id: taskId }), "mark done");
+    ok(
+      await gql(`mutation($id:String!){ updateTask(id:$id, status:"done"){ id status } }`, {
+        id: taskId,
+      }),
+      "mark done",
+    );
 
     // ── verify the whole chain persisted, cross-module ──────────────────────
     const [pWorker, pTask, pDeliv, pApproval] = await Promise.all([
@@ -151,10 +214,10 @@ describe("E2E: engineering-team lifecycle (leader → worker → task → delive
       prisma.deliverable.findUnique({ where: { id: deliverableId } }),
       prisma.approval.findUnique({ where: { id: approvalId } }),
     ]);
-    expect(pWorker?.companyId).toBe(companyId);        // worker ↔ company
-    expect(pTask?.status).toBe("done");                // task reached terminal state
-    expect(pTask?.projectId).toBe(projectId);          // task ↔ project
-    expect(pDeliv?.taskId).toBe(taskId);               // deliverable ↔ task
-    expect(pApproval?.status).toBe("approved");        // human approval recorded
+    expect(pWorker?.companyId).toBe(companyId); // worker ↔ company
+    expect(pTask?.status).toBe("done"); // task reached terminal state
+    expect(pTask?.projectId).toBe(projectId); // task ↔ project
+    expect(pDeliv?.taskId).toBe(taskId); // deliverable ↔ task
+    expect(pApproval?.status).toBe("approved"); // human approval recorded
   });
 });

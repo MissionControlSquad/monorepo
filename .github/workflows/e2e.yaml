@@ -92,6 +92,10 @@ jobs:
           # Bypass per-IP rate limiting under the parallel Playwright run (see job env above). Read by
           # both the Edge middleware (inlined at `next build`) and the per-route limiters at runtime.
           E2E_RATE_LIMIT_DISABLED="1"
+          # Force the RUNNERS (opt-in, Tier D) flag on for the served app. buildbase is dormant in CI, so
+          # entitlement falls back to FLAG_DEFAULTS (core features on, opt-in off); the agent-lifecycle
+          # spec's cloud skill/config endpoint (/api/agents/me/context) is RUNNERS-gated, so force it here.
+          FEATURE_FLAGS_ON="runners"
           EOF
 
       - name: Apply DB migrations
@@ -106,6 +110,10 @@ jobs:
         run: cd apps/web && npx tsx scripts/seed-enterprise.ts
         env:
           SEED_FAST: "1"
+          # Hand the freshly-minted admin mc_session to the Playwright auth setup (e2e/.auth/seed-session.json).
+          # Lets auth.setup authenticate against the production `next start` server without NODE_ENV=test
+          # or TEST_SESSION_SECRET (which the Next CLI makes unreachable at runtime).
+          E2E_WRITE_STORAGE_STATE: "1"
           # Enable the RUNNERS flag for the served app so the agent-lifecycle spec can reach the
           # RUNNERS-gated cloud skill+config endpoint (/api/agents/me/context). Runs before the app
           # boots; the app's create-only flag startup-migration then leaves this row untouched.

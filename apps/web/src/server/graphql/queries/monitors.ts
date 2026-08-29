@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { evaluateMonitors } from "@/server/services/monitors";
 
 // Tier C: monitors read with LIVE on-demand evaluation. MONITORS-gated, member+.
@@ -23,7 +24,7 @@ builder.queryField("monitors", (t) =>
     type: [MonitorEvaluationType],
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.MONITORS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const evals = await evaluateMonitors(tenancy.workspaceId);
       return evals.map((e) => ({
         id: e.monitor.id,

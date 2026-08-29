@@ -11,6 +11,13 @@ model AgentRun {
   providerKey          String?
   sandboxId            String? // the ephemeral sandbox/host id this run used
   status               String    @default("running") // running | done | failed | timeout | canceled
+  // §3 #2 cancellation — a human-readable reason set when a run is canceled (queued-cancel or an
+  // in-flight abort). Pairs with exitReason="canceled". Null for non-canceled runs.
+  cancelReason         String?
+  // §3 #2 cost — pricing status of costCents: "reported" (priced from the rate card) | "unpriced"
+  // (unknown model → costCents 0, repriceable later). Mirrors CostEvent.costStatus. Null = no cost
+  // computed (a blob-only run with no captured usage).
+  costStatus           String?
   // Domain 9 #10 — product silence-watchdog signals. The runner stamps lastOutputAt when output arrives;
   // the watchdog classifies a running run silent past thresholds. watchdogSnoozedUntil suppresses it.
   lastOutputAt         DateTime?
@@ -44,11 +51,18 @@ model AgentRun {
   retryReason          String?
   retryOfRunId         String?
   requestedByProfileId String?
+  // §3 #11 (1) — priority dispatch. The run-queue drain orders QUEUED runs by priority DESC then
+  // createdAt ASC, so a higher-priority queued run dispatches ahead of an older lower-priority one.
+  // Derived from the task's Priority at enqueue time (urgent=3, high=2, medium=1, low=0); default 0.
+  priority             Int       @default(0)
   bridgeTokenHash      String? // Plan 6: hash of the run-scoped in-sandbox bridge token (null when inactive)
   startedAt            DateTime  @default(now())
   finishedAt           DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
+
+  // Parity §3.12 — task comments this run posted (attribution).
+  postedMessages Message[] @relation("MessageCreatedByRun")
 
   @@index([workspaceId, createdAt])
   @@index([agentId])
@@ -56,5 +70,7 @@ model AgentRun {
   @@index([bridgeTokenHash])
   @@index([status])
   @@index([scheduledRetryAt])
+  // §3 #11 (1) — the drain's claim predicate: scan QUEUED runs highest-priority-first, then oldest.
+  @@index([status, kind, priority, createdAt])
   @@map("agent_runs")
 }

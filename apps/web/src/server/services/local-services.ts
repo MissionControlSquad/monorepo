@@ -1,17 +1,13 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { LocalService } from "@agentcenter/database";
 import { shouldRestartService, shouldEvictIdle, type RestartDecision } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 // Local service supervision (parity #95). Registry + observed state for local_stdio services; the
 // supervisor reports lifecycle here and asks requestRestart / findEvictable which consult the pure
 // storm/idle policies. The actual spawn/kill/health-probe is the infra seam. Workspace-scoped.
 
 const MAX_HISTORY = 20;
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 export async function registerLocalService(input: {
   workspaceId: string;

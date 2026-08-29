@@ -1,6 +1,20 @@
 import { builder } from "../builder";
 import { documentModel } from "../../models";
 
+// Parity §3.12 — list a document's revision history (newest first).
+builder.queryField("documentRevisions", (t) =>
+  t.prismaField({
+    type: ["DocumentRevision"],
+    args: { documentId: t.arg.string({ required: true }) },
+    resolve: (query, _root, args, ctx) =>
+      ctx.prisma.documentRevision.findMany({
+        ...query,
+        where: { documentId: args.documentId },
+        orderBy: { revision: "desc" },
+      }),
+  }),
+);
+
 builder.queryField("documents", (t) =>
   t.prismaField({
     type: ["Document"],

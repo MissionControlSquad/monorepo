@@ -6,6 +6,8 @@
 export {
   Roles,
   TaskStatus,
+  WorkMode,
+  WORK_MODE_META,
   Priority,
   SetupStatus,
   ProfileKind,
@@ -30,6 +32,7 @@ export {
 export type {
   RoleValue,
   TaskStatusValue,
+  WorkModeValue,
   PriorityValue,
   SetupStatusValue,
   ProfileKindValue,

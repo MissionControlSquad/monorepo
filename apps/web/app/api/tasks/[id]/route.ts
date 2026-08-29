@@ -2,15 +2,15 @@ import { diffTaskAssignees } from "@agentcenter/database";
 import { taskModel } from "@/server/models/task";
 import { agentModel } from "@/server/models";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "@/server/pubsub";
-import { resolveAgent } from "../../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError, assertFound } from "../../_lib/json-response";
+import { withAgent } from "../../_lib/with-agent";
+import { successResponse, errorResponse, assertFound } from "../../_lib/json-response";
 import { ERR } from "../../_lib/error-messages";
 import { validateBody, updateTaskSchema } from "../../_lib/validation";
 import { log } from "../../_lib/logger";
 import { assertProjectMember, assertAllMembersOfProject } from "../../_lib/project-access";
 import { assertAssignableAgents } from "@/server/assignment-guard";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
-import { isSystemShutdown, isProjectShutdown } from "@/server/system-settings";
+import { isProjectShutdown } from "@/server/system-settings";
 import {
   tryDeliverTaskToLiveAgents,
   tryDeliverReviewNotification,
@@ -18,39 +18,29 @@ import {
 import { TaskStatus, Priority } from "@/server/constants";
 import type { RouteContext } from "../../_lib/route-context";
 
-export async function GET(request: Request, ctx: RouteContext) {
-  try {
-    const agent = await resolveAgent(request);
-    const { id } = await ctx.params;
+export const GET = withAgent(async (_request, agent, ctx: RouteContext) => {
+  const { id } = await ctx.params;
 
-    const task = await taskModel.findById(id, {
-      include: { assignees: { include: { profile: true } } },
-    });
+  const task = await taskModel.findById(id, {
+    include: { assignees: { include: { profile: true } } },
+  });
 
-    assertFound(task, ERR.TASK_NOT_FOUND);
-    if (task.projectId) {
-      if (await isProjectShutdown(task.projectId)) {
-        return errorResponse(ERR.TASK_NOT_FOUND, 404);
-      }
-      await assertProjectMember(agent.id, task.projectId);
+  assertFound(task, ERR.TASK_NOT_FOUND);
+  if (task.projectId) {
+    if (await isProjectShutdown(task.projectId)) {
+      return errorResponse(ERR.TASK_NOT_FOUND, 404);
     }
-    return successResponse(task);
-  } catch (err) {
-    return handleError(err);
+    await assertProjectMember(agent.id, task.projectId);
   }
-}
+  return successResponse(task);
+});
 
-export async function PATCH(request: Request, ctx: RouteContext) {
-  try {
+export const PATCH = withAgent(
+  async (request, agent, ctx: RouteContext) => {
     const v = await validateBody(request, updateTaskSchema);
     if (v.error) return v.error;
     const body = v.data;
-    const agent = await resolveAgent(request);
     const { id } = await ctx.params;
-
-    if (await isSystemShutdown()) {
-      return errorResponse("System is in shutdown mode. No task updates allowed.", 503);
-    }
 
     const oldTask = await taskModel.findById(id, {
       include: { assignees: { include: { profile: true } } },
@@ -206,41 +196,35 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       include: { assignees: { include: { profile: true } } },
     });
     return successResponse(updated);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  { blockOnShutdown: { error: "System is in shutdown mode. No task updates allowed." } },
+);
 
-export async function DELETE(request: Request, ctx: RouteContext) {
-  try {
-    const agent = await resolveAgent(request);
-    const { id } = await ctx.params;
+export const DELETE = withAgent(async (request, agent, ctx: RouteContext) => {
+  const { id } = await ctx.params;
 
-    const task = await taskModel.findById(id, {
-      include: { assignees: { include: { profile: true } } },
-    });
-    assertFound(task, ERR.TASK_NOT_FOUND);
-    if (task.projectId) await assertProjectMember(agent.id, task.projectId);
+  const task = await taskModel.findById(id, {
+    include: { assignees: { include: { profile: true } } },
+  });
+  assertFound(task, ERR.TASK_NOT_FOUND);
+  if (task.projectId) await assertProjectMember(agent.id, task.projectId);
 
-    // Resolve profileId → agentId for notification compat
-    const assigneeAgentIds = task.assignees
-      .map((a: any) => a.profile?.agentId)
-      .filter(Boolean) as string[];
+  // Resolve profileId → agentId for notification compat
+  const assigneeAgentIds = task.assignees
+    .map((a: any) => a.profile?.agentId)
+    .filter(Boolean) as string[];
 
-    log("task", `DELETED agent="${agent.name}" task=#${task.taskNumber} "${task.title}"`, request);
-    await taskModel.emitDeleted(task, {
-      agentId: agent.id,
-      agentName: agent.name,
-      assigneeIds: assigneeAgentIds,
-    });
+  log("task", `DELETED agent="${agent.name}" task=#${task.taskNumber} "${task.title}"`, request);
+  await taskModel.emitDeleted(task, {
+    agentId: agent.id,
+    agentName: agent.name,
+    assigneeIds: assigneeAgentIds,
+  });
 
-    const deletePayload = { taskId: task.id, projectId: task.projectId ?? undefined };
-    pubsub.publish(taskTopic(task.id), deletePayload);
-    if (task.projectId) pubsub.publish(taskProjectTopic(task.projectId), deletePayload);
-    pubsub.publish(PubSubEvent.TASK.UPDATED, deletePayload);
-    await taskModel.softDelete(id);
-    return successResponse({ success: true });
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  const deletePayload = { taskId: task.id, projectId: task.projectId ?? undefined };
+  pubsub.publish(taskTopic(task.id), deletePayload);
+  if (task.projectId) pubsub.publish(taskProjectTopic(task.projectId), deletePayload);
+  pubsub.publish(PubSubEvent.TASK.UPDATED, deletePayload);
+  await taskModel.softDelete(id);
+  return successResponse({ success: true });
+});

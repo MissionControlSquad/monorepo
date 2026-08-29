@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import {
   createProjectWorkspace,
   listProjectWorkspaces,
@@ -13,11 +14,7 @@ import { getOrCreateAgentProfileId } from "../../src/server/agent-profile";
 const WS = "ws_exws";
 
 async function enableFlag(key: string) {
-  await prisma.featureFlag.upsert({
-    where: { key },
-    create: { key, enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature(key, true);
 }
 
 beforeAll(() => {
@@ -130,10 +127,7 @@ describe("per-run execution-workspace recording", () => {
   });
 
   it("records nothing when EXECUTION_WORKSPACES is off", async () => {
-    await prisma.featureFlag.update({
-      where: { key: "execution_workspaces" },
-      data: { enabled: false },
-    });
+    setTestFeature(FLAG_KEYS.EXECUTION_WORKSPACES, false);
     invalidateFlagCache();
     const task = await prisma.task.create({
       data: { title: "t", description: "d", status: "assigned", priority: "high", tags: [] },

@@ -7,11 +7,18 @@
  * Run: npm run seed:enterprise  (loads .env)
  */
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
 import { prisma } from "../src/server/prisma";
 import { SetupStatus, DeliverableKind, Priority } from "../src/server/constants";
-import { FLAG_KEYS } from "@agentcenter/utils";
 import { agentCache, agentListCache, memberCache, projectIdsCache } from "../src/server/cache";
-import { adminSetup, adminLogin, buildRequest, callRoute } from "../tests/helpers";
+import {
+  adminSetup,
+  adminLogin,
+  buildRequest,
+  callRoute,
+  extractSessionCookie,
+} from "../tests/helpers";
 
 import { POST as createAgent } from "../app/api/agents/create/route";
 import { POST as createProject } from "../app/api/projects/route";
@@ -98,33 +105,41 @@ async function run() {
   }
   const loginRes = await adminLogin("admin", "securepass123", "10.0.0.2");
   if (loginRes.status !== 200) throw new Error("Admin login failed");
+  // /api/agents/create is human-ADMIN gated (withTenancy). Thread the admin session cookie into every
+  // create-agent call, exactly as the tests do — without it the create returns 401 UNAUTHENTICATED.
+  const sessionCookie = extractSessionCookie(loginRes);
+  if (!sessionCookie) throw new Error("Admin login returned no mc_session cookie");
+  const adminHeaders = { cookie: `mc_session=${sessionCookie}` };
   console.log("✅ Admin ready");
 
-  // The agent-lifecycle e2e exercises the RUNNERS-tier "load skill+config from cloud" step
-  // (GET /api/agents/me/context), which is gated behind the RUNNERS feature flag. That flag defaults
-  // OFF (FLAG_DEFAULTS) and the served app's startup-migrations seeds it disabled, so the endpoint
-  // 403s and the spec sees `ctx.skills === undefined`. Enable it here for the e2e environment.
-  // Gated on SEED_ENABLE_RUNNERS (set only in the e2e workflow) so a normal local seed leaves this
-  // opt-in operator surface at its default. This runs before the served app boots; startup-migrations'
-  // ensureFeatureFlagExists is create-only, so it will not override the row we write here.
-  if (process.env.SEED_ENABLE_RUNNERS === "1") {
-    await prisma.featureFlag.upsert({
-      where: { key: FLAG_KEYS.RUNNERS },
-      update: { enabled: true },
-      create: {
-        key: FLAG_KEYS.RUNNERS,
-        enabled: true,
-        managedBy: "system",
-        description: "Runner / cloud skill+config serving (enabled for e2e)",
-      },
-    });
-    console.log("✅ RUNNERS feature flag enabled (e2e)");
+  // e2e handoff: expose the freshly-minted mc_session to the Playwright auth setup. The seed mints via
+  // the ungated createSessionToken (AUTH_SECRET-signed) so the cookie authenticates against the served
+  // production app directly — no TEST_SESSION_SECRET / NODE_ENV=test needed on the server. auth.setup.ts
+  // reads this file and injects the cookie into the browser context. Written only when asked (CI/e2e).
+  if (process.env.E2E_WRITE_STORAGE_STATE) {
+    const out = process.env.E2E_SEED_SESSION_PATH
+      ? resolve(process.env.E2E_SEED_SESSION_PATH)
+      : resolve(process.cwd(), "../../e2e/.auth/seed-session.json");
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(
+      out,
+      JSON.stringify({
+        cookie: sessionCookie,
+        baseUrl: process.env.BASE_URL ?? "http://localhost:3000",
+      }),
+    );
+    console.log("✅ Wrote e2e seed session →", out);
   }
+
+  // Feature entitlement (incl. the RUNNERS tier the agent-lifecycle e2e needs) now comes from
+  // buildbase — the local feature_flags table was removed. Enable RUNNERS on the e2e workspace's
+  // buildbase plan instead of seeding a DB row here.
 
   // Squad Lead
   let squadLeadCred: AgentCred;
   {
     const req = buildRequest("POST", "/api/agents/create", {
+      headers: adminHeaders,
       body: { name: "Seed Lead", role: "Squad Lead", username: "seed-lead" },
     });
     const res = await callRoute(createAgent, req);
@@ -150,6 +165,7 @@ async function run() {
   const roles = ["Engineer", "Designer", "QA", "PM", "DevOps", "Research", "Writer", "Lead"];
   for (let i = 1; i < CONFIG.numAgents; i++) {
     const req = buildRequest("POST", "/api/agents/create", {
+      headers: adminHeaders,
       body: {
         name: `Agent ${i + 1}`,
         role: roles[i % roles.length],

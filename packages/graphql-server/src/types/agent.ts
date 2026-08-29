@@ -49,6 +49,8 @@ builder.prismaObject("Agent", {
     runtimeAdapter: t.exposeString("runtimeAdapter", { nullable: true }), // Tier D per-agent runtime
     sandboxProvider: t.exposeString("sandboxProvider", { nullable: true }), // Tier D sandbox binding
     environmentId: t.exposeString("environmentId", { nullable: true }), // Tier D / Phase 3 environment binding
+    // §3 #11 (1) — per-agent in-flight run cap the sandbox drain honors. null = unlimited.
+    maxConcurrentRuns: t.exposeInt("maxConcurrentRuns", { nullable: true }),
     runtimeModel: t.exposeString("runtimeModel", { nullable: true }),
     runtimeTemplate: t.exposeString("runtimeTemplate", { nullable: true }),
     memoryProvider: t.exposeString("memoryProvider"), // Tier D memory binding

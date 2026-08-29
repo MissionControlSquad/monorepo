@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Example plugin slot — echo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #0f172a;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --accent: #4f46e5;
+      }
+      body.dark {
+        --bg: #0b1120;
+        --fg: #e2e8f0;
+        --muted: #94a3b8;
+        --border: #1e293b;
+        --accent: #818cf8;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 16px;
+        font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      h1 { font-size: 13px; margin: 0 0 8px; }
+      .muted { color: var(--muted); }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+      }
+      pre {
+        background: color-mix(in srgb, var(--fg) 6%, transparent);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        overflow: auto;
+        margin: 8px 0;
+      }
+      button {
+        appearance: none;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: #fff;
+        border-radius: 8px;
+        padding: 6px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:disabled { opacity: 0.6; cursor: default; }
+      .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    </style>
+  </head>
+  <body>
+    <h1>Example plugin UI slot</h1>
+    <p class="muted">
+      This fragment is provided by a plugin and rendered inside the host's
+      <strong>sandboxed iframe</strong>. It talks to the host only via typed
+      <code>postMessage</code> frames — it has no access to the host page.
+    </p>
+    <div id="status" class="muted">Waiting for host context…</div>
+    <pre id="context">{}</pre>
+    <div class="row">
+      <button id="ping" disabled>Send action-request → host</button>
+      <span id="reply" class="muted"></span>
+    </div>
+
+    <script>
+      // Protocol version + shapes MUST match @agentcenter/utils/plugin-ui-protocol.
+      var VERSION = 1;
+      var contextEl = document.getElementById("context");
+      var statusEl = document.getElementById("status");
+      var pingBtn = document.getElementById("ping");
+      var replyEl = document.getElementById("reply");
+      var reqCounter = 0;
+
+      // We are sandboxed (opaque origin) — always post to the parent with "*".
+      function toHost(msg) {
+        parent.postMessage(msg, "*");
+      }
+
+      window.addEventListener("message", function (event) {
+        // Only trust frames from our parent window (the host).
+        if (event.source !== parent) return;
+        var data = event.data;
+        if (!data || data.version !== VERSION) return;
+
+        if (data.type === "host:context") {
+          var ctx = data.context || {};
+          document.body.className = ctx.theme === "dark" ? "dark" : "";
+          contextEl.textContent = JSON.stringify(ctx, null, 2);
+          statusEl.textContent = "Connected to host ✓";
+          pingBtn.disabled = false;
+          // Report our content height so the host can size the frame (round-trip #1).
+          toHost({ type: "plugin:resize", version: VERSION, height: document.body.scrollHeight + 8 });
+        } else if (data.type === "host:action-result") {
+          replyEl.textContent = data.ok
+            ? "host replied: " + JSON.stringify(data.result)
+            : "host error: " + data.error;
+        }
+      });
+
+      pingBtn.addEventListener("click", function () {
+        var requestId = "req-" + ++reqCounter;
+        replyEl.textContent = "…";
+        // Ask the host to do something on our behalf (round-trip #2).
+        toHost({
+          type: "plugin:action-request",
+          version: VERSION,
+          requestId: requestId,
+          action: "ping",
+          payload: { at: Date.now() },
+        });
+      });
+
+      // Announce we are ready — the host answers with host:context.
+      toHost({ type: "plugin:ready", version: VERSION });
+    </script>
+  </body>
+</html>

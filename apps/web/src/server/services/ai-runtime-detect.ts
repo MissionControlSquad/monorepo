@@ -43,20 +43,31 @@ export interface RuntimeInventory {
 
 const VERSION_RE = /\d+\.\d+(?:\.\d+)?[\w.+-]*/;
 
-/** Probe one binary. ENOENT -> not installed. Otherwise installed (a non-zero exit still proves presence). */
-function probe(
-  bin: string,
-  args: string[],
-): Promise<{ installed: boolean; version: string | null }> {
+/** The outcome of probing one runtime binary — presence, a parsed version, and the raw combined output. */
+export interface RuntimeProbeResult {
+  installed: boolean;
+  version: string | null;
+  /** Combined stdout+stderr (trimmed) — used by callers that classify auth/error text. */
+  output: string;
+}
+
+/**
+ * Probe one binary by running `<bin> <args>` WITHOUT a shell (injection-safe: bin/args come from a
+ * pure catalog, never user input). ENOENT -> not installed. Otherwise installed (a non-zero exit still
+ * proves presence). Shared by the runtime inventory below AND the adapter preflight service, so the
+ * single detection pattern is never duplicated.
+ */
+export function probeRuntimeBin(bin: string, args: string[]): Promise<RuntimeProbeResult> {
   return new Promise((resolve) => {
     execFile(bin, args, { timeout: 6000, windowsHide: true }, (err, stdout, stderr) => {
       const e = err as NodeJS.ErrnoException | null;
-      if (e && e.code === "ENOENT") return resolve({ installed: false, version: null });
       const out = `${stdout ?? ""}${stderr ?? ""}`.trim();
+      if (e && e.code === "ENOENT") return resolve({ installed: false, version: null, output: out });
       const m = out.match(VERSION_RE);
       resolve({
         installed: true,
         version: m ? m[0] : out ? out.split("\n")[0].slice(0, 60) : null,
+        output: out,
       });
     });
   });
@@ -66,10 +77,10 @@ function probe(
 export async function detectLocalRuntimes(
   os: RuntimeOs = osFromPlatform(process.platform),
 ): Promise<RuntimeInventory> {
-  const node = await probe(NODE_PREREQ.binName, NODE_PREREQ.versionArgs);
+  const node = await probeRuntimeBin(NODE_PREREQ.binName, NODE_PREREQ.versionArgs);
   const tools = await Promise.all(
     AI_RUNTIME_TOOLS.map(async (t): Promise<RuntimeToolStatus> => {
-      const r = await probe(t.binName, t.versionArgs);
+      const r = await probeRuntimeBin(t.binName, t.versionArgs);
       return {
         key: t.key,
         displayName: t.displayName,

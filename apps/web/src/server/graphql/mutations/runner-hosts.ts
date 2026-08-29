@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { createRunnerHost, deleteRunnerHost } from "@/server/services/runner-hosts";
 import { runCommandOnHost } from "@/server/services/runner-commands";
 
@@ -19,7 +20,7 @@ builder.mutationField("createRunnerHost", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const host = await createRunnerHost({
         workspaceId: tenancy.workspaceId,
         name: args.name,
@@ -40,7 +41,7 @@ builder.mutationField("deleteRunnerHost", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return deleteRunnerHost(tenancy.workspaceId, args.id);
     },
   }),
@@ -57,7 +58,7 @@ builder.mutationField("runCommandOnHost", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const cmd = await runCommandOnHost({
         workspaceId: tenancy.workspaceId,
         hostId: args.hostId,

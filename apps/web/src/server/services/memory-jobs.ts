@@ -34,6 +34,53 @@ export interface MemoryJobPayload {
   summary: string;
 }
 
+/**
+ * The single run-finalize memory-capture entry point every run path shares (§3 memory). When the MEMORY
+ * flag is on, capture is DURABLE + async — enqueue a MemoryJob the reap cron drains, so it survives
+ * process loss. With the flag off, fall back to inline capture so nothing regresses. Provenance is
+ * always `run`. Best-effort: a capture/enqueue failure must never fail the run, so this never throws.
+ *
+ * Ported out of the sandbox path so the wakeup/heartbeat-driven (gateway) run path can reuse it verbatim
+ * — previously auto-capture lived only in the sandbox branch, leaving wake-driven runs memory-blind.
+ */
+export async function enqueueOrCaptureRunMemory(input: {
+  workspaceId: string;
+  agentId: string;
+  agentProvider: string | null;
+  taskId?: string | null;
+  runId?: string | null;
+  summary: string;
+}): Promise<void> {
+  try {
+    if (await isFeatureEnabled(FLAG_KEYS.MEMORY)) {
+      await enqueueMemoryJob({
+        workspaceId: input.workspaceId,
+        agentId: input.agentId,
+        sourceKind: "run",
+        sourceRefId: input.runId ?? null,
+        payload: {
+          agentProvider: input.agentProvider,
+          taskId: input.taskId ?? null,
+          runId: input.runId ?? null,
+          summary: input.summary,
+        },
+      });
+    } else {
+      await captureRunMemory({
+        workspaceId: input.workspaceId,
+        agentId: input.agentId,
+        agentProvider: input.agentProvider,
+        taskId: input.taskId ?? null,
+        runId: input.runId ?? null,
+        summary: input.summary,
+      });
+    }
+  } catch (err) {
+    // Capture is best-effort — never let it fail the run. Log so a systemic drop is visible.
+    logError("memory-jobs", "run-finalize memory capture failed", { error: String(err) });
+  }
+}
+
 /** Backoff delay before the next attempt (attempts = number of attempts already made). */
 export function memoryJobBackoffMs(attempts: number): number {
   return Math.min(RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1), RETRY_CAP_MS);

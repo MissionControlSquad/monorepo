@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { GraphQLError } from "graphql";
 import {
   createProposal,
@@ -26,7 +27,7 @@ builder.mutationField("createSecretProposal", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRET_PROPOSALS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       if (args.scope && !isProposalScope(args.scope))
         throw new GraphQLError(`Invalid scope '${args.scope}'`, {
           extensions: { code: "BAD_USER_INPUT" },
@@ -60,7 +61,7 @@ builder.mutationField("approveSecretProposal", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRET_PROPOSALS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const { proposal } = await approveProposal({
         workspaceId: tenancy.workspaceId,
         proposalId: args.id,
@@ -83,7 +84,7 @@ builder.mutationField("denySecretProposal", (t) =>
     args: { id: t.arg.string({ required: true }), reason: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRET_PROPOSALS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const proposal = await denyProposal({
         workspaceId: tenancy.workspaceId,
         proposalId: args.id,

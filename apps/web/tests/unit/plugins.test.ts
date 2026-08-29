@@ -72,6 +72,72 @@ describe("validateManifest", () => {
   });
 });
 
+// Extensibility residuals (§3) — ui / apiRoutes / webhooks are all additive + optional.
+describe("validateManifest — extensibility (ui/apiRoutes/webhooks)", () => {
+  it("keeps a legacy manifest (no ui/apiRoutes/webhooks) valid", () => {
+    const r = validateManifest(valid);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.manifest.ui).toBeUndefined();
+      expect(r.manifest.apiRoutes).toBeUndefined();
+      expect(r.manifest.webhooks).toBeUndefined();
+    }
+  });
+
+  it("accepts a manifest with ui slots, api routes, and webhooks", () => {
+    const r = validateManifest({
+      ...valid,
+      ui: [{ slot: "plugin.detail.panel", entry: "/plugin-slots/echo.html", title: "Panel" }],
+      apiRoutes: [
+        { path: "/status", method: "GET", capability: "projects.read" },
+        { path: "/echo", method: "POST" },
+      ],
+      webhooks: [{ hook: "inbound", jobKey: "webhook:inbound" }],
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      // method defaults to GET when omitted.
+      expect(r.manifest.apiRoutes?.[1].method).toBe("POST");
+      expect(r.manifest.ui?.[0].slot).toBe("plugin.detail.panel");
+    }
+  });
+
+  it("defaults an api route method to GET", () => {
+    const r = validateManifest({ ...valid, apiRoutes: [{ path: "/ping" }] });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.manifest.apiRoutes?.[0].method).toBe("GET");
+  });
+
+  it("rejects a ui entry that is neither a same-origin path nor https", () => {
+    const r = validateManifest({
+      ...valid,
+      ui: [{ slot: "s", entry: "http://evil.example/x" }],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.join()).toMatch(/entry/);
+  });
+
+  it("rejects an api route declaring an unknown capability", () => {
+    const r = validateManifest({
+      ...valid,
+      apiRoutes: [{ path: "/x", capability: "root.access" }],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.join()).toMatch(/capability/);
+  });
+
+  it("rejects a webhook hook that is not a slug", () => {
+    const r = validateManifest({ ...valid, webhooks: [{ hook: "Not A Slug" }] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.join()).toMatch(/hook/);
+  });
+
+  it("rejects a malformed api route path (no leading slash)", () => {
+    const r = validateManifest({ ...valid, apiRoutes: [{ path: "status" }] });
+    expect(r.ok).toBe(false);
+  });
+});
+
 describe("isValidCron", () => {
   it("accepts 5-field expressions", () => {
     expect(isValidCron("*/15 * * * *")).toBe(true);

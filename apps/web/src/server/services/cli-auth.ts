@@ -13,14 +13,11 @@ import {
   CLI_USER_CODE_LENGTH,
   normalizeUserCode,
 } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 const CHALLENGE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 export type CliAuthStatus = "pending" | "approved" | "denied" | "expired";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 function randomUserCode(): string {
   const bytes = randomBytes(CLI_USER_CODE_LENGTH);

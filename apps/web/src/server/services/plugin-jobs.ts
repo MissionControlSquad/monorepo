@@ -1,16 +1,12 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { PluginJob } from "@agentcenter/database";
 import { nextCronTick, isValidCron } from "@agentcenter/utils";
+import { badRequest } from "./service-errors";
 
 // Plugin job store + scheduler + coordinator (parity #111/#112/#113). Enqueue one-shot or cron-scheduled
 // plugin jobs; a worker claims the next due job under a lease (coordinator), runs it, and settles it.
 // Failures retry with backoff up to maxAttempts; a cron job re-enqueues its next tick on completion.
 // The worker process itself is infra-gated; this is the durable queue it drives. Workspace-scoped.
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 /** Enqueue a job. A `schedule` (cron) makes it recurring; `delayMs`/`runAt` set the first run time. */
 export async function enqueuePluginJob(input: {

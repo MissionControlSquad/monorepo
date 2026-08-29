@@ -36,6 +36,15 @@ import {
 
 // ─── Shared state across the sequential flow ───────────────────────
 let sessionCookie: string;
+
+// agents/create is now human-ADMIN gated (withTenancy). Direct handler calls bypass middleware, so
+// every create in the flow must carry the admin session cookie established by the auth-session tests.
+const createAgentReq = (body: Record<string, unknown>) =>
+  buildRequest("POST", "/api/agents/create", {
+    body,
+    headers: { cookie: `mc_session=${sessionCookie}` },
+  });
+
 let rexApiKey: string;
 let rexAgentId: string;
 let rexProfileId: string;
@@ -115,27 +124,16 @@ import { GET as getProjectContext } from "../../app/api/projects/[id]/context/ro
 import { POST as regenerateKey } from "../../app/api/agents/[id]/regenerate-key/route";
 
 // ════════════════════════════════════════════════════════════════════
-// 1. FIRST-TIME SERVER SETUP
+// 1. SESSION BOOTSTRAP  (buildbase-only auth: password login/setup removed)
 // ════════════════════════════════════════════════════════════════════
+//
+// There is no password login/setup route anymore — production auth is buildbase-only. The vitest
+// suite establishes an app session via the in-process test-only mint (helpers.adminSetup/adminLogin).
+// These tests assert the session mechanism (mc_session) that the rest of the flow depends on.
 
-describe("1. First-Time Server Setup", () => {
-  // Each attempt uses a unique IP to avoid hitting the rate limit (3/60s)
-  it("rejects setup with short username", async () => {
-    const res = await adminSetup("ab", "password123", "10.1.0.1");
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toMatch(/username/i);
-  });
-
-  it("rejects setup with short password", async () => {
-    const res = await adminSetup("admin", "short", "10.1.0.2");
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toMatch(/password/i);
-  });
-
-  it("creates admin account and returns session cookie", async () => {
-    const res = await adminSetup("admin", "securepass123", "10.1.0.3");
+describe("1. Session Bootstrap", () => {
+  it("establishes an admin session and returns an mc_session cookie", async () => {
+    const res = await adminSetup("admin");
     expect(res.status).toBe(200);
 
     const data = await res.json();
@@ -146,71 +144,19 @@ describe("1. First-Time Server Setup", () => {
     expect(sessionCookie.length).toBeGreaterThan(20); // JWT is long
   });
 
-  it("cannot setup again — admin already exists", async () => {
-    const res = await adminSetup("hacker", "tryagain123", "10.1.0.4");
-    expect(res.status).toBe(400);
-
-    const data = await res.json();
-    expect(data.error).toMatch(/already exists/i);
+  it("is idempotent — re-establishing the same admin still yields a valid session", async () => {
+    const res = await adminSetup("admin");
+    expect(res.status).toBe(200);
+    sessionCookie = extractSessionCookie(res)!;
+    expect(sessionCookie).toBeTruthy();
   });
 });
 
 // ════════════════════════════════════════════════════════════════════
-// 2. AUTH: LOGIN, LOGOUT, BRUTE FORCE
+// 2. SESSION LIFECYCLE  (logout / re-establish)
 // ════════════════════════════════════════════════════════════════════
 
-describe("2. Auth & Brute Force", () => {
-  it("rejects login with wrong password", async () => {
-    const res = await adminLogin("admin", "wrongpassword", "10.2.0.1");
-    expect(res.status).toBe(401);
-
-    const data = await res.json();
-    expect(data.error).toBe("Invalid credentials");
-  });
-
-  it("rejects login with nonexistent user", async () => {
-    const res = await adminLogin("ghost", "doesntmatter", "10.2.0.2");
-    expect(res.status).toBe(401);
-
-    const data = await res.json();
-    expect(data.error).toBe("Invalid credentials");
-  });
-
-  it("rate limits after 5 failed login attempts from same IP", async () => {
-    const bruteIp = "10.99.99.99";
-
-    // Burn through 5 allowed attempts
-    for (let i = 0; i < 5; i++) {
-      await adminLogin("admin", "wrong", bruteIp);
-    }
-
-    // 6th attempt should be rate limited
-    const res = await adminLogin("admin", "wrong", bruteIp);
-    expect(res.status).toBe(429);
-
-    const data = await res.json();
-    expect(data.error).toMatch(/too many/i);
-    expect(res.headers.get("Retry-After")).toBeTruthy();
-  });
-
-  it("rate limits even correct credentials from brute-force IP", async () => {
-    const res = await adminLogin("admin", "securepass123", "10.99.99.99");
-    expect(res.status).toBe(429);
-  });
-
-  it("logs in successfully from a clean IP", async () => {
-    const res = await adminLogin("admin", "securepass123", "10.2.0.50");
-    expect(res.status).toBe(200);
-
-    const data = await res.json();
-    expect(data.success).toBe(true);
-    expect(data.username).toBe("admin");
-
-    const cookie = extractSessionCookie(res);
-    expect(cookie).toBeTruthy();
-    sessionCookie = cookie!;
-  });
-
+describe("2. Session Lifecycle", () => {
   it("logs out and clears cookie", async () => {
     const res = await adminLogout();
     expect(res.status).toBe(200);
@@ -219,15 +165,11 @@ describe("2. Auth & Brute Force", () => {
     expect(data.success).toBe(true);
   });
 
-  it("can log back in after logout", async () => {
-    const res = await adminLogin("admin", "securepass123", "10.2.0.51");
+  it("can re-establish a session after logout", async () => {
+    const res = await adminLogin("admin");
     expect(res.status).toBe(200);
     sessionCookie = extractSessionCookie(res)!;
-  });
-
-  it("login is case-insensitive for username", async () => {
-    const res = await adminLogin("ADMIN", "securepass123", "10.2.0.52");
-    expect(res.status).toBe(200);
+    expect(sessionCookie).toBeTruthy();
   });
 });
 
@@ -237,13 +179,11 @@ describe("2. Auth & Brute Force", () => {
 
 describe("3. Agent Management", () => {
   it("creates Rex — frontend dev", async () => {
-    const req = buildRequest("POST", "/api/agents/create", {
-      body: {
-        name: "Rex",
-        role: "Frontend Developer",
-        username: "rex",
-        templateId: "frontend-dev",
-      },
+    const req = createAgentReq({
+      name: "Rex",
+      role: "Frontend Developer",
+      username: "rex",
+      templateId: "frontend-dev",
     });
 
     const res = await callRoute(createAgent, req);
@@ -263,12 +203,10 @@ describe("3. Agent Management", () => {
   });
 
   it("creates Nova — researcher", async () => {
-    const req = buildRequest("POST", "/api/agents/create", {
-      body: {
-        name: "Nova",
-        role: "Research Analyst",
-        username: "nova",
-      },
+    const req = createAgentReq({
+      name: "Nova",
+      role: "Research Analyst",
+      username: "nova",
     });
 
     const res = await callRoute(createAgent, req);
@@ -280,9 +218,7 @@ describe("3. Agent Management", () => {
   });
 
   it("rejects duplicate username — 409", async () => {
-    const req = buildRequest("POST", "/api/agents/create", {
-      body: { name: "Fake Rex", role: "Impostor", username: "rex" },
-    });
+    const req = createAgentReq({ name: "Fake Rex", role: "Impostor", username: "rex" });
 
     const res = await callRoute(createAgent, req);
     expect(res.status).toBe(409);
@@ -292,9 +228,7 @@ describe("3. Agent Management", () => {
   });
 
   it("rejects agent creation without name — 400", async () => {
-    const req = buildRequest("POST", "/api/agents/create", {
-      body: { role: "Developer" },
-    });
+    const req = createAgentReq({ role: "Developer" });
 
     const res = await callRoute(createAgent, req);
     expect(res.status).toBe(400);
@@ -1854,9 +1788,7 @@ describe.skipIf(!r2Configured)("6½. Real R2 Storage — Upload, Download, Verif
 describe("9. Project-Scoped Collaboration", () => {
   // Create Kia (Squad Lead) and Sage (non-member) for project tests
   it("creates Kia — Squad Lead", async () => {
-    const req = buildRequest("POST", "/api/agents/create", {
-      body: { name: "Kia", role: "Squad Lead", username: "kia" },
-    });
+    const req = createAgentReq({ name: "Kia", role: "Squad Lead", username: "kia" });
     const res = await callRoute(createAgent, req);
     expect(res.status).toBe(201);
     const data = await res.json();
@@ -1871,9 +1803,7 @@ describe("9. Project-Scoped Collaboration", () => {
   });
 
   it("creates Sage — Social Media (will be non-member)", async () => {
-    const req = buildRequest("POST", "/api/agents/create", {
-      body: { name: "Sage", role: "Social Media Manager", username: "sage" },
-    });
+    const req = createAgentReq({ name: "Sage", role: "Social Media Manager", username: "sage" });
     const res = await callRoute(createAgent, req);
     expect(res.status).toBe(201);
     const data = await res.json();
@@ -4845,9 +4775,7 @@ describe("G. Pending Review, Events Ingest & Additional Routes", () => {
     // Create a temporary agent for this test
     const createRes = await callRoute(
       createAgent,
-      buildRequest("POST", "/api/agents/create", {
-        body: { name: "KeyRegenTest", role: "Tester", username: "keyregen-test" },
-      }),
+      createAgentReq({ name: "KeyRegenTest", role: "Tester", username: "keyregen-test" }),
     );
     const { agent: tempAgent, apiKey: oldKey } = await createRes.json();
 
@@ -4864,7 +4792,10 @@ describe("G. Pending Review, Events Ingest & Additional Routes", () => {
     expect(meRes.status).toBe(200);
 
     // Regenerate
-    const regenReq = buildRequest("POST", `/api/agents/${tempAgent.id}/regenerate-key`);
+    // regenerate-key is now human-ADMIN gated (withTenancy) — authenticate with the admin session.
+    const regenReq = buildRequest("POST", `/api/agents/${tempAgent.id}/regenerate-key`, {
+      headers: { cookie: `mc_session=${sessionCookie}` },
+    });
     const regenRes = await callRoute(regenerateKey, regenReq, { id: tempAgent.id });
     expect(regenRes.status).toBe(200);
     const regenData = await regenRes.json();
@@ -4886,9 +4817,19 @@ describe("G. Pending Review, Events Ingest & Additional Routes", () => {
   });
 
   it("regenerate key for nonexistent agent — 404", async () => {
-    const req = buildRequest("POST", "/api/agents/nonexistent/regenerate-key");
+    const req = buildRequest("POST", "/api/agents/nonexistent/regenerate-key", {
+      headers: { cookie: `mc_session=${sessionCookie}` },
+    });
     const res = await callRoute(regenerateKey, req, { id: "nonexistent" });
     expect(res.status).toBe(404);
+  });
+
+  it("regenerate-key without a session is rejected — 401 (auth-gap regression)", async () => {
+    // This route used to have NO auth at all — anyone could mint a fresh agent key. withTenancy now
+    // gates it; an unauthenticated caller is rejected before the agent is ever looked up.
+    const req = buildRequest("POST", "/api/agents/anything/regenerate-key");
+    const res = await callRoute(regenerateKey, req, { id: "anything" });
+    expect(res.status).toBe(401);
   });
 
   // ── Queue: Skipped Status ─────────────────────────────────────
@@ -5118,6 +5059,7 @@ describe("H. Extended GraphQL Coverage", () => {
         deleteDeliverable(id: $id)
       }`,
       { id: gqlDeliverableId },
+      sessionCookie,
     );
     expect(result.errors).toBeFalsy();
     expect(result.data?.deleteDeliverable).toBe(true);
@@ -5279,23 +5221,6 @@ describe("15. Task Deletion & Cleanup", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════
-// 16. SETUP RATE LIMITING
+// 16. SETUP RATE LIMITING — removed. The admin password setup route no longer exists (buildbase-only
+// auth), so there is no setup rate-limiting surface to exercise here.
 // ════════════════════════════════════════════════════════════════════
-
-describe("16. Setup Rate Limiting", () => {
-  it("rate limits setup attempts after 3 from same IP", async () => {
-    const setupIp = "10.88.88.88";
-
-    // 3 attempts (all fail because admin already exists, but they count)
-    for (let i = 0; i < 3; i++) {
-      await adminSetup("hacker", "password123", setupIp);
-    }
-
-    // 4th attempt should be rate limited
-    const res = await adminSetup("hacker", "password123", setupIp);
-    expect(res.status).toBe(429);
-
-    const data = await res.json();
-    expect(data.error).toMatch(/too many/i);
-  });
-});

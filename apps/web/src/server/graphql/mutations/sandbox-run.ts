@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { GraphQLError } from "graphql";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { getSandboxProvider } from "@/server/services/sandbox-providers";
 import { runTaskInSandbox, enqueueSandboxRun, cancelAgentRun } from "@/server/services/sandbox-run";
 import { promoteAgentRunReview } from "@/server/services/run-review";
@@ -21,7 +22,7 @@ builder.mutationField("setAgentSandboxProvider", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       if (args.provider && !getSandboxProvider(args.provider)) {
         throw new GraphQLError(`Unknown sandbox provider: ${args.provider}`, {
           extensions: { code: "BAD_USER_INPUT" },
@@ -36,6 +37,43 @@ builder.mutationField("setAgentSandboxProvider", (t) =>
         ...query,
         where: { id: agent.id },
         data: { sandboxProvider: args.provider ?? null },
+      });
+    },
+  }),
+);
+
+// §3 #11 (1): set an agent's per-agent in-flight run cap (maxConcurrentRuns). The sandbox run-queue
+// drain never starts a run for an agent already at this many running runs. Pass null to clear (=
+// unlimited). RUNNERS-gated, admin. HOW TO USE: setAgentMaxConcurrentRuns(agentId, maxConcurrentRuns:2)
+// then enqueue > 2 runs for that agent — the drain keeps at most 2 in-flight; the rest stay queued.
+builder.mutationField("setAgentMaxConcurrentRuns", (t) =>
+  t.prismaField({
+    type: "Agent",
+    args: {
+      agentId: t.arg.string({ required: true }),
+      // Positive integer cap, or null to clear (unlimited).
+      maxConcurrentRuns: t.arg.int(),
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.RUNNERS);
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
+      if (args.maxConcurrentRuns != null && args.maxConcurrentRuns < 1) {
+        throw new GraphQLError(
+          "maxConcurrentRuns must be a positive integer (or null for unlimited)",
+          {
+            extensions: { code: "BAD_USER_INPUT" },
+          },
+        );
+      }
+      const agent = await ctx.prisma.agent.findFirst({
+        where: { id: args.agentId, workspaceId: tenancy.workspaceId },
+        select: { id: true },
+      });
+      if (!agent) throw new GraphQLError("Agent not found", { extensions: { code: "NOT_FOUND" } });
+      return ctx.prisma.agent.update({
+        ...query,
+        where: { id: agent.id },
+        data: { maxConcurrentRuns: args.maxConcurrentRuns ?? null },
       });
     },
   }),
@@ -60,7 +98,7 @@ builder.mutationField("enqueueTaskInSandbox", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return enqueueSandboxRun({
         workspaceId: tenancy.workspaceId,
         taskId: args.taskId,
@@ -72,15 +110,21 @@ builder.mutationField("enqueueTaskInSandbox", (t) =>
   }),
 );
 
-// Cancel a QUEUED run (a running one can't be cleanly killed in this model). RUNNERS-gated, admin.
+// Cancel a run (§3 #2). A QUEUED run is marked canceled so the worker never claims it; a RUNNING run
+// executing in this process is TERMINATED via its AbortSignal (child process killed) and finalized
+// canceled + reason. RUNNERS-gated, admin (arbitrary code execution + credential use).
 builder.mutationField("cancelAgentRun", (t) =>
   t.field({
     type: "Boolean",
-    args: { runId: t.arg.string({ required: true }) },
+    args: {
+      runId: t.arg.string({ required: true }),
+      // Optional operator-supplied cancellation reason (stored on AgentRun.cancelReason).
+      reason: t.arg.string(),
+    },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
-      return cancelAgentRun(tenancy.workspaceId, args.runId);
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
+      return cancelAgentRun(tenancy.workspaceId, args.runId, args.reason ?? undefined);
     },
   }),
 );
@@ -96,7 +140,7 @@ builder.mutationField("promoteAgentRunReview", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LOW_TRUST_REVIEW);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const run = await promoteAgentRunReview({
         workspaceId: tenancy.workspaceId,
         runId: args.runId,
@@ -132,7 +176,7 @@ builder.mutationField("runTaskInSandbox", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       // Tenancy is enforced downstream: the agent is workspace-scoped and assembleContextBundle
       // scopes the task to that agent's accessible projects (throws if not accessible).
       return runTaskInSandbox({

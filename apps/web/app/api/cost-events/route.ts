@@ -1,10 +1,8 @@
-import { resolveAgent } from "../_lib/resolve-agent";
-import { requireAgentCapability } from "@/server/services/agent-authz";
+import { withAgent } from "../_lib/with-agent";
 import { AGENT_CAPABILITY } from "@agentcenter/utils";
-import { successResponse, errorResponse, handleError } from "../_lib/json-response";
+import { successResponse, errorResponse } from "../_lib/json-response";
 import { checkRateLimit } from "../_lib/rate-limit-check";
 import { createRateLimiter } from "@/server/rate-limit";
-import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { DEFAULT_WORKSPACE_ID } from "@/server/tenancy";
 import { recordCostEvent } from "@/server/services/cost";
@@ -13,16 +11,11 @@ import { recordCostEvent } from "@/server/services/cost";
 const costLimiter = createRateLimiter({ max: 240, windowSec: 60, prefix: "rl:cost" });
 
 // Epic #4: cost ingestion. Scoped to the resolving agent's workspace; funnels recordCostEvent.
-export async function POST(request: Request) {
-  try {
+export const POST = withAgent(
+  async (request, agent) => {
     const limited = await checkRateLimit(costLimiter, request);
     if (limited) return limited;
 
-    if (!(await isFeatureEnabled(FLAG_KEYS.BUDGETS)))
-      return errorResponse("Budgets are not enabled", 403, "FEATURE_DISABLED");
-
-    const agent = await resolveAgent(request);
-    await requireAgentCapability(agent, AGENT_CAPABILITY.COST_REPORT);
     const workspaceId = agent.workspaceId ?? DEFAULT_WORKSPACE_ID;
 
     const body = (await request.json()) as {
@@ -66,7 +59,9 @@ export async function POST(request: Request) {
     });
 
     return successResponse({ ok: true, id: event.id });
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  {
+    feature: { flag: FLAG_KEYS.BUDGETS, error: "Budgets are not enabled" },
+    capability: AGENT_CAPABILITY.COST_REPORT,
+  },
+);

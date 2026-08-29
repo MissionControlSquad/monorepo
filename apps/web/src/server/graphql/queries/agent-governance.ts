@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { getAgentGovernance } from "@/server/services/agent-governance";
 
 // Epic A.4: workspace agent-governance read. GOVERNANCE-gated, workspace-scoped, member+.
@@ -16,7 +17,7 @@ builder.queryField("agentGovernance", (t) =>
     type: AgentGovernanceType,
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.GOVERNANCE);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return getAgentGovernance(tenancy.workspaceId);
     },
   }),

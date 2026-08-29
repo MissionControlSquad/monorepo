@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { visibleSecretsWhere } from "@/server/services/secrets";
 
 // Epic #5: secrets vault reads — SECRETS_VAULT-gated, workspace-scoped, member+ (metadata only;
@@ -11,7 +12,7 @@ builder.queryField("secrets", (t) =>
     type: ["Secret"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // All workspace secrets + only the caller's own personal secrets (never another member's).
       return ctx.prisma.secret.findMany({
         ...query,
@@ -29,7 +30,7 @@ builder.queryField("secret", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.secret.findFirst({
         ...query,
         where: scoped(ctx, { id: args.id, ...visibleSecretsWhere(tenancy.userId) }),
@@ -43,7 +44,7 @@ builder.queryField("secretProviders", (t) =>
     type: ["SecretProviderConfig"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.secretProviderConfig.findMany({
         ...query,
         where: scoped(ctx, {}),
@@ -59,7 +60,7 @@ builder.queryField("secretAccessEvents", (t) =>
     args: { secretId: t.arg.string({ required: true }), limit: t.arg.int() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.SECRETS_VAULT);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // Scope through the owning secret so another workspace's — or another member's personal —
       // audit is never returned.
       const secret = await ctx.prisma.secret.findFirst({

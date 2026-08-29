@@ -8,10 +8,7 @@ import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Monitor } from "@agentcenter/database";
 import { isBreached, type MonitorMetric, type MonitorComparator } from "@agentcenter/utils";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 /** Compute a metric's current value for a workspace. Pure reads over existing data — no engine. */
 export async function computeMetric(workspaceId: string, metric: MonitorMetric): Promise<number> {

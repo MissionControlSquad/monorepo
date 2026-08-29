@@ -34,6 +34,8 @@ export interface SandboxExecResult {
   stderr: string;
   /** True when the command was killed because it exceeded its timeout budget. */
   timedOut?: boolean;
+  /** True when the command was killed because the run was CANCELED via its AbortSignal (§3 #2). */
+  aborted?: boolean;
   /** The signal that terminated the process, if any (e.g. "SIGKILL"). */
   signal?: string | null;
 }
@@ -49,6 +51,13 @@ export interface SandboxExecOpts {
   timeoutMs?: number;
   /** Called with each output chunk as it arrives — enables mid-run streaming (Plan 6). */
   onLog?: (chunk: SandboxLogChunk) => void;
+  /**
+   * In-flight cancellation (§3 #2): when this signal aborts, the provider must terminate the exec —
+   * kill the child process / cancel the provider call — and resolve/return as soon as possible. The
+   * `local` provider SIGKILLs the process group; exe-dev kills the ssh subprocess. Providers whose SDK
+   * cannot observe an AbortSignal simply ignore it (documented limitation in run-cancellation.ts).
+   */
+  signal?: AbortSignal;
 }
 
 export interface SandboxHandle {

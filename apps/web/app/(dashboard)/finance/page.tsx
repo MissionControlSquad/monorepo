@@ -16,9 +16,11 @@ import {
   RAISE_BUDGET_AND_RESUME,
 } from "@/lib/graphql/mutations";
 import { IncidentThreshold, formatCents as money } from "@agentcenter/utils";
-import { Button, Card, Badge, Select } from "@/components/ui";
+import { Button, Card, Badge, Select, Tooltip, ConfirmDialog, EmptyState } from "@/components/ui";
+import { Wallet } from "lucide-react";
 import { BudgetPolicyDialog } from "@/components/dialogs/BudgetPolicyDialog";
 import { FinanceEventsSection } from "@/components/finance/FinanceEventsSection";
+import { useAppContext } from "@/components/context/AppContext";
 
 // Epic #4: agent budgets / cost dashboard. API-gated by the BUDGETS feature + buildbase role
 // (admin manages policies + resolves incidents; member views). All data is workspace-scoped
@@ -34,6 +36,7 @@ interface Policy {
   id: string;
   scope: string;
   agentId: string | null;
+  projectId: string | null;
   name: string;
   limitCents: number;
   window: string;
@@ -59,7 +62,6 @@ interface Bucket {
   amountCents: number;
   eventCount: number;
 }
-
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
@@ -92,12 +94,17 @@ export default function FinancePage() {
     variables: { days: 30 },
   });
 
+  const { projects } = useAppContext();
+  const projectName = (id: string | null) =>
+    id ? (projects?.find((p) => p.id === id)?.name ?? "project") : null;
+
   const [, deletePolicy] = useMutation(DELETE_BUDGET_POLICY);
   const [, resolveIncident] = useMutation(RESOLVE_BUDGET_INCIDENT);
   const [, raiseAndResume] = useMutation(RAISE_BUDGET_AND_RESUME);
 
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<Policy | null>(null);
   const [raiseLimit, setRaiseLimit] = useState<Record<string, string>>({});
   const [raiseError, setRaiseError] = useState<string | null>(null);
 
@@ -119,7 +126,9 @@ export default function FinancePage() {
     try {
       const res = await deletePolicy({ id });
       if (res.error) {
-        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to delete");
+        toast.error(
+          res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to delete",
+        );
         return;
       }
       refetchPolicies({ requestPolicy: "network-only" });
@@ -134,7 +143,11 @@ export default function FinancePage() {
     try {
       const res = await resolveIncident({ id });
       if (res.error) {
-        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to resolve incident");
+        toast.error(
+          res.error.graphQLErrors?.[0]?.message ??
+            res.error.message ??
+            "Failed to resolve incident",
+        );
         return;
       }
       refetchIncidents({ requestPolicy: "network-only" });
@@ -184,7 +197,9 @@ export default function FinancePage() {
         <section className="space-y-2">
           <h2 className="text-sm font-semibold text-foreground">Open incidents</h2>
           {raiseError && (
-            <p className="text-sm text-destructive" role="alert">{raiseError}</p>
+            <p className="text-sm text-destructive" role="alert">
+              {raiseError}
+            </p>
           )}
           {incidents.map((inc) => (
             <Card
@@ -194,11 +209,19 @@ export default function FinancePage() {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   {inc.thresholdType === IncidentThreshold.HARD ? (
-                    <Badge variant="red">hard breach</Badge>
+                    <Tooltip content="Spend passed the budget's hard limit. If hard stop is on, the agent was paused to halt further spend.">
+                      <Badge variant="red">hard breach</Badge>
+                    </Tooltip>
                   ) : (
-                    <Badge variant="yellow">soft warning</Badge>
+                    <Tooltip content="Spend crossed the warn threshold. This is a heads-up only — nothing was paused.">
+                      <Badge variant="yellow">soft warning</Badge>
+                    </Tooltip>
                   )}
-                  {inc.autoPaused && <Badge variant="orange">agent auto-paused</Badge>}
+                  {inc.autoPaused && (
+                    <Tooltip content="This agent was automatically paused to stop further spend. Raise the limit and resume to restart it.">
+                      <Badge variant="orange">agent auto-paused</Badge>
+                    </Tooltip>
+                  )}
                   <span className="text-sm font-medium text-foreground">
                     {money(inc.spendCents)} / {money(inc.limitCents)}
                   </span>
@@ -215,19 +238,27 @@ export default function FinancePage() {
                       value={raiseLimit[inc.id] ?? ""}
                       onChange={(e) => setRaiseLimit((m) => ({ ...m, [inc.id]: e.target.value }))}
                     />
-                    <Button size="sm" disabled={busy === inc.id} onClick={() => onRaiseResume(inc)}>
-                      Raise &amp; resume
-                    </Button>
+                    <Tooltip content="Lift this budget's limit above current spend and restart the paused agent.">
+                      <Button
+                        size="sm"
+                        disabled={busy === inc.id}
+                        onClick={() => onRaiseResume(inc)}
+                      >
+                        Raise &amp; resume
+                      </Button>
+                    </Tooltip>
                   </>
                 )}
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busy === inc.id}
-                  onClick={() => onResolve(inc.id)}
-                >
-                  Resolve
-                </Button>
+                <Tooltip content="Close this incident. A paused agent stays paused — use Raise & resume to restart it.">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy === inc.id}
+                    onClick={() => onResolve(inc.id)}
+                  >
+                    Resolve
+                  </Button>
+                </Tooltip>
               </div>
             </Card>
           ))}
@@ -269,7 +300,10 @@ export default function FinancePage() {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Spend by {breakdownBy}</h2>
-          <Select size="sm" className="text-xs" value={breakdownBy}
+          <Select
+            size="sm"
+            className="text-xs"
+            value={breakdownBy}
             onChange={(e) => setBreakdownBy(e.target.value)}
           >
             <option value="model">model</option>
@@ -311,15 +345,24 @@ export default function FinancePage() {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Budget policies</h2>
-          <Button size="sm" onClick={() => setOpen(true)}>New budget</Button>
+          <Button size="sm" onClick={() => setOpen(true)}>
+            New budget
+          </Button>
         </div>
 
         <BudgetPolicyDialog open={open} onOpenChange={setOpen} onSaved={refreshBudgets} />
 
         {policies.length === 0 && (
-          <Card className="p-8 text-center text-sm text-muted-foreground">
-            No budget policies yet.
-          </Card>
+          <EmptyState
+            icon={<Wallet />}
+            title="No budget policies yet"
+            description="Add a budget to cap spend for the whole workspace or one project, get warned as it fills, and auto-pause agents on a hard breach."
+            action={
+              <Button size="sm" onClick={() => setOpen(true)}>
+                New budget
+              </Button>
+            }
+          />
         )}
 
         {policies.map((p) => (
@@ -328,6 +371,9 @@ export default function FinancePage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="truncate font-medium text-foreground">{p.name}</span>
                 <Badge variant="gray">{p.scope}</Badge>
+                {p.scope === "project" && p.projectId && (
+                  <Badge variant="gray">{projectName(p.projectId)}</Badge>
+                )}
                 <Badge variant="blue">{p.window}</Badge>
                 {p.hardStop && <Badge variant="orange">hard stop</Badge>}
                 {!p.isActive && <Badge variant="gray">inactive</Badge>}
@@ -336,17 +382,33 @@ export default function FinancePage() {
                 Limit {money(p.limitCents)} · warn at {p.warnPercent}%
               </p>
             </div>
-            <Button
-              size="sm"
-              variant="danger"
-              disabled={busy === p.id}
-              onClick={() => onDelete(p.id)}
-            >
-              Delete
-            </Button>
+            <Tooltip content="Delete this budget. Its spend cap and warnings stop applying — agents in scope can spend without this limit.">
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={busy === p.id}
+                onClick={() => setConfirmDelete(p)}
+              >
+                Delete
+              </Button>
+            </Tooltip>
           </Card>
         ))}
       </section>
+
+      <ConfirmDialog
+        isOpen={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={async () => {
+          if (!confirmDelete) return;
+          await onDelete(confirmDelete.id);
+          setConfirmDelete(null);
+        }}
+        title={confirmDelete ? `Delete "${confirmDelete.name}"?` : "Delete budget?"}
+        description="This removes the budget's spend cap and warn threshold. Agents in scope can then spend without this limit, and a hard breach will no longer auto-pause them. Past incidents are kept."
+        confirmLabel="Delete budget"
+        loading={busy === confirmDelete?.id}
+      />
     </div>
   );
 }

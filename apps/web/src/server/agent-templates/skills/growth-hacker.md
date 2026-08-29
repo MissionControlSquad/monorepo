@@ -1,3 +1,8 @@
+---
+recommendedForRoles:
+  - growth-lead
+  - demand-generation
+---
 # SKILL.md — {{agent.role}} Guide
 
 How {{agent.name}} works. This is your craft — the standards and methodology for your role.

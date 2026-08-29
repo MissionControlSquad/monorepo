@@ -56,7 +56,13 @@ export async function bridgePostMessage(run: VerifiedRun, content: string): Prom
   if (!trimmed) return false;
   const fromProfileId = await getOrCreateAgentProfileId(run.agentId);
   await prisma.message.create({
-    data: { taskId: run.taskId, fromProfileId, content: trimmed.slice(0, MAX_BRIDGE_MESSAGE) },
+    data: {
+      taskId: run.taskId,
+      fromProfileId,
+      content: trimmed.slice(0, MAX_BRIDGE_MESSAGE),
+      // Parity §3.12 — attribute the comment to the posting run.
+      createdByRunId: run.runId,
+    },
   });
   return true;
 }
@@ -167,6 +173,81 @@ export async function bridgeMemoryForget(
   const mem = await resolveRunMemory(run);
   if (!mem?.adapter) return null;
   return mem.adapter.forget(mem.scope, memoryId.trim());
+}
+
+/**
+ * memory.correct — the in-run agent supersedes one of its OWN prior entries with corrected content,
+ * preserving the original provenance. Scope-bound (an id owned by another agent, or already corrected,
+ * is a no-op → null-id result). Returns the new entry's id, or null when memory is unavailable / the
+ * correction couldn't be applied. Cost rolls into the run (`included_in_run`).
+ */
+export async function bridgeMemoryCorrect(
+  run: VerifiedRun,
+  memoryId: string,
+  content: string,
+): Promise<{ id: string } | null> {
+  const id = memoryId?.trim();
+  const trimmed = content?.trim();
+  if (!id || !trimmed) return null;
+  const mem = await resolveRunMemory(run);
+  if (!mem?.adapter?.correct) return null;
+  const entry = await mem.adapter.correct(mem.scope, id, trimmed.slice(0, MAX_MEMORY_NOTE), {
+    taskId: run.taskId,
+    runId: run.runId,
+    sourceKind: "run",
+    sourceRefId: run.runId,
+  });
+  return entry ? { id: entry.id } : null;
+}
+
+/**
+ * memory.list — the in-run agent enumerates its OWN live memory (newest-first, paginated). Returns null
+ * when memory is unavailable for the run; otherwise the page plus the next offset for the caller to
+ * continue from (null when the page is the last).
+ */
+export async function bridgeMemoryList(
+  run: VerifiedRun,
+  opts?: { limit?: number; offset?: number },
+): Promise<{
+  results: Array<{ id: string; content: string; createdAt: string }>;
+  nextOffset: number | null;
+} | null> {
+  const mem = await resolveRunMemory(run);
+  if (!mem?.adapter?.list) return null;
+  const page = await mem.adapter.list(mem.scope, opts);
+  return {
+    results: page.items.map((r) => ({
+      id: r.id,
+      content: r.content,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    nextOffset: page.nextOffset,
+  };
+}
+
+/**
+ * memory.record_upsert — the in-run agent idempotently upserts a KEYED record into its OWN store.
+ * Re-upserting the same key updates the same row rather than appending a duplicate. Returns the entry's
+ * id + whether it was newly created, or null when memory is unavailable / the input is empty. Cost rolls
+ * into the run.
+ */
+export async function bridgeMemoryRecordUpsert(
+  run: VerifiedRun,
+  key: string,
+  content: string,
+): Promise<{ id: string; created: boolean } | null> {
+  const k = key?.trim();
+  const trimmed = content?.trim();
+  if (!k || !trimmed) return null;
+  const mem = await resolveRunMemory(run);
+  if (!mem?.adapter?.upsertRecord) return null;
+  const res = await mem.adapter.upsertRecord(mem.scope, k, trimmed.slice(0, MAX_MEMORY_NOTE), {
+    taskId: run.taskId,
+    runId: run.runId,
+    sourceKind: "run",
+    sourceRefId: run.runId,
+  });
+  return res ? { id: res.entry.id, created: res.created } : null;
 }
 
 /** Attach a freshly-minted token to a run (call once at run start). */

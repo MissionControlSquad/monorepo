@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import { getOrCreateAgentProfileId } from "../../src/server/agent-profile";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { createTestAgent } from "../helpers";
@@ -49,19 +49,23 @@ describe("E2E: a freshly-created agent works a task end-to-end from the CLOUD (a
     await prisma.task.deleteMany({ where: { title: TASK_TITLE } }).catch(() => {});
     await prisma.agent.deleteMany({ where: { name: { in: ["Nova FE", "Ada Lead"] } } });
     for (const key of Object.values(FLAG_KEYS)) {
-      await prisma.featureFlag.upsert({
-        where: { key },
-        create: { key, enabled: true, managedBy: "user" },
-        update: { enabled: true },
-      });
+      setTestFeature(key, true);
     }
     invalidateFlagCache();
 
     // 1) Create a brand-new worker agent + a squad lead — with role runtime + role template set.
-    const worker = await createTestAgent({ name: "Nova FE", role: "Frontend Developer", status: "active" });
+    const worker = await createTestAgent({
+      name: "Nova FE",
+      role: "Frontend Developer",
+      status: "active",
+    });
     await prisma.agent.update({
       where: { id: worker.agent.id },
-      data: { runtimeAdapter: "claude", runtimeModel: "claude-haiku-4-5-20251001", templateId: "frontend-dev" },
+      data: {
+        runtimeAdapter: "claude",
+        runtimeModel: "claude-haiku-4-5-20251001",
+        templateId: "frontend-dev",
+      },
     });
     workerKey = worker.apiKey;
     workerId = worker.agent.id;
@@ -87,7 +91,12 @@ describe("E2E: a freshly-created agent works a task end-to-end from the CLOUD (a
     });
 
     // 3) The fresh agent fetches EVERYTHING it needs from ONE cloud call — no local files.
-    const ctxRes = await GET_CONTEXT(req(`${BASE}/api/agents/me/context?taskId=${task.id}`, workerKey));
+    const ctxRes = await GET_CONTEXT(
+      req(`${BASE}/api/agents/me/context?taskId=${task.id}`, workerKey),
+      {
+        params: Promise.resolve({}),
+      },
+    );
     expect(ctxRes.status).toBe(200);
     const ctx = await ctxRes.json();
 
@@ -96,21 +105,29 @@ describe("E2E: a freshly-created agent works a task end-to-end from the CLOUD (a
     // its cloud role skill (specific template)
     expect(ctx.skills[0].key).toBe("role:frontend-dev");
     // the FULL config/identity file set, generated from the control plane
-    const fileNames: string[] = (ctx.configFiles ?? []).map((f: { filename: string }) => f.filename);
+    const fileNames: string[] = (ctx.configFiles ?? []).map(
+      (f: { filename: string }) => f.filename,
+    );
     for (const f of EXPECTED_FILES) expect(fileNames).toContain(f);
     expect(ctx.configVersion).toBeTruthy();
     // the task itself is attached
     expect(ctx.task).toMatchObject({ id: task.id, title: TASK_TITLE, status: "assigned" });
 
     // 4) The agent works the task purely via the cloud API.
-    const co = await CHECKOUT(req(`${BASE}/api/tasks/checkout`, workerKey, "POST", { taskId: task.id, action: "checkout" }));
+    const co = await CHECKOUT(
+      req(`${BASE}/api/tasks/checkout`, workerKey, "POST", { taskId: task.id, action: "checkout" }),
+      {
+        params: Promise.resolve({}),
+      },
+    );
     expect(co.status).toBe(200);
 
     const del = await SUBMIT_DELIVERABLE(
       req(`${BASE}/api/tasks/${task.id}/deliverables`, workerKey, "POST", {
         title: "PR: fix nav dropdown overflow",
         kind: "code",
-        content: "- .nav-dropdown{overflow:hidden}\n+ .nav-dropdown{overflow:visible;max-height:80vh;overflow-y:auto}",
+        content:
+          "- .nav-dropdown{overflow:hidden}\n+ .nav-dropdown{overflow:visible;max-height:80vh;overflow-y:auto}",
         language: "css",
       }),
       params(task.id),

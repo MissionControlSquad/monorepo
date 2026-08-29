@@ -3,7 +3,8 @@ import { schema } from "@/server/graphql/schema";
 import { prisma } from "@/server/prisma";
 import type { GraphQLContext } from "@/server/graphql/builder";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
-import { resolveTenancy } from "@/server/tenancy";
+import { readCookie } from "@/server/tenancy/buildbase";
+import { resolveTenancy, resolveUsageContext } from "@/server/tenancy";
 import { isLicenseActive } from "@/server/license";
 import { apiLimiters, checkRateLimit } from "../_lib/rate-limit-check";
 
@@ -13,10 +14,7 @@ const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const MAX_QUERY_DEPTH = 12;
 
 function getSessionTokenFromRequest(request: Request): string | null {
-  const cookie = request.headers.get("cookie");
-  if (!cookie) return null;
-  const match = cookie.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-  return match ? match[1].trim() : null;
+  return readCookie(request.headers.get("cookie"), COOKIE_NAME);
 }
 
 const yoga = createYoga<GraphQLContext>({
@@ -44,6 +42,8 @@ const yoga = createYoga<GraphQLContext>({
         request.headers.get("cookie"),
         request.headers.get("authorization"),
       ),
+      // buildbase human session (if any) for plan-usage recording in human-plane resolvers.
+      usage: await resolveUsageContext(request),
     };
   },
   graphqlEndpoint: "/api/graphql",

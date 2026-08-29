@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 /**
  * Epic #17 cases — real GraphQL route + Postgres. `userId` is a real Profile id (case FKs). Proves
@@ -198,16 +203,12 @@ describe("isolation + gate (Epic #17)", () => {
 
   it("rejects access when CASES is off", async () => {
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "cases" },
-        create: { key: "cases", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature(FLAG_KEYS.CASES, false);
       invalidateFlagCache();
       const r = await gql(`query{ cases{ id } }`, undefined, await cookieFor(WS_A, "member"));
       expect(r.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "cases" } });
+      resetTestFeature(FLAG_KEYS.CASES);
       invalidateFlagCache();
     }
   });

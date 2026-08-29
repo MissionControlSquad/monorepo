@@ -1,6 +1,6 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { RunScratch, RunSkillSelection, RunHandoffState } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // Per-run runtime state (parity #145/#146/#155). Scratch KV, skill selections, and the successful-run
 // handoff a continuation reads. Workspace-scoped. The agent runtime is the writer; the UI and
@@ -8,10 +8,6 @@ import type { RunScratch, RunSkillSelection, RunHandoffState } from "@agentcente
 
 const HANDOFF_OUTCOMES = new Set(["success", "partial"]);
 const SKILL_SOURCES = new Set(["auto", "pinned", "inherited"]);
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 // ── Run scratch (#145) ────────────────────────────────────────────────────────
 export function setRunScratch(

@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { openTerminalSession, closeTerminalSession } from "@/server/services/terminals";
 
 // Epic #9: terminal session mutations. admin only (opening a session into an environment is
@@ -30,7 +31,7 @@ builder.mutationField("openTerminalSession", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TERMINALS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const { session, connectToken } = await openTerminalSession({
         workspaceId: tenancy.workspaceId,
         command: args.command,
@@ -56,7 +57,7 @@ builder.mutationField("closeTerminalSession", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TERMINALS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await closeTerminalSession(tenancy.workspaceId, args.id);
       return true;
     },

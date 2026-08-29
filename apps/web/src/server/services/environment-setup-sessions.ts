@@ -1,8 +1,8 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { EnvironmentCustomImageSetupSession } from "@agentcenter/database";
 import { setupSessionNext, SetupSessionError, type SetupSessionStatus } from "@agentcenter/utils";
 import { captureCustomImage } from "@/server/services/environment-custom-images";
+import { badRequest } from "./service-errors";
 
 // Custom-image setup-session lifecycle (parity #47/#48). Orchestrates the existing TerminalSession (SSH
 // PTY, #48 broker) and image capture into an interactive "configure a box, then snapshot it" flow. The
@@ -10,10 +10,6 @@ import { captureCustomImage } from "@/server/services/environment-custom-images"
 // so the lifecycle is testable offline). Workspace-scoped; CUSTOM_IMAGES-gated at the resolver.
 
 const DEFAULT_TTL_MS = 60 * 60_000; // 1h
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 /** A capture function: (workspaceId, environmentId) → the id of the created custom-image template. */
 export type CaptureFn = (workspaceId: string, environmentId: string) => Promise<string>;

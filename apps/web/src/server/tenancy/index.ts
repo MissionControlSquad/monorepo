@@ -3,7 +3,14 @@
  * plane via `ctx.tenancy` + `workspaceId`. See docs/gap-plans/01-buildbase-tenancy.md and
  * .claude/skills/buildbase-tenancy.
  */
-export { roleAtLeast, roleCan } from "./roles";
+export { roleAtLeast, roleCan, isManagerRole } from "./roles";
 export { resolveTenancy, DEFAULT_WORKSPACE_ID } from "./resolve";
 export { requireTenancy, requireRole, requirePermission, scoped } from "./guards";
 export { getBuildbase, isBuildbaseConfigured, BB_SESSION_COOKIE } from "./buildbase";
+export {
+  recordPlanUsage,
+  recordPlanUsageFromRequest,
+  resolveUsageContext,
+  type UsageContext,
+  type RecordPlanUsageInput,
+} from "./usage";

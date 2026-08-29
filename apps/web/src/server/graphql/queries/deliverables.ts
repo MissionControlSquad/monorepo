@@ -3,6 +3,7 @@ import { builder } from "../builder";
 import { deliverableModel, deliverableVersionModel, taskModel } from "../../models";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { isDeliverableKind } from "@agentcenter/utils";
 import type { DeliverableKind } from "@agentcenter/database";
 
@@ -13,7 +14,7 @@ builder.queryField("workspaceDeliverables", (t) =>
     type: ["Deliverable"],
     args: { kind: t.arg.string(), limit: t.arg.int({ defaultValue: 60 }) },
     resolve: async (query, _root, args, ctx) => {
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const take = Math.min(Math.max(args.limit ?? 60, 1), 200);
       if (args.kind && !isDeliverableKind(args.kind))
         throw new GraphQLError(`Invalid kind '${args.kind}'`, {

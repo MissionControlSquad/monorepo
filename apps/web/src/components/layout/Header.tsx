@@ -6,7 +6,6 @@ import { Activity, Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { GlobalSearch } from "./GlobalSearch";
 import { Button } from "../ui";
 import { NotificationBell } from "../notifications/NotificationBell";
-import { WorkspaceSwitcherSlot } from "../providers/WorkspaceSwitcherSlot";
 import { WhenFeatureEnabled } from "../context/FeatureFlagContext";
 import { FLAG_KEYS } from "@agentcenter/utils";
 
@@ -66,8 +65,8 @@ export const Header = memo(function Header({
 
         {/* Right controls */}
         <div className="flex items-center gap-1 shrink-0">
-          {/* buildbase workspace switcher — renders only when buildbase is configured (Epic #1) */}
-          <WorkspaceSwitcherSlot />
+          {/* Account/profile menu lives in the icon-rail bottom slot; the header has no account menu
+              or workspace switcher. */}
           <WhenFeatureEnabled flag={FLAG_KEYS.NOTIFICATIONS}>
             <NotificationBell />
           </WhenFeatureEnabled>

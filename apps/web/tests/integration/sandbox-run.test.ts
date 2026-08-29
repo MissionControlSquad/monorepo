@@ -4,7 +4,7 @@ import { hashApiKey } from "../../src/server/api-key";
 import { agentCache } from "../../src/server/cache";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import {
   runTaskInSandbox,
   composeSandboxScript,
@@ -24,6 +24,7 @@ import { armTaskMonitor, tickDueTaskMonitors } from "../../src/server/services/t
 import { createEnvironment } from "../../src/server/services/environments";
 import { getRunRuntimeStatus } from "../../src/server/services/run-runtime-status";
 import { createSecret, bindSecret } from "../../src/server/services/secrets";
+import { FLAG_KEYS, registerAdapter, getAdapter } from "@agentcenter/utils";
 
 // Tier D: the sandbox EXECUTION SEAM. Exercised end-to-end against the REAL `local` provider (temp
 // dir + child_process, no keys) — proving provision → materialise the task → run the runtime → capture
@@ -88,11 +89,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE agent_runs, messages, tasks, agent_skills, skills, agent_instructions, agents, profiles, environments, secrets CASCADE`,
   );
-  await prisma.featureFlag.upsert({
-    where: { key: "runners" },
-    create: { key: "runners", enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature(FLAG_KEYS.RUNNERS, true);
   invalidateFlagCache();
 });
 
@@ -227,6 +224,64 @@ describe("sandbox task execution (Tier D)", () => {
     expect(live!.phase).toBe("done");
     expect(live!.tail).toContain("LIVE_MARKER"); // streamed output captured
     expect(live!.tail).not.toContain("sk-streamed-secret"); // secret value scrubbed
+  });
+
+  it("streams the PARSED transcript live for an adapter with a parseLine (§3 Item 1)", async () => {
+    // Register a test adapter whose command emits ONE claude-style stream-json assistant line, and reuse
+    // claude's parseLine. The live tail must show the RENDERED assistant text (not raw JSONL) mid-run.
+    const claudeParse = getAdapter("claude")!.parseLine!;
+    const assistantLine = JSON.stringify({
+      type: "assistant",
+      message: { content: [{ type: "text", text: "STREAMED_TURN" }] },
+    });
+    registerAdapter({
+      key: "streamtest",
+      displayName: "Stream Test",
+      requiresTemplate: false,
+      supportsModel: false,
+      models: [],
+      build: (ctx) => ({
+        mode: "spawn",
+        argv: [`printf '%s\\n' '${assistantLine}'`],
+        cwd: ctx.workspaceDir,
+        useShell: true,
+        layout: {
+          instructionsFile: "AGENTS.md",
+          skillsDir: "skills",
+          identityFile: "IDENTITY.md",
+          taskFile: "TASK.md",
+        },
+      }),
+      parseLine: (line, ts) => claudeParse(line, ts),
+    });
+
+    const agent = await prisma.agent.create({
+      data: {
+        name: "StreamAdapter",
+        role: "worker",
+        personality: "x",
+        workspaceId: WS,
+        setupStatus: "active",
+        apiKeyHash: hashApiKey(`mc_streamadp_${Math.random()}`),
+        runtimeAdapter: "streamtest",
+        sandboxProvider: "local",
+      },
+    });
+    const taskId = await makeTask();
+
+    const result = await runTaskInSandbox({ workspaceId: WS, taskId, agentId: agent.id });
+    const live = getRunRuntimeStatus(result.runId);
+    expect(live).not.toBeNull();
+    // The live tail shows the human-readable assistant turn…
+    expect(live!.tail).toContain("STREAMED_TURN");
+    // …NOT the raw stream-json envelope (streaming replaced the JSONL blob on the live tail).
+    expect(live!.tail).not.toContain('"type":"assistant"');
+    // The post-hoc authoritative result still parsed the same transcript.
+    expect(
+      result.execution?.transcript?.some(
+        (e) => e.kind === "assistant" && e.text === "STREAMED_TURN",
+      ),
+    ).toBe(true);
   });
 
   it("exposes the persisted run via the agentRuns query (RUNNERS-gated)", async () => {
@@ -448,7 +503,11 @@ describe("environment-driven execution (Plan 1 wiring)", () => {
     expect(result.stdout).toContain("VAR=env-value-123");
   });
 
-  it("rejects an ssh/plugin Environment (not yet runnable via the sandbox seam)", async () => {
+  it("rejects an ssh/plugin Environment when ENVIRONMENTS is off (not yet runnable via the seam)", async () => {
+    // Back-compat: with the ENVIRONMENTS flag dark, the ssh runtime driver stays disabled and an ssh env
+    // is refused up front (the unified driver only routes ssh when ENVIRONMENTS is enabled).
+    setTestFeature(FLAG_KEYS.ENVIRONMENTS, false);
+    invalidateFlagCache();
     const env = await createEnvironment(WS, {
       name: "Ssh",
       driver: "ssh",
@@ -499,11 +558,7 @@ describe("environment-driven execution (Plan 1 wiring)", () => {
 
 describe("untrusted-output review gate (Domain 8 G2)", () => {
   async function enableLowTrustReview(on = true) {
-    await prisma.featureFlag.upsert({
-      where: { key: "low_trust_review" },
-      create: { key: "low_trust_review", enabled: on, managedBy: "user" },
-      update: { enabled: on },
-    });
+    setTestFeature(FLAG_KEYS.LOW_TRUST_REVIEW, on);
     invalidateFlagCache();
   }
 
@@ -781,5 +836,118 @@ describe("issue monitors — one-shot deferred wake (Domain 9 #11)", () => {
     expect(
       (await prisma.task.findUniqueOrThrow({ where: { id: taskId } })).monitorNextCheckAt,
     ).toBeNull();
+  });
+});
+
+describe("§3 #11 (1) — priority dispatch + per-agent maxConcurrentRuns", () => {
+  /** A task with an explicit Priority (drives AgentRun.priority at enqueue). */
+  async function makeTaskWithPriority(priority: "low" | "medium" | "high" | "urgent") {
+    const task = await prisma.task.create({
+      data: { title: `T ${priority}`, description: "d", status: "assigned", priority, tags: [] },
+    });
+    return task.id;
+  }
+
+  it("stamps AgentRun.priority from the task's Priority at enqueue", async () => {
+    const agentId = await makeAgent("local");
+    const low = await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTaskWithPriority("low"),
+      agentId,
+    });
+    const urgent = await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTaskWithPriority("urgent"),
+      agentId,
+    });
+    expect((await prisma.agentRun.findUniqueOrThrow({ where: { id: low.runId } })).priority).toBe(
+      0,
+    );
+    expect(
+      (await prisma.agentRun.findUniqueOrThrow({ where: { id: urgent.runId } })).priority,
+    ).toBe(3);
+  });
+
+  it("drains the highest-priority queued run first (priority DESC, then FIFO)", async () => {
+    const agentId = await makeAgent("local");
+    // Three distinct tasks for the same agent, enqueued low → urgent → high.
+    await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTaskWithPriority("low"),
+      agentId,
+    });
+    await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTaskWithPriority("urgent"),
+      agentId,
+    });
+    await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTaskWithPriority("high"),
+      agentId,
+    });
+
+    // Drain exactly one → only the URGENT run starts; the rest stay queued in priority order.
+    const started = await drainSandboxRunQueue(1);
+    expect(started).toBe(1);
+    const runs = await prisma.agentRun.findMany({ where: { agentId } });
+    expect(runs.find((r) => r.priority === 3)?.status).toBe("done"); // urgent ran
+    expect(runs.find((r) => r.priority === 2)?.status).toBe("queued"); // high waits
+    expect(runs.find((r) => r.priority === 0)?.status).toBe("queued"); // low waits
+  });
+
+  it("respects the per-agent maxConcurrentRuns cap (skips while at capacity, runs once free)", async () => {
+    const agentId = await makeAgent("local");
+    await prisma.agent.update({ where: { id: agentId }, data: { maxConcurrentRuns: 1 } });
+
+    // Simulate one run already in-flight for this agent (as if on another worker).
+    await prisma.agentRun.create({
+      data: {
+        workspaceId: WS,
+        agentId,
+        taskId: await makeTaskWithPriority("high"),
+        kind: "sandbox",
+        providerKey: "local",
+        status: "running",
+      },
+    });
+
+    const { runId } = await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTask(),
+      agentId,
+    });
+    // At capacity (1 running ≥ cap 1) → the queued run is NOT started; it stays queued.
+    expect(await drainSandboxRunQueue()).toBe(0);
+    expect((await prisma.agentRun.findUnique({ where: { id: runId } }))?.status).toBe("queued");
+
+    // Free the in-flight slot → now under cap → the queued run drains + completes.
+    await prisma.agentRun.updateMany({
+      where: { agentId, status: "running" },
+      data: { status: "done", finishedAt: new Date() },
+    });
+    expect(await drainSandboxRunQueue()).toBeGreaterThanOrEqual(1);
+    expect((await prisma.agentRun.findUnique({ where: { id: runId } }))?.status).toBe("done");
+  });
+
+  it("with no cap set, drains a run regardless of other in-flight runs (unlimited)", async () => {
+    const agentId = await makeAgent("local"); // maxConcurrentRuns null = unlimited
+    await prisma.agentRun.create({
+      data: {
+        workspaceId: WS,
+        agentId,
+        taskId: await makeTask(),
+        kind: "sandbox",
+        providerKey: "local",
+        status: "running",
+      },
+    });
+    const { runId } = await enqueueSandboxRun({
+      workspaceId: WS,
+      taskId: await makeTask(),
+      agentId,
+    });
+    expect(await drainSandboxRunQueue()).toBeGreaterThanOrEqual(1);
+    expect((await prisma.agentRun.findUnique({ where: { id: runId } }))?.status).toBe("done");
   });
 });

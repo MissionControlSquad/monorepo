@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import type { WatchdogCondition, WatchdogActionType, WatchdogScope } from "@agentcenter/database";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   proposeDecomposition,
   reviewDecomposition,
@@ -30,7 +31,7 @@ builder.mutationField("proposeDecomposition", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const dec = await proposeDecomposition({ parentTaskId: args.parentTaskId, plan: args.plan });
       return ctx.prisma.planDecomposition.findUniqueOrThrow({ ...query, where: { id: dec.id } });
     },
@@ -43,7 +44,7 @@ builder.mutationField("reviewDecomposition", (t) =>
     args: { id: t.arg.string({ required: true }), decision: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const dec = await reviewDecomposition({
         id: args.id,
         decision: args.decision === "approve" ? "approve" : "reject",
@@ -60,7 +61,7 @@ builder.mutationField("applyDecomposition", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const { taskIds } = await applyDecomposition(args.id);
       return taskIds;
     },
@@ -79,7 +80,7 @@ builder.mutationField("armTaskMonitor", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       if (args.maxAttempts != null && args.maxAttempts < 1)
         throw new GraphQLError("maxAttempts must be >= 1", {
           extensions: { code: "BAD_USER_INPUT" },
@@ -101,7 +102,7 @@ builder.mutationField("clearTaskMonitor", (t) =>
     args: { taskId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await clearTaskMonitor(args.taskId);
       return true;
     },
@@ -117,7 +118,7 @@ builder.mutationField("holdSubtree", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const hold = await holdSubtree(args.rootTaskId, args.reason, tenancy.userId);
       return ctx.prisma.taskTreeHold.findUniqueOrThrow({ ...query, where: { id: hold.id } });
     },
@@ -130,7 +131,7 @@ builder.mutationField("releaseSubtreeHold", (t) =>
     args: { rootTaskId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return releaseSubtreeHold(args.rootTaskId);
     },
   }),
@@ -148,7 +149,7 @@ builder.mutationField("createTaskWatchdog", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const wd = await createWatchdog({
         taskId: args.taskId,
         condition: args.condition as WatchdogCondition,
@@ -167,7 +168,7 @@ builder.mutationField("evaluateWatchdogsNow", (t) =>
     type: "Int",
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const decisions = await evaluateWatchdogs();
       return decisions.length;
     },
@@ -188,7 +189,7 @@ builder.mutationField("createThreadInteraction", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.THREAD_INTERACTIONS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const it = await createThreadInteraction({
         taskId: args.taskId,
         kind: args.kind,
@@ -212,7 +213,7 @@ builder.mutationField("resolveThreadInteraction", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.THREAD_INTERACTIONS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const decision = args.decision === "dismissed" ? "dismissed" : "resolved";
       const it = await resolveThreadInteraction({
         id: args.id,
@@ -231,7 +232,7 @@ builder.mutationField("cancelTask", (t) =>
     type: "Task",
     args: { taskId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const task = await ctx.prisma.task.findFirst({
         where: { id: args.taskId, deletedAt: null },
         select: { id: true, status: true },
@@ -257,7 +258,7 @@ builder.mutationField("cancelSubtree", (t) =>
     args: { rootTaskId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return cancelSubtree(args.rootTaskId);
     },
   }),
@@ -269,7 +270,7 @@ builder.mutationField("restoreSubtree", (t) =>
     args: { rootTaskId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.TASK_AUTONOMY);
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return restoreSubtree(args.rootTaskId);
     },
   }),

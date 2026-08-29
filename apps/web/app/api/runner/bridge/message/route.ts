@@ -1,5 +1,5 @@
 import { successResponse, errorResponse, handleError } from "../../../_lib/json-response";
-import { isFeatureEnabled } from "@/server/feature-flags";
+import { withFeature } from "../../../_lib/with-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { verifyRunBridgeToken, bridgePostMessage } from "@/server/services/run-bridge";
 
@@ -14,11 +14,13 @@ import { verifyRunBridgeToken, bridgePostMessage } from "@/server/services/run-b
  *   Authorization: Bearer rbt_<token>
  *   { "content": "..." }
  */
-export async function POST(request: Request) {
+export const POST = withFeature(
+  { flag: FLAG_KEYS.RUNNERS, error: "Runners are not enabled" },
+  postHandler,
+);
+
+async function postHandler(request: Request) {
   try {
-    if (!(await isFeatureEnabled(FLAG_KEYS.RUNNERS))) {
-      return errorResponse("Runners are not enabled", 403, "FEATURE_DISABLED");
-    }
     const auth = request.headers.get("authorization") ?? "";
     const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
     const run = await verifyRunBridgeToken(token);

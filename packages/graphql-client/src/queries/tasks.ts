@@ -289,3 +289,18 @@ export const TASKS_BY_PROJECT_QUERY = gql`
     }
   }
 `;
+
+// Parity §3.12 — a task's first-class labels.
+export const TASK_LABELS_QUERY = gql`
+  query TaskLabels($taskId: String!) {
+    taskLabels(taskId: $taskId) {
+      id
+      labelId
+      label {
+        id
+        name
+        color
+      }
+    }
+  }
+`;

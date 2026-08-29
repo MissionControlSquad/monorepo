@@ -4,25 +4,24 @@
  * clashes, and records a TeamInstall with the affected agent ids.
  */
 import { randomUUID } from "node:crypto";
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { Team, TeamMember, TeamKind, TeamTrustLevel } from "@agentcenter/database";
 import { slugify } from "./skills";
 import { provisionSetupStatus } from "./agent-governance";
 import { resolveCollision, planCollisions, COLLISION_ACTION } from "@agentcenter/utils";
 import type { CollisionAction, CollisionStrategy, CollisionPlanItem } from "@agentcenter/utils";
+import { verifyPackageIntegrity } from "@agentcenter/utils";
+import {
+  listCatalogTeams,
+  getCatalogTeam,
+  type CatalogTeamEntry,
+} from "@agentcenter/teams-catalog";
+import { badRequest, notFound } from "./service-errors";
 
 // resolveCollision is a shared pure helper in @agentcenter/utils (reused by skills, teams,
 // portability). Imported for internal use here and re-exported for existing importers.
 export { resolveCollision };
 export type { CollisionAction, CollisionStrategy };
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
-function notFound(what: string): never {
-  throw new GraphQLError(`${what} not found`, { extensions: { code: "NOT_FOUND" } });
-}
 
 export async function createTeam(input: {
   workspaceId: string;
@@ -36,6 +35,7 @@ export async function createTeam(input: {
   tagline?: string | null;
   author?: string | null;
   tags?: string[] | null;
+  sourceRef?: string | null;
 }): Promise<Team> {
   const name = input.name.trim();
   if (!name) badRequest("name is required");
@@ -55,6 +55,7 @@ export async function createTeam(input: {
       tagline: input.tagline ?? null,
       author: input.author ?? null,
       tags: input.tags ?? [],
+      sourceRef: input.sourceRef ?? null,
     },
   });
 }
@@ -200,4 +201,89 @@ export async function installTeam(args: {
   });
 
   return { installId: install.id, createdAgentIds, actions };
+}
+
+// ── Install-from-markdown: the app-shipped teams catalog (Domain 14 — Paperclip teams-catalog parity) ──
+
+export interface CatalogTeamSummary {
+  id: string;
+  slug: string;
+  key: string;
+  name: string;
+  description: string;
+  tagline: string;
+  icon: string | null;
+  author: string | null;
+  tags: string[];
+  roleCount: number;
+  roles: { name: string; role: string }[];
+  sourceRef: string;
+}
+
+/** List the shipped markdown teams catalog (for the "Browse teams catalog" UI). Pure, in-memory. */
+export function listTeamCatalog(): CatalogTeamSummary[] {
+  return listCatalogTeams().map(toSummary);
+}
+
+function toSummary(e: CatalogTeamEntry): CatalogTeamSummary {
+  return {
+    id: e.id,
+    slug: e.slug,
+    key: e.key,
+    name: e.name,
+    description: e.description,
+    tagline: e.tagline,
+    icon: e.icon,
+    author: e.author,
+    tags: e.tags,
+    roleCount: e.roles.length,
+    roles: e.roles.map((r) => ({ name: r.name, role: r.role })),
+    sourceRef: e.sourceRef,
+  };
+}
+
+/**
+ * Install a team from the shipped markdown catalog: verify the package's sha256 integrity against the
+ * pinned `sourceRef`, then create a workspace Team + one TeamMember per role. A tampered package (any
+ * content change vs. the pinned digest) is rejected before anything is created. The created Team carries
+ * the pinned `sourceRef` for provenance; installing agents from it uses the existing `installTeam` flow.
+ */
+export async function installTeamFromCatalog(input: {
+  workspaceId: string;
+  ref: string; // catalog id, slug, or key
+  createdByProfileId?: string | null;
+}): Promise<Team> {
+  const entry = getCatalogTeam(input.ref);
+  if (!entry) badRequest(`catalog team "${input.ref}" not found`);
+
+  const integrity = verifyPackageIntegrity(entry.files, entry.sourceRef);
+  if (!integrity.ok)
+    badRequest(
+      `catalog team "${entry.slug}" failed sha256 integrity check (expected ${integrity.expected}, got ${integrity.actual})`,
+    );
+
+  const team = await createTeam({
+    workspaceId: input.workspaceId,
+    key: entry.key,
+    name: entry.name,
+    description: entry.description || null,
+    kind: "bundled",
+    trustLevel: entry.trustLevel as TeamTrustLevel,
+    createdByProfileId: input.createdByProfileId ?? null,
+    icon: entry.icon,
+    tagline: entry.tagline || null,
+    author: entry.author,
+    tags: entry.tags,
+    sourceRef: entry.sourceRef,
+  });
+
+  let order = 0;
+  for (const role of entry.roles) {
+    await addTeamMember(input.workspaceId, team.id, {
+      name: role.name,
+      role: role.role,
+      order: order++,
+    });
+  }
+  return prisma.team.findUniqueOrThrow({ where: { id: team.id } });
 }

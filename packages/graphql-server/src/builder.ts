@@ -16,8 +16,12 @@ export interface SessionPayload {
   iat?: number;
 }
 
-/** Workspace-level role of the current human, resolved from buildbase (Epic #1). */
-export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
+// Workspace-role vocabulary is defined once in the client-safe `@agentcenter/utils` package and
+// re-exported here so every existing `import { WORKSPACE_ROLES } from "@agentcenter/graphql-server"`
+// keeps resolving to the same single source (client components import it straight from utils).
+import { WORKSPACE_ROLES, type WorkspaceRole } from "@agentcenter/utils";
+export { WORKSPACE_ROLES };
+export type { WorkspaceRole };
 
 /**
  * Per-request human tenancy, bridging the buildbase SaaS plane to the AgentCenter domain plane.
@@ -35,12 +39,25 @@ export interface TenancyContext {
   can: (permission: string) => boolean;
 }
 
+/**
+ * The buildbase human session resolved from the request cookies, when present. Carried on the context
+ * so human-plane resolvers (e.g. createProject) can record plan-quota consumption in buildbase via
+ * `withSession(sessionId).usage.record(workspaceId, …)`. Null for anonymous / agent / self-host
+ * requests. Structurally matches `UsageContext` in apps/web (kept inline here to avoid a package cycle).
+ */
+export interface UsageSession {
+  sessionId: string;
+  workspaceId: string;
+}
+
 export interface GraphQLContext extends YogaInitialContext {
   prisma: typeof prisma;
   /** Set when request has valid mc_session cookie (admin login with Profile). Used for createdByProfileId, fromProfileId, etc. */
   session: (SessionPayload & { profileId: string }) | null;
   /** Human workspace tenancy (Epic #1). Null for anonymous or agent requests. */
   tenancy: TenancyContext | null;
+  /** buildbase human session for plan-usage recording. Null for anonymous/agent/self-host requests. */
+  usage: UsageSession | null;
 }
 
 export const builder = new SchemaBuilder<{

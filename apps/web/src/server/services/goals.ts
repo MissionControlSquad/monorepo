@@ -2,7 +2,6 @@
  * Goals / OKRs (Epic #11). Hierarchical goal tree (company → team → task), each optionally owned by an
  * agent. Ports Paperclip `services/goals.ts` (`goalService`, `getDefaultCompanyGoal`). workspaceId-scoped.
  */
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import {
   wouldCreateCycle,
@@ -13,10 +12,7 @@ import {
 } from "@agentcenter/utils";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import type { Goal, GoalLevel, GoalStatus } from "@agentcenter/database";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
+import { badRequest } from "./service-errors";
 
 /**
  * Epic #11b: resolve which goal a new task should advance, using the shared fallback (explicit goal →

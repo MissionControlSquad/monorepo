@@ -1,4 +1,8 @@
 export { getOrCreateAgentProfileId, ensureAgentProfile } from "./ensure-agent-profile";
+export {
+  ensureUserAndProfileForBuildbase,
+  type EnsureBuildbaseProfileInput,
+} from "./ensure-buildbase-profile";
 export { findProfilesWithR2AvatarUrl, updateProfileAvatarUrl } from "./normalize-avatars";
 export { getProfileAgentId } from "./get-agent-id";
 export { getProfileIdsByAgentIds } from "./get-ids-by-agent-ids";

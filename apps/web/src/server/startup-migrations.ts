@@ -3,12 +3,7 @@
  * Each migration is idempotent and guarded by a check so it only does real
  * work when there are rows to fix.
  */
-import {
-  findProfilesWithR2AvatarUrl,
-  updateProfileAvatarUrl,
-  ensureFeatureFlagExists,
-} from "@agentcenter/database";
-import { FLAG_KEYS, FLAG_DEFAULTS, type FlagKey } from "@agentcenter/utils";
+import { findProfilesWithR2AvatarUrl, updateProfileAvatarUrl } from "@agentcenter/database";
 import { ensureBuiltinAdapters } from "@/server/adapters/registry";
 
 /**
@@ -54,142 +49,9 @@ async function normalizeAvatarUrls() {
   }
 }
 
-/**
- * Ensure all feature flags exist in the database with sensible defaults.
- * Uses upsert so existing flags (and their current enabled state) are not overwritten.
- */
-async function ensureFeatureFlags() {
-  const defaults: {
-    key: string;
-    enabled: boolean;
-    managedBy: "system" | "user";
-    description: string;
-  }[] = [
-    {
-      key: FLAG_KEYS.CHANNELS,
-      enabled: true,
-      managedBy: "system",
-      description: "Team messaging channels and DMs",
-    },
-    {
-      key: FLAG_KEYS.ANALYTICS,
-      enabled: true,
-      managedBy: "system",
-      description: "Analytics dashboard with charts and metrics",
-    },
-    {
-      key: FLAG_KEYS.RECURRING_TASKS,
-      enabled: true,
-      managedBy: "system",
-      description: "Recurring/scheduled task templates",
-    },
-    {
-      key: FLAG_KEYS.REVIEWS,
-      enabled: true,
-      managedBy: "system",
-      description: "Task review workflow (approve/reject/clarify)",
-    },
-    {
-      key: FLAG_KEYS.DOCUMENTS,
-      enabled: true,
-      managedBy: "system",
-      description: "Document management and project docs",
-    },
-    {
-      key: FLAG_KEYS.AGENT_QUEUE,
-      enabled: true,
-      managedBy: "user",
-      description: "Agent work queue management",
-    },
-    {
-      key: FLAG_KEYS.NOTIFICATIONS,
-      enabled: true,
-      managedBy: "user",
-      description: "Push and email notifications",
-    },
-    {
-      key: FLAG_KEYS.GOVERNANCE,
-      enabled: true,
-      managedBy: "system",
-      description: "Agent governance: approvals + trust profiles (Epic #3)",
-    },
-    {
-      key: FLAG_KEYS.BUDGETS,
-      enabled: true,
-      managedBy: "system",
-      description: "Agent budgets: cost tracking + auto-pause (Epic #4)",
-    },
-    {
-      key: FLAG_KEYS.LEDGER,
-      enabled: true,
-      managedBy: "user",
-      description: "Business finance ledger: revenue + expenses (Epic #16)",
-    },
-    {
-      // Opt-in: OpenClaw (builtIn) always works; other providers unlock only when enabled.
-      key: FLAG_KEYS.MULTI_PROVIDER_ADAPTERS,
-      enabled: false,
-      managedBy: "system",
-      description: "Multi-provider agent adapters beyond OpenClaw (Epic #2)",
-    },
-    {
-      key: FLAG_KEYS.SECRETS_VAULT,
-      enabled: true,
-      managedBy: "system",
-      description: "Encrypted secrets vault with versioning + bindings (Epic #5)",
-    },
-    {
-      key: FLAG_KEYS.PIPELINES_ROUTINES,
-      enabled: true,
-      managedBy: "user",
-      description: "Routines (scheduled workflows) + Pipelines (multi-stage cases) (Epic #7)",
-    },
-    {
-      key: FLAG_KEYS.TASK_AUTONOMY,
-      enabled: true,
-      managedBy: "system",
-      description: "Task autonomy: lease checkout, watchdogs, recovery, decomposition (Epic #8)",
-    },
-    {
-      key: FLAG_KEYS.CASES,
-      enabled: true,
-      managedBy: "user",
-      description:
-        "Cases domain: support-ticket/work-item entity with labels + task links (Epic #17)",
-    },
-  ];
-
-  // Catch-all: every remaining FLAG_KEYS entry (not in the curated list above) gets a user-managed
-  // row seeded at its FLAG_DEFAULTS value. Without this, newer flags have no DB row — the UI's flag
-  // panel (which reads DB rows only) can't list them and their FeatureGate falls back to the default,
-  // leaving the feature both hidden and impossible to enable. ensureFeatureFlagExists is a
-  // non-destructive upsert, so this never overrides a curated entry or an admin's toggle.
-  const curated = new Set(defaults.map((d) => d.key));
-  for (const key of Object.values(FLAG_KEYS)) {
-    if (curated.has(key)) continue;
-    defaults.push({
-      key,
-      enabled: FLAG_DEFAULTS[key as FlagKey] ?? false,
-      managedBy: "user",
-      description: `${key} (experimental)`,
-    });
-  }
-
-  let created = 0;
-  for (const flag of defaults) {
-    const didCreate = await ensureFeatureFlagExists(flag);
-    if (didCreate) created++;
-  }
-
-  if (created > 0) {
-    console.log(`[startup] Created ${created} missing feature flag(s).`);
-  }
-}
-
 export async function runStartupMigrations() {
   try {
     await normalizeAvatarUrls();
-    await ensureFeatureFlags();
     await ensureBuiltinAdapters();
   } catch (err) {
     // Log but don't crash the server — these are best-effort fixes

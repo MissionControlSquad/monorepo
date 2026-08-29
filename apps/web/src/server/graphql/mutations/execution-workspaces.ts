@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { ProjectWorkspaceType } from "../queries/execution-workspaces";
 import {
   createProjectWorkspace,
@@ -26,7 +27,7 @@ builder.mutationField("createProjectWorkspace", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.EXECUTION_WORKSPACES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return createProjectWorkspace(
         tenancy.workspaceId,
         {
@@ -60,7 +61,7 @@ builder.mutationField("updateProjectWorkspace", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.EXECUTION_WORKSPACES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return updateProjectWorkspace(tenancy.workspaceId, args.id, {
         ...(args.name != null ? { name: args.name } : {}),
         ...(args.repoUrl !== undefined ? { repoUrl: args.repoUrl } : {}),
@@ -80,7 +81,7 @@ builder.mutationField("deleteProjectWorkspace", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.EXECUTION_WORKSPACES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return deleteProjectWorkspace(tenancy.workspaceId, args.id);
     },
   }),

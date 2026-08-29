@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   listEnvironments,
   getEnvironment,
@@ -98,7 +99,7 @@ builder.queryField("environments", (t) =>
     type: [EnvironmentType],
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return listEnvironments(tenancy.workspaceId);
     },
   }),
@@ -110,7 +111,7 @@ builder.queryField("environment", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return getEnvironment(tenancy.workspaceId, args.id);
     },
   }),
@@ -121,7 +122,7 @@ builder.queryField("environmentCapabilities", (t) =>
     type: EnvironmentCapabilitiesType,
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return getEnvironmentCapabilities();
     },
   }),
@@ -133,7 +134,7 @@ builder.queryField("environmentDeleteBlastRadius", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return getEnvironmentDeleteBlastRadius(tenancy.workspaceId, args.id);
     },
   }),
@@ -166,7 +167,7 @@ builder.queryField("environmentCustomImages", (t) =>
     args: { environmentId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CUSTOM_IMAGES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const [templates, drift] = await Promise.all([
         listTemplates(tenancy.workspaceId, args.environmentId),
         classifyActiveTemplateDrift(tenancy.workspaceId, args.environmentId),
@@ -182,7 +183,7 @@ builder.queryField("environmentLeases", (t) =>
     args: { environmentId: t.arg.string() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return listEnvironmentLeases(tenancy.workspaceId, args.environmentId);
     },
   }),
@@ -193,7 +194,7 @@ builder.queryField("workspaceExecutionPolicy", (t) =>
     type: WorkspaceExecutionPolicyType,
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.EXECUTION_POLICY);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return getWorkspaceExecutionPolicy(tenancy.workspaceId);
     },
   }),

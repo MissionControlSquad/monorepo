@@ -8,7 +8,7 @@ import { UPDATE_QUEUE_ITEM_STATUS } from "../../lib/graphql/mutations";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/shadcn/dialog";
 import { X, CheckCircle2, Circle, Clock, AlertCircle, SkipForward, Play } from "lucide-react";
 import { TimeAgo } from "../common/TimeAgo";
-import { Button, Badge, Input } from "../ui";
+import { Button, Badge, Input, Tooltip } from "../ui";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import type { Agent, AgentQueueItem } from "@agentcenter/types";
 import { QueueItemStatus, Priority } from "@/server/constants";
@@ -142,13 +142,16 @@ export function AgentQueueDialog({ agentId, isOpen, onClose }: AgentQueueDialogP
               <p className="text-sm text-muted-foreground truncate">{agent?.role}</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<X />}
-            onClick={onClose}
-            className="shrink-0 ml-2"
-          />
+          <Tooltip content="Close">
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<X />}
+              onClick={onClose}
+              aria-label="Close"
+              className="shrink-0 ml-2"
+            />
+          </Tooltip>
         </div>
 
         {/* Queue Stats */}

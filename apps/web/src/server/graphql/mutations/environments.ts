@@ -3,6 +3,7 @@ import { requireFeature } from "../require-feature";
 import { GraphQLError } from "graphql";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   EnvironmentType,
   EnvironmentProbeResultType,
@@ -49,7 +50,7 @@ builder.mutationField("createEnvironment", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return createEnvironment(
         tenancy.workspaceId,
         {
@@ -80,7 +81,7 @@ builder.mutationField("updateEnvironment", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return updateEnvironment(tenancy.workspaceId, args.id, {
         ...(args.name != null ? { name: args.name } : {}),
         ...(args.driver != null ? { driver: coerceDriver(args.driver) } : {}),
@@ -101,7 +102,7 @@ builder.mutationField("archiveEnvironment", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return archiveEnvironment(tenancy.workspaceId, args.id);
     },
   }),
@@ -113,7 +114,7 @@ builder.mutationField("deleteEnvironment", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return removeEnvironmentIfDeletable(tenancy.workspaceId, args.id);
     },
   }),
@@ -126,7 +127,7 @@ builder.mutationField("probeEnvironment", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return probeEnvironment(tenancy.workspaceId, args.id);
     },
   }),
@@ -142,7 +143,7 @@ builder.mutationField("setAgentEnvironment", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const agent = await ctx.prisma.agent.findFirst({
         where: { id: args.agentId, workspaceId: tenancy.workspaceId },
         select: { id: true },
@@ -173,7 +174,7 @@ builder.mutationField("destroyEnvironmentLease", (t) =>
     args: { leaseId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ENVIRONMENTS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return destroyLeaseNow(tenancy.workspaceId, args.leaseId);
     },
   }),
@@ -186,7 +187,7 @@ builder.mutationField("captureCustomImage", (t) =>
     args: { environmentId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CUSTOM_IMAGES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const created = await captureCustomImage(
         tenancy.workspaceId,
         args.environmentId,
@@ -203,7 +204,7 @@ builder.mutationField("rollbackCustomImage", (t) =>
     args: { templateId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CUSTOM_IMAGES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const t2 = await rollbackToTemplate(tenancy.workspaceId, args.templateId);
       return t2.id;
     },
@@ -216,7 +217,7 @@ builder.mutationField("disableCustomImage", (t) =>
     args: { templateId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.CUSTOM_IMAGES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return disableTemplate(tenancy.workspaceId, args.templateId);
     },
   }),
@@ -232,7 +233,7 @@ builder.mutationField("setWorkspaceExecutionMode", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.EXECUTION_POLICY);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return setWorkspaceExecutionMode(
         tenancy.workspaceId,
         {

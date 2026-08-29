@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { listAssets, getAssetDownloadUrl } from "@/server/services/assets";
 
 builder.queryField("assets", (t) =>
@@ -10,7 +11,7 @@ builder.queryField("assets", (t) =>
     args: { kind: t.arg.string(), ownerType: t.arg.string(), ownerId: t.arg.string() },
     resolve: async (_query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ASSETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return listAssets(tenancy.workspaceId, {
         kind: args.kind ?? undefined,
         ownerType: args.ownerType ?? undefined,
@@ -26,7 +27,7 @@ builder.queryField("assetDownloadUrl", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ASSETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return getAssetDownloadUrl(tenancy.workspaceId, args.id);
     },
   }),

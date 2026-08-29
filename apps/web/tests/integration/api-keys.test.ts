@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { verifyApiKey } from "../../src/server/services/api-keys";
 import { hashApiKey } from "../../src/server/api-key";
 
@@ -117,16 +122,12 @@ describe("guards (Epic #12)", () => {
 
   it("rejects access when API_KEYS is off", async () => {
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "api_keys" },
-        create: { key: "api_keys", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature(FLAG_KEYS.API_KEYS, false);
       invalidateFlagCache();
       const r = await gql(LIST, undefined, await cookieFor(WS_A, "admin"));
       expect(r.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "api_keys" } });
+      resetTestFeature(FLAG_KEYS.API_KEYS);
       invalidateFlagCache();
     }
   });

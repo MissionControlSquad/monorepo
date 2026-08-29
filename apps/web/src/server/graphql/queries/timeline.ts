@@ -1,5 +1,6 @@
 import { builder } from "../builder";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { prisma } from "@/server/prisma";
 
 // Work timeline (Gantt) — completed agent work spans across the workspace, for the timeline view.
@@ -29,7 +30,7 @@ builder.queryField("workTimeline", (t) =>
       limit: t.arg.int({ defaultValue: 200 }),
     },
     resolve: async (_root, args, ctx) => {
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const take = Math.min(Math.max(args.limit ?? 200, 1), 500);
       const rows = await prisma.workSession.findMany({
         where: {

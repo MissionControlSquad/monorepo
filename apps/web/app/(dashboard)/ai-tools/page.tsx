@@ -17,7 +17,7 @@ import {
   type RuntimeOs,
   type InstallMethod,
 } from "@agentcenter/utils";
-import { Button, Card, Badge, Spinner, Select } from "@/components/ui";
+import { Button, Card, Badge, Spinner, Select, Tooltip } from "@/components/ui";
 import { CopyButton } from "@/components/common/CopyButton";
 import { CheckCircle2, Circle, ExternalLink, Download, ChevronDown, Terminal } from "lucide-react";
 
@@ -235,17 +235,26 @@ export default function AiToolsPage() {
                     <p className="text-xs text-muted-foreground">{tool.summary}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    {installed ? (
-                      <Badge variant="green">
-                        <CheckCircle2 className="mr-1 inline h-3 w-3" />
-                        Installed{st?.version ? ` · ${st.version}` : ""}
-                      </Badge>
-                    ) : (
-                      <Badge variant="gray">
-                        <Circle className="mr-1 inline h-3 w-3" />
-                        Not installed
-                      </Badge>
-                    )}
+                    <Tooltip
+                      side="bottom"
+                      content={
+                        installed
+                          ? `Checks that the ${tool.binName} command is installed and on PATH for this machine. Green means agents that use ${tool.displayName} can start here.`
+                          : `Checks that the ${tool.binName} command is installed and on PATH for this machine. It wasn't found, so agents that use ${tool.displayName} will fail to start until you install it below.`
+                      }
+                    >
+                      {installed ? (
+                        <Badge variant="green">
+                          <CheckCircle2 className="mr-1 inline h-3 w-3" />
+                          Installed{st?.version ? ` · ${st.version}` : ""}
+                        </Badge>
+                      ) : (
+                        <Badge variant="gray">
+                          <Circle className="mr-1 inline h-3 w-3" />
+                          Not installed
+                        </Badge>
+                      )}
+                    </Tooltip>
                     <a
                       href={tool.docsUrl}
                       target="_blank"
@@ -295,16 +304,18 @@ export default function AiToolsPage() {
                     )}
 
                     {isRunnerTarget && recommended && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        loading={busy === tool.key}
-                        disabled={busy === tool.key}
-                        onClick={() => onInstall(tool.key)}
-                      >
-                        <Download className="mr-1 h-3.5 w-3.5" />
-                        Install via runner
-                      </Button>
+                      <Tooltip content="Queues this install command to run on the selected runner. It executes on the runner's next poll — you don't run anything yourself.">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          loading={busy === tool.key}
+                          disabled={busy === tool.key}
+                          onClick={() => onInstall(tool.key)}
+                        >
+                          <Download className="mr-1 h-3.5 w-3.5" />
+                          Install via runner
+                        </Button>
+                      </Tooltip>
                     )}
                   </div>
                 )}

@@ -143,4 +143,61 @@ describe("Kubernetes sandbox provider (through the seam)", () => {
     );
     expect(createPodMock).not.toHaveBeenCalled();
   });
+
+  // Security hardening — Item 2: the image allowlist is consulted BEFORE the pod is created.
+  it("refuses a disallowed image (no pod created) with a readable reason", async () => {
+    await createSecret({
+      workspaceId: WS,
+      name: "KUBECONFIG",
+      value: KUBECONFIG_YAML,
+      createdBy: "h",
+    });
+    // Point the sandbox at an off-allowlist image and configure an allowlist that excludes it.
+    await createSecret({
+      workspaceId: WS,
+      name: "K8S_SANDBOX_IMAGE",
+      value: "evil.io/malware:latest",
+      createdBy: "h",
+    });
+    await createSecret({
+      workspaceId: WS,
+      name: "K8S_IMAGE_ALLOWLIST",
+      value: "ubuntu:*, ghcr.io/*",
+      createdBy: "h",
+    });
+    const agentId = await makeAgent();
+    const taskId = await makeTask();
+
+    await expect(runTaskInSandbox({ workspaceId: WS, taskId, agentId })).rejects.toThrow(
+      /refused|allowlist/i,
+    );
+    expect(createPodMock).not.toHaveBeenCalled(); // admission blocked BEFORE provisioning
+  });
+
+  it("allows an image on the workspace allowlist (pod created, runs)", async () => {
+    await createSecret({
+      workspaceId: WS,
+      name: "KUBECONFIG",
+      value: KUBECONFIG_YAML,
+      createdBy: "h",
+    });
+    await createSecret({
+      workspaceId: WS,
+      name: "K8S_SANDBOX_IMAGE",
+      value: "ghcr.io/acme/base:1",
+      createdBy: "h",
+    });
+    await createSecret({
+      workspaceId: WS,
+      name: "K8S_IMAGE_ALLOWLIST",
+      value: "ubuntu:*, ghcr.io/*",
+      createdBy: "h",
+    });
+    const agentId = await makeAgent();
+    const taskId = await makeTask();
+
+    const result = await runTaskInSandbox({ workspaceId: WS, taskId, agentId });
+    expect(result.exitCode).toBe(0);
+    expect(createPodMock).toHaveBeenCalledTimes(1);
+  });
 });

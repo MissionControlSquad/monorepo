@@ -12,6 +12,19 @@ import { cookies } from "next/headers";
  * convention (SAAS_*), with the skill's BUILDBASE_* names accepted as a fallback.
  */
 export const BB_SESSION_COOKIE = "bb-session-id";
+/** App-minted, workspace-scoped JWT cookie (host-only, pinned to TENANT_WORKSPACE_ID). Canonical name. */
+export const WORKSPACE_TOKEN_COOKIE = "bb-workspace-token";
+
+/**
+ * Read a single cookie value from a raw `Cookie` request header. Returns null when absent. The one
+ * canonical request-cookie parser — used by resolveTenancy, usage recording, and the auth routes so the
+ * `(?:^|;\s*)name=` regex isn't hand-copied per file.
+ */
+export function readCookie(cookieHeader: string | null | undefined, name: string): string | null {
+  if (!cookieHeader) return null;
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
 
 const SERVER_URL =
   process.env.SAAS_SERVER_URL ||

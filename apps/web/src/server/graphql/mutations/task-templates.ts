@@ -1,4 +1,6 @@
 import { builder } from "../builder";
+import { requireRole } from "@/server/tenancy/guards";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { assertAssignableAgents } from "../../assignment-guard";
 import { taskTemplateModel } from "../../models";
 import { taskModel } from "../../models/task";
@@ -14,15 +16,17 @@ builder.mutationField("createTaskTemplate", (t) =>
       description: t.arg.string(),
       subtasks: t.arg.string({ required: true }), // JSON string
     },
-    resolve: (query, _root, args) =>
-      taskTemplateModel.delegate.create({
+    resolve: (query, _root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
+      return taskTemplateModel.delegate.create({
         ...query,
         data: {
           name: args.name,
           description: args.description ?? undefined,
           subtasks: JSON.parse(args.subtasks),
         },
-      }),
+      });
+    },
   }),
 );
 
@@ -35,8 +39,9 @@ builder.mutationField("updateTaskTemplate", (t) =>
       description: t.arg.string(),
       subtasks: t.arg.string(), // JSON string
     },
-    resolve: (query, _root, args) =>
-      taskTemplateModel.delegate.update({
+    resolve: (query, _root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
+      return taskTemplateModel.delegate.update({
         ...query,
         where: { id: args.id },
         data: {
@@ -44,7 +49,8 @@ builder.mutationField("updateTaskTemplate", (t) =>
           ...(args.description !== undefined ? { description: args.description } : {}),
           ...(args.subtasks ? { subtasks: JSON.parse(args.subtasks) } : {}),
         },
-      }),
+      });
+    },
   }),
 );
 
@@ -52,7 +58,8 @@ builder.mutationField("deleteTaskTemplate", (t) =>
   t.field({
     type: "Boolean",
     args: { id: t.arg.string({ required: true }) },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await taskTemplateModel.deleteById(args.id);
       return true;
     },
@@ -63,7 +70,8 @@ builder.mutationField("saveTaskAsTemplate", (t) =>
   t.prismaField({
     type: "TaskTemplate",
     args: { taskId: t.arg.string({ required: true }) },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const parentTask = await taskModel.findByIdOrThrow(args.taskId, {
         include: { childTasks: true },
       });
@@ -99,7 +107,8 @@ builder.mutationField("instantiateTemplate", (t) =>
       tags: t.arg.stringList(),
       projectId: t.arg.string(),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const template = await taskTemplateModel.findByIdOrThrow(args.templateId);
       const assigneeIds = args.assigneeIds ?? [];
       await assertAssignableAgents(assigneeIds);

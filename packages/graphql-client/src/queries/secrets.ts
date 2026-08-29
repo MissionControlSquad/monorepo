@@ -17,8 +17,12 @@ export const SECRETS_QUERY = gql`
         scope
         agentId
         adapterType
+        toolConnectionId
         envVarName
         pinnedVersion
+        configPath
+        versionSelector
+        projectionClass
       }
       versions {
         version

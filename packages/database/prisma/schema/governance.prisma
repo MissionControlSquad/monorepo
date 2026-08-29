@@ -15,6 +15,7 @@ enum ApprovalSubjectType {
   deliverable
   hire_agent
   budget_override
+  agent_action // generic agent action gated by the approval-policy engine (run | tool_call | …)
 }
 
 enum TrustLevel {
@@ -104,4 +105,29 @@ model AgentTrustProfile {
 
   @@index([workspaceId, trustLevel])
   @@map("agent_trust_profiles")
+}
+
+// ─── Rule-based approval-policy engine (Domain 3 / governance depth) ─────
+// Today agent approval is a coarse bool (`AgentGovernancePolicy.requireAgentApproval`) + trust flags.
+// This adds a small declarative RULE engine: priority-ordered policies, first match wins, default allow.
+// The pure evaluator lives in @agentcenter/utils (`evaluateApprovalPolicy`); this is its durable store.
+// `subject` (which agents/roles a policy applies to) and `condition` (a JSON predicate, e.g.
+// {costCentsOver:5000} / {trustBelow:"trusted"}) are JSON (app-validated). `effect` is TEXT
+// (allow | require_approval | deny), not an enum, mirroring ToolAccessPolicy. workspaceId-scoped
+// (D5; no FK). GOVERNANCE-gated.
+model ApprovalPolicy {
+  id          String   @id @default(cuid())
+  workspaceId String // buildbase workspace _id; no FK (D5)
+  name        String
+  priority    Int      @default(0) // higher wins; ties broken deterministically by id
+  subject     Json? // {all:true} | {agentIds:[...]} | {roles:[...]} | {trustLevels:[...]}; null/empty = all
+  action      String // hire_agent | run | spend_over | tool_call | "*"
+  condition   Json? // predicate, e.g. {costCentsOver:5000} | {trustBelow:"trusted"}; null = always
+  effect      String   @default("require_approval") // allow | require_approval | deny
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId, enabled])
+  @@map("approval_policies")
 }

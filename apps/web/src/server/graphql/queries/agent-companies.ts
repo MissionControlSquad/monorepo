@@ -3,6 +3,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   exportCompanyPackage,
   searchCompanies,
@@ -15,7 +16,7 @@ builder.queryField("agentCompanies", (t) =>
     type: ["AgentCompany"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.AGENT_COMPANIES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.agentCompany.findMany({
         ...query,
         where: { workspaceId: tenancy.workspaceId },
@@ -32,7 +33,7 @@ builder.queryField("agentCompany", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AGENT_COMPANIES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.agentCompany.findFirst({
         ...query,
         where: { id: args.id, workspaceId: tenancy.workspaceId },
@@ -57,7 +58,7 @@ builder.queryField("searchCompanies", (t) =>
     args: { query: t.arg.string({ required: true }), limit: t.arg.int() },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AGENT_COMPANIES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       if (isCompanySearchRateLimited(tenancy.workspaceId)) {
         throw new GraphQLError("Search rate limit exceeded — try again shortly.", {
           extensions: { code: "RATE_LIMITED" },
@@ -85,7 +86,7 @@ builder.queryField("exportCompanyPackage", (t) =>
     args: { companyId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.AGENT_COMPANIES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return exportCompanyPackage(tenancy.workspaceId, args.companyId);
     },
   }),

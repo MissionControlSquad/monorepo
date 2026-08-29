@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 // Epic #6: plugin registry read. PLUGIN_SDK-gated (off by default), admin, workspace-scoped.
 builder.queryField("plugins", (t) =>
@@ -9,7 +10,7 @@ builder.queryField("plugins", (t) =>
     type: ["Plugin"],
     resolve: async (query, _root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.PLUGIN_SDK);
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return ctx.prisma.plugin.findMany({
         ...query,
         where: scoped(ctx, {}),
@@ -27,7 +28,7 @@ builder.queryField("plugin", (t) =>
     args: { pluginId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PLUGIN_SDK);
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return ctx.prisma.plugin.findFirst({
         ...query,
         where: scoped(ctx, { pluginId: args.pluginId }),

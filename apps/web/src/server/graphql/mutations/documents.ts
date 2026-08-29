@@ -1,7 +1,10 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
+import { requireRole } from "@/server/tenancy/guards";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { taskModel, documentModel, agentModel } from "../../models";
+import { snapshotDocumentRevision } from "@/server/services/document-revisions";
 
 builder.mutationField("createDocument", (t) =>
   t.prismaField({
@@ -13,8 +16,9 @@ builder.mutationField("createDocument", (t) =>
       taskId: t.arg.string(),
       createdById: t.arg.string({ required: true }),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       let projectId: string | undefined;
       let taskTitle: string | undefined;
       if (args.taskId) {
@@ -62,15 +66,22 @@ builder.mutationField("updateDocument", (t) =>
       title: t.arg.string(),
       content: t.arg.string(),
     },
-    resolve: async (query, _root, args) => {
+    resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
-      return documentModel.update(args.id, {
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
+      const doc = await documentModel.update(args.id, {
         ...query,
         data: {
           ...(args.title ? { title: args.title } : {}),
           ...(args.content ? { content: args.content } : {}),
         },
       });
+      // Parity §3.12 — snapshot the committed version into the revision history (best-effort).
+      await snapshotDocumentRevision({
+        documentId: args.id,
+        authorProfileId: ctx.session?.profileId ?? null,
+      }).catch(() => {});
+      return doc;
     },
   }),
 );
@@ -79,8 +90,9 @@ builder.mutationField("deleteDocument", (t) =>
   t.field({
     type: "Boolean",
     args: { id: t.arg.string({ required: true }) },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.DOCUMENTS);
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await documentModel.deleteById(args.id);
       return true;
     },

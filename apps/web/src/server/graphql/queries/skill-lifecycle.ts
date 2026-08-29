@@ -2,7 +2,12 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
-import { computeSkillUpdateStatus } from "@/server/services/skills";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
+import {
+  computeSkillUpdateStatus,
+  precheckForkTarget,
+  listProjectWorkspaceSkillCandidates,
+} from "@/server/services/skills";
 import { listCatalogSkills } from "@/server/skill-catalog/manifest";
 
 const SkillUpdateStatus = builder.simpleObject("SkillUpdateStatus", {
@@ -18,7 +23,7 @@ builder.queryField("skillUpdateStatus", (t) =>
     args: { skillId: t.arg.string({ required: true }) },
     resolve: async (_r, args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      const tn = requireRole(ctx, "member");
+      const tn = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return computeSkillUpdateStatus(tn.workspaceId, args.skillId);
     },
   }),
@@ -39,12 +44,63 @@ const CatalogSkillEntry = builder.simpleObject("CatalogSkillEntry", {
     packageName: t.string(),
   }),
 });
+// §3 fork depth: precheck whether this workspace already forks a given origin (drives the UI warn).
+const ForkPrecheckType = builder.simpleObject("ForkPrecheck", {
+  fields: (t) => ({
+    originId: t.string(),
+    hasExistingFork: t.boolean(),
+    existingForkId: t.string({ nullable: true }),
+    existingForkName: t.string({ nullable: true }),
+  }),
+});
+builder.queryField("forkPrecheck", (t) =>
+  t.field({
+    type: ForkPrecheckType,
+    args: { skillId: t.arg.string({ required: true }) },
+    resolve: async (_r, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tn = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
+      return precheckForkTarget(tn.workspaceId, args.skillId);
+    },
+  }),
+);
+
+// §3 project-workspace scan: discovered skill bundles inside a project workspace's checked-out files.
+const ProjectSkillCandidateType = builder.simpleObject("ProjectSkillCandidate", {
+  fields: (t) => ({
+    dir: t.string(),
+    name: t.string(),
+    fileCount: t.int(),
+    sourceRef: t.string(),
+  }),
+});
+builder.queryField("projectWorkspaceSkillCandidates", (t) =>
+  t.field({
+    type: [ProjectSkillCandidateType],
+    args: { projectWorkspaceId: t.arg.string({ required: true }) },
+    resolve: async (_r, args, ctx) => {
+      await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
+      const tn = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
+      const candidates = await listProjectWorkspaceSkillCandidates({
+        workspaceId: tn.workspaceId,
+        projectWorkspaceId: args.projectWorkspaceId,
+      });
+      return candidates.map((c) => ({
+        dir: c.dir,
+        name: c.name,
+        fileCount: c.files.length,
+        sourceRef: c.provenance.sourceRef,
+      }));
+    },
+  }),
+);
+
 builder.queryField("skillCatalogPackages", (t) =>
   t.field({
     type: [CatalogSkillEntry],
     resolve: async (_r, _args, ctx) => {
       await requireFeature(FLAG_KEYS.SKILLS_TEAMS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return listCatalogSkills().map((s) => ({
         id: s.id,
         key: s.key,

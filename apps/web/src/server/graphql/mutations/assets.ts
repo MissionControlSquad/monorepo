@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { createAssetUploadUrl, recordAsset, deleteAsset } from "@/server/services/assets";
 
 // Assets (parity #15/#27). ASSETS-gated, member+ (mutations admin for delete). Two-step upload:
@@ -13,10 +14,13 @@ const AssetUpload = builder.simpleObject("AssetUpload", {
 builder.mutationField("createAssetUploadUrl", (t) =>
   t.field({
     type: AssetUpload,
-    args: { fileName: t.arg.string({ required: true }), mimeType: t.arg.string({ required: true }) },
+    args: {
+      fileName: t.arg.string({ required: true }),
+      mimeType: t.arg.string({ required: true }),
+    },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ASSETS);
-      requireRole(ctx, "member");
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return createAssetUploadUrl(args.fileName, args.mimeType);
     },
   }),
@@ -36,7 +40,7 @@ builder.mutationField("recordAsset", (t) =>
     },
     resolve: async (_query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ASSETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return recordAsset({
         workspaceId: tenancy.workspaceId,
         name: args.name,
@@ -58,7 +62,7 @@ builder.mutationField("deleteAsset", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.ASSETS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return deleteAsset(tenancy.workspaceId, args.id);
     },
   }),

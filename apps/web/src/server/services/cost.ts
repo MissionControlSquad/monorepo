@@ -127,7 +127,8 @@ export async function recordCostEvent(input: RecordCostEventInput): Promise<Cost
     throw err;
   }
 
-  // Find every active policy this cost feeds: the workspace budget + the agent's own budget.
+  // Find every active policy this cost feeds: the workspace budget + the agent's own budget +
+  // (when the cost is attributed to a project) that project's budget.
   const policies = await prisma.budgetPolicy.findMany({
     where: {
       workspaceId: input.workspaceId,
@@ -135,6 +136,9 @@ export async function recordCostEvent(input: RecordCostEventInput): Promise<Cost
       OR: [
         { scope: "workspace" as BudgetScope },
         ...(input.agentId ? [{ scope: "agent" as BudgetScope, agentId: input.agentId }] : []),
+        ...(input.projectId
+          ? [{ scope: "project" as BudgetScope, projectId: input.projectId }]
+          : []),
       ],
     },
     select: { id: true, window: true },
@@ -194,6 +198,9 @@ export async function repriceCostEvent(
           { scope: "workspace" as BudgetScope },
           ...(existing.agentId
             ? [{ scope: "agent" as BudgetScope, agentId: existing.agentId }]
+            : []),
+          ...(existing.projectId
+            ? [{ scope: "project" as BudgetScope, projectId: existing.projectId }]
             : []),
         ],
       },

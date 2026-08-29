@@ -21,7 +21,10 @@ import {
 } from "lucide-react";
 import { Breadcrumbs, Button, Badge, Card, Input, EmptyState, PageLayout } from "../components/ui";
 import { ProfileAvatar } from "../components/ui/ProfileAvatar";
+import { QuotaGate, QuotaIndicator } from "@/components/usage";
+import { USAGE_QUOTA_SLUGS } from "@/lib/quota-slugs";
 import { ErrorBoundary, PanelErrorFallback } from "../components/common/ErrorBoundary";
+import { WhenAdmin } from "@/components/auth/WhenAdmin";
 import type { AgentDetailedStatus } from "../lib/constants";
 import type { AgentStatusValue } from "@/server/constants";
 import { SetupStatus } from "@/server/constants";
@@ -95,11 +98,19 @@ export function AgentsPage() {
               {visibleCount} agent{visibleCount !== 1 ? "s" : ""} in your squad
             </p>
           </div>
-          <Link href="/agents/new">
-            <Button variant="primary" icon={<Plus />}>
-              Create Agent
-            </Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            <QuotaIndicator slug={USAGE_QUOTA_SLUGS.agents} />
+            {/* Agent hire — manage (admin/owner); agent create/hire is governed admin-side */}
+            <WhenAdmin>
+              <QuotaGate slug={USAGE_QUOTA_SLUGS.agents}>
+                <Link href="/agents/new">
+                  <Button variant="primary" icon={<Plus />}>
+                    Create Agent
+                  </Button>
+                </Link>
+              </QuotaGate>
+            </WhenAdmin>
+          </div>
         </div>
 
         {/* Search */}
@@ -246,14 +257,16 @@ export function AgentsPage() {
                       </span>
                       <p className="text-sm text-muted-foreground truncate">{agent.role}</p>
                     </div>
-                    <Button
-                      variant="success"
-                      size="sm"
-                      icon={<Power />}
-                      onClick={() => executeSetActivation({ id: agent.id, deactivated: false })}
-                    >
-                      Reactivate
-                    </Button>
+                    <WhenAdmin>
+                      <Button
+                        variant="success"
+                        size="sm"
+                        icon={<Power />}
+                        onClick={() => executeSetActivation({ id: agent.id, deactivated: false })}
+                      >
+                        Reactivate
+                      </Button>
+                    </WhenAdmin>
                   </div>
                 </Card>
               ))}

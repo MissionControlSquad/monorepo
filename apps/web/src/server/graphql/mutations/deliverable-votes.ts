@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { castVote } from "@/server/services/deliverable-votes";
 import { VoteSummaryType } from "../queries/deliverable-votes";
 
@@ -15,7 +16,7 @@ builder.mutationField("castDeliverableVote", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.VOTING);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return castVote({
         deliverableId: args.deliverableId,
         voterId: tenancy.userId,

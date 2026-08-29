@@ -20,6 +20,11 @@ export const SKILLS_QUERY = gql`
       trustLevel
       sharingScope
       forkedFromSkillId
+      sourceType
+      sourceBadge
+      catalogKey
+      packageVersion
+      catalogKind
     }
   }
 `;
@@ -105,6 +110,29 @@ export const PREVIEW_TEAM_INSTALL_QUERY = gql`
       member
       action
       agentName
+    }
+  }
+`;
+
+// Domain 14: browse the app-shipped markdown teams catalog.
+export const TEAM_CATALOG_QUERY = gql`
+  query TeamCatalog {
+    teamCatalog {
+      id
+      slug
+      key
+      name
+      description
+      tagline
+      icon
+      author
+      tags
+      roleCount
+      roles {
+        name
+        role
+      }
+      sourceRef
     }
   }
 `;

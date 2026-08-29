@@ -40,7 +40,9 @@ vi.mock("@/server/services/ai-runtime-detect", () => ({
 
 import { POST as GQL } from "../../app/api/graphql/route";
 import { POST as REPORT } from "../../app/api/runner/ai-tools/route";
-import { GET as LOCAL_REST } from "../../app/api/ai-tools/route";
+import { GET as _LOCAL_REST } from "../../app/api/ai-tools/route";
+// Route handlers are wrapped by withFeature (2-arg); these routes are static, so supply a dummy ctx.
+const LOCAL_REST = (req: Request) => _LOCAL_REST(req, undefined as never);
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
@@ -146,6 +148,7 @@ function postReport(key: string, body: unknown) {
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+    { params: Promise.resolve({}) },
   );
 }
 
@@ -199,6 +202,7 @@ describe("runner report endpoint + reportedRuntimeInventories", () => {
         method: "POST",
         body: JSON.stringify({ inventory: remoteInventory }),
       }),
+      { params: Promise.resolve({}) },
     );
     expect(res.status).toBe(401);
   });

@@ -13,12 +13,14 @@ function req(auth?: string) {
 
 describe("reap-stale-work cron route", () => {
   it("401s without a valid CRON_SECRET bearer", async () => {
-    expect((await GET(req())).status).toBe(401);
-    expect((await GET(req("Bearer wrong-secret"))).status).toBe(401);
+    expect((await GET(req(), { params: Promise.resolve({}) })).status).toBe(401);
+    expect((await GET(req("Bearer wrong-secret"), { params: Promise.resolve({}) })).status).toBe(
+      401,
+    );
   });
 
   it("runs all reapers and returns the fan-out summary with the correct secret", async () => {
-    const res = await GET(req(`Bearer ${env.CRON_SECRET}`));
+    const res = await GET(req(`Bearer ${env.CRON_SECRET}`), { params: Promise.resolve({}) });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);

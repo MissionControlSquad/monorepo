@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
 import { Boxes } from "lucide-react";
-import { Card, Badge, Button, Spinner, EmptyState } from "@/components/ui";
+import { Card, Badge, Button, Spinner, EmptyState, Tooltip } from "@/components/ui";
 import { AdapterInstallDialog } from "@/components/dialogs/AdapterInstallDialog";
+import { AdapterConnectionTest } from "@/components/agent/AdapterConnectionTest";
 
 // Epic #2 (Adapter Manager): instance-admin view of installed provider adapters. MULTI_PROVIDER_ADAPTERS
 // gated. Lists each adapter with its transport/auth kind + model-profile count and lets an admin
@@ -67,7 +68,9 @@ export default function AdaptersPage() {
     try {
       const res = await setEnabled({ type: a.type, enabled: !a.enabled });
       if (res.error) {
-        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to update adapter");
+        toast.error(
+          res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to update adapter",
+        );
         return;
       }
       refetch({ requestPolicy: "network-only" });
@@ -82,7 +85,9 @@ export default function AdaptersPage() {
     try {
       const res = await removeAdapter({ adapterType: a.type });
       if (res.error) {
-        toast.error(res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to remove adapter");
+        toast.error(
+          res.error.graphQLErrors?.[0]?.message ?? res.error.message ?? "Failed to remove adapter",
+        );
         return;
       }
       refetch({ requestPolicy: "network-only" });
@@ -101,9 +106,11 @@ export default function AdaptersPage() {
             to an agent from its settings. The built-in gateway is always available.
           </p>
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setShowInstall(true)}>
-          Install adapter
-        </Button>
+        <Tooltip content="Register a new provider adapter so your agents can run on it.">
+          <Button size="sm" variant="secondary" onClick={() => setShowInstall(true)}>
+            Install adapter
+          </Button>
+        </Tooltip>
       </div>
 
       <AdapterInstallDialog
@@ -120,53 +127,77 @@ export default function AdaptersPage() {
         <EmptyState
           icon={<Boxes className="h-8 w-8" />}
           title="No adapters installed"
-          description="Provider adapters appear here once installed."
+          description="Install a provider adapter to give your agents a runtime to run on."
+          action={
+            <Button size="sm" variant="secondary" onClick={() => setShowInstall(true)}>
+              Install adapter
+            </Button>
+          }
         />
       ) : (
         <div className="space-y-2">
           {adapters.map((a) => (
-            <Card key={a.type} className="flex flex-wrap items-center justify-between gap-3 p-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-foreground">{a.displayName}</span>
-                  {a.builtIn && <Badge variant="blue">Built-in</Badge>}
-                  <Badge variant={a.enabled ? "green" : "gray"}>
-                    {a.enabled ? "Enabled" : "Disabled"}
-                  </Badge>
+            <Card key={a.type} className="space-y-3 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground">{a.displayName}</span>
+                    {a.builtIn && <Badge variant="blue">Built-in</Badge>}
+                    <Badge variant={a.enabled ? "green" : "gray"}>
+                      {a.enabled ? "Enabled" : "Disabled"}
+                    </Badge>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <code className="rounded bg-muted px-1.5 py-0.5">{a.type}</code>
+                    <span>transport: {a.transport}</span>
+                    <span>auth: {a.authKind}</span>
+                    <span>v{a.version}</span>
+                    <span>
+                      {a.modelProfiles.length} model{a.modelProfiles.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <code className="rounded bg-muted px-1.5 py-0.5">{a.type}</code>
-                  <span>transport: {a.transport}</span>
-                  <span>auth: {a.authKind}</span>
-                  <span>v{a.version}</span>
-                  <span>
-                    {a.modelProfiles.length} model{a.modelProfiles.length === 1 ? "" : "s"}
-                  </span>
+                <div className="flex shrink-0 gap-2">
+                  <Tooltip
+                    content={
+                      a.builtIn && a.enabled
+                        ? "The built-in gateway is always on — existing agents rely on it."
+                        : a.enabled
+                          ? "Turn this adapter off so it can no longer be assigned to agents. Running tasks finish."
+                          : "Turn this adapter on so agents can be assigned to it."
+                    }
+                  >
+                    <Button
+                      variant={a.enabled ? "secondary" : "primary"}
+                      size="sm"
+                      disabled={busy === a.type || (a.builtIn && a.enabled)}
+                      loading={busy === a.type}
+                      onClick={() => toggle(a)}
+                      title={
+                        a.builtIn && a.enabled
+                          ? "The built-in adapter cannot be disabled"
+                          : undefined
+                      }
+                    >
+                      {a.enabled ? "Disable" : "Enable"}
+                    </Button>
+                  </Tooltip>
+                  {!a.builtIn && (
+                    <Tooltip content="Remove this adapter and its model profiles. Agents using it must be reassigned.">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy === a.type}
+                        onClick={() => onRemove(a)}
+                      >
+                        Remove
+                      </Button>
+                    </Tooltip>
+                  )}
                 </div>
               </div>
-              <div className="flex shrink-0 gap-2">
-                <Button
-                  variant={a.enabled ? "secondary" : "primary"}
-                  size="sm"
-                  disabled={busy === a.type || (a.builtIn && a.enabled)}
-                  loading={busy === a.type}
-                  onClick={() => toggle(a)}
-                  title={
-                    a.builtIn && a.enabled ? "The built-in adapter cannot be disabled" : undefined
-                  }
-                >
-                  {a.enabled ? "Disable" : "Enable"}
-                </Button>
-                {!a.builtIn && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy === a.type}
-                    onClick={() => onRemove(a)}
-                  >
-                    Remove
-                  </Button>
-                )}
+              <div className="border-t border-border pt-3">
+                <AdapterConnectionTest adapterKey={a.type} />
               </div>
             </Card>
           ))}

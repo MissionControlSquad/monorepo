@@ -9,6 +9,7 @@ import {
 } from "@/lib/graphql/queries";
 import {
   ROTATE_SECRET,
+  ROTATE_MANAGED_SECRET,
   BIND_SECRET,
   UNBIND_SECRET,
   UPDATE_SECRET,
@@ -16,11 +17,12 @@ import {
   DELETE_SECRET_PROVIDER,
   CHECK_SECRET_PROVIDER_HEALTH,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Select } from "@/components/ui";
+import { Button, Card, Badge, Select, Tooltip, ConfirmDialog } from "@/components/ui";
 import { SecretDialog } from "@/components/dialogs/SecretDialog";
 import { SecretProviderDialog } from "@/components/dialogs/SecretProviderDialog";
 import { SecretImportDialog } from "@/components/dialogs/SecretImportDialog";
 import { SecretProposalsPanel } from "@/components/secrets/SecretProposalsPanel";
+import { MySecretsPanel } from "@/components/secrets/MySecretsPanel";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 
 // Epic #5: secrets vault. API-gated by SECRETS_VAULT + buildbase role (admin manages; member views
@@ -32,8 +34,12 @@ interface Binding {
   scope: string;
   agentId: string | null;
   adapterType: string | null;
+  toolConnectionId: string | null;
   envVarName: string;
   pinnedVersion: number | null;
+  configPath: string | null;
+  versionSelector: string;
+  projectionClass: string;
 }
 interface Version {
   version: number;
@@ -64,12 +70,24 @@ const STATUS_VARIANT: Record<string, "green" | "yellow" | "gray"> = {
   archived: "gray",
 };
 
+/** A fresh richer-binding form: env-var projection, latest version, no config path. */
+function emptyBindForm() {
+  return {
+    env: "",
+    agentId: "",
+    configPath: "",
+    versionSelector: "latest",
+    projectionClass: "env",
+  };
+}
+
 export default function SecretsPage() {
   const [{ data }, refetch] = useQuery<{ secrets: Secret[] }>({ query: SECRETS_QUERY });
   const [{ data: providerData }, refetchProviders] = useQuery<{ secretProviders: Provider[] }>({
     query: SECRET_PROVIDERS_QUERY,
   });
   const [, rotateSecret] = useMutation(ROTATE_SECRET);
+  const [, rotateManaged] = useMutation(ROTATE_MANAGED_SECRET);
   const [, bindSecret] = useMutation(BIND_SECRET);
   const [, unbindSecret] = useMutation(UNBIND_SECRET);
   const [, setStatus] = useMutation(SET_SECRET_STATUS);
@@ -83,14 +101,49 @@ export default function SecretsPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const [rotateVal, setRotateVal] = useState<Record<string, string>>({});
-  const [bindForm, setBindForm] = useState<Record<string, { env: string; agentId: string }>>({});
+  const [bindForm, setBindForm] = useState<
+    Record<
+      string,
+      {
+        env: string;
+        agentId: string;
+        configPath: string;
+        versionSelector: string;
+        projectionClass: string;
+      }
+    >
+  >({});
+  // "Rotate via provider" confirm (managed/provider-backed secrets only).
+  const [confirmManaged, setConfirmManaged] = useState<{ id: string; name: string } | null>(null);
+  const [managedVal, setManagedVal] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<{ id: string; name: string; description: string } | null>(
     null,
   );
   const [openAudit, setOpenAudit] = useState<string | null>(null);
+  const [confirmDeleteProvider, setConfirmDeleteProvider] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
   const proposalsEnabled = useFeatureFlag("secret_proposals");
-  const [tab, setTab] = useState<"secrets" | "proposals">("secrets");
+  const [tab, setTab] = useState<"secrets" | "my-secrets" | "proposals">("secrets");
+  // "My secrets" (user-scoped definitions/coverage) always available under SECRETS_VAULT; proposals
+  // stays opt-in behind its own flag.
+  const tabs: ("secrets" | "my-secrets" | "proposals")[] = [
+    "secrets",
+    "my-secrets",
+    ...(proposalsEnabled ? (["proposals"] as const) : []),
+  ];
+  const TAB_LABEL: Record<string, string> = {
+    secrets: "secrets",
+    "my-secrets": "my secrets",
+    proposals: "proposals",
+  };
+  // Short "what lives here" copy for each tab.
+  const TAB_HINT: Record<string, string> = {
+    secrets:
+      "Workspace vault: shared secrets an admin manages. Bind one to an agent to inject it as an env var.",
+    "my-secrets": "Your own values for the credentials this workspace asks each member to provide.",
+    proposals:
+      "Secrets an agent asked for — an admin approves with the real value or denies the request.",
+  };
 
   const secrets = data?.secrets ?? [];
   const providers = providerData?.secretProviders ?? [];
@@ -142,6 +195,9 @@ export default function SecretsPage() {
   async function onBind(id: string) {
     const bf = bindForm[id];
     if (!bf?.env || !bf?.agentId) return setError("Env var name and agent id are required to bind");
+    const projectionClass = bf.projectionClass || "env";
+    if (projectionClass !== "env" && !bf.configPath?.trim())
+      return setError(`A "${projectionClass}" projection needs a config path (e.g. auth.token)`);
     setBusy(id);
     try {
       const res = await bindSecret({
@@ -149,9 +205,31 @@ export default function SecretsPage() {
         scope: "agent",
         envVarName: bf.env,
         agentId: bf.agentId,
+        configPath: bf.configPath?.trim() || null,
+        versionSelector: bf.versionSelector?.trim() || "latest",
+        projectionClass,
       });
       if (res.error) return setError(res.error.graphQLErrors[0]?.message ?? "Failed to bind");
-      setBindForm((m) => ({ ...m, [id]: { env: "", agentId: "" } }));
+      setBindForm((m) => ({ ...m, [id]: emptyBindForm() }));
+      setError(null);
+      refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Provider WRITE-side rotation: write the new value to the secret's external store (AWS/Vault) and
+  // record a new local version + audit. Only offered for provider-backed (managed) secrets.
+  async function onRotateManaged(id: string) {
+    const value = managedVal[id];
+    if (!value) return setError("Enter the new value to write to the provider");
+    setBusy(id);
+    try {
+      const res = await rotateManaged({ id, value });
+      if (res.error)
+        return setError(res.error.graphQLErrors[0]?.message ?? "Provider rotation failed");
+      setManagedVal((m) => ({ ...m, [id]: "" }));
+      setError(null);
       refresh();
     } finally {
       setBusy(null);
@@ -174,26 +252,28 @@ export default function SecretsPage() {
         <div>
           <h1 className="text-lg font-semibold text-foreground">Secrets</h1>
           <p className="text-sm text-muted-foreground">
-            Encrypted at rest (AES-256-GCM). Values are write-only — they are never shown again, only
-            rotated. Bind a secret to an agent to inject it as an env var.
+            Encrypted at rest (AES-256-GCM). Values are write-only — they are never shown again,
+            only rotated. Bind a secret to an agent to inject it as an env var.
           </p>
         </div>
         {tab === "secrets" && (
           <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={() => setImportOpen(true)}>Bulk import</Button>
+            <Button variant="secondary" onClick={() => setImportOpen(true)}>
+              Bulk import
+            </Button>
             <Button onClick={() => setOpen(true)}>New secret</Button>
           </div>
         )}
       </div>
 
-      {/* Proposals is an opt-in governance surface (SECRET_PROPOSALS). Tab hidden unless enabled. */}
-      {proposalsEnabled && (
-        <div className="flex gap-1 border-b border-border">
-          {(["secrets", "proposals"] as const).map((t) => (
+      {/* Tabs: workspace secrets, the member's own required secrets, and (opt-in) agent proposals. */}
+      <div className="flex gap-1 border-b border-border">
+        {tabs.map((t) => (
+          <Tooltip key={t} content={TAB_HINT[t]} side="bottom">
             <button
-              key={t}
               type="button"
               onClick={() => setTab(t)}
+              aria-current={tab === t ? "page" : undefined}
               className={
                 "-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize transition-colors " +
                 (tab === t
@@ -201,261 +281,445 @@ export default function SecretsPage() {
                   : "border-transparent text-muted-foreground hover:text-foreground")
               }
             >
-              {t}
+              {TAB_LABEL[t]}
             </button>
-          ))}
-        </div>
-      )}
+          </Tooltip>
+        ))}
+      </div>
 
+      {tab === "my-secrets" && <MySecretsPanel />}
       {proposalsEnabled && tab === "proposals" && <SecretProposalsPanel />}
 
       {tab === "secrets" && (
         <>
           {error && (
-            <p className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+            <p
+              className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              role="alert"
+            >
               {error}
             </p>
           )}
 
           <SecretDialog open={open} onOpenChange={setOpen} onSaved={refresh} />
 
-      {/* Provider configs — point the vault at an external backend (aws/vault) or the local
+          {/* Provider configs — point the vault at an external backend (aws/vault) or the local
           envelope (env). `config` holds only non-secret settings; backend creds are Secrets. */}
-      <Card className="space-y-3 p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Providers</h2>
-          <Button size="sm" variant="ghost" onClick={() => setProviderOpen(true)}>
-            Add provider
-          </Button>
-        </div>
-        <p className="-mt-1 text-xs text-muted-foreground">
-          Where secrets are stored. Default is the local envelope.
-        </p>
-
-        <SecretProviderDialog
-          open={providerOpen}
-          onOpenChange={setProviderOpen}
-          onSaved={refreshProviders}
-        />
-        <div className="space-y-1">
-          {providers.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              No custom providers — secrets use the local AES-256-GCM envelope.
+          <Card className="space-y-3 p-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground">Providers</h2>
+              <Button size="sm" variant="ghost" onClick={() => setProviderOpen(true)}>
+                Add provider
+              </Button>
+            </div>
+            <p className="-mt-1 text-xs text-muted-foreground">
+              Where secrets are stored. Default is the local envelope.
             </p>
-          )}
-          {providers.map((p) => (
-            <div key={p.id} className="flex items-center justify-between gap-2 text-sm">
-              <span className="flex items-center gap-2">
-                <Badge variant="blue">{p.kind}</Badge>
-                <span className="text-foreground">{p.name}</span>
-                <Badge variant={p.healthy ? "green" : p.lastError ? "red" : "gray"}>
-                  {p.healthy ? "healthy" : p.lastError ? "unhealthy" : "unchecked"}
-                </Badge>
-                {p.lastError && <span className="text-xs text-destructive">{p.lastError}</span>}
-              </span>
-              <span className="flex shrink-0 gap-1">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busy === p.id}
-                  onClick={() => onCheckProvider(p.id)}
-                >
-                  Check
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy === p.id}
-                  onClick={() => onDeleteProvider(p.id)}
-                >
-                  Delete
-                </Button>
-              </span>
-            </div>
-          ))}
-        </div>
-      </Card>
 
-      {/* Create */}
-
-      {/* Bulk import — paste a .env (KEY=VALUE lines). Values are encrypted on the way in. */}
-      <SecretImportDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImported={setImportResult}
-        onSaved={refresh}
-      />
-      {importResult && <p className="text-xs text-muted-foreground">{importResult}</p>}
-
-      {secrets.length === 0 && (
-        <Card className="p-8 text-center text-sm text-muted-foreground">No secrets yet.</Card>
-      )}
-
-      {secrets.map((s) => (
-        <Card key={s.id} className="space-y-3 p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-foreground">{s.name}</span>
-            <Badge variant="gray">v{s.currentVersion}</Badge>
-            <Badge variant={STATUS_VARIANT[s.status] ?? "gray"}>{s.status}</Badge>
-            {s.personal && <Badge variant="purple">personal</Badge>}
-            {s.providerId && <Badge variant="blue">{providerName(s.providerId)}</Badge>}
-            {s.description && (
-              <span className="text-sm text-muted-foreground">{s.description}</span>
-            )}
-            <span className="ml-auto flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() =>
-                  setEditing((e) =>
-                    e?.id === s.id
-                      ? null
-                      : { id: s.id, name: s.name, description: s.description ?? "" },
-                  )
-                }
-              >
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setOpenAudit((o) => (o === s.id ? null : s.id))}
-              >
-                Audit
-              </Button>
-              <Select size="sm" className="text-xs" value={s.status}
-                onChange={async (e) => {
-                  await setStatus({ id: s.id, status: e.target.value });
-                  refresh();
-                }}
-              >
-                <option value="active">active</option>
-                <option value="disabled">disabled</option>
-                <option value="archived">archived</option>
-              </Select>
-            </span>
-          </div>
-
-          {/* Inline rename / edit description */}
-          {editing?.id === s.id && (
-            <div className="flex flex-wrap gap-2 rounded border border-dashed border-border p-2">
-              <input
-                className="flex-1 rounded border border-border bg-background px-2 py-1 text-sm"
-                placeholder="Name"
-                value={editing.name}
-                onChange={(e) => setEditing((p) => (p ? { ...p, name: e.target.value } : p))}
-              />
-              <input
-                className="flex-1 rounded border border-border bg-background px-2 py-1 text-sm"
-                placeholder="Description"
-                value={editing.description}
-                onChange={(e) => setEditing((p) => (p ? { ...p, description: e.target.value } : p))}
-              />
-              <Button
-                size="sm"
-                disabled={!editing.name.trim() || busy === s.id}
-                onClick={async () => {
-                  setBusy(s.id);
-                  try {
-                    const res = await updateSecret({
-                      id: s.id,
-                      name: editing.name.trim(),
-                      description: editing.description.trim() || null,
-                    });
-                    if (res.error)
-                      setError(res.error.graphQLErrors[0]?.message ?? "Failed to update");
-                    else {
-                      setEditing(null);
-                      refresh();
-                    }
-                  } finally {
-                    setBusy(null);
-                  }
-                }}
-              >
-                Save
-              </Button>
-            </div>
-          )}
-          {openAudit === s.id && <SecretAuditPanel secretId={s.id} />}
-
-          {/* Bindings */}
-          <div className="space-y-1">
-            {s.bindings.length === 0 && (
-              <p className="text-xs text-muted-foreground">No bindings.</p>
-            )}
-            {s.bindings.map((b) => (
-              <div key={b.id} className="flex items-center justify-between gap-2 text-sm">
-                <span className="flex items-center gap-2">
-                  <Badge variant="blue">{b.envVarName}</Badge>
-                  <span className="text-muted-foreground">
-                    {b.scope === "agent"
-                      ? `agent ${b.agentId?.slice(0, 8)}`
-                      : `adapter ${b.adapterType}`}
-                    {b.pinnedVersion ? ` · pinned v${b.pinnedVersion}` : ""}
+            <SecretProviderDialog
+              open={providerOpen}
+              onOpenChange={setProviderOpen}
+              onSaved={refreshProviders}
+            />
+            <div className="space-y-1">
+              {providers.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No custom providers — secrets use the local AES-256-GCM envelope.
+                </p>
+              )}
+              {providers.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="flex items-center gap-2">
+                    <Badge variant="blue">{p.kind}</Badge>
+                    <span className="text-foreground">{p.name}</span>
+                    <Badge variant={p.healthy ? "green" : p.lastError ? "red" : "gray"}>
+                      {p.healthy ? "healthy" : p.lastError ? "unhealthy" : "unchecked"}
+                    </Badge>
+                    {p.lastError && <span className="text-xs text-destructive">{p.lastError}</span>}
                   </span>
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy === b.id}
-                  onClick={() => onUnbind(b.id)}
-                >
-                  Unbind
-                </Button>
-              </div>
-            ))}
-          </div>
+                  <span className="flex shrink-0 gap-1">
+                    <Tooltip
+                      content="Check this provider is reachable and its stored credentials work."
+                      side="bottom"
+                    >
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy === p.id}
+                        onClick={() => onCheckProvider(p.id)}
+                      >
+                        Check
+                      </Button>
+                    </Tooltip>
+                    <Tooltip
+                      content="Remove this provider. Secrets stored in it can no longer be read or rotated."
+                      side="bottom"
+                    >
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy === p.id}
+                        onClick={() => setConfirmDeleteProvider(p)}
+                      >
+                        Delete
+                      </Button>
+                    </Tooltip>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
 
-          {/* Actions: rotate + bind */}
-          <div className="grid grid-cols-1 gap-2 border-t border-border pt-3 sm:grid-cols-2">
-            <div className="flex gap-2">
-              <input
-                className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
-                placeholder="New value (rotate)"
-                type="password"
-                value={rotateVal[s.id] ?? ""}
-                onChange={(e) => setRotateVal((m) => ({ ...m, [s.id]: e.target.value }))}
-              />
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={busy === s.id}
-                onClick={() => onRotate(s.id)}
-              >
-                Rotate
-              </Button>
-            </div>
-            <div className="flex gap-2">
-              <input
-                className="w-1/2 rounded border border-border bg-background px-2 py-1.5 text-sm"
-                placeholder="ENV_VAR"
-                value={bindForm[s.id]?.env ?? ""}
-                onChange={(e) =>
-                  setBindForm((m) => ({
-                    ...m,
-                    [s.id]: { env: e.target.value, agentId: m[s.id]?.agentId ?? "" },
-                  }))
-                }
-              />
-              <input
-                className="w-1/2 rounded border border-border bg-background px-2 py-1.5 text-sm"
-                placeholder="agent id"
-                value={bindForm[s.id]?.agentId ?? ""}
-                onChange={(e) =>
-                  setBindForm((m) => ({
-                    ...m,
-                    [s.id]: { env: m[s.id]?.env ?? "", agentId: e.target.value },
-                  }))
-                }
-              />
-              <Button size="sm" disabled={busy === s.id} onClick={() => onBind(s.id)}>
-                Bind
-              </Button>
-            </div>
-          </div>
-        </Card>
-      ))}
+          {/* Create */}
+
+          {/* Bulk import — paste a .env (KEY=VALUE lines). Values are encrypted on the way in. */}
+          <SecretImportDialog
+            open={importOpen}
+            onOpenChange={setImportOpen}
+            onImported={setImportResult}
+            onSaved={refresh}
+          />
+          {importResult && <p className="text-xs text-muted-foreground">{importResult}</p>}
+
+          {secrets.length === 0 && (
+            <Card className="p-8 text-center text-sm text-muted-foreground">No secrets yet.</Card>
+          )}
+
+          {secrets.map((s) => (
+            <Card key={s.id} className="space-y-3 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-foreground">{s.name}</span>
+                <Badge variant="gray">v{s.currentVersion}</Badge>
+                <Badge variant={STATUS_VARIANT[s.status] ?? "gray"}>{s.status}</Badge>
+                {s.personal && <Badge variant="purple">personal</Badge>}
+                {s.providerId && <Badge variant="blue">{providerName(s.providerId)}</Badge>}
+                {s.description && (
+                  <span className="text-sm text-muted-foreground">{s.description}</span>
+                )}
+                <span className="ml-auto flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      setEditing((e) =>
+                        e?.id === s.id
+                          ? null
+                          : { id: s.id, name: s.name, description: s.description ?? "" },
+                      )
+                    }
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setOpenAudit((o) => (o === s.id ? null : s.id))}
+                  >
+                    Audit
+                  </Button>
+                  <Select
+                    size="sm"
+                    className="text-xs"
+                    value={s.status}
+                    onChange={async (e) => {
+                      await setStatus({ id: s.id, status: e.target.value });
+                      refresh();
+                    }}
+                  >
+                    <option value="active">active</option>
+                    <option value="disabled">disabled</option>
+                    <option value="archived">archived</option>
+                  </Select>
+                </span>
+              </div>
+
+              {/* Inline rename / edit description */}
+              {editing?.id === s.id && (
+                <div className="flex flex-wrap gap-2 rounded border border-dashed border-border p-2">
+                  <input
+                    className="flex-1 rounded border border-border bg-background px-2 py-1 text-sm"
+                    placeholder="Name"
+                    value={editing.name}
+                    onChange={(e) => setEditing((p) => (p ? { ...p, name: e.target.value } : p))}
+                  />
+                  <input
+                    className="flex-1 rounded border border-border bg-background px-2 py-1 text-sm"
+                    placeholder="Description"
+                    value={editing.description}
+                    onChange={(e) =>
+                      setEditing((p) => (p ? { ...p, description: e.target.value } : p))
+                    }
+                  />
+                  <Button
+                    size="sm"
+                    disabled={!editing.name.trim() || busy === s.id}
+                    onClick={async () => {
+                      setBusy(s.id);
+                      try {
+                        const res = await updateSecret({
+                          id: s.id,
+                          name: editing.name.trim(),
+                          description: editing.description.trim() || null,
+                        });
+                        if (res.error)
+                          setError(res.error.graphQLErrors[0]?.message ?? "Failed to update");
+                        else {
+                          setEditing(null);
+                          refresh();
+                        }
+                      } finally {
+                        setBusy(null);
+                      }
+                    }}
+                  >
+                    Save
+                  </Button>
+                </div>
+              )}
+              {openAudit === s.id && <SecretAuditPanel secretId={s.id} />}
+
+              {/* Bindings */}
+              <div className="space-y-1">
+                {s.bindings.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No bindings.</p>
+                )}
+                {s.bindings.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <Badge variant="blue">{b.envVarName}</Badge>
+                      {b.projectionClass !== "env" && (
+                        <Badge variant="purple">{b.projectionClass}</Badge>
+                      )}
+                      <span className="text-muted-foreground">
+                        {b.scope === "agent"
+                          ? `agent ${b.agentId?.slice(0, 8)}`
+                          : b.scope === "adapter"
+                            ? `adapter ${b.adapterType}`
+                            : `tool ${b.toolConnectionId?.slice(0, 8)}`}
+                        {b.configPath ? ` · ${b.configPath}` : ""}
+                        {b.versionSelector && b.versionSelector !== "latest"
+                          ? ` · v${b.versionSelector}`
+                          : b.pinnedVersion
+                            ? ` · pinned v${b.pinnedVersion}`
+                            : ""}
+                      </span>
+                    </span>
+                    <Tooltip
+                      content="Stop injecting this secret into that agent. Its next run won't have this env var."
+                      side="bottom"
+                    >
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy === b.id}
+                        onClick={() => onUnbind(b.id)}
+                      >
+                        Unbind
+                      </Button>
+                    </Tooltip>
+                  </div>
+                ))}
+              </div>
+
+              {/* Actions: rotate + (provider rotate) + richer bind editor */}
+              <div className="space-y-2 border-t border-border pt-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="flex gap-2">
+                    <input
+                      className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
+                      placeholder="New value (rotate)"
+                      type="password"
+                      value={rotateVal[s.id] ?? ""}
+                      onChange={(e) => setRotateVal((m) => ({ ...m, [s.id]: e.target.value }))}
+                    />
+                    <Tooltip
+                      content="Rotate replaces the stored value; every agent bound to this secret uses the new value on its next run."
+                      side="bottom"
+                    >
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy === s.id}
+                        onClick={() => onRotate(s.id)}
+                      >
+                        Rotate
+                      </Button>
+                    </Tooltip>
+                  </div>
+
+                  {/* Provider-backed (managed) secrets: write the new value to the external store. */}
+                  {s.providerId && (
+                    <div className="flex gap-2">
+                      <input
+                        className="w-full rounded border border-border bg-background px-3 py-1.5 text-sm"
+                        placeholder="New value (write to provider)"
+                        type="password"
+                        value={managedVal[s.id] ?? ""}
+                        onChange={(e) => setManagedVal((m) => ({ ...m, [s.id]: e.target.value }))}
+                      />
+                      <Tooltip
+                        content="Managed rotation: writes the new value to this secret's external provider (AWS/Vault), then records a new version + audit. Existing bindings pick it up on their next run."
+                        side="bottom"
+                      >
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busy === s.id}
+                          onClick={() => {
+                            if (!managedVal[s.id])
+                              return setError("Enter the new value to write to the provider");
+                            setConfirmManaged({ id: s.id, name: s.name });
+                          }}
+                        >
+                          Rotate via provider
+                        </Button>
+                      </Tooltip>
+                    </div>
+                  )}
+                </div>
+
+                {/* Richer bind editor: env var + agent, plus projection / config path / version. */}
+                <div className="grid grid-cols-1 gap-2 rounded border border-dashed border-border p-2 sm:grid-cols-6">
+                  <Tooltip
+                    content="The environment variable (or projected key) the value is exposed as."
+                    side="bottom"
+                  >
+                    <input
+                      className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+                      placeholder="ENV_VAR"
+                      value={bindForm[s.id]?.env ?? ""}
+                      onChange={(e) =>
+                        setBindForm((m) => ({
+                          ...m,
+                          [s.id]: { ...emptyBindForm(), ...m[s.id], env: e.target.value },
+                        }))
+                      }
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    content="The agent this secret is injected into at run time."
+                    side="bottom"
+                  >
+                    <input
+                      className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+                      placeholder="agent id"
+                      value={bindForm[s.id]?.agentId ?? ""}
+                      onChange={(e) =>
+                        setBindForm((m) => ({
+                          ...m,
+                          [s.id]: { ...emptyBindForm(), ...m[s.id], agentId: e.target.value },
+                        }))
+                      }
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    content="How the value is projected. env = an environment variable; file = a mounted file at the config path; inline_ref = patched into the target's config JSON at the config path."
+                    side="bottom"
+                  >
+                    <Select
+                      size="sm"
+                      className="text-xs"
+                      value={bindForm[s.id]?.projectionClass ?? "env"}
+                      onChange={(e) =>
+                        setBindForm((m) => ({
+                          ...m,
+                          [s.id]: {
+                            ...emptyBindForm(),
+                            ...m[s.id],
+                            projectionClass: e.target.value,
+                          },
+                        }))
+                      }
+                    >
+                      <option value="env">env</option>
+                      <option value="file">file</option>
+                      <option value="inline_ref">inline_ref</option>
+                    </Select>
+                  </Tooltip>
+                  <Tooltip
+                    content="Dotted path into the target's config JSON where the value is written, e.g. auth.token. Required for file / inline_ref projections."
+                    side="bottom"
+                  >
+                    <input
+                      className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+                      placeholder="configPath (auth.token)"
+                      value={bindForm[s.id]?.configPath ?? ""}
+                      onChange={(e) =>
+                        setBindForm((m) => ({
+                          ...m,
+                          [s.id]: { ...emptyBindForm(), ...m[s.id], configPath: e.target.value },
+                        }))
+                      }
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    content='Which version resolves: "latest" follows the current version; enter a number to pin an exact version.'
+                    side="bottom"
+                  >
+                    <input
+                      className="rounded border border-border bg-background px-2 py-1.5 text-sm"
+                      placeholder="version (latest)"
+                      value={bindForm[s.id]?.versionSelector ?? ""}
+                      onChange={(e) =>
+                        setBindForm((m) => ({
+                          ...m,
+                          [s.id]: {
+                            ...emptyBindForm(),
+                            ...m[s.id],
+                            versionSelector: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </Tooltip>
+                  <Tooltip
+                    content="Bind injects this secret into the chosen agent using the projection above, at run time."
+                    side="bottom"
+                  >
+                    <Button size="sm" disabled={busy === s.id} onClick={() => onBind(s.id)}>
+                      Bind
+                    </Button>
+                  </Tooltip>
+                </div>
+              </div>
+            </Card>
+          ))}
+
+          <ConfirmDialog
+            isOpen={confirmDeleteProvider !== null}
+            onClose={() => setConfirmDeleteProvider(null)}
+            onConfirm={async () => {
+              const p = confirmDeleteProvider;
+              setConfirmDeleteProvider(null);
+              if (p) await onDeleteProvider(p.id);
+            }}
+            title={
+              confirmDeleteProvider
+                ? `Delete provider "${confirmDeleteProvider.name}"?`
+                : "Delete provider?"
+            }
+            description="Any secret stored in this provider can no longer be read, rotated, or injected into agents bound to it. Their next runs will fail to load those values. This does not delete the secrets themselves."
+            confirmLabel="Delete provider"
+            loading={busy === confirmDeleteProvider?.id}
+          />
+
+          <ConfirmDialog
+            isOpen={confirmManaged !== null}
+            onClose={() => setConfirmManaged(null)}
+            onConfirm={async () => {
+              const m = confirmManaged;
+              setConfirmManaged(null);
+              if (m) await onRotateManaged(m.id);
+            }}
+            title={
+              confirmManaged
+                ? `Rotate "${confirmManaged.name}" via its provider?`
+                : "Rotate via provider?"
+            }
+            description="This writes the new value to the secret's external provider (AWS Secrets Manager / HashiCorp Vault) and records a new version. Agents bound to this secret use the new value on their next run. This cannot be undone from here."
+            confirmLabel="Rotate via provider"
+            loading={busy === confirmManaged?.id}
+          />
         </>
       )}
     </div>

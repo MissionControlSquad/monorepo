@@ -1,6 +1,22 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { FLAG_KEYS, FLAG_DEFAULTS } from "@agentcenter/utils";
 import type { FlagKey } from "@agentcenter/utils";
+
+/**
+ * The buildbase plan/pricing matrix (docs/gap-plans/buildbase-feature-slugs.json) is the operator's
+ * source for which plan includes which feature. It must list EXACTLY the flags the code knows about —
+ * a flag added to FLAG_KEYS but not to the matrix would ship a feature no plan grants (dead in prod);
+ * a matrix slug with no FLAG_KEYS constant is stale. This test is that guard: keep the two in sync or
+ * the build fails, telling you which slug to add/remove in buildbase.
+ */
+const PLAN_MATRIX = JSON.parse(
+  readFileSync(
+    path.resolve(process.cwd(), "../../docs/gap-plans/buildbase-feature-slugs.json"),
+    "utf8",
+  ),
+) as { items: { slug: string; name: string; tier: string }[] };
 
 describe("FLAG_KEYS", () => {
   it("contains all expected flag keys", () => {
@@ -42,10 +58,12 @@ describe("FLAG_KEYS", () => {
     expect(FLAG_KEYS.RUNNERS).toBe("runners");
     expect(FLAG_KEYS.MEMORY).toBe("memory");
     expect(FLAG_KEYS.AI_TOOLS).toBe("ai_tools");
+    expect(FLAG_KEYS.ADAPTER_PLUGINS).toBe("adapter_plugins");
+    expect(FLAG_KEYS.ARTIFACTS).toBe("artifacts");
   });
 
-  it("has 61 flag keys", () => {
-    expect(Object.keys(FLAG_KEYS)).toHaveLength(61);
+  it("has 63 flag keys", () => {
+    expect(Object.keys(FLAG_KEYS)).toHaveLength(63);
   });
 
   it("every flag key has a matching default (FLAG_KEYS ⊇ FLAG_DEFAULTS in sync)", () => {
@@ -57,6 +75,25 @@ describe("FLAG_KEYS", () => {
   it("all values are unique", () => {
     const values = Object.values(FLAG_KEYS);
     expect(new Set(values).size).toBe(values.length);
+  });
+});
+
+describe("FLAG_KEYS ⇔ buildbase plan matrix (docs/gap-plans/buildbase-feature-slugs.json)", () => {
+  const matrixSlugs = new Set(PLAN_MATRIX.items.map((i) => i.slug));
+  const codeSlugs = new Set<string>(Object.values(FLAG_KEYS));
+
+  it("every FLAG_KEYS flag exists in the buildbase plan matrix (nothing to add in buildbase)", () => {
+    const missingFromMatrix = [...codeSlugs].filter((s) => !matrixSlugs.has(s)).sort();
+    expect(missingFromMatrix, "add these slugs to the plan matrix + buildbase plans").toEqual([]);
+  });
+
+  it("every plan-matrix slug maps to a FLAG_KEYS constant (no stale matrix entries)", () => {
+    const staleInMatrix = [...matrixSlugs].filter((s) => !codeSlugs.has(s)).sort();
+    expect(staleInMatrix, "remove these stale slugs from the plan matrix").toEqual([]);
+  });
+
+  it("the two registries are exactly the same set", () => {
+    expect(codeSlugs).toEqual(matrixSlugs);
   });
 });
 

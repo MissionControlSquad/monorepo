@@ -4,7 +4,6 @@ import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "urql";
 import { toast } from "sonner";
-import { Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { AGENT_QUERY } from "../lib/graphql/queries";
 import { UPDATE_AGENT_PROFILE } from "../lib/graphql/mutations/agents";
@@ -15,6 +14,7 @@ import { Input } from "@/components/ui/shadcn/input";
 import { ProfileAvatar } from "../components/ui/ProfileAvatar";
 import { MentionTextArea } from "../components/common/MentionTextArea";
 import { useMentionData, useMentionSuggestions } from "../components/context/MentionDataContext";
+import { CenteredSpinner, CenteredMessage } from "@/components/common/AsyncBoundary";
 import { useForm } from "react-hook-form";
 import {
   Form,
@@ -94,22 +94,9 @@ export function AgentEditPage({
     }
   };
 
-  if (fetching) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  if (fetching) return <CenteredSpinner />;
 
-  if (!agent) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
-        <AlertCircle className="w-8 h-8" />
-        <p className="text-sm font-medium">Agent not found</p>
-      </div>
-    );
-  }
+  if (!agent) return <CenteredMessage>Agent not found</CenteredMessage>;
 
   const body = (
     <>

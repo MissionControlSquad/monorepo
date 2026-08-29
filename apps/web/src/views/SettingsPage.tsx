@@ -3,60 +3,39 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
-import { ShieldOff, Lock, KeyRound, FlaskConical, Brain } from "lucide-react";
-import {
-  SET_SYSTEM_SHUTDOWN,
-  SYSTEM_SETTINGS_QUERY,
-  CHANGE_PASSWORD,
-} from "../lib/graphql/mutations/system";
+import Link from "next/link";
+import { ShieldOff, KeyRound, FlaskConical, Brain, Gauge, ArrowRight } from "lucide-react";
+import { SET_SYSTEM_SHUTDOWN, SYSTEM_SETTINGS_QUERY } from "../lib/graphql/mutations/system";
 import {
   AGENT_GOVERNANCE_QUERY,
   FEATURE_FLAGS_QUERY,
   COMPANY_MEMORY_DEFAULT_QUERY,
 } from "@/lib/graphql/queries";
-import {
-  SET_AGENT_GOVERNANCE,
-  UPDATE_FEATURE_FLAG,
-  SET_COMPANY_MEMORY_PROVIDER,
-} from "@/lib/graphql/mutations";
+import { SET_AGENT_GOVERNANCE, SET_COMPANY_MEMORY_PROVIDER } from "@/lib/graphql/mutations";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 import { MEMORY_PROVIDERS, FLAG_KEYS } from "@agentcenter/utils";
-import { Breadcrumbs, Card, Button, ConfirmDialog, PageLayout, Select, Checkbox } from "../components/ui";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-} from "@/components/ui/shadcn/form";
-import { Input } from "@/components/ui/shadcn/input";
+  Breadcrumbs,
+  Card,
+  Button,
+  ConfirmDialog,
+  PageLayout,
+  Select,
+  Checkbox,
+} from "../components/ui";
 import { LicenseStatusCode } from "@/server/constants";
 import { API_ROUTES } from "@/lib/api-routes";
 import { SidebarCustomizeCard } from "@/components/layout/sidebar/SidebarCustomizeCard";
 import { AppearanceCard } from "@/components/settings/AppearanceCard";
 import { BuildbaseAccountCard } from "@/components/settings/BuildbaseAccountCard";
-
-const changePasswordSchema = z
-  .object({
-    currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z.string().min(8, "New password must be at least 8 characters"),
-    confirmPassword: z.string().min(1, "Please confirm your new password"),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
-
-type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
+import { AccountSecurityCard } from "@/components/settings/AccountSecurityCard";
+import { ApprovalPoliciesCard } from "@/components/settings/ApprovalPoliciesCard";
+import { WhenAdmin } from "@/components/auth/WhenAdmin";
+import { PushNotificationsCard } from "@/components/settings/PushNotificationsCard";
 
 export function SettingsPage() {
   const [systemSettingsResult] = useQuery({ query: SYSTEM_SETTINGS_QUERY });
   const [, executeSetShutdown] = useMutation(SET_SYSTEM_SHUTDOWN);
-  const [, executeChangePassword] = useMutation(CHANGE_PASSWORD);
   const shutdownActive = systemSettingsResult.data?.systemSettings?.shutdownActive ?? false;
 
   const [showConfirm, setShowConfirm] = useState(false);
@@ -79,11 +58,6 @@ export function SettingsPage() {
       .catch(() => {});
   }, []);
 
-  const form = useForm<ChangePasswordValues>({
-    resolver: zodResolver(changePasswordSchema),
-    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
-  });
-
   const handleToggleShutdown = async () => {
     setIsToggling(true);
     try {
@@ -102,28 +76,6 @@ export function SettingsPage() {
     }
   };
 
-  const onSubmitPassword = async (values: ChangePasswordValues) => {
-    try {
-      const result = await executeChangePassword({
-        currentPassword: values.currentPassword,
-        newPassword: values.newPassword,
-      });
-      if (result.error) {
-        const msg = result.error.graphQLErrors[0]?.message || result.error.message;
-        toast.error(msg);
-        return;
-      }
-      toast.success("Password changed. You will be redirected to login.");
-      form.reset();
-      // Session was revoked — redirect to login after a short delay
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 1500);
-    } catch {
-      toast.error("Failed to change password");
-    }
-  };
-
   return (
     <PageLayout maxWidth="wide">
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Settings" }]} />
@@ -135,76 +87,44 @@ export function SettingsPage() {
       {/* Buildbase user-layer account/billing — opens inbuilt SDK screens (renders only when configured) */}
       <BuildbaseAccountCard />
 
-      {/* Change Password */}
-      <Card padding="lg" className="space-y-4">
-        <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-muted">
-            <Lock className="w-5 h-5 text-muted-foreground" />
+      {/* Account & security — self-service sessions/devices/connected-agents/passkeys (own page) */}
+      <AccountSecurityCard />
+
+      {/* Usage & limits — our rendered plan-quota surface (human plan quota, not agent budgets) */}
+      <Card padding="none">
+        <Link
+          href="/usage"
+          className="flex items-center gap-4 rounded-xl p-5 transition-colors hover:bg-muted"
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Gauge className="size-5" aria-hidden />
           </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-foreground">Change Password</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Update your password. All existing sessions will be revoked.
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-foreground">Usage &amp; limits</h2>
+            <p className="text-sm text-muted-foreground">
+              Your workspace plan&apos;s quotas (agents, projects) and recent activity.
             </p>
           </div>
-        </div>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmitPassword)} className="space-y-3">
-            <FormField
-              control={form.control}
-              name="currentPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Current Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="newPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="Min. 8 characters" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirm New Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" loading={form.formState.isSubmitting} className="w-full">
-              {form.formState.isSubmitting ? "Changing..." : "Change Password"}
-            </Button>
-          </form>
-        </Form>
+          <ArrowRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        </Link>
       </Card>
 
-      {/* Agent Governance */}
-      <AgentGovernanceCard />
+      {/* Agent Governance (manage — admin/owner only; server: SET_AGENT_GOVERNANCE requires admin) */}
+      <WhenAdmin>
+        <AgentGovernanceCard />
+      </WhenAdmin>
+
+      {/* Rule-based approval policies (GOVERNANCE — self-hides when off; manage → admin/owner) */}
+      <WhenAdmin>
+        <ApprovalPoliciesCard />
+      </WhenAdmin>
 
       {/* Agent memory backend */}
       <MemoryDefaultCard />
 
-      {/* Notification preferences now live in buildbase — see BuildbaseAccountCard →
-          openWorkspaceSettings('notifications'). */}
+      {/* Push notifications — per-device web-push opt-in, delivered by buildbase. Email/in-app
+          preferences still live in buildbase (BuildbaseAccountCard → openWorkspaceSettings). */}
+      <PushNotificationsCard />
 
       {/* Appearance / theme */}
       <AppearanceCard />
@@ -212,8 +132,10 @@ export function SettingsPage() {
       {/* Sidebar customization */}
       <SidebarCustomizeCard />
 
-      {/* Experimental feature flags */}
-      <FeatureFlagsCard />
+      {/* Plan features — READ-ONLY entitlement sourced from buildbase (no local toggle post-cutover) */}
+      <WhenAdmin>
+        <FeatureFlagsCard />
+      </WhenAdmin>
 
       {/* License */}
       {licenseInfo && licenseInfo.status !== LicenseStatusCode.NONE && (
@@ -290,63 +212,65 @@ export function SettingsPage() {
         </Card>
       )}
 
-      {/* System Shutdown */}
-      <div
-        className={`rounded-xl border p-6 space-y-4 ${
-          shutdownActive
-            ? "border-destructive/30 bg-destructive-muted"
-            : "border-border bg-background"
-        }`}
-      >
-        <div className="flex items-start gap-4">
-          <div
-            className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
-              shutdownActive ? "bg-destructive/15" : "bg-muted"
-            }`}
-          >
-            <ShieldOff
-              className={`w-5 h-5 ${shutdownActive ? "text-destructive" : "text-muted-foreground"}`}
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-foreground">System Shutdown</h2>
-            <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
-              <li>Blocks all new task creation (dashboard & API)</li>
-              <li>Prevents agents from picking up new work</li>
-              <li>Stops recurring tasks from generating</li>
-              <li>Does not affect tasks already in progress</li>
-            </ul>
-            {shutdownActive && (
-              <div className="mt-3 flex items-center gap-2 text-sm font-medium text-destructive">
-                <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-                System is currently shut down
-              </div>
-            )}
-          </div>
-        </div>
-
-        <Button
-          onClick={() => setShowConfirm(true)}
-          variant={shutdownActive ? "primary" : "danger"}
-          className="w-full"
-        >
-          {shutdownActive ? "Resume Operations" : "Activate Shutdown"}
-        </Button>
-        <ConfirmDialog
-          isOpen={showConfirm}
-          onClose={() => setShowConfirm(false)}
-          onConfirm={handleToggleShutdown}
-          title={shutdownActive ? "Resume operations?" : "Activate system shutdown?"}
-          description={
+      {/* System Shutdown (manage — admin/owner; server: SET_SYSTEM_SHUTDOWN requires admin) */}
+      <WhenAdmin>
+        <div
+          className={`rounded-xl border p-6 space-y-4 ${
             shutdownActive
-              ? "Agents will be able to receive tasks again."
-              : "This will immediately block all task creation and agent assignments across the entire system."
-          }
-          confirmLabel={shutdownActive ? "Yes, resume operations" : "Yes, shut down"}
-          variant={shutdownActive ? "primary" : "danger"}
-          loading={isToggling}
-        />
-      </div>
+              ? "border-destructive/30 bg-destructive-muted"
+              : "border-border bg-background"
+          }`}
+        >
+          <div className="flex items-start gap-4">
+            <div
+              className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
+                shutdownActive ? "bg-destructive/15" : "bg-muted"
+              }`}
+            >
+              <ShieldOff
+                className={`w-5 h-5 ${shutdownActive ? "text-destructive" : "text-muted-foreground"}`}
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base font-semibold text-foreground">System Shutdown</h2>
+              <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+                <li>Blocks all new task creation (dashboard & API)</li>
+                <li>Prevents agents from picking up new work</li>
+                <li>Stops recurring tasks from generating</li>
+                <li>Does not affect tasks already in progress</li>
+              </ul>
+              {shutdownActive && (
+                <div className="mt-3 flex items-center gap-2 text-sm font-medium text-destructive">
+                  <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+                  System is currently shut down
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Button
+            onClick={() => setShowConfirm(true)}
+            variant={shutdownActive ? "primary" : "danger"}
+            className="w-full"
+          >
+            {shutdownActive ? "Resume Operations" : "Activate Shutdown"}
+          </Button>
+          <ConfirmDialog
+            isOpen={showConfirm}
+            onClose={() => setShowConfirm(false)}
+            onConfirm={handleToggleShutdown}
+            title={shutdownActive ? "Resume operations?" : "Activate system shutdown?"}
+            description={
+              shutdownActive
+                ? "Agents will be able to receive tasks again."
+                : "This will immediately block all task creation and agent assignments across the entire system."
+            }
+            confirmLabel={shutdownActive ? "Yes, resume operations" : "Yes, shut down"}
+            variant={shutdownActive ? "primary" : "danger"}
+            loading={isToggling}
+          />
+        </div>
+      </WhenAdmin>
     </PageLayout>
   );
 }
@@ -475,33 +399,17 @@ interface FeatureFlag {
 }
 
 /**
- * Experimental feature flags — a per-flag toggle grid so an admin can turn optional features on/off
- * without a DB round-trip. Only user-managed flags are toggleable; system-managed ones are shown but
- * locked (the server rejects toggling them). Mirrors Paperclip's InstanceExperimentalSettings.
+ * Feature entitlement — a READ-ONLY view of which optional features are enabled for this workspace.
+ * Entitlement is now sourced entirely from buildbase (the customer's plan): `featureFlags` resolves to
+ * the workspace's buildbase `features` map. There is no local toggle — features are changed by moving
+ * plans in buildbase, not per-flag here (the old per-flag write path was removed in the cutover).
  */
 function FeatureFlagsCard() {
-  const [{ data, fetching }, refetch] = useQuery<{ featureFlags: FeatureFlag[] }>({
+  const [{ data, fetching }] = useQuery<{ featureFlags: FeatureFlag[] }>({
     query: FEATURE_FLAGS_QUERY,
   });
-  const [, updateFlag] = useMutation(UPDATE_FEATURE_FLAG);
-  const [busy, setBusy] = useState<string | null>(null);
 
   const flags = [...(data?.featureFlags ?? [])].sort((a, b) => a.key.localeCompare(b.key));
-
-  async function toggle(key: string, next: boolean) {
-    setBusy(key);
-    try {
-      const res = await updateFlag({ key, enabled: next });
-      if (res.error) {
-        toast.error(res.error.graphQLErrors[0]?.message ?? "Failed to update flag");
-      } else {
-        toast.success(`${key} ${next ? "enabled" : "disabled"}`);
-        refetch({ requestPolicy: "network-only" });
-      }
-    } finally {
-      setBusy(null);
-    }
-  }
 
   return (
     <Card padding="lg" className="space-y-4">
@@ -510,46 +418,38 @@ function FeatureFlagsCard() {
           <FlaskConical className="h-5 w-5 text-muted-foreground" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold text-foreground">Experimental Features</h2>
+          <h2 className="text-base font-semibold text-foreground">Plan features</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Turn optional features on or off for this workspace. System-managed flags are shown but
-            can only be changed by your administrator.
+            The optional features included with your workspace&apos;s plan. Entitlement is managed
+            by your plan in buildbase — upgrade your plan to enable more.
           </p>
         </div>
       </div>
 
       {fetching && flags.length === 0 && (
-        <p className="text-sm text-muted-foreground">Loading flags…</p>
+        <p className="text-sm text-muted-foreground">Loading features…</p>
       )}
 
       <ul className="divide-y divide-border">
-        {flags.map((f) => {
-          const locked = f.managedBy !== "user";
-          return (
-            <li key={f.key} className="flex items-center justify-between gap-4 py-2.5">
-              <div className="min-w-0">
-                <p className="flex items-center gap-2 font-mono text-sm text-foreground">
-                  {f.key}
-                  {locked && (
-                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                      system
-                    </span>
-                  )}
-                </p>
-                {f.description && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">{f.description}</p>
-                )}
-              </div>
-              <label className="inline-flex shrink-0 cursor-pointer items-center">
-                <Checkbox
-                  checked={f.enabled}
-                  disabled={locked || busy === f.key}
-                  onChange={(e) => toggle(f.key, e.target.checked)}
-                />
-              </label>
-            </li>
-          );
-        })}
+        {flags.map((f) => (
+          <li key={f.key} className="flex items-center justify-between gap-4 py-2.5">
+            <div className="min-w-0">
+              <p className="font-mono text-sm text-foreground">{f.key}</p>
+              {f.description && (
+                <p className="mt-0.5 text-xs text-muted-foreground">{f.description}</p>
+              )}
+            </div>
+            <span
+              className={
+                f.enabled
+                  ? "shrink-0 rounded bg-success/10 px-2 py-0.5 text-xs font-medium text-success"
+                  : "shrink-0 rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
+              }
+            >
+              {f.enabled ? "Included" : "Not in plan"}
+            </span>
+          </li>
+        ))}
       </ul>
     </Card>
   );

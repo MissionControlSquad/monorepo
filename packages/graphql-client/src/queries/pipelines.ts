@@ -47,6 +47,8 @@ export const ROUTINE_QUERY = gql`
         nextFireAt
         publicId
         isEnabled
+        concurrencyPolicy
+        catchUpPolicy
         createdAt
       }
       revisions {

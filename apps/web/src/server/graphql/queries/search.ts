@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { taskModel, messageModel, deliverableModel } from "../../models";
 import { toSearchQuery } from "./search-utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 
 const SearchResultsType = builder.simpleObject("SearchResults", {
   fields: (t) => ({
@@ -94,7 +95,7 @@ builder.queryField("searchAll", (t) =>
       limit: t.arg.int({ defaultValue: 20 }),
     },
     resolve: async (_root, args, ctx) => {
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const ws = tenancy.workspaceId;
       const take = Math.min(Math.max(args.limit ?? 20, 1), 50);
       const query = toSearchQuery(args.searchText);

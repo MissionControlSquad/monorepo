@@ -23,7 +23,7 @@ import {
   CANCEL_AGENT_RUN,
   PROMOTE_AGENT_RUN_REVIEW,
 } from "@/lib/graphql/mutations";
-import { Button, Card, Badge, Spinner, Select } from "@/components/ui";
+import { Button, Card, Badge, Spinner, Select, Tooltip, ConfirmDialog } from "@/components/ui";
 import { RunnerHostDialog } from "@/components/dialogs/RunnerHostDialog";
 import { RunnerQueueCommandDialog } from "@/components/dialogs/RunnerQueueCommandDialog";
 import { Server, Bot, Box } from "lucide-react";
@@ -102,6 +102,26 @@ const RUN_STATUS_VARIANT: Record<string, "green" | "red" | "gray" | "yellow"> = 
   queued: "yellow",
 };
 
+// Plain-language meaning of each run status, surfaced on hover so the badge is self-explanatory.
+const RUN_STATUS_HELP: Record<string, string> = {
+  queued: "Waiting for a worker to pick it up.",
+  running: "The agent is executing this task now.",
+  done: "Finished successfully.",
+  failed: "Ended with an error before finishing.",
+  timeout: "Stopped after exceeding its time limit.",
+  canceled: "Stopped by a user before it finished.",
+};
+
+// What a run's kind:provider transport means — surfaced on hover so the env-kind/driver is legible.
+const PROVIDER_KEY_HELP: Record<string, string> = {
+  local: "Ran in-process on the control-plane host (local driver).",
+  ssh: "Ran on a remote host over SSH (the environment's ssh driver).",
+};
+function providerKeyHelp(providerKey: string | null): string {
+  if (!providerKey) return "Where this run executed.";
+  return PROVIDER_KEY_HELP[providerKey] ?? `Ran on the "${providerKey}" sandbox provider.`;
+}
+
 // Plan 6: the redacted live tail of an in-flight run, polled every 2s while open.
 function LiveTail({ runId }: { runId: string }) {
   const [{ data }, refetch] = useQuery<{
@@ -135,6 +155,7 @@ function RunHistory() {
   const [, promoteRun] = useMutation(PROMOTE_AGENT_RUN_REVIEW);
   const [open, setOpen] = useState<string | null>(null);
   const [busyCancel, setBusyCancel] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<AgentRun | null>(null);
   const [busyReview, setBusyReview] = useState<string | null>(null);
   const runs = data?.agentRuns ?? [];
   const refresh = () => refetch({ requestPolicy: "network-only" });
@@ -172,6 +193,7 @@ function RunHistory() {
       refresh();
     } finally {
       setBusyCancel(null);
+      setConfirmCancel(null);
     }
   }
 
@@ -186,7 +208,11 @@ function RunHistory() {
           Refresh
         </button>
       </div>
-      {runs.length === 0 && <p className="text-sm text-muted-foreground">No runs yet.</p>}
+      {runs.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          No runs yet. Run or enqueue a task in a sandbox above and it will appear here.
+        </p>
+      )}
       {runs.map((r) => (
         <Card key={r.id} className="p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -194,28 +220,42 @@ function RunHistory() {
               className="flex-1 truncate text-left font-mono text-xs text-foreground"
               onClick={() => setOpen(open === r.id ? null : r.id)}
             >
-              {r.kind}
-              {r.providerKey ? `:${r.providerKey}` : ""} ·{" "}
-              {r.startedAt.slice(0, 19).replace("T", " ")}
+              <Tooltip content={providerKeyHelp(r.providerKey)}>
+                <span>
+                  {r.kind}
+                  {r.providerKey ? `:${r.providerKey}` : ""}
+                </span>
+              </Tooltip>{" "}
+              · {r.startedAt.slice(0, 19).replace("T", " ")}
             </button>
             <span className="flex items-center gap-2">
               {r.exitCode != null && (
                 <span className="text-xs text-muted-foreground">exit {r.exitCode}</span>
               )}
-              <Badge variant={RUN_STATUS_VARIANT[r.status] ?? "gray"}>{r.status}</Badge>
+              <Tooltip content={RUN_STATUS_HELP[r.status] ?? "Current state of this run."}>
+                <Badge variant={RUN_STATUS_VARIANT[r.status] ?? "gray"}>{r.status}</Badge>
+              </Tooltip>
               {r.reviewState === "needs_review" && <Badge variant="yellow">needs review</Badge>}
               {r.reviewState === "approved" && <Badge variant="green">approved</Badge>}
               {r.reviewState === "changes_requested" && (
                 <Badge variant="orange">changes requested</Badge>
               )}
-              {r.status === "queued" && (
-                <button
-                  onClick={() => onCancel(r.id)}
-                  disabled={busyCancel === r.id}
-                  className="text-xs text-destructive transition hover:underline disabled:opacity-50"
+              {(r.status === "queued" || r.status === "running") && (
+                <Tooltip
+                  content={
+                    r.status === "running"
+                      ? "Cancel this run — the agent stops immediately and any unfinished work is discarded."
+                      : "Cancel this queued run before a worker picks it up."
+                  }
                 >
-                  Cancel
-                </button>
+                  <button
+                    onClick={() => setConfirmCancel(r)}
+                    disabled={busyCancel === r.id}
+                    className="text-xs text-destructive transition hover:underline disabled:opacity-50"
+                  >
+                    {r.status === "running" ? "Cancel run" : "Cancel"}
+                  </button>
+                </Tooltip>
               )}
               {r.reviewState === "needs_review" && (
                 <>
@@ -241,6 +281,17 @@ function RunHistory() {
             <div className="mt-2 space-y-2">
               {(r.status === "running" || r.status === "queued") && <LiveTail runId={r.id} />}
               {/* Structured adapter execution result (usage/model + machine-readable outcome). */}
+              {/* Config gate: a run refused pre-dispatch renders a readable "needs configuration"
+                  callout listing exactly what's missing, instead of an opaque failure. */}
+              {r.exitReason === "configuration_incomplete" && (
+                <div className="rounded border border-orange-400/40 bg-orange-400/10 p-2 text-xs text-orange-700 dark:text-orange-300">
+                  <p className="font-medium">This run needs configuration</p>
+                  <p className="mt-0.5">
+                    {(r.errorMessage ?? "").replace(/^This run needs configuration:\s*/, "") ||
+                      "Required config or a secret binding is missing for this environment."}
+                  </p>
+                </div>
+              )}
               {(r.exitReason ||
                 r.errorFamily ||
                 r.usageModel ||
@@ -251,9 +302,11 @@ function RunHistory() {
                   {r.errorFamily && <Badge variant="orange">{r.errorFamily}</Badge>}
                   {r.usageModel && <span className="font-mono">{r.usageModel}</span>}
                   {(r.usageTokensIn != null || r.usageTokensOut != null) && (
-                    <span>
-                      tokens {r.usageTokensIn ?? 0} in / {r.usageTokensOut ?? 0} out
-                    </span>
+                    <Tooltip content="Tokens this run billed against the model: input is the prompt sent, output is the text generated.">
+                      <span>
+                        tokens {r.usageTokensIn ?? 0} in / {r.usageTokensOut ?? 0} out
+                      </span>
+                    </Tooltip>
                   )}
                 </div>
               )}
@@ -267,11 +320,29 @@ function RunHistory() {
                   {r.stderr}
                 </pre>
               )}
-              {r.errorMessage && <p className="text-xs text-destructive">{r.errorMessage}</p>}
+              {r.errorMessage && r.exitReason !== "configuration_incomplete" && (
+                <p className="text-xs text-destructive">{r.errorMessage}</p>
+              )}
             </div>
           )}
         </Card>
       ))}
+      <ConfirmDialog
+        isOpen={confirmCancel != null}
+        onClose={() => setConfirmCancel(null)}
+        onConfirm={() => {
+          if (confirmCancel) onCancel(confirmCancel.id);
+        }}
+        title={confirmCancel?.status === "running" ? "Cancel this run?" : "Cancel this queued run?"}
+        description={
+          confirmCancel?.status === "running"
+            ? "The agent stops immediately and any unfinished work is discarded. This can't be undone."
+            : "The run is removed from the queue before a worker picks it up. This can't be undone."
+        }
+        confirmLabel="Cancel run"
+        cancelLabel="Keep running"
+        loading={busyCancel === confirmCancel?.id}
+      />
     </div>
   );
 }

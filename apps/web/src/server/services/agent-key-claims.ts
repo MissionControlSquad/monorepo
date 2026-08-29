@@ -1,8 +1,8 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import { generateApiKey, hashApiKey } from "@/server/api-key";
 import type { AgentKeyClaim } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // One-time agent-key claim ceremony (parity Domain-10 A13 / GAP-5). createKeyClaim mints a durable claim
 // token (only its hash stored); claimAgentKey burns it on first use and issues a scoped agent key. A
@@ -10,10 +10,6 @@ import type { AgentKeyClaim } from "@agentcenter/database";
 // Workspace-scoped.
 
 const DEFAULT_TTL_MS = 7 * 24 * 3_600_000; // 7 days
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");

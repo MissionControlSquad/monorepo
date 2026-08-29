@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { approveDevice, revokeDevice } from "@/server/services/live-gateway-devices";
 import { createKeyClaim, claimAgentKey, revokeKeyClaim } from "@/server/services/agent-key-claims";
 
@@ -17,7 +18,7 @@ builder.mutationField("approveLiveGatewayDevice", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LIVE_GATEWAY);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await approveDevice(tenancy.workspaceId, args.id, tenancy.userId);
       return ctx.prisma.liveGatewayDevice.findUniqueOrThrow({ ...query, where: { id: args.id } });
     },
@@ -30,7 +31,7 @@ builder.mutationField("revokeLiveGatewayDevice", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LIVE_GATEWAY);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return revokeDevice(tenancy.workspaceId, args.id);
     },
   }),
@@ -66,7 +67,7 @@ builder.mutationField("createAgentKeyClaim", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LIVE_GATEWAY);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const { claim, claimSecret } = await createKeyClaim({
         workspaceId: tenancy.workspaceId,
         agentId: args.agentId ?? null,
@@ -88,7 +89,7 @@ builder.mutationField("claimAgentKey", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LIVE_GATEWAY);
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return claimAgentKey(args.claimId, args.secret);
     },
   }),
@@ -100,7 +101,7 @@ builder.mutationField("revokeAgentKeyClaim", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.LIVE_GATEWAY);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return revokeKeyClaim(tenancy.workspaceId, args.id);
     },
   }),

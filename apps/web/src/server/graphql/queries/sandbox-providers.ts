@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   listSandboxProviders,
   isSandboxProviderConfigured,
@@ -32,7 +33,7 @@ builder.queryField("sandboxProviders", (t) =>
     type: [SandboxProviderType],
     resolve: async (_root, _args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const resolveSecret = (name: string) => resolveWorkspaceSecret(tenancy.workspaceId, name);
       return Promise.all(
         listSandboxProviders().map(async (p) => {

@@ -1,13 +1,15 @@
 import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
-import { requireRole } from "@/server/tenancy";
+import { requireRole, isManagerRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   createRoutine,
   updateRoutine,
   addRoutineTrigger,
   triggerRoutineNow,
   regenerateTriggerPublicId,
+  updateRoutineTriggerPolicies,
 } from "@/server/services/routines";
 import {
   createPipeline,
@@ -43,7 +45,7 @@ builder.mutationField("createRoutine", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const routine = await createRoutine({
         workspaceId: tenancy.workspaceId,
         createdByProfileId: tenancy.userId,
@@ -78,7 +80,7 @@ builder.mutationField("updateRoutine", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const routine = await updateRoutine(tenancy.workspaceId, args.id, {
         name: args.name ?? null,
         description: args.description ?? undefined,
@@ -106,10 +108,17 @@ builder.mutationField("addRoutineTrigger", (t) =>
       cronExpression: t.arg.string(),
       timezone: t.arg.string(),
       nextFireAt: t.arg({ type: "DateTime" }),
+      // §3 #11 (2) overlap policy — how to handle a due tick while the routine's prior run is still
+      // active: "allow" (default, fire anyway) | "skip" (don't start if the previous run is still
+      // going) | "queue" (defer and run once the routine is idle).
+      concurrencyPolicy: t.arg.string(),
+      // §3 #11 (2) missed-window policy — after downtime skipped ≥1 tick: "skip" (default, advance
+      // without firing) | "run_once" (fire once for the backlog).
+      catchUpPolicy: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const type = args.type === "cron" || args.type === "webhook" ? args.type : "manual";
       const trigger = await addRoutineTrigger(tenancy.workspaceId, args.routineId, {
         type,
@@ -117,6 +126,30 @@ builder.mutationField("addRoutineTrigger", (t) =>
         cronExpression: args.cronExpression ?? null,
         timezone: args.timezone ?? null,
         nextFireAt: args.nextFireAt ?? null,
+        concurrencyPolicy: args.concurrencyPolicy ?? null,
+        catchUpPolicy: args.catchUpPolicy ?? null,
+      });
+      return ctx.prisma.routineTrigger.findUniqueOrThrow({ ...query, where: { id: trigger.id } });
+    },
+  }),
+);
+
+// §3 #11 (2): tune a routine trigger's overlap / missed-window policies without recreating it.
+// PIPELINES_ROUTINES-gated, admin.
+builder.mutationField("updateRoutineTriggerPolicies", (t) =>
+  t.prismaField({
+    type: "RoutineTrigger",
+    args: {
+      triggerId: t.arg.string({ required: true }),
+      concurrencyPolicy: t.arg.string(), // allow | skip | queue
+      catchUpPolicy: t.arg.string(), // skip | run_once
+    },
+    resolve: async (query, _root, args, ctx) => {
+      await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
+      const trigger = await updateRoutineTriggerPolicies(tenancy.workspaceId, args.triggerId, {
+        concurrencyPolicy: args.concurrencyPolicy ?? undefined,
+        catchUpPolicy: args.catchUpPolicy ?? undefined,
       });
       return ctx.prisma.routineTrigger.findUniqueOrThrow({ ...query, where: { id: trigger.id } });
     },
@@ -129,7 +162,7 @@ builder.mutationField("regenerateTriggerPublicId", (t) =>
     args: { triggerId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const trigger = await regenerateTriggerPublicId(tenancy.workspaceId, args.triggerId);
       return ctx.prisma.routineTrigger.findUniqueOrThrow({ ...query, where: { id: trigger.id } });
     },
@@ -142,7 +175,7 @@ builder.mutationField("triggerRoutineNow", (t) =>
     args: { routineId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const run = await triggerRoutineNow({
         workspaceId: tenancy.workspaceId,
         routineId: args.routineId,
@@ -165,7 +198,7 @@ builder.mutationField("createPipeline", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const p = await createPipeline({
         workspaceId: tenancy.workspaceId,
         name: args.name,
@@ -187,7 +220,7 @@ builder.mutationField("setPipelineSequential", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const p = await setPipelineSequential(
         tenancy.workspaceId,
         args.pipelineId,
@@ -211,7 +244,7 @@ builder.mutationField("addPipelineStage", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const stage = await addPipelineStage(tenancy.workspaceId, args.pipelineId, {
         name: args.name,
         order: args.order,
@@ -237,7 +270,7 @@ builder.mutationField("updatePipelineStage", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const stage = await updatePipelineStage(tenancy.workspaceId, args.stageId, {
         name: args.name ?? null,
         isReviewStage: args.isReviewStage ?? null,
@@ -256,7 +289,7 @@ builder.mutationField("deletePipelineStage", (t) =>
     args: { stageId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return deletePipelineStage(tenancy.workspaceId, args.stageId);
     },
   }),
@@ -272,7 +305,7 @@ builder.mutationField("createPipelineCase", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const c = await createCase(tenancy.workspaceId, args.pipelineId, {
         title: args.title,
         payload: args.payload ?? undefined,
@@ -288,7 +321,7 @@ builder.mutationField("claimCase", (t) =>
     args: { caseId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const c = await claimCase(tenancy.workspaceId, args.caseId, tenancy.userId);
       return ctx.prisma.pipelineCase.findUniqueOrThrow({ ...query, where: { id: c.id } });
     },
@@ -301,12 +334,12 @@ builder.mutationField("releaseCase", (t) =>
     args: { caseId: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const c = await releaseCase({
         workspaceId: tenancy.workspaceId,
         caseId: args.caseId,
         actorProfileId: tenancy.userId,
-        actorIsAdmin: tenancy.role === "admin" || tenancy.role === "owner",
+        actorIsAdmin: isManagerRole(tenancy.role),
       });
       return ctx.prisma.pipelineCase.findUniqueOrThrow({ ...query, where: { id: c.id } });
     },
@@ -319,7 +352,7 @@ builder.mutationField("commentCase", (t) =>
     args: { caseId: t.arg.string({ required: true }), note: t.arg.string({ required: true }) },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const c = await commentCase({
         workspaceId: tenancy.workspaceId,
         caseId: args.caseId,
@@ -341,13 +374,13 @@ builder.mutationField("transitionCase", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const c = await transitionCase({
         workspaceId: tenancy.workspaceId,
         caseId: args.caseId,
         toStageId: args.toStageId,
         actorProfileId: tenancy.userId,
-        actorIsAdmin: tenancy.role === "admin" || tenancy.role === "owner",
+        actorIsAdmin: isManagerRole(tenancy.role),
         note: args.note ?? null,
       });
       return ctx.prisma.pipelineCase.findUniqueOrThrow({ ...query, where: { id: c.id } });
@@ -365,7 +398,7 @@ builder.mutationField("breakdownCase", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const res = await breakdownCase({
         workspaceId: tenancy.workspaceId,
         caseId: args.caseId,
@@ -384,7 +417,7 @@ builder.mutationField("rejectCase", (t) =>
     args: { caseId: t.arg.string({ required: true }), note: t.arg.string() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.PIPELINES_ROUTINES);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const c = await rejectCase({
         workspaceId: tenancy.workspaceId,
         caseId: args.caseId,

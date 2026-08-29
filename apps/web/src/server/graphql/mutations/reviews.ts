@@ -4,6 +4,7 @@ import { FLAG_KEYS } from "@agentcenter/utils";
 import { agentModel } from "../../models";
 import { Roles } from "../../constants";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { prisma } from "@/server/prisma";
 import { isSystemShutdown } from "../../system-settings";
 import {
@@ -31,7 +32,8 @@ builder.mutationField("approveTask", (t) =>
       approvalComment: t.arg.string(),
       childTasks: t.arg.string(), // JSON string: [{title, description?, priority?, assigneeIds?}]
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await requireFeature(FLAG_KEYS.REVIEWS);
       if (await isSystemShutdown())
         throw new Error("System is in shutdown mode. No task approvals allowed.");
@@ -74,7 +76,8 @@ builder.mutationField("rejectTask", (t) =>
       rejectionReason: t.arg.string({ required: true }),
       changesNeeded: t.arg.stringList({ required: true }),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       await requireFeature(FLAG_KEYS.REVIEWS);
       if (await isSystemShutdown())
         throw new Error("System is in shutdown mode. No task rejections allowed.");
@@ -107,7 +110,8 @@ builder.mutationField("requestClarification", (t) =>
       taskId: t.arg.string({ required: true }),
       questions: t.arg.stringList({ required: true }),
     },
-    resolve: async (_root, args) => {
+    resolve: async (_root, args, ctx) => {
+      requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       await requireFeature(FLAG_KEYS.REVIEWS);
       if (await isSystemShutdown())
         throw new Error("System is in shutdown mode. No clarification requests allowed.");
@@ -147,7 +151,7 @@ builder.mutationField("reviewTask", (t) =>
       await requireFeature(FLAG_KEYS.REVIEWS);
       if (await isSystemShutdown())
         throw new Error("System is in shutdown mode. No task reviews allowed.");
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const decision = args.decision === "approve" ? "approve" : "request_changes";
       const profile = await prisma.profile.findUnique({
         where: { id: tenancy.userId },

@@ -1,9 +1,10 @@
 "use client";
 
 import { useQuery } from "urql";
-import { Loader2, AlertCircle } from "lucide-react";
 import { PROFILE_ANALYTICS_QUERY } from "@/lib/graphql/queries";
 import { Breadcrumbs, Card, Badge, PageLayout } from "@/components/ui";
+import { formatCost } from "@agentcenter/utils";
+import { CenteredSpinner, CenteredMessage } from "@/components/common/AsyncBoundary";
 
 // Per-member analytics dashboard — read-only productivity + cost for a profile. App-data only.
 
@@ -40,8 +41,6 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
-
 export function ProfileAnalyticsPage({ profileId }: { profileId: string }) {
   const [{ data, fetching }] = useQuery<{ profileAnalytics: Analytics | null }>({
     query: PROFILE_ANALYTICS_QUERY,
@@ -49,21 +48,8 @@ export function ProfileAnalyticsPage({ profileId }: { profileId: string }) {
   });
   const a = data?.profileAnalytics;
 
-  if (fetching && !a) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-  if (!a) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-        <AlertCircle className="h-8 w-8" />
-        <p className="text-sm font-medium">No analytics available for this profile.</p>
-      </div>
-    );
-  }
+  if (fetching && !a) return <CenteredSpinner />;
+  if (!a) return <CenteredMessage>No analytics available for this profile.</CenteredMessage>;
 
   return (
     <PageLayout maxWidth="wide">
@@ -86,7 +72,7 @@ export function ProfileAnalyticsPage({ profileId }: { profileId: string }) {
         <Stat label="Tasks completed" value={a.tasksCompleted} />
         <Stat label="Tasks created" value={a.tasksCreated} />
         <Stat label="Activity events" value={a.activityCount} />
-        <Stat label="Spend" value={usd(a.cost.totalSpendCents)} />
+        <Stat label="Spend" value={formatCost(a.cost.totalSpendCents)} />
         <Stat label="Tokens in" value={a.cost.totalTokensIn.toLocaleString()} />
         <Stat label="Tokens out" value={a.cost.totalTokensOut.toLocaleString()} />
       </div>
@@ -118,7 +104,7 @@ export function ProfileAnalyticsPage({ profileId }: { profileId: string }) {
                     <td className="py-1.5 pr-4 text-muted-foreground">
                       {m.tokensOut.toLocaleString()}
                     </td>
-                    <td className="py-1.5 text-foreground">{usd(m.spendCents)}</td>
+                    <td className="py-1.5 text-foreground">{formatCost(m.spendCents)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,17 +1,15 @@
 import { verifySessionToken, COOKIE_NAME, type SessionPayload } from "@/server/admin-auth";
+import { readCookie } from "@/server/tenancy/buildbase";
 
 /**
  * Extract and verify the admin session from request cookies.
  * Throws { error, status } on failure (compatible with handleError).
  */
 export async function resolveSession(request: Request): Promise<SessionPayload> {
-  const cookie = request.headers.get("cookie");
-  if (!cookie) throw { error: "Not authenticated", status: 401, code: "UNAUTHENTICATED" };
+  const raw = readCookie(request.headers.get("cookie"), COOKIE_NAME);
+  if (!raw) throw { error: "Not authenticated", status: 401, code: "UNAUTHENTICATED" };
 
-  const match = cookie.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-  if (!match) throw { error: "Not authenticated", status: 401, code: "UNAUTHENTICATED" };
-
-  const session = await verifySessionToken(match[1].trim());
+  const session = await verifySessionToken(raw);
   if (!session) throw { error: "Invalid or expired session", status: 401, code: "SESSION_EXPIRED" };
 
   return session;

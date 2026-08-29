@@ -2,15 +2,35 @@ import {
   findRecurringTaskOrThrow,
   findDueRecurringTasks,
   advanceRecurringTaskDueAt,
-  getProjectStatus,
 } from "@agentcenter/database";
 import { pubsub, PubSubEvent, taskTopic, taskProjectTopic } from "./pubsub";
 import { addDays, addWeeks, addMonths } from "date-fns";
 import { taskModel } from "./models/task";
-import { isSystemShutdown } from "./system-settings";
 import { filterAvailableAssignees } from "./assignment-guard";
 import { ProjectStatus, RecurringFrequency } from "./constants";
 import type { RecurringFrequencyValue } from "./constants";
+import {
+  resolveSchedulingSuppression,
+  type SchedulingSuppressionReason,
+} from "./services/agent-wakeups";
+
+/**
+ * §3 #11 (3) — human-readable reason for a suppressed recurring-task trigger. All pause checks now flow
+ * through the single {@link resolveSchedulingSuppression} guard; this only maps its verdict to the
+ * message this path historically threw.
+ */
+function recurringSuppressionMessage(reason: SchedulingSuppressionReason | null): string {
+  switch (reason) {
+    case "system_shutdown":
+      return "System is in shutdown mode. Cannot trigger recurring tasks.";
+    case "project_archived":
+      return "This project is archived. Cannot trigger recurring tasks.";
+    case "project_paused":
+      return "This project is paused. Cannot trigger recurring tasks.";
+    default:
+      return "Scheduling is suppressed on this instance. Cannot trigger recurring tasks.";
+  }
+}
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -273,20 +293,12 @@ export function calculateInitialDueDate(
  * Advances nextDueAt to the next future occurrence.
  */
 export async function triggerRecurringTaskNow(recurringTaskId: string): Promise<void> {
-  if (await isSystemShutdown()) {
-    throw new Error("System is in shutdown mode. Cannot trigger recurring tasks.");
-  }
-
   const rt = await findRecurringTaskOrThrow(recurringTaskId);
 
-  if (rt.projectId) {
-    const project = await getProjectStatus(rt.projectId);
-    if (project?.status === ProjectStatus.ARCHIVED) {
-      throw new Error("This project is archived. Cannot trigger recurring tasks.");
-    }
-    if (project?.shutdownActive) {
-      throw new Error("This project is paused. Cannot trigger recurring tasks.");
-    }
+  // §3 #11 (3) — one guard for system/instance pause AND this task's project pause/archive.
+  const suppression = await resolveSchedulingSuppression({ projectId: rt.projectId ?? null });
+  if (suppression.suppressed) {
+    throw new Error(recurringSuppressionMessage(suppression.reason));
   }
 
   const config = rt.recurrenceConfig as unknown as RecurrenceConfig;
@@ -345,7 +357,9 @@ export async function triggerRecurringTaskNow(recurringTaskId: string): Promise<
  * Returns the number of tasks generated.
  */
 export async function generateRecurringTasks(opts?: { projectId?: string }): Promise<number> {
-  if (await isSystemShutdown()) return 0;
+  // §3 #11 (3) — same guard for instance/system pause. Per-project pause is still enforced by the query
+  // filter below (efficient batch predicate), keeping the previously-shipped behavior intact.
+  if ((await resolveSchedulingSuppression({})).suppressed) return 0;
 
   const now = new Date();
 

@@ -1,5 +1,7 @@
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import type { GraphQLContext, TenancyContext, WorkspaceRole } from "@agentcenter/graphql-server";
 import { roleCan } from "./roles";
+import { WORKSPACE_TOKEN_COOKIE, readCookie } from "./buildbase";
 import { verifyJWT } from "@/lib/jwt";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { isFeatureEnabled } from "@/server/feature-flags";
@@ -12,26 +14,17 @@ import { verifyApiKey } from "@/server/services/api-keys";
  */
 export const DEFAULT_WORKSPACE_ID = process.env.DEFAULT_WORKSPACE_ID ?? "ws_default";
 
-/** httpOnly cookie holding the buildbase workspace-scoped JWT (minted by /api/auth/buildbase/workspace-token). */
-const WORKSPACE_TOKEN_COOKIE = "bb-workspace-token";
-
 function mapRole(raw: unknown): WorkspaceRole {
   switch (typeof raw === "string" ? raw.toLowerCase() : "") {
-    case "owner":
-      return "owner";
-    case "admin":
-      return "admin";
-    case "viewer":
-      return "viewer";
+    case WORKSPACE_ROLES.OWNER:
+      return WORKSPACE_ROLES.OWNER;
+    case WORKSPACE_ROLES.ADMIN:
+      return WORKSPACE_ROLES.ADMIN;
+    case WORKSPACE_ROLES.VIEWER:
+      return WORKSPACE_ROLES.VIEWER;
     default:
-      return "member";
+      return WORKSPACE_ROLES.MEMBER;
   }
-}
-
-function readCookie(cookieHeader: string | null | undefined, name: string): string | null {
-  if (!cookieHeader) return null;
-  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[1]) : null;
 }
 
 /** Resolve tenancy from the buildbase workspace-scoped JWT, if present + valid. */
@@ -48,6 +41,15 @@ async function fromBuildbaseToken(
   const userId = typeof claims.userId === "string" ? claims.userId : "";
   const workspaceId = typeof claims.workspaceId === "string" ? claims.workspaceId : "";
   if (!userId || !workspaceId) return null;
+
+  // Belt-and-suspenders: in a bound (hosted) tenant, refuse any workspace-token whose workspaceId isn't
+  // the bound one. The switch-block route + auth bridge only ever mint tokens pinned to
+  // TENANT_WORKSPACE_ID, so a mismatch means a STALE cookie — e.g. a tenant that was migrated from
+  // unbound (email-keyed) to bound (set-workspace) while a user still held a 7-day bb-workspace-token
+  // carrying the old workspaceId. Returning null here fails closed → resolveTenancy falls through to the
+  // bound-fallback refusal, and the client re-mints a correctly-pinned token on the next workspace event.
+  const bound = process.env.TENANT_WORKSPACE_ID?.trim();
+  if (bound && workspaceId !== bound) return null;
 
   const role = mapRole(claims.userRole);
   return { userId, workspaceId, role, can: (permission: string) => roleCan(role, permission) };
@@ -68,7 +70,7 @@ async function fromApiKey(authHeader: string | null | undefined): Promise<Tenanc
   const verified = await verifyApiKey(match[1]);
   if (!verified) return null;
 
-  const role: WorkspaceRole = "member";
+  const role: WorkspaceRole = WORKSPACE_ROLES.MEMBER;
   return {
     userId: verified.createdByProfileId ?? `apikey_${verified.apiKeyId}`,
     workspaceId: verified.workspaceId,
@@ -96,8 +98,19 @@ export async function resolveTenancy(
   const fromBuildbase = await fromBuildbaseToken(cookieHeader);
   if (fromBuildbase) return fromBuildbase;
 
+  // Bootstrap fallback: mc_session → DEFAULT_WORKSPACE_ID as owner.
+  //
+  // SECURITY: this fallback is ONLY safe for a single-tenant / self-host install and the test harness.
+  // In a hosted multi-tenant container (TENANT_WORKSPACE_ID set), the `bb-session-id` cookie is shared
+  // across all *.agentcenter.cloud hosts, so an authenticated-but-non-member user could otherwise be
+  // silently granted OWNER of the default workspace — a cross-tenant breach. When this container is
+  // bound to a workspace we therefore REFUSE the fallback: a verified member always carries a
+  // bb-workspace-token pinned to TENANT_WORKSPACE_ID (resolved above by fromBuildbaseToken); a
+  // non-member is denied at the auth bridge and never obtains that token. Fail-closed → null.
+  if (process.env.TENANT_WORKSPACE_ID?.trim()) return null;
+
   if (!session?.profileId) return null;
-  const role: WorkspaceRole = "owner";
+  const role: WorkspaceRole = WORKSPACE_ROLES.OWNER;
   return {
     userId: session.profileId,
     workspaceId: DEFAULT_WORKSPACE_ID,

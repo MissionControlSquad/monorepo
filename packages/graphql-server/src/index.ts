@@ -1,7 +1,7 @@
 // Register all Pothos type definitions on the builder (side effects)
 import "./types";
 
-export { builder } from "./builder";
+export { builder, WORKSPACE_ROLES } from "./builder";
 export type { GraphQLContext, SessionPayload, TenancyContext, WorkspaceRole } from "./builder";
 export { CURRENT_CONFIG_VERSION } from "./config-version";
 

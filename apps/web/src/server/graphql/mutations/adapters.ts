@@ -2,6 +2,7 @@ import { GraphQLError } from "graphql";
 import { builder } from "../builder";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole, scoped } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { isFeatureEnabled } from "@/server/feature-flags";
 import { getAdapter, validateAdapterConfig } from "@/server/adapters/registry";
 
@@ -16,7 +17,7 @@ builder.mutationField("setAgentAdapter", (t) =>
       adapterConfig: t.arg({ type: "JSON" }),
     },
     resolve: async (query, _root, args, ctx) => {
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
 
       // Agent must belong to the caller's workspace.
       const agent = await ctx.prisma.agent.findFirst({ where: scoped(ctx, { id: args.agentId }) });
@@ -64,7 +65,7 @@ builder.mutationField("setAdapterEnabled", (t) =>
       enabled: t.arg.boolean({ required: true }),
     },
     resolve: async (query, _root, args, ctx) => {
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
 
       const adapter = await getAdapter(args.adapterType);
       if (!adapter)
@@ -105,7 +106,7 @@ builder.mutationField("installAdapter", (t) =>
       version: t.arg.string(),
     },
     resolve: async (query, _root, args, ctx) => {
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const featureEnabled = await isFeatureEnabled(FLAG_KEYS.MULTI_PROVIDER_ADAPTERS);
       if (!featureEnabled)
         throw new GraphQLError("Multi-provider adapters are not enabled on your plan", {
@@ -152,7 +153,7 @@ builder.mutationField("removeAdapter", (t) =>
     type: "Boolean",
     args: { adapterType: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
-      requireRole(ctx, "admin");
+      requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       const adapter = await getAdapter(args.adapterType);
       if (!adapter)
         throw new GraphQLError(`Unknown adapter '${args.adapterType}'`, {

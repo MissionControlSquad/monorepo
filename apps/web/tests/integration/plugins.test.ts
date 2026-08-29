@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 /**
  * Epic #6 plugin registry — real GraphQL route + Postgres. PLUGIN_SDK is off by default; happy-path
@@ -30,11 +35,7 @@ async function cookieFor(workspaceId: string, role: "admin" | "member") {
   return `bb-workspace-token=${token}`;
 }
 async function setPluginSdk(enabled: boolean) {
-  await prisma.featureFlag.upsert({
-    where: { key: "plugin_sdk" },
-    create: { key: "plugin_sdk", enabled, managedBy: "user" },
-    update: { enabled },
-  });
+  setTestFeature(FLAG_KEYS.PLUGIN_SDK, enabled);
   invalidateFlagCache();
 }
 const INSTALL = `mutation($m:JSON!){ installPlugin(manifest:$m){ id pluginId version enabled status capabilities } }`;
@@ -55,7 +56,7 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE plugins, profiles CASCADE`);
-  await prisma.featureFlag.deleteMany({ where: { key: "plugin_sdk" } });
+  resetTestFeature(FLAG_KEYS.PLUGIN_SDK);
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Plugin Human" } });
   humanId = p.id;

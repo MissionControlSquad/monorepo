@@ -1,4 +1,5 @@
 export const TASK_STATUSES = [
+  { id: "backlog", label: "Backlog", color: "gray" },
   { id: "inbox", label: "Inbox", color: "gray" },
   { id: "assigned", label: "Assigned", color: "blue" },
   { id: "in_progress", label: "In Progress", color: "yellow" },
@@ -107,6 +108,7 @@ export type AgentLevelId = keyof typeof AGENT_LEVELS;
 
 // Column icons (lucide icon names)
 export const COLUMN_ICONS: Record<string, string> = {
+  backlog: "Archive",
   inbox: "Inbox",
   assigned: "UserCheck",
   in_progress: "PlayCircle",
@@ -117,6 +119,7 @@ export const COLUMN_ICONS: Record<string, string> = {
 
 // Column empty states
 export const COLUMN_EMPTY_STATES: Record<string, { message: string; hint: string }> = {
+  backlog: { message: "Backlog is empty", hint: "Park un-triaged work here" },
   inbox: { message: "No incoming tasks", hint: "Create a new task to get started" },
   assigned: { message: "No assigned tasks", hint: "Drag tasks here or assign agents" },
   in_progress: { message: "Nothing in progress", hint: "Tasks being worked on appear here" },
@@ -137,6 +140,7 @@ export const MAX_MESSAGE_BYTES = 4096;
 // Platform-agnostic hex colors for status values (usable by mobile, charts, Electron)
 export const STATUS_HEX_COLORS: Record<string, string> = {
   // Task statuses
+  backlog: "#64748b",
   inbox: "#6b7280",
   assigned: "#2563eb",
   in_progress: "#d97706",

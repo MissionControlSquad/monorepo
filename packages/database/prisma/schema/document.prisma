@@ -36,10 +36,32 @@ model Document {
   messageAttachments        MessageAttachment[]
   channelMessageAttachments ChannelMessageAttachment[]
   caseDocument              CaseDocument?              @relation("CaseDocument") // Epic #17
+  revisions                 DocumentRevision[] // Parity §3.12 — generic revision history
 
   @@index([taskId])
   @@index([type])
   @@index([createdAt])
   @@index([projectId])
   @@map("documents")
+}
+
+// Parity §3.12 — generic revision history for the `Document` entity (the analogue of
+// ProjectDocRevision / RoutineRevision, which cover only their own doc types). Each revision is a
+// content snapshot taken on update, numbered per-document. Author attribution is by plain id (human
+// profile or agent) with no FK, mirroring other attribution fields (D5) so this stays additive.
+model DocumentRevision {
+  id              String   @id @default(cuid())
+  documentId      String
+  revision        Int // monotonic per-document revision number (1-based)
+  title           String
+  content         String
+  authorProfileId String?
+  authorAgentId   String?
+  createdAt       DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, revision])
+  @@index([documentId, createdAt])
+  @@map("document_revisions")
 }

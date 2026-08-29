@@ -1,6 +1,6 @@
-import { GraphQLError } from "graphql";
 import { prisma } from "@/server/prisma";
 import type { InboxPolicy } from "@agentcenter/database";
+import { badRequest } from "./service-errors";
 
 // Inbox-agent policy service (parity #74). Rules decide, per inbox item kind, whether an agent may
 // auto-handle it, must route it to a human, or should ignore it. resolveInboxAction() is the decision
@@ -12,10 +12,6 @@ const ACTIONS = new Set(["auto_handle", "route_to_human", "ignore"]);
 
 /** Default when no rule matches: humans stay in the loop. */
 export const DEFAULT_INBOX_ACTION = "route_to_human";
-
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 
 /** Create or update an inbox policy rule. */
 export async function setInboxPolicy(input: {

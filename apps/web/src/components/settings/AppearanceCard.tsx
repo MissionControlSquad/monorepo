@@ -42,6 +42,10 @@ export function AppearanceCard() {
           );
         })}
       </div>
+      <p className="text-xs leading-snug text-muted-foreground">
+        Light and Dark set a fixed theme. System follows your device&apos;s appearance setting and
+        switches automatically when it changes.
+      </p>
     </Card>
   );
 }

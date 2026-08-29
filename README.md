@@ -87,8 +87,38 @@ Linux gets a `~/.config/systemd/user` unit driven by `systemctl --user`.
 Wraps `scripts/doctor.mjs`, `scripts/db-backup.mjs`, and `prisma migrate status`. Pass args to the
 underlying script after ` -- ` (e.g. `db:backup -- --out /backups --keep 7`).
 
+## Testing
+
+Three layers, all backed by the repo's real scripts. Full guide: **[docs/TESTING.md](docs/TESTING.md)**.
+
+```bash
+# fast unit tests (no database)
+npm run test:unit:no-db --workspace @agentcenter/web
+
+# unit + integration + API-e2e (needs Postgres + Redis + apps/web/.env.test)
+npm run test --workspace @agentcenter/web
+
+# browser E2E (Playwright)
+npm run e2e:install     # one-time
+npm run e2e
+```
+
+## Deploy
+
+Vercel (managed) or self-hosted Docker. Full checklist — required env vars, migrations, the
+feature-flag rollout plan, smoke tests, and rollback: **[docs/GO-LIVE.md](docs/GO-LIVE.md)**.
+
+```bash
+npm run operator env:check       # validate required env vars
+npm run doctor                   # env + DB connectivity + migration status
+npm run db:backup -- --gzip      # back up before migrating
+npm run db:migrate:deploy        # apply the migration chain
+```
+
 ## Documentation
 
+- [Testing Guide](docs/TESTING.md) — run the suite locally + reproduce CI failures
+- [Go-Live Checklist](docs/GO-LIVE.md) — production env, migrations, flag rollout, smoke tests, rollback
 - [Self-Hosted Setup Guide](apps/web/self-hosted/SETUP.md) — full installation, HTTPS, backups, troubleshooting
 - [Deployment Guide](apps/web/DEPLOYMENT.md) — Vercel deployment with Supabase
 

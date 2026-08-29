@@ -8,16 +8,11 @@
  * Registered in vercel.json as: { "path": "/api/cron/cleanup-live-gateway", "schedule": "0 * * * *" }
  */
 
-import { successResponse, errorResponse } from "../../_lib/json-response";
+import { successResponse } from "../../_lib/json-response";
 import { deleteExpiredNonces, deleteExpiredDeliveries } from "@agentcenter/database";
-import { env } from "@/server/env";
+import { withCronAuth } from "../../_lib/with-cron-auth";
 
-export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return errorResponse("Unauthorized", 401);
-  }
-
+export const GET = withCronAuth(async () => {
   const [noncesDeleted, deliveriesDeleted] = await Promise.all([
     deleteExpiredNonces(),
     deleteExpiredDeliveries(),
@@ -29,4 +24,4 @@ export async function GET(request: Request) {
     deliveriesDeleted,
     at: new Date().toISOString(),
   });
-}
+});

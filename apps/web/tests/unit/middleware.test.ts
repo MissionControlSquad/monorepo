@@ -7,6 +7,13 @@ describe("requiresAdminAuth", () => {
     expect(requiresAdminAuth("/setup")).toBe(false);
   });
 
+  it("returns false for the public buildbase billing surfaces", () => {
+    // Prospective users (no session) must reach the pricing page and the post-checkout return —
+    // gating these to /login would break marketing pricing and 404/deadend a Stripe return.
+    expect(requiresAdminAuth("/pricing")).toBe(false);
+    expect(requiresAdminAuth("/billing")).toBe(false);
+  });
+
   it("returns false for auth API", () => {
     expect(requiresAdminAuth("/api/auth/login")).toBe(false);
     expect(requiresAdminAuth("/api/auth/setup")).toBe(false);

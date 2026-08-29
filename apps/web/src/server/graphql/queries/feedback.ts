@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { listFeedback, feedbackSummary } from "@/server/services/feedback";
 
 // Parity #60: read feedback. FEEDBACK-gated, member+, workspace-scoped.
@@ -15,7 +16,7 @@ builder.queryField("feedback", (t) =>
     },
     resolve: async (_query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.FEEDBACK);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return listFeedback(tenancy.workspaceId, {
         targetType: args.targetType,
         targetId: args.targetId,
@@ -38,7 +39,7 @@ builder.queryField("feedbackSummary", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.FEEDBACK);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return feedbackSummary(tenancy.workspaceId, args.targetType, args.targetId);
     },
   }),

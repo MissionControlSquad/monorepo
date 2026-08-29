@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 /**
  * Epic #20 attention feed — real GraphQL route + Postgres. Computed, read-only, workspace-scoped.
@@ -168,16 +173,12 @@ describe("attention feed (Epic #20)", () => {
 
   it("rejects access when ATTENTION is off", async () => {
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "attention" },
-        create: { key: "attention", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature(FLAG_KEYS.ATTENTION, false);
       invalidateFlagCache();
       const r = await gql(FEED, undefined, await cookieFor(WS_A, "member"));
       expect(r.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "attention" } });
+      resetTestFeature(FLAG_KEYS.ATTENTION);
       invalidateFlagCache();
     }
   });

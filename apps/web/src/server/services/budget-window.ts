@@ -15,11 +15,19 @@ export interface WindowBounds {
 
 /**
  * Compute the [start, end) bounds of the `window` containing `now`, in UTC.
- * - hourly:  top of the hour → next hour
- * - daily:   UTC midnight → next midnight
- * - weekly:  Monday 00:00 UTC → next Monday (ISO week)
- * - monthly: first of month 00:00 UTC → first of next month
+ * - hourly:   top of the hour → next hour
+ * - daily:    UTC midnight → next midnight
+ * - weekly:   Monday 00:00 UTC → next Monday (ISO week)
+ * - monthly:  first of month 00:00 UTC → first of next month
+ * - lifetime: a single perpetual window (epoch → year 9999) so ALL spend accrues to one
+ *             QuotaWindow row and never rolls over. windowStart is a fixed constant, which
+ *             keeps the (policyId, windowStart) upsert-increment key stable forever.
  */
+// A single, never-rolling window for `lifetime` budgets. windowStart must be a fixed instant
+// (it is the upsert key), so it is intentionally not derived from `now`.
+const LIFETIME_START = new Date(Date.UTC(1970, 0, 1));
+const LIFETIME_END = new Date(Date.UTC(9999, 0, 1));
+
 export function windowBounds(window: BudgetWindow, now: Date, _tz = "UTC"): WindowBounds {
   const y = now.getUTCFullYear();
   const mo = now.getUTCMonth();
@@ -48,6 +56,9 @@ export function windowBounds(window: BudgetWindow, now: Date, _tz = "UTC"): Wind
       const start = new Date(Date.UTC(y, mo, 1));
       const end = new Date(Date.UTC(y, mo + 1, 1));
       return { windowStart: start, windowEnd: end };
+    }
+    case "lifetime": {
+      return { windowStart: LIFETIME_START, windowEnd: LIFETIME_END };
     }
     default: {
       // Exhaustiveness guard — a new BudgetWindow value must be handled explicitly.

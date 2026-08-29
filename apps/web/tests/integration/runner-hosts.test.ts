@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 // Real SSH is mocked; the host row + credential decryption run for real (no SSH_KEY_ENCRYPTION_SECRET
 // in test env → raw key path). Covers the "host" RunnerCommand target end-to-end + the security
@@ -42,11 +47,7 @@ async function gql(
 }
 
 async function enableRunners() {
-  await prisma.featureFlag.upsert({
-    where: { key: "runners" },
-    create: { key: "runners", enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature(FLAG_KEYS.RUNNERS, true);
   invalidateFlagCache();
 }
 
@@ -56,7 +57,7 @@ beforeAll(() => {
 beforeEach(async () => {
   mockedSshExec.mockReset();
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE runner_hosts, runner_commands CASCADE`);
-  await prisma.featureFlag.deleteMany({ where: { key: "runners" } });
+  resetTestFeature(FLAG_KEYS.RUNNERS);
   invalidateFlagCache();
 });
 
@@ -133,11 +134,7 @@ describe("runner-hosts GraphQL (Tier D)", () => {
     expect(denied.errors).toBeDefined();
 
     // gate off
-    await prisma.featureFlag.upsert({
-      where: { key: "runners" },
-      create: { key: "runners", enabled: false, managedBy: "user" },
-      update: { enabled: false },
-    });
+    setTestFeature(FLAG_KEYS.RUNNERS, false);
     invalidateFlagCache();
     const gated = await gql(`query{ runnerHosts{ id } }`);
     expect(gated.errors).toBeDefined();

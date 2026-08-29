@@ -28,13 +28,12 @@ import {
 } from "./sandbox-providers";
 import { resolveWorkspaceSecret } from "./secrets";
 import { sshTestConnection } from "./ssh";
+import type { EnvSshResolution } from "./sandbox/ssh-runtime";
+import { badRequest } from "./service-errors";
 
 export const ENVIRONMENT_DRIVERS = ["local", "ssh", "sandbox", "plugin"] as const;
 export type EnvironmentDriver = (typeof ENVIRONMENT_DRIVERS)[number];
 
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
 function notFound(): never {
   throw new GraphQLError("Environment not found", { extensions: { code: "NOT_FOUND" } });
 }
@@ -401,19 +400,26 @@ export async function probeEnvironment(workspaceId: string, id: string): Promise
 export interface EnvExecutionResolution {
   environmentId: string;
   driver: string; // local | ssh | sandbox | plugin
-  /** Sandbox provider key for local/sandbox drivers; null for drivers not yet runnable via the seam. */
+  /**
+   * Execution key for the run: the sandbox provider key for local/sandbox, the synthetic "ssh" key for
+   * an ssh transport, or null for drivers not runnable via this seam (plugin). Used for the AgentRun
+   * ledger + the execution allowlist.
+   */
   providerKey: string | null;
   /** Instance-scoped env vars merged into the run env (non-secret bag). */
   envVars: Record<string, string>;
   /** Lease policy from env metadata: ephemeral (default) | reuse_by_environment | retain_on_failure. */
   leasePolicy: string;
+  /** ssh transport descriptor (host/port/username + key ref) — present only for the `ssh` driver. */
+  ssh?: EnvSshResolution;
 }
 
 /**
- * Resolve an agent's bound Environment into a concrete execution target for the sandbox seam. Maps
- * `local`→the local provider and `sandbox`→its configured provider; `ssh`/`plugin` resolve to a null
- * provider (not yet runnable via this seam — they need Plan 6 transport). Returns null if the agent has
- * no active environment. Archived environments are ignored (fall back to the agent's ad-hoc provider).
+ * Resolve an agent's bound Environment into a concrete execution target for the run seam. Maps
+ * `local`→the local provider, `sandbox`→its configured provider, and `ssh`→a real remote transport (the
+ * unified environment driver routes it through the ssh runtime). `plugin` resolves to a null provider
+ * (not yet runnable via this seam). Returns null if the agent has no active environment. Archived
+ * environments are ignored (fall back to the agent's ad-hoc provider).
  */
 export async function resolveEnvironmentExecution(
   workspaceId: string,
@@ -434,6 +440,21 @@ export async function resolveEnvironmentExecution(
   }
   if (env.driver === "local") {
     return { ...base, driver: "local", providerKey: "local" };
+  }
+  if (env.driver === "ssh") {
+    // Carry the NON-secret ssh transport descriptor; the private key is resolved from the vault only at
+    // provision/gate time. providerKey "ssh" makes it a real (allowlist-checkable) execution target.
+    return {
+      ...base,
+      driver: "ssh",
+      providerKey: "ssh",
+      ssh: {
+        host: String(cfg.host ?? ""),
+        port: typeof cfg.port === "number" ? cfg.port : 22,
+        username: typeof cfg.username === "string" ? cfg.username : "root",
+        privateKey: cfg.privateKey as EnvSshResolution["privateKey"],
+      },
+    };
   }
   return { ...base, driver: env.driver, providerKey: null };
 }

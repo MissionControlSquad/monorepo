@@ -55,7 +55,8 @@ model ExecutionWorkspace {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  operations WorkspaceOperation[]
+  operations      WorkspaceOperation[]
+  runtimeServices WorkspaceRuntimeService[]
 
   @@index([workspaceId, projectId, status])
   @@index([runId])

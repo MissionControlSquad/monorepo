@@ -69,6 +69,7 @@ function runLocal(
   cwd: string,
   timeoutMs?: number,
   onLog?: (chunk: { stream: "stdout" | "stderr"; data: string }) => void,
+  signal?: AbortSignal,
 ): Promise<SandboxExecResult> {
   return new Promise((resolve) => {
     // `detached` puts the command in its own process group so a timeout can kill the WHOLE tree
@@ -80,6 +81,7 @@ function runLocal(
     let outDropped = 0;
     let errDropped = 0;
     let timedOut = false;
+    let aborted = false;
     const killTree = (sig: NodeJS.Signals) => {
       try {
         if (child.pid) process.kill(-child.pid, sig); // negative pid → the process group
@@ -93,6 +95,17 @@ function runLocal(
           killTree("SIGKILL");
         }, timeoutMs)
       : undefined;
+    // In-flight cancellation (§3 #2): abort SIGKILLs the whole process tree so a RUNNING run is
+    // actually terminated. `aborted` is surfaced on the result so the run finalizer marks it canceled
+    // (distinct from a timeout kill). If the signal already aborted, kill immediately.
+    const onAbort = () => {
+      aborted = true;
+      killTree("SIGKILL");
+    };
+    if (signal) {
+      if (signal.aborted) queueMicrotask(onAbort);
+      else signal.addEventListener("abort", onAbort, { once: true });
+    }
     child.stdout?.on("data", (d: Buffer) => {
       const s = d.toString();
       if (stdout.length < MAX_CAPTURE_BYTES) stdout += s;
@@ -107,22 +120,30 @@ function runLocal(
     });
     const cap = (s: string, dropped: number) =>
       dropped > 0 ? `${s}\n…[truncated ${dropped} bytes]` : s;
-    child.on("error", (err) => {
+    const cleanup = () => {
       if (timer) clearTimeout(timer);
+      if (signal) signal.removeEventListener("abort", onAbort);
+    };
+    child.on("error", (err) => {
+      cleanup();
       resolve({
         exitCode: null,
         stdout: cap(stdout, outDropped),
         stderr: cap(stderr, errDropped) + String(err),
+        aborted,
       });
     });
-    child.on("close", (code, signal) => {
-      if (timer) clearTimeout(timer);
+    child.on("close", (code, procSignal) => {
+      cleanup();
       resolve({
         exitCode: code,
         stdout: cap(stdout, outDropped),
-        stderr: cap(stderr, errDropped) + (timedOut ? "\n…[killed: exceeded timeout]" : ""),
+        stderr:
+          cap(stderr, errDropped) +
+          (aborted ? "\n…[killed: run canceled]" : timedOut ? "\n…[killed: exceeded timeout]" : ""),
         timedOut,
-        signal: signal ?? null,
+        aborted,
+        signal: procSignal ?? null,
       });
     });
   });
@@ -133,7 +154,8 @@ function localHandle(dir: string): SandboxHandle {
   return {
     id: dir,
     providerKey: "local",
-    exec: (command, opts) => runLocal(command, opts?.cwd ?? dir, opts?.timeoutMs, opts?.onLog),
+    exec: (command, opts) =>
+      runLocal(command, opts?.cwd ?? dir, opts?.timeoutMs, opts?.onLog, opts?.signal),
     destroy: async () => {
       rmSync(dir, { recursive: true, force: true });
     },

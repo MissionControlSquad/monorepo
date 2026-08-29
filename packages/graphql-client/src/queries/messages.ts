@@ -7,7 +7,21 @@ const MESSAGE_FIELDS = `
   fromProfileId
   content
   projectId
+  presentation
+  annotationCommentId
   createdAt
+  annotationComment {
+    id
+    threadId
+    thread {
+      id
+      documentId
+      quote
+      startOffset
+      endOffset
+      status
+    }
+  }
   fromProfile {
     ${PROFILE_FIELDS}
   }

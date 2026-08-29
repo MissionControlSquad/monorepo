@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import {
   financeSummary,
   financeByBiller,
@@ -41,7 +42,7 @@ builder.queryField("financeEventSummary", (t) =>
     args: { since: t.arg({ type: "DateTime" }), until: t.arg({ type: "DateTime" }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return financeSummary({ workspaceId: tenancy.workspaceId, ...range(args.since, args.until) });
     },
   }),
@@ -53,7 +54,7 @@ builder.queryField("financeEventsByBiller", (t) =>
     args: { since: t.arg({ type: "DateTime" }), until: t.arg({ type: "DateTime" }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return financeByBiller({
         workspaceId: tenancy.workspaceId,
         ...range(args.since, args.until),
@@ -68,7 +69,7 @@ builder.queryField("financeEventsByKind", (t) =>
     args: { since: t.arg({ type: "DateTime" }), until: t.arg({ type: "DateTime" }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return financeByKind({ workspaceId: tenancy.workspaceId, ...range(args.since, args.until) });
     },
   }),
@@ -80,7 +81,7 @@ builder.queryField("financeEvents", (t) =>
     args: { limit: t.arg.int() },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.BUDGETS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       // The service caps + orders; prismaField selection is merged for field resolution.
       const rows = await listFinanceEvents({ workspaceId: tenancy.workspaceId }, args.limit ?? 50);
       return ctx.prisma.financeEvent.findMany({

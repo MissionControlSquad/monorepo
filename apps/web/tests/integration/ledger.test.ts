@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 /**
  * Epic #16 business ledger — real GraphQL route (schema + resolvers + Postgres), human auth via a
@@ -323,17 +328,13 @@ describe("feature gate (Epic #16)", () => {
   it("rejects when LEDGER is off", async () => {
     const admin = await cookieFor(WS_A, "admin");
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "ledger" },
-        create: { key: "ledger", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature(FLAG_KEYS.LEDGER, false);
       invalidateFlagCache();
       const r = await gql(`query{ ledgerSummary{ netCents } }`, undefined, admin);
       expect(r.errors).toBeDefined();
       expect(r.data?.ledgerSummary).toBeFalsy();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "ledger" } });
+      resetTestFeature(FLAG_KEYS.LEDGER);
       invalidateFlagCache();
     }
   });

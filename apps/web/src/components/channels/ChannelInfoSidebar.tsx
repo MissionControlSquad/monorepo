@@ -22,6 +22,7 @@ import { Hash, Lock, Loader2, LogOut, UserPlus, Users, X, Trash2 } from "lucide-
 import { toast } from "sonner";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
 import { ProfilePickerDialog } from "../ui/ProfilePickerDialog";
+import { WhenAdmin } from "@/components/auth/WhenAdmin";
 import type { ProfilePickerItem } from "../ui/ProfilePickerDialog";
 
 interface Member {
@@ -107,8 +108,7 @@ export function ChannelInfoSidebar({
               .filter(Boolean)
               .join(" · ") || null,
           kind: (p.kind === ProfileKind.AGENT ? ProfileKind.AGENT : ProfileKind.HUMAN) as
-            | ProfileKindValue
-            | undefined,
+            ProfileKindValue | undefined,
           profileId: p.id,
         }),
       ),
@@ -325,46 +325,49 @@ export function ChannelInfoSidebar({
           </div>
         )}
 
-        {isCreator && channel.visibility !== ChannelVisibility.DM && (
-          <div className="pt-2 border-t border-border">
-            {!deleteChannelConfirm ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full text-destructive border-destructive/30 hover:bg-destructive-muted"
-                onClick={() => setDeleteChannelConfirm(true)}
-              >
-                <Trash2 className="w-4 h-4" />
-                <span className="ml-2">Delete channel</span>
-              </Button>
-            ) : (
-              <div className="space-y-2 p-2 bg-muted rounded-lg border border-border">
-                <p className="text-xs text-muted-foreground">
-                  Permanently delete this channel and all messages? This cannot be undone.
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => setDeleteChannelConfirm(false)}
-                    disabled={isDeletingChannel}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="flex-1 bg-destructive hover:bg-destructive"
-                    onClick={handleDeleteChannel}
-                    disabled={isDeletingChannel}
-                  >
-                    {isDeletingChannel ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
-                  </Button>
+        {/* Delete channel — destructive manage action (admin/owner). Members use "Leave channel". */}
+        <WhenAdmin>
+          {isCreator && channel.visibility !== ChannelVisibility.DM && (
+            <div className="pt-2 border-t border-border">
+              {!deleteChannelConfirm ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full text-destructive border-destructive/30 hover:bg-destructive-muted"
+                  onClick={() => setDeleteChannelConfirm(true)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="ml-2">Delete channel</span>
+                </Button>
+              ) : (
+                <div className="space-y-2 p-2 bg-muted rounded-lg border border-border">
+                  <p className="text-xs text-muted-foreground">
+                    Permanently delete this channel and all messages? This cannot be undone.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setDeleteChannelConfirm(false)}
+                      disabled={isDeletingChannel}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1 bg-destructive hover:bg-destructive"
+                      onClick={handleDeleteChannel}
+                      disabled={isDeletingChannel}
+                    >
+                      {isDeletingChannel ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
+        </WhenAdmin>
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ import { z } from "zod";
  * during `next build` (where runtime secrets aren't available).
  */
 
-const serverSchema = z.object({
+export const serverSchema = z.object({
   // ── Database ─────────────────────────────────────────────
   POSTGRES_PRISMA_URL: z.string().min(1, "Pooled Postgres connection string is required"),
   POSTGRES_URL_NON_POOLING: z.string().min(1, "Direct Postgres connection string is required"),
@@ -20,6 +20,11 @@ const serverSchema = z.object({
     .refine((s) => s !== "mc-dev-secret-change-in-production", {
       message: "AUTH_SECRET must not be the default dev value in production",
     }),
+  // Optional. When set (e.g. ".agentcenter.cloud" in prod), the mc_session cookie is issued with
+  // Domain=<value> so it is shared across subdomains — enabling cross-subdomain buildbase SSO from
+  // the landing site to a tenant dashboard subdomain. Leave UNSET for local dev + self-host (default
+  // host-only cookie, no behavior change). See apps/web/src/server/admin-auth.ts getSessionCookieOptions.
+  AUTH_COOKIE_DOMAIN: z.string().optional(),
 
   // ── Cloudflare R2 Storage (optional — only needed for file deliverables) ──
   R2_ACCOUNT_ID: z.string().optional(),
@@ -78,6 +83,42 @@ const serverSchema = z.object({
     .union([z.string().url(), z.literal("")])
     .optional()
     .transform((v) => v || undefined),
+
+  // ── buildbase human-tenancy (all OPTIONAL) ──────────────
+  // The app runs fully self-hosted on its own admin auth when these are absent — buildbase stays
+  // DORMANT (SaaSOSProvider renders children without the SDK, hooks no-op). Setting SAAS_ORG_ID /
+  // NEXT_PUBLIC_SAAS_ORG_ID (a 24-char hex org id) is what activates the human-tenancy plane:
+  // sign-in, workspaces, human roles, billing/quota, and the Account & security surfaces.
+  // Read ad-hoc in server/tenancy/buildbase.ts + BuildbaseProvider; declared here so the schema is
+  // the single source of truth. NONE are required — do not add .min()/required to any of them, or
+  // the existing no-buildbase deploy would break.
+  SAAS_SERVER_URL: z
+    .union([z.string().url(), z.literal("")])
+    .optional()
+    .transform((v) => v || undefined),
+  SAAS_ORG_ID: z.string().optional(),
+  SAAS_CLIENT_ID: z.string().optional(),
+  SAAS_CLIENT_SECRET: z.string().optional(),
+  NEXT_PUBLIC_SAAS_SERVER_URL: z
+    .union([z.string().url(), z.literal("")])
+    .optional()
+    .transform((v) => v || undefined),
+  NEXT_PUBLIC_SAAS_ORG_ID: z.string().optional(),
+  NEXT_PUBLIC_SAAS_CLIENT_ID: z.string().optional(),
+  // SDK i18n locale for the SaaSOSProvider (BuildbaseProvider). Falls back to browser/`en` when unset.
+  NEXT_PUBLIC_SAAS_LOCALE: z.string().optional(),
+  // Public pricing page (PricingView): plan-group slug + display currency. Default to buildbase's
+  // canonical "main-pricing" / "usd" when unset.
+  NEXT_PUBLIC_SAAS_PRICING_SLUG: z.string().optional(),
+  NEXT_PUBLIC_SAAS_PRICING_CURRENCY: z.string().optional(),
+  NEXT_PUBLIC_APP_URL: z
+    .union([z.string().url(), z.literal("")])
+    .optional()
+    .transform((v) => v || undefined),
+  // Shared secret the in-sandbox MCP bridge uses to authenticate callbacks into buildbase surfaces.
+  BUILDBASE_MCP_SECRET: z.string().optional(),
+  // Service session id for background (non-request) buildbase calls where no user cookie exists.
+  BUILDBASE_SERVICE_SESSION_ID: z.string().optional(),
 
   // ── Optional ─────────────────────────────────────────────
   NEXT_PUBLIC_MC_URL: z

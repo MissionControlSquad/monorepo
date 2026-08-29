@@ -1,18 +1,13 @@
-import { successResponse, errorResponse } from "../../_lib/json-response";
+import { successResponse } from "../../_lib/json-response";
 import { findStaleAgents, isAgentStill } from "@agentcenter/database";
-import { env } from "@/server/env";
+import { withCronAuth } from "../../_lib/with-cron-auth";
 import { applyAgentStatusUpdate } from "@/server/agent-status";
 import { AgentStatus } from "@/server/constants";
 
 // 5 minutes — heartbeat timeout threshold
 const HEARTBEAT_TIMEOUT_MS = 5 * 60 * 1000;
 
-export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return errorResponse("Unauthorized", 401);
-  }
-
+export const GET = withCronAuth(async () => {
   const staleAgents = await findStaleAgents(HEARTBEAT_TIMEOUT_MS);
 
   let sleptCount = 0;
@@ -36,4 +31,4 @@ export async function GET(request: Request) {
     checked: staleAgents.length,
     slept: sleptCount,
   });
-}
+});

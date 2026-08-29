@@ -3,6 +3,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { cancelRunnerCommand, createRunnerCommand } from "@/server/services/runner-commands";
 
 // Tier D: runner command writes. RUNNERS-gated, admin manages (arbitrary shell execution).
@@ -21,7 +22,7 @@ builder.mutationField("queueAgentCommand", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       // The target agent must belong to this workspace (no dangling cross-workspace command).
       const agent = await ctx.prisma.agent.findFirst({
         where: { id: args.agentId, workspaceId: tenancy.workspaceId },
@@ -48,7 +49,7 @@ builder.mutationField("cancelRunnerCommand", (t) =>
     args: { id: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "admin");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.ADMIN);
       return cancelRunnerCommand(tenancy.workspaceId, args.id);
     },
   }),

@@ -17,7 +17,12 @@ import type {
   SandboxSpec,
 } from "./sandbox/types";
 import { getSandboxProvider } from "./sandbox-providers";
-import { resolveWorkspaceSecret } from "./secrets";
+import {
+  resolveWorkspaceSecret,
+  resolveAgentSecretVersionRefs,
+  resolveNamedSecretVersionRefs,
+} from "./secrets";
+import { collectSecretRefs, fingerprintSecretVersions } from "@agentcenter/utils";
 
 export const LEASE_POLICIES = ["ephemeral", "reuse_by_environment", "retain_on_failure"] as const;
 export type LeasePolicy = (typeof LEASE_POLICIES)[number];
@@ -37,13 +42,57 @@ export interface AcquiredLease {
   handle: SandboxHandle;
   /** The persisted lease row, or null for an ad-hoc (no-environment) ephemeral run. */
   lease: EnvironmentLease | null;
+  /**
+   * true when a reusable machine was NOT re-attached because its secret-version fingerprint no longer
+   * matched (a secret was rotated) — a fresh machine was provisioned with the current credentials
+   * instead. Surfaced so the run UI can explain why a "reuse_by_environment" run booted fresh.
+   */
+  freshDueToSecretRotation?: boolean;
 }
 
-/** Atomically claim a released, reusable lease for this environment (compare-and-set on status). */
+/**
+ * Compute the secret-version fingerprint a lease for this run depends on (security hardening — Item 1).
+ * Pure hash (via {@link fingerprintSecretVersions}) over the resolved versions of:
+ *   • the environment's config + envVars secret-refs (`{secretRef:{name}}` pointers), and
+ *   • the agent's secret bindings (agent- + adapter-scoped).
+ * A rotation bumps the depended-on secret's version → the fingerprint changes → a reusable lease keyed
+ * on the OLD fingerprint is not re-attached. Exported for unit testing (two computes across a rotation).
+ */
+export async function computeLeaseSecretFingerprint(opts: {
+  workspaceId: string;
+  environmentId: string | null;
+  agentId?: string | null;
+}): Promise<string> {
+  const refs: { key: string; version: number }[] = [];
+
+  if (opts.environmentId) {
+    const env = await prisma.environment.findFirst({
+      where: { id: opts.environmentId, workspaceId: opts.workspaceId },
+      select: { config: true, envVars: true },
+    });
+    if (env) {
+      const names = new Set<string>();
+      collectSecretRefs(env.config, names);
+      collectSecretRefs(env.envVars, names);
+      refs.push(...(await resolveNamedSecretVersionRefs(opts.workspaceId, [...names])));
+    }
+  }
+  if (opts.agentId) {
+    refs.push(...(await resolveAgentSecretVersionRefs(opts.workspaceId, opts.agentId)));
+  }
+  return fingerprintSecretVersions(refs);
+}
+
+/**
+ * Atomically claim a released, reusable lease for this environment (compare-and-set on status). Only a
+ * lease whose stored `secretFingerprint` MATCHES this run's is eligible — a rotated secret changes the
+ * fingerprint so a machine holding stale credentials is skipped (a fresh one is provisioned instead).
+ */
 async function claimReusableLease(
   workspaceId: string,
   environmentId: string,
   runId: string | null,
+  secretFingerprint: string,
 ): Promise<EnvironmentLease | null> {
   const candidate = await prisma.environmentLease.findFirst({
     where: {
@@ -52,6 +101,8 @@ async function claimReusableLease(
       status: "released",
       leasePolicy: "reuse_by_environment",
       providerLeaseId: { not: null },
+      // Secret-version fingerprint gate: never re-attach a machine provisioned with rotated-out creds.
+      secretFingerprint,
     },
     orderBy: { lastUsedAt: "desc" },
   });
@@ -80,14 +131,30 @@ export async function acquireLease(opts: {
   runId?: string | null;
   /** Provision spec — e.g. a custom-image ref to boot a fresh box from (Plan 5). */
   spec?: SandboxSpec;
+  /**
+   * Secret-version fingerprint (security hardening — Item 1) over the secrets this run depends on. Reuse
+   * is gated on an exact match; a rotated secret changes it → a stale-credential machine is not reused.
+   * When omitted, computed here from {workspaceId, environmentId} (env secret-refs only). Callers with an
+   * agent should pass the full fingerprint (env + agent bindings) via computeLeaseSecretFingerprint.
+   */
+  secretFingerprint?: string;
 }): Promise<AcquiredLease> {
   const { workspaceId, environmentId, provider, ctx, policy, taskId, runId, spec } = opts;
   if (!environmentId) {
     return { handle: await provider.provision(ctx, spec), lease: null };
   }
 
+  const secretFingerprint =
+    opts.secretFingerprint ?? (await computeLeaseSecretFingerprint({ workspaceId, environmentId }));
+
+  let freshDueToSecretRotation = false;
   if (policy === "reuse_by_environment" && provider.resume) {
-    const claimed = await claimReusableLease(workspaceId, environmentId, runId ?? null);
+    const claimed = await claimReusableLease(
+      workspaceId,
+      environmentId,
+      runId ?? null,
+      secretFingerprint,
+    );
     if (claimed?.providerLeaseId) {
       try {
         const handle = await provider.resume(claimed.providerLeaseId, ctx);
@@ -99,6 +166,19 @@ export async function acquireLease(opts: {
           data: { status: "expired", cleanupStatus: "success", releasedAt: new Date() },
         });
       }
+    } else {
+      // A reusable machine EXISTS for this env but its fingerprint didn't match (a secret was rotated),
+      // so we're about to provision fresh instead of reusing. Flag it for the run UI.
+      const staleExists = await prisma.environmentLease.count({
+        where: {
+          workspaceId,
+          environmentId,
+          status: "released",
+          leasePolicy: "reuse_by_environment",
+          providerLeaseId: { not: null },
+        },
+      });
+      if (staleExists > 0) freshDueToSecretRotation = true;
     }
   }
 
@@ -113,9 +193,10 @@ export async function acquireLease(opts: {
       leasePolicy: policy,
       taskId: taskId ?? null,
       runId: runId ?? null,
+      secretFingerprint,
     },
   });
-  return { handle, lease };
+  return { handle, lease, freshDueToSecretRotation };
 }
 
 /**

@@ -1,0 +1,49 @@
+# AgentCenter — Untrusted-PR-Review Isolation Profile (security hardening — Item 3)
+#
+# When a run's SOURCE trust is UNTRUSTED (an inbound PR from outside the trust boundary), the control
+# plane routes its checkout/review to THIS isolated container profile instead of the normal execution
+# path (see resolveReviewCheckoutRouting in @agentcenter/utils and run-review.ts). A hostile PR must
+# never be checked out where it can reach the control plane, the shared network, or sibling runs'
+# credentials — so this profile is deliberately hardened:
+#   • network_mode: none        — NO network at all (can't exfiltrate secrets or phone home)
+#   • read_only root + tmpfs    — no persistence outside the throwaway workspace
+#   • cap_drop ALL + no-new-privileges — minimal kernel surface
+#   • no secrets injected       — the review only needs the checked-out tree, never live credentials
+#   • pids/mem limits           — bounded blast radius
+#
+# This file is the documented SEAM. The control-plane DECISION (trust → isolated) and its recording on
+# the run's sourceTrust marker (`reviewIsolated` / `reviewProfile`) are wired in the app; an operator
+# running self-hosted enables this container by starting compose with the `review-checkout` profile:
+#
+#     docker compose -f docker-compose.yml -f docker-compose.review-checkout.yml \
+#       --profile review-checkout run --rm review-checkout /workspace/review.sh <pr-ref>
+#
+# The image is BYO (bring-your-own review runner); default is a minimal, pinned base with git.
+
+services:
+  # ── Isolated review-checkout runner ──────────────────────────────
+  review-checkout:
+    # Only started when the `review-checkout` compose profile is active (never up by default).
+    profiles:
+      - review-checkout
+    image: ${REVIEW_CHECKOUT_IMAGE:-alpine/git:latest}
+    # Hostile code gets NO network — cannot exfiltrate injected data or reach internal services.
+    network_mode: none
+    working_dir: /workspace
+    # Throwaway workspace only; nothing survives the run.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /workspace
+    environment:
+      # Explicitly NO credentials: the review path receives only the checkout ref, never live secrets.
+      - REVIEW_PR_REF=${REVIEW_PR_REF:-}
+      - REVIEW_REPO_URL=${REVIEW_REPO_URL:-}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    mem_limit: 512m
+    # Default to a no-op so an accidental `up` without a command does nothing harmful.
+    command: ["sh", "-c", "echo 'isolated review-checkout profile — supply a review command'"]

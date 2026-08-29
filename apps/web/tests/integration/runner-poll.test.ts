@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
 import { agentCache } from "../../src/server/cache";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { GET as GET_COMMANDS } from "../../app/api/runner/commands/route";
 import { POST as POST_RESULT } from "../../app/api/runner/commands/[id]/result/route";
 import { createRunnerCommand } from "../../src/server/services/runner-commands";
@@ -28,7 +33,9 @@ async function makeAgent(key: string, workspaceId = WS): Promise<string> {
 
 function getCommands(key: string, limit?: number) {
   const url = `http://test/api/runner/commands${limit ? `?limit=${limit}` : ""}`;
-  return GET_COMMANDS(new Request(url, { headers: { Authorization: `Bearer ${key}` } }));
+  return GET_COMMANDS(new Request(url, { headers: { Authorization: `Bearer ${key}` } }), {
+    params: Promise.resolve({}),
+  });
 }
 
 function postResult(key: string, id: string, body: unknown) {
@@ -43,11 +50,7 @@ function postResult(key: string, id: string, body: unknown) {
 }
 
 async function enableRunners() {
-  await prisma.featureFlag.upsert({
-    where: { key: "runners" },
-    create: { key: "runners", enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature(FLAG_KEYS.RUNNERS, true);
   invalidateFlagCache();
 }
 
@@ -57,7 +60,7 @@ beforeAll(() => {
 beforeEach(async () => {
   agentCache.clear();
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE runner_commands, agents CASCADE`);
-  await prisma.featureFlag.deleteMany({ where: { key: "runners" } });
+  resetTestFeature(FLAG_KEYS.RUNNERS);
   invalidateFlagCache();
   await enableRunners();
   agentId = await makeAgent(KEY);
@@ -152,16 +155,14 @@ describe("runner poll endpoints (Tier D Slice 2)", () => {
   });
 
   it("rejects an unauthenticated poll", async () => {
-    const res = await GET_COMMANDS(new Request("http://test/api/runner/commands"));
+    const res = await GET_COMMANDS(new Request("http://test/api/runner/commands"), {
+      params: Promise.resolve({}),
+    });
     expect(res.status).toBe(401);
   });
 
   it("is feature-gated", async () => {
-    await prisma.featureFlag.upsert({
-      where: { key: "runners" },
-      create: { key: "runners", enabled: false, managedBy: "user" },
-      update: { enabled: false },
-    });
+    setTestFeature(FLAG_KEYS.RUNNERS, false);
     invalidateFlagCache();
     const res = await getCommands(KEY);
     expect(res.status).toBe(403);

@@ -17,11 +17,13 @@ import { emit } from "@/server/events";
 import { applyAgentStatusUpdate } from "@/server/agent-status";
 import { AUTO_PAUSE_MESSAGE } from "./budget-enforcement";
 import { windowBounds } from "./budget-window";
+import { badRequest } from "./service-errors";
 
 export interface CreateBudgetPolicyInput {
   workspaceId: string;
   scope: BudgetScope;
   agentId?: string | null;
+  projectId?: string | null;
   name: string;
   limitCents: number;
   window: BudgetWindow;
@@ -39,16 +41,26 @@ export interface UpdateBudgetPolicyInput {
   isActive?: boolean | null;
 }
 
-function badRequest(message: string): never {
-  throw new GraphQLError(message, { extensions: { code: "BAD_USER_INPUT" } });
-}
-
 export async function createBudgetPolicy(input: CreateBudgetPolicyInput): Promise<BudgetPolicy> {
   if (input.scope === "agent" && !input.agentId) {
     badRequest("agentId is required when scope is 'agent'");
   }
-  if (input.scope === "workspace" && input.agentId) {
-    badRequest("agentId must be omitted when scope is 'workspace'");
+  if (input.scope === "project" && !input.projectId) {
+    badRequest("projectId is required when scope is 'project'");
+  }
+  if (input.scope !== "agent" && input.agentId) {
+    badRequest("agentId must be omitted unless scope is 'agent'");
+  }
+  if (input.scope !== "project" && input.projectId) {
+    badRequest("projectId must be omitted unless scope is 'project'");
+  }
+  // A project-scoped budget must reference a project in the caller's workspace (D5 boundary).
+  if (input.scope === "project" && input.projectId) {
+    const project = await prisma.project.findFirst({
+      where: { id: input.projectId, workspaceId: input.workspaceId },
+      select: { id: true },
+    });
+    if (!project) badRequest("project not found in this workspace");
   }
   if (!Number.isInteger(input.limitCents) || input.limitCents <= 0) {
     badRequest("limitCents must be a positive integer");
@@ -62,6 +74,7 @@ export async function createBudgetPolicy(input: CreateBudgetPolicyInput): Promis
       workspaceId: input.workspaceId,
       scope: input.scope,
       agentId: input.scope === "agent" ? input.agentId : null,
+      projectId: input.scope === "project" ? input.projectId : null,
       name: input.name,
       limitCents: input.limitCents,
       window: input.window,
@@ -203,6 +216,7 @@ export async function resolveBudgetIncident(args: {
 async function budgetPausedAgentIds(policy: {
   scope: string;
   agentId: string | null;
+  projectId: string | null;
   workspaceId: string;
 }): Promise<string[]> {
   if (policy.scope === "agent") {
@@ -212,6 +226,29 @@ async function budgetPausedAgentIds(policy: {
       select: { id: true },
     });
     return a ? [a.id] : [];
+  }
+  if (policy.scope === "project") {
+    if (!policy.projectId) return [];
+    const members = await prisma.projectMember.findMany({
+      where: {
+        projectId: policy.projectId,
+        status: "active",
+        profile: { kind: "agent", agentId: { not: null } },
+      },
+      select: { profile: { select: { agentId: true } } },
+    });
+    const ids = members.map((m) => m.profile?.agentId).filter((id): id is string => Boolean(id));
+    if (ids.length === 0) return [];
+    const agents = await prisma.agent.findMany({
+      where: {
+        id: { in: ids },
+        workspaceId: policy.workspaceId,
+        status: "blocked",
+        statusMessage: AUTO_PAUSE_MESSAGE,
+      },
+      select: { id: true },
+    });
+    return agents.map((x) => x.id);
   }
   const agents = await prisma.agent.findMany({
     where: {

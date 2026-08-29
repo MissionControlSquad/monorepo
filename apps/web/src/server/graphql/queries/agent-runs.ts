@@ -2,6 +2,7 @@ import { builder } from "../builder";
 import { requireFeature } from "../require-feature";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { requireRole } from "@/server/tenancy";
+import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
 import { getRunRuntimeStatus } from "@/server/services/run-runtime-status";
 import { readRunLog } from "@/server/services/run-log-store";
 
@@ -16,7 +17,7 @@ builder.queryField("agentRuns", (t) =>
     },
     resolve: async (query, _root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       return ctx.prisma.agentRun.findMany({
         ...query,
         where: {
@@ -48,7 +49,7 @@ builder.queryField("agentRunLiveStatus", (t) =>
     args: { runId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const run = await ctx.prisma.agentRun.findFirst({
         where: { id: args.runId, workspaceId: tenancy.workspaceId },
         select: { id: true },
@@ -85,7 +86,7 @@ builder.queryField("runLog", (t) =>
     },
     resolve: async (_root, args, ctx) => {
       await requireFeature(FLAG_KEYS.RUNNERS);
-      const tenancy = requireRole(ctx, "member");
+      const tenancy = requireRole(ctx, WORKSPACE_ROLES.MEMBER);
       const run = await ctx.prisma.agentRun.findFirst({
         where: { id: args.runId, workspaceId: tenancy.workspaceId },
         select: { id: true },

@@ -68,11 +68,17 @@ export async function revokeAllSessions(adminUserId: string): Promise<void> {
 }
 
 export function getSessionCookieOptions() {
+  // AUTH_COOKIE_DOMAIN (optional) scopes the cookie to a parent domain (e.g. ".agentcenter.cloud")
+  // so mc_session is shared across subdomains — required for cross-subdomain buildbase SSO from the
+  // landing site to a tenant dashboard subdomain. Unset (default) → host-only cookie: local dev and
+  // self-host are unchanged. Only shared across subdomains of ONE registrable domain (see PR notes).
+  const domain = env.AUTH_COOKIE_DOMAIN?.trim() || undefined;
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
     path: "/",
     maxAge: SESSION_DURATION,
+    ...(domain ? { domain } : {}),
   };
 }

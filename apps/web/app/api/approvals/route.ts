@@ -1,7 +1,6 @@
-import { resolveAgent } from "../_lib/resolve-agent";
-import { successResponse, errorResponse, handleError } from "../_lib/json-response";
+import { withAgent } from "../_lib/with-agent";
+import { successResponse, errorResponse } from "../_lib/json-response";
 import { prisma } from "@/server/prisma";
-import { isFeatureEnabled } from "@/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { DEFAULT_WORKSPACE_ID } from "@/server/tenancy";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
@@ -11,11 +10,8 @@ import type { ApprovalStatus, ApprovalSubjectType } from "@agentcenter/database"
 const SUBJECT_TYPES: ApprovalSubjectType[] = ["task", "deliverable", "hire_agent"];
 
 // Epic #3: agent-facing approvals (create/list). Scoped to the resolving agent's workspace.
-export async function GET(request: Request) {
-  try {
-    if (!(await isFeatureEnabled(FLAG_KEYS.GOVERNANCE)))
-      return errorResponse("Governance is not enabled", 403, "FEATURE_DISABLED");
-    const agent = await resolveAgent(request);
+export const GET = withAgent(
+  async (request, agent) => {
     const workspaceId = agent.workspaceId ?? DEFAULT_WORKSPACE_ID;
     const status = new URL(request.url).searchParams.get("status") as ApprovalStatus | null;
     const approvals = await prisma.approval.findMany({
@@ -24,16 +20,12 @@ export async function GET(request: Request) {
       take: 100,
     });
     return successResponse({ approvals });
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  { feature: { flag: FLAG_KEYS.GOVERNANCE, error: "Governance is not enabled" } },
+);
 
-export async function POST(request: Request) {
-  try {
-    if (!(await isFeatureEnabled(FLAG_KEYS.GOVERNANCE)))
-      return errorResponse("Governance is not enabled", 403, "FEATURE_DISABLED");
-    const agent = await resolveAgent(request);
+export const POST = withAgent(
+  async (request, agent) => {
     const workspaceId = agent.workspaceId ?? DEFAULT_WORKSPACE_ID;
 
     const body = (await request.json()) as {
@@ -59,7 +51,6 @@ export async function POST(request: Request) {
       requestedById,
     });
     return successResponse({ approval }, 201);
-  } catch (err) {
-    return handleError(err);
-  }
-}
+  },
+  { feature: { flag: FLAG_KEYS.GOVERNANCE, error: "Governance is not enabled" } },
+);

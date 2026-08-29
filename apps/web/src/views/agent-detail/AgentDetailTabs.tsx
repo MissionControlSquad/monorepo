@@ -10,16 +10,44 @@ import {
   Settings,
   Wrench,
 } from "lucide-react";
+import { Tooltip } from "@/components/ui";
 import { AGENT_DETAIL_TABS, buildAgentDetailHref, type AgentDetailTab } from "./agent-detail-tabs";
 
-const TAB_META: Record<AgentDetailTab, { label: string; icon: typeof LayoutDashboard }> = {
-  overview: { label: "Overview", icon: LayoutDashboard },
-  tasks: { label: "Tasks", icon: ClipboardList },
-  deliverables: { label: "Deliverables", icon: FileText },
-  activity: { label: "Activity", icon: Activity },
-  runs: { label: "Runs", icon: Cpu },
-  tools: { label: "Tools", icon: Wrench },
-  settings: { label: "Settings", icon: Settings },
+const TAB_META: Record<
+  AgentDetailTab,
+  { label: string; icon: typeof LayoutDashboard; tip: string }
+> = {
+  overview: {
+    label: "Overview",
+    icon: LayoutDashboard,
+    tip: "This agent's status, pay, queue, memory, trust, and what it's working on now.",
+  },
+  tasks: { label: "Tasks", icon: ClipboardList, tip: "Tasks currently assigned to this agent." },
+  deliverables: {
+    label: "Deliverables",
+    icon: FileText,
+    tip: "Work this agent has completed and handed back.",
+  },
+  activity: {
+    label: "Activity",
+    icon: Activity,
+    tip: "A timeline of everything this agent has done recently.",
+  },
+  runs: {
+    label: "Runs",
+    icon: Cpu,
+    tip: "Each execution this agent has run, with live and past transcripts.",
+  },
+  tools: {
+    label: "Tools",
+    icon: Wrench,
+    tip: "Which tools this agent is allowed or blocked from using.",
+  },
+  settings: {
+    label: "Settings",
+    icon: Settings,
+    tip: "Edit this agent's identity, role, and configuration.",
+  },
 };
 
 // URL-driven tab bar for Agent Detail. Each tab is a real Link (`?tab=`), so tabs are shareable,
@@ -42,21 +70,22 @@ export function AgentDetailTabs({
         const Icon = meta.icon;
         const isActive = tab === activeTab;
         return (
-          <Link
-            key={tab}
-            href={buildAgentDetailHref(agentId, tab)}
-            role="tab"
-            aria-selected={isActive}
-            aria-current={isActive ? "page" : undefined}
-            className={`flex flex-shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ${
-              isActive
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Icon className="h-4 w-4" />
-            <span>{meta.label}</span>
-          </Link>
+          <Tooltip key={tab} content={meta.tip} side="bottom">
+            <Link
+              href={buildAgentDetailHref(agentId, tab)}
+              role="tab"
+              aria-selected={isActive}
+              aria-current={isActive ? "page" : undefined}
+              className={`flex flex-shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ${
+                isActive
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{meta.label}</span>
+            </Link>
+          </Tooltip>
         );
       })}
     </div>

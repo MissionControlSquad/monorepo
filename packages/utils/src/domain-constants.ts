@@ -12,6 +12,7 @@ export type RoleValue = (typeof Roles)[keyof typeof Roles];
 
 // ─── Task Statuses ───────────────────────────────────────
 export const TaskStatus = {
+  BACKLOG: "backlog",
   INBOX: "inbox",
   ASSIGNED: "assigned",
   IN_PROGRESS: "in_progress",
@@ -22,6 +23,24 @@ export const TaskStatus = {
 } as const;
 
 export type TaskStatusValue = (typeof TaskStatus)[keyof typeof TaskStatus];
+
+/** Parity §3.12 — how an agent should approach a task. Mirrors the Prisma `WorkMode` enum. */
+export const WorkMode = {
+  STANDARD: "standard",
+  ASK: "ask",
+  PLANNING: "planning",
+  SKILL_TEST: "skill_test",
+} as const;
+
+export type WorkModeValue = (typeof WorkMode)[keyof typeof WorkMode];
+
+/** Human-readable labels + help text for each WorkMode (used by the create-task form select tooltip). */
+export const WORK_MODE_META: Record<WorkModeValue, { label: string; help: string }> = {
+  standard: { label: "Standard", help: "Execute the task normally." },
+  ask: { label: "Ask", help: "Ask clarifying questions before taking action." },
+  planning: { label: "Planning", help: "Produce a plan only — don't execute it yet." },
+  skill_test: { label: "Skill test", help: "A sandboxed trial run to exercise a skill." },
+};
 
 // ─── Priorities ──────────────────────────────────────────
 export const Priority = {
@@ -199,7 +218,8 @@ export const ProjectMemberStatus = {
   DEACTIVATED: "deactivated",
 } as const;
 
-export type ProjectMemberStatusValue = (typeof ProjectMemberStatus)[keyof typeof ProjectMemberStatus];
+export type ProjectMemberStatusValue =
+  (typeof ProjectMemberStatus)[keyof typeof ProjectMemberStatus];
 
 // ─── License Status Codes ─────────────────────────────────
 export const LicenseStatusCode = {
@@ -218,7 +238,8 @@ export const QueueItemGeneratedFrom = {
   REVIEW_REJECTION: "review_rejection",
 } as const;
 
-export type QueueItemGeneratedFromValue = (typeof QueueItemGeneratedFrom)[keyof typeof QueueItemGeneratedFrom];
+export type QueueItemGeneratedFromValue =
+  (typeof QueueItemGeneratedFrom)[keyof typeof QueueItemGeneratedFrom];
 
 // ─── Agent Levels ─────────────────────────────────────────
 export const AgentLevel = {
@@ -240,7 +261,8 @@ export const MessageReactionEmoji = {
   THINK: "think",
 } as const;
 
-export type MessageReactionEmojiValue = (typeof MessageReactionEmoji)[keyof typeof MessageReactionEmoji];
+export type MessageReactionEmojiValue =
+  (typeof MessageReactionEmoji)[keyof typeof MessageReactionEmoji];
 
 // ─── Storage Prefixes ─────────────────────────────────────
 export const StoragePrefix = {
@@ -264,12 +286,23 @@ export const CaseState = {
 export const CASE_STATES = Object.values(CaseState);
 export type CaseStateValue = (typeof CASE_STATES)[number];
 
+// ─── Budget Scopes (Epic #4) ─────────────────────────────
+export const BudgetScope = {
+  WORKSPACE: "workspace",
+  AGENT: "agent",
+  PROJECT: "project",
+} as const;
+export const BUDGET_SCOPES = Object.values(BudgetScope);
+export type BudgetScopeValue = (typeof BUDGET_SCOPES)[number];
+
 // ─── Budget Windows (Epic #4) ────────────────────────────
+// `lifetime` is a single perpetual window — spend accrues forever and never rolls over.
 export const BudgetWindow = {
   HOURLY: "hourly",
   DAILY: "daily",
   WEEKLY: "weekly",
   MONTHLY: "monthly",
+  LIFETIME: "lifetime",
 } as const;
 export const BUDGET_WINDOWS = Object.values(BudgetWindow);
 export type BudgetWindowValue = (typeof BUDGET_WINDOWS)[number];
@@ -296,6 +329,7 @@ export const ApprovalSubjectType = {
   DELIVERABLE: "deliverable",
   HIRE_AGENT: "hire_agent",
   BUDGET_OVERRIDE: "budget_override",
+  AGENT_ACTION: "agent_action",
 } as const;
 export type ApprovalSubjectTypeValue =
   (typeof ApprovalSubjectType)[keyof typeof ApprovalSubjectType];

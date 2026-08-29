@@ -21,5 +21,20 @@ builder.prismaObject("Document", {
     createdByProfile: t.relation("createdByProfile", { nullable: true }),
     task: t.relation("task", { nullable: true }),
     project: t.relation("project", { nullable: true }),
+    revisions: t.relation("revisions"), // Parity §3.12 — revision history
+  }),
+});
+
+// Parity §3.12 — generic document revision (content snapshot on update).
+builder.prismaObject("DocumentRevision", {
+  fields: (t) => ({
+    id: t.exposeID("id"),
+    documentId: t.exposeString("documentId"),
+    revision: t.exposeInt("revision"),
+    title: t.exposeString("title"),
+    content: t.exposeString("content"),
+    authorProfileId: t.exposeString("authorProfileId", { nullable: true }),
+    authorAgentId: t.exposeString("authorAgentId", { nullable: true }),
+    createdAt: t.expose("createdAt", { type: "DateTime" }),
   }),
 });

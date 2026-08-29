@@ -54,6 +54,7 @@ builder.prismaObject("BudgetPolicy", {
     workspaceId: t.exposeString("workspaceId"),
     scope: t.exposeString("scope"),
     agentId: t.exposeString("agentId", { nullable: true }),
+    projectId: t.exposeString("projectId", { nullable: true }),
     name: t.exposeString("name"),
     limitCents: t.exposeInt("limitCents"),
     window: t.exposeString("window"),

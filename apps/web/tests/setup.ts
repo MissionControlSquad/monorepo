@@ -31,13 +31,10 @@ async function truncateAll() {
   clearCaches();
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
-      -- feature_flags + licenses must be cleared per file: the DB is shared across test files. Many
-      -- files toggle a flag off to exercise the disabled path; the row lingers because it was never
-      -- truncated, so a later file that expects the feature on (e.g. goals, secrets) intermittently
-      -- reads the stale disabled row and its requireFeature() gate throws. Truncating here makes every
-      -- file start from all-flags-default-enabled; files that need an opt-in flag seed it in their own
-      -- beforeAll/beforeEach (which run after this). (In-process caches reset per isolated fork.)
-      feature_flags,
+      -- licenses is cleared per file (shared DB across test files). Feature entitlement is no longer a
+      -- DB table — it's the in-process setTestFeature seam (feature-flags.ts), reset per isolated fork,
+      -- so every file starts from all-flags-default-enabled; files needing a flag off set it in their
+      -- own beforeEach.
       licenses,
       -- newer tables (added by later features) that must also reset per file so their rows do not
       -- leak across shared-DB test files (e.g. memory_jobs enqueued by run-completion in one file
@@ -66,6 +63,7 @@ async function truncateAll() {
       skill_stars,
       skill_versions,
       skills,
+      task_labels,
       case_labels,
       case_documents,
       case_events,
@@ -103,6 +101,7 @@ async function truncateAll() {
       agent_queue_items,
       activities,
       status_history,
+      document_revisions,
       documents,
       task_assignees,
       project_doc_revisions,

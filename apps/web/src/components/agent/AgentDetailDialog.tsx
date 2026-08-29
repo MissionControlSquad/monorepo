@@ -28,7 +28,7 @@ import { MentionTextArea } from "../common/MentionTextArea";
 import { useMentionData, useMentionSuggestions } from "../context/MentionDataContext";
 import { CopyButton } from "../common/CopyButton";
 import { ProfileAvatar } from "../ui/ProfileAvatar";
-import { Button } from "../ui";
+import { Button, Tooltip, ConfirmDialog } from "../ui";
 import { Input as ShadcnInput } from "@/components/ui/shadcn/input";
 import type { Agent } from "@agentcenter/types";
 
@@ -102,6 +102,7 @@ function AgentDetailContent({
   const [editRole, setEditRole] = useState("");
   const [editEmoji, setEditEmoji] = useState("");
   const [editPersonality, setEditPersonality] = useState("");
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [, updateProfile] = useMutation(UPDATE_AGENT_PROFILE);
   const [, executeSetActivation] = useMutation(SET_AGENT_ACTIVATION);
   const { agents } = useAgentStatus();
@@ -170,9 +171,11 @@ function AgentDetailContent({
             <p className="text-sm text-muted-foreground">{agent?.role}</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="w-6 h-6" />
-        </Button>
+        <Tooltip content="Close">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+            <X className="w-6 h-6" />
+          </Button>
+        </Tooltip>
       </div>
 
       {/* Content */}
@@ -302,32 +305,53 @@ function AgentDetailContent({
             {agent?.setupStatus !== SetupStatus.PENDING_SETUP && (
               <div className="pt-2">
                 {isDeactivated ? (
-                  <Button
-                    variant="success"
-                    size="xs"
-                    onClick={() => executeSetActivation({ id: agentId, deactivated: false })}
-                    className="w-full justify-center"
-                  >
-                    <Power className="w-3.5 h-3.5" />
-                    Reactivate Agent
-                  </Button>
+                  <Tooltip content="Bring this agent back online so it can pick up tasks again.">
+                    <Button
+                      variant="success"
+                      size="xs"
+                      onClick={() => executeSetActivation({ id: agentId, deactivated: false })}
+                      className="w-full justify-center"
+                    >
+                      <Power className="w-3.5 h-3.5" />
+                      Reactivate Agent
+                    </Button>
+                  </Tooltip>
                 ) : (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={() => executeSetActivation({ id: agentId, deactivated: true })}
-                    disabled={isLastLead}
-                    className={`w-full justify-center ${
+                  <Tooltip
+                    content={
                       isLastLead
-                        ? "text-muted-foreground bg-muted cursor-not-allowed"
-                        : "text-destructive bg-destructive/15 hover:bg-destructive/25"
-                    }`}
-                    title={isLastLead ? "Cannot deactivate the last Squad Lead" : undefined}
+                        ? "You can't deactivate the last Squad Lead — promote another agent first."
+                        : "Take this agent offline. It stops picking up new tasks and disappears from assignment, but its history and config are kept. You can reactivate it later."
+                    }
                   >
-                    <PowerOff className="w-3.5 h-3.5" />
-                    {isLastLead ? "Last Squad Lead" : "Deactivate Agent"}
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => setConfirmDeactivate(true)}
+                      disabled={isLastLead}
+                      className={`w-full justify-center ${
+                        isLastLead
+                          ? "text-muted-foreground bg-muted cursor-not-allowed"
+                          : "text-destructive bg-destructive/15 hover:bg-destructive/25"
+                      }`}
+                    >
+                      <PowerOff className="w-3.5 h-3.5" />
+                      {isLastLead ? "Last Squad Lead" : "Deactivate Agent"}
+                    </Button>
+                  </Tooltip>
                 )}
+                <ConfirmDialog
+                  isOpen={confirmDeactivate}
+                  onClose={() => setConfirmDeactivate(false)}
+                  onConfirm={async () => {
+                    await executeSetActivation({ id: agentId, deactivated: true });
+                    setConfirmDeactivate(false);
+                  }}
+                  title={`Deactivate ${agent?.name ?? "this agent"}?`}
+                  description="It stops picking up new tasks and won't be available for assignment. Its history and configuration are kept, and you can reactivate it any time."
+                  confirmLabel="Deactivate"
+                  variant="danger"
+                />
               </div>
             )}
           </div>
