@@ -5,35 +5,25 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, CreditCard } from "lucide-react";
 import { Button, Card, PageLayout } from "@/components/ui";
+import { readBillingOutcome, type BillingOutcome } from "@/lib/billing-return";
 
 /**
  * PUBLIC post-checkout return page (buildbase billing). The SDK `<PricingPage>` sends the browser to
  * `${origin}/billing` after a Stripe checkout completes or is cancelled (see PricingView
  * `redirectBaseUrl`). Without this route that return 404s. It is intentionally public (checkout can be
  * started by a prospective user from the public /pricing page) and dormant-safe (no SDK hooks — it only
- * reads the return status from the query string, which buildbase appends).
+ * reads the return status from the query string, which buildbase appends). Outcome logic lives in
+ * `@/lib/billing-return` so it can be unit-tested.
  */
-
-type Outcome = "success" | "cancelled" | "unknown";
-
-function readOutcome(params: URLSearchParams): Outcome {
-  // buildbase / Stripe append a status hint; accept the common variants without depending on the SDK.
-  const raw = (
-    params.get("status") ??
-    params.get("checkout") ??
-    params.get("result") ??
-    ""
-  ).toLowerCase();
-  if (["success", "succeeded", "complete", "completed", "paid"].includes(raw)) return "success";
-  if (["cancel", "cancelled", "canceled", "failed"].includes(raw)) return "cancelled";
-  return "unknown";
-}
 
 function BillingReturnContent() {
   const params = useSearchParams();
-  const outcome = readOutcome(params);
+  const outcome = readBillingOutcome(params);
 
-  const copy: Record<Outcome, { icon: React.ReactNode; title: string; description: string }> = {
+  const copy: Record<
+    BillingOutcome,
+    { icon: React.ReactNode; title: string; description: string }
+  > = {
     success: {
       icon: <CheckCircle2 className="h-8 w-8 text-success" aria-hidden="true" />,
       title: "Subscription updated",
