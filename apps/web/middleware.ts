@@ -111,6 +111,8 @@ const PUBLIC_EXACT = new Set([
   "/activate",
   "/reset-password",
   "/no-access", // Cross-tenant deny page (buildbase user who isn't a member of this workspace)
+  "/pricing", // Public buildbase pricing surface (prospective upgrades — renders dormant-safe when off)
+  "/billing", // Public post-checkout return (Stripe/buildbase redirects here; must not bounce to /login)
   "/favicon.ico",
   "/logo.png",
   "/robots.txt",
