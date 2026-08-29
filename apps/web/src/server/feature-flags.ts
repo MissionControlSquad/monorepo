@@ -1,5 +1,5 @@
-import { getBuildbase } from "./tenancy/buildbase";
-import { FLAG_KEYS } from "@agentcenter/utils";
+import { getBuildbase, isBuildbaseConfigured } from "./tenancy/buildbase";
+import { FLAG_KEYS, FLAG_DEFAULTS } from "@agentcenter/utils";
 
 /**
  * Feature entitlements — buildbase is the SINGLE source of truth. A feature is enabled when the tenant
@@ -28,20 +28,25 @@ const BB_TTL = 60_000; // 1 minute
  * single workspace per tenant. Unknown slug ⇒ not entitled (false).
  */
 async function getBuildbaseFeatures(): Promise<Record<string, boolean>> {
+  // Buildbase-LESS deployment (self-host / CI with no buildbase org): fall back to the shipped
+  // FLAG_DEFAULTS (core features on, opt-in features off) rather than "everything off" — a workspace
+  // with no plan to read from should still get the product's default surface. When buildbase IS
+  // configured it stays the single source of truth below.
+  if (!isBuildbaseConfigured()) return FLAG_DEFAULTS;
   const bb = getBuildbase();
   const workspaceId = process.env.TENANT_WORKSPACE_ID?.trim();
-  if (!bb || !workspaceId) return bbFeatures?.map ?? {};
+  if (!bb || !workspaceId) return bbFeatures?.map ?? FLAG_DEFAULTS;
   const ttl = process.env.DISABLE_FLAG_CACHE === "1" ? -1 : BB_TTL;
   if (!bbFeatures || Date.now() - bbFeatures.at > ttl) {
     try {
       const ws = await bb.workspace.get(workspaceId);
       bbFeatures = { map: ws.features ?? {}, at: Date.now() };
     } catch {
-      // Session-less context (background/WS) or a transient error: reuse the HTTP-warmed map.
-      // buildbase remains the source of truth; this only bridges contexts with no request cookie.
+      // Session-less context (background/WS) or a transient error: reuse the HTTP-warmed map, or the
+      // shipped defaults on a cold start. buildbase remains the source of truth when a request warms it.
     }
   }
-  return bbFeatures?.map ?? {};
+  return bbFeatures?.map ?? FLAG_DEFAULTS;
 }
 
 // ── Test seam ───────────────────────────────────────────────────────────────
@@ -52,6 +57,18 @@ async function getBuildbaseFeatures(): Promise<Record<string, boolean>> {
 // `resetTestFeature(key)` (back to the default-ON).
 const IS_TEST = process.env.NODE_ENV === "test";
 const testOverrides = new Map<string, boolean>();
+
+/**
+ * Env force-on override for buildbase-LESS environments (CI e2e, self-host without a buildbase org).
+ * buildbase stays the source of truth wherever it is configured; this only fills the gap where there is
+ * no buildbase workspace to read a plan from — otherwise every feature would be off (empty feature map).
+ * Comma-separated FLAG_KEYS slugs, e.g. FEATURE_FLAGS_ON="runners,memory". Read at call time.
+ */
+export function isForcedOn(key: string): boolean {
+  const raw = process.env.FEATURE_FLAGS_ON;
+  if (!raw) return false;
+  return raw.split(",").some((s) => s.trim() === key);
+}
 
 export function setTestFeature(key: string, enabled: boolean): void {
   testOverrides.set(key, enabled);
@@ -66,6 +83,7 @@ export function resetTestFeatures(): void {
 /** Check if a feature is enabled for the current tenant workspace. */
 export async function isFeatureEnabled(key: string): Promise<boolean> {
   if (IS_TEST) return testOverrides.get(key) ?? true;
+  if (isForcedOn(key)) return true;
   const features = await getBuildbaseFeatures();
   return features[key] === true;
 }
@@ -75,7 +93,7 @@ export async function getAllFlags(): Promise<FlagEntry[]> {
   const map = IS_TEST ? null : await getBuildbaseFeatures();
   return Object.values(FLAG_KEYS).map((key) => ({
     key,
-    enabled: IS_TEST ? (testOverrides.get(key) ?? true) : map![key] === true,
+    enabled: IS_TEST ? (testOverrides.get(key) ?? true) : isForcedOn(key) || map![key] === true,
     managedBy: "system" as const,
     description: null,
   }));

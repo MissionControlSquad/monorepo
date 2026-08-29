@@ -92,6 +92,10 @@ jobs:
           # Bypass per-IP rate limiting under the parallel Playwright run (see job env above). Read by
           # both the Edge middleware (inlined at `next build`) and the per-route limiters at runtime.
           E2E_RATE_LIMIT_DISABLED="1"
+          # Force the RUNNERS (opt-in, Tier D) flag on for the served app. buildbase is dormant in CI, so
+          # entitlement falls back to FLAG_DEFAULTS (core features on, opt-in off); the agent-lifecycle
+          # spec's cloud skill/config endpoint (/api/agents/me/context) is RUNNERS-gated, so force it here.
+          FEATURE_FLAGS_ON="runners"
           EOF
 
       - name: Apply DB migrations
