@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import {
   isFeatureEnabled,
@@ -6,6 +6,7 @@ import {
   setTestFeature,
   resetTestFeature,
   resetTestFeatures,
+  isForcedOn,
 } from "../../src/server/feature-flags";
 
 /**
@@ -13,6 +14,33 @@ import {
  * setTestFeature seam (replacing the removed local `feature_flags` table), DEFAULTING TO ON so suites
  * that don't touch flags see every feature enabled. This suite exercises that seam.
  */
+describe("isForcedOn (FEATURE_FLAGS_ON env override — buildbase-less environments)", () => {
+  const prev = process.env.FEATURE_FLAGS_ON;
+  afterEach(() => {
+    if (prev === undefined) delete process.env.FEATURE_FLAGS_ON;
+    else process.env.FEATURE_FLAGS_ON = prev;
+  });
+
+  it("returns false when the env var is unset", () => {
+    delete process.env.FEATURE_FLAGS_ON;
+    expect(isForcedOn(FLAG_KEYS.RUNNERS)).toBe(false);
+  });
+
+  it("force-enables a single listed slug", () => {
+    process.env.FEATURE_FLAGS_ON = "runners";
+    expect(isForcedOn(FLAG_KEYS.RUNNERS)).toBe(true);
+    expect(isForcedOn(FLAG_KEYS.MEMORY)).toBe(false);
+  });
+
+  it("parses a comma-separated list (with whitespace)", () => {
+    process.env.FEATURE_FLAGS_ON = "runners, memory ,plugin_sdk";
+    expect(isForcedOn(FLAG_KEYS.RUNNERS)).toBe(true);
+    expect(isForcedOn(FLAG_KEYS.MEMORY)).toBe(true);
+    expect(isForcedOn(FLAG_KEYS.PLUGIN_SDK)).toBe(true);
+    expect(isForcedOn(FLAG_KEYS.GOALS)).toBe(false);
+  });
+});
+
 describe("feature-flags test seam (buildbase-only module)", () => {
   beforeEach(() => resetTestFeatures());
 
