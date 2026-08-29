@@ -10,7 +10,13 @@
 import { prisma } from "../src/server/prisma";
 import { SetupStatus, DeliverableKind, Priority } from "../src/server/constants";
 import { agentCache, agentListCache, memberCache, projectIdsCache } from "../src/server/cache";
-import { adminSetup, adminLogin, buildRequest, callRoute } from "../tests/helpers";
+import {
+  adminSetup,
+  adminLogin,
+  buildRequest,
+  callRoute,
+  extractSessionCookie,
+} from "../tests/helpers";
 
 import { POST as createAgent } from "../app/api/agents/create/route";
 import { POST as createProject } from "../app/api/projects/route";
@@ -97,6 +103,11 @@ async function run() {
   }
   const loginRes = await adminLogin("admin", "securepass123", "10.0.0.2");
   if (loginRes.status !== 200) throw new Error("Admin login failed");
+  // /api/agents/create is human-ADMIN gated (withTenancy). Thread the admin session cookie into every
+  // create-agent call, exactly as the tests do — without it the create returns 401 UNAUTHENTICATED.
+  const sessionCookie = extractSessionCookie(loginRes);
+  if (!sessionCookie) throw new Error("Admin login returned no mc_session cookie");
+  const adminHeaders = { cookie: `mc_session=${sessionCookie}` };
   console.log("✅ Admin ready");
 
   // Feature entitlement (incl. the RUNNERS tier the agent-lifecycle e2e needs) now comes from
@@ -107,6 +118,7 @@ async function run() {
   let squadLeadCred: AgentCred;
   {
     const req = buildRequest("POST", "/api/agents/create", {
+      headers: adminHeaders,
       body: { name: "Seed Lead", role: "Squad Lead", username: "seed-lead" },
     });
     const res = await callRoute(createAgent, req);
@@ -132,6 +144,7 @@ async function run() {
   const roles = ["Engineer", "Designer", "QA", "PM", "DevOps", "Research", "Writer", "Lead"];
   for (let i = 1; i < CONFIG.numAgents; i++) {
     const req = buildRequest("POST", "/api/agents/create", {
+      headers: adminHeaders,
       body: {
         name: `Agent ${i + 1}`,
         role: roles[i % roles.length],
