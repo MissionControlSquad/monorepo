@@ -106,6 +106,10 @@ jobs:
         run: cd apps/web && npx tsx scripts/seed-enterprise.ts
         env:
           SEED_FAST: "1"
+          # Hand the freshly-minted admin mc_session to the Playwright auth setup (e2e/.auth/seed-session.json).
+          # Lets auth.setup authenticate against the production `next start` server without NODE_ENV=test
+          # or TEST_SESSION_SECRET (which the Next CLI makes unreachable at runtime).
+          E2E_WRITE_STORAGE_STATE: "1"
           # Enable the RUNNERS flag for the served app so the agent-lifecycle spec can reach the
           # RUNNERS-gated cloud skill+config endpoint (/api/agents/me/context). Runs before the app
           # boots; the app's create-only flag startup-migration then leaves this row untouched.
