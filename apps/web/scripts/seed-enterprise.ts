@@ -7,6 +7,8 @@
  * Run: npm run seed:enterprise  (loads .env)
  */
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
 import { prisma } from "../src/server/prisma";
 import { SetupStatus, DeliverableKind, Priority } from "../src/server/constants";
 import { agentCache, agentListCache, memberCache, projectIdsCache } from "../src/server/cache";
@@ -109,6 +111,25 @@ async function run() {
   if (!sessionCookie) throw new Error("Admin login returned no mc_session cookie");
   const adminHeaders = { cookie: `mc_session=${sessionCookie}` };
   console.log("✅ Admin ready");
+
+  // e2e handoff: expose the freshly-minted mc_session to the Playwright auth setup. The seed mints via
+  // the ungated createSessionToken (AUTH_SECRET-signed) so the cookie authenticates against the served
+  // production app directly — no TEST_SESSION_SECRET / NODE_ENV=test needed on the server. auth.setup.ts
+  // reads this file and injects the cookie into the browser context. Written only when asked (CI/e2e).
+  if (process.env.E2E_WRITE_STORAGE_STATE) {
+    const out = process.env.E2E_SEED_SESSION_PATH
+      ? resolve(process.env.E2E_SEED_SESSION_PATH)
+      : resolve(process.cwd(), "../../e2e/.auth/seed-session.json");
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(
+      out,
+      JSON.stringify({
+        cookie: sessionCookie,
+        baseUrl: process.env.BASE_URL ?? "http://localhost:3000",
+      }),
+    );
+    console.log("✅ Wrote e2e seed session →", out);
+  }
 
   // Feature entitlement (incl. the RUNNERS tier the agent-lifecycle e2e needs) now comes from
   // buildbase — the local feature_flags table was removed. Enable RUNNERS on the e2e workspace's
