@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 /**
  * Epic #11c: goal re-resolution on task update (resolveNextIssueGoalId). Explicit goal set/clear,
@@ -36,7 +41,7 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE tasks, goals, projects, agents, profiles CASCADE`);
-  await prisma.featureFlag.deleteMany({ where: { key: "goals" } });
+  resetTestFeature(FLAG_KEYS.GOALS);
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "TUG Human" } });
   humanId = p.id;
@@ -89,11 +94,7 @@ describe("goal re-resolution on task update (Epic #11c)", () => {
     const c = await cookie();
     const goal = await prisma.goal.create({ data: { workspaceId: WS_A, title: "G" } });
     const task = (await gql(CREATE, { t: "T", d: "d" }, c)).data.createTask;
-    await prisma.featureFlag.upsert({
-      where: { key: "goals" },
-      create: { key: "goals", enabled: false, managedBy: "user" },
-      update: { enabled: false },
-    });
+    setTestFeature(FLAG_KEYS.GOALS, false);
     invalidateFlagCache();
     // With GOALS off, an explicit goalId is still honored (it's the caller's intent), but no inheritance.
     const set = await gql(UPDATE, { id: task.id, g: goal.id }, c);

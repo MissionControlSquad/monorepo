@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, resetTestFeature } from "../../src/server/feature-flags";
 import {
   mintRunBridgeToken,
   verifyRunBridgeToken,
@@ -96,7 +97,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE tasks, messages, deliverables, profiles, agents, api_keys, agent_runs CASCADE`,
   );
-  await prisma.featureFlag.deleteMany({ where: { key: "api_keys" } });
+  resetTestFeature(FLAG_KEYS.API_KEYS);
   invalidateFlagCache();
   await seedFixtures();
 });

@@ -102,8 +102,6 @@ export {
 
 export { UPDATE_MY_PROFILE } from "./profile";
 
-export { UPDATE_FEATURE_FLAG } from "./feature-flags";
-
 export {
   APPROVE_LIVE_GATEWAY_DEVICE,
   REVOKE_LIVE_GATEWAY_DEVICE,

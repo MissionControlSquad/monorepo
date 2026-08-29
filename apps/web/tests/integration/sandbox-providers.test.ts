@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { createSecret } from "../../src/server/services/secrets";
 import {
   getSandboxProvider,
@@ -52,7 +57,7 @@ beforeAll(() => {
   process.env.SYSTEM_SECRET = SECRET;
 });
 beforeEach(async () => {
-  await prisma.featureFlag.deleteMany({ where: { key: "runners" } });
+  resetTestFeature(FLAG_KEYS.RUNNERS);
   invalidateFlagCache();
   await clearVault();
 });
@@ -112,11 +117,7 @@ describe("sandbox providers (Tier D — BYO)", () => {
   });
 
   it("sandboxProviders query reflects the workspace vault; RUNNERS-gated", async () => {
-    await prisma.featureFlag.upsert({
-      where: { key: "runners" },
-      create: { key: "runners", enabled: true, managedBy: "user" },
-      update: { enabled: true },
-    });
+    setTestFeature(FLAG_KEYS.RUNNERS, true);
     invalidateFlagCache();
 
     // No secrets yet → cloud providers are not configured; local is always available.
@@ -146,11 +147,7 @@ describe("sandbox providers (Tier D — BYO)", () => {
     expect(e2b).toMatchObject({ configured: true, available: true });
 
     // gated
-    await prisma.featureFlag.upsert({
-      where: { key: "runners" },
-      create: { key: "runners", enabled: false, managedBy: "user" },
-      update: { enabled: false },
-    });
+    setTestFeature(FLAG_KEYS.RUNNERS, false);
     invalidateFlagCache();
     expect((await gql(`query{ sandboxProviders{ key } }`)).errors).toBeDefined();
   });

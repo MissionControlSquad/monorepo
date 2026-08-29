@@ -10,6 +10,7 @@ import {
   webhookSecretName,
 } from "../../src/server/services/plugin-webhooks";
 import { FLAG_KEYS } from "@agentcenter/utils";
+import { setTestFeature, resetTestFeature } from "../../src/server/feature-flags";
 
 // §3 plugins — inbound webhook receiver. Fail-closed: flag off / ungranted / bad signature all refuse;
 // a good signature enqueues a PluginJob for the worker.
@@ -35,11 +36,7 @@ const SECRET = "whsec_integration";
 const sign = (body: string) => createHmac("sha256", SECRET).update(body, "utf8").digest("hex");
 
 async function setFlag(enabled: boolean) {
-  await prisma.featureFlag.upsert({
-    where: { key: RUNTIME_FLAG },
-    create: { key: RUNTIME_FLAG, enabled, managedBy: "system" },
-    update: { enabled },
-  });
+  setTestFeature(RUNTIME_FLAG, enabled);
 }
 
 beforeEach(async () => {
@@ -62,7 +59,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await prisma.featureFlag.deleteMany({ where: { key: RUNTIME_FLAG } });
+  resetTestFeature(RUNTIME_FLAG);
 });
 
 describe("receivePluginWebhook — fail-closed gates", () => {

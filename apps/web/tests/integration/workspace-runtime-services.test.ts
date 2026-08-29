@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import { schema } from "../../src/server/graphql/schema";
 import { requireFeature } from "../../src/server/graphql/require-feature";
 import { requireRole } from "../../src/server/tenancy";
@@ -23,11 +23,7 @@ const WS = "ws_runtime_svc";
 const OTHER_WS = "ws_runtime_other";
 
 async function setFlag(key: string, enabled: boolean) {
-  await prisma.featureFlag.upsert({
-    where: { key },
-    create: { key, enabled, managedBy: "user" },
-    update: { enabled },
-  });
+  setTestFeature(key, enabled);
   invalidateFlagCache();
 }
 
@@ -55,8 +51,8 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE workspace_runtime_services, workspace_operations, execution_workspaces CASCADE`,
   );
-  await setFlag("local_services", true);
-  await setFlag("execution_workspaces", true);
+  await setFlag(FLAG_KEYS.LOCAL_SERVICES, true);
+  await setFlag(FLAG_KEYS.EXECUTION_WORKSPACES, true);
 });
 
 describe("WorkspaceRuntimeService — service lifecycle", () => {
@@ -302,11 +298,11 @@ describe("WorkspaceRuntimeService — isolation + flag/role gates", () => {
   });
 
   it("gate: requireFeature(LOCAL_SERVICES) blocks when the flag is off, passes when on", async () => {
-    await setFlag("local_services", false);
+    await setFlag(FLAG_KEYS.LOCAL_SERVICES, false);
     await expect(requireFeature(FLAG_KEYS.LOCAL_SERVICES)).rejects.toMatchObject({
       extensions: { code: "FEATURE_DISABLED" },
     });
-    await setFlag("local_services", true);
+    await setFlag(FLAG_KEYS.LOCAL_SERVICES, true);
     await expect(requireFeature(FLAG_KEYS.LOCAL_SERVICES)).resolves.toBeUndefined();
   });
 

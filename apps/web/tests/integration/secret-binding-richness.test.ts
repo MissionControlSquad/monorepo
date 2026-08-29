@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import {
   createSecret,
   rotateSecret,
@@ -406,16 +411,12 @@ describe("rotateManagedSecret GraphQL gates", () => {
 
     // flag off → FEATURE_DISABLED before any provider call.
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "secrets_vault" },
-        create: { key: "secrets_vault", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature(FLAG_KEYS.SECRETS_VAULT, false);
       invalidateFlagCache();
       const off = await gql(MUT, { id: s.id, v: "x" }, await cookieFor("admin"));
       expect(off.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "secrets_vault" } });
+      resetTestFeature(FLAG_KEYS.SECRETS_VAULT);
       invalidateFlagCache();
     }
 

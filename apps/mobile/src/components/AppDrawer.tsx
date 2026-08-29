@@ -193,7 +193,6 @@ export function AppDrawer() {
           <DrawerItem icon="repeat-outline" label="Recurring Tasks" onPress={() => navigate("/recurring-tasks")} isDark={isDark} />
           <DrawerItem icon="document-text-outline" label="Task Templates" onPress={() => navigate("/task-templates")} isDark={isDark} />
           <DrawerItem icon="notifications-outline" label="Notifications" onPress={() => navigate("/notifications")} isDark={isDark} badge={notificationCount > 0 ? (notificationCount > 99 ? "99+" : String(notificationCount)) : undefined} />
-          {/* <DrawerItem icon="toggle-outline" label="Feature Flags" onPress={() => navigate("/feature-flags")} isDark={isDark} /> */}
         </View>
 
         {/* Divider */}

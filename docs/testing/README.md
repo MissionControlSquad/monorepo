@@ -4,6 +4,9 @@ Playwright is the single UI/E2E framework for this monorepo. Specs run identical
 and in GitHub Actions. Unit/integration tests stay in Vitest (`npm test`); Playwright is the browser
 layer on top.
 
+> **Component / render tests** (one `"use client"` component in jsdom, between node-unit and E2E) live
+> in a separate layer — see [`component-testing.md`](./component-testing.md).
+
 ## One-time setup (fresh clone)
 
 ```bash

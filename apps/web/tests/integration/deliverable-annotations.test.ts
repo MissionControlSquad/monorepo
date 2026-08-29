@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import {
   addDeliverableAnnotation,
   setAnnotationResolved,
@@ -95,11 +100,7 @@ describe("deliverable annotations GraphQL (Tier C)", () => {
     expect(list.data.deliverableAnnotations).toHaveLength(1);
 
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "annotations" },
-        create: { key: "annotations", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature(FLAG_KEYS.ANNOTATIONS, false);
       invalidateFlagCache();
       const gated = await gql(
         `mutation($d:String!){ addDeliverableAnnotation(deliverableId:$d, body:"x"){ id } }`,
@@ -107,7 +108,7 @@ describe("deliverable annotations GraphQL (Tier C)", () => {
       );
       expect(gated.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "annotations" } });
+      resetTestFeature(FLAG_KEYS.ANNOTATIONS);
       invalidateFlagCache();
     }
   });

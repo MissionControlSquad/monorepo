@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { computeMetric, evaluateMonitors, createMonitor } from "../../src/server/services/monitors";
 
 /** Tier C: workspace monitors — metric computation + on-demand evaluation + GraphQL + gate. */
@@ -105,16 +110,12 @@ describe("monitors GraphQL (Tier C)", () => {
     expect(bad.errors).toBeDefined();
 
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "monitors" },
-        create: { key: "monitors", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature(FLAG_KEYS.MONITORS, false);
       invalidateFlagCache();
       const gated = await gql(`query{ monitors{ id } }`);
       expect(gated.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "monitors" } });
+      resetTestFeature(FLAG_KEYS.MONITORS);
       invalidateFlagCache();
     }
   });

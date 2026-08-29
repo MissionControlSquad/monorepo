@@ -4,7 +4,7 @@ import { prisma } from "@/server/prisma";
 import type { GraphQLContext } from "@/server/graphql/builder";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
 import { readCookie } from "@/server/tenancy/buildbase";
-import { resolveTenancy } from "@/server/tenancy";
+import { resolveTenancy, resolveUsageContext } from "@/server/tenancy";
 import { isLicenseActive } from "@/server/license";
 import { apiLimiters, checkRateLimit } from "../_lib/rate-limit-check";
 
@@ -42,6 +42,8 @@ const yoga = createYoga<GraphQLContext>({
         request.headers.get("cookie"),
         request.headers.get("authorization"),
       ),
+      // buildbase human session (if any) for plan-usage recording in human-plane resolvers.
+      usage: await resolveUsageContext(request),
     };
   },
   graphqlEndpoint: "/api/graphql",

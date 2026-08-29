@@ -1,11 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import {
   requireAgentCapability,
   grantAgentCapability,
 } from "../../src/server/services/agent-authz";
-import { AGENT_CAPABILITY } from "@agentcenter/utils";
+import { FLAG_KEYS, AGENT_CAPABILITY } from "@agentcenter/utils";
 import { createTestAgent } from "../helpers";
 
 // Parity #9/#10 — the agent capability ENFORCEMENT machinery (requireAgentCapability).
@@ -13,11 +17,7 @@ let agentId = "";
 let role = "worker";
 
 async function enableAuthz(on = true) {
-  await prisma.featureFlag.upsert({
-    where: { key: "agent_authz" },
-    create: { key: "agent_authz", enabled: on, managedBy: "system" },
-    update: { enabled: on },
-  });
+  setTestFeature(FLAG_KEYS.AGENT_AUTHZ, on);
   invalidateFlagCache();
 }
 
@@ -33,7 +33,7 @@ beforeEach(async () => {
   await prisma.agentAuthzEvent.deleteMany({});
   await prisma.agentCapabilityGrant.deleteMany({});
   await prisma.agentTrustProfile.deleteMany({});
-  await prisma.featureFlag.deleteMany({ where: { key: "agent_authz" } });
+  resetTestFeature(FLAG_KEYS.AGENT_AUTHZ);
   invalidateFlagCache();
   const { agent } = await createTestAgent({ role: "worker" });
   agentId = agent.id;

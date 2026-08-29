@@ -20,6 +20,9 @@ vi.mock("@/server/tenancy/buildbase", () => ({
   getBuildbase: () => getBuildbase(),
   isBuildbaseConfigured: () => isBuildbaseConfigured(),
   BB_SESSION_COOKIE: "bb-session-id",
+  WORKSPACE_TOKEN_COOKIE: "bb-workspace-token",
+  readCookie: (h: string | null | undefined, n: string) =>
+    h ? (h.match(new RegExp(`(?:^|;\\s*)${n}=([^;]+)`))?.[1] ?? null) : null,
 }));
 
 import {

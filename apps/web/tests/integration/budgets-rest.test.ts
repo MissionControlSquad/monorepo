@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { GET as LIST, POST as CREATE } from "../../app/api/budgets/route";
 import { GET as GET_ONE, PATCH, DELETE } from "../../app/api/budgets/[id]/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 
 // Epic #4 R3: budget-policy CRUD over REST must reach parity with GraphQL — session-authenticated,
 // admin-gated writes, workspace-scoped. Drives the real route handlers with a workspace JWT.
@@ -40,11 +41,7 @@ beforeAll(() => {
 
 beforeEach(async () => {
   await prisma.budgetPolicy.deleteMany({ where: { workspaceId: { in: [WS, OTHER_WS] } } });
-  await prisma.featureFlag.upsert({
-    where: { key: "budgets" },
-    create: { key: "budgets", enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature(FLAG_KEYS.BUDGETS, true);
   invalidateFlagCache();
 });
 

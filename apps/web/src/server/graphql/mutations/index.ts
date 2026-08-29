@@ -19,7 +19,6 @@ import "./events";
 import "./system";
 import "./sidebar-preferences";
 import "./profile";
-import "./feature-flags";
 import "./live-gateway-devices";
 import "./approvals";
 import "./approval-policies";

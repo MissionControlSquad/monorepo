@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 // Tier D: the control plane exposes the runtime adapter registry (RUNNERS-gated, member+).
 const SECRET = "adapters-secret";
@@ -26,17 +31,13 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE agents CASCADE`);
-  await prisma.featureFlag.deleteMany({ where: { key: "runners" } });
+  resetTestFeature(FLAG_KEYS.RUNNERS);
   invalidateFlagCache();
 });
 
 describe("runtimeAdapters query (Tier D)", () => {
   it("returns the built-in adapters when RUNNERS is on", async () => {
-    await prisma.featureFlag.upsert({
-      where: { key: "runners" },
-      create: { key: "runners", enabled: true, managedBy: "user" },
-      update: { enabled: true },
-    });
+    setTestFeature(FLAG_KEYS.RUNNERS, true);
     invalidateFlagCache();
     const res = await gql(
       `query{ runtimeAdapters{ key displayName requiresTemplate supportsModel models } }`,
@@ -51,11 +52,7 @@ describe("runtimeAdapters query (Tier D)", () => {
   });
 
   it("setAgentRuntime sets + validates an agent's runtime (admin)", async () => {
-    await prisma.featureFlag.upsert({
-      where: { key: "runners" },
-      create: { key: "runners", enabled: true, managedBy: "user" },
-      update: { enabled: true },
-    });
+    setTestFeature(FLAG_KEYS.RUNNERS, true);
     invalidateFlagCache();
     const agent = await prisma.agent.create({
       data: { name: "RT", role: "worker", workspaceId: WS, setupStatus: "active" },
@@ -84,11 +81,7 @@ describe("runtimeAdapters query (Tier D)", () => {
   });
 
   it("is RUNNERS-gated", async () => {
-    await prisma.featureFlag.upsert({
-      where: { key: "runners" },
-      create: { key: "runners", enabled: false, managedBy: "user" },
-      update: { enabled: false },
-    });
+    setTestFeature(FLAG_KEYS.RUNNERS, false);
     invalidateFlagCache();
     const res = await gql(`query{ runtimeAdapters{ key } }`);
     expect(res.errors).toBeDefined();

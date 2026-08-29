@@ -19,6 +19,7 @@ import {
 } from "../../src/server/services/plugin-api-routes";
 import { ForkPluginWorkerManager } from "../../src/server/services/plugin-worker-manager";
 import { FLAG_KEYS } from "@agentcenter/utils";
+import { setTestFeature, resetTestFeature } from "../../src/server/feature-flags";
 
 // §3 plugins — scoped plugin API routes. Capability-checked, fail-closed dispatch into the plugin
 // worker (running the in-repo example plugin's `routes` map).
@@ -47,11 +48,7 @@ const MANIFEST = {
 let mgr: ForkPluginWorkerManager;
 
 async function setFlag(enabled: boolean) {
-  await prisma.featureFlag.upsert({
-    where: { key: RUNTIME_FLAG },
-    create: { key: RUNTIME_FLAG, enabled, managedBy: "system" },
-    update: { enabled },
-  });
+  setTestFeature(RUNTIME_FLAG, enabled);
 }
 
 beforeEach(async () => {
@@ -66,7 +63,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await mgr.stopAll();
   unregisterPluginEntrypoint(PLUGIN);
-  await prisma.featureFlag.deleteMany({ where: { key: RUNTIME_FLAG } });
+  resetTestFeature(RUNTIME_FLAG);
 });
 
 describe("matchDeclaredApiRoute (pure)", () => {

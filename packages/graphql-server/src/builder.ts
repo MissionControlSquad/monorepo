@@ -39,12 +39,25 @@ export interface TenancyContext {
   can: (permission: string) => boolean;
 }
 
+/**
+ * The buildbase human session resolved from the request cookies, when present. Carried on the context
+ * so human-plane resolvers (e.g. createProject) can record plan-quota consumption in buildbase via
+ * `withSession(sessionId).usage.record(workspaceId, …)`. Null for anonymous / agent / self-host
+ * requests. Structurally matches `UsageContext` in apps/web (kept inline here to avoid a package cycle).
+ */
+export interface UsageSession {
+  sessionId: string;
+  workspaceId: string;
+}
+
 export interface GraphQLContext extends YogaInitialContext {
   prisma: typeof prisma;
   /** Set when request has valid mc_session cookie (admin login with Profile). Used for createdByProfileId, fromProfileId, etc. */
   session: (SessionPayload & { profileId: string }) | null;
   /** Human workspace tenancy (Epic #1). Null for anonymous or agent requests. */
   tenancy: TenancyContext | null;
+  /** buildbase human session for plan-usage recording. Null for anonymous/agent/self-host requests. */
+  usage: UsageSession | null;
 }
 
 export const builder = new SchemaBuilder<{

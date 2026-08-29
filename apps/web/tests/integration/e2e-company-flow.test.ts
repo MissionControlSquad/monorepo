@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import { FLAG_KEYS } from "@agentcenter/utils";
 import { createTestAgent } from "../helpers";
 
@@ -14,8 +14,15 @@ const SECRET = "e2e-company-secret";
 const WS = "ws_e2e_company";
 let humanId = "";
 
-async function gql(query: string, variables?: Record<string, unknown>, role: "admin" | "member" = "admin") {
-  const token = await createJWT({ userId: humanId, workspaceId: WS, userRole: role, email: "u@x.com" }, SECRET);
+async function gql(
+  query: string,
+  variables?: Record<string, unknown>,
+  role: "admin" | "member" = "admin",
+) {
+  const token = await createJWT(
+    { userId: humanId, workspaceId: WS, userRole: role, email: "u@x.com" },
+    SECRET,
+  );
   const req = new Request("http://test/api/graphql", {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: `bb-workspace-token=${token}` },
@@ -31,18 +38,17 @@ beforeAll(() => {
 
 beforeEach(async () => {
   // clean slate for this workspace (Task is scoped via its project, not a direct workspaceId)
-  const wsProjects = await prisma.project.findMany({ where: { workspaceId: WS }, select: { id: true } });
+  const wsProjects = await prisma.project.findMany({
+    where: { workspaceId: WS },
+    select: { id: true },
+  });
   await prisma.task.deleteMany({ where: { projectId: { in: wsProjects.map((p) => p.id) } } });
   await prisma.agent.deleteMany({ where: { workspaceId: WS } });
   await prisma.project.deleteMany({ where: { workspaceId: WS } });
   await prisma.agentCompany.deleteMany({ where: { workspaceId: WS } });
   // enable every feature flag so no vertical is gated off
   for (const key of Object.values(FLAG_KEYS)) {
-    await prisma.featureFlag.upsert({
-      where: { key },
-      create: { key, enabled: true, managedBy: "user" },
-      update: { enabled: true },
-    });
+    setTestFeature(key, true);
   }
   invalidateFlagCache();
 });
@@ -64,7 +70,11 @@ describe("E2E: company → projects → agents → tasks → governance → clau
     expect(projectId).toBeTruthy();
 
     // 3) create an agent (canonical test helper), scoped to this workspace
-    const { agent } = await createTestAgent({ name: "Rosie", role: "Automation Engineer", status: "active" });
+    const { agent } = await createTestAgent({
+      name: "Rosie",
+      role: "Automation Engineer",
+      status: "active",
+    });
     await prisma.agent.update({ where: { id: agent.id }, data: { workspaceId: WS } });
     const agentId = agent.id;
 

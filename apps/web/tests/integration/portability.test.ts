@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 import { createSkill } from "../../src/server/services/skills";
 
 /**
@@ -183,11 +188,7 @@ describe("import (Epic #14)", () => {
 describe("gate (Epic #14)", () => {
   it("rejects export when WORKSPACE_PORTABILITY is off", async () => {
     try {
-      await prisma.featureFlag.upsert({
-        where: { key: "workspace_portability" },
-        create: { key: "workspace_portability", enabled: false, managedBy: "user" },
-        update: { enabled: false },
-      });
+      setTestFeature(FLAG_KEYS.WORKSPACE_PORTABILITY, false);
       invalidateFlagCache();
       const r = await gql(
         `query{ exportWorkspaceBundle }`,
@@ -196,7 +197,7 @@ describe("gate (Epic #14)", () => {
       );
       expect(r.errors).toBeDefined();
     } finally {
-      await prisma.featureFlag.deleteMany({ where: { key: "workspace_portability" } });
+      resetTestFeature(FLAG_KEYS.WORKSPACE_PORTABILITY);
       invalidateFlagCache();
     }
   });

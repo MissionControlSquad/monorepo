@@ -6,6 +6,8 @@ import { validateBody, batchCreateAgentSchema } from "../../_lib/validation";
 import { createSingleAgent, type CreateAgentResult } from "../_lib/create-agent";
 import { withTenancy } from "../../_lib/rest-tenancy";
 import { WORKSPACE_ROLES } from "@agentcenter/graphql-server";
+import { recordPlanUsageFromRequest } from "@/server/tenancy";
+import { USAGE_QUOTA_SLUGS } from "@/lib/quota-slugs";
 
 /**
  * POST /api/agents/batch-create
@@ -62,6 +64,14 @@ export const POST = withTenancy(
         const result = await createSingleAgent(agents[i], agentCount + i);
         results.push(result);
       }
+
+      // Best-effort: record consumption of the workspace's HUMAN plan `agents` quota in buildbase —
+      // one unit per agent created in the batch (parity with the single-create path). Fail-safe +
+      // dormant until buildbase is configured; never blocks or breaks the create.
+      await recordPlanUsageFromRequest(request, {
+        quotaSlug: USAGE_QUOTA_SLUGS.agents,
+        quantity: results.length,
+      });
 
       return successResponse({ results, totalCreated: results.length }, 201);
     } catch (err) {

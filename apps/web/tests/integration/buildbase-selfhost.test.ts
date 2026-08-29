@@ -28,6 +28,9 @@ const listMock = vi.fn(async () => {
 });
 vi.mock("@/server/tenancy/buildbase", () => ({
   BB_SESSION_COOKIE: "bb-session-id",
+  WORKSPACE_TOKEN_COOKIE: "bb-workspace-token",
+  readCookie: (h: string | null | undefined, n: string) =>
+    h ? (h.match(new RegExp(`(?:^|;\\s*)${n}=([^;]+)`))?.[1] ?? null) : null,
   isBuildbaseConfigured: () => true,
   getBuildbase: () => ({ withSession: () => ({ workspace: { list: listMock } }) }),
 }));

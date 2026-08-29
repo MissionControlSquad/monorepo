@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { existsSync } from "node:fs";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import { createEnvironment } from "../../src/server/services/environments";
 import { runTaskInSandbox } from "../../src/server/services/sandbox-run";
 import { computeLeaseSecretFingerprint } from "../../src/server/services/environment-leases";
@@ -21,11 +22,7 @@ beforeEach(async () => {
     `TRUNCATE TABLE environment_leases, environments, agent_runs, messages, tasks, agents, profiles,
        secret_bindings, secret_versions, secret_access_events, secrets CASCADE`,
   );
-  await prisma.featureFlag.upsert({
-    where: { key: "runners" },
-    create: { key: "runners", enabled: true, managedBy: "user" },
-    update: { enabled: true },
-  });
+  setTestFeature(FLAG_KEYS.RUNNERS, true);
   invalidateFlagCache();
 });
 

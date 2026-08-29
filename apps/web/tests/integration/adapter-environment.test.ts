@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
-import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
-import { invalidateFlagCache } from "../../src/server/feature-flags";
+import {
+  invalidateFlagCache,
+  setTestFeature,
+  resetTestFeature,
+} from "../../src/server/feature-flags";
 
 // Mock the runtime probe so the resolver + service run for real but no CLI is ever spawned.
 const probeMock = vi.fn();
@@ -30,11 +33,7 @@ async function gql(query: string, role: "admin" | "member" = "admin", variables?
 }
 
 async function setFlag(enabled: boolean) {
-  await prisma.featureFlag.upsert({
-    where: { key: FLAG },
-    create: { key: FLAG, enabled, managedBy: "user" },
-    update: { enabled },
-  });
+  setTestFeature(FLAG, enabled);
   invalidateFlagCache();
 }
 
@@ -53,7 +52,7 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   probeMock.mockReset();
-  await prisma.featureFlag.deleteMany({ where: { key: FLAG } });
+  resetTestFeature(FLAG);
   invalidateFlagCache();
 });
 
