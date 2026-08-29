@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -271,13 +272,13 @@ describe("feature gate (Epic #5)", () => {
   it("rejects vault access when SECRETS_VAULT is off", async () => {
     const admin = await cookieFor(WS_A, "admin");
     try {
-      setTestFeature("secrets_vault", false);
+      setTestFeature(FLAG_KEYS.SECRETS_VAULT, false);
       invalidateFlagCache();
       const r = await gql(`query{ secrets{ id } }`, undefined, admin);
       expect(r.errors).toBeDefined();
       expect(r.data?.secrets).toBeFalsy();
     } finally {
-      resetTestFeature("secrets_vault");
+      resetTestFeature(FLAG_KEYS.SECRETS_VAULT);
       invalidateFlagCache();
     }
   });

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -168,12 +169,12 @@ describe("isolation + gate (Epic #11)", () => {
 
   it("rejects access when GOALS is off", async () => {
     try {
-      setTestFeature("goals", false);
+      setTestFeature(FLAG_KEYS.GOALS, false);
       invalidateFlagCache();
       const r = await gql(`query{ goals{ id } }`, undefined, await cookieFor(WS_A, "member"));
       expect(r.errors).toBeDefined();
     } finally {
-      resetTestFeature("goals");
+      resetTestFeature(FLAG_KEYS.GOALS);
       invalidateFlagCache();
     }
   });

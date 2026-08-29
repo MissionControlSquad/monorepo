@@ -12,7 +12,12 @@ import {
   unregisterRunAbort,
   isRunActive,
 } from "../../src/server/services/run-cancellation";
-import { registerAdapter, deriveAdapterExecutionResult, type Adapter } from "@agentcenter/utils";
+import {
+  FLAG_KEYS,
+  registerAdapter,
+  deriveAdapterExecutionResult,
+  type Adapter,
+} from "@agentcenter/utils";
 
 // §3 #2 vertical slice — in-flight run cancellation + sandbox cost population. Exercised end-to-end
 // against the REAL `local` provider (a child process on this host) so the AbortSignal → SIGKILL path,
@@ -107,7 +112,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE cost_events, budget_policies, quota_windows, agent_runs, messages, tasks, agents, profiles CASCADE`,
   );
-  setTestFeature("runners", true);
+  setTestFeature(FLAG_KEYS.RUNNERS, true);
   invalidateFlagCache();
 });
 

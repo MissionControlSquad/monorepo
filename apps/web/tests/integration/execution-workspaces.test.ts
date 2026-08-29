@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
 import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
@@ -126,7 +127,7 @@ describe("per-run execution-workspace recording", () => {
   });
 
   it("records nothing when EXECUTION_WORKSPACES is off", async () => {
-    setTestFeature("execution_workspaces", false);
+    setTestFeature(FLAG_KEYS.EXECUTION_WORKSPACES, false);
     invalidateFlagCache();
     const task = await prisma.task.create({
       data: { title: "t", description: "d", status: "assigned", priority: "high", tags: [] },

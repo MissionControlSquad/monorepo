@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import {
   invalidateFlagCache,
@@ -29,7 +30,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   invalidateFlagCache();
   // TASK_AUTONOMY defaults on (no flag row + no license). Ensure any prior test's disable is cleared.
-  resetTestFeature("task_autonomy");
+  resetTestFeature(FLAG_KEYS.TASK_AUTONOMY);
 });
 
 describe("wakeDependentsOf (blockedByTaskId edge)", () => {
@@ -103,7 +104,7 @@ describe("wakeDependentsOf (multiple blockers via `blocks` relations)", () => {
 
 describe("gating", () => {
   it("is a no-op when TASK_AUTONOMY is disabled", async () => {
-    setTestFeature("task_autonomy", false);
+    setTestFeature(FLAG_KEYS.TASK_AUTONOMY, false);
     invalidateFlagCache();
 
     const blocker = await createTestTask(agentId, { status: "done" });

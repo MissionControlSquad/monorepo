@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
@@ -218,7 +219,7 @@ describe("feature gate (GraphQL)", () => {
     const token = await createJWT({ userId: "u", workspaceId: "ws", userRole: "admin" }, SECRET);
     const cookie = `bb-workspace-token=${token}`;
     try {
-      setTestFeature("task_autonomy", false);
+      setTestFeature(FLAG_KEYS.TASK_AUTONOMY, false);
       invalidateFlagCache();
       const req = new Request("http://test/api/graphql", {
         method: "POST",
@@ -229,7 +230,7 @@ describe("feature gate (GraphQL)", () => {
       const json = JSON.parse(await res.text());
       expect(json.errors).toBeDefined();
     } finally {
-      resetTestFeature("task_autonomy");
+      resetTestFeature(FLAG_KEYS.TASK_AUTONOMY);
       invalidateFlagCache();
     }
   });
@@ -238,7 +239,7 @@ describe("feature gate (GraphQL)", () => {
 describe("typed thread interactions (Domain 8 G6.5)", () => {
   async function tiGql(query: string, variables?: Record<string, unknown>) {
     const { invalidateFlagCache } = await import("../../src/server/feature-flags");
-    setTestFeature("thread_interactions", true);
+    setTestFeature(FLAG_KEYS.THREAD_INTERACTIONS, true);
     invalidateFlagCache();
     const token = await createJWT({ userId: "u", workspaceId: "ws", userRole: "member" }, SECRET);
     const req = new Request("http://test/api/graphql", {
@@ -326,7 +327,7 @@ describe("cancel task (Domain 8 G6.7)", () => {
 describe("subtree cancel / restore (Domain 8 G6.6)", () => {
   async function adminGql(query: string, variables?: Record<string, unknown>) {
     const { invalidateFlagCache } = await import("../../src/server/feature-flags");
-    resetTestFeature("task_autonomy");
+    resetTestFeature(FLAG_KEYS.TASK_AUTONOMY);
     invalidateFlagCache();
     const token = await createJWT({ userId: "u", workspaceId: "ws", userRole: "admin" }, SECRET);
     const req = new Request("http://test/api/graphql", {

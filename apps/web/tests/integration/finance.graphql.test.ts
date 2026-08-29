@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -156,7 +157,7 @@ describe("BUDGETS feature gate (Epic #4)", () => {
   it("budgetPolicies is rejected when the feature is off", async () => {
     const admin = await cookieFor(WS_A, "admin");
     try {
-      setTestFeature("budgets", false);
+      setTestFeature(FLAG_KEYS.BUDGETS, false);
       invalidateFlagCache();
 
       const r = await runGraphQL(`query{ budgetPolicies{ id } }`, undefined, admin);
@@ -164,7 +165,7 @@ describe("BUDGETS feature gate (Epic #4)", () => {
       expect(r.errors!.length).toBeGreaterThan(0);
       expect(r.data?.budgetPolicies).toBeFalsy();
     } finally {
-      resetTestFeature("budgets");
+      resetTestFeature(FLAG_KEYS.BUDGETS);
       invalidateFlagCache();
     }
   });

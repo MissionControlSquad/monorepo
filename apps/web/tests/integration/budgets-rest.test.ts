@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { GET as LIST, POST as CREATE } from "../../app/api/budgets/route";
 import { GET as GET_ONE, PATCH, DELETE } from "../../app/api/budgets/[id]/route";
 import { createJWT } from "../../src/lib/jwt";
@@ -40,7 +41,7 @@ beforeAll(() => {
 
 beforeEach(async () => {
   await prisma.budgetPolicy.deleteMany({ where: { workspaceId: { in: [WS, OTHER_WS] } } });
-  setTestFeature("budgets", true);
+  setTestFeature(FLAG_KEYS.BUDGETS, true);
   invalidateFlagCache();
 });
 

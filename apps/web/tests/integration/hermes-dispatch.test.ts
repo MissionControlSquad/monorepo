@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
 import { agentCache } from "../../src/server/cache";
@@ -69,7 +70,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE agent_runs, messages, tasks, agents, profiles, secrets CASCADE`,
   );
-  setTestFeature("runners", true);
+  setTestFeature(FLAG_KEYS.RUNNERS, true);
   invalidateFlagCache();
   await createSecret({ workspaceId: WS, name: "HERMES_KEY", value: API_KEY, createdBy: "h" });
 });

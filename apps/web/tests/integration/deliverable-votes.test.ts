@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
@@ -94,12 +95,12 @@ describe("deliverable votes GraphQL (Tier C)", () => {
     expect(seenByC.data.deliverableVotes.myVote).toBe(0);
 
     try {
-      setTestFeature("voting", false);
+      setTestFeature(FLAG_KEYS.VOTING, false);
       invalidateFlagCache();
       const gated = await gql(CAST, { d, v: 1 }, "human_a");
       expect(gated.errors).toBeDefined();
     } finally {
-      resetTestFeature("voting");
+      resetTestFeature(FLAG_KEYS.VOTING);
       invalidateFlagCache();
     }
     void voteSummary;

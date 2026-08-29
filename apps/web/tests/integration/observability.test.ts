@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -142,12 +143,12 @@ describe("workspace summary (Epic #13)", () => {
 
   it("rejects access when OBSERVABILITY is off", async () => {
     try {
-      setTestFeature("observability", false);
+      setTestFeature(FLAG_KEYS.OBSERVABILITY, false);
       invalidateFlagCache();
       const r = await gql(SUMMARY, undefined, await cookieFor(WS_A, "member"));
       expect(r.errors).toBeDefined();
     } finally {
-      resetTestFeature("observability");
+      resetTestFeature(FLAG_KEYS.OBSERVABILITY);
       invalidateFlagCache();
     }
   });

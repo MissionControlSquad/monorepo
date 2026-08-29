@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
@@ -79,7 +80,7 @@ describe("external links GraphQL (Tier C)", () => {
     expect(list.data.taskExternalLinks).toHaveLength(1);
 
     try {
-      setTestFeature("external_links", false);
+      setTestFeature(FLAG_KEYS.EXTERNAL_LINKS, false);
       invalidateFlagCache();
       const gated = await gql(
         `mutation($t:String!,$u:String!){ addExternalLink(taskId:$t, url:$u){ id } }`,
@@ -87,7 +88,7 @@ describe("external links GraphQL (Tier C)", () => {
       );
       expect(gated.errors).toBeDefined();
     } finally {
-      resetTestFeature("external_links");
+      resetTestFeature(FLAG_KEYS.EXTERNAL_LINKS);
       invalidateFlagCache();
     }
   });

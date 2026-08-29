@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
@@ -30,13 +31,13 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE agents CASCADE`);
-  resetTestFeature("runners");
+  resetTestFeature(FLAG_KEYS.RUNNERS);
   invalidateFlagCache();
 });
 
 describe("runtimeAdapters query (Tier D)", () => {
   it("returns the built-in adapters when RUNNERS is on", async () => {
-    setTestFeature("runners", true);
+    setTestFeature(FLAG_KEYS.RUNNERS, true);
     invalidateFlagCache();
     const res = await gql(
       `query{ runtimeAdapters{ key displayName requiresTemplate supportsModel models } }`,
@@ -51,7 +52,7 @@ describe("runtimeAdapters query (Tier D)", () => {
   });
 
   it("setAgentRuntime sets + validates an agent's runtime (admin)", async () => {
-    setTestFeature("runners", true);
+    setTestFeature(FLAG_KEYS.RUNNERS, true);
     invalidateFlagCache();
     const agent = await prisma.agent.create({
       data: { name: "RT", role: "worker", workspaceId: WS, setupStatus: "active" },
@@ -80,7 +81,7 @@ describe("runtimeAdapters query (Tier D)", () => {
   });
 
   it("is RUNNERS-gated", async () => {
-    setTestFeature("runners", false);
+    setTestFeature(FLAG_KEYS.RUNNERS, false);
     invalidateFlagCache();
     const res = await gql(`query{ runtimeAdapters{ key } }`);
     expect(res.errors).toBeDefined();

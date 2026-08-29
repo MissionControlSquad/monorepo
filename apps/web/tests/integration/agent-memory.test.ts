@@ -21,7 +21,7 @@ import {
   setCompanyDefaultMemoryProvider,
   resolveEffectiveMemoryProvider,
 } from "../../src/server/services/agent-memory";
-import { resolveMemoryProvider } from "@agentcenter/utils";
+import { FLAG_KEYS, resolveMemoryProvider } from "@agentcenter/utils";
 
 // Tier D: two-layer memory — control-plane binding + `db` provider storage/provenance + injection.
 const SECRET = "mem-secret";
@@ -42,11 +42,11 @@ async function makeAgent(): Promise<string> {
   return a.id;
 }
 async function enableMemory(on = true) {
-  setTestFeature("memory", on);
+  setTestFeature(FLAG_KEYS.MEMORY, on);
   invalidateFlagCache();
 }
 async function enableRunners() {
-  setTestFeature("runners", true);
+  setTestFeature(FLAG_KEYS.RUNNERS, true);
   invalidateFlagCache();
 }
 function postMemory(body: unknown) {
@@ -80,8 +80,8 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE agent_memories, memory_operations, workspace_memory_settings, agent_runs, tasks, agents CASCADE`,
   );
-  resetTestFeature("memory");
-  resetTestFeature("runners");
+  resetTestFeature(FLAG_KEYS.MEMORY);
+  resetTestFeature(FLAG_KEYS.RUNNERS);
   invalidateFlagCache();
   await enableMemory();
   await enableRunners();

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -43,7 +44,7 @@ async function makeAgentInWs(ws: string) {
 }
 
 async function setFeature(enabled: boolean) {
-  setTestFeature("multi_provider_adapters", enabled);
+  setTestFeature(FLAG_KEYS.MULTI_PROVIDER_ADAPTERS, enabled);
   invalidateFlagCache();
 }
 
@@ -56,7 +57,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  resetTestFeature("multi_provider_adapters");
+  resetTestFeature(FLAG_KEYS.MULTI_PROVIDER_ADAPTERS);
   invalidateFlagCache();
   // agent_adapters is global seed data (not truncated between files), so restore any adapter this
   // file toggled back to enabled so the disabled state can't bleed into other test files.

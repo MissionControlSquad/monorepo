@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -38,12 +39,12 @@ describe("adapter install/remove (Epic #2)", () => {
   beforeAll(async () => {
     process.env.SYSTEM_SECRET = SECRET;
     await prisma.agentAdapter.deleteMany({ where: { type: TEST_TYPE } });
-    setTestFeature("multi_provider_adapters", true);
+    setTestFeature(FLAG_KEYS.MULTI_PROVIDER_ADAPTERS, true);
     invalidateFlagCache();
   });
   afterAll(async () => {
     await prisma.agentAdapter.deleteMany({ where: { type: TEST_TYPE } });
-    resetTestFeature("multi_provider_adapters");
+    resetTestFeature(FLAG_KEYS.MULTI_PROVIDER_ADAPTERS);
     invalidateFlagCache();
   });
 

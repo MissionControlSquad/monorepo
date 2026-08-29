@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { randomUUID } from "node:crypto";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
@@ -38,7 +39,7 @@ async function cookieFor(workspaceId: string, role: "admin" | "member") {
   return `bb-workspace-token=${token}`;
 }
 async function setGovernance(enabled: boolean) {
-  setTestFeature("governance", enabled);
+  setTestFeature(FLAG_KEYS.GOVERNANCE, enabled);
   invalidateFlagCache();
 }
 async function makeAgent(workspaceId: string, over: { role?: string; trustLevel?: any } = {}) {
@@ -66,7 +67,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE approval_policies, approvals, agents, agent_governance_policies, profiles CASCADE`,
   );
-  resetTestFeature("governance");
+  resetTestFeature(FLAG_KEYS.GOVERNANCE);
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "AP Human" } });
   humanId = p.id;

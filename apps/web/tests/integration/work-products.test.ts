@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -38,7 +39,7 @@ beforeEach(async () => {
   humanId = p.id;
   const task = await prisma.task.create({ data: { title: "Ship it", description: "d" } });
   taskId = task.id;
-  setTestFeature("work_products", true);
+  setTestFeature(FLAG_KEYS.WORK_PRODUCTS, true);
   invalidateFlagCache();
 });
 

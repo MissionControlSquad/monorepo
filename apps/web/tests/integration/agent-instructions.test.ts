@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -146,12 +147,12 @@ describe("guards (Epic #18)", () => {
   it("rejects access when AGENT_INSTRUCTIONS is off", async () => {
     const agentId = await makeAgent(WS_A);
     try {
-      setTestFeature("agent_instructions", false);
+      setTestFeature(FLAG_KEYS.AGENT_INSTRUCTIONS, false);
       invalidateFlagCache();
       const r = await gql(LIST, { a: agentId }, await cookieFor(WS_A, "member"));
       expect(r.errors).toBeDefined();
     } finally {
-      resetTestFeature("agent_instructions");
+      resetTestFeature(FLAG_KEYS.AGENT_INSTRUCTIONS);
       invalidateFlagCache();
     }
   });

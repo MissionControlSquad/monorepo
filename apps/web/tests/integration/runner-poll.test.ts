@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
 import { agentCache } from "../../src/server/cache";
@@ -49,7 +50,7 @@ function postResult(key: string, id: string, body: unknown) {
 }
 
 async function enableRunners() {
-  setTestFeature("runners", true);
+  setTestFeature(FLAG_KEYS.RUNNERS, true);
   invalidateFlagCache();
 }
 
@@ -59,7 +60,7 @@ beforeAll(() => {
 beforeEach(async () => {
   agentCache.clear();
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE runner_commands, agents CASCADE`);
-  resetTestFeature("runners");
+  resetTestFeature(FLAG_KEYS.RUNNERS);
   invalidateFlagCache();
   await enableRunners();
   agentId = await makeAgent(KEY);
@@ -161,7 +162,7 @@ describe("runner poll endpoints (Tier D Slice 2)", () => {
   });
 
   it("is feature-gated", async () => {
-    setTestFeature("runners", false);
+    setTestFeature(FLAG_KEYS.RUNNERS, false);
     invalidateFlagCache();
     const res = await getCommands(KEY);
     expect(res.status).toBe(403);

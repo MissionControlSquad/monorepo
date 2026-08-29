@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -327,13 +328,13 @@ describe("feature gate (Epic #16)", () => {
   it("rejects when LEDGER is off", async () => {
     const admin = await cookieFor(WS_A, "admin");
     try {
-      setTestFeature("ledger", false);
+      setTestFeature(FLAG_KEYS.LEDGER, false);
       invalidateFlagCache();
       const r = await gql(`query{ ledgerSummary{ netCents } }`, undefined, admin);
       expect(r.errors).toBeDefined();
       expect(r.data?.ledgerSummary).toBeFalsy();
     } finally {
-      resetTestFeature("ledger");
+      resetTestFeature(FLAG_KEYS.LEDGER);
       invalidateFlagCache();
     }
   });

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -34,7 +35,7 @@ async function cookieFor(workspaceId: string, role: "admin" | "member") {
   return `bb-workspace-token=${token}`;
 }
 async function setPluginSdk(enabled: boolean) {
-  setTestFeature("plugin_sdk", enabled);
+  setTestFeature(FLAG_KEYS.PLUGIN_SDK, enabled);
   invalidateFlagCache();
 }
 const INSTALL = `mutation($m:JSON!){ installPlugin(manifest:$m){ id pluginId version enabled status capabilities } }`;
@@ -55,7 +56,7 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE plugins, profiles CASCADE`);
-  resetTestFeature("plugin_sdk");
+  resetTestFeature(FLAG_KEYS.PLUGIN_SDK);
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Plugin Human" } });
   humanId = p.id;

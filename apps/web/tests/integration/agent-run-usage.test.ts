@@ -6,7 +6,12 @@ import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
 import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import { runTaskInSandbox } from "../../src/server/services/sandbox-run";
-import { registerAdapter, deriveAdapterExecutionResult, type Adapter } from "@agentcenter/utils";
+import {
+  FLAG_KEYS,
+  registerAdapter,
+  deriveAdapterExecutionResult,
+  type Adapter,
+} from "@agentcenter/utils";
 
 // PR #99 tail: the sandbox seam DERIVES a structured adapter execution result and now PERSISTS its
 // usage/errorFamily/exitReason onto the AgentRun ledger (additive columns). This exercises that
@@ -103,7 +108,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE agent_runs, messages, tasks, agents, profiles CASCADE`,
   );
-  setTestFeature("runners", true);
+  setTestFeature(FLAG_KEYS.RUNNERS, true);
   invalidateFlagCache();
 });
 

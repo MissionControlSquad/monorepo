@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -208,7 +209,7 @@ describe("feature gate (parity §3 #7)", () => {
   it("rejects all user-secret ops when SECRETS_VAULT is off", async () => {
     const admin = await cookieFor(WS_A, "admin");
     try {
-      setTestFeature("secrets_vault", false);
+      setTestFeature(FLAG_KEYS.SECRETS_VAULT, false);
       invalidateFlagCache();
       const defs = await gql(`query{ userSecretDefinitions{ id } }`, undefined, admin);
       expect(defs.errors).toBeDefined();
@@ -217,7 +218,7 @@ describe("feature gate (parity §3 #7)", () => {
       const create = await addDefinition("BLOCKED");
       expect(create.errors).toBeDefined();
     } finally {
-      resetTestFeature("secrets_vault");
+      resetTestFeature(FLAG_KEYS.SECRETS_VAULT);
       invalidateFlagCache();
     }
   });

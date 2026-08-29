@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -32,7 +33,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE agent_companies, agents, profiles CASCADE`);
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Founder" } });
   humanId = p.id;
-  setTestFeature("agent_companies", true);
+  setTestFeature(FLAG_KEYS.AGENT_COMPANIES, true);
   invalidateFlagCache();
 });
 

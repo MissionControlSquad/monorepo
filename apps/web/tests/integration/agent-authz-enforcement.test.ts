@@ -9,7 +9,7 @@ import {
   requireAgentCapability,
   grantAgentCapability,
 } from "../../src/server/services/agent-authz";
-import { AGENT_CAPABILITY } from "@agentcenter/utils";
+import { FLAG_KEYS, AGENT_CAPABILITY } from "@agentcenter/utils";
 import { createTestAgent } from "../helpers";
 
 // Parity #9/#10 — the agent capability ENFORCEMENT machinery (requireAgentCapability).
@@ -17,7 +17,7 @@ let agentId = "";
 let role = "worker";
 
 async function enableAuthz(on = true) {
-  setTestFeature("agent_authz", on);
+  setTestFeature(FLAG_KEYS.AGENT_AUTHZ, on);
   invalidateFlagCache();
 }
 
@@ -33,7 +33,7 @@ beforeEach(async () => {
   await prisma.agentAuthzEvent.deleteMany({});
   await prisma.agentCapabilityGrant.deleteMany({});
   await prisma.agentTrustProfile.deleteMany({});
-  resetTestFeature("agent_authz");
+  resetTestFeature(FLAG_KEYS.AGENT_AUTHZ);
   invalidateFlagCache();
   const { agent } = await createTestAgent({ role: "worker" });
   agentId = agent.id;

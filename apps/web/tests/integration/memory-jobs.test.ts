@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import {
@@ -17,7 +18,7 @@ const WS = "ws_memjobs";
 const AGENT = "agent_memjobs";
 
 async function setFlag(on: boolean) {
-  setTestFeature("memory", on);
+  setTestFeature(FLAG_KEYS.MEMORY, on);
   invalidateFlagCache();
 }
 

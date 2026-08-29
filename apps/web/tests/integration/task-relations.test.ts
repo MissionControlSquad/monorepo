@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
@@ -121,7 +122,7 @@ describe("task relations GraphQL (Tier C)", () => {
     const a = await makeTask("A");
     const b = await makeTask("B");
     try {
-      setTestFeature("task_relations", false);
+      setTestFeature(FLAG_KEYS.TASK_RELATIONS, false);
       invalidateFlagCache();
       const r = await gql(
         `mutation($s:String!,$t:String!){ linkTasks(sourceTaskId:$s, targetTaskId:$t, type:"blocks"){ id } }`,
@@ -129,7 +130,7 @@ describe("task relations GraphQL (Tier C)", () => {
       );
       expect(r.errors).toBeDefined();
     } finally {
-      resetTestFeature("task_relations");
+      resetTestFeature(FLAG_KEYS.TASK_RELATIONS);
       invalidateFlagCache();
     }
   });

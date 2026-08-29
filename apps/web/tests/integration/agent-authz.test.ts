@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -53,7 +54,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE agent_capability_grants, agent_authz_events, agent_trust_profiles, agents, profiles CASCADE`,
   );
-  resetTestFeature("agent_authz");
+  resetTestFeature(FLAG_KEYS.AGENT_AUTHZ);
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Authz Human" } });
   humanId = p.id;
@@ -142,14 +143,14 @@ describe("enforcement — requireAgentCapability (Epic #21)", () => {
     const id = await makeAgent(WS_A);
     await restrict(id, WS_A);
     try {
-      setTestFeature("agent_authz", false);
+      setTestFeature(FLAG_KEYS.AGENT_AUTHZ, false);
       invalidateFlagCache();
       // even a restricted, ungranted capability is allowed when the feature is off
       await expect(
         requireAgentCapability({ id, role: "worker" }, "host.write"),
       ).resolves.toBeUndefined();
     } finally {
-      resetTestFeature("agent_authz");
+      resetTestFeature(FLAG_KEYS.AGENT_AUTHZ);
       invalidateFlagCache();
     }
   });
@@ -159,12 +160,12 @@ describe("gate (Epic #21)", () => {
   it("rejects grant reads when AGENT_AUTHZ is off", async () => {
     const agentId = await makeAgent(WS_A);
     try {
-      setTestFeature("agent_authz", false);
+      setTestFeature(FLAG_KEYS.AGENT_AUTHZ, false);
       invalidateFlagCache();
       const r = await gql(GRANTS, { a: agentId }, await cookieFor(WS_A, "member"));
       expect(r.errors).toBeDefined();
     } finally {
-      resetTestFeature("agent_authz");
+      resetTestFeature(FLAG_KEYS.AGENT_AUTHZ);
       invalidateFlagCache();
     }
   });

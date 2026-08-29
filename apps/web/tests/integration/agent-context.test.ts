@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
 import { agentCache } from "../../src/server/cache";
@@ -40,7 +41,7 @@ function getContext(taskId: string | null, key = KEY) {
 }
 
 async function enableRunners() {
-  setTestFeature("runners", true);
+  setTestFeature(FLAG_KEYS.RUNNERS, true);
   invalidateFlagCache();
 }
 
@@ -52,7 +53,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE deliverables, documents, tasks, project_members, projects, agent_skills, skills, agent_instructions, agents, profiles CASCADE`,
   );
-  resetTestFeature("runners");
+  resetTestFeature(FLAG_KEYS.RUNNERS);
   invalidateFlagCache();
   await enableRunners();
   agentId = await makeAgent(KEY);
@@ -203,7 +204,7 @@ describe("agent context endpoint (Tier D Slice 3)", () => {
 
   it("is feature-gated", async () => {
     const { taskId } = await makeProjectTask();
-    setTestFeature("runners", false);
+    setTestFeature(FLAG_KEYS.RUNNERS, false);
     invalidateFlagCache();
     const res = await getContext(taskId);
     expect(res.status).toBe(403);

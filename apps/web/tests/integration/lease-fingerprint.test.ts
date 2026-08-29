@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { existsSync } from "node:fs";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
@@ -21,7 +22,7 @@ beforeEach(async () => {
     `TRUNCATE TABLE environment_leases, environments, agent_runs, messages, tasks, agents, profiles,
        secret_bindings, secret_versions, secret_access_events, secrets CASCADE`,
   );
-  setTestFeature("runners", true);
+  setTestFeature(FLAG_KEYS.RUNNERS, true);
   invalidateFlagCache();
 });
 

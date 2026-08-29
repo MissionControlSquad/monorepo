@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -34,7 +35,7 @@ async function cookieFor(workspaceId: string, role: "admin" | "member") {
   return `bb-workspace-token=${token}`;
 }
 async function setBoardChat(enabled: boolean) {
-  setTestFeature("board_chat", enabled);
+  setTestFeature(FLAG_KEYS.BOARD_CHAT, enabled);
   invalidateFlagCache();
 }
 const SEND = `mutation($b:String!){ sendBoardMessage(body:$b){ id role body } }`;
@@ -45,7 +46,7 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE board_threads, profiles CASCADE`);
-  resetTestFeature("board_chat");
+  resetTestFeature(FLAG_KEYS.BOARD_CHAT);
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Board Human" } });
   humanId = p.id;

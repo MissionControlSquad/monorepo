@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -53,7 +54,7 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE api_keys, goals, profiles CASCADE`);
-  resetTestFeature("api_keys");
+  resetTestFeature(FLAG_KEYS.API_KEYS);
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "KeyAuth Human" } });
   humanId = p.id;
@@ -93,12 +94,12 @@ describe("API-key auth middleware (Epic #12)", () => {
   it("is a kill-switch: disabling API_KEYS stops key auth", async () => {
     const { plainKey } = await mintKey(WS_A);
     try {
-      setTestFeature("api_keys", false);
+      setTestFeature(FLAG_KEYS.API_KEYS, false);
       invalidateFlagCache();
       const r = await gql(`query{ goals{ id } }`, undefined, bearer(plainKey));
       expect(r.errors).toBeDefined();
     } finally {
-      resetTestFeature("api_keys");
+      resetTestFeature(FLAG_KEYS.API_KEYS);
       invalidateFlagCache();
     }
   });

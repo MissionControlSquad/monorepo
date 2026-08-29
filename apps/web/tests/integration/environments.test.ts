@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
 import { createJWT } from "../../src/lib/jwt";
@@ -31,7 +32,7 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE environments, agents CASCADE`);
-  setTestFeature("environments", true);
+  setTestFeature(FLAG_KEYS.ENVIRONMENTS, true);
   invalidateFlagCache();
 });
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -172,12 +173,12 @@ describe("attention feed (Epic #20)", () => {
 
   it("rejects access when ATTENTION is off", async () => {
     try {
-      setTestFeature("attention", false);
+      setTestFeature(FLAG_KEYS.ATTENTION, false);
       invalidateFlagCache();
       const r = await gql(FEED, undefined, await cookieFor(WS_A, "member"));
       expect(r.errors).toBeDefined();
     } finally {
-      resetTestFeature("attention");
+      resetTestFeature(FLAG_KEYS.ATTENTION);
       invalidateFlagCache();
     }
   });

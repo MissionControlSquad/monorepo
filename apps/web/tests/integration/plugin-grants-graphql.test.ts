@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -61,8 +62,8 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE plugins, plugin_grants, profiles CASCADE`);
-  resetTestFeature("plugin_sdk");
-  resetTestFeature("plugin_runtime");
+  resetTestFeature(FLAG_KEYS.PLUGIN_SDK);
+  resetTestFeature(FLAG_KEYS.PLUGIN_RUNTIME);
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "Grant Human" } });
   humanId = p.id;
@@ -70,17 +71,17 @@ beforeEach(async () => {
 
 describe("plugin capability grants — GraphQL guards (#103)", () => {
   it("grant is PLUGIN_RUNTIME-gated and admin-only, fail-closed by default", async () => {
-    await setFlag("plugin_sdk", true);
+    await setFlag(FLAG_KEYS.PLUGIN_SDK, true);
     const admin = await cookieFor(WS_A, "admin");
     await gql(INSTALL, { m: manifest }, admin);
 
     // Flag off → feature disabled (the route masks the message; presence of an error is the signal).
-    await setFlag("plugin_runtime", false);
+    await setFlag(FLAG_KEYS.PLUGIN_RUNTIME, false);
     const off = await gql(GRANT, { p: "acme", c: "agent.tools.register" }, admin);
     expect(off.errors).toBeDefined();
     expect(off.data?.grantPluginCapability ?? null).toBeNull();
 
-    await setFlag("plugin_runtime", true);
+    await setFlag(FLAG_KEYS.PLUGIN_RUNTIME, true);
 
     // member role → forbidden.
     const member = await cookieFor(WS_A, "member");
@@ -102,8 +103,8 @@ describe("plugin capability grants — GraphQL guards (#103)", () => {
   });
 
   it("list + revoke, and workspace isolation", async () => {
-    await setFlag("plugin_sdk", true);
-    await setFlag("plugin_runtime", true);
+    await setFlag(FLAG_KEYS.PLUGIN_SDK, true);
+    await setFlag(FLAG_KEYS.PLUGIN_RUNTIME, true);
     const adminA = await cookieFor(WS_A, "admin");
     const adminB = await cookieFor(WS_B, "admin");
     await gql(INSTALL, { m: manifest }, adminA);

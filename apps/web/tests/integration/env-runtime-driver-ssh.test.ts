@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { hashApiKey } from "../../src/server/api-key";
 import { agentCache } from "../../src/server/cache";
@@ -86,14 +87,14 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE agent_runs, messages, tasks, agents, profiles, environments, environment_leases, secrets CASCADE`,
   );
-  await setFlag("environments", true);
-  await setFlag("execution_policy", true);
+  await setFlag(FLAG_KEYS.ENVIRONMENTS, true);
+  await setFlag(FLAG_KEYS.EXECUTION_POLICY, true);
 });
 
 // Reset the flags this suite flips so they never leak `true` into unrelated suites (shared test DB).
 afterAll(async () => {
-  await setFlag("environments", false);
-  await setFlag("execution_policy", false);
+  await setFlag(FLAG_KEYS.ENVIRONMENTS, false);
+  await setFlag(FLAG_KEYS.EXECUTION_POLICY, false);
 });
 
 describe("unified driver routing per env kind", () => {
@@ -225,7 +226,7 @@ describe("ssh runtime round-trip (injected transport)", () => {
   });
 
   it("ssh stays not-runnable when ENVIRONMENTS is off (back-compat)", async () => {
-    await setFlag("environments", false);
+    await setFlag(FLAG_KEYS.ENVIRONMENTS, false);
     const env = await createEnvironment(WS, {
       name: "Host",
       driver: "ssh",
@@ -305,7 +306,7 @@ describe("pre-dispatch config/binding gate (configuration_incomplete)", () => {
   });
 
   it("does not gate when EXECUTION_POLICY is off (a missing binding fails later, not pre-dispatch)", async () => {
-    await setFlag("execution_policy", false);
+    await setFlag(FLAG_KEYS.EXECUTION_POLICY, false);
     const env = await createEnvironment(WS, {
       name: "Unbound host",
       driver: "ssh",

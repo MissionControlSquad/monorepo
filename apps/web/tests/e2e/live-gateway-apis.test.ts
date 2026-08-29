@@ -15,6 +15,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { invalidateFlagCache, setTestFeature } from "../../src/server/feature-flags";
 import { adminSetup, adminLogin, extractSessionCookie, buildRequest, callRoute } from "../helpers";
@@ -63,7 +64,7 @@ function unauthed(method: string, url: string, body?: unknown): Request {
 
 /** Enable or disable the live_gateway feature flag and bust the cache. */
 async function setLiveGatewayFlag(enabled: boolean) {
-  setTestFeature("live_gateway", enabled);
+  setTestFeature(FLAG_KEYS.LIVE_GATEWAY, enabled);
   invalidateFlagCache();
 }
 

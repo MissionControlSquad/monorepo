@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -187,7 +188,7 @@ describe("import (Epic #14)", () => {
 describe("gate (Epic #14)", () => {
   it("rejects export when WORKSPACE_PORTABILITY is off", async () => {
     try {
-      setTestFeature("workspace_portability", false);
+      setTestFeature(FLAG_KEYS.WORKSPACE_PORTABILITY, false);
       invalidateFlagCache();
       const r = await gql(
         `query{ exportWorkspaceBundle }`,
@@ -196,7 +197,7 @@ describe("gate (Epic #14)", () => {
       );
       expect(r.errors).toBeDefined();
     } finally {
-      resetTestFeature("workspace_portability");
+      resetTestFeature(FLAG_KEYS.WORKSPACE_PORTABILITY);
       invalidateFlagCache();
     }
   });

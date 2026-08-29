@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { POST } from "../../app/api/graphql/route";
 import { createJWT } from "../../src/lib/jwt";
 import { prisma } from "../../src/server/prisma";
@@ -45,7 +46,7 @@ beforeAll(() => {
 });
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE tasks, goals, projects, agents, profiles CASCADE`);
-  resetTestFeature("goals");
+  resetTestFeature(FLAG_KEYS.GOALS);
   invalidateFlagCache();
   const p = await prisma.profile.create({ data: { kind: "human", displayName: "GT Human" } });
   humanId = p.id;
@@ -85,7 +86,7 @@ describe("createTask goal auto-resolution (Epic #11b)", () => {
 
   it("does not auto-assign when GOALS is disabled", async () => {
     await companyGoal(WS_A);
-    setTestFeature("goals", false);
+    setTestFeature(FLAG_KEYS.GOALS, false);
     invalidateFlagCache();
     const r = await gql(CREATE, { t: "T", d: "d" }, await cookieFor(WS_A));
     expect(r.data.createTask.goalId).toBeNull();

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { FLAG_KEYS } from "@agentcenter/utils";
 import { prisma } from "../../src/server/prisma";
 import { createJWT } from "../../src/lib/jwt";
 import { POST as GRAPHQL } from "../../app/api/graphql/route";
@@ -71,7 +72,7 @@ async function makeHost(): Promise<string> {
 }
 
 async function enableRunners() {
-  setTestFeature("runners", true);
+  setTestFeature(FLAG_KEYS.RUNNERS, true);
   invalidateFlagCache();
 }
 
@@ -81,7 +82,7 @@ beforeAll(() => {
 beforeEach(async () => {
   mockedSshExec.mockReset();
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE runner_commands, runner_hosts CASCADE`);
-  resetTestFeature("runners");
+  resetTestFeature(FLAG_KEYS.RUNNERS);
   invalidateFlagCache();
 });
 
@@ -254,7 +255,7 @@ describe("runner-commands GraphQL (Tier D)", () => {
     expect(denied.errors).toBeDefined();
 
     // disable the flag → gated
-    setTestFeature("runners", false);
+    setTestFeature(FLAG_KEYS.RUNNERS, false);
     invalidateFlagCache();
     const gated = await gql(`query($hostId:String!){ runnerCommands(targetId:$hostId){ id } }`, {
       hostId,
