@@ -2,7 +2,7 @@
 # Build with: docker build -f apps/web/Dockerfile .
 
 # ── Stage 1: Install dependencies ──────────────────────────────────
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 
 # Copy workspace manifests (for npm workspaces install)
@@ -22,7 +22,7 @@ COPY packages/database/prisma ./packages/database/prisma
 RUN npm ci --workspace=apps/web --include-workspace-root
 
 # ── Stage 2: Build the Next.js app ────────────────────────────────
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 
 # Copy all installed dependencies (includes workspace-level node_modules)
@@ -43,7 +43,7 @@ RUN npm run build
 RUN npm run build:server
 
 # ── Stage 3: Production runner ─────────────────────────────────────
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 
 LABEL org.opencontainers.image.title="AgentCenter"
