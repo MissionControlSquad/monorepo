@@ -24,19 +24,12 @@ export interface TeamAgent {
 
 interface TeamPreviewStepProps {
   team: TeamAgent[];
-  licenseLimit: number | null;
   onUpdateTeam: (team: TeamAgent[]) => void;
   onBack: () => void;
   onCreate: () => void;
 }
 
-export function TeamPreviewStep({
-  team,
-  licenseLimit,
-  onUpdateTeam,
-  onBack,
-  onCreate,
-}: TeamPreviewStepProps) {
+export function TeamPreviewStep({ team, onUpdateTeam, onBack, onCreate }: TeamPreviewStepProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
@@ -77,8 +70,6 @@ export function TeamPreviewStep({
     onUpdateTeam([...team, newAgent]);
   };
 
-  const atLimit = licenseLimit !== null && team.length >= licenseLimit;
-  const overLimit = licenseLimit !== null && team.length > licenseLimit;
   const editingAgent = editIndex !== null ? team[editIndex] : null;
 
   return (
@@ -114,15 +105,13 @@ export function TeamPreviewStep({
                 Review your team, edit details, and add or remove agents
               </p>
             </div>
-            {!atLimit && (
-              <button
-                onClick={() => setDialogOpen(true)}
-                className="shrink-0 h-8 px-3 rounded-lg border border-dashed border-border hover:border-muted-foreground/40 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 text-xs sm:text-sm"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Add Agent</span>
-              </button>
-            )}
+            <button
+              onClick={() => setDialogOpen(true)}
+              className="shrink-0 h-8 px-3 rounded-lg border border-dashed border-border hover:border-muted-foreground/40 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 text-xs sm:text-sm"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Add Agent</span>
+            </button>
           </div>
         </div>
       </div>
@@ -148,15 +137,13 @@ export function TeamPreviewStep({
             ))}
 
             {/* Add agent card */}
-            {!atLimit && (
-              <button
-                onClick={() => setDialogOpen(true)}
-                className="min-h-[100px] rounded-xl border border-dashed border-border hover:border-muted-foreground/40 text-muted-foreground hover:text-foreground transition-colors flex flex-col items-center justify-center gap-1.5 text-sm"
-              >
-                <Plus className="w-5 h-5" />
-                <span>Add Agent</span>
-              </button>
-            )}
+            <button
+              onClick={() => setDialogOpen(true)}
+              className="min-h-[100px] rounded-xl border border-dashed border-border hover:border-muted-foreground/40 text-muted-foreground hover:text-foreground transition-colors flex flex-col items-center justify-center gap-1.5 text-sm"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Add Agent</span>
+            </button>
           </div>
         </div>
       </div>
@@ -164,28 +151,11 @@ export function TeamPreviewStep({
       {/* Sticky footer */}
       <div className="shrink-0 border-t border-border px-4 py-2.5 sm:py-3 bg-muted">
         <div className="max-w-4xl w-full mx-auto flex items-center justify-between gap-4">
-          {licenseLimit !== null ? (
-            <span className="text-xs sm:text-sm text-muted-foreground">
-              {team.length} / {licenseLimit} agent limit
-            </span>
-          ) : (
-            <span />
-          )}
-          <Button
-            onClick={onCreate}
-            disabled={team.length === 0 || overLimit}
-            className="px-5 sm:px-8"
-          >
+          <span />
+          <Button onClick={onCreate} disabled={team.length === 0} className="px-5 sm:px-8">
             Create {team.length} Agent{team.length !== 1 ? "s" : ""}
           </Button>
         </div>
-        {overLimit && (
-          <div className="max-w-4xl w-full mx-auto">
-            <p className="mt-1.5 text-xs sm:text-sm text-destructive text-right">
-              Team exceeds your license limit of {licenseLimit} agents. Remove some to continue.
-            </p>
-          </div>
-        )}
       </div>
 
       <AddAgentDialog

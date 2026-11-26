@@ -57,14 +57,6 @@ const serverSchema = z.object({
     .optional()
     .transform((v) => v || undefined),
 
-  // ── License ─────────────────────────────────────────────────
-  LICENSE_SERVER_URL: z
-    .union([z.string().url(), z.literal("")])
-    .optional()
-    .transform((v) => v || undefined),
-  LICENSE_REFRESH_TOKEN: z.string().optional(),
-  LICENSE_PUBLIC_KEY: z.string().optional(),
-
   // ── Redis (optional — only needed when using pub/sub or caching) ──
   REDIS_URL: z.string().url().optional(),
 

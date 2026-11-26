@@ -4,7 +4,6 @@ import { prisma } from "@/server/prisma";
 import type { GraphQLContext } from "@/server/graphql/builder";
 import { verifySessionToken, COOKIE_NAME } from "@/server/admin-auth";
 import { resolveTenancy } from "@/server/tenancy";
-import { isLicenseActive } from "@/server/license";
 import { apiLimiters, checkRateLimit } from "../_lib/rate-limit-check";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
@@ -88,16 +87,8 @@ function estimateQueryDepth(query: string): number {
   return maxDepth;
 }
 
-function withLicenseAndRateLimit(handler: (req: Request) => Promise<Response>) {
+function withRateLimit(handler: (req: Request) => Promise<Response>) {
   return async (req: Request) => {
-    // License gate — block all GraphQL when license is not active
-    const licensed = await isLicenseActive();
-    if (!licensed) {
-      return Response.json(
-        { errors: [{ message: "License not active. Please activate your license at /activate" }] },
-        { status: 403 },
-      );
-    }
     const limited = await checkRateLimit(apiLimiters.graphql, req);
     if (limited) return limited;
 
@@ -134,5 +125,5 @@ function withLicenseAndRateLimit(handler: (req: Request) => Promise<Response>) {
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-export const GET = withLicenseAndRateLimit(yogaHandler);
-export const POST = withLicenseAndRateLimit(yogaHandler);
+export const GET = withRateLimit(yogaHandler);
+export const POST = withRateLimit(yogaHandler);

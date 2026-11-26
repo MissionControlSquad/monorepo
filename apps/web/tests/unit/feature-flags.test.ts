@@ -7,12 +7,6 @@ vi.mock("@agentcenter/database", () => ({
   listAllFeatureFlags: (...args: unknown[]) => mockListAllFeatureFlags(...args),
 }));
 
-// Mock the license module — in tests, all features are licensed and no license configured
-vi.mock("../../src/server/license", () => ({
-  isFeatureLicensed: vi.fn().mockResolvedValue(true),
-  getLicenseStatus: vi.fn().mockResolvedValue({ status: "none" }),
-}));
-
 import {
   getFeatureFlags,
   isFeatureEnabled,
@@ -79,6 +73,14 @@ describe("feature-flags server module", () => {
 
     it("defaults to true for unknown flag", async () => {
       expect(await isFeatureEnabled("nonexistent_flag")).toBe(true);
+    });
+
+    it("lets the flag alone decide in production (no license gate)", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      expect(await isFeatureEnabled("channels")).toBe(true);
+      expect(await isFeatureEnabled("terminals")).toBe(false);
+      expect(await isFeatureEnabled("nonexistent_flag")).toBe(true);
+      vi.unstubAllEnvs();
     });
   });
 

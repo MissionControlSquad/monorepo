@@ -19,7 +19,13 @@ import { useAgentStatus } from "../context/AgentStatusContext";
 import { type AgentLevelValue } from "@/server/constants";
 
 type Step =
-  "welcome" | "install-mode" | "local-install" | "use-case" | "preview" | "creating" | "success";
+  | "welcome"
+  | "install-mode"
+  | "local-install"
+  | "use-case"
+  | "preview"
+  | "creating"
+  | "success";
 
 function nameToUsername(name: string): string {
   return name
@@ -57,27 +63,8 @@ export function OnboardingWizard() {
   const [team, setTeam] = useState<TeamAgent[]>([]);
   const [createdCount, setCreatedCount] = useState(0);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [licenseLimit, setLicenseLimit] = useState<number | null>(null);
   const [resolved, setResolved] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
-
-  const fetchLicenseLimit = useCallback(async () => {
-    try {
-      const res = await fetch(API_ROUTES.license.get);
-      if (res.ok) {
-        const data = await res.json();
-        const limit = data.maxAgents;
-        setLicenseLimit(limit === -1 ? null : (limit ?? null));
-      }
-    } catch {
-      // Non-critical
-    }
-  }, []);
-
-  // Pre-fetch license limit on mount
-  useEffect(() => {
-    fetchLicenseLimit();
-  }, [fetchLicenseLimit]);
 
   // On mount: fetch saved progress from the API.
   useEffect(() => {
@@ -131,10 +118,8 @@ export function OnboardingWizard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ categoryId: useCase.id }),
       }).catch(() => {});
-
-      if (licenseLimit === null) fetchLicenseLimit();
     },
-    [licenseLimit, fetchLicenseLimit, goToStep],
+    [goToStep],
   );
 
   const handleBack = useCallback(
@@ -253,7 +238,6 @@ export function OnboardingWizard() {
         return (
           <TeamPreviewStep
             team={team}
-            licenseLimit={licenseLimit}
             onUpdateTeam={setTeam}
             onBack={() => handleBack("use-case")}
             onCreate={handleCreate}

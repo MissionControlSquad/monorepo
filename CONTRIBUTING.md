@@ -24,8 +24,7 @@ npm run db:migrate
 npm run dev
 ```
 
-Set `LICENSE_DEV_BYPASS=1` in `apps/web/.env` for local development; it only takes effect outside
-production builds. See [Project status](README.md#project-status) for why.
+No license key is needed: the app runs fully unlocked out of the box.
 
 ## Before you open a pull request
 

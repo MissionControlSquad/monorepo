@@ -11,11 +11,12 @@ The hosted AgentCenter app service and its license server have been shut down, a
 now open source under the [MIT License](LICENSE). It is provided as-is and maintained on a best-effort
 basis.
 
-> [!WARNING]
-> The app still checks a license against the shut-down license server (`LICENSE_SERVER_URL`, see
-> [`apps/web/src/server/license.ts`](apps/web/src/server/license.ts)). Until that gate is removed or
-> replaced, new self-hosted installations can't be activated and existing ones stop working once their
-> cached license expires (3-day grace period). Contributions that remove the gate are welcome.
+No license key is needed. The app no longer contacts any license server: every feature is on and
+there are no limits on agents, projects or seats.
+
+> [!NOTE]
+> Docker images published before this change still contain the old license check. Build the image
+> from this repository, or use an image published after this change.
 
 ## Self-Hosted Quick Start
 
@@ -32,7 +33,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Open `http://localhost:3000`, activate your license, and create your admin account.
+Open `http://localhost:3000` and create your admin account.
 
 Full setup guide: [apps/web/self-hosted/SETUP.md](apps/web/self-hosted/SETUP.md)
 
@@ -52,8 +53,6 @@ The Docker Compose setup runs three services:
 | Docker Compose | v2.0+ |
 | RAM | 2 GB |
 | Disk | 10 GB |
-
-The app currently asks for a **license key** on first start; see [Project status](#project-status).
 
 ## Docker Image
 

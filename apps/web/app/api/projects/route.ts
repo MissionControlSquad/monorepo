@@ -6,7 +6,6 @@ import { parsePaginationParams } from "../_lib/pagination";
 import { ProjectStatus, ProjectMemberStatus } from "@/server/constants";
 import { getOrCreateAgentProfileId } from "@/server/agent-profile";
 import { squadLeadRequired } from "../_lib/project-access";
-import { checkLicenseLimit } from "@/server/license";
 
 export async function GET(request: Request) {
   try {
@@ -52,16 +51,6 @@ export async function POST(request: Request) {
     if (guard) return guard;
 
     const { name, description, memberIds } = v.data;
-
-    // Enforce license limit on project count
-    const projectCount = await projectModel.count({ where: { status: ProjectStatus.ACTIVE } });
-    const limitCheck = await checkLicenseLimit("projects", projectCount);
-    if (!limitCheck.allowed) {
-      return errorResponse(
-        `Project limit reached (${limitCheck.limit}). Upgrade your plan to add more projects.`,
-        403,
-      );
-    }
 
     // Always include the creating Squad Lead
     const allMemberIds = [...new Set([...(memberIds ?? []), agent.id])];
