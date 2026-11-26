@@ -27,7 +27,9 @@ permissions: {}
 jobs:
   e2e:
     name: Playwright (chromium)
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which Playwright 1.55 can't install
+    # browsers on. Move to ubuntu-latest again after upgrading @playwright/test.
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 30
