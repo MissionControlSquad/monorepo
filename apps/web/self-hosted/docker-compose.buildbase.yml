@@ -20,7 +20,7 @@ volumes:
 services:
   # ── buildbase MongoDB ────────────────────────────────────────────
   bb-mongodb:
-    image: ${BB_MONGO_IMAGE:-mongo:7}
+    image: ${BB_MONGO_IMAGE:-mongo:9}
     restart: unless-stopped
     volumes:
       - bb_mongo_data:/data/db
