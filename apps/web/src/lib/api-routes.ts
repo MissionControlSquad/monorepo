@@ -19,9 +19,6 @@ export const API_ROUTES = {
     start: "/api/cli-auth/start",
     poll: "/api/cli-auth/poll",
   },
-  license: {
-    get: "/api/license",
-  },
   liveGateway: {
     connections: "/api/live-gateway/connections",
     tokens: "/api/live-gateway/tokens",

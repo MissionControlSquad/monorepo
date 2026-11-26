@@ -5,7 +5,6 @@ import { invalidateProjectsList } from "../../cache";
 import { Roles, ProjectStatus, ProjectMemberStatus } from "../../constants";
 import { getOrCreateAgentProfileId } from "../../agent-profile";
 import { findProfilesWithAgentIdsByIds, findProfileAgentId } from "@agentcenter/database";
-import { checkLicenseLimit } from "../../license";
 import { requireRole, scoped } from "@/server/tenancy";
 import { isProjectSourceType, isProjectVisibility, sourceTypeUsesRepo } from "@agentcenter/utils";
 
@@ -19,15 +18,6 @@ builder.mutationField("createProject", (t) =>
       memberIds: t.arg.stringList(),
     },
     resolve: async (query, _root, args) => {
-      // Enforce license limit on project count
-      const projectCount = await projectModel.count({ where: { status: ProjectStatus.ACTIVE } });
-      const limitCheck = await checkLicenseLimit("projects", projectCount);
-      if (!limitCheck.allowed) {
-        throw new Error(
-          `Project limit reached (${limitCheck.limit}). Upgrade your plan to add more projects.`,
-        );
-      }
-
       // Auto-include Squad Lead's profile
       const squadLead = await agentModel.findOne({
         where: { role: Roles.SQUAD_LEAD },

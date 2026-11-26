@@ -1,5 +1,4 @@
 import { agentModel } from "@/server/models";
-import { checkLicenseLimit } from "@/server/license";
 import { Prisma } from "@agentcenter/database";
 import { successResponse, errorResponse, handleError } from "../../_lib/json-response";
 import { validateBody, batchCreateAgentSchema } from "../../_lib/validation";
@@ -19,23 +18,8 @@ export async function POST(request: Request) {
 
     const { agents } = parsed.data;
 
-    // Check license limit
+    // Existing agent count staggers the new agents' cron schedules
     const agentCount = await agentModel.count();
-    const limitCheck = await checkLicenseLimit("agents", agentCount);
-    if (!limitCheck.allowed) {
-      return errorResponse(
-        `Agent limit reached (${limitCheck.limit}). Upgrade your plan to add more agents.`,
-        403,
-      );
-    }
-
-    // -1 means unlimited
-    if (limitCheck.limit !== -1 && agentCount + agents.length > limitCheck.limit) {
-      return errorResponse(
-        `Adding ${agents.length} agents would exceed your limit of ${limitCheck.limit}. You currently have ${agentCount} agent(s).`,
-        403,
-      );
-    }
 
     // Verify all usernames are unique within the batch
     const usernames = agents.map((a) => a.username).filter((u): u is string => !!u);

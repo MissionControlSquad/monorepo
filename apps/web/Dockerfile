@@ -52,7 +52,7 @@ LABEL org.opencontainers.image.url="https://agentcenter.cloud"
 LABEL org.opencontainers.image.source="https://github.com/MissionControlSquad/app"
 LABEL org.opencontainers.image.documentation="https://github.com/MissionControlSquad/app/blob/main/self-hosted/SETUP.md"
 LABEL org.opencontainers.image.vendor="AgentCenter"
-LABEL org.opencontainers.image.licenses="Proprietary"
+LABEL org.opencontainers.image.licenses="MIT"
 
 ENV NODE_ENV=production
 ENV PORT=3000

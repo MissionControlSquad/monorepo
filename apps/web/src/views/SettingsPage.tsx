@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation } from "urql";
-import { ShieldOff, Lock, KeyRound, FlaskConical, Brain } from "lucide-react";
+import { ShieldOff, Lock, FlaskConical, Brain } from "lucide-react";
 import {
   SET_SYSTEM_SHUTDOWN,
   SYSTEM_SETTINGS_QUERY,
@@ -21,7 +21,15 @@ import {
 } from "@/lib/graphql/mutations";
 import { useFeatureFlag } from "@/components/context/FeatureFlagContext";
 import { MEMORY_PROVIDERS, FLAG_KEYS } from "@agentcenter/utils";
-import { Breadcrumbs, Card, Button, ConfirmDialog, PageLayout, Select, Checkbox } from "../components/ui";
+import {
+  Breadcrumbs,
+  Card,
+  Button,
+  ConfirmDialog,
+  PageLayout,
+  Select,
+  Checkbox,
+} from "../components/ui";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -34,8 +42,6 @@ import {
   FormMessage,
 } from "@/components/ui/shadcn/form";
 import { Input } from "@/components/ui/shadcn/input";
-import { LicenseStatusCode } from "@/server/constants";
-import { API_ROUTES } from "@/lib/api-routes";
 import { SidebarCustomizeCard } from "@/components/layout/sidebar/SidebarCustomizeCard";
 import { AppearanceCard } from "@/components/settings/AppearanceCard";
 import { BuildbaseAccountCard } from "@/components/settings/BuildbaseAccountCard";
@@ -61,23 +67,6 @@ export function SettingsPage() {
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
-  const [licenseInfo, setLicenseInfo] = useState<{
-    status: string;
-    plan: string | null;
-    org: string | null;
-    expiresAt: string | null;
-    features: string[];
-    maxAgents: number;
-    maxProjects: number;
-    maxSeats: number;
-  } | null>(null);
-
-  useEffect(() => {
-    fetch(API_ROUTES.license.get)
-      .then((r) => r.json())
-      .then(setLicenseInfo)
-      .catch(() => {});
-  }, []);
 
   const form = useForm<ChangePasswordValues>({
     resolver: zodResolver(changePasswordSchema),
@@ -214,81 +203,6 @@ export function SettingsPage() {
 
       {/* Experimental feature flags */}
       <FeatureFlagsCard />
-
-      {/* License */}
-      {licenseInfo && licenseInfo.status !== LicenseStatusCode.NONE && (
-        <Card padding="lg" className="space-y-4">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-muted">
-              <KeyRound className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-base font-semibold text-foreground">License</h2>
-              <p className="text-sm text-muted-foreground mt-1">Your current license details</p>
-            </div>
-            <span
-              className={`text-xs px-2 py-1 rounded-full font-medium ${
-                licenseInfo.status === LicenseStatusCode.ACTIVE
-                  ? "bg-success-muted text-success"
-                  : licenseInfo.status === LicenseStatusCode.GRACE
-                    ? "bg-warning-muted text-warning"
-                    : "bg-destructive/10 text-destructive"
-              }`}
-            >
-              {licenseInfo.status}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            {licenseInfo.org && (
-              <div>
-                <span className="text-muted-foreground">Organization</span>
-                <p className="font-medium text-foreground">{licenseInfo.org}</p>
-              </div>
-            )}
-            {licenseInfo.plan && (
-              <div>
-                <span className="text-muted-foreground">Plan</span>
-                <p className="font-medium text-foreground capitalize">{licenseInfo.plan}</p>
-              </div>
-            )}
-            {licenseInfo.expiresAt && (
-              <div>
-                <span className="text-muted-foreground">Expires</span>
-                <p className="font-medium text-foreground">
-                  {new Date(licenseInfo.expiresAt).toLocaleDateString()}
-                </p>
-              </div>
-            )}
-            <div>
-              <span className="text-muted-foreground">Limits</span>
-              <p className="font-medium text-foreground">
-                {licenseInfo.maxAgents === -1 ? "Unlimited" : licenseInfo.maxAgents} agents
-                {" / "}
-                {licenseInfo.maxProjects === -1 ? "Unlimited" : licenseInfo.maxProjects} projects
-                {" / "}
-                {licenseInfo.maxSeats === -1 ? "Unlimited" : licenseInfo.maxSeats} seats
-              </p>
-            </div>
-          </div>
-
-          {licenseInfo.features.length > 0 && (
-            <div>
-              <span className="text-sm text-muted-foreground">Licensed features</span>
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {licenseInfo.features.map((f) => (
-                  <span
-                    key={f}
-                    className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
-                  >
-                    {f}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </Card>
-      )}
 
       {/* System Shutdown */}
       <div

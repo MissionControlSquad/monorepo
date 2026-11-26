@@ -4,7 +4,7 @@ import { getLicenseStatus } from "@/server/license";
 
 export async function GET() {
   const adminCount = await adminUserModel.count();
-  const license = await getLicenseStatus();
+  const license = getLicenseStatus();
 
   return NextResponse.json(
     {

@@ -9,24 +9,19 @@ export async function register() {
     const { runStartupMigrations } = await import("./src/server/startup-migrations");
     await runStartupMigrations();
 
-    // Initialize license (check stored license in DB, start heartbeat if valid)
-    const { initLicense, stopTokenRefresh } = await import("./src/server/license");
-    await initLicense();
-
     // Note: notification retry processor removed — buildbase owns push/email delivery + its own
     // retry; the in-app feed is written synchronously and never needs redelivery.
 
-    // Graceful shutdown: stop the license heartbeat before exiting
+    // Graceful shutdown: log and exit cleanly on SIGTERM/SIGINT
     const shutdown = () => {
       console.info(
         JSON.stringify({
           timestamp: new Date().toISOString(),
           level: "info",
           tag: "instrumentation",
-          message: "Shutting down — stopping license refresh",
+          message: "Shutting down",
         }),
       );
-      stopTokenRefresh();
       process.exit(0);
     };
     process.once("SIGTERM", shutdown);

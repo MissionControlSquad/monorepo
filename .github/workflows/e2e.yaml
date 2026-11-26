@@ -21,10 +21,15 @@ concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege: every job declares the permissions it needs.
+permissions: {}
+
 jobs:
   e2e:
     name: Playwright (chromium)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 30
     services:
       postgres:
@@ -50,7 +55,6 @@ jobs:
       AUTH_SECRET: "ci-e2e-secret-not-for-production"
       SYSTEM_SECRET: "ci-e2e-system-secret"
       CRON_SECRET: "ci-cron-secret"
-      LICENSE_DEV_BYPASS: "1"
       NEXT_PUBLIC_MC_URL: "http://localhost:3000"
       BASE_URL: "http://localhost:3000"
       ADMIN_USER: "admin"
@@ -65,8 +69,10 @@ jobs:
       # in the app .env written below (present at `next build` time).
       E2E_RATE_LIMIT_DISABLED: "1"
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22.22.1"
           cache: "npm"
@@ -87,7 +93,6 @@ jobs:
           # Secrets-vault master key (AES-256-GCM). env.ts requires >=32 chars at production runtime,
           # which `next start` is — without it every request 500s and login never redirects. CI-only value.
           SECRET_ENCRYPTION_KEY="ci-e2e-secret-encryption-key-not-for-production-0"
-          LICENSE_DEV_BYPASS="1"
           NEXT_PUBLIC_MC_URL="http://localhost:3000"
           # Bypass per-IP rate limiting under the parallel Playwright run (see job env above). Read by
           # both the Edge middleware (inlined at `next build`) and the per-route limiters at runtime.
@@ -118,11 +123,17 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E
-        run: npx playwright test --config=e2e/playwright.config.ts ${{ github.event.inputs.grep && format('--grep {0}', github.event.inputs.grep) || '' }}
+        run: |
+          if [ -n "$GREP" ]; then
+            npx playwright test --config=e2e/playwright.config.ts --grep "$GREP"
+          else
+            npx playwright test --config=e2e/playwright.config.ts
+          fi
         env:
           CI: "true"
+          GREP: ${{ github.event.inputs.grep }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: ${{ !cancelled() }}
         with:
           name: playwright-report

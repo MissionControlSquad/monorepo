@@ -1,460 +1,98 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import fs from "fs";
+import path from "path";
 import { LicenseStatusCode } from "../../src/server/constants";
-import crypto from "crypto";
+import { getLicenseStatus, UNLIMITED } from "../../src/server/license";
+import { GET as getLicenseRoute } from "../../app/api/license/route";
 
-// ── Generate a test RSA key pair ────────────────────────────────
+/**
+ * The hosted license server at agentcenter.cloud is gone. Self-hosted installs must keep working
+ * forever: always active, nothing limited, and no network calls of any kind.
+ */
 
-const { publicKey: TEST_PUBLIC_KEY, privateKey: TEST_PRIVATE_KEY } = crypto.generateKeyPairSync(
-  "rsa",
-  {
-    modulusLength: 2048,
-    publicKeyEncoding: { type: "spki", format: "pem" },
-    privateKeyEncoding: { type: "pkcs8", format: "pem" },
-  },
-);
+const WEB_ROOT = path.resolve(__dirname, "../..");
 
-// ── Clear VITEST env BEFORE module evaluation ───────────────────
-// IS_TEST = !!process.env.VITEST is captured at module load time.
-// vi.hoisted runs before vi.mock and module imports.
-vi.hoisted(() => {
-  delete process.env.VITEST;
-});
-
-// ── Mock @agentcenter/database ──────────────────────────────────
-// license.ts imports getStoredLicense, upsertLicenseRecord, deleteLicenseRecord, etc.
-// from @agentcenter/database, which internally uses prisma. We mock at the package level.
-
-const mockFindUnique = vi.fn();
-const mockUpsert = vi.fn();
-const mockDeleteMany = vi.fn();
-const mockUpdate = vi.fn();
-
-vi.mock("@agentcenter/database", () => ({
-  getStoredLicense: (...args: unknown[]) => mockFindUnique(...args),
-  upsertLicenseRecord: (...args: unknown[]) => mockUpsert(...args),
-  deleteLicenseRecord: (...args: unknown[]) => mockDeleteMany(...args),
-  updateLicenseAccessToken: (...args: unknown[]) => mockUpdate(...args),
-  markLicenseRecordRevoked: vi.fn(),
-}));
-
-// ── Mock filesystem (no real keys on disk) ──────────────────────
-
-vi.mock("fs", async () => {
-  const actual = await vi.importActual<typeof import("fs")>("fs");
-  return {
-    ...actual,
-    default: {
-      ...actual,
-      existsSync: vi.fn().mockReturnValue(false),
-      readFileSync: vi.fn().mockReturnValue(""),
-      writeFileSync: vi.fn(),
-    },
-    existsSync: vi.fn().mockReturnValue(false),
-    readFileSync: vi.fn().mockReturnValue(""),
-    writeFileSync: vi.fn(),
-  };
-});
-
-// Set env vars before importing the module
-process.env.LICENSE_PUBLIC_KEY = TEST_PUBLIC_KEY;
-process.env.LICENSE_SERVER_URL = "https://test-license-server.example.com";
-
-// ── Import after mocks ─────────────────────────────────────────
-
-import {
-  verifyAccessToken,
-  getLicenseStatus,
-  isLicenseActive,
-  isFeatureLicensed,
-  checkLicenseLimit,
-  clearStoredLicense,
-  invalidateLicenseCache,
-  type AccessTokenPayload,
-} from "../../src/server/license";
-
-// ── Helpers ─────────────────────────────────────────────────────
-
-function b64url(data: string): string {
-  return Buffer.from(data).toString("base64url");
+function listSourceFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...listSourceFiles(full));
+    else if (/\.(ts|tsx|js|mjs)$/.test(entry.name)) out.push(full);
+  }
+  return out;
 }
 
-function signToken(payload: Record<string, unknown>): string {
-  const header = { alg: "RS256", typ: "LICENSE" };
-  const headerB64 = b64url(JSON.stringify(header));
-  const payloadB64 = b64url(JSON.stringify(payload));
-  const signingInput = `${headerB64}.${payloadB64}`;
-
-  const sign = crypto.createSign("RSA-SHA256");
-  sign.update(signingInput);
-  const signature = sign.sign(TEST_PRIVATE_KEY, "base64url");
-
-  return `${signingInput}.${signature}`;
-}
-
-function makeAccessToken(overrides: Partial<AccessTokenPayload> = {}): string {
-  const now = Math.floor(Date.now() / 1000);
-  const payload: AccessTokenPayload = {
-    typ: "access",
-    lid: "lic_test123",
-    sub: "test-client",
-    org: "Test Org",
-    plan: "pro",
-    maxAgents: 25,
-    maxProjects: 50,
-    maxSeats: 10,
-    features: ["channels", "documents", "agent_queue"],
-    iat: now,
-    exp: now + 86400, // 24h
-    iss: "agentcenter.cloud",
-    ...overrides,
-  };
-  return signToken(payload as unknown as Record<string, unknown>);
-}
-
-function makeStoredLicense(tokenOverrides: Partial<AccessTokenPayload> = {}) {
-  const token = makeAccessToken(tokenOverrides);
-  const now = Math.floor(Date.now() / 1000);
-  return {
-    id: "active",
-    token: "refresh_token_here",
-    instanceId: token,
-    plan: tokenOverrides.plan ?? "pro",
-    org: tokenOverrides.org ?? "Test Org",
-    maxAgents: tokenOverrides.maxAgents ?? 25,
-    maxProjects: tokenOverrides.maxProjects ?? 50,
-    maxSeats: tokenOverrides.maxSeats ?? 10,
-    features: tokenOverrides.features ?? ["channels", "documents", "agent_queue"],
-    expiresAt: new Date((tokenOverrides.exp ?? now + 86400) * 1000),
-    lastVerifiedAt: new Date(),
-  };
-}
-
-// ── Tests ───────────────────────────────────────────────────────
-
-describe("license module", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    invalidateLicenseCache();
+describe("license (open source, no license server)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  // ── verifyAccessToken ───────────────────────────────────────
-
-  describe("verifyAccessToken", () => {
-    it("returns payload for a valid, non-expired token", () => {
-      const token = makeAccessToken();
-      const payload = verifyAccessToken(token);
-      expect(payload).not.toBeNull();
-      expect(payload!.typ).toBe("access");
-      expect(payload!.plan).toBe("pro");
-      expect(payload!.org).toBe("Test Org");
-      expect(payload!.features).toEqual(["channels", "documents", "agent_queue"]);
-    });
-
-    it("returns null for an expired token (default behavior)", () => {
-      const now = Math.floor(Date.now() / 1000);
-      const token = makeAccessToken({ iat: now - 86400, exp: now - 3600 }); // expired 1h ago
-      const payload = verifyAccessToken(token);
-      expect(payload).toBeNull();
-    });
-
-    it("returns payload for an expired token when ignoreExpiry is true", () => {
-      const now = Math.floor(Date.now() / 1000);
-      const token = makeAccessToken({ iat: now - 86400, exp: now - 3600 });
-      const payload = verifyAccessToken(token, { ignoreExpiry: true });
-      expect(payload).not.toBeNull();
-      expect(payload!.plan).toBe("pro");
-    });
-
-    it("returns null for a tampered token", () => {
-      const token = makeAccessToken();
-      const parts = token.split(".");
-      // Corrupt the payload (middle section) to invalidate the signature
-      parts[1] = parts[1].slice(0, -4) + "XXXX";
-      const tampered = parts.join(".");
-      expect(verifyAccessToken(tampered)).toBeNull();
-    });
-
-    it("returns null for a token with wrong typ", () => {
-      const token = signToken({
-        typ: "refresh",
-        lid: "lic_test",
-        sub: "test",
-        iat: Math.floor(Date.now() / 1000),
-        iss: "agentcenter.cloud",
-      });
-      expect(verifyAccessToken(token)).toBeNull();
-    });
-
-    it("returns null for empty string", () => {
-      expect(verifyAccessToken("")).toBeNull();
-    });
-
-    it("returns null for malformed token (wrong number of parts)", () => {
-      expect(verifyAccessToken("abc.def")).toBeNull();
-      expect(verifyAccessToken("abc.def.ghi.jkl")).toBeNull();
-    });
-
-    it("returns null for a token signed with a different key", () => {
-      const { privateKey: otherKey } = crypto.generateKeyPairSync("rsa", {
-        modulusLength: 2048,
-        publicKeyEncoding: { type: "spki", format: "pem" },
-        privateKeyEncoding: { type: "pkcs8", format: "pem" },
-      });
-
-      const now = Math.floor(Date.now() / 1000);
-      const header = { alg: "RS256", typ: "LICENSE" };
-      const payload = {
-        typ: "access",
-        lid: "lic_test",
-        sub: "test",
-        org: "Test",
-        plan: "pro",
-        maxAgents: 5,
-        maxProjects: 10,
-        maxSeats: 3,
-        features: [],
-        iat: now,
-        exp: now + 86400,
-        iss: "agentcenter.cloud",
-      };
-      const headerB64 = b64url(JSON.stringify(header));
-      const payloadB64 = b64url(JSON.stringify(payload));
-      const signingInput = `${headerB64}.${payloadB64}`;
-      const sign = crypto.createSign("RSA-SHA256");
-      sign.update(signingInput);
-      const signature = sign.sign(otherKey, "base64url");
-      const token = `${signingInput}.${signature}`;
-
-      expect(verifyAccessToken(token)).toBeNull();
-    });
-
-    it("correctly extracts all payload fields", () => {
-      const token = makeAccessToken({
-        plan: "enterprise",
-        maxAgents: -1,
-        maxProjects: -1,
-        maxSeats: -1,
-        features: ["channels", "analytics", "terminals"],
-      });
-      const payload = verifyAccessToken(token);
-      expect(payload).not.toBeNull();
-      expect(payload!.plan).toBe("enterprise");
-      expect(payload!.maxAgents).toBe(-1);
-      expect(payload!.maxProjects).toBe(-1);
-      expect(payload!.maxSeats).toBe(-1);
-      expect(payload!.features).toEqual(["channels", "analytics", "terminals"]);
-    });
-
-    it("returns payload for token expiring in the future", () => {
-      const now = Math.floor(Date.now() / 1000);
-      const token = makeAccessToken({ exp: now + 1 }); // expires in 1 second
-      expect(verifyAccessToken(token)).not.toBeNull();
-    });
+  it("is always active with no limits and no expiry", () => {
+    const status = getLicenseStatus();
+    expect(status.status).toBe(LicenseStatusCode.ACTIVE);
+    expect(status.maxAgents).toBe(UNLIMITED);
+    expect(status.maxProjects).toBe(UNLIMITED);
+    expect(status.maxSeats).toBe(UNLIMITED);
+    expect(status.expiresAt).toBeNull();
+    expect(UNLIMITED).toBe(-1); // the value older clients treat as "no limit"
   });
 
-  // ── getLicenseStatus ────────────────────────────────────────
+  it("stays active regardless of leftover license env vars", () => {
+    vi.stubEnv("LICENSE_SERVER_URL", "https://admin.app.agentcenter.cloud");
+    vi.stubEnv("LICENSE_REFRESH_TOKEN", "leftover");
+    vi.stubEnv("LICENSE_PUBLIC_KEY", "leftover");
+    vi.stubEnv("NODE_ENV", "production");
+    expect(getLicenseStatus().status).toBe(LicenseStatusCode.ACTIVE);
+    vi.unstubAllEnvs();
+  });
 
-  describe("getLicenseStatus", () => {
-    it("returns 'none' when no license in DB", async () => {
-      mockFindUnique.mockResolvedValue(null);
-      const status = await getLicenseStatus();
-      expect(status.status).toBe(LicenseStatusCode.NONE);
-      expect(status.plan).toBeNull();
-    });
+  it("never makes a network call", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    getLicenseStatus();
+    getLicenseStatus();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 
-    it("returns 'active' for valid non-expired license", async () => {
-      mockFindUnique.mockResolvedValue(makeStoredLicense());
-      const status = await getLicenseStatus();
-      expect(status.status).toBe(LicenseStatusCode.ACTIVE);
-      expect(status.plan).toBe("pro");
-      expect(status.features).toEqual(["channels", "documents", "agent_queue"]);
-    });
+  it("returns a fresh object each time so callers can't change the shared status", () => {
+    const first = getLicenseStatus();
+    first.status = LicenseStatusCode.EXPIRED;
+    first.maxAgents = 1;
+    first.features.push("tampered");
+    const second = getLicenseStatus();
+    expect(second.status).toBe(LicenseStatusCode.ACTIVE);
+    expect(second.maxAgents).toBe(UNLIMITED);
+    expect(second.features).toEqual([]);
+  });
 
-    it("returns 'revoked' when plan is 'revoked'", async () => {
-      mockFindUnique.mockResolvedValue({
-        ...makeStoredLicense(),
-        plan: "revoked",
-      });
-      const status = await getLicenseStatus();
-      expect(status.status).toBe(LicenseStatusCode.REVOKED);
-    });
+  it("GET /api/license reports the same active, unlimited status for older clients", async () => {
+    const res = getLicenseRoute();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(getLicenseStatus());
+  });
 
-    it("returns 'invalid' when no access token stored", async () => {
-      mockFindUnique.mockResolvedValue({
-        ...makeStoredLicense(),
-        instanceId: null,
-      });
-      const status = await getLicenseStatus();
-      expect(status.status).toBe(LicenseStatusCode.INVALID);
-    });
+  it("no longer exposes license activation or refresh", async () => {
+    const route = await import("../../app/api/license/route");
+    expect("POST" in route).toBe(false);
+    expect("DELETE" in route).toBe(false);
+    expect(fs.existsSync(path.join(WEB_ROOT, "app/api/license/refresh/route.ts"))).toBe(false);
+    expect(fs.existsSync(path.join(WEB_ROOT, "app/(auth)/activate/page.tsx"))).toBe(false);
+  });
 
-    it("returns 'active' within grace period (expired < 3 days)", async () => {
-      const now = Math.floor(Date.now() / 1000);
-      // Expired 1 day ago — within 3-day grace period
-      mockFindUnique.mockResolvedValue(makeStoredLicense({ exp: now - 86400 }));
-      const status = await getLicenseStatus();
-      expect(status.status).toBe(LicenseStatusCode.ACTIVE);
-      expect(status.message).toContain("renewal pending");
-    });
-
-    it("returns 'expired' after grace period (expired > 3 days)", async () => {
-      const now = Math.floor(Date.now() / 1000);
-      // Expired 4 days ago — past 3-day grace period
-      mockFindUnique.mockResolvedValue(makeStoredLicense({ exp: now - 4 * 86400 }));
-      const status = await getLicenseStatus();
-      expect(status.status).toBe(LicenseStatusCode.EXPIRED);
-    });
-
-    it("includes correct limits in status", async () => {
-      mockFindUnique.mockResolvedValue(
-        makeStoredLicense({ maxAgents: 5, maxProjects: 10, maxSeats: 3 }),
+  it("no app or server code talks to the old license server", () => {
+    const offenders = [
+      ...listSourceFiles(path.join(WEB_ROOT, "app")),
+      ...listSourceFiles(path.join(WEB_ROOT, "src")),
+      path.join(WEB_ROOT, "middleware.ts"),
+      path.join(WEB_ROOT, "instrumentation.ts"),
+    ].filter((file) => {
+      const src = fs.readFileSync(file, "utf-8");
+      return (
+        /LICENSE_SERVER_URL|LICENSE_REFRESH_TOKEN|LICENSE_PUBLIC_KEY|LICENSE_DEV_BYPASS/.test(src) ||
+        /agentcenter\.cloud\/api\/license|\/api\/license\/(activate|token|public-key)/.test(src) ||
+        /\b(isLicenseActive|checkLicenseLimit|isFeatureLicensed|initLicense|activateLicenseKey)\b/.test(src)
       );
-      const status = await getLicenseStatus();
-      expect(status.maxAgents).toBe(5);
-      expect(status.maxProjects).toBe(10);
-      expect(status.maxSeats).toBe(3);
     });
-  });
-
-  // ── isLicenseActive ─────────────────────────────────────────
-
-  describe("isLicenseActive", () => {
-    it("returns true when license is active", async () => {
-      mockFindUnique.mockResolvedValue(makeStoredLicense());
-      invalidateLicenseCache();
-      const active = await isLicenseActive();
-      expect(active).toBe(true);
-    });
-
-    it("returns false when no license exists", async () => {
-      mockFindUnique.mockResolvedValue(null);
-      invalidateLicenseCache();
-      const active = await isLicenseActive();
-      expect(active).toBe(false);
-    });
-
-    it("returns false when license is revoked", async () => {
-      mockFindUnique.mockResolvedValue({
-        ...makeStoredLicense(),
-        plan: "revoked",
-      });
-      invalidateLicenseCache();
-      const active = await isLicenseActive();
-      expect(active).toBe(false);
-    });
-  });
-
-  // ── isFeatureLicensed ───────────────────────────────────────
-
-  describe("isFeatureLicensed", () => {
-    it("returns true for a licensed feature", async () => {
-      mockFindUnique.mockResolvedValue(makeStoredLicense());
-      invalidateLicenseCache();
-      const licensed = await isFeatureLicensed("channels");
-      expect(licensed).toBe(true);
-    });
-
-    it("returns false for an unlicensed feature", async () => {
-      mockFindUnique.mockResolvedValue(makeStoredLicense());
-      invalidateLicenseCache();
-      const licensed = await isFeatureLicensed("terminals");
-      expect(licensed).toBe(false);
-    });
-
-    it("returns false when no license exists", async () => {
-      mockFindUnique.mockResolvedValue(null);
-      invalidateLicenseCache();
-      const licensed = await isFeatureLicensed("channels");
-      expect(licensed).toBe(false);
-    });
-  });
-
-  // ── checkLicenseLimit ───────────────────────────────────────
-
-  describe("checkLicenseLimit", () => {
-    it("allows when under the limit", async () => {
-      mockFindUnique.mockResolvedValue(makeStoredLicense({ maxAgents: 10 }));
-      invalidateLicenseCache();
-      const result = await checkLicenseLimit("agents", 5);
-      expect(result.allowed).toBe(true);
-      expect(result.limit).toBe(10);
-    });
-
-    it("blocks when at the limit", async () => {
-      mockFindUnique.mockResolvedValue(makeStoredLicense({ maxAgents: 5 }));
-      invalidateLicenseCache();
-      const result = await checkLicenseLimit("agents", 5);
-      expect(result.allowed).toBe(false);
-      expect(result.limit).toBe(5);
-    });
-
-    it("blocks when over the limit", async () => {
-      mockFindUnique.mockResolvedValue(makeStoredLicense({ maxAgents: 5 }));
-      invalidateLicenseCache();
-      const result = await checkLicenseLimit("agents", 10);
-      expect(result.allowed).toBe(false);
-    });
-
-    it("always allows when limit is -1 (unlimited)", async () => {
-      mockFindUnique.mockResolvedValue(makeStoredLicense({ maxAgents: -1 }));
-      invalidateLicenseCache();
-      const result = await checkLicenseLimit("agents", 9999);
-      expect(result.allowed).toBe(true);
-      expect(result.limit).toBe(-1);
-    });
-
-    it("checks project limits", async () => {
-      mockFindUnique.mockResolvedValue(makeStoredLicense({ maxProjects: 3 }));
-      invalidateLicenseCache();
-      const result = await checkLicenseLimit("projects", 3);
-      expect(result.allowed).toBe(false);
-      expect(result.limit).toBe(3);
-    });
-
-    it("checks seat limits", async () => {
-      mockFindUnique.mockResolvedValue(makeStoredLicense({ maxSeats: 10 }));
-      invalidateLicenseCache();
-      const result = await checkLicenseLimit("seats", 8);
-      expect(result.allowed).toBe(true);
-      expect(result.limit).toBe(10);
-    });
-  });
-
-  // ── Cache behavior ──────────────────────────────────────────
-
-  describe("status cache", () => {
-    it("caches status for 60 seconds", async () => {
-      mockFindUnique.mockResolvedValue(makeStoredLicense());
-      invalidateLicenseCache();
-
-      await isLicenseActive();
-      await isLicenseActive();
-      await isLicenseActive();
-
-      // Should only query DB once due to cache
-      expect(mockFindUnique).toHaveBeenCalledTimes(1);
-    });
-
-    it("invalidateLicenseCache forces re-query", async () => {
-      mockFindUnique.mockResolvedValue(makeStoredLicense());
-      invalidateLicenseCache();
-
-      await isLicenseActive();
-      expect(mockFindUnique).toHaveBeenCalledTimes(1);
-
-      invalidateLicenseCache();
-      await isLicenseActive();
-      expect(mockFindUnique).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  // ── clearStoredLicense ──────────────────────────────────────
-
-  describe("clearStoredLicense", () => {
-    it("calls deleteLicenseRecord with correct ID", async () => {
-      mockDeleteMany.mockResolvedValue(undefined);
-      await clearStoredLicense();
-      expect(mockDeleteMany).toHaveBeenCalledWith("active");
-    });
+    expect(offenders.map((f) => path.relative(WEB_ROOT, f))).toEqual([]);
   });
 });

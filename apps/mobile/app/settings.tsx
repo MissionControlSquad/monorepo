@@ -18,32 +18,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { CHANGE_PASSWORD, SET_SYSTEM_SHUTDOWN, SYSTEM_SETTINGS_QUERY } from "@agentcenter/graphql-client";
 import { useAuth } from "../src/context/AuthContext";
-import { DEFAULT_COLOR, formatDate, LicenseStatusCode } from "@agentcenter/utils";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface LicenseData {
-  status: string;
-  plan: string | null;
-  org: string | null;
-  expiresAt: string | null;
-  features: string[];
-  maxAgents: number;
-  maxProjects: number;
-  maxSeats: number;
-}
-
-function limitLabel(n: number): string {
-  return n === -1 ? "Unlimited" : String(n);
-}
-
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { serverUrl, onLogout } = useAuth();
+  const { onLogout } = useAuth();
 
   useEffect(() => {
     navigation.setOptions({ title: "Settings" });
@@ -60,7 +41,6 @@ export default function SettingsScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <ChangePasswordSection onPasswordChanged={onLogout} />
-        <LicenseSection serverUrl={serverUrl} />
         <SystemShutdownSection />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -166,166 +146,6 @@ function ChangePasswordSection({ onPasswordChanged }: { onPasswordChanged: () =>
       </FormField>
 
       <ActionButton label="Change Password" onPress={handleSubmit} loading={fetching} disabled={false} />
-    </View>
-  );
-}
-
-// ── License ───────────────────────────────────────────────────────────────────
-
-function LicenseSection({ serverUrl }: { serverUrl: string | null }) {
-  const [license, setLicense] = useState<LicenseData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [licenseKey, setLicenseKey] = useState("");
-  const [activating, setActivating] = useState(false);
-  const [activateError, setActivateError] = useState<string | null>(null);
-
-  const fetchLicense = () => {
-    if (!serverUrl) return;
-    setLoading(true);
-    fetch(`${serverUrl}/api/license`, { credentials: "include" })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((data) => setLicense(data))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { fetchLicense(); }, [serverUrl]);
-
-  const handleActivate = async () => {
-    if (!licenseKey.trim() || !serverUrl) return;
-    setActivating(true);
-    setActivateError(null);
-    try {
-      const res = await fetch(`${serverUrl}/api/license`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: licenseKey.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setActivateError(data.message ?? "Activation failed");
-        return;
-      }
-      setLicenseKey("");
-      Alert.alert("Success", "License activated successfully");
-      fetchLicense();
-    } catch (err) {
-      setActivateError((err as Error).message ?? "Something went wrong");
-    } finally {
-      setActivating(false);
-    }
-  };
-
-  const statusColor: Record<string, string> = {
-    active: "#16a34a",
-    grace: "#d97706",
-    expired: "#dc2626",
-    none: DEFAULT_COLOR,
-  };
-
-  const status = license?.status ?? LicenseStatusCode.NONE;
-  const color = statusColor[status] ?? DEFAULT_COLOR;
-
-  return (
-    <View className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-gray-200 dark:border-slate-700 gap-3.5">
-      <View className="flex-row items-start gap-3">
-        <View className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-slate-700 justify-center items-center shrink-0">
-          <Ionicons name="key-outline" size={20} color="#6b7280" />
-        </View>
-        <View className="flex-1">
-          <Text className="text-base font-bold text-gray-900 dark:text-slate-100">License</Text>
-          <Text className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Your current license details</Text>
-        </View>
-        {!loading && license && (
-          <View className="rounded-md px-2 py-1 self-center" style={{ backgroundColor: color + "22" }}>
-            <Text className="text-xs font-bold lowercase" style={{ color }}>{status}</Text>
-          </View>
-        )}
-      </View>
-
-      {loading && (
-        <View className="flex-row items-center gap-2">
-          <ActivityIndicator size="small" color="#2563eb" />
-          <Text className="text-sm text-gray-500 dark:text-slate-400">Loading license…</Text>
-        </View>
-      )}
-
-      {error && !loading && (
-        <Text className="text-sm text-red-600 dark:text-red-400">Failed to load license: {error}</Text>
-      )}
-
-      {license && !loading && (
-        <>
-          <View className="gap-3">
-            <LicenseGridItem label="Organization" value={license.org ?? "—"} />
-            <LicenseGridItem label="Plan" value={license.plan ?? "—"} />
-            <LicenseGridItem label="Expires" value={formatDate(license.expiresAt)} />
-            <LicenseGridItem
-              label="Limits"
-              value={`${limitLabel(license.maxAgents)} agents / ${limitLabel(license.maxProjects)} projects / ${limitLabel(license.maxSeats)} seats`}
-            />
-          </View>
-
-          {license.features.length > 0 && (
-            <View className="gap-2">
-              <Text className="text-xs font-bold text-gray-400 dark:text-slate-500 lowercase tracking-[0.3px]">Licensed features</Text>
-              <View className="flex-row flex-wrap gap-1.5">
-                {license.features.map((f) => (
-                  <View key={f} className="bg-gray-100 dark:bg-slate-700 rounded-md px-2 py-1">
-                    <Text className="text-xs text-gray-700 dark:text-slate-300">{f}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-        </>
-      )}
-
-      {/* Activate / update license */}
-      <View className="h-px bg-gray-100 dark:bg-slate-700" />
-      <View className="gap-1.5">
-        <Text className="text-sm font-semibold text-gray-700 dark:text-slate-300">{license?.status === LicenseStatusCode.ACTIVE ? "Update License Key" : "Activate License"}</Text>
-        <View className="flex-row items-center bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl px-3.5">
-          <TextInput
-            className="flex-1 text-base text-gray-900 dark:text-slate-100 py-3"
-            value={licenseKey}
-            onChangeText={setLicenseKey}
-            placeholder="Paste your license key…"
-            placeholderTextColor="#9ca3af"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-        </View>
-        {activateError ? <Text className="text-sm text-red-600 dark:text-red-400">{activateError}</Text> : null}
-      </View>
-      <TouchableOpacity
-        className={`bg-blue-600 rounded-xl py-3.5 items-center ${(!licenseKey.trim() || activating) ? "opacity-50" : ""}`}
-        onPress={handleActivate}
-        disabled={!licenseKey.trim() || activating}
-        activeOpacity={0.8}
-      >
-        {activating ? (
-          <ActivityIndicator color="#fff" size="small" />
-        ) : (
-          <Text className="text-white text-base font-semibold">
-            {license?.status === LicenseStatusCode.ACTIVE ? "Update License" : "Activate License"}
-          </Text>
-        )}
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function LicenseGridItem({ label, value }: { label: string; value: string }) {
-  return (
-    <View className="flex-row gap-3">
-      <Text className="text-sm text-gray-500 dark:text-slate-400 w-24 shrink-0">{label}</Text>
-      <Text className="text-sm font-semibold text-gray-900 dark:text-slate-100 flex-1">{value}</Text>
     </View>
   );
 }

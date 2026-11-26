@@ -86,7 +86,6 @@ function checkGlobalRateLimit(ip: string): { limited: boolean; retryAfter: numbe
 const PUBLIC_EXACT = new Set([
   "/login",
   "/setup",
-  "/activate",
   "/reset-password",
   "/favicon.ico",
   "/logo.png",
@@ -96,7 +95,7 @@ const PUBLIC_EXACT = new Set([
 
 const PUBLIC_PREFIXES = [
   "/api/auth/", // Auth endpoints (login, logout, setup, status)
-  "/api/license", // License activation (public — before auth)
+  "/api/license", // Static license status for older desktop/mobile clients (no secrets)
   "/api/events/", // Agent event ingestion (Bearer token auth in handler)
   "/api/agents/me", // Agent-scoped "me" routes (Bearer token auth in handler)
   "/api/cron/", // Cron jobs (CRON_SECRET auth in handler)

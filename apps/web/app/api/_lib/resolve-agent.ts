@@ -1,7 +1,6 @@
 import { agentModel } from "@/server/models";
 import { hashApiKey } from "@/server/api-key";
 import { agentCache } from "@/server/cache";
-import { isLicenseActive } from "@/server/license";
 import { log, logWarn } from "./logger";
 import { SetupStatus } from "@/server/constants";
 
@@ -17,12 +16,6 @@ interface ResolveOptions {
  * Throws { error, status } on failure.
  */
 export async function resolveAgent(request: Request, options?: ResolveOptions) {
-  // License gate — no agent operations when license is not active
-  const licensed = await isLicenseActive();
-  if (!licensed) {
-    throw { error: "License not active", status: 403 };
-  }
-
   const authHeader = request.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     throw {
