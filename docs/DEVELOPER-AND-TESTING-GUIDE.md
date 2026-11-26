@@ -210,7 +210,7 @@ cd apps/web && npx dotenv -e .env.test -- npx vitest run tests/integration
 rm -rf apps/web/.next && npx turbo run build --filter=@agentcenter/web   # expect: Compiled successfully
 ```
 
-Test DB (local): `postgresql://dharmikjagodana:yourpassword@127.0.0.1:5432/clawd_test`. Start Postgres
+Test DB (local): `postgresql://postgres:postgres@127.0.0.1:5432/clawd_test`. Start Postgres
 first; the e2e suite also needs **Redis** (`brew install redis`; the stock brew service aborts on a broken
 `redisbloom` module path, so run a bare server: `redis-server --port 6379 --daemonize yes --save "" --appendonly no`).
 
