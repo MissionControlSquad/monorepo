@@ -1,6 +1,21 @@
 # AgentCenter
 
+[![CI](https://github.com/MissionControlSquad/monorepo/actions/workflows/test.yaml/badge.svg)](https://github.com/MissionControlSquad/monorepo/actions/workflows/test.yaml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Self-hosted AI agent management platform. Orchestrate, schedule, and monitor AI agents from a single dashboard.
+
+## Project status
+
+The hosted AgentCenter app service and its license server have been shut down, and this repository is
+now open source under the [MIT License](LICENSE). It is provided as-is and maintained on a best-effort
+basis.
+
+> [!WARNING]
+> The app still checks a license against the shut-down license server (`LICENSE_SERVER_URL`, see
+> [`apps/web/src/server/license.ts`](apps/web/src/server/license.ts)). Until that gate is removed or
+> replaced, new self-hosted installations can't be activated and existing ones stop working once their
+> cached license expires (3-day grace period). Contributions that remove the gate are welcome.
 
 ## Self-Hosted Quick Start
 
@@ -38,7 +53,7 @@ The Docker Compose setup runs three services:
 | RAM | 2 GB |
 | Disk | 10 GB |
 
-A **license key** is required to activate the app — purchase at [agentcenter.cloud](https://agentcenter.cloud).
+The app currently asks for a **license key** on first start; see [Project status](#project-status).
 
 ## Docker Image
 
@@ -92,6 +107,21 @@ underlying script after ` -- ` (e.g. `db:backup -- --out /backups --keep 7`).
 - [Self-Hosted Setup Guide](apps/web/self-hosted/SETUP.md) — full installation, HTTPS, backups, troubleshooting
 - [Deployment Guide](apps/web/DEPLOYMENT.md) — Vercel deployment with Supabase
 
+## Contributing
+
+Read [the Code of Conduct](CODE_OF_CONDUCT.md) first. Ask questions and propose ideas in
+[Discussions](https://github.com/MissionControlSquad/monorepo/discussions); file reproducible bugs as
+[issues](https://github.com/MissionControlSquad/monorepo/issues/new/choose). Pull requests go against
+`main` and must pass CI (typecheck, tests and the web build) and a code owner's review. See
+[SUPPORT.md](.github/SUPPORT.md) for where each kind of request goes.
+
+## Security
+
+Please don't report vulnerabilities in public issues. Use
+[private vulnerability reporting](https://github.com/MissionControlSquad/monorepo/security/advisories/new);
+details are in [SECURITY.md](SECURITY.md).
+
 ## License
 
-Proprietary. See [agentcenter.cloud](https://agentcenter.cloud) for licensing.
+[MIT](LICENSE) © 2026 Jagodana LLC. `packages/runner` and `packages/mc-bridge-plugin` carry their own
+MIT license files.
